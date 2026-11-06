@@ -35,17 +35,45 @@ Numbers sit in `tabular-nums` everywhere (set on `body`).
 - Spacing comes from the grid gaps (16px). One-off margins use `.mt` (8px), not `style=""`.
   Inline styles are only for values computed at run time (a chart height, the reader's page width).
 
-## Model pages
+## Navigation
 
-Every model on the ladder (`LADDER` in `thorp/models/registry.py`) gets one page, built from one
-template (`web/src/components/ModelPage.astro`, filled by `renderRung` in `dashboard.js`). Its URL
-is `#/models/<class>`, named by class, not size: `#/models/proxy`, `#/models/speller`… Old `#proxy`
-and `#rung-1m` links redirect there.
+The site is organised the way the project is: classes of ship (model sizes), the ships of each
+class (runs), the voyages they sail on, and the discoveries followed across all of them. The header
+holds the three ways in, always:
 
-On a model page the global tabs (Ladder, Betting, Books…), the run picker and the run overview
-step aside; the header carries the model's own four tabs instead, each with its own address:
+- **Classes** (`#/classes`, home): one card per class of ship, each a model size with one job.
+  A class opens its page (`#/classes/<class>`, below), whose first tab is its **fleet**: every
+  ship of that class. A ship opens its own page.
+- **Voyages** (`#/voyages`): the campaigns several ships sail on to find something
+  (`thorp/fleet.py` `VOYAGES`): one card each with its goal, status, fleet and headline. A voyage
+  (`#/voyages/<key>`) has one template: what it is and what it found, its ships with their
+  settings, Forgotten Tomes score and the step each star first lit, the score run by run, first
+  light (each star's score against step, threshold dotted), outcomes and levers. A panel only one
+  voyage has carries `data-voyage` (the book-value loop's fit).
+- **Discoveries** (`#/discoveries`): the two things followed across every ship to find our
+  bearings. **Stars** (`fleet.STARS`: the Previous Word, the Duplicate Word, Nevermore), one card
+  each with its threshold, what it rests on, and the first ship to light it or the nearest so far;
+  and **traits** (fiction, verse, first person, the language families), with how many ships
+  found and learned each, and the first to do so.
 
-1. **Overview** (`#/models/proxy`): the model's performance in as few charts as possible. The
+A ship (`#/ships/<name>[/<tab>]`, a run) has its own tabs: Betting, Books, Languages, Sieves,
+Attention, Traits, and a breadcrumb back to its class. `#/ships` lists every ship. Ships are
+reached from a class's fleet, a voyage or a discovery; there is no run picker.
+
+Every address is canonical: older ones (`#sizes`, `#proxy`, `#rung-1m`, `#/models/…`, `#betting`,
+`?run=`) are rewritten to the new form, never kept beside it.
+
+## Class pages
+
+Every class on the ladder (`LADDER` in `thorp/models/registry.py`) gets one page, built from one
+template (`web/src/components/ModelPage.astro`, filled by `renderRung` in `dashboard.js`) at
+`#/classes/<class>`, named by class, not size: `#/classes/proxy`, `#/classes/speller`…
+
+Its tabs sit under its title, each with its own address:
+
+0. **Fleet** (`#/classes/proxy`): every ship of the class, newest first, with its fleet, voyage,
+   shelf, how far it got and its Forgotten Tomes score; a row opens the ship.
+1. **Overview** (`/overview`): the class's performance in as few charts as possible. The
    RunGrid (every run at this size), then the Forgotten Tomes score run by run with the best so
    far and the Qwen lines.
 2. **Training** (`/training`): what it was trained on and how. The model (shape, parameters,

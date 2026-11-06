@@ -15,51 +15,111 @@ const layerOnly = (m, prefix) => topKeys(m, prefix).filter(k => groupOf(k, prefi
 
 let selected = new URLSearchParams(location.search).get('run');
 
-const TABS = ['sizes', 'rung', 'betting', 'books', 'languages', 'sieves', 'attention', 'traits-section', 'runs-section'];
 let currentRung = null;
-// a model page lives at its class name: #proxy, #speller, #stylist… (old #rung-1m links still open it)
 const slugOf = r => r.name.toLowerCase().replace(/^the\s+/, '').replace(/[^a-z0-9]+/g, '-');
 const rungFor = key => ladderData && ladderData.rungs.find(r => slugOf(r) === key || r.preset === key);
-// Routes: #sizes, #betting… are the global tabs; a model page is #/models/<class>[/training|/scoring|/waypoints].
-// Old model links (#proxy, #rung-1m) land on the new address.
-const MTABS = ['overview', 'training', 'scoring', 'waypoints'];
-let modelTab = 'overview';
+// ---- Navigation (UI.md, "Navigation"). Three ways in, each a section of the header:
+//   #/classes                    the classes of ship, one card per model size (home)
+//   #/classes/<class>[/<tab>]    one class: fleet (default), overview, training, scoring, waypoints
+//   #/ships                      every ship ever launched
+//   #/ships/<name>[/<tab>]       one ship (a run): betting (default), books, languages, sieves, attention, traits
+//   #/voyages, #/voyages/<key>   the voyages, and one voyage
+//   #/discoveries                the stars and traits followed across every ship
+// Older addresses (#sizes, #proxy, #rung-1m, #/models/…, #betting…, ?run=) land on the new ones.
+const MTABS = ['fleet', 'overview', 'training', 'scoring', 'waypoints'];
+const STABS = ['betting', 'books', 'languages', 'sieves', 'attention', 'traits'];
+const STAB_EL = { betting: 'betting', books: 'books', languages: 'languages', sieves: 'sieves', attention: 'attention', traits: 'traits-section' };
+const OLD_SHIP = { betting: 'betting', books: 'books', languages: 'languages', sieves: 'sieves', attention: 'attention', 'traits-section': 'traits' };
+const SECTION_NAV = { sizes: 'classes', rung: 'classes', ship: 'classes', 'runs-section': 'classes', voyages: 'voyages', voyage: 'voyages', discoveries: 'discoveries' };
+let page = 'sizes', modelTab = 'fleet', shipKey = null, shipTab = 'betting', voyageKey = null, runsList = null;
 function route(h) {
-  if (h.startsWith('/models/')) { const [slug, mt] = h.slice(8).split('/'); return { tab: 'rung', rung: slug, mtab: MTABS.includes(mt) ? mt : 'overview' }; }
-  if (h.startsWith('rung-')) return { tab: 'rung', rung: h.slice(5), mtab: 'overview' };
-  if (TABS.includes(h) && h !== 'rung') return { tab: h };
-  if (h && h !== 'rung' && !h.startsWith('/')) return { tab: 'rung', rung: h, mtab: 'overview' };
-  return { tab: TABS[0] };
+  if (h.startsWith('/')) {
+    const [a, b, c] = h.slice(1).split('/');
+    if (a === 'classes' && b) return { page: 'rung', rung: b, mtab: MTABS.includes(c) ? c : 'fleet' };
+    if (a === 'models' && b) return { page: 'rung', rung: b, mtab: MTABS.includes(c) ? c : 'overview' };
+    if (a === 'ships' && b) return { page: 'ship', ship: decodeURIComponent(b), stab: STABS.includes(c) ? c : 'betting' };
+    if (a === 'ships') return { page: 'runs-section' };
+    if (a === 'voyages' && b) return { page: 'voyage', voyage: b };
+    if (a === 'voyages') return { page: 'voyages' };
+    if (a === 'discoveries') return { page: 'discoveries' };
+    return { page: 'sizes' };
+  }
+  if (h.startsWith('rung-')) return { page: 'rung', rung: h.slice(5), mtab: 'fleet' };
+  if (h in OLD_SHIP) return { page: 'ship', ship: null, stab: OLD_SHIP[h] };
+  if (h === 'runs-section') return { page: 'runs-section' };
+  if (!h || h === 'sizes' || h === 'rung') return { page: 'sizes' };
+  return { page: 'rung', rung: h, mtab: 'fleet' };  // an old class link: #proxy
 }
-const modelHash = (r, mt = 'overview') => `/models/${slugOf(r)}${mt === 'overview' ? '' : '/' + mt}`;
+const modelHash = (r, mt = 'fleet') => `/classes/${slugOf(r)}${mt === 'fleet' ? '' : '/' + mt}`;
+const shipHash = (name, st = 'betting') => `/ships/${encodeURIComponent(name)}${st === 'betting' ? '' : '/' + st}`;
+// the run a ship address names: by name, by run id, or (for an old address) the run picked before
+function shipRun(runs) {
+  if (shipKey) return runs.find(r => r.name === shipKey || r.run_id === shipKey) || runs.find(r => r.run_id.startsWith(shipKey));
+  return runs.find(r => r.run_id === selected) || runs.find(r => r.status === 'running' && r.name && !r.name.startsWith('smoke')) || runs[0];
+}
+// go to a ship from anywhere (a fleet row, a grid square, a voyage's run)
+function goShip(key) {
+  const all = runsList || (ladderData && ladderData.runs) || [];
+  const r = all.find(x => x.run_id === key || x.name === key);
+  location.hash = '#' + shipHash(r ? (r.name || r.run_id) : key);
+}
 function showTab(h, push = true) {
   const rt = route(h);
-  let id = rt.tab, hash = h || TABS[0];
-  if (id === 'rung') {
+  let hash = null, wasShip = selected;
+  page = rt.page;
+  if (page === 'rung') {
     const r = rungFor(rt.rung);
-    if (ladderData && !r) { id = hash = TABS[0]; push = true; }  // not a model this ladder has
+    if (ladderData && !r) { page = 'sizes'; push = true; }  // not a class this ladder has
     else {
       currentRung = rt.rung; modelTab = rt.mtab;
       if (r) {
-        hash = modelHash(r, modelTab); push = true;
+        hash = modelHash(r, modelTab);
         document.querySelectorAll('#modelnav a').forEach(a => { a.href = '#' + modelHash(r, a.dataset.mtab); });
       }
       if (ladderData) renderRung();
     }
   }
-  document.body.classList.toggle('on-model', id === 'rung');
-  document.querySelectorAll('.section').forEach(s => s.classList.toggle('active', s.id === id));
-  document.querySelectorAll('#mainnav a').forEach(a => a.classList.toggle('active', a.dataset.tab === id));
+  if (page === 'ship') {
+    shipKey = rt.ship; shipTab = rt.stab;
+    if (runsList) {
+      const run = shipRun(runsList);
+      if (run) { selected = run.run_id; shipKey = run.name || run.run_id; hash = shipHash(shipKey, shipTab); }
+      document.querySelectorAll('#shipnav a').forEach(a => { a.href = '#' + shipHash(shipKey, a.dataset.stab); });
+      shipHeader(run);
+    }
+  }
+  if (page === 'voyage') { voyageKey = rt.voyage; hash = '/voyages/' + voyageKey; }
+  if (page === 'sizes') hash = '/classes';
+  if (page === 'runs-section') hash = '/ships';
+  if (page === 'voyages') hash = '/voyages';
+  if (page === 'discoveries') hash = '/discoveries';
+  document.querySelectorAll('main > .section').forEach(s => s.classList.toggle('active', s.id === page));
+  document.querySelectorAll('#mainnav a').forEach(a => a.classList.toggle('active', a.dataset.nav === SECTION_NAV[page]));
   document.querySelectorAll('#rung .mtab').forEach(t => t.classList.toggle('active', t.dataset.mtab === modelTab));
   document.querySelectorAll('#modelnav a').forEach(a => a.classList.toggle('active', a.dataset.mtab === modelTab));
-  if (push && location.hash !== '#' + hash) history.replaceState(null, '', location.pathname + location.search + '#' + hash);
+  document.querySelectorAll('#ship .shiptab').forEach(t => t.classList.toggle('active', t.id === STAB_EL[shipTab]));
+  document.querySelectorAll('#shipnav a').forEach(a => a.classList.toggle('active', a.dataset.stab === shipTab));
+  // the address always reads the canonical way (old addresses and ?run= are rewritten, not stacked)
+  if (hash && (location.hash !== '#' + hash || location.search)) history.replaceState(null, '', location.pathname + '#' + hash);
+  if (page === 'voyages' || page === 'voyage') loadVoyages();
+  if (page === 'discoveries') loadDiscoveries();
+  if (page === 'ship' && (selected !== wasShip || !runsList)) refresh();
   // charts drawn while hidden have no width; size the ones now showing
-  document.querySelectorAll(`#${id} .chart`).forEach(el => { if (el.data && el.offsetParent) Plotly.Plots.resize(el); });
+  document.querySelectorAll(`#${page} .chart`).forEach(el => { if (el.data && el.offsetParent) Plotly.Plots.resize(el); });
 }
-document.querySelectorAll('#mainnav a').forEach(a => a.onclick = e => { e.preventDefault(); showTab(a.dataset.tab); });
-document.getElementById('home').onclick = e => { e.preventDefault(); showTab(TABS[0]); window.scrollTo(0, 0); };
+function shipHeader(run) {
+  const cls = run && ladderData && ladderData.rungs.find(x => x.preset === run.preset);
+  const link = document.getElementById('shipclass');
+  link.textContent = cls ? `${cls.preset} · ${cls.name}` : (run && run.preset) || '';
+  if (cls) link.href = '#' + modelHash(cls); else link.removeAttribute('href');
+  document.getElementById('shipname').textContent = run ? (run.ship || run.name || run.run_id.slice(0, 12)) : `no ship called ${shipKey}`;
+}
 window.addEventListener('hashchange', () => showTab(location.hash.slice(1), false));
-showTab(location.hash.slice(1) || TABS[0], false);
+// once the whole script has run (showTab reaches state declared further down); an old ?run= address opens that ship
+queueMicrotask(() => {
+  const h = location.hash.slice(1);
+  showTab(selected && !h.startsWith('/') && !(h in OLD_SHIP) ? '/ships/' + selected : (h || '/classes'), false);
+});
 
 function ema(xs, span) {
   const a = 2 / (span + 1); let m = null;
@@ -593,26 +653,13 @@ function contentPanel(ships) {
 }
 
 // the header's run picker: every per-run panel follows it; panels marked ALL RUNS do not
-function runPicker(runs) {
-  const sel = document.getElementById('runpick');
-  const key = runs.map(r => r.run_id + r.status).join(',');
-  if (sel.dataset.key !== key) { // rebuild only when the run list changes, so an open list stays open
-    sel.innerHTML = runs.map(r => `<option value="${r.run_id}">${esc(r.ship || r.name || r.run_id.slice(0, 12))} · ${esc(r.name || '')} · ${esc((r.status || '').split(':')[0])}</option>`).join('');
-    sel.dataset.key = key;
-  }
-  sel.value = selected;
-  sel.onchange = () => { selected = sel.value; history.replaceState(null, '', '?run=' + selected + location.hash); refresh(); };
-}
-
 function runsTable(runs) {
   const tb = document.querySelector('#runs tbody');
   tb.innerHTML = runs.map(r => `<tr data-run="${r.run_id}" class="${r.run_id === selected ? 'sel' : ''}">
     <td>${esc(r.ship || '')}</td><td>${esc(r.name || '')}</td><td class="mono">${r.run_id.slice(0, 12)}</td><td>${esc(r.preset || '')}</td><td>${r.seed ?? ''}</td>
     <td><span class="badge ${(r.status || '').split(':')[0]}">${esc(r.status || '')}</span></td><td>${big(r.tokens_seen)}</td>
     <td>${fmt(r.wall_minutes, 1)}</td><td>${fmt(r.hole_bpb_mean, 4)}</td><td>${esc(r.started || '')}</td></tr>`).join('');
-  tb.querySelectorAll('tr').forEach(tr => tr.onclick = () => {
-    selected = tr.dataset.run; history.replaceState(null, '', '?run=' + selected + location.hash); refresh();
-  });
+  tb.querySelectorAll('tr').forEach(tr => tr.onclick = () => goShip(tr.dataset.run));
 }
 
 
@@ -730,7 +777,7 @@ async function loadLadder() {
   }).join('');
   document.querySelector('#queue tbody').innerHTML = d.queue.map((q, i) => `<tr${q.status === 'running' ? ' class="sel"' : ''}><td>${i + 1}</td>
     <td>${esc(q.name)}</td><td>${esc(q.status.split(':')[0])}</td></tr>`).join('');
-  if (document.getElementById('rung').classList.contains('active')) showTab(location.hash.slice(1), false);
+  if (page === 'rung' || page === 'ship') showTab(location.hash.slice(1), false);
 }
 const RECENT = 30;
 // ---- RunGrid: every run at one size as a square, like a GitHub contribution graph. Bands of 7 rows
@@ -782,7 +829,7 @@ function runGrid(r, runs) {
   // a square opens its run, as a row in the Runs table does
   el.addEventListener('click', e => {
     const c = e.target.closest('i[data-run]'); if (!c) return;
-    selected = c.dataset.run; history.replaceState(null, '', '?run=' + selected + location.hash); refresh();
+    goShip(c.dataset.run);
   });
 })();  // panels that draw one mark per run show the latest RECENT; the run grid shows every run
 // Scoring is in two parts. Science: how well the model predicts text it has never seen (bits per
@@ -822,6 +869,14 @@ function renderRung() {
     <td>${x.passes ?? '–'}</td><td>${x.seed ?? '–'}</td><td>${x.vocab ?? '–'}</td><td>${x.context ?? '–'}</td><td>${big(x.tokens_seen)}</td>
     <td>${fmt(x.wall_minutes, 1)}</td><td>${esc(String(x.started || '–').slice(0, 16).replace('T', ' '))}</td></tr>`).join('') + more(11) : none(11);
   renderShelf(r, runs);
+
+  // ---- Fleet: every ship of this class
+  const voyageLink = x => x.voyage ? `<a href="#/voyages/${esc(x.voyage)}">${esc(VOYAGE_NAME[x.voyage] || x.voyage)}</a>` : '–';
+  document.querySelector('#fleettable tbody').innerHTML = allRuns.length ? [...allRuns].reverse().map(x => `<tr data-run="${esc(x.run_id)}">
+    <td>${esc(x.ship || '')}</td><td>${esc(x.name)}</td><td>${esc(x.fleet || '–')}</td><td>${voyageLink(x)}</td>
+    <td><span class="pill ${(x.status || '').split(':')[0]}">${esc((x.status || '').split(':')[0])}</span></td><td>${shelfName(x)}</td>
+    <td>${x.passes ?? '–'}</td><td>${x.seed ?? '–'}</td><td>${big(x.tokens_seen)}</td><td>${fmt(x.wall_minutes, 1)}</td><td>${fmt(x.ft_en)}</td>
+    <td>${esc(String(x.started || '–').slice(0, 16).replace('T', ' '))}</td></tr>`).join('') : none(12);
 
   // ---- Scoring: science, then art
   document.querySelector('#sciencemetrics tbody').innerHTML = metricRows(r.metrics.filter(m => !ART.has(m[0])));
@@ -961,11 +1016,161 @@ async function renderWaypoints(r) {
 document.querySelectorAll('[data-essay]').forEach(b => b.onclick = () => openEssay(b.dataset.essay));
 document.getElementById('readpassage').onclick = e => { if (e.currentTarget.dataset.book) openBook(e.currentTarget.dataset.book); };
 
-// a Training row opens its run, as the Runs table does
-document.getElementById('trainruns').addEventListener('click', e => {
-  const tr = e.target.closest('tr[data-run]'); if (!tr || e.target.closest('.info')) return;
-  selected = tr.dataset.run; history.replaceState(null, '', '?run=' + selected + location.hash); refresh();
-});
+// a row in a class's fleet or training table, or a voyage's ships, opens that ship
+['fleettable', 'trainruns', 'voyageruns'].forEach(id => document.getElementById(id).addEventListener('click', e => {
+  const tr = e.target.closest('tr[data-run]'); if (!tr || e.target.closest('.info') || e.target.closest('a')) return;
+  goShip(tr.dataset.run);
+}));
+
+// ---- Voyages (server.py api_voyages, from thorp/voyages.py): the list, and one voyage from one
+// template. A panel that belongs to one voyage carries data-voyage (book_value's fit).
+const VOYAGE_NAME = {};
+let voyagesData = null, voyagesKey = '', voyageSeries = null, voyageSeriesKey = '';
+const statusPill = st => `<span class="pill ${{ running: 'blue', done: 'good', paused: 'accent' }[st] || ''}">${esc(st || '')}</span>`;
+const classOf = preset => ladderData && ladderData.rungs.find(x => x.preset === preset);
+const classLink = preset => { const c = classOf(preset); return c ? `<a href="#${modelHash(c)}">${esc(c.preset)} · ${esc(c.name)}</a>` : esc(preset || '–'); };
+// the stars a voyage's runs have lit so far: the soonest step for each, or the best score yet
+function starHeadline(v) {
+  return Object.values(v.runs.reduce((acc, r) => {
+    r.stars.forEach(x => {
+      const a = acc[x.star] || (acc[x.star] = { star: x.star, lit: null, ship: null, best: null });
+      if (x.steps_to_lit != null && (a.lit == null || x.steps_to_lit < a.lit)) { a.lit = x.steps_to_lit; a.ship = r.ship || r.name; }
+      if (x.best != null && (a.best == null || x.best > a.best)) a.best = x.best;
+    });
+    return acc;
+  }, {})).filter(a => a.best != null).map(a => a.lit != null ? `${STAR_LABEL[a.star] || a.star} lit at step ${a.lit} (${esc(a.ship)})` : `${STAR_LABEL[a.star] || a.star} not lit yet, best ${fmt(a.best)}`).join('; ');
+}
+const STAR_LABEL = { previous_word: 'the Previous Word', duplicate_word: 'the Duplicate Word', nevermore: 'Nevermore' };
+async function loadVoyages() {
+  let d;
+  try { d = await get('/api/voyages'); } catch (e) { return; }
+  d.forEach(v => { VOYAGE_NAME[v.key] = v.name; });
+  const key = JSON.stringify(d) + '|' + voyageKey + '|' + !!ladderData;
+  if (key === voyagesKey) return;
+  voyagesKey = key; voyagesData = d;
+  document.getElementById('voyagecards').innerHTML = d.map(v => {
+    const valid = v.runs.filter(r => !r.set_aside).length;
+    const headline = v.learned || starHeadline(v) || 'nothing found yet';
+    return `<a class="card" href="#/voyages/${esc(v.key)}">
+      <div class="top"><span class="preset">${esc(v.name)}</span>${statusPill(v.status)}</div>
+      <div class="goal">${esc(v.goal)}</div>
+      <div class="ov">${esc(headline)}</div>
+      <div class="foot"><span>${esc(v.fleet || '')} · ${esc(v.preset || '')}</span><span>${valid} of ${v.stop.max_runs} runs</span></div>
+      <div class="foot"><span>ships: ${esc((v.ships || []).join(', ') || '–')}</span></div></a>`;
+  }).join('') || '<div class="empty">no voyages yet</div>';
+  if (page === 'voyage') renderVoyage();
+}
+function renderVoyage() {
+  const v = voyagesData && voyagesData.find(x => x.key === voyageKey);
+  if (!v) { document.getElementById('voyagetitle').textContent = voyagesData ? `no voyage called ${voyageKey}` : 'loading…'; return; }
+  document.querySelectorAll('#voyage [data-voyage]').forEach(el => { el.hidden = el.dataset.voyage !== v.key; });
+  document.getElementById('voyagetitle').textContent = v.name;
+  document.getElementById('voyagestatus').innerHTML = statusPill(v.status);
+  document.getElementById('voyagegoal').textContent = v.goal;
+  const valid = v.runs.filter(r => !r.set_aside);
+  document.getElementById('voyageover').innerHTML = [
+    ['fleet', esc(v.fleet || '–')], ['class', classLink(v.preset)], ['ships', esc((v.ships || []).join(', ') || '–')],
+    ['runs', `${valid.length} of ${v.stop.max_runs}${v.runs.length > valid.length ? ` (${v.runs.length - valid.length} set aside)` : ''}`],
+    ['stop rule', esc(v.stop.about || '')], ['status', esc(v.status)],
+  ].map(([k, val]) => `<div><div class="k">${k}</div><div>${val}</div></div>`).join('');
+  const learned = v.learned || starHeadline(v);
+  document.getElementById('voyagelearned').hidden = !learned;
+  document.getElementById('voyagelearnedtext').textContent = learned;
+  // the fit (book_value): what a pure shelf of each kind is worth, with its interval
+  if (v.fit && v.fit.coef) {
+    const rows = Object.entries(v.fit.coef);
+    document.getElementById('fitr2').textContent = `cross-validated R² ${fmt(v.fit.cv_r2, 2)} over ${v.fit.runs} runs`;
+    document.querySelector('#fittable tbody').innerHTML = rows.map(([k, [e, lo, hi]]) => `<tr><td>${esc(k)}</td><td>${fmt(e)}</td><td>${fmt(lo)}</td><td>${fmt(hi)}</td></tr>`).join('');
+    const pure = rows.filter(([k]) => k.startsWith('pure ')).sort((a, b) => b[1][0] - a[1][0]);
+    plot('fitchart', [{ type: 'scatter', mode: 'markers', x: pure.map(p => p[1][0]), y: pure.map(p => p[0].replace('pure ', '')),
+      error_x: { type: 'data', symmetric: false, array: pure.map(p => p[1][2] - p[1][0]), arrayminus: pure.map(p => p[1][0] - p[1][1]), color: C.muted },
+      marker: { size: 9, color: C.accent }, hovertemplate: '%{y}: %{x:.3f}<extra></extra>' }],
+      layout({ xaxis: { title: 'Forgotten Tomes bits per byte (lower is better)', gridcolor: C.line }, yaxis: { automargin: true }, margin: { l: 140 } }));
+  }
+  // the ships, with each star's first light
+  const starKeys = [...new Set(v.runs.flatMap(r => r.stars.map(x => x.star)))];
+  document.querySelector('#voyageruns thead').innerHTML = `<tr><th>ship</th><th>name</th><th>status</th><th>vocab</th><th>lr</th><th>shelf</th><th>passes</th><th>seed</th>
+    <th>Forgotten Tomes${info('ft')}</th>${starKeys.map(k => `<th>${esc(STAR_LABEL[k] || k)} lit</th>`).join('')}</tr>`;
+  const st = v.runs.map(r => r.settings || {});
+  document.querySelector('#voyageruns tbody').innerHTML = v.runs.length ? v.runs.map((r, i) => `<tr data-run="${esc(r.run_id)}"${r.set_aside ? ' class="aside"' : ''}>
+    <td>${esc(r.ship || '')}${r.set_aside ? ` <span class="pill" title="${esc(r.set_aside)}">set aside</span>` : ''}</td><td>${esc(r.name)}</td>
+    <td>${esc((r.status || '').split(':')[0])}</td><td>${st[i].vocab ?? '–'}</td><td>${st[i].lr ?? '–'}</td>
+    <td>${esc((st[i].recipe || '–').replace('lists/', '').replace('.csv', ''))}</td><td>${st[i].passes ?? '–'}</td><td>${st[i].seed ?? '–'}</td><td>${fmt(r.ft_en)}</td>
+    ${starKeys.map(k => { const x = r.stars.find(y => y.star === k) || {};
+      return x.steps_to_lit != null ? `<td data-sort="${x.steps_to_lit}">step ${x.steps_to_lit}</td>`
+        : x.best != null ? `<td data-sort="" class="s" title="not lit yet; its best so far">best ${fmt(x.best)}</td>` : '<td>–</td>'; }).join('')}</tr>`).join('')
+    : `<tr><td colspan="${9 + starKeys.length}" class="empty">no ships have sailed on this voyage yet</td></tr>`;
+  // the Forgotten Tomes score run by run, one colour per value of the setting that varies most
+  const scored = v.runs.map((r, i) => ({ r, i: i + 1 })).filter(p => p.r.ft_en != null && !p.r.set_aside);
+  if (!scored.length) empty('voyageft', 'no run on this voyage has a Forgotten Tomes score yet');
+  else {
+    const fields = ['passes', 'vocab', 'lr', 'recipe'];
+    const by = fields.map(f => [f, new Set(scored.map(p => (p.r.settings || {})[f])).size]).sort((a, b) => b[1] - a[1])[0][0];
+    const groups = [...new Set(scored.map(p => (p.r.settings || {})[by]))];
+    plot('voyageft', groups.map((g, gi) => { const pts = scored.filter(p => (p.r.settings || {})[by] === g);
+      return { type: 'scatter', mode: 'markers', name: `${by} ${String(g).replace('lists/', '').replace('.csv', '')}`, x: pts.map(p => p.i), y: pts.map(p => p.r.ft_en),
+        text: pts.map(p => p.r.ship || p.r.name), hovertemplate: '%{text}: %{y:.3f}<extra></extra>', marker: { size: 9, color: PALETTE[gi % PALETTE.length] } }; }),
+      layout({ xaxis: { title: 'run, in the order they sailed', gridcolor: C.line }, yaxis: { title: 'bits per byte', gridcolor: C.line }, legend: { orientation: 'h', y: 1.1 } }));
+  }
+  document.querySelector('#voyageoutcomes tbody').innerHTML = v.outcomes.map(o => `<tr><td>${esc(o.about)}</td><td class="mono">${esc(o.metric)}</td><td>${esc(o.better)}</td></tr>`).join('');
+  document.querySelector('#voyagelevers tbody').innerHTML = v.levers.map(l => `<tr><td class="mono">${esc(l.key)}</td>
+    <td>${l.fixed ? 'fixed' : l.choices && l.choices.length ? esc(l.choices.join(', ')) : `${l.low ?? '–'} to ${l.high ?? '–'}`}</td><td>${esc(l.about || '')}</td></tr>`).join('');
+  voyageStars(v);
+}
+// first light: each star's score against step for every run of the voyage, the threshold dotted
+async function voyageStars(v) {
+  let d;
+  try { d = await get('/api/voyage?key=' + encodeURIComponent(v.key)); } catch (e) { return; }
+  const sel = document.getElementById('voyagestar');
+  const keys = Object.keys(d.stars), lit = k => d.runs.some(r => r.series[k] && r.series[k].step.length);
+  if (sel.dataset.voyage !== v.key) {
+    sel.innerHTML = keys.map(k => `<option value="${k}">${esc(d.stars[k].name)}</option>`).join('');
+    sel.value = keys.find(lit) || keys[0]; sel.dataset.voyage = v.key;
+  }
+  const k = sel.value, star = d.stars[k], key = JSON.stringify(d.runs.map(r => r.series[k])) + k;
+  if (key === voyageSeriesKey) return;
+  voyageSeriesKey = key;
+  const rs = d.runs.filter(r => r.series[k] && r.series[k].step.length);
+  if (!rs.length) return empty('voyagestars', `no run on this voyage has a reading for ${esc(star.name)} yet`);
+  plot('voyagestars', rs.map((r, i) => ({ type: 'scatter', mode: 'lines+markers', name: r.ship || r.name, x: r.series[k].step, y: r.series[k].value,
+    line: { color: PALETTE[i % PALETTE.length], width: 1.5 }, marker: { size: 4 } })),
+    layout({ xaxis: { title: 'step', gridcolor: C.line }, yaxis: { title: `${star.name} score`, gridcolor: C.line, range: [0, Math.max(1, ...rs.flatMap(r => r.series[k].value))] },
+      shapes: [{ type: 'line', xref: 'paper', x0: 0, x1: 1, y0: star.threshold, y1: star.threshold, line: { color: C.accent, dash: 'dot' } }] }));
+}
+document.getElementById('voyagestar').onchange = () => { voyageSeriesKey = ''; const v = voyagesData && voyagesData.find(x => x.key === voyageKey); if (v) voyageStars(v); };
+
+// ---- Discoveries (server.py api_discoveries): the stars and the traits, across every ship
+let discKey = '';
+const TRAIT_NAME = t => t.startsWith('family/') ? `${t.slice(7)} (language family)` : ({ fiction: 'Fiction', verse: 'Verse', first_person: 'First person' }[t] || t);
+async function loadDiscoveries() {
+  let d;
+  try { d = await get('/api/discoveries'); } catch (e) { return; }
+  const key = JSON.stringify(d) + !!ladderData;
+  if (key === discKey) return;
+  discKey = key;
+  const byName = Object.fromEntries(d.stars.map(s => [s.key, s.name]));
+  document.getElementById('starcards').innerHTML = d.stars.map(s => {
+    const lit = s.ships.filter(x => x.steps_to_lit != null).sort((a, b) => a.steps_to_lit - b.steps_to_lit);
+    const best = [...s.ships].sort((a, b) => (b.best ?? -1) - (a.best ?? -1))[0];
+    const first = lit[0];
+    return `<div class="card${lit.length ? ' lit' : ''}">
+      <div class="top"><span class="preset">${esc(s.name)}</span><span class="pill${lit.length ? ' good' : ''}">${lit.length ? 'lit' : 'not lit yet'}</span></div>
+      <div class="job">level ${s.level}${s.rests_on.length ? ` · rests on ${esc(s.rests_on.map(k => byName[k] || k).join(', '))}` : ''} · lit at ${s.threshold}</div>
+      <div class="ov">${esc(s.about)}</div>
+      <div class="foot"><span>${first ? `first lit by <a href="#${shipHash(first.name)}">${esc(first.ship || first.name)}</a> at step ${first.steps_to_lit}` : best && best.best != null ? `nearest: <a href="#${shipHash(best.name)}">${esc(best.ship || best.name)}</a> at ${fmt(best.best)}` : 'no readings yet'}</span></div>
+      <div class="foot"><span>lit by ${lit.length} of ${s.ships.length} ships measured</span></div></div>`;
+  }).join('');
+  document.querySelector('#traittable thead').innerHTML = `<tr><th>trait</th><th>ships measured</th><th>found by</th><th>first found</th><th>learned by</th><th>first learned</th><th>best held-out AUC</th></tr>`;
+  const firstOf = (ships, k) => ships.filter(x => x[k] != null).sort((a, b) => a[k] - b[k])[0];
+  document.querySelector('#traittable tbody').innerHTML = d.traits.map(t => {
+    const f = firstOf(t.ships, 'found_at'), l = firstOf(t.ships, 'learned_at'), best = [...t.ships].sort((a, b) => (b.best ?? -1) - (a.best ?? -1))[0];
+    const who = (x, k) => x ? `<a href="#${shipHash(x.name)}">${esc(x.ship || x.name)}</a> (${esc(x.preset || '')}) at step ${x[k]}` : 'not yet';
+    return `<tr${(l || f) ? ` data-run="${esc((l || f).run_id)}" tabindex="0"` : ''}><td><b>${esc(TRAIT_NAME(t.key))}</b></td><td>${t.ships.length}</td>
+      <td>${t.ships.filter(x => x.found_at != null).length}</td><td>${who(f, 'found_at')}</td>
+      <td>${t.ships.filter(x => x.learned_at != null).length}</td><td>${who(l, 'learned_at')}</td><td>${best && best.best != null ? `${fmt(best.best)} (${esc(best.ship || best.name)})` : '–'}</td></tr>`;
+  }).join('') || '<tr><td colspan="7" class="empty">no ship has trait probes yet</td></tr>';
+}
+document.getElementById('traittable').addEventListener('click', e => { const tr = e.target.closest('tr[data-run]'); if (tr && !e.target.closest('a')) goShip(tr.dataset.run); });
 
 // Overview's second chart: every scored run's Forgotten Tomes score in start order, the best so far,
 // and the outside models as dotted lines. One trace of dots, so thousands of runs stay quick.
@@ -1034,14 +1239,19 @@ async function rungExtras(r, runs, allRuns) {
 })();
 async function refresh() {
   loadLadder();
+  if (page === 'voyages' || page === 'voyage') loadVoyages();
+  if (page === 'discoveries') loadDiscoveries();
   try {
     const runs = await get('/api/runs');
+    const first = !runsList;
+    runsList = runs;
     if (!runs.length) { document.getElementById('title').textContent = 'no runs in the ledger yet'; return; }
-    if (!selected || !runs.find(r => r.run_id === selected)) {
-      selected = (runs.find(r => r.status === 'running' && r.name && !r.name.startsWith('smoke')) || runs.find(r => r.status === 'running') || runs[0]).run_id;
-    }
     runsTable(runs);
-    runPicker(runs);
+    if (page !== 'ship') { document.getElementById('updated').textContent = 'updated ' + new Date().toLocaleTimeString(); return; }
+    if (first) return showTab(location.hash.slice(1), false);  // now the ship can be named
+    const run = shipRun(runs);
+    if (!run) { shipHeader(null); return; }
+    selected = run.run_id;
     const cur = runs.find(x => x.run_id === selected);
     if (cur) document.getElementById('stripsum').textContent = `${cur.ship || cur.name} · ${(cur.status || '').split(':')[0]}`;
     const [r, m, evals, cmp, content] = await Promise.all([get('/api/run?run=' + selected), get('/api/metrics?run=' + selected), get('/api/evals?run=' + selected), get('/api/compare'), get('/api/experiment?prefix=content-')]);

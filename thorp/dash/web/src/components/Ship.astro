@@ -1,0 +1,24 @@
+---
+// One ship: a single run, at #/ships/<name>[/<tab>]. Its tabs are the per-run views: how it bets,
+// its books, its languages, its sieves, attention, and the traits found in it.
+import RunOverview from './RunOverview.astro';
+import Betting from './Betting.astro';
+import Books from './Books.astro';
+import Languages from './Languages.astro';
+import Sieves from './Sieves.astro';
+import Attention from './Attention.astro';
+import Traits from './Traits.astro';
+---
+<div class="section" id="ship">
+  <h1><a href="#/classes" class="back">← classes</a> <a class="crumb" id="shipclass"></a> <span id="shipname"></span> <span class="q" id="title"></span></h1>
+  <nav class="subnav" id="shipnav">
+    <a data-stab="betting">Betting</a><a data-stab="books">Books</a><a data-stab="languages">Languages</a><a data-stab="sieves">Sieves</a><a data-stab="attention">Attention</a><a data-stab="traits">Traits</a>
+  </nav>
+  <RunOverview />
+  <Betting />
+  <Books />
+  <Languages />
+  <Sieves />
+  <Attention />
+  <Traits />
+</div>

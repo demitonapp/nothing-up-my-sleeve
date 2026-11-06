@@ -27,6 +27,10 @@ table.clickable tbody tr[tabindex] { cursor: pointer; }
 table.clickable tbody tr[tabindex]:hover td, table.clickable tbody tr[tabindex]:focus-visible td { background: var(--raise); color: var(--accent); }
 table.clickable tbody tr:focus-visible { outline: none; }
 .mt { margin-top: 8px; }
+/* links in text and tables: one colour, underlined on hover (cards, tabs and back links have their own) */
+main a:not(.card):not(.back):not(.crumb) { color: var(--blue); text-decoration: none; }
+main a:not(.card):not(.back):not(.crumb):hover { text-decoration: underline; }
+tr.aside td { opacity: .55; }
 /* RunGrid: a GitHub contribution graph of runs (UI.md) */
 .gridsum { display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: center; font-size: var(--fs-sm); color: var(--muted); margin-bottom: 10px; }
 .gridsum b { color: var(--text); font-weight: 600; }
@@ -68,11 +72,16 @@ main { padding: 16px 20px 40px; display: grid; gap: 16px; max-width: 1500px; mar
 .section > h1 { margin: 18px 0 0; font-size: var(--fs-lg); letter-spacing: .08em; text-transform: uppercase; color: var(--accent); border-bottom: 1px solid var(--line); padding-bottom: 6px; }
 .section > h1 .q { color: var(--muted); font-weight: 400; text-transform: none; letter-spacing: 0; margin-left: 12px; font-size: var(--fs-md); }
 nav a { cursor: pointer; }
-/* a model page: its own tabs replace the global ones, and the per-run header pieces step aside */
-#modelnav, body.on-model #mainnav, body.on-model .perrun { display: none; }
-body.on-model #modelnav { display: flex; }
-.mtab { display: none; }
-.mtab.active { display: grid; gap: 16px; min-width: 0; }
+/* a page's own tabs (a class, a ship) sit under its title, below the three main sections */
+.subnav { display: flex; gap: 4px; flex-wrap: wrap; font-size: var(--fs-sm); border-bottom: 1px solid var(--line); padding-bottom: 8px; margin-left: 0; }
+.mtab, .shiptab { display: none; }
+.mtab.active, .shiptab.active { display: grid; gap: 16px; min-width: 0; }
+.shiptab > h1 { margin: 4px 0 0; font-size: var(--fs-md); letter-spacing: .08em; text-transform: uppercase; color: var(--text); }
+.shiptab > h1 .q { color: var(--muted); font-weight: 400; text-transform: none; letter-spacing: 0; margin-left: 12px; font-size: var(--fs-md); }
+a.crumb { color: var(--muted); text-decoration: none; margin-right: 8px; }
+a.crumb:hover { color: var(--accent); }
+a.crumb:not(:empty)::after { content: ' ›'; }
+.cards .card .goal { color: var(--text); font-size: var(--fs-md); }
 /* a band divides one tab into parts (Scoring: science, then art) */
 .band { margin: 10px 0 0; font-size: var(--fs-md); font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--text);
         border-bottom: 1px solid var(--line); padding-bottom: 6px; }
@@ -169,7 +178,6 @@ tr.sel td { color: var(--accent); }
 .samples .p { color: var(--accent); }
 .samples .t { color: var(--muted); font-size: var(--fs-xs); }
 .samples pre { white-space: pre-wrap; margin: 2px 0 0; font: var(--fs-sm)/1.4 ui-monospace, Menlo, monospace; }
-#runpick { background: var(--panel); font-size: var(--fs-md); max-width: 420px; }
 .allruns { margin-right: 8px; letter-spacing: .06em; text-transform: uppercase; vertical-align: 2px; }
 .empty { color: var(--muted); padding: 30px 0; text-align: center; }
 .scroll { overflow-x: auto; }

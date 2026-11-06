@@ -388,6 +388,7 @@ def api_ladder() -> dict:
         " from runs order by started"
     )
     last = _last_scores([r["run_id"] for r in rows])
+    voyage = _voyage_of()
     for r in rows:
         spec = json.loads(r.pop("spec_json") or "{}")
         m = last.get(r["run_id"], {})
@@ -403,6 +404,8 @@ def api_ladder() -> dict:
             "recipe": spec.get("data", {}).get("recipe"),
             "passes": spec.get("data", {}).get("passes"),
             "ft_en": m.get("eval/hole-cards-unseen/bpb_mean_en"),
+            "fleet": _fleet_of(r["ship"]),
+            "voyage": voyage.get(r["name"]),
             "set": first,
             "bpb_en": m.get(f"eval/{first}/bpb_mean_en") if first else None,
             "split": {},
@@ -585,6 +588,168 @@ def api_essay(name: str) -> dict:
     }
 
 
+def _voyage_of() -> dict[str, str]:
+    """run name -> voyage key, for every run a voyage claims (thorp/voyages.py runs_of)."""
+    try:
+        from thorp import fleet, voyages
+    except ImportError:
+        return {}
+    out = {}
+    for v in fleet.VOYAGES.values():
+        for r in voyages.runs_of(v):
+            out[r["name"]] = v.key
+    return out
+
+
+def _fleet_of(ship: str | None) -> str | None:
+    try:
+        from thorp import fleet
+    except ImportError:
+        return None
+    return fleet.fleet_of(ship)
+
+
+def api_voyages() -> list[dict]:
+    """Every voyage: goal, outcomes, levers, stop rule, status, lessons and its runs (voyages.py)."""
+    from thorp import voyages
+
+    return voyages.payload()
+
+
+def api_voyage_series(key: str) -> dict:
+    """For one voyage's runs, each star's score at every reading, so a chart can show the step at
+    which a line crosses its threshold: first light."""
+    from thorp import fleet, voyages
+
+    v = fleet.VOYAGES[key]
+    runs = voyages.runs_of(v)
+    con = _con()
+    try:
+        out = []
+        for r in runs:
+            series = {}
+            for sk, star in fleet.STARS.items():
+                pts = list(
+                    con.execute(
+                        "select step, value from metrics where run_id=? and name=? order by step, rowid",
+                        [r["run_id"], star.metric],
+                    )
+                )
+                series[sk] = {"step": [p[0] for p in pts], "value": [p[1] for p in pts]}
+            out.append(
+                {"run_id": r["run_id"], "name": r["name"], "ship": r["ship"], "series": series}
+            )
+    finally:
+        con.close()
+    return {
+        "runs": out,
+        "stars": {
+            k: {"name": s.name, "threshold": s.threshold, "metric": s.metric}
+            for k, s in fleet.STARS.items()
+        },
+    }
+
+
+def api_discoveries() -> dict:
+    """The two things followed across every ship: stars (heads that light, fleet.STARS) and traits
+    (directions the probes find, evaluators/probes.py). For each, which ships have it and when."""
+    from thorp import fleet, voyages
+    from thorp.evaluators import probes
+
+    runs = _rows("select run_id, name, ship, status, spec_json from runs order by started")
+    voyage = _voyage_of()
+    stars = []
+    for star in fleet.STARS.values():
+        ships = []
+        for r in runs:
+            if r["name"] and r["name"].startswith("smoke"):
+                continue
+            spec = json.loads(r["spec_json"] or "{}")
+            t = voyages.star_timeline(
+                r["run_id"], star, spec.get("optim", {}).get("batch_tokens", 32768)
+            )
+            if t["readings"]:
+                ships.append(
+                    {
+                        "run_id": r["run_id"],
+                        "name": r["name"],
+                        "ship": r["ship"],
+                        "preset": spec.get("model", {}).get("preset"),
+                        "voyage": voyage.get(r["name"]),
+                        **t,
+                    }
+                )
+        stars.append(
+            {
+                "key": star.key,
+                "name": star.name,
+                "level": star.level,
+                "rests_on": list(star.rests_on),
+                "threshold": star.threshold,
+                "metric": star.metric,
+                "about": star.about,
+                "ships": ships,
+            }
+        )
+    con = _con()
+    traits: dict[str, list] = {}
+    try:
+        for r in runs:
+            if r["name"] and r["name"].startswith("smoke"):
+                continue
+            spec = json.loads(r["spec_json"] or "{}")
+            series: dict[str, dict[str, dict[int, float]]] = {}
+            for name, step, value in con.execute(
+                "select name, step, value from metrics where run_id=? and name >= 'probe/' and name < 'probe0'"
+                " and (name like '%/best' or name like '%/floor_bow' or name like '%/floor_init')"
+                " order by step, rowid",
+                [r["run_id"]],
+            ):
+                t, part = name[len("probe/") :].rsplit("/", 1)
+                series.setdefault(t, {}).setdefault(part, {})[step] = value
+            for t, parts in series.items():
+                best = parts.get("best", {})
+                found = next((st for st, v in best.items() if v >= probes.AUC_FOUND), None)
+                floors = [parts[k] for k in ("floor_bow", "floor_init") if k in parts]
+                learned = None
+                if floors:
+                    learned = next(
+                        (
+                            st
+                            for st, v in best.items()
+                            if v >= probes.AUC_FOUND
+                            and v - max(f.get(st, float("-inf")) for f in floors)
+                            >= probes.EMERGE_MARGIN
+                        ),
+                        None,
+                    )
+                traits.setdefault(t, []).append(
+                    {
+                        "run_id": r["run_id"],
+                        "name": r["name"],
+                        "ship": r["ship"],
+                        "preset": spec.get("model", {}).get("preset"),
+                        "found_at": found,
+                        "learned_at": learned,
+                        "floors": bool(floors),
+                        "best": max(best.values()) if best else None,
+                        "readings": len(best),
+                    }
+                )
+    finally:
+        con.close()
+    return {
+        "stars": stars,
+        "traits": [
+            {"key": t, "ships": v}
+            for t, v in sorted(traits.items(), key=lambda kv: (kv[0].startswith("family/"), kv[0]))
+        ],
+        "trait_found": probes.AUC_FOUND,
+        "trait_margin": probes.EMERGE_MARGIN,
+        "core_traits": list(probes.TRAIT_COLUMNS),
+    }
+
+
 TOMES = "lists/hole-cards-unseen.csv"
 _tome_ids: list[str] | None = None
 
@@ -717,6 +882,9 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/tomes": lambda: api_tomes(),
                 "/api/waypoints": lambda: api_waypoints(q["preset"], q.get("limit", 30)),
                 "/api/essay": lambda: api_essay(q["name"]),
+                "/api/voyages": lambda: api_voyages(),
+                "/api/voyage": lambda: api_voyage_series(q["key"]),
+                "/api/discoveries": lambda: api_discoveries(),
                 "/api/shelf": lambda: api_shelf(q["run"]),
                 "/api/book": lambda: api_book(q["id"], q.get("offset", 0), q.get("length", 20000)),
                 "/api/experiment": lambda: api_experiment(q.get("prefix", "content-")),

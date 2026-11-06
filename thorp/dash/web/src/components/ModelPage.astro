@@ -1,6 +1,7 @@
 ---
-// One model page: the template every model on the ladder uses (UI.md, "Model pages"). It lives at
-// #/models/<class>[/training|/scoring|/waypoints] and has four tabs of its own, chosen in the header:
+// One class of ship (a model size): the template every class on the ladder uses (UI.md, "Model pages"). It lives at
+// #/classes/<class>[/overview|/training|/scoring|/waypoints] and has five tabs of its own:
+//   Fleet     the ships of this class (the default)
 //   Overview  the model's performance in as few charts as possible
 //   Training  what it was trained on and how: the model, every run's setup, loss, the shelves
 //   Scoring   every score on its runs, in two parts: science (how well it predicts text it has
@@ -9,7 +10,19 @@
 // A panel that belongs to one kind of model only carries data-kind (the proxy's calibration).
 ---
 <div class="section" id="rung">
-  <h1><a href="#sizes" class="back">← ladder</a> <span id="rungtitle"></span> <span class="q" id="rungjob"></span></h1>
+  <h1><a href="#/classes" class="back">← classes</a> <span id="rungtitle"></span> <span class="q" id="rungjob"></span></h1>
+  <nav class="subnav" id="modelnav">
+    <a data-mtab="fleet">Fleet</a><a data-mtab="overview">Overview</a><a data-mtab="training">Training</a><a data-mtab="scoring">Scoring</a><a data-mtab="waypoints">Waypoints</a>
+  </nav>
+
+  <!-- ============================== Fleet: the ships of this class -->
+  <div class="mtab" data-mtab="fleet">
+    <section class="panel">
+      <h2>The fleet <span class="note">every ship of this class, the fleet and voyage it sailed with, how far it got and its Forgotten Tomes score; open one to see it sail</span></h2>
+      <div class="scroll"><table id="fleettable" class="clickable"><thead><tr><th>ship</th><th>name</th><th>fleet</th><th>voyage</th><th>status</th><th>shelf</th>
+        <th>passes</th><th>seed</th><th>tokens seen</th><th>minutes</th><th>Forgotten Tomes</th><th>started</th></tr></thead><tbody></tbody></table></div>
+    </section>
+  </div>
 
   <!-- ============================== Overview -->
   <div class="mtab" data-mtab="overview">

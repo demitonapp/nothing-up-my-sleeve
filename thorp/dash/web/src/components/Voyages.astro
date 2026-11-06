@@ -1,0 +1,31 @@
+---
+// Voyages: the campaigns several ships take part in to find something (thorp/fleet.py VOYAGES).
+// #/voyages lists them; #/voyages/<key> is one voyage, from one template.
+---
+<div class="section" id="voyages">
+  <h1>Voyages <span class="q">campaigns of ships sent to find something: their goals, how they are steered, and what they found</span></h1>
+  <div class="cards" id="voyagecards"></div>
+</div>
+
+<div class="section" id="voyage">
+  <h1><a href="#/voyages" class="back">← voyages</a> <span id="voyagetitle"></span> <span id="voyagestatus"></span> <span class="q" id="voyagegoal"></span></h1>
+  <section class="panel"><div class="rungover" id="voyageover"></div></section>
+  <section class="panel" id="voyagelearned"><h2>What it found</h2><p id="voyagelearnedtext"></p></section>
+  <!-- this voyage's own panels: data-voyage names the voyage they belong to -->
+  <section class="panel" data-voyage="book_value" hidden>
+    <h2>The fit: what each kind of book is worth <span class="note">the Forgotten Tomes score a pure shelf of each kind would give, with 90% intervals, lower is better; <b id="fitr2"></b></span></h2>
+    <div class="row"><div class="scroll"><table id="fittable"><thead><tr><th>term</th><th>estimate</th><th>90% low</th><th>90% high</th></tr></thead><tbody></tbody></table></div>
+      <div class="chart" id="fitchart"></div></div>
+  </section>
+  <section class="panel"><h2>The ships <span class="note">every run of this voyage, its settings, its Forgotten Tomes score, and the step each star first lit; open one to see it sail</span></h2>
+    <div class="scroll"><table id="voyageruns" class="clickable"><thead></thead><tbody></tbody></table></div></section>
+  <div class="row">
+    <section class="panel"><h2>The Forgotten Tomes score, run by run <span class="note">one dot per run in the order they sailed, coloured by the voyage's main lever; lower is better</span></h2><div class="chart" id="voyageft"></div></section>
+    <section class="panel"><h2>First light <span class="note">each star's score against step, one line per run; the dotted line is the star's threshold, and the moment a line crosses it is first light</span></h2>
+      <div class="handtools"><select id="voyagestar" title="the star shown"></select></div><div class="chart" id="voyagestars"></div></section>
+  </div>
+  <div class="row">
+    <section class="panel"><h2>What it measures <span class="note">the outcomes the voyage is judged by</span></h2><div class="scroll"><table id="voyageoutcomes"><thead><tr><th>outcome</th><th>metric</th><th>better is</th></tr></thead><tbody></tbody></table></div></section>
+    <section class="panel"><h2>The levers <span class="note">what the voyage may change between runs, and within what limits</span></h2><div class="scroll"><table id="voyagelevers"><thead><tr><th>lever</th><th>range or choices</th><th>about</th></tr></thead><tbody></tbody></table></div></section>
+  </div>
+</div>

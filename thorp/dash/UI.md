@@ -54,7 +54,12 @@ holds the ways in, always:
   bearings. **Stars** (`fleet.STARS`: the Previous Word, the Duplicate Word, Nevermore), one card
   each with its threshold, what it rests on, and the first ship to light it or the nearest so far;
   and **traits** (fiction, verse, first person, the language families), with how many ships
-  found and learned each, and the first to do so.
+  found and learned each, and the first to do so. Under the star cards, **the star chart**: every
+  kind of attention head the literature describes (`thorp/dash/heads.py` `KNOWN_HEADS`: what it
+  does, its family, what its source reports it rests on, where it was first described, what it has
+  been seen in). A kind Thorp measures links to its `fleet.STARS` star and shows its state from the
+  ledger; the rest say how Thorp could measure them. Adding a kind is an entry in `heads.py`;
+  measuring one is a star in `fleet.py` and an evaluator.
 - **Sieves** (`#/sieves[/<sailing>]`): how the ship answers the wind, layer by layer. An intro in
   the voyage vocabulary, a card per sieve with its write-up from `fleet.SIEVES` (push, move,
   heading: rendered as written there, never rewritten on the page), then for a picked sailing

@@ -1,5 +1,6 @@
 ---
-// Discoveries: the two things followed across every ship to find our bearings. Stars: attention
+// Discoveries: the two things followed across every ship to find our bearings. The star chart lists
+// every kind of head described in the literature (thorp/dash/heads.py). Stars: attention
 // heads that light up (thorp/fleet.py STARS: the previous word, the duplicate word, Nevermore).
 // Traits: directions in the hidden state that tell kinds of book apart (evaluators/probes.py).
 ---
@@ -7,6 +8,11 @@
   <h1>Discoveries <span class="q">the two things we follow across every ship to find our bearings: stars that light, and traits that emerge</span></h1>
   <h2 class="band">Stars <span class="q">attention heads that do one recognisable job; a star is lit when one head reaches its threshold, and lit shared when the best layer's two strongest heads reach it together; some rest on others</span><span class="bandtools"><button data-essay="nevermore">Read: what a Nevermore is</button></span></h2>
   <div class="cards" id="starcards"></div>
+  <section class="panel">
+    <h2>The star chart <span class="note">every kind of attention head described so far, induction heads among them. The three Thorp measures carry their state from the ledger; the rest are charted but not yet measured, each with how Thorp could measure it. "Rests on" is the dependency its source reports; a blank means none reported</span></h2>
+    <div class="handtools"><span class="note">family</span><select id="headfamily"><option value="">all</option></select><span class="note" id="headcount"></span></div>
+    <div class="scroll"><table id="headtable"><thead><tr><th>kind of head</th><th>family</th><th>what it does</th><th>rests on</th><th>in Thorp</th><th>first described</th><th>seen in</th></tr></thead><tbody></tbody></table></div>
+  </section>
   <h2 class="band">Traits <span class="q">can a ship's hidden state tell fiction, verse, first person or a language family apart on books it has never read; found at the threshold, learned when it also clears the floors</span><span class="bandtools"><button data-essay="traits">Read: how traits are found</button></span></h2>
   <section class="panel"><div class="scroll"><table id="traittable" class="clickable"><thead></thead><tbody></tbody></table></div></section>
 </div>

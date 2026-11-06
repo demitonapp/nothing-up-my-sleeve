@@ -860,6 +860,8 @@ def api_discoveries() -> dict:
         "trait_found": probes.AUC_FOUND,
         "trait_margin": probes.EMERGE_MARGIN,
         "core_traits": list(probes.TRAIT_COLUMNS),
+        # the star chart: every kind of head the literature describes (thorp/dash/heads.py)
+        "known_heads": __import__("thorp.dash.heads", fromlist=["KNOWN_HEADS"]).KNOWN_HEADS,
     }
 
 

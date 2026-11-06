@@ -250,3 +250,7 @@ details.archive[open] > summary { margin-bottom: 8px; }
 
 .lede { margin: 0; line-height: 1.6; max-width: 980px; }
 .lede b { color: var(--accent); font-weight: 600; }
+
+/* the star chart: measured kinds stand out from the charted ones */
+#headtable tr.measured td:first-child { border-left: 2px solid var(--accent); }
+#headtable td i { font-style: normal; color: var(--muted); }

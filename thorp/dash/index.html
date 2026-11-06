@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Thorp</title>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<style>
+  :root {
+    --bg: #0e1116; --panel: #161b22; --line: #2a313c; --text: #e6edf3; --muted: #8b949e;
+    --accent: #e3b341; --good: #3fb950; --bad: #f85149; --blue: #58a6ff;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 14px/1.45 ui-sans-serif, -apple-system, "Segoe UI", sans-serif; }
+  header { padding: 14px 20px; border-bottom: 1px solid var(--line); display: flex;
+           align-items: baseline; gap: 16px; flex-wrap: wrap; }
+  header h1 { margin: 0; font-size: 18px; letter-spacing: .04em; }
+  header .sub { color: var(--muted); }
+  main { padding: 16px 20px 40px; display: grid; gap: 16px; max-width: 1500px; margin: 0 auto; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+           padding: 12px 14px; min-width: 0; }
+  .panel h2 { margin: 0 0 8px; font-size: 13px; font-weight: 600; color: var(--muted);
+              text-transform: uppercase; letter-spacing: .06em; }
+  .row { display: grid; gap: 16px; grid-template-columns: 1fr 1fr; }
+  @media (max-width: 900px) { .row { grid-template-columns: 1fr; } main { padding: 12px 16px; } }
+  .strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+  .stat .k { color: var(--muted); font-size: 12px; }
+  .stat .v { font-size: 20px; font-variant-numeric: tabular-nums; }
+  .stat .s { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .chart { width: 100%; height: 320px; }
+  .chart.tall { height: 380px; }
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 500; font-size: 12px; }
+  tr.sel td { color: var(--accent); }
+  tbody tr { cursor: pointer; }
+  tbody tr:hover td { background: #1c232c; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+  .samples div { margin: 0 0 10px; }
+  .samples .p { color: var(--accent); }
+  .samples .t { color: var(--muted); font-size: 11px; }
+  .samples pre { white-space: pre-wrap; margin: 2px 0 0; font: 12px/1.4 ui-monospace, Menlo, monospace; }
+  .badge { padding: 1px 7px; border-radius: 10px; font-size: 11px; border: 1px solid var(--line); }
+  .badge.running { color: var(--blue); border-color: var(--blue); }
+  .badge.finished { color: var(--good); border-color: var(--good); }
+  .badge.failed { color: var(--bad); border-color: var(--bad); }
+  .empty { color: var(--muted); padding: 30px 0; text-align: center; }
+  .scroll { overflow-x: auto; }
+</style>
+</head>
+<body>
+<header>
+  <h1>THORP</h1>
+  <span class="sub" id="title">loading…</span>
+  <span class="sub" id="updated"></span>
+</header>
+<main>
+  <section class="panel"><div class="strip" id="strip"></div></section>
+
+  <section class="panel">
+    <h2>Training loss, 100-step EMA, eval cross-entropy, learning rate</h2>
+    <div class="chart tall" id="loss"></div>
+  </section>
+
+  <section class="panel">
+    <h2>Bits per byte per hole card</h2>
+    <div class="chart tall" id="bpb"></div>
+  </section>
+
+  <div class="row">
+    <section class="panel"><h2>Throughput and memory</h2><div class="chart" id="speed"></div></section>
+    <section class="panel"><h2>Gradient norm per layer</h2><div class="chart" id="gradheat"></div></section>
+  </div>
+
+  <div class="row">
+    <section class="panel"><h2>Recipe: tokens by language family</h2><div class="chart" id="families"></div></section>
+    <section class="panel"><h2>Byte-fallback rate per book</h2><div class="chart" id="fallback"></div></section>
+  </div>
+
+  <div class="row">
+    <section class="panel"><h2 id="samplesh">Samples</h2><div class="samples" id="samples"></div></section>
+    <section class="panel"><h2>Next token after “The capital of France is”</h2><div class="chart" id="top10"></div></section>
+  </div>
+
+  <section class="panel">
+    <h2>Runs</h2>
+    <div class="scroll"><table id="runs"><thead><tr>
+      <th>name</th><th>run</th><th>preset</th><th>seed</th><th>status</th><th>tokens</th>
+      <th>minutes</th><th>hole-card bpb mean</th><th>started</th></tr></thead><tbody></tbody></table></div>
+  </section>
+</main>
+<script>
+const C = { text: '#e6edf3', muted: '#8b949e', line: '#2a313c', accent: '#e3b341', blue: '#58a6ff',
+            good: '#3fb950', bad: '#f85149' };
+const layout = (extra = {}) => Object.assign({
+  paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
+  font: { color: C.text, size: 11 }, margin: { l: 50, r: 50, t: 10, b: 36 },
+  xaxis: { gridcolor: C.line, zerolinecolor: C.line },
+  yaxis: { gridcolor: C.line, zerolinecolor: C.line },
+  legend: { orientation: 'h', y: -0.18, font: { size: 10 } }, hovermode: 'closest',
+}, extra);
+const cfg = { displayModeBar: false, responsive: true };
+const fmt = (v, d = 3) => v == null || isNaN(v) ? '–' : Number(v).toFixed(d);
+const big = v => v == null ? '–' : v >= 1e9 ? (v / 1e9).toFixed(2) + 'B' : v >= 1e6 ? (v / 1e6).toFixed(1) + 'M' : v >= 1e3 ? (v / 1e3).toFixed(1) + 'k' : String(Math.round(v));
+const esc = s => String(s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+const get = async u => (await fetch(u)).json();
+const empty = (id, msg = 'no data yet') => { Plotly.purge(id); document.getElementById(id).innerHTML = `<div class="empty">${msg}</div>`; };
+const plot = (id, data, lay) => { const el = document.getElementById(id); if (el.querySelector('.empty')) el.innerHTML = ''; Plotly.react(id, data, lay, cfg); };
+
+let selected = new URLSearchParams(location.search).get('run');
+
+function ema(xs, span) {
+  const a = 2 / (span + 1); let m = null;
+  return xs.map(x => (m = m == null ? x : a * x + (1 - a) * m));
+}
+
+function stat(k, v, s = '') { return `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${s}</div></div>`; }
+
+function headline(r) {
+  const run = r.run, ch = r.chinchilla || {};
+  const latest = r.hole_bpb_latest, prev = r.hole_bpb_previous;
+  const wall = run.wall_minutes != null ? fmt(run.wall_minutes, 1) + ' min' : '–';
+  document.getElementById('strip').innerHTML = [
+    stat('run', esc(run.name || ''), `<span class="mono">${run.run_id.slice(0, 12)}</span> <span class="badge ${run.status.split(':')[0]}">${esc(run.status)}</span>`),
+    stat('preset', esc(r.spec.model.preset), `N = ${big(r.n_params_non_embedding)} non-embedding`),
+    stat('tokens seen', big(r.tokens_seen), `of ${big(r.tokens_planned)} planned`),
+    stat('tokens / s', big(r.tokens_per_s), 'mean of last 50 steps'),
+    stat('wall time', wall, r.eta_minutes != null ? `est. finish in ${fmt(r.eta_minutes, 1)} min` : (run.finished || '')),
+    stat('hole-card bpb mean', latest ? fmt(latest.value) : '–', latest ? `step ${latest.step}` + (prev ? ` · prev ${fmt(prev.value)} @ ${prev.step}` : '') : ''),
+    stat('Chinchilla L(N,D)', fmt(ch.L_planned), `nats/token, indicative · D=${big(ch.D_planned)}; unique: ${fmt(ch.L_unique)}`),
+    stat('gap (en hole-card CE − L)', fmt(ch.gap_planned), `en CE ${fmt(r.hole_ce_mean_en)} nats`),
+  ].join('');
+  document.getElementById('title').textContent = `${run.name} · ${run.run_id.slice(0, 12)} · ${run.hardware || ''}`;
+}
+
+function lossPanel(m, evals, sets) {
+  if (!m.loss) return empty('loss');
+  const [s, v] = m.loss;
+  const data = [
+    { x: s, y: v, name: 'loss', type: 'scattergl', mode: 'lines', line: { color: '#3b4655', width: 1 } },
+    { x: s, y: ema(v, 100), name: 'EMA 100', type: 'scattergl', mode: 'lines', line: { color: C.blue, width: 2 } },
+  ];
+  const palette = [C.accent, C.good, C.bad, '#d2a8ff'];
+  sets.forEach((set, i) => {
+    const k = `eval/${set}/ce_mean`;
+    if (m[k]) data.push({ x: m[k][0], y: m[k][1], name: `${set} CE mean`, mode: 'markers+lines', line: { dash: 'dot', color: palette[i % 4] }, marker: { size: 8, color: palette[i % 4] } });
+    const ken = `eval/${set}/ce_mean_en`;
+    if (m[ken]) data.push({ x: m[ken][0], y: m[ken][1], name: `${set} CE mean (en)`, mode: 'markers', marker: { size: 7, symbol: 'diamond', color: palette[(i + 1) % 4] } });
+  });
+  if (m.lr) data.push({ x: m.lr[0], y: m.lr[1], name: 'lr', yaxis: 'y2', mode: 'lines', line: { color: C.muted, width: 1, dash: 'dash' } });
+  plot('loss', data, layout({ xaxis: { title: 'step', gridcolor: C.line }, yaxis: { title: 'nats / token', gridcolor: C.line },
+    yaxis2: { overlaying: 'y', side: 'right', title: 'lr', showgrid: false, exponentformat: 'e' } }));
+}
+
+function bpbPanel(evals, r) {
+  if (!evals.length) return empty('bpb');
+  const titles = {};
+  for (const sets of Object.values((r.eval_sets && r.eval_sets.data.sets) || {}))
+    for (const b of sets) titles[b.book_id] = `${b.title} (${b.language})`;
+  const by = {};
+  for (const e of evals) (by[e.book_id] ||= []).push(e);
+  const data = Object.entries(by).map(([b, rows]) => ({
+    x: rows.map(r => r.step), y: rows.map(r => r.bpb), name: titles[b] || b, mode: 'lines+markers', marker: { size: 5 },
+    hovertemplate: `${esc(titles[b] || b)}<br>step %{x}<br>%{y:.4f} bpb<extra></extra>`,
+  }));
+  plot('bpb', data, layout({ xaxis: { title: 'step', gridcolor: C.line }, yaxis: { title: 'bits per byte', gridcolor: C.line },
+    legend: { orientation: 'v', x: 1.02, y: 1, font: { size: 10 } }, margin: { l: 50, r: 10, t: 10, b: 36 } }));
+}
+
+function speedPanel(m) {
+  if (!m.tokens_per_s) return empty('speed');
+  const data = [{ x: m.tokens_per_s[0], y: ema(m.tokens_per_s[1], 20), name: 'tokens/s (EMA 20)', mode: 'lines', line: { color: C.good } }];
+  if (m.mem_gb) data.push({ x: m.mem_gb[0], y: m.mem_gb[1], name: 'peak memory GB', yaxis: 'y2', mode: 'lines+markers', line: { color: C.accent }, marker: { size: 4 } });
+  plot('speed', data, layout({ yaxis: { title: 'tokens / s', gridcolor: C.line }, yaxis2: { overlaying: 'y', side: 'right', title: 'GB', showgrid: false, rangemode: 'tozero' } }));
+}
+
+function gradPanel(m) {
+  const keys = Object.keys(m).filter(k => k.startsWith('grad_norm/layer_')).sort((a, b) => +a.split('_').pop() - +b.split('_').pop());
+  if (!keys.length) return empty('gradheat');
+  const x = m[keys[0]][0];
+  plot('gradheat', [{ type: 'heatmap', x, y: keys.map(k => 'layer ' + k.split('_').pop()), z: keys.map(k => m[k][1].map(v => Math.log10(v))),
+    colorscale: 'Viridis', colorbar: { title: 'log10', thickness: 10 }, hovertemplate: 'step %{x}<br>%{y}<br>log10 norm %{z:.2f}<extra></extra>' }],
+    layout({ margin: { l: 60, r: 10, t: 10, b: 36 } }));
+}
+
+function recipePanels(r) {
+  const rec = r.recipe && r.recipe.data;
+  if (!rec) { empty('families'); empty('fallback'); return; }
+  const fam = {};
+  for (const b of rec) fam[b.family] = (fam[b.family] || 0) + b.tokens;
+  const fk = Object.keys(fam).sort((a, b) => fam[b] - fam[a]);
+  plot('families', [{ type: 'bar', x: fk, y: fk.map(k => fam[k]), marker: { color: C.blue }, hovertemplate: '%{x}<br>%{y:,} tokens<extra></extra>' }],
+    layout({ yaxis: { title: 'tokens per pass', gridcolor: C.line } }));
+  const stats = (r.tokeniser && r.tokeniser.stats) || {};
+  const rows = rec.map(b => ({ ...b, rate: (stats[b.book_id] || {}).byte_fallback_rate ?? b.byte_fallback_rate ?? 0 }))
+    .sort((a, b) => b.rate - a.rate).slice(0, 25);
+  plot('fallback', [{ type: 'bar', orientation: 'h', y: rows.map(b => `${b.title.slice(0, 34)} (${b.language})`).reverse(),
+    x: rows.map(b => b.rate * 100).reverse(), marker: { color: C.accent }, hovertemplate: '%{y}<br>%{x:.3f}% byte tokens<extra></extra>' }],
+    layout({ margin: { l: 230, r: 10, t: 10, b: 36 }, xaxis: { title: '% of tokens that are byte pieces (top 25)', gridcolor: C.line }, yaxis: { tickfont: { size: 10 } } }));
+}
+
+function samplesPanel(r) {
+  const el = document.getElementById('samples');
+  if (!r.samples) { el.innerHTML = '<div class="empty">no samples yet</div>'; empty('top10'); return; }
+  document.getElementById('samplesh').textContent = `Samples at step ${r.samples.step}`;
+  el.innerHTML = r.samples.data.map(s => `<div><span class="p">${esc(s.prompt)}</span> <span class="t">${s.temperature ? 'T=' + s.temperature : 'greedy'}</span><pre>${esc(s.prompt)}${esc(s.text)}</pre></div>`).join('');
+  if (r.top10) {
+    const t = r.top10.data.top.slice().reverse();
+    plot('top10', [{ type: 'bar', orientation: 'h', y: t.map(x => JSON.stringify(x.token.replace(/▁/g, ' '))), x: t.map(x => x.p), marker: { color: C.good },
+      hovertemplate: '%{y}<br>p = %{x:.4f}<extra></extra>' }], layout({ margin: { l: 110, r: 10, t: 10, b: 36 }, xaxis: { title: 'probability', gridcolor: C.line } }));
+  }
+}
+
+function runsTable(runs) {
+  const tb = document.querySelector('#runs tbody');
+  tb.innerHTML = runs.map(r => `<tr data-run="${r.run_id}" class="${r.run_id === selected ? 'sel' : ''}">
+    <td>${esc(r.name || '')}</td><td class="mono">${r.run_id.slice(0, 12)}</td><td>${esc(r.preset || '')}</td><td>${r.seed ?? ''}</td>
+    <td><span class="badge ${(r.status || '').split(':')[0]}">${esc(r.status || '')}</span></td><td>${big(r.tokens_seen)}</td>
+    <td>${fmt(r.wall_minutes, 1)}</td><td>${fmt(r.hole_bpb_mean, 4)}</td><td>${esc(r.started || '')}</td></tr>`).join('');
+  tb.querySelectorAll('tr').forEach(tr => tr.onclick = () => {
+    selected = tr.dataset.run; history.replaceState(null, '', '?run=' + selected); refresh();
+  });
+}
+
+async function refresh() {
+  try {
+    const runs = await get('/api/runs');
+    if (!runs.length) { document.getElementById('title').textContent = 'no runs in the ledger yet'; return; }
+    if (!selected || !runs.find(r => r.run_id === selected)) {
+      selected = (runs.find(r => r.status === 'running' && r.name && !r.name.startsWith('smoke')) || runs.find(r => r.status === 'running') || runs[0]).run_id;
+    }
+    runsTable(runs);
+    const [r, m, evals] = await Promise.all([get('/api/run?run=' + selected), get('/api/metrics?run=' + selected), get('/api/evals?run=' + selected)]);
+    headline(r);
+    lossPanel(m, evals, r.sets || []);
+    bpbPanel(evals, r);
+    speedPanel(m);
+    gradPanel(m);
+    recipePanels(r);
+    samplesPanel(r);
+    document.getElementById('updated').textContent = 'updated ' + new Date().toLocaleTimeString();
+  } catch (e) {
+    document.getElementById('updated').textContent = 'error: ' + e;
+  }
+}
+refresh();
+setInterval(refresh, 5000);
+</script>
+</body>
+</html>

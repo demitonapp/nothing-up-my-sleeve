@@ -1,0 +1,61 @@
+"""Fixed prompts -> greedy and temperature-0.8 continuations, plus the top-10 after the Paris prompt."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+
+import mlx.core as mx
+
+from thorp.evaluators import EvalContext, EvalResult
+
+PROMPTS = [
+    "The capital of France is",
+    "It is a truth universally acknowledged",
+    "The Master said",
+    "In the beginning",
+]
+PARIS = PROMPTS[0]
+NEW_TOKENS = 60
+TEMPERATURE = 0.8
+
+
+def generate(model, tok, prompt: str, temperature: float, n: int, context: int, key) -> str:
+    ids = tok.encode(prompt)
+    out = []
+    for i in range(n):
+        x = mx.array([(ids + out)[-context:]])
+        logits = model(x)[0, -1].astype(mx.float32)
+        if temperature == 0:
+            nxt = mx.argmax(logits)
+        else:
+            nxt = mx.random.categorical(logits / temperature, key=mx.random.split(key, n)[i])
+        out.append(int(nxt.item()))
+    return tok.decode(out)
+
+
+def top10(model, tok, prompt: str) -> list[dict]:
+    logits = model(mx.array([tok.encode(prompt)]))[0, -1].astype(mx.float32)
+    probs = mx.softmax(logits)
+    order = mx.argsort(-probs)[:10].tolist()
+    return [{"token": tok.sp.id_to_piece(i), "id": i, "p": probs[i].item()} for i in order]
+
+
+def evaluate(ctx: EvalContext) -> EvalResult:
+    key = mx.random.key(ctx.step)
+    samples = []
+    for p in PROMPTS:
+        for t in (0.0, TEMPERATURE):
+            text = generate(ctx.model, ctx.tokeniser, p, t, NEW_TOKENS, ctx.context, key)
+            samples.append({"prompt": p, "temperature": t, "text": text})
+    s = json.dumps(samples, ensure_ascii=False)
+    t10 = json.dumps(
+        {"prompt": PARIS, "top": top10(ctx.model, ctx.tokeniser, PARIS)}, ensure_ascii=False
+    )
+    sha = lambda x: hashlib.sha1(x.encode()).hexdigest()  # noqa: E731
+    return EvalResult(
+        artifacts=[
+            {"kind": "samples", "path": "", "sha1": sha(s), "text": s},
+            {"kind": "top10", "path": "", "sha1": sha(t10), "text": t10},
+        ]
+    )

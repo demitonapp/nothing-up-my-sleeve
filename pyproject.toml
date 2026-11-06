@@ -1,0 +1,40 @@
+[project]
+name = "thorp"
+version = "0.1.0"
+description = "A harness for training small language models on pre-1930 public-domain books and scoring shelves by bits per byte on held-out books."
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "mlx",
+    "sentencepiece",
+    "numpy",
+    "requests",
+    "pyyaml",
+]
+
+[dependency-groups]
+dev = ["pytest", "ruff"]
+
+[project.scripts]
+thorp = "thorp.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["thorp"]
+artifacts = ["thorp/dash/index.html"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["data"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = ["E501"]  # ruff format owns line length; long docstring lines are allowed
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["network: needs the internet"]

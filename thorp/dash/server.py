@@ -755,6 +755,29 @@ def api_sieves() -> dict:
     }
 
 
+# classes renamed (old address name -> new), so old addresses and names keep working (7 Nov, Justin)
+CLASS_RENAMES = {"seedling": "keel", "proxy": "pilot"}
+
+
+def _known_heads() -> list[dict]:
+    """The star chart (thorp/dash/heads.py), each kind's expected class turned into its preset."""
+    import re
+
+    from thorp.dash.heads import KNOWN_HEADS
+    from thorp.models.registry import LADDER
+
+    by_name = {
+        re.sub(r"[^a-z0-9]+", "-", re.sub(r"^the\s+", "", r["name"].lower())): r["preset"]
+        for r in LADDER
+    }
+    for old, new in CLASS_RENAMES.items():  # either name finds the class, before and after a rename
+        if old in by_name:
+            by_name.setdefault(new, by_name[old])
+        if new in by_name:
+            by_name.setdefault(old, by_name[new])
+    return [{**h, "expected_from": by_name.get(h.get("expected_class"))} for h in KNOWN_HEADS]
+
+
 def api_discoveries() -> dict:
     """The two things followed across every ship: stars (heads that light, fleet.STARS) and traits
     (directions the probes find, evaluators/probes.py). For each, which ships have it and when."""
@@ -861,7 +884,7 @@ def api_discoveries() -> dict:
         "trait_margin": probes.EMERGE_MARGIN,
         "core_traits": list(probes.TRAIT_COLUMNS),
         # the star chart: every kind of head the literature describes (thorp/dash/heads.py)
-        "known_heads": __import__("thorp.dash.heads", fromlist=["KNOWN_HEADS"]).KNOWN_HEADS,
+        "known_heads": _known_heads(),
     }
 
 

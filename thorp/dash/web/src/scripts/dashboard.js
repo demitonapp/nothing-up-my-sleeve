@@ -17,7 +17,11 @@ let selected = new URLSearchParams(location.search).get('run');
 
 let currentRung = null;
 const slugOf = r => r.name.toLowerCase().replace(/^the\s+/, '').replace(/[^a-z0-9]+/g, '-');
-const rungFor = key => ladderData && ladderData.rungs.find(r => slugOf(r) === key || r.preset === key);
+// classes renamed (old address name -> new; server.py CLASS_RENAMES): either name opens the class,
+// and the address is rewritten to the class's current name
+const CLASS_RENAMES = { seedling: 'keel', proxy: 'pilot' };
+const CLASS_ALIASES = Object.fromEntries(Object.entries(CLASS_RENAMES).flatMap(([a, b]) => [[a, b], [b, a]]));
+const rungFor = key => ladderData && ladderData.rungs.find(r => slugOf(r) === key || r.preset === key || slugOf(r) === CLASS_ALIASES[key]);
 // ---- Navigation (UI.md, "Navigation"). Three ways in, each a section of the header:
 //   #/classes                    the classes of ship, one card per model size (home)
 //   #/classes/<class>[/<tab>]    one class: fleet (default), overview, training, scoring, waypoints
@@ -946,7 +950,7 @@ function renderRung() {
       shapes: [{ type: 'line', xref: 'paper', x0: 0, x1: 1, y0: 1, y1: 1, line: { color: C.accent, dash: 'dot' } }] }));
   renderTomes(r, allRuns);
   rungExtras(r, runs, allRuns);
-  if (modelTab === 'waypoints') renderWaypoints(r);
+  if (modelTab === 'waypoints') { renderWaypoints(r); starsInReach(r); }
   document.querySelectorAll('#rung .chart').forEach(el => { if (el.data && el.offsetParent) Plotly.Plots.resize(el); });
 }
 // ---- Waypoints: when each run passed each waypoint (server.py api_waypoints). Fetched only while
@@ -1307,6 +1311,39 @@ async function loadDiscoveries() {
   }).join('') || '<tr><td colspan="7" class="empty">no ship has trait probes yet</td></tr>';
 }
 let discHeads = [], discStars = [];
+// classes in ladder order, smallest first; a kind beyond the ladder ranks after them all
+const classRank = p => { const i = ladderData ? ladderData.rungs.findIndex(r => r.preset === p) : -1; return i < 0 ? 99 : i; };
+// the smallest class where any sailing has lit a measured kind (one head first, else shared)
+function firstLitIn(h) {
+  const st = h.star && discStars.find(x => x.key === h.star);
+  if (!st) return '<td data-sort="99">–</td>';
+  const lit = st.ships.filter(x => x.steps_to_lit != null || x.shared_steps_to_lit != null).sort((a, b) => classRank(a.preset) - classRank(b.preset));
+  if (!lit.length) return '<td data-sort="98" class="s">not lit yet</td>';
+  const x = lit[0], below = classRank(x.preset) < classRank(h.expected_from);
+  return `<td data-sort="${classRank(x.preset)}">${classLink(x.preset)} · ${x.steps_to_lit != null ? 'lit' : 'lit shared'} by ${shipLink(x)}${below ? ' <span class="pill good" title="lit below the class expected to reach it">below expectation</span>' : ''}</td>`;
+}
+// a class's stars in reach: the kinds expected at or below it, with its own sailings' state
+let reachData = null, reachAt = 0;
+async function starsInReach(r) {
+  if (!reachData || Date.now() - reachAt > 30000) { try { reachData = await get('/api/discoveries'); reachAt = Date.now(); } catch (e) { return; } }
+  const me = classRank(r.preset), heads = reachData.known_heads || [];
+  const inReach = heads.filter(h => h.expected_from && classRank(h.expected_from) <= me).sort((a, b) => classRank(a.expected_from) - classRank(b.expected_from));
+  const next = heads.filter(h => h.expected_from && classRank(h.expected_from) === me + 1);
+  document.getElementById('reachnext').textContent = next.length ? `next in reach, one class up: ${next.map(h => h.name).join(', ')}` : '';
+  document.querySelector('#reachtable tbody').innerHTML = inReach.length ? inReach.map(h => {
+    const st = h.star && reachData.stars.find(x => x.key === h.star);
+    let cell = '<td data-sort="9" class="s">not measured yet</td>';
+    if (st) {
+      const mine = st.ships.filter(x => x.preset === r.preset), lit = mine.filter(x => x.steps_to_lit != null), sh = mine.filter(x => x.shared_steps_to_lit != null);
+      const best = Math.max(-1, ...mine.map(x => x.best ?? -1));
+      cell = !mine.length ? '<td data-sort="8" class="s">measured, but no sailing of this class has a reading yet</td>'
+        : `<td data-sort="${lit.length ? 0 : sh.length ? 1 : 2}">${lit.length ? '<span class="pill good">lit</span>' : sh.length ? '<span class="pill accent">lit shared</span>' : '<span class="pill">not lit yet</span>'}
+          ${lit.length ? `on ${lit.length}` : sh.length ? `on ${sh.length}` : `best ${fmt(best)}`} of ${mine.length} sailings · threshold ${st.threshold}</td>`;
+    }
+    return `<tr><td><b>${esc(h.name)}</b></td><td>${esc(FAMILY[h.family] || h.family)}</td><td data-sort="${classRank(h.expected_from)}">${classLink(h.expected_from)}</td>
+      <td class="s">${esc(h.expected_why || '')}</td>${cell}</tr>`;
+  }).join('') : '<tr><td colspan="5" class="empty">no kind of head is expected this small</td></tr>';
+}
 const FAMILY = { position: 'position', copying: 'copying', circuit: 'the indirect-object circuit', suppression: 'suppression', structure: 'grammar and reference', task: 'the task' };
 function drawHeads() {
   const sel = document.getElementById('headfamily');
@@ -1317,6 +1354,7 @@ function drawHeads() {
     if (!h.star) return `<td data-sort="9" class="s" title="${esc(h.measure)}">not measured yet · <i>${esc(h.measure)}</i></td>`;
     const st = discStars.find(x => x.key === h.star);
     if (!st) return '<td data-sort="5">measured</td>';
+    if (!st.ships.length) return `<td data-sort="3"><span class="pill">measured</span> a star: ${esc(st.name)} · readings start with the next ship to sail · threshold ${st.threshold}</td>`;
     const lit = st.ships.filter(x => x.steps_to_lit != null), sh = st.ships.filter(x => x.shared_steps_to_lit != null);
     const best = Math.max(-1, ...st.ships.map(x => x.best ?? -1));
     const pill = lit.length ? '<span class="pill good">lit</span>' : sh.length ? '<span class="pill accent">lit shared</span>' : '<span class="pill">not lit yet</span>';
@@ -1324,7 +1362,8 @@ function drawHeads() {
   };
   document.getElementById('headcount').textContent = `${rows.length} kinds · ${rows.filter(h => h.star).length} measured by Thorp`;
   document.querySelector('#headtable tbody').innerHTML = rows.map(h => `<tr${h.star ? ' class="measured"' : ''}><td><b>${esc(h.name)}</b></td><td>${esc(FAMILY[h.family] || h.family)}</td>
-    <td>${esc(h.does)}</td><td>${h.rests_on.length ? esc(h.rests_on.map(k => byKey[k] || k).join(', ')) : '–'}</td>${state(h)}
+    <td>${esc(h.does)}</td><td>${h.rests_on.length ? esc(h.rests_on.map(k => byKey[k] || k).join(', ')) : '–'}</td>
+    <td data-sort="${classRank(h.expected_from)}" title="${esc(h.expected_why || '')}">${h.expected_from ? classLink(h.expected_from) : 'beyond the ladder'}</td>${firstLitIn(h)}${state(h)}
     <td class="s">${esc(h.source)}</td><td class="s">${esc(h.seen_in)}</td></tr>`).join('');
 }
 document.getElementById('headfamily').onchange = drawHeads;

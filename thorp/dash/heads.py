@@ -7,6 +7,14 @@ rests on, where it was first described, what size of model it has been seen in, 
 measure it. Promoting one to a star is the fleet's job (fleet.STARS plus an evaluator); this list
 only charts the sky.
 
+`expected_class` is the smallest class of ship expected to reach the kind, by class name (the
+ladder's names less "The", as in the page's addresses: "keel", "speller"…), a prediction
+written down before it is tested (None: beyond the ladder). The server turns it into the class's
+preset from the registry, so no size is written here. The floor is depth: each layer gives a head one hop,
+so a mechanism of k heads in sequence needs at least k layers; width, data, vocabulary and context
+decide the rest. `expected_why` says why in a line. The page sets it beside "first lit in", the
+smallest class where a sailing actually lit it: a star lit below its expected class is a discovery.
+
 `rests_on` lists only dependencies the source reports (the indirect-object circuit's chain, and
 induction resting on a previous-token head); a blank list means none reported, not none exists.
 
@@ -29,17 +37,21 @@ KNOWN_HEADS: list[dict] = [
     # ------------------------------------------------------------------ position
     {
         "key": "attention_sink",
+        "expected_class": "keel",
+        "expected_why": "one hop: a single layer can rest its attention on the first token",
         "name": "Attention sink",
         "family": "position",
         "does": "Puts most of its attention on the first token of the window whatever comes, a resting place for a head with nothing to do.",
         "rests_on": [],
         "source": "Xiao et al. 2023, Efficient Streaming Language Models with Attention Sinks",
         "seen_in": "language models across sizes",
-        "star": None,
+        "star": "attention_sink",
         "measure": "Mean attention to position 0 (Thorp's windows start with an end-of-text token) over every query; cheap, from the same attention patterns the stars use.",
     },
     {
         "key": "previous_token",
+        "expected_class": "keel",
+        "expected_why": "one hop: a single layer can attend by position",
         "name": "Previous-token head",
         "family": "position",
         "does": "At each word, attends to the word just before it, so the next layer knows what came before.",
@@ -50,41 +62,62 @@ KNOWN_HEADS: list[dict] = [
         "measure": "",
     },
     {
-        "key": "positional",
-        "name": "Positional head",
+        "key": "offset_2",
+        "expected_class": "keel",
+        "expected_why": "one hop: a single layer can attend by position",
+        "name": "Positional head: two words back",
         "family": "position",
-        "does": "Attends to a fixed offset, two or three tokens back or one ahead in a bidirectional model, whatever the words are.",
+        "does": "Attends to the token two back, whatever it is: a fixed offset (the previous-token head is offset one).",
         "rests_on": [],
         "source": VOITA_2019,
         "seen_in": "translation encoders and BERT",
-        "star": None,
+        "star": "offset_2",
+        "measure": "The previous-word test at offsets 2 and 3: mean attention from each token to the token k back.",
+    },
+    {
+        "key": "offset_3",
+        "expected_class": "keel",
+        "expected_why": "one hop: a single layer can attend by position",
+        "name": "Positional head: three words back",
+        "family": "position",
+        "does": "Attends to the token three back, whatever it is: a fixed offset.",
+        "rests_on": [],
+        "source": VOITA_2019,
+        "seen_in": "translation encoders and BERT",
+        "star": "offset_3",
         "measure": "The previous-word test at offsets 2 and 3: mean attention from each token to the token k back.",
     },
     {
         "key": "delimiter",
+        "expected_class": "keel",
+        "expected_why": "one hop: a single layer can find punctuation by its token",
         "name": "Delimiter head",
         "family": "position",
         "does": "Attends to separators and punctuation (full stops, line breaks, special tokens).",
         "rests_on": [],
         "source": CLARK_2019,
         "seen_in": "BERT",
-        "star": None,
+        "star": "delimiter",
         "measure": "Share of attention landing on punctuation and newline tokens, against their share of the window.",
     },
     {
         "key": "rare_word",
+        "expected_class": "keel",
+        "expected_why": "one hop, once the embeddings know which tokens are rare",
         "name": "Rare-word head",
         "family": "position",
         "does": "Attends to the least frequent words in the sentence.",
         "rests_on": [],
         "source": VOITA_2019,
         "seen_in": "translation encoders",
-        "star": None,
+        "star": "rare_word",
         "measure": "Correlation between attention received and the token's rarity on the shelf.",
     },
     # ------------------------------------------------------------------ copying
     {
         "key": "duplicate_token",
+        "expected_class": "keel",
+        "expected_why": "one hop: match the current token against earlier ones",
         "name": "Duplicate-token head",
         "family": "copying",
         "does": "At a word, attends to where the same word appeared before: noticing that Darcy has been mentioned already.",
@@ -96,6 +129,8 @@ KNOWN_HEADS: list[dict] = [
     },
     {
         "key": "induction",
+        "expected_class": "keel",
+        "expected_why": "two hops, a previous-token head below and the induction head above; two layers is the minimum",
         "name": "Induction head (Nevermore)",
         "family": "copying",
         "does": "At a word seen before, attends to the word that followed it last time and bets it comes again: [A][B] … [A] → [B].",
@@ -107,6 +142,8 @@ KNOWN_HEADS: list[dict] = [
     },
     {
         "key": "fuzzy_induction",
+        "expected_class": "speller",
+        "expected_why": "needs embeddings that put a word's forms (case, plural) near each other",
         "name": "Fuzzy and translation induction head",
         "family": "copying",
         "does": "Induction on near matches rather than exact ones: a word in another case or form, or the same sentence in another language.",
@@ -118,6 +155,8 @@ KNOWN_HEADS: list[dict] = [
     },
     {
         "key": "retrieval",
+        "expected_class": None,
+        "expected_why": "found only in long-context models of billions of parameters: beyond the ladder",
         "name": "Retrieval head",
         "family": "copying",
         "does": "Finds a fact stated far back in a long context and copies it out: the needle-in-a-haystack heads.",
@@ -129,6 +168,8 @@ KNOWN_HEADS: list[dict] = [
     },
     {
         "key": "successor",
+        "expected_class": "stylist",
+        "expected_why": "needs the order of numbers, days and months held in its weights",
         "name": "Successor head",
         "family": "copying",
         "does": "Given an item of an ordered series, pushes up the next one: Monday → Tuesday, 3 → 4, March → April.",
@@ -141,6 +182,8 @@ KNOWN_HEADS: list[dict] = [
     # ------------------------------------------------------------------ the indirect-object circuit
     {
         "key": "s_inhibition",
+        "expected_class": "bettor",
+        "expected_why": "four or more hops in sequence; found in GPT-2 small, the shape of the 100m (12 x 768)",
         "name": "S-inhibition head",
         "family": "circuit",
         "does": "In 'When Mary and John went to the store, John gave a drink to', marks that John is repeated, so later heads leave him out.",
@@ -152,6 +195,8 @@ KNOWN_HEADS: list[dict] = [
     },
     {
         "key": "name_mover",
+        "expected_class": "bettor",
+        "expected_why": "four or more hops in sequence; found in GPT-2 small, the shape of the 100m (12 x 768)",
         "name": "Name mover head",
         "family": "circuit",
         "does": "Attends to the name not yet repeated and copies it to the answer: Mary.",
@@ -163,6 +208,8 @@ KNOWN_HEADS: list[dict] = [
     },
     {
         "key": "backup_name_mover",
+        "expected_class": "bettor",
+        "expected_why": "redundancy beside the name movers; found in GPT-2 small",
         "name": "Backup name mover head",
         "family": "circuit",
         "does": "Does a name mover's job only when the name movers are knocked out: redundancy the model builds in.",
@@ -175,6 +222,8 @@ KNOWN_HEADS: list[dict] = [
     # ------------------------------------------------------------------ suppression
     {
         "key": "negative_name_mover",
+        "expected_class": "bettor",
+        "expected_why": "beside the name movers in the same circuit; found in GPT-2 small",
         "name": "Negative name mover head",
         "family": "suppression",
         "does": "Attends to the right name and pushes its logit down, hedging the model's bet.",
@@ -186,6 +235,8 @@ KNOWN_HEADS: list[dict] = [
     },
     {
         "key": "copy_suppression",
+        "expected_class": "paragraph",
+        "expected_why": "sits above the copying heads late in the stack; found in a 12-layer model",
         "name": "Copy-suppression head",
         "family": "suppression",
         "does": "When a word earlier in the text is being over-predicted, attends to it and pushes it down: the brake on copying.",
@@ -198,6 +249,8 @@ KNOWN_HEADS: list[dict] = [
     # ------------------------------------------------------------------ structure
     {
         "key": "syntactic",
+        "expected_class": "paragraph",
+        "expected_why": "needs grammar in the hidden state; found in 12-layer encoders",
         "name": "Syntactic head",
         "family": "structure",
         "does": "Follows a grammatical relation: from a verb to its subject or object, from a noun to its determiner.",
@@ -209,6 +262,8 @@ KNOWN_HEADS: list[dict] = [
     },
     {
         "key": "coreference",
+        "expected_class": "paragraph",
+        "expected_why": "needs names and pronouns tracked in the hidden state; found in 12-layer encoders",
         "name": "Coreference head",
         "family": "structure",
         "does": "From a pronoun, attends to the name it stands for: from 'she' back to Elizabeth.",
@@ -221,6 +276,8 @@ KNOWN_HEADS: list[dict] = [
     # ------------------------------------------------------------------ task
     {
         "key": "function_vector",
+        "expected_class": None,
+        "expected_why": "found only in models of billions of parameters: beyond the ladder",
         "name": "Function-vector head",
         "family": "task",
         "does": "From a few examples in the prompt (hot → cold, big → small), carries what the task is, so the model does it on the next word.",

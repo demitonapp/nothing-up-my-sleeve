@@ -55,11 +55,15 @@ holds the ways in, always:
   each with its threshold, what it rests on, and the first ship to light it or the nearest so far;
   and **traits** (fiction, verse, first person, the language families), with how many ships
   found and learned each, and the first to do so. Under the star cards, **the star chart**: every
-  kind of attention head the literature describes (`thorp/dash/heads.py` `KNOWN_HEADS`: what it
+  kind of attention head the literature describes (`thorp/dash/heads.py` `KNOWN_HEADS`, 19 kinds,
+  8 measured: the whole position family, duplicate-token and induction; what it
   does, its family, what its source reports it rests on, where it was first described, what it has
   been seen in). A kind Thorp measures links to its `fleet.STARS` star and shows its state from the
-  ledger; the rest say how Thorp could measure them. Adding a kind is an entry in `heads.py`;
-  measuring one is a star in `fleet.py` and an evaluator.
+  ledger; the rest say how Thorp could measure them. Each kind also carries **expected from**,
+  the smallest class predicted to reach it (written down before it is tested; the floor is depth,
+  one hop per layer), beside **first lit in**, the smallest class where a sailing actually lit it;
+  a kind lit below its expected class is flagged "below expectation". Adding a kind is an entry in
+  `heads.py`; measuring one is a star in `fleet.py` and an evaluator.
 - **Sieves** (`#/sieves[/<sailing>]`): how the ship answers the wind, layer by layer. An intro in
   the voyage vocabulary, a card per sieve with its write-up from `fleet.SIEVES` (push, move,
   heading: rendered as written there, never rewritten on the page), then for a picked sailing
@@ -85,7 +89,9 @@ Every address is canonical: older ones (`#sizes`, `#proxy`, `#rung-1m`, `#/model
 
 Every class on the ladder (`LADDER` in `thorp/models/registry.py`) gets one page, built from one
 template (`web/src/components/ModelPage.astro`, filled by `renderRung` in `dashboard.js`) at
-`#/classes/<class>`, named by class, not size: `#/classes/proxy`, `#/classes/speller`…
+`#/classes/<class>`, named by class, not size: `#/classes/pilot`, `#/classes/speller`…
+Renamed classes keep their old addresses (`CLASS_RENAMES` in `server.py` and `dashboard.js`:
+the seedling is now the keel, the proxy the pilot), which redirect to the current name.
 
 Its tabs sit under its title, each with its own address:
 
@@ -106,7 +112,9 @@ Its tabs sit under its title, each with its own address:
      and punctuation, balance and capitals, grammar (minimal pairs), voice (register), traits.
    Each band opens with its own "What we measure" list. The split is the `ART` set in
    `dashboard.js`; a metric not named there counts as science, so a new art metric must be added.
-4. **Waypoints** (`/waypoints`): the moments it passes in training. When each run first formed a
+4. **Waypoints** (`/waypoints`): opens with **stars in reach**, the kinds of head this class is
+   expected to reach (the star chart's "expected from" at or below it) with its own sailings'
+   state on each, and what comes into reach one class up. Then the moments it passes in training. When each run first formed a
    Nevermore (induction head, `evaluators/nevermore.py`) and first found and learned each trait
    (`evaluators/probes.py`), then the strongest head and copy gain by step, and each trait's
    held-out AUC by step. The thresholds come from the evaluators through `/api/waypoints`. Each
@@ -190,7 +198,7 @@ The page speaks the project's metaphor, consistently. Each word means one thing:
 
 | word | means |
 |---|---|
-| class | a model size with one job (1m the proxy, 9m the speller…) |
+| class | a model size with one job (300k the keel, 1m the pilot, 9m the speller…) |
 | ship | a class fitted out one way: its training material and settings (the fitout) |
 | sailing | one run of a ship, one per seed |
 | fleet | the ships of a class; the First Fleet is everything fitted out before 7 November, archived |

@@ -30,7 +30,7 @@ const rungFor = key => ladderData && ladderData.rungs.find(r => slugOf(r) === ke
 //   #/ships/<key>[/<sailing>[/<tab>]]  one ship (a class fitted out one way) and one of its sailings (runs):
 //                                betting (default), books, languages, sieves, attention, traits
 //   #/voyages, #/voyages/<key>   the voyages, and one voyage
-//   #/discoveries                the stars and traits followed across every ship
+//   #/discoveries[/<trick>]      the tricks of the trade, and one trick; /stars and /traits beside them
 //   #/sieves[/<sailing>]         the sieves explained, and one sailing's push, move and heading
 // Older addresses (#sizes, #proxy, #rung-1m, #/models/…, #betting…, ?run=) land on the new ones.
 const MTABS = ['fleet', 'overview', 'training', 'scoring', 'waypoints'];
@@ -38,6 +38,7 @@ const STABS = ['betting', 'books', 'languages', 'sieves', 'attention', 'traits']
 const STAB_EL = { betting: 'betting', books: 'books', languages: 'languages', sieves: 'sieves', attention: 'attention', traits: 'traits-section' };
 const OLD_SHIP = { betting: 'betting', books: 'books', languages: 'languages', sieves: 'sieves', attention: 'attention', 'traits-section': 'traits' };
 const SECTION_NAV = { sizes: 'classes', rung: 'classes', ship: 'classes', 'runs-section': 'classes', voyages: 'voyages', voyage: 'voyages', discoveries: 'discoveries', sievesguide: 'sieves' };
+let discView = 'index', discTrick = null;
 let page = 'sizes', modelTab = 'fleet', shipKey = null, sailingKey = null, shipTab = 'betting', voyageKey = null, runsList = null, shipsData = null;
 function route(h) {
   if (h.startsWith('/')) {
@@ -52,7 +53,7 @@ function route(h) {
     if (a === 'ships') return { page: 'runs-section' };
     if (a === 'voyages' && b) return { page: 'voyage', voyage: b };
     if (a === 'voyages') return { page: 'voyages' };
-    if (a === 'discoveries') return { page: 'discoveries' };
+    if (a === 'discoveries') return { page: 'discoveries', dview: !b ? 'index' : (b === 'stars' || b === 'traits') ? b : 'trick', trick: b && b !== 'stars' && b !== 'traits' ? b : null };
     if (a === 'sieves') return { page: 'sievesguide', run: b ? decodeURIComponent(b) : null };
     return { page: 'sizes' };
   }
@@ -119,7 +120,12 @@ function showTab(h, push = true) {
   if (page === 'sizes') hash = '/classes';
   if (page === 'runs-section') hash = '/ships';
   if (page === 'voyages') hash = '/voyages';
-  if (page === 'discoveries') hash = '/discoveries';
+  if (page === 'discoveries') {
+    discView = rt.dview || 'index'; discTrick = rt.trick || null;
+    hash = '/discoveries' + (discView === 'index' ? '' : '/' + (discView === 'trick' ? discTrick : discView));
+    document.querySelectorAll('#discoveries .dview').forEach(v => v.classList.toggle('active', v.dataset.dview === discView));
+    if (discData) drawDiscoveryView();
+  }
   if (page === 'sievesguide') { sieveRun = rt.run; hash = '/sieves' + (sieveRun ? '/' + encodeURIComponent(sieveRun) : ''); }
   document.querySelectorAll('main > .section').forEach(s => s.classList.toggle('active', s.id === page));
   document.querySelectorAll('#mainnav a').forEach(a => a.classList.toggle('active', a.dataset.nav === SECTION_NAV[page]));
@@ -1344,23 +1350,6 @@ async function loadDiscoveries() {
   if (key === discKey) return;
   discKey = key;
   const byName = Object.fromEntries(d.stars.map(s => [s.key, s.name]));
-  // tricks: can it do it? each with the stars thought to perform it, and the two telling mismatches
-  const starLitAnywhere = k => { const s = d.stars.find(x => x.key === k); return s && s.ships.some(x => x.steps_to_lit != null || x.shared_steps_to_lit != null); };
-  document.getElementById('trickcards').innerHTML = (d.tricks || []).map(t => {
-    const done = t.ships.filter(x => x.performed_at != null).sort((a, b) => a.performed_at - b.performed_at);
-    const best = [...t.ships].sort((a, b) => b.best - a.best)[0], first = done[0];
-    const otherWay = done.filter(x => t.performed_by.length && !x.stars_lit.length).length;
-    const noAct = t.ships.filter(x => x.performed_at == null && x.stars_lit.length).length;
-    const by = t.performed_by.length ? t.performed_by.map(k => `${esc(byName[k] || k)} <span class="pill ${starLitAnywhere(k) ? 'good' : ''}">${starLitAnywhere(k) ? 'lit somewhere' : 'not lit yet'}</span>`).join(', ')
-      : ((d.known_heads || []).find(h => h.trick === t.key) ? `its star, the ${esc((d.known_heads || []).find(h => h.trick === t.key).name.toLowerCase())}, is charted but not yet measured` : 'no star linked yet');
-    return `<div class="card${done.length ? ' lit' : ''}">
-      <div class="top"><span class="preset">${esc(t.name)}</span><span class="pill ${done.length ? 'good' : ''}">${done.length ? 'performed' : 'not performed yet'}</span></div>
-      <div class="job">performed at ${t.threshold} · <span class="mono">${esc(t.metric)}</span></div>
-      <div class="ov">${esc(t.about)}</div>
-      <div class="foot"><span>${first ? `first performed by ${shipLink(first)} (${esc(first.preset || '')}) at step ${first.performed_at}` : best ? `nearest: ${shipLink(best)} at ${fmt(best.best)}` : 'readings start with the next ship to sail'}</span></div>
-      <div class="foot"><span>performed by: ${by}</span></div>
-      ${t.ships.length ? `<div class="foot"><span>performed on ${done.length} of ${t.ships.length} sailings${t.performed_by.length ? ` · ${done.length - otherWay} with a performing star lit, <b>${otherWay} done some other way</b> · <b>${noAct}</b> with a star lit but the trick not performed` : ''}</span></div>` : ''}</div>`;
-  }).join('') || '<div class="empty">no tricks measured yet</div>';
   document.getElementById('starcards').innerHTML = d.stars.map(s => {
     const lit = s.ships.filter(x => x.steps_to_lit != null).sort((a, b) => a.steps_to_lit - b.steps_to_lit);
     const shared = s.ships.filter(x => x.shared_steps_to_lit != null).sort((a, b) => a.shared_steps_to_lit - b.shared_steps_to_lit);
@@ -1376,7 +1365,7 @@ async function loadDiscoveries() {
       <div class="foot"><span>lit on ${lit.length}${shared.length ? `, lit shared on ${shared.length},` : ''} of ${s.ships.length} sailings measured</span></div></div>`;
   }).join('');
   // the star chart: every known kind of head; the measured ones carry their state
-  discHeads = d.known_heads || []; discStars = d.stars; discTricks = d.tricks || []; drawHeads();
+  discHeads = d.known_heads || []; discStars = d.stars; discTricks = d.tricks || []; discData = d; drawHeads(); drawDiscoveryView();
   document.querySelector('#traittable thead').innerHTML = `<tr><th>trait</th><th>ships measured</th><th>found by</th><th>first found</th><th>learned by</th><th>first learned</th><th>best held-out AUC</th></tr>`;
   const firstOf = (ships, k) => ships.filter(x => x[k] != null).sort((a, b) => a[k] - b[k])[0];
   document.querySelector('#traittable tbody').innerHTML = d.traits.map(t => {
@@ -1387,7 +1376,93 @@ async function loadDiscoveries() {
       <td>${t.ships.filter(x => x.learned_at != null).length}</td><td>${who(l, 'learned_at')}</td><td>${best && best.best != null ? `${fmt(best.best)} (${esc(best.ship_name || best.ship || best.name)})` : '–'}</td></tr>`;
   }).join('') || '<tr><td colspan="7" class="empty">no ship has trait probes yet</td></tr>';
 }
-let discHeads = [], discStars = [], discTricks = [];
+let discHeads = [], discStars = [], discTricks = [], discData = null;
+// a kind of head's state in Thorp: not measured, measured without readings, lit, lit shared or best so far
+function headState(h) {
+  if (!h.star) return `<td data-sort="9" class="s" title="${esc(h.measure)}">not measured yet · <i>${esc(h.measure)}</i>${trickNote(h)}</td>`;
+  const st = discStars.find(x => x.key === h.star);
+  if (!st) return '<td data-sort="5">measured</td>';
+  if (!st.ships.length) return `<td data-sort="3"><span class="pill">measured</span> a star: ${esc(st.name)} · readings start with the next ship to sail · threshold ${st.threshold}</td>`;
+  const lit = st.ships.filter(x => x.steps_to_lit != null), sh = st.ships.filter(x => x.shared_steps_to_lit != null);
+  const best = Math.max(-1, ...st.ships.map(x => x.best ?? -1));
+  const pill = lit.length ? '<span class="pill good">lit</span>' : sh.length ? '<span class="pill accent">lit shared</span>' : '<span class="pill">not lit yet</span>';
+  return `<td data-sort="${lit.length ? 0 : sh.length ? 1 : 2}">${pill} a star: ${esc(st.name)} · ${lit.length ? `lit on ${lit.length}` : sh.length ? `lit shared on ${sh.length}` : `best ${fmt(best)}`} of ${st.ships.length} sailings · threshold ${st.threshold}${trickNote(h)}</td>`;
+}
+// Thorp's progress on a trick: the smallest class that performed it, else the best reading so far
+function trickProgress(kt) {
+  const t = kt.fleet && discTricks.find(x => x.key === kt.fleet);
+  if (!kt.fleet) return { cell: '<td data-sort="9" class="s">not measured yet</td>', state: 'not measured yet', cls: '' };
+  if (!t || !t.ships.length) return { cell: '<td data-sort="8" class="s">measured · readings start with the next ship to sail</td>', state: 'measured, no readings yet', cls: '' };
+  const done = t.ships.filter(x => x.performed_at != null).sort((a, b) => classRank(a.preset) - classRank(b.preset) || a.performed_at - b.performed_at);
+  if (done.length) { const x = done[0]; return { cell: `<td data-sort="${classRank(x.preset)}"><span class="pill good">performed</span> at ${classLink(x.preset)} by ${shipLink(x)}, step ${x.performed_at}</td>`, state: 'performed', cls: 'good' }; }
+  const best = [...t.ships].sort((a, b) => b.best - a.best)[0];
+  return { cell: `<td data-sort="7"><span class="pill">not yet</span> best ${fmt(best.best)} of ${t.threshold} (${classLink(best.preset)})</td>`, state: 'not performed yet', cls: '' };
+}
+const ladderParams = p => { const r = ladderData && ladderData.rungs.find(x => x.preset === p); return r ? r.total : null; };
+function drawTricks() {
+  const sel = document.getElementById('trickfamily'), bandSel = document.getElementById('trickband'), kts = discData.known_tricks || [];
+  const fams = [...new Set(kts.map(t => t.family))];
+  if (sel.options.length !== fams.length + 1) sel.innerHTML = '<option value="">all</option>' + fams.map(f => `<option value="${esc(f)}">${esc(f)}</option>`).join('');
+  // the size bands present, smallest first
+  const bands = [...new Map(kts.map(t => [t.field_band_rank, t.field_band])).entries()].sort((a, b) => a[0] - b[0]);
+  if (bandSel.options.length !== bands.length + 1) { const was = bandSel.value; bandSel.innerHTML = '<option value="">any size</option>' + bands.map(([r, b]) => `<option value="${r}">${esc(b)}</option>`).join(''); bandSel.value = was; }
+  const rows = kts.filter(t => (!sel.value || t.family === sel.value) && (bandSel.value === '' || String(t.field_band_rank) === bandSel.value)).sort((a, b) => a.field_params - b.field_params);
+  const heads = Object.fromEntries((discData.known_heads || []).map(h => [h.key, h.name]));
+  document.getElementById('trickcount').textContent = `${rows.length} tricks · ${rows.filter(t => t.fleet).length} measured by Thorp`;
+  document.querySelector('#tricktable tbody').innerHTML = rows.map(t => `<tr data-trick="${esc(t.key)}" tabindex="0"${t.fleet ? ' class="measured"' : ''}>
+    <td><b>${esc(t.name)}</b></td><td>${esc(t.does)}</td><td data-sort="${t.field_params}" title="${esc(t.field_at)}"><span class="sizeband">${esc(t.field_band)}</span></td><td class="s">${esc(t.sure)}</td>
+    <td>${t.stars.length ? esc(t.stars.map(k => heads[k] || k).join(', ')) : '<span class="s">none charted yet</span>'}</td>
+    ${trickProgress(t).cell}<td data-sort="${classRank(t.target_class)}">${classLink(t.target_class)}${t.below_ladder ? ' <span class="s">(the field is already below the ladder)</span>' : ''}</td></tr>`).join('');
+}
+document.getElementById('trickfamily').onchange = () => discData && drawTricks();
+document.getElementById('trickband').onchange = () => discData && drawTricks();
+document.getElementById('tricktable').addEventListener('click', e => { const tr = e.target.closest('tr[data-trick]'); if (tr && !e.target.closest('a')) location.hash = '#/discoveries/' + tr.dataset.trick; });
+let trickChartKey = '';
+async function drawTrickPage() {
+  const t = (discData.known_tricks || []).find(x => x.key === discTrick);
+  if (!t) { document.getElementById('tricktitle').textContent = `no trick called ${discTrick}`; return; }
+  const p = trickProgress(t), ft = t.fleet && discTricks.find(x => x.key === t.fleet);
+  document.getElementById('tricktitle').textContent = t.name;
+  document.getElementById('trickstate').innerHTML = `<span class="pill ${p.cls}">${esc(p.state)}</span>`;
+  document.getElementById('trickdoes').textContent = t.does;
+  const tgt = classOf(t.target_class);
+  document.getElementById('trickover').innerHTML = [
+    ['the field shows it at', `<span class="sizeband">${esc(t.field_band)}</span> parameters · ${esc(t.field_at)} <span class="s">(${esc(t.sure)})</span>`], ['in', esc(t.field_models)], ['first shown by', `<span class="s">${esc(t.source)}</span>`],
+    ["Thorp's target", `${classLink(t.target_class)}${tgt ? ` · ${big(tgt.total)} parameters` : ''}${t.below_ladder ? ' (the field already shows it below the ladder, so the smallest class)' : ', a tenth of the field\'s size or less'}`],
+    ['how Thorp measures it', ft ? `<span class="mono">${esc(ft.metric)}</span>, performed at ${ft.threshold}` : `not yet: ${esc(t.measure)}`],
+  ].map(([k, v]) => `<div><div class="k">${k}</div><div>${v}</div></div>`).join('');
+  // the stars needed
+  const hs = t.stars.map(k => (discData.known_heads || []).find(h => h.key === k)).filter(Boolean), byKey = Object.fromEntries((discData.known_heads || []).map(h => [h.key, h.name]));
+  document.querySelector('#trickstars tbody').innerHTML = hs.length ? hs.map(h => `<tr><td><b>${esc(h.name)}</b></td><td>${esc(h.does)}</td>
+    <td>${h.rests_on.length ? esc(h.rests_on.map(k => byKey[k] || k).join(', ')) : '–'}</td>
+    <td data-sort="${classRank(h.expected_from)}">${h.expected_from ? classLink(h.expected_from) : 'beyond the ladder'}</td>${firstLitIn(h)}${headState(h)}</tr>`).join('')
+    : '<tr><td colspan="6" class="empty">no kind of head is charted for this trick yet; it may be done in the feed-forward layers, or by heads not yet described</td></tr>';
+  // class by class
+  const thr = ft ? ft.threshold : null;
+  document.querySelector('#tricktrack tbody').innerHTML = (ladderData ? ladderData.rungs : []).map(r => {
+    const mine = ft ? ft.ships.filter(x => x.preset === r.preset) : [], done = mine.filter(x => x.performed_at != null).sort((a, b) => a.performed_at - b.performed_at);
+    const orders = Math.log10(t.field_params / r.total), best = mine.length ? Math.max(...mine.map(x => x.best)) : null, isT = r.preset === t.target_class;
+    return `<tr${isT ? ' class="target"' : ''}><td>${classLink(r.preset)}${isT ? ' <span class="pill accent">target</span>' : ''}</td><td data-sort="${r.total}">${big(r.total)}</td>
+      <td data-sort="${orders}">${orders >= 0 ? `${orders.toFixed(1)} orders of magnitude smaller` : `${(-orders).toFixed(1)} orders larger`}</td>
+      <td>${ft ? mine.length : '–'}</td><td>${ft ? (mine.length ? `${done.length} of ${mine.length}` : '–') : '–'}</td>
+      <td>${best != null ? `${fmt(best)} <span class="s">of ${thr}</span>` : '–'}</td><td>${done.length ? `${shipLink(done[0])} at step ${done[0].performed_at}` : '–'}</td></tr>`;
+  }).join('');
+  // the chart, for a measured trick
+  document.getElementById('trickchartpanel').hidden = !ft;
+  if (!ft) return;
+  let d;
+  try { d = await get('/api/trick?key=' + encodeURIComponent(ft.key)); } catch (e) { return; }
+  const key = JSON.stringify(d.runs.map(r => [r.run_id, r.value.length, r.value[r.value.length - 1]]));
+  if (key === trickChartKey) return;
+  trickChartKey = key;
+  if (!d.runs.length) return empty('trickchart', 'readings start with the next ship to sail');
+  const presets = ladderData.rungs.map(r => r.preset);
+  plot('trickchart', d.runs.map(r => ({ type: 'scatter', mode: 'lines', name: `${r.ship || r.name} (${r.preset})`, legendgroup: r.preset, x: r.step, y: r.value,
+    line: { color: PALETTE[presets.indexOf(r.preset) % PALETTE.length], width: 1.4 }, hovertemplate: `${esc(r.ship || r.name)}: %{y:.3f} at step %{x}<extra></extra>` })),
+    layout({ showlegend: d.runs.length <= 12, xaxis: { title: 'step', gridcolor: C.line }, yaxis: { title: esc(t.name), gridcolor: C.line },
+      shapes: [{ type: 'line', xref: 'paper', x0: 0, x1: 1, y0: d.threshold, y1: d.threshold, line: { color: C.accent, dash: 'dot' } }] }));
+}
+function drawDiscoveryView() { if (discView === 'index') drawTricks(); if (discView === 'trick') drawTrickPage(); }
 // the trick a kind of head performs, if measured: performed or not, on how many sailings
 const trickNote = h => {
   const t = h.trick && discTricks.find(x => x.key === h.trick);
@@ -1434,16 +1509,7 @@ function drawHeads() {
   const fams = [...new Set(discHeads.map(h => h.family))];
   if (sel.options.length !== fams.length + 1) sel.innerHTML = '<option value="">all</option>' + fams.map(f => `<option value="${f}">${esc(FAMILY[f] || f)}</option>`).join('');
   const rows = discHeads.filter(h => !sel.value || h.family === sel.value), byKey = Object.fromEntries(discHeads.map(h => [h.key, h.name]));
-  const state = h => {
-    if (!h.star) return `<td data-sort="9" class="s" title="${esc(h.measure)}">not measured yet · <i>${esc(h.measure)}</i>${trickNote(h)}</td>`;
-    const st = discStars.find(x => x.key === h.star);
-    if (!st) return '<td data-sort="5">measured</td>';
-    if (!st.ships.length) return `<td data-sort="3"><span class="pill">measured</span> a star: ${esc(st.name)} · readings start with the next ship to sail · threshold ${st.threshold}</td>`;
-    const lit = st.ships.filter(x => x.steps_to_lit != null), sh = st.ships.filter(x => x.shared_steps_to_lit != null);
-    const best = Math.max(-1, ...st.ships.map(x => x.best ?? -1));
-    const pill = lit.length ? '<span class="pill good">lit</span>' : sh.length ? '<span class="pill accent">lit shared</span>' : '<span class="pill">not lit yet</span>';
-    return `<td data-sort="${lit.length ? 0 : sh.length ? 1 : 2}">${pill} a star: ${esc(st.name)} · ${lit.length ? `lit on ${lit.length}` : sh.length ? `lit shared on ${sh.length}` : `best ${fmt(best)}`} of ${st.ships.length} sailings · threshold ${st.threshold}${trickNote(h)}</td>`;
-  };
+  const state = headState;
   document.getElementById('headcount').textContent = `${rows.length} kinds · ${rows.filter(h => h.star).length} measured by Thorp`;
   document.querySelector('#headtable tbody').innerHTML = rows.map(h => `<tr${h.star ? ' class="measured"' : ''}><td><b>${esc(h.name)}</b></td><td>${esc(FAMILY[h.family] || h.family)}</td>
     <td>${esc(h.does)}</td><td>${h.rests_on.length ? esc(h.rests_on.map(k => byKey[k] || k).join(', ')) : '–'}</td>

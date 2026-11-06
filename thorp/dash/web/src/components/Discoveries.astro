@@ -1,21 +1,58 @@
 ---
-// Discoveries: what we follow across every ship to find our bearings. Tricks: what a ship can do,
-// judged by its bets (fleet.TRICKS); stars: the mechanism inside that does it (fleet.STARS). The star chart lists
-// every kind of head described in the literature (thorp/dash/heads.py). Stars: attention
-// heads that light up (thorp/fleet.py STARS: the previous word, the duplicate word, Nevermore).
-// Traits: directions in the hidden state that tell kinds of book apart (evaluators/probes.py).
+// Discoveries (#/discoveries): the tricks of the trade, one table. A trick is what a model can do,
+// judged from outside by its bets (thorp/dash/tricks.py KNOWN_TRICKS; the ones Thorp measures are in
+// fleet.TRICKS). A row opens the trick (#/discoveries/<trick>): the stars needed to learn it (the
+// mechanisms inside, thorp/dash/heads.py), the size the field learns it at, and how Thorp is
+// tracking, class by class, toward learning it at a smaller class. The star chart and the traits
+// are one link away (#/discoveries/stars, #/discoveries/traits).
 ---
 <div class="section" id="discoveries">
-  <h1>Discoveries <span class="q">what we follow across every ship to find our bearings: tricks it can do, the stars inside that do them, and traits that emerge</span></h1>
-  <h2 class="band">Tricks <span class="q">can it do it? what a ship can do, judged from outside by its bets (copying what followed last time; Wednesday after Tuesday), each linked to the stars thought to perform it</span></h2>
-  <div class="cards" id="trickcards"></div>
-  <h2 class="band">Stars <span class="q">what inside does it? attention heads that do one recognisable job; a star is lit when one head reaches its threshold, and lit shared when the best layer's two strongest heads reach it together; some rest on others</span><span class="bandtools"><button data-essay="nevermore">Read: what a Nevermore is</button></span></h2>
-  <div class="cards" id="starcards"></div>
-  <section class="panel">
-    <h2>The star chart <span class="note">every kind of attention head described so far, induction heads among them. The three Thorp measures carry their state from the ledger; the rest are charted but not yet measured, each with how Thorp could measure it. "Rests on" is the dependency its source reports; a blank means none reported. "Expected from" is the smallest class predicted to reach it (the floor is depth: one hop per layer), set beside the smallest class where a sailing has lit it</span></h2>
-    <div class="handtools"><span class="note">family</span><select id="headfamily"><option value="">all</option></select><span class="note" id="headcount"></span></div>
-    <div class="scroll"><table id="headtable"><thead><tr><th>kind of head</th><th>family</th><th>what it does</th><th>rests on</th><th>expected from</th><th>first lit in</th><th>in Thorp</th><th>first described</th><th>seen in</th></tr></thead><tbody></tbody></table></div>
-  </section>
-  <h2 class="band">Traits <span class="q">can a ship's hidden state tell fiction, verse, first person or a language family apart on books it has never read; found at the threshold, learned when it also clears the floors</span><span class="bandtools"><button data-essay="traits">Read: how traits are found</button></span></h2>
-  <section class="panel"><div class="scroll"><table id="traittable" class="clickable"><thead></thead><tbody></tbody></table></div></section>
+
+  <!-- ============================== the tricks of the trade -->
+  <div class="dview" data-dview="index">
+    <h1>Tricks of the trade</h1>
+    <section class="panel">
+      <h2>The tricks <span class="note">a trick is what a model can do, judged from outside by its bets; open one for the stars that do it and Thorp's progress, class by class. "The field shows it at" is the size band (one order of magnitude, in parameters) where the trick is documented in standard models, not a proven smallest size; hover a band for the detail. "Thorp's target" is a tenth of that, an order of magnitude smaller</span></h2>
+      <div class="handtools"><span class="note">family</span><select id="trickfamily"><option value="">all</option></select><span class="note">the field shows it at</span><select id="trickband"><option value="">any size</option></select><span class="note" id="trickcount"></span></div>
+      <div class="scroll"><table id="tricktable" class="clickable"><thead><tr><th>trick</th><th>what it does</th><th>the field shows it at</th><th>how sure</th><th>stars needed</th><th>Thorp so far</th><th>Thorp's target</th></tr></thead><tbody></tbody></table></div>
+      <p class="note mt">Also: <a href="#/discoveries/stars">every kind of head (the star chart)</a> · <a href="#/discoveries/traits">traits</a></p>
+    </section>
+  </div>
+
+  <!-- ============================== one trick -->
+  <div class="dview" data-dview="trick">
+    <h1><a href="#/discoveries" class="back">← discoveries</a> <span id="tricktitle"></span> <span id="trickstate"></span> <span class="q" id="trickdoes"></span></h1>
+    <section class="panel"><div class="rungover" id="trickover"></div></section>
+    <section class="panel">
+      <h2>The stars needed to learn it <span class="note">the mechanisms inside thought to do this trick, each with where it is expected and its state in Thorp</span></h2>
+      <div class="scroll"><table id="trickstars"><thead><tr><th>kind of head</th><th>what it does</th><th>rests on</th><th>expected from</th><th>first lit in</th><th>in Thorp</th></tr></thead><tbody></tbody></table></div>
+    </section>
+    <section class="panel">
+      <h2>How Thorp is tracking, class by class <span class="note">each class of ship, how many of its sailings have been measured on this trick and how many performed it; the target is a tenth of the field's size</span></h2>
+      <div class="scroll"><table id="tricktrack"><thead><tr><th>class</th><th>parameters</th><th>against the field</th><th>sailings measured</th><th>performed</th><th>best</th><th>first performed</th></tr></thead><tbody></tbody></table></div>
+    </section>
+    <section class="panel" id="trickchartpanel">
+      <h2>The trick, sailing by sailing <span class="note">its score at every reading, one line per sailing, coloured by class; the dotted line is the mark that counts as performed</span></h2>
+      <div class="chart tall" id="trickchart"></div>
+    </section>
+  </div>
+
+  <!-- ============================== the stars -->
+  <div class="dview" data-dview="stars">
+    <h1><a href="#/discoveries" class="back">← discoveries</a> The stars <span class="q">what inside does it? attention heads that do one recognisable job; a star is lit when one head reaches its threshold, and lit shared when the best layer's two strongest heads reach it together; some rest on others</span></h1>
+    <div class="handtools"><button data-essay="nevermore">Read: what a Nevermore is</button></div>
+    <div class="cards" id="starcards"></div>
+    <section class="panel">
+      <h2>The star chart <span class="note">every kind of attention head described so far. Those Thorp measures carry their state from the ledger; the rest are charted but not yet measured, each with how Thorp could measure it. "Rests on" is the dependency its source reports; a blank means none reported. "Expected from" is the smallest class predicted to reach it (the floor is depth: one hop per layer), set beside the smallest class where a sailing has lit it</span></h2>
+      <div class="handtools"><span class="note">family</span><select id="headfamily"><option value="">all</option></select><span class="note" id="headcount"></span></div>
+      <div class="scroll"><table id="headtable"><thead><tr><th>kind of head</th><th>family</th><th>what it does</th><th>rests on</th><th>expected from</th><th>first lit in</th><th>in Thorp</th><th>first described</th><th>seen in</th></tr></thead><tbody></tbody></table></div>
+    </section>
+  </div>
+
+  <!-- ============================== the traits -->
+  <div class="dview" data-dview="traits">
+    <h1><a href="#/discoveries" class="back">← discoveries</a> Traits <span class="q">can a ship's hidden state tell fiction, verse, first person or a language family apart on books it has never read; found at the threshold, learned when it also clears the floors</span></h1>
+    <div class="handtools"><button data-essay="traits">Read: how traits are found</button></div>
+    <section class="panel"><div class="scroll"><table id="traittable" class="clickable"><thead></thead><tbody></tbody></table></div></section>
+  </div>
 </div>

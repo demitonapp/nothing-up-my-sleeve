@@ -10,6 +10,7 @@ and /api/compare (every run's hole-card score against tokens seen: the experimen
 from __future__ import annotations
 
 import json
+import math
 import sqlite3
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -826,6 +827,77 @@ def _known_heads() -> list[dict]:
     return [{**h, "expected_from": by_name.get(h.get("expected_class"))} for h in KNOWN_HEADS]
 
 
+# the size bands a trick is placed in: one order of magnitude each, since the field's sizes are rough
+FIELD_BANDS = ("under 1M", "1M–10M", "10M–100M", "100M–1B", "1B–10B", "10B–100B", "100B and up")
+
+
+def _known_tricks() -> list[dict]:
+    """The tricks of the trade (thorp/dash/tricks.py), each with Thorp's target: the largest class on
+    the ladder at a tenth of the size the field documents it at (an order of magnitude smaller),
+    or the smallest class when even that is below the ladder."""
+    from thorp.dash.tricks import KNOWN_TRICKS
+    from thorp.models.registry import LADDER, PRESETS
+
+    sizes = []
+    for r in LADDER:
+        c = PRESETS[r["preset"]]
+        sizes.append(
+            (
+                12 * c["layers"] * c["width"] ** 2 + (r.get("vocab", 16384) + 1024) * c["width"],
+                r["preset"],
+            )
+        )
+    sizes.sort()
+    out = []
+    for t in KNOWN_TRICKS:
+        fit = [p for n, p in sizes if n <= t["field_params"] / 10]
+        rank = min(len(FIELD_BANDS) - 1, max(0, int(math.floor(math.log10(t["field_params"]))) - 5))
+        out.append(
+            {
+                **t,
+                "field_band": FIELD_BANDS[rank],
+                "field_band_rank": rank,
+                "target_class": fit[-1] if fit else sizes[0][1],
+                "below_ladder": not fit,
+            }
+        )
+    return out
+
+
+def api_trick_series(key: str) -> dict:
+    """One measured trick's score at every reading of every sailing, for its chart."""
+    from thorp import fleet
+
+    tr = fleet.TRICKS[key]
+    out = []
+    con = _con()
+    try:
+        for r in _rows("select run_id, name, ship, spec_json from runs order by started"):
+            if (r["name"] or "").startswith("smoke"):
+                continue
+            pts = list(
+                con.execute(
+                    "select step, value from metrics where run_id=? and name=? order by step, rowid",
+                    [r["run_id"], tr.metric],
+                )
+            )
+            if pts:
+                spec = json.loads(r["spec_json"] or "{}")
+                out.append(
+                    {
+                        "run_id": r["run_id"],
+                        "name": r["name"],
+                        "ship": r["ship"],
+                        "preset": spec.get("model", {}).get("preset"),
+                        "step": [p[0] for p in pts],
+                        "value": [p[1] for p in pts],
+                    }
+                )
+    finally:
+        con.close()
+    return {"key": key, "threshold": tr.threshold, "metric": tr.metric, "runs": out}
+
+
 def api_discoveries() -> dict:
     """The two things followed across every ship: stars (heads that light, fleet.STARS) and traits
     (directions the probes find, evaluators/probes.py). For each, which ships have it and when."""
@@ -985,6 +1057,7 @@ def api_discoveries() -> dict:
         "core_traits": list(probes.TRAIT_COLUMNS),
         # the star chart: every kind of head the literature describes (thorp/dash/heads.py)
         "known_heads": _known_heads(),
+        "known_tricks": _known_tricks(),
     }
 
 
@@ -1125,6 +1198,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/voyage": lambda: api_voyage_series(q["key"]),
                 "/api/discoveries": lambda: api_discoveries(),
                 "/api/sieves": lambda: api_sieves(),
+                "/api/trick": lambda: api_trick_series(q["key"]),
                 "/api/shelf": lambda: api_shelf(q["run"]),
                 "/api/book": lambda: api_book(q["id"], q.get("offset", 0), q.get("length", 20000)),
                 "/api/experiment": lambda: api_experiment(q.get("prefix", "content-")),

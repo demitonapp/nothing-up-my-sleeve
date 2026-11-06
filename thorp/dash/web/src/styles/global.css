@@ -69,8 +69,8 @@ nav a.active { color: var(--accent); border-color: var(--line); background: var(
 .section.active { display: grid; }
 main { padding: 16px 20px 40px; display: grid; gap: 16px; max-width: 1500px; margin: 0 auto; }
 .section.active { gap: 16px; }
-.section > h1 { margin: 18px 0 0; font-size: var(--fs-lg); letter-spacing: .08em; text-transform: uppercase; color: var(--accent); border-bottom: 1px solid var(--line); padding-bottom: 6px; }
-.section > h1 .q { color: var(--muted); font-weight: 400; text-transform: none; letter-spacing: 0; margin-left: 12px; font-size: var(--fs-md); }
+.section > h1, #discoveries .dview > h1 { margin: 18px 0 0; font-size: var(--fs-lg); letter-spacing: .08em; text-transform: uppercase; color: var(--accent); border-bottom: 1px solid var(--line); padding-bottom: 6px; }
+.section > h1 .q, #discoveries .dview > h1 .q { color: var(--muted); font-weight: 400; text-transform: none; letter-spacing: 0; margin-left: 12px; font-size: var(--fs-md); }
 nav a { cursor: pointer; }
 /* a page's own tabs (a class, a ship) sit under its title, below the three main sections */
 .subnav { display: flex; gap: 4px; flex-wrap: wrap; font-size: var(--fs-sm); border-bottom: 1px solid var(--line); padding-bottom: 8px; margin-left: 0; }
@@ -276,3 +276,9 @@ svg.journey .j-bad { fill: var(--bad); font-size: 11px; }
 #journeymods label { display: inline-flex; gap: 4px; align-items: center; font-size: var(--fs-sm); color: var(--muted); cursor: pointer; }
 svg.journey .j-box.j-transplant { stroke: var(--accent); stroke-width: 2; }
 svg.journey .j-tp { fill: var(--accent); font-size: 11px; font-weight: 600; }
+/* Discoveries' views: the tricks, one trick, the stars, the traits */
+#discoveries .dview { display: none; }
+#discoveries .dview.active { display: grid; gap: 16px; min-width: 0; }
+#tricktable tr.measured td:first-child { border-left: 2px solid var(--accent); }
+#tricktrack tr.target td { background: var(--raise); }
+.sizeband { display: inline-block; padding: 1px 8px; border: 1px solid var(--line); border-radius: var(--r-pill); white-space: nowrap; font-variant-numeric: tabular-nums; }

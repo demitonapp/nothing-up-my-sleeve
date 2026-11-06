@@ -50,23 +50,21 @@ holds the ways in, always:
   settings, Forgotten Tomes score and the step each star first lit, the score run by run, first
   light (each star's score against step, threshold dotted), outcomes and levers. A panel only one
   voyage has carries `data-voyage` (the book-value loop's fit).
-- **Discoveries** (`#/discoveries`): what is followed across every ship to find our bearings.
-  **Tricks** first ("can it do it?", `fleet.TRICKS`): one card each with its threshold, the first
-  ship to perform it or the nearest, the stars thought to perform it, and the two telling
-  mismatches counted: performed with none of its stars lit (done some other way) and a star lit
-  with the trick not performed (a performer with no act). Then **Stars** (`fleet.STARS`: the Previous Word, the Duplicate Word, Nevermore), one card
-  each with its threshold, what it rests on, and the first ship to light it or the nearest so far;
-  and **traits** (fiction, verse, first person, the language families), with how many ships
-  found and learned each, and the first to do so. Under the star cards, **the star chart**: every
-  kind of attention head the literature describes (`thorp/dash/heads.py` `KNOWN_HEADS`, 19 kinds,
-  8 measured: the whole position family, duplicate-token and induction; what it
-  does, its family, what its source reports it rests on, where it was first described, what it has
-  been seen in). A kind Thorp measures links to its `fleet.STARS` star and shows its state from the
-  ledger; the rest say how Thorp could measure them. Each kind also carries **expected from**,
-  the smallest class predicted to reach it (written down before it is tested; the floor is depth,
-  one hop per layer), beside **first lit in**, the smallest class where a sailing actually lit it;
-  a kind lit below its expected class is flagged "below expectation". Adding a kind is an entry in
-  `heads.py`; measuring one is a star in `fleet.py` and an evaluator.
+- **Discoveries** (`#/discoveries`): **Tricks of the trade**, one table. A trick is what a model
+  can do, judged from outside by its bets; the catalogue is `thorp/dash/tricks.py` (`KNOWN_TRICKS`:
+  what it does, the size the field documents it at, how sure that size is, the models and paper,
+  shown as a **size band** of one order of magnitude, `FIELD_BANDS` in `server.py`, from "under 1M"
+  to "100B and up", so the table sorts and filters by size even where the number is rough;
+  the kinds of head thought to do it, and the `fleet.TRICKS` key where Thorp measures it). Each row
+  shows Thorp's progress (the smallest class that performed it, or the best reading) and **Thorp's
+  target**: the largest class at a tenth of the field's size or below, an order of magnitude
+  smaller. A row opens the trick (`#/discoveries/<trick>`): the field, the target and how it is
+  measured; **the stars needed to learn it** (kinds of head from `heads.py`, each with its expected
+  class, first lit and state); **how Thorp is tracking, class by class** (parameters, orders of
+  magnitude against the field, sailings measured and performing, best, first performed; the
+  target class marked); and, for a measured trick, its score by step for every sailing, coloured
+  by class. One link away: **the stars** (`#/discoveries/stars`: the star cards and the star chart
+  of every kind of head) and **traits** (`#/discoveries/traits`).
 - **Sieves** (`#/sieves[/<sailing>]`): how the ship answers the wind, layer by layer. An intro in
   the voyage vocabulary, a card per sieve with its write-up from `fleet.SIEVES` (push, move,
   heading: rendered as written there, never rewritten on the page), then for a picked sailing

@@ -20,26 +20,28 @@ from thorp.evaluators import EvalContext, EvalResult
 EVAL_BATCH = 16
 
 
-def book_ce(model, tokens: np.ndarray, eos: int, context: int) -> tuple[float, int]:
+def book_losses(model, tokens: np.ndarray, eos: int, context: int) -> np.ndarray:
+    """Nats for each prediction of [EOS] + tokens: entry i is the loss on tokens[i]."""
     seq = np.concatenate([[eos], np.asarray(tokens, dtype=np.int32)])
     n_pred = len(seq) - 1
     n_win = math.ceil(n_pred / context)
     padded = np.zeros(n_win * context + 1, dtype=np.int32)
     padded[: len(seq)] = seq
-    mask = np.zeros(n_win * context, dtype=np.float32)
-    mask[:n_pred] = 1.0
     x = padded[:-1].reshape(n_win, context)
     y = padded[1:].reshape(n_win, context)
-    m = mask.reshape(n_win, context)
-    total = 0.0
+    out = np.zeros(n_win * context, dtype=np.float64)
     for i in range(0, n_win, EVAL_BATCH):
-        xb, yb, mb = (mx.array(a[i : i + EVAL_BATCH]) for a in (x, y, m))
+        xb, yb = mx.array(x[i : i + EVAL_BATCH]), mx.array(y[i : i + EVAL_BATCH])
         logits = model(xb).astype(mx.float32)
         ce = nn.losses.cross_entropy(logits, yb, reduction="none")
-        s = (ce * mb).sum()
-        mx.eval(s)
-        total += s.item()
-    return total / n_pred, n_pred
+        mx.eval(ce)
+        out[i * context : i * context + ce.size] = np.array(ce, dtype=np.float64).reshape(-1)
+    return out[:n_pred]
+
+
+def book_ce(model, tokens: np.ndarray, eos: int, context: int) -> tuple[float, int]:
+    losses = book_losses(model, tokens, eos, context)
+    return float(losses.sum()) / len(losses), len(losses)
 
 
 def evaluate(ctx: EvalContext) -> EvalResult:

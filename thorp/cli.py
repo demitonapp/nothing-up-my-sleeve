@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 import sys
 
 
@@ -37,25 +36,12 @@ def cmd_id(a) -> int:
 
 def cmd_eval(a) -> int:
     from thorp import train
-    from thorp.ledger import Ledger, spec_of
 
-    rec = Ledger()
-    rows = rec.query("select * from runs where run_id like ? order by started desc", [a.run + "%"])
-    if not rows:
-        print(f"no run {a.run}", file=sys.stderr)
+    try:
+        train.rescore(a.run, sets=a.sets, evaluators=a.evaluators)
+    except LookupError as e:
+        print(e, file=sys.stderr)
         return 1
-    run = rows[0]
-    spec = spec_of(run)
-    rid = run["run_id"]
-    ckpt = train.latest_checkpoint(rid)
-    if ckpt is None:
-        print(f"run {rid} has no checkpoint", file=sys.stderr)
-        return 1
-    prep = train.prepare(spec)
-    step = json.loads((ckpt / "state.json").read_text())["step"]
-    model = train.build_model(spec, prep.tokeniser.vocab_size)
-    model.update(train.to_compute(train.load_master(ckpt), spec["optim"].get("precision", "bf16")))
-    train.run_evaluators(spec, rid, step, model, prep, rec, print)
     return 0
 
 
@@ -110,6 +96,8 @@ def main(argv: list[str] | None = None) -> int:
     s.set_defaults(fn=cmd_id)
     s = sub.add_parser("eval", help="re-run the evaluators on a run's latest checkpoint")
     s.add_argument("run", help="run id or prefix")
+    s.add_argument("--sets", nargs="+", help="score these lists instead of the spec's eval.sets")
+    s.add_argument("--evaluators", nargs="+", help="run these evaluators instead of the spec's")
     s.set_defaults(fn=cmd_eval)
     s = sub.add_parser("dash", help="serve the dashboard on http://localhost:8787")
     s.add_argument("--port", type=int, default=8787)

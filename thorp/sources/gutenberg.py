@@ -43,11 +43,14 @@ class ListRow:
 
 def read_list(path: str | Path) -> list[ListRow]:
     with open(paths.resolve(path), newline="", encoding="utf-8") as f:
-        return [ListRow(**{k: (v or "").strip() for k, v in r.items()}) for r in csv.DictReader(f)]
+        # extra columns (a list's own notes, such as `work`) are ignored; missing ones are blank
+        keys = ListRow.__dataclass_fields__
+        return [ListRow(**{k: (r.get(k) or "").strip() for k in keys}) for r in csv.DictReader(f)]
 
 
 def set_for_list(path: str | Path) -> str:
-    return "hole-card" if "hole" in Path(path).stem else "recipe"
+    stem = Path(path).stem
+    return "hole-card" if "hole" in stem else "truth" if "truth" in stem else "recipe"
 
 
 def book_id(gutenberg_id: int) -> str:
@@ -103,6 +106,21 @@ def catalogue() -> list[dict]:
 
 # ---------------------------------------------------------------- resolution
 
+_texts_cache: list[tuple[dict, str, list[str]]] | None = None
+
+
+def _texts() -> list[tuple[dict, str, list[str]]]:
+    """The catalogue's Text rows with their normalised titles and languages, computed once per
+    process (resolving a 1,000-book list re-normalised every title per row: minutes, now seconds)."""
+    global _texts_cache
+    if _texts_cache is None:
+        _texts_cache = [
+            (c, norm(c["Title"]), [x.strip() for x in c["Language"].split(";")])
+            for c in catalogue()
+            if c["Type"] == "Text"
+        ]
+    return _texts_cache
+
 
 def norm(s: str) -> str:
     """Lowercase, strip accents and punctuation, collapse whitespace. CJK passes through."""
@@ -143,13 +161,10 @@ def resolve(row: ListRow, overrides: dict | None = None) -> Resolution:
     res = Resolution(row)
     want = norm(row.title)
     sur = surname(row.author)
-    for c in catalogue():
-        if c["Type"] != "Text":
-            continue
-        langs = [x.strip() for x in c["Language"].split(";")]
+    for c, title_norm, langs in _texts():
         if row.language not in langs:
             continue
-        if want and want in norm(c["Title"]):
+        if want and want in title_norm:
             res.candidates.append((int(c["Text#"]), c["Title"].replace("\n", " "), c["Authors"]))
     res.candidates.sort()
     key = (row.title, row.author)

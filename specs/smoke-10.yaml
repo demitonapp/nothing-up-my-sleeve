@@ -1,5 +1,6 @@
 # specs/smoke-10.yaml: section 4 with passes 1, the first 10 recipe rows, eval every 50
 name: smoke-10
+ship: Dinghy   # ten books, one pass: the boat you test the harness in
 data:
   recipe: lists/smoke-10.csv
   passes: 1

@@ -1,0 +1,35 @@
+# specs/pool-400-v1.yaml: the whole pool, 400 books read twice: the shelf sized to the 9M model's appetite
+name: pool-400-v1
+ship: Endeavour   # the whole pool, a survey of the catalogue's first 400, read twice
+data:
+  recipe: lists/pool-400.csv
+  passes: 2
+  order: shuffled
+  refuse: [lists/hole-cards.csv]
+tokeniser:
+  kind: spm-bpe
+  vocab: 16384
+  byte_fallback: true
+  train_on: recipe
+model:
+  family: gpt
+  preset: 9m
+  context: 1024
+optim:
+  name: adamw
+  lr: 1.0e-3
+  betas: [0.9, 0.95]
+  weight_decay: 0.1
+  warmup_steps: 200
+  schedule: cosine
+  min_lr_ratio: 0.1
+  batch_tokens: 32768
+  grad_clip: 1.0
+  precision: bf16
+eval:
+  sets: [lists/hole-cards.csv]
+  every_steps: 250
+  evaluators: [ce_bpb, samples, probes]
+checkpoint:
+  every_steps: 500
+seed: 1

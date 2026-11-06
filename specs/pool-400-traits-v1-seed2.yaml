@@ -1,0 +1,54 @@
+# specs/pool-400-traits-v1-seed2.yaml: phase 3 of the trait campaign (2026-11-06): pool-400-v1 with the traits as a time series:
+# eval every 100 steps on the v2 hole cards and the truths deck, probes with their floors, and
+# the curiosity ladder. Not started: the brief holds phase 3 until phase 2's panel reads.
+name: pool-400-traits-v1-seed2
+ship: Resolution II
+experiment: 'kinks against traits: do traits appear before, at or after each layer''s
+  kink, and at what rate?'
+question: 'The same question as Resolution, seed 2: does the order of trait and kink
+  repeat?'
+data:
+  recipe: lists/pool-400.csv
+  passes: 2
+  order: shuffled
+  refuse:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+  - lists/truths.csv
+tokeniser:
+  kind: spm-bpe
+  vocab: 16384
+  byte_fallback: true
+  train_on: recipe
+model:
+  family: gpt
+  preset: 9m
+  context: 1024
+optim:
+  name: adamw
+  lr: 0.001
+  betas:
+  - 0.9
+  - 0.95
+  weight_decay: 0.1
+  warmup_steps: 200
+  schedule: cosine
+  min_lr_ratio: 0.1
+  batch_tokens: 32768
+  grad_clip: 1.0
+  precision: bf16
+eval:
+  sets:
+  - lists/hole-cards-v2.csv
+  - lists/truths.csv
+  every_steps: 100
+  evaluators:
+  - ce_bpb
+  - bpb_split
+  - laws
+  - samples
+  - probes
+  - curiosity
+checkpoint:
+  every_steps: 500
+seed: 2

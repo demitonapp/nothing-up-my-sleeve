@@ -1,0 +1,50 @@
+# specs/spell-ctx256-v1.yaml: the 9m rung's tuning sweep (2026-11-06), written by scripts/make_9m_specs.py.
+# Endeavour's shelf and passes; one setting changed: {'model': {'context': 256}}.
+name: spell-ctx256-v1
+ship: Short Memory
+experiment: '9m tuning: which settings let the 9m model learn spelling, punctuation and the laws of text
+  best?'
+question: Does a 256-token context cost the 9m model anything on spelling, punctuation or the laws?
+data:
+  recipe: lists/pool-400.csv
+  passes: 2
+  order: shuffled
+  refuse:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+tokeniser:
+  kind: spm-bpe
+  vocab: 16384
+  byte_fallback: true
+  train_on: recipe
+model:
+  family: gpt
+  preset: 9m
+  context: 256
+optim:
+  name: adamw
+  lr: 0.001
+  betas:
+  - 0.9
+  - 0.95
+  weight_decay: 0.1
+  warmup_steps: 200
+  schedule: cosine
+  min_lr_ratio: 0.1
+  batch_tokens: 32768
+  grad_clip: 1.0
+  precision: bf16
+eval:
+  sets:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+  every_steps: 250
+  evaluators:
+  - ce_bpb
+  - bpb_split
+  - laws
+  - samples
+  - probes
+checkpoint:
+  every_steps: 500
+seed: 1

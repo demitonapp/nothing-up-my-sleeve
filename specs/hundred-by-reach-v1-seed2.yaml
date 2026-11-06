@@ -1,5 +1,6 @@
 # specs/hundred-by-reach-v1-seed2.yaml
 name: hundred-by-reach-v1-seed2
+ship: Argo II   # the same hundred, seed 2: the error bar
 data:
   recipe: lists/hundred-by-reach.csv
   passes: 4

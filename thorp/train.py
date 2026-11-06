@@ -35,9 +35,17 @@ def load_spec(path: str | Path) -> dict:
         return yaml.safe_load(f)
 
 
+NOT_HASHED = (
+    "name",
+    "ship",
+    "experiment",
+    "question",
+)  # labels: a run's id is its settings, never what it is called or what it is for
+
+
 def canonical(spec: dict) -> str:
     return json.dumps(
-        {k: v for k, v in spec.items() if k != "name"},
+        {k: v for k, v in spec.items() if k not in NOT_HASHED},
         sort_keys=True,
         separators=(",", ":"),
         ensure_ascii=False,
@@ -132,6 +140,7 @@ class Prepared:
     eval_sets: dict[str, list[str]]
     missing: dict[str, list[str]] = field(default_factory=dict)
     tokeniser: tokmod.Tokeniser | None = None
+    first: list[str] = field(default_factory=list)  # a curriculum's opening books (data.first)
 
     def books(self) -> dict[str, manifest.Book]:
         ids = set(self.recipe) | {b for s in self.eval_sets.values() for b in s}
@@ -172,12 +181,16 @@ def prepare(spec: dict, resolver: ListResolver = gutenberg_resolver, log=print) 
     check_refusals(recipe, {**refused, **eval_sets})
     missing["recipe"] = missing_recipe
     prep = Prepared(recipe=recipe, eval_sets=eval_sets, missing=missing)
+    if d.get("first"):
+        prep.first, missing["first"] = resolver(d["first"])
     t = spec["tokeniser"]
-    if t.get("train_on", "recipe") != "recipe":
-        raise ValueError("only tokeniser.train_on: recipe is implemented")
+    # train_on: "recipe" (the default) or a list path, so runs on different shelves can share one
+    # tokeniser and differ only in what they read (the data-lever experiment, 2026-11-06)
+    train_on = t.get("train_on", "recipe")
+    tok_books = recipe if train_on == "recipe" else resolver(train_on)[0]
     settings = {"kind": t["kind"], "vocab": t["vocab"], "byte_fallback": t["byte_fallback"]}
-    log(f"tokeniser: training or loading on {len(recipe)} recipe books")
-    prep.tokeniser = tokmod.train_or_load(recipe, settings)
+    log(f"tokeniser: training or loading on {len(tok_books)} books ({train_on})")
+    prep.tokeniser = tokmod.train_or_load(tok_books, settings)
     log(f"tokeniser {prep.tokeniser.id[:12]} vocab {prep.tokeniser.vocab_size}; sharding")
     for b in recipe + [b for s in eval_sets.values() for b in s]:
         shards.encode(prep.tokeniser.id, b, prep.tokeniser)
@@ -237,6 +250,16 @@ def build_model(spec: dict, vocab: int):
     return registry.build(m["family"], m["preset"], vocab, m["context"])
 
 
+def init_model(spec: dict, vocab: int):
+    """The run's model at initialisation (its own seed), in its compute precision: the untrained
+    floor the probes and the curiosity ladder are measured against. build_model reseeds MLX's
+    global generator; that is safe mid-run only because nothing in training draws from it after
+    the model is built (the samples evaluator uses explicit keys)."""
+    m = build_model(spec, vocab)
+    m.update(to_compute(m.parameters(), spec["optim"].get("precision", "bf16")))
+    return m
+
+
 def to_compute(master, precision: str):
     dt = mx.bfloat16 if precision == "bf16" else mx.float32
     return tree_map(lambda p: p.astype(dt), master)
@@ -252,12 +275,28 @@ def run_evaluators(spec, rid, step, model, prep, rec: Ledger, log) -> dict:
         context=spec["model"]["context"],
         sets=prep.eval_sets,
         languages={b: books[b].language for b in books},
+        recipe=list(prep.recipe),
+        init_model=lambda: init_model(spec, prep.tokeniser.vocab_size),
     )
-    rec.clear_step(rid, step, tables=("evals",))
+    if "ce_bpb" in spec["eval"]["evaluators"]:  # the only evaluator that writes evals rows, so a
+        # re-score with others alone (bpb_split, laws) leaves the step's scores in place
+        rec.clear_step(rid, step, tables=("evals",), sets=list(prep.eval_sets))
     t0 = time.time()
     merged = {}
     for name in spec["eval"]["evaluators"]:
-        res = evaluators.get(name)(ctx)
+        try:
+            res = evaluators.get(name)(ctx)
+        except Exception as e:  # noqa: BLE001
+            # the score (ce_bpb) may stop a run; any other evaluator that fails is recorded at the
+            # step and skipped, so a probe or the ladder can never cost a night's training
+            if name == "ce_bpb":
+                raise
+            msg = f"{name} failed at step {step}: {e.__class__.__name__}: {e}"
+            log(msg)
+            rec.artifact(
+                rid, step, "eval_error", "", "", json.dumps({"evaluator": name, "error": msg})
+            )
+            continue
         if res.evals:
             rec.evals(res.evals)
         if res.metrics:
@@ -270,6 +309,32 @@ def run_evaluators(spec, rid, step, model, prep, rec: Ledger, log) -> dict:
     rec.metrics(rid, step, {"eval/seconds": time.time() - t0})
     log(f"eval @ {step}: " + ", ".join(f"{k}={v:.4f}" for k, v in merged.items()))
     return merged
+
+
+def record_eval_sets(rid: str, step: int, prep: Prepared, rec: Ledger) -> None:
+    """The held-out books scored from this step on, with titles and families, as an artifact."""
+    books = prep.books()
+    sets = {
+        name: [
+            {
+                "book_id": b,
+                "title": books[b].title,
+                "language": books[b].language,
+                "family": books[b].family,
+                "bytes": books[b].bytes,
+            }
+            for b in ids
+        ]
+        for name, ids in prep.eval_sets.items()
+    }
+    rec.artifact(
+        rid,
+        step,
+        "eval_sets",
+        "",
+        "",
+        json.dumps({"sets": sets, "missing": prep.missing}, ensure_ascii=False),
+    )
 
 
 def record_setup(spec, rid, prep: Prepared, stream: data.Stream, counts: dict, rec: Ledger):
@@ -286,28 +351,8 @@ def record_setup(spec, rid, prep: Prepared, stream: data.Stream, counts: dict, r
         }
         for b in prep.recipe
     ]
-    sets = {
-        name: [
-            {
-                "book_id": b,
-                "title": books[b].title,
-                "language": books[b].language,
-                "family": books[b].family,
-                "bytes": books[b].bytes,
-            }
-            for b in ids
-        ]
-        for name, ids in prep.eval_sets.items()
-    }
     rec.artifact(rid, 0, "recipe", "", "", json.dumps(recipe, ensure_ascii=False))
-    rec.artifact(
-        rid,
-        0,
-        "eval_sets",
-        "",
-        "",
-        json.dumps({"sets": sets, "missing": prep.missing}, ensure_ascii=False),
-    )
+    record_eval_sets(rid, 0, prep, rec)
     rec.artifact(rid, 0, "tokeniser", str(prep.tokeniser.dir), prep.tokeniser.id, "")
     rec.metrics(
         rid,
@@ -344,6 +389,8 @@ def train(
         m["context"],
         spec["data"]["passes"],
         families,
+        first=prep.first,
+        first_repeats=spec["data"].get("first_repeats", 1),
     )
     total = stream.total_steps
 
@@ -368,6 +415,7 @@ def train(
         {
             "run_id": rid,
             "name": spec.get("name"),
+            "ship": spec.get("ship"),
             "spec_json": canonical(spec),
             "commit": git_commit(),
             "hardware": hardware(),
@@ -384,13 +432,22 @@ def train(
     )
 
     def loss_fn(mdl, x, y):
-        return nn.losses.cross_entropy(mdl(x).astype(mx.float32), y, reduction="mean")
+        # (batch, time) -> the mean per window, so the loss can be attributed to the window's book;
+        # every window is the same length, so the mean of the window means is the batch mean.
+        ce = nn.losses.cross_entropy(mdl(x).astype(mx.float32), y, reduction="none")
+        per_window = ce.mean(axis=1)
+        return per_window.mean(), per_window
 
     value_and_grad = nn.value_and_grad(model, loss_fn)
     step_fn = mx.compile(
         lambda x, y: value_and_grad(model, x, y), inputs=model.state, outputs=model.state
     )
-    layer_names = model.layer_names()
+    groups = model.param_groups()
+    # the sieves: the weights as they stood at the last record, so the move per group is measured
+    prev_flat, prev_step = dict(tree_flatten(master)), start
+    # the loss per book: window losses summed per recipe book since the last record
+    book_loss: dict[int, float] = {}
+    book_n: dict[int, int] = {}
     every_eval = spec["eval"]["every_steps"]
     every_ckpt = spec["checkpoint"]["every_steps"]
     t_run = time.time()
@@ -401,13 +458,16 @@ def train(
         lr = lr_at(step, total, o)
         opt.learning_rate = lr
         tokens = mx.array(batch.tokens)
-        loss, grads = step_fn(tokens[:, :-1], tokens[:, 1:])
+        (loss, per_window), grads = step_fn(tokens[:, :-1], tokens[:, 1:])
         grads = tree_map(lambda g: g.astype(mx.float32), grads)
         grads, gnorm = optim.clip_grad_norm(grads, o["grad_clip"])
         master = opt.apply_gradients(grads, master)
         model.update(to_compute(master, precision))
-        mx.eval(loss, gnorm, master, opt.state)
+        mx.eval(loss, per_window, gnorm, master, opt.state)
         step += 1
+        for bi, lw in zip(batch.book_index.tolist(), per_window.tolist(), strict=True):
+            book_loss[bi] = book_loss.get(bi, 0.0) + lw
+            book_n[bi] = book_n.get(bi, 0) + 1
         tokens_seen += stream.tokens_per_step
         dt = time.time() - t0
         loss_v = loss.item()
@@ -427,11 +487,30 @@ def train(
                 sum((p * p).sum().item() for _, p in tree_flatten(master))
             )
             vals["mem_gb"] = mx.get_peak_memory() / 1e9
-            for i, ln in enumerate(layer_names):
-                sq = sum((g * g).sum().item() for k, g in flat.items() if k.startswith(ln + "."))
-                vals[f"grad_norm/layer_{i}"] = math.sqrt(sq)
+            # the sieves, per group (each layer, its attn and mlp halves, the two embeddings):
+            # the push is the gradient, the size is the weights, the move is what Adam made of
+            # the push since the last record
+            mflat = dict(tree_flatten(master))
+            moved = step - prev_step == METRICS_EVERY
+            for g, prefix in groups.items():
+                keys = [k for k in mflat if k.startswith(prefix)]
+                vals[f"grad_norm/{g}"] = math.sqrt(
+                    sum((flat[k] * flat[k]).sum().item() for k in keys if k in flat)
+                )
+                pn = math.sqrt(sum((mflat[k] * mflat[k]).sum().item() for k in keys))
+                vals[f"param_norm/{g}"] = pn
+                if moved:
+                    un = math.sqrt(sum(((mflat[k] - prev_flat[k]) ** 2).sum().item() for k in keys))
+                    vals[f"update_norm/{g}"] = un
+                    vals[f"update_ratio/{g}"] = un / pn if pn else 0.0
+            if step % METRICS_EVERY == 0:
+                prev_flat, prev_step = mflat, step
             for fam, frac in batch.family_mix(stream.families).items():
                 vals[f"data/family/{fam}"] = frac
+            # the loss per book over the window since the last record
+            for bi, n in book_n.items():
+                vals[f"loss/book/{stream.book_ids[bi]}"] = book_loss[bi] / n
+            book_loss, book_n = {}, {}
             log(
                 f"step {step}/{total} loss {loss_v:.4f} lr {lr:.2e} "
                 f"{vals['tokens_per_s']:.0f} tok/s mem {vals['mem_gb']:.1f} GB"
@@ -474,6 +553,45 @@ def train(
     )
     log(f"finished {rid}: {tokens_seen} tokens in {wall / 60:.1f} min")
     return {"run_id": rid, "step": step, "status": "finished"}
+
+
+def rescore(
+    run: str,
+    sets: list[str] | None = None,
+    evaluators: list[str] | None = None,
+    resolver: ListResolver = gutenberg_resolver,
+    rec: Ledger | None = None,
+    log=print,
+) -> int:
+    """Re-run the evaluators on a run's latest checkpoint; returns the step scored.
+
+    With `sets`, score those lists instead of the spec's (2026-11-06, phase 2): the run's own spec
+    in the ledger is untouched, the held-out books are refused against the recipe exactly as at
+    training, an `eval_sets` artifact records what was scored at that step, and only the evals rows
+    of those sets at that step are replaced.
+    """
+    from thorp.ledger import spec_of
+
+    rec = rec or Ledger()
+    rows = rec.query("select * from runs where run_id like ? order by started desc", [run + "%"])
+    if not rows:
+        raise LookupError(f"no run {run}")
+    spec, rid = spec_of(rows[0]), rows[0]["run_id"]
+    ckpt = latest_checkpoint(rid)
+    if ckpt is None:
+        raise LookupError(f"run {rid} has no checkpoint")
+    if sets:
+        spec["eval"] = {**spec["eval"], "sets": list(sets)}
+    if evaluators:
+        spec["eval"] = {**spec["eval"], "evaluators": list(evaluators)}
+    prep = prepare(spec, resolver=resolver, log=log)
+    step = json.loads((ckpt / "state.json").read_text())["step"]
+    model = build_model(spec, prep.tokeniser.vocab_size)
+    model.update(to_compute(load_master(ckpt), spec["optim"].get("precision", "bf16")))
+    if sets:
+        record_eval_sets(rid, step, prep, rec)
+    run_evaluators(spec, rid, step, model, prep, rec, log)
+    return step
 
 
 def run(spec_path: str | Path, rec: Ledger | None = None) -> dict:

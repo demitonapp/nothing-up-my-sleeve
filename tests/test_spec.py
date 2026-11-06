@@ -9,14 +9,15 @@ def test_same_spec_same_id(spec):
     reordered = dict(reversed(list(spec.items())))
     assert train.run_id(reordered) == a
     assert train.run_id({**spec, "name": "something else"}) == a
+    assert train.run_id({**spec, "ship": "Dinghy"}) == a, "the ship name is a label, not a setting"
     assert train.run_id({**spec, "seed": 2}) != a
 
 
 def test_shipped_specs_differ_only_by_seed():
     a = train.load_spec("specs/hundred-by-reach-v1.yaml")
     b = train.load_spec("specs/hundred-by-reach-v1-seed2.yaml")
-    assert {k: v for k, v in a.items() if k not in ("name", "seed")} == {
-        k: v for k, v in b.items() if k not in ("name", "seed")
+    assert {k: v for k, v in a.items() if k not in ("name", "ship", "seed")} == {
+        k: v for k, v in b.items() if k not in ("name", "ship", "seed")
     }
     assert train.run_id(a) != train.run_id(b)
 

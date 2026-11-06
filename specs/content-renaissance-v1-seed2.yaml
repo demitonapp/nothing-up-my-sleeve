@@ -1,0 +1,59 @@
+# specs/content-renaissance-v1-seed2.yaml: the content experiment (2026-11-06), the continental Renaissance in translation; seed 2.
+# Pre-registered in DECISIONS.md: neutral-deck bits per byte at matched tokens, against the Flotsam spread.
+name: content-renaissance-v1-seed2
+ship: Florence, In Translation, Rolled Again
+experiment: 'content: does what is on the shelf change how well the model bets on
+  unseen books?'
+question: 'Does a shelf of the Renaissance bet better or worse on unseen books than
+  random books do? (seed 2: the same question, its error bar)'
+data:
+  recipe: lists/content-renaissance.csv
+  passes: 4
+  order: shuffled
+  refuse:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+  - lists/truths.csv
+  - lists/neutral.csv
+  - lists/held-greek.csv
+  - lists/held-islamic.csv
+  - lists/held-renaissance.csv
+tokeniser:
+  kind: spm-bpe
+  vocab: 16384
+  byte_fallback: true
+  train_on: recipe
+model:
+  family: gpt
+  preset: 9m
+  context: 1024
+optim:
+  name: adamw
+  lr: 0.001
+  betas:
+  - 0.9
+  - 0.95
+  weight_decay: 0.1
+  warmup_steps: 100
+  schedule: cosine
+  min_lr_ratio: 0.1
+  batch_tokens: 8192
+  grad_clip: 1.0
+  precision: bf16
+eval:
+  sets:
+  - lists/neutral.csv
+  - lists/held-greek.csv
+  - lists/held-islamic.csv
+  - lists/held-renaissance.csv
+  every_steps: 400
+  evaluators:
+  - ce_bpb
+  - bpb_split
+  - laws
+  - samples
+  - probes
+  - curiosity
+checkpoint:
+  every_steps: 500
+seed: 2

@@ -1,0 +1,48 @@
+# specs/lever-u400-p4.yaml: the 9m data levers (2026-11-06), written by scripts/make_lever_specs.py.
+name: lever-u400-p4
+ship: Four Times Round
+experiment: '9m data levers: is spelling bought with distinct text or with total reading?'
+question: With Endeavour's distinct text, does reading it four times instead of twice help spelling?
+data:
+  recipe: lists/pool-400.csv
+  passes: 4
+  order: shuffled
+  refuse:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+tokeniser:
+  kind: spm-bpe
+  vocab: 16384
+  byte_fallback: true
+  train_on: lists/pool-400.csv
+model:
+  family: gpt
+  preset: 9m
+  context: 1024
+optim:
+  name: adamw
+  lr: 0.001
+  betas:
+  - 0.9
+  - 0.95
+  weight_decay: 0.1
+  warmup_steps: 200
+  schedule: cosine
+  min_lr_ratio: 0.1
+  batch_tokens: 32768
+  grad_clip: 1.0
+  precision: bf16
+eval:
+  sets:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+  every_steps: 250
+  evaluators:
+  - ce_bpb
+  - bpb_split
+  - laws
+  - samples
+  - probes
+checkpoint:
+  every_steps: 500
+seed: 1

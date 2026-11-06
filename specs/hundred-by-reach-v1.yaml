@@ -1,5 +1,6 @@
 # specs/hundred-by-reach-v1.yaml
 name: hundred-by-reach-v1
+ship: Argo   # the hundred by translation reach, a crew gathered from everywhere, seed 1
 data:
   recipe: lists/hundred-by-reach.csv
   passes: 4

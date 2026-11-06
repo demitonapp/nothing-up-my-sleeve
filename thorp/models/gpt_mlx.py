@@ -83,6 +83,16 @@ class GPT(nn.Module):
             x = b(x)
         return self.tok.as_linear(self.ln_f(x))
 
+    def hidden(self, tokens) -> list:
+        """The residual stream after each block: a list of (batch, time, width), depth order."""
+        T = tokens.shape[1]
+        x = self.tok(tokens) + self.pos(mx.arange(T))
+        out = []
+        for b in self.layers:
+            x = b(x)
+            out.append(x)
+        return out
+
     def parameter_counts(self) -> dict[str, int]:
         flat = dict(tree_flatten(self.parameters()))
         total = sum(v.size for v in flat.values())
@@ -91,3 +101,12 @@ class GPT(nn.Module):
 
     def layer_names(self) -> list[str]:
         return [f"layers.{i}" for i in range(len(self.layers))]
+
+    def param_groups(self) -> dict[str, str]:
+        """Named parameter groups -> key prefix: the two embeddings, then each block in depth order."""
+        groups = {"tok": "tok.", "pos": "pos."}
+        for i in range(len(self.layers)):
+            groups[f"layer_{i}"] = f"layers.{i}."
+            groups[f"layer_{i}/attn"] = f"layers.{i}.attn."
+            groups[f"layer_{i}/mlp"] = f"layers.{i}.mlp."
+        return groups

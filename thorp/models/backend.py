@@ -14,3 +14,9 @@ class Backend(Protocol):
 
     def layer_names(self) -> list[str]:
         """Keys under which per-layer parameters live, in depth order."""
+
+    def param_groups(self) -> dict[str, str]:
+        """Named parameter groups -> key prefix: embeddings, then each layer and its attn and mlp halves."""
+
+    def hidden(self, tokens: Any) -> list[Any]:
+        """(batch, time) int tokens -> the residual stream after each layer, (batch, time, width)."""

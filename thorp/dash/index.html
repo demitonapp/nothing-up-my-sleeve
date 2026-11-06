@@ -8,91 +8,444 @@
 <style>
   :root {
     --bg: #0e1116; --panel: #161b22; --line: #2a313c; --text: #e6edf3; --muted: #8b949e;
-    --accent: #e3b341; --good: #3fb950; --bad: #f85149; --blue: #58a6ff;
+    --accent: #e3b341; --good: #3fb950; --bad: #f85149; --blue: #58a6ff; --raise: #1c232c; --track: #3b4655;
+    --c5: #d2a8ff; --c6: #ff9f6e; --c7: #79c0ff; --c8: #f778ba; --c9: #56d4dd; --c10: #a5d6ff; --c11: #ffd27a; --c12: #8ddb8c;
+    --fs-xs: 11px; --fs-sm: 12px; --fs-md: 13px; --fs-base: 14px; --fs-lg: 16px; --fs-xl: 18px; --fs-2xl: 22px;
+    --r-sm: 6px; --r-md: 8px; --r-pill: 10px;
   }
+  /* the standards in UI.md: one control, one field, one pill, one clickable row, one focus ring */
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  button, .btn { background: var(--bg); color: var(--muted); border: 1px solid var(--line); border-radius: var(--r-sm);
+                 padding: 4px 10px; font: inherit; font-size: var(--fs-sm); cursor: pointer; }
+  button:hover, .btn:hover, button.on { color: var(--accent); border-color: var(--accent); }
+  button:disabled { opacity: .4; cursor: default; color: var(--muted); border-color: var(--line); }
+  select, input { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-sm);
+                  padding: 4px 8px; font: inherit; font-size: var(--fs-sm); }
+  .pill, .badge { display: inline-block; padding: 1px 8px; border-radius: var(--r-pill); font-size: var(--fs-xs); border: 1px solid var(--line); }
+  .pill { white-space: nowrap; }
+  .pill.good, .pill.live, .badge.finished, .pill.finished { color: var(--good); border-color: var(--good); }
+  .pill.bad, .badge.failed, .pill.failed { color: var(--bad); border-color: var(--bad); }
+  .pill.blue, .badge.running, .pill.running { color: var(--blue); border-color: var(--blue); }
+  .pill.accent { color: var(--accent); border-color: var(--accent); }
+  .pill.solid, .allruns { color: var(--bg); background: var(--accent); border-color: var(--accent); }
+  table.clickable tbody tr[tabindex] { cursor: pointer; }
+  table.clickable tbody tr[tabindex]:hover td, table.clickable tbody tr[tabindex]:focus-visible td { background: var(--raise); color: var(--accent); }
+  table.clickable tbody tr:focus-visible { outline: none; }
+  .mt { margin-top: 8px; }
   * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
   body { margin: 0; background: var(--bg); color: var(--text);
-         font: 14px/1.45 ui-sans-serif, -apple-system, "Segoe UI", sans-serif; }
+         font: var(--fs-base)/1.45 ui-sans-serif, -apple-system, "Segoe UI", sans-serif; }
   header { padding: 14px 20px; border-bottom: 1px solid var(--line); display: flex;
-           align-items: baseline; gap: 16px; flex-wrap: wrap; }
-  header h1 { margin: 0; font-size: 18px; letter-spacing: .04em; }
+           align-items: baseline; gap: 16px; flex-wrap: wrap; position: sticky; top: 0; background: var(--bg); z-index: 5; }
+  header h1 { margin: 0; font-size: var(--fs-xl); letter-spacing: .04em; }
+  header h1 a { color: inherit; text-decoration: none; }
+  header h1 a:hover { color: var(--accent); }
   header .sub { color: var(--muted); }
+  nav { margin-left: auto; display: flex; gap: 4px; flex-wrap: wrap; font-size: var(--fs-sm); }
+  nav a { color: var(--muted); text-decoration: none; text-transform: uppercase; letter-spacing: .06em;
+          padding: 6px 10px; border-radius: var(--r-sm); border: 1px solid transparent; }
+  nav a:hover { color: var(--accent); }
+  nav a.active { color: var(--accent); border-color: var(--line); background: var(--panel); }
+  .section { display: none; }
+  .section.active { display: grid; }
   main { padding: 16px 20px 40px; display: grid; gap: 16px; max-width: 1500px; margin: 0 auto; }
-  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+  .section.active { gap: 16px; }
+  .section > h1 { margin: 18px 0 0; font-size: var(--fs-lg); letter-spacing: .08em; text-transform: uppercase; color: var(--accent); border-bottom: 1px solid var(--line); padding-bottom: 6px; }
+  .section > h1 .q { color: var(--muted); font-weight: 400; text-transform: none; letter-spacing: 0; margin-left: 12px; font-size: var(--fs-md); }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-md);
            padding: 12px 14px; min-width: 0; }
-  .panel h2 { margin: 0 0 8px; font-size: 13px; font-weight: 600; color: var(--muted);
+  .panel h2 { margin: 0 0 8px; font-size: var(--fs-md); font-weight: 600; color: var(--muted);
               text-transform: uppercase; letter-spacing: .06em; }
+  .panel h2 .note { text-transform: none; letter-spacing: 0; font-weight: 400; margin-left: 8px; }
   .row { display: grid; gap: 16px; grid-template-columns: 1fr 1fr; }
-  @media (max-width: 900px) { .row { grid-template-columns: 1fr; } main { padding: 12px 16px; } }
+  .row3 { display: grid; gap: 16px; grid-template-columns: 1fr 1fr 1fr; }
+  @media (max-width: 1100px) { .row3 { grid-template-columns: 1fr; } }
+  @media (max-width: 900px) { .row { grid-template-columns: 1fr; } main { padding: 12px 16px; } nav { margin-left: 0; } }
   .strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
-  .stat .k { color: var(--muted); font-size: 12px; }
-  .stat .v { font-size: 20px; font-variant-numeric: tabular-nums; }
-  .stat .s { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .stat .k { color: var(--muted); font-size: var(--fs-sm); }
+  .stat .v { font-size: var(--fs-2xl); font-variant-numeric: tabular-nums; }
+  .stat .s { color: var(--muted); font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
+  .info { display: inline-block; position: relative; margin-left: 4px; color: var(--blue); cursor: help; font-size: var(--fs-xs); font-weight: 400;
+          text-transform: none; letter-spacing: 0; }
+  .info .pop { display: none; position: fixed; z-index: 50; width: 280px; padding: 10px 12px; text-align: left;
+               background: var(--raise); border: 1px solid var(--line); border-radius: var(--r-md); color: var(--text); font-size: var(--fs-sm);
+               line-height: 1.45; white-space: normal; box-shadow: 0 6px 20px rgba(0,0,0,.4); }
+  .info .pop b { color: var(--accent); font-weight: 600; }
+  .info:hover .pop, .info:focus .pop, .info.open .pop { display: block; }
+  .booktabs { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
+  #bookswrap { max-height: 420px; overflow: auto; }
+  /* the book reader: a Kindle Paperwhite page, after the Atlas essay reader (monorepo
+     packages/ui/apps/atlas/src/components/EssayReader.tsx): warm paper, black ink, no colour or shadow,
+     a justified serif with first-line indents, a quiet footer */
+  #reader { --paper: #F3F2ED; --ink: #101010; --soft: #555552; --rule: #BDBCB4;
+            --rsans: ui-sans-serif, -apple-system, "Segoe UI", sans-serif;
+            --rserif: "Iowan Old Style", "Palatino Linotype", Georgia, "Times New Roman", serif;
+            position: fixed; inset: 0; z-index: 60; background: var(--paper); color: var(--ink);
+            display: flex; flex-direction: column; font-family: var(--rserif); }
+  #reader[hidden] { display: none; }
+  #reader ::selection { background: #9C9B94; color: #000; }
+  #reader .rbar { display: flex; align-items: center; gap: 10px; padding: 0 18px; height: 42px; flex: 0 0 42px;
+                  font: var(--fs-sm) var(--rsans); color: var(--soft); border-bottom: 1px solid var(--rule); }
+  #reader .rbar.foot { border-bottom: 0; border-top: 1px solid var(--rule); height: 34px; flex-basis: 34px; justify-content: space-between; }
+  #reader .rbar .t { font: italic var(--fs-md) var(--rserif); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  #reader .rbar .tools { margin-left: auto; display: flex; gap: 6px; align-items: center; flex: 0 0 auto; }
+  #reader button { background: transparent; color: var(--ink); border: 1px solid var(--ink); border-radius: 2px; padding: 3px 9px;
+                   font: var(--fs-sm)/1.3 var(--rsans); cursor: pointer; }
+  #reader button:disabled { opacity: .35; cursor: default; }
+  #reader button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+  #reader .rwrap { flex: 1; min-height: 0; display: flex; justify-content: center; }
+  #reader .rstage { width: 100%; max-width: 716px; padding: 26px 28px 14px; height: 100%; overflow: hidden; }
+  #reader .rpage { overflow: hidden; position: relative; }
+  #reader .rscroll { height: 100%; overflow-y: auto; padding-right: 6px; }
+  #reader .rtext { line-height: 1.55; hyphens: auto; -webkit-hyphens: auto; text-align: justify; overflow-wrap: break-word; }
+  #reader .rtext p { margin: 0; text-indent: 1.3em; orphans: 2; widows: 2; }
+  #reader .rtext p.v { text-indent: 0; text-align: left; white-space: pre-wrap; margin: .8em 0; hyphens: none; }
+  #reader .rtext p.h { text-indent: 0; text-align: center; font-weight: 700; margin: 1.6em 0 .7em; break-after: avoid; hyphens: none; }
+  #reader .rtext p.h + p, #reader .rtext p.v + p, #reader .rtext .title + p { text-indent: 0; }
+  #reader .rtext .title { text-align: center; margin: 12% 0 2.2em; text-indent: 0; }
+  #reader .rtext .title h1 { font-size: 1.7em; line-height: 1.2; font-weight: 700; margin: 0; }
+  #reader .rtext .title .by { font: .62em var(--rsans); letter-spacing: .06em; text-transform: uppercase; color: var(--soft); margin: 1.1em 0 0; }
+  #reader .rtext .title hr { border: 0; border-top: 1px solid var(--rule); width: 30%; margin: 2em auto 0; }
+  #reader .rtext .more { text-align: center; font: var(--fs-sm) var(--rsans); color: var(--soft); margin: 2em 0 1em; text-indent: 0; }
   .chart { width: 100%; height: 320px; }
+  #stripwrap > summary { cursor: pointer; color: var(--muted); font-size: var(--fs-md); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
+  #stripwrap > summary .note { text-transform: none; letter-spacing: 0; font-weight: 400; margin-left: 8px; }
+  #stripwrap[open] > summary { margin-bottom: 8px; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-md); padding: 14px 16px; cursor: pointer;
+          display: flex; flex-direction: column; gap: 8px; color: var(--text); text-decoration: none; transition: border-color .15s; }
+  .card:hover, .card:focus-visible { border-color: var(--accent); outline: none; }
+  .card .top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .card .preset { font-size: var(--fs-2xl); font-weight: 600; }
+  .card .nm { color: var(--accent); font-size: var(--fs-sm); text-transform: uppercase; letter-spacing: .06em; }
+  .card .job { font-weight: 600; }
+  .card .ov { color: var(--muted); font-size: var(--fs-md); flex: 1; }
+  .card .foot { display: flex; justify-content: space-between; gap: 8px; font-size: var(--fs-sm); color: var(--muted); border-top: 1px solid var(--line); padding-top: 8px; }
+  a.back { color: var(--muted); text-decoration: none; font-size: var(--fs-md); margin-right: 8px; }
+  a.back:hover { color: var(--accent); }
+  .rungover { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px 24px; }
+  .rungover .k { color: var(--muted); font-size: var(--fs-sm); } 
   .chart.tall { height: 380px; }
+  .chart.short { height: 240px; }
   table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
   th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--line); }
-  th { color: var(--muted); font-weight: 500; font-size: 12px; }
+  th { color: var(--muted); font-weight: 500; font-size: var(--fs-sm); }
+  th.dt-sortable { cursor: pointer; user-select: none; }
+  th.dt-sortable:hover { color: var(--text); }
+  th.dt-sortable::after { content: '↕'; margin-left: 4px; opacity: 0; font-size: var(--fs-xs); }
+  th.dt-sortable:hover::after { opacity: .5; }
+  th.dt-asc, th.dt-desc { color: var(--accent); }
+  th.dt-asc::after { content: '▲'; opacity: 1; } th.dt-desc::after { content: '▼'; opacity: 1; }
   tr.sel td { color: var(--accent); }
-  tbody tr { cursor: pointer; }
-  tbody tr:hover td { background: #1c232c; }
-  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: var(--fs-sm); }
   .samples div { margin: 0 0 10px; }
   .samples .p { color: var(--accent); }
-  .samples .t { color: var(--muted); font-size: 11px; }
-  .samples pre { white-space: pre-wrap; margin: 2px 0 0; font: 12px/1.4 ui-monospace, Menlo, monospace; }
-  .badge { padding: 1px 7px; border-radius: 10px; font-size: 11px; border: 1px solid var(--line); }
-  .badge.running { color: var(--blue); border-color: var(--blue); }
-  .badge.finished { color: var(--good); border-color: var(--good); }
-  .badge.failed { color: var(--bad); border-color: var(--bad); }
+  .samples .t { color: var(--muted); font-size: var(--fs-xs); }
+  .samples pre { white-space: pre-wrap; margin: 2px 0 0; font: var(--fs-sm)/1.4 ui-monospace, Menlo, monospace; }
+  #runpick { background: var(--panel); font-size: var(--fs-md); max-width: 420px; }
+  .allruns { margin-right: 8px; letter-spacing: .06em; text-transform: uppercase; vertical-align: 2px; }
   .empty { color: var(--muted); padding: 30px 0; text-align: center; }
   .scroll { overflow-x: auto; }
+  .claim { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+  .claim .k { color: var(--accent); font-size: var(--fs-sm); text-transform: uppercase; letter-spacing: .06em; }
+  .claim .v { margin-top: 4px; }
+  .claim .reading { grid-column: 1 / -1; border-top: 1px solid var(--line); padding-top: 10px; }
+  .verdict { font-size: var(--fs-lg); }
+  .verdict.open { color: var(--muted); }
+  .verdict.yes { color: var(--good); }
+  .verdict.no { color: var(--bad); }
+  .traits { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin-bottom: 10px; }
+  .trait { border: 1px solid var(--line); border-radius: var(--r-sm); padding: 8px 10px; }
+  .trait .n { color: var(--muted); font-size: var(--fs-sm); }
+  .trait .a { font-size: var(--fs-2xl); font-weight: 600; }
+  .trait .a.yes { color: var(--good); } .trait .a.no { color: var(--bad); } .trait .a.na { color: var(--muted); }
+  .trait .r { color: var(--muted); font-size: var(--fs-xs); }
+  .kinks td.t { color: var(--muted); }
+  .foot { color: var(--muted); font-size: var(--fs-sm); padding-top: 10px; }
 </style>
 </head>
 <body>
 <header>
-  <h1>THORP</h1>
+  <h1><a href="/" id="home" title="back to the ladder">THORP</a></h1>
+  <select id="runpick" title="the run every per-run panel shows"></select>
   <span class="sub" id="title">loading…</span>
   <span class="sub" id="updated"></span>
+  <nav>
+    <a href="#sizes" data-tab="sizes">Ladder</a><a href="#betting" data-tab="betting">Betting</a><a href="#books" data-tab="books">Books</a><a href="#languages" data-tab="languages">Languages</a>
+    <a href="#sieves" data-tab="sieves">Sieves</a><a href="#attention" data-tab="attention">Attention</a><a href="#traits-section" data-tab="traits-section">Traits</a><a href="#runs-section" data-tab="runs-section">Runs</a>
+  </nav>
 </header>
 <main>
-  <section class="panel"><div class="strip" id="strip"></div></section>
+  <details class="panel" id="stripwrap" open><summary>Run overview <span class="note" id="stripsum"></span></summary><div class="strip" id="strip"></div></details>
 
-  <section class="panel">
-    <h2>Training loss, 100-step EMA, eval cross-entropy, learning rate</h2>
-    <div class="chart tall" id="loss"></div>
-  </section>
-
-  <section class="panel">
-    <h2>Bits per byte per hole card</h2>
-    <div class="chart tall" id="bpb"></div>
-  </section>
-
-  <div class="row">
-    <section class="panel"><h2>Throughput and memory</h2><div class="chart" id="speed"></div></section>
-    <section class="panel"><h2>Gradient norm per layer</h2><div class="chart" id="gradheat"></div></section>
+  <!-- ============================================================ the ladder: home -->
+  <div class="section" id="sizes">
+    <h1>The ladder <span class="q">each model size has one job; open a card for the metrics that judge it</span></h1>
+    <div class="cards" id="rungcards"></div>
+    <section class="panel"><h2>Tonight's queue <span class="note">scripts/queue_9m.sh runs these one at a time, after the pool runs and the re-score</span></h2><div class="scroll"><table id="queue"><thead><tr><th>#</th><th>spec</th><th>status</th></tr></thead><tbody></tbody></table></div></section>
   </div>
 
-  <div class="row">
-    <section class="panel"><h2>Recipe: tokens by language family</h2><div class="chart" id="families"></div></section>
-    <section class="panel"><h2>Byte-fallback rate per book</h2><div class="chart" id="fallback"></div></section>
+  <!-- ============================================================ one rung -->
+  <div class="section" id="rung">
+    <h1><a href="#sizes" class="back">← ladder</a> <span id="rungtitle"></span> <span class="q" id="rungjob"></span></h1>
+    <section class="panel"><div class="rungover" id="rungover"></div></section>
+    <section class="panel"><h2>What we measure, and why <span class="note">each metric tied to this rung's job; "to come" is not built yet</span></h2>
+      <div class="scroll"><table id="rungmetrics"><thead><tr><th>metric</th><th>what it tells us</th><th>better is</th><th>state</th></tr></thead><tbody></tbody></table></div></section>
+    <section class="panel"><h2 id="boardh">Scoreboard <span class="note">English held-out books; lower bits per byte is better; laws show the model beside the books' own value (ref)</span></h2>
+      <div class="scroll"><table id="rungboard"><thead></thead><tbody></tbody></table></div></section>
+    <section class="panel" id="calpanel" style="display:none">
+      <h2>Calibration against 9m <span class="note">the same shelf and passes at both sizes; the proxy is trusted only if it orders the shelves as 9m does. Forgotten Tomes bits per byte, English, lower is better</span></h2>
+      <div class="row">
+        <div class="scroll"><table id="caltable"><thead><tr><th>shelf</th><th>passes</th><th>9m run</th><th>9m score</th><th>1m run</th><th>1m score</th></tr></thead><tbody></tbody></table>
+          <p class="note" id="calverdict"></p></div>
+        <div class="chart" id="calchart"></div>
+      </div>
+    </section>
+    <div class="row">
+      <section class="panel"><h2>The Forgotten Tomes score <span class="note">bits per byte on 16 books Qwen 3.8 cannot have read; lower is better; dotted lines are Qwen models scored the same way</span></h2><div class="chart" id="ftchart"></div></section>
+      <section class="panel"><h2>Training loss <span class="note">nats per token on the training shelf, every run at this size</span></h2><div class="chart" id="losschart"></div></section>
+    </div>
+    <section class="panel" id="bookspanel">
+      <h2>The books <span class="note">click any book to read it: the same stripped text Thorp trains and scores on</span></h2>
+      <div class="booktabs"><button data-bt="tomes" class="on">The Forgotten Tomes</button><button data-bt="shelf">Training shelves</button>
+        <select id="shelfpick" style="display:none"></select><input id="bookfilter" placeholder="filter by title or family" style="display:none"></div>
+      <div class="scroll" id="bookswrap"><table id="bookstable" class="clickable"><thead></thead><tbody></tbody></table></div>
+    </section>
+    <div class="row" id="rungcharts">
+      <section class="panel"><h2>Bits per byte by kind of byte <span class="note">spelling is "inside a word"; one bar per run; lower is better</span></h2><div class="chart" id="splitchart"></div></section>
+      <section class="panel"><h2>The laws: model against the books <span class="note">model value ÷ the books' value; closer to the dotted line at 1 is better</span></h2><div class="chart" id="lawchart"></div></section>
+    </div>
   </div>
 
-  <div class="row">
-    <section class="panel"><h2 id="samplesh">Samples</h2><div class="samples" id="samples"></div></section>
-    <section class="panel"><h2>Next token after “The capital of France is”</h2><div class="chart" id="top10"></div></section>
+  <!-- ============================================================ betting performance -->
+  <div class="section" id="betting">
+    <h1>Betting performance <span class="q">how well the machine bets on books it has never seen, and how fast that improves</span></h1>
+    <section class="panel"><div class="strip" id="numbers"></div></section>
+    <section class="panel" id="contentpanel">
+      <h2><span class="allruns" title="this panel compares every run on the ledger; it does not follow the run picker">all runs</span>The content experiment <span class="note">does what is on the shelf change how well the model bets on unseen books, its traits, its kinks or its sieves? Fifteen 9m ships, five shelves, the same bytes, tokens and test; the rule was written before any shelf was cut (DECISIONS.md)</span></h2>
+      <div class="claim" id="contentverdict"></div>
+      <div id="contentships"></div>
+      <div class="chart tall" id="contentchart"></div>
+    </section>
+    <section class="panel">
+      <h2><span class="allruns" title="this panel compares every run on the ledger; it does not follow the run picker">all runs</span>The claim, and what the ledger says about it</h2>
+      <div class="claim" id="claim"></div>
+    </section>
+    <section class="panel">
+      <h2><span class="allruns" title="this panel compares every run on the ledger; it does not follow the run picker">all runs</span>Shelves compared: guessing accuracy against tokens seen <span class="note">hole-card bits per byte, every run on the ledger; the slope is the learning speed</span></h2>
+      <div class="chart tall" id="compare"></div>
+    </section>
+    <section class="panel">
+      <h2><span class="allruns" title="this panel compares every run on the ledger; it does not follow the run picker">all runs</span>Matched tokens <span class="note">each run's hole-card bits per byte interpolated at the same tokens seen, so shelves of different sizes compare honestly; – where the run has not reached that point</span></h2>
+      <div id="matched"></div>
+    </section>
+    <section class="panel">
+      <h2><span class="allruns" title="this panel compares every run on the ledger; it does not follow the run picker">all runs</span>The truth gap <span class="note">bits per byte on the truths deck (one treatise per field) minus the literature hole cards, at the same step; a shelf that narrows it taught the laws, not just the register</span></h2>
+      <div id="truthgap"></div>
+    </section>
+    <section class="panel">
+      <h2>Training loss, 100-step EMA, eval cross-entropy, learning rate</h2>
+      <div class="chart tall" id="loss"></div>
+    </section>
+    <section class="panel">
+      <h2>Bits per byte per hole card</h2>
+      <div class="chart tall" id="bpb"></div>
+    </section>
   </div>
 
-  <section class="panel">
-    <h2>Runs</h2>
-    <div class="scroll"><table id="runs"><thead><tr>
-      <th>name</th><th>run</th><th>preset</th><th>seed</th><th>status</th><th>tokens</th>
-      <th>minutes</th><th>hole-card bpb mean</th><th>started</th></tr></thead><tbody></tbody></table></div>
-  </section>
+  <!-- ============================================================ books -->
+  <div class="section" id="books">
+    <h1>Books <span class="q">which books are learned fast, which teach, and which the tokeniser cannot read</span></h1>
+    <div class="row">
+      <section class="panel">
+        <h2>Loss by book <span class="note">each recipe book's own descent, mean over each 50-step window, coloured by family</span></h2>
+        <div class="chart tall" id="bookloss"></div>
+      </section>
+      <section class="panel">
+        <h2>Loss by kind <span class="note">mean over the books that carry the trait against the ones that do not</span></h2>
+        <div class="chart tall" id="kindloss"></div>
+      </section>
+    </div>
+    <section class="panel">
+      <h2>When each book is learned <span class="note">half-life: the step at which a book has made half the drop it has made so far; sooner is a book of formulae, later is a book that is still teaching</span></h2>
+      <div class="chart tall" id="halflife"></div>
+      <div class="foot">What each book contributed to the hole-card score (the heart of the dice, section 13) is not on this page yet: it is a gradient per book at the final checkpoint, computed once a run ends.</div>
+    </section>
+    <section class="panel"><h2>Byte-fallback rate per book <span class="note">the share of a book's tokens the tokeniser had to spell out in raw bytes</span></h2><div class="chart" id="fallback"></div></section>
+  </div>
+
+  <!-- ============================================================ language groups -->
+  <div class="section" id="languages">
+    <h1>Language groups <span class="q">what the shelf is made of by family, and how each family is learned and scored</span></h1>
+    <div class="row3">
+      <section class="panel"><h2>Recipe: tokens by language family</h2><div class="chart" id="families"></div></section>
+      <section class="panel"><h2>Loss by family <span class="note">mean over the family's recipe books</span></h2><div class="chart" id="familyloss"></div></section>
+      <section class="panel"><h2>Hole-card bits per byte by family <span class="note">latest eval, mean over the family's held-out books</span></h2><div class="chart" id="familybpb"></div></section>
+    </div>
+  </div>
+
+  <!-- ============================================================ sieves -->
+  <div class="section" id="sieves">
+    <h1>Sieves <span class="q">how hard each layer is pushed, how far it actually moves, and where each one changes regime</span></h1>
+    <div class="row">
+      <section class="panel"><h2>Gradient push per layer <span class="note">log10 of the pre-clip norm; ◆ the kink</span></h2><div class="chart" id="gradheat"></div></section>
+      <section class="panel"><h2>Weight move per layer <span class="note">log10 of the move since the last record over the size of the weights; ◆ the kink</span></h2><div class="chart" id="moveheat"></div></section>
+    </div>
+    <div class="row">
+      <section class="panel">
+        <h2>The kink <span class="note">each layer's push, fitted as two lines; the break is where the layer changes regime</span></h2>
+        <div class="chart" id="kinks"></div>
+      </section>
+      <section class="panel">
+        <h2>Where each layer broke</h2>
+        <div class="scroll"><table class="kinks" id="kinktable"><thead><tr>
+          <th>layer</th><th>kink at step</th><th>which way</th><th>slope before</th><th>slope after</th><th>strength</th><th></th></tr></thead><tbody></tbody></table></div>
+        <div class="foot" id="kinknote"></div>
+      </section>
+    </div>
+  </div>
+
+  <!-- ============================================================ attention -->
+  <div class="section" id="attention">
+    <h1>Attention and MLP <span class="q">within each layer, whether the learning lands in attention or in the MLP, and what the engine is doing</span></h1>
+    <div class="row3">
+      <section class="panel"><h2>Push: attention over MLP <span class="note">log10 of the ratio per layer; above zero the attention half is pushed harder</span></h2><div class="chart" id="attnpush"></div></section>
+      <section class="panel"><h2>Move: attention over MLP <span class="note">log10 of the ratio of relative moves per layer</span></h2><div class="chart" id="attnmove"></div></section>
+      <section class="panel"><h2>Throughput and memory</h2><div class="chart" id="speed"></div></section>
+    </div>
+  </div>
+
+  <!-- ============================================================ traits -->
+  <div class="section" id="traits-section">
+    <h1>Traits <span class="q">whether any direction in the machine separates a kind of book it has never seen, and what it says when asked</span></h1>
+    <section class="panel">
+      <h2 id="probesh">Traits: is there a direction? <span class="note">a difference-of-means direction fitted on the shelf, scored on the hole cards; YES needs AUC ≥ 0.8 at some layer with two or more held-out books a side</span></h2>
+      <div class="controls" id="traitctl" style="display:flex;gap:16px;align-items:center;margin:4px 0 10px;font-size:12px">
+        <label>sort by <select id="traitsort"><option value="layer">sieve layer</option><option value="first">first step found</option><option value="auc">best AUC</option><option value="name">name</option></select></label>
+        <label>step <select id="traitstep"></select></label>
+        <span class="note" id="traitnote"></span>
+      </div>
+      <div class="traits" id="traits"></div>
+      <div class="chart short" id="probeheat"></div>
+    </section>
+    <section class="panel">
+      <h2 id="ladderh">The curiosity ladder <span class="note">six precursors of curiosity, bottom first, each measured on the held-out books against the untrained model (and, for the two probe rungs, a bag of tokens); the prediction is that they appear in order</span></h2>
+      <div class="claim" id="ladderverdict"></div>
+      <div id="ladder"></div>
+      <div class="chart short" id="laddertime"></div>
+    </section>
+    <div class="row">
+      <section class="panel"><h2 id="samplesh">Samples</h2><div class="samples" id="samples"></div></section>
+      <section class="panel"><h2 id="top10h">Next token</h2><div class="chart" id="top10"></div></section>
+    </div>
+  </div>
+
+  <!-- ============================================================ runs -->
+  <div class="section" id="runs-section">
+    <h1>Runs</h1>
+    <section class="panel">
+      <div class="scroll"><table id="runs" class="clickable"><thead><tr>
+        <th>ship</th><th>name</th><th>run</th><th>preset</th><th>seed</th><th>status</th><th>tokens</th>
+        <th>minutes</th><th>hole-card bpb mean</th><th>started</th></tr></thead><tbody></tbody></table></div>
+    </section>
+  </div>
 </main>
+<div id="reader" hidden>
+  <div class="rbar"><button id="rclose" title="Esc">Books</button><span class="t" id="rtitle"></span>
+    <span class="tools"><button id="rsmaller" aria-label="Smaller text">A&minus;</button><button id="rlarger" aria-label="Larger text">A+</button><button id="rmode"></button></span></div>
+  <div class="rwrap"><div class="rstage" id="rstage"></div></div>
+  <div class="rbar foot"><span id="rpos" aria-live="polite"></span><span id="rleft"></span></div>
+</div>
 <script>
-const C = { text: '#e6edf3', muted: '#8b949e', line: '#2a313c', accent: '#e3b341', blue: '#58a6ff',
-            good: '#3fb950', bad: '#f85149' };
+// ---- DataTable: the one sortable table every table on the page uses. Click a header to sort by it,
+// again to reverse, a third time for the order it was drawn in. It attaches to every <table> by
+// itself (opt out with data-nosort), and keeps each table's sort while the page redraws it every
+// 5 s. A cell may carry data-sort="…" to sort by something other than its text. Rows that are not
+// data (a single colspan cell: "no runs yet", "12 of 40 books") stay at the bottom.
+const DataTable = (() => {
+  const state = new Map();  // table key -> { col, dir }
+  const UNIT = { k: 1e3, K: 1e3, M: 1e6, B: 1e9, G: 1e9, T: 1e12, KB: 1e3, MB: 1e6, GB: 1e9, TB: 1e12, '%': 1 };
+  const NUM = /^([+\-−]?\d*\.?\d+(?:e[+\-]?\d+)?)\s*(KB|MB|GB|TB|[kKMBGT%])?$/;
+  // cell text without the ⓘ popovers, which carry a paragraph of help text
+  const text = n => n.nodeType === 3 ? n.nodeValue : n.classList && n.classList.contains('info') ? '' : [...n.childNodes].map(text).join('');
+  const headers = table => [...table.querySelectorAll('thead th')];
+  const key = table => {
+    const host = table.id || (table.closest('[id]') || {}).id || '';
+    return host + '|' + headers(table).map(th => text(th).trim()).join('|');
+  };
+  const value = td => {
+    if (!td) return null;
+    const s = (td.dataset.sort ?? text(td)).trim().replace(/,/g, '');
+    if (!s || s === '–' || s === '-' || s === '—') return null;
+    const m = s.match(NUM);
+    return m ? parseFloat(m[1].replace('−', '-')) * (UNIT[m[2]] || 1) : s.toLowerCase();
+  };
+  const isData = (tr, n) => tr.cells.length === n && ![...tr.cells].some(td => td.colSpan > 1);
+  function apply(table) {
+    const body = table.tBodies[0], ths = headers(table);
+    if (!body || !ths.length) return;
+    const rows = [...body.rows];
+    const link = table.classList.contains('clickable');
+    rows.forEach((tr, i) => {
+      if (tr.dataset.dti === undefined) tr.dataset.dti = i;
+      if (link && isData(tr, ths.length) && !tr.hasAttribute('tabindex')) tr.tabIndex = 0;
+    });
+    const st = state.get(key(table)) || { col: -1, dir: 0 };
+    ths.forEach((th, i) => {
+      th.classList.add('dt-sortable');
+      th.classList.toggle('dt-asc', i === st.col && st.dir === 1);
+      th.classList.toggle('dt-desc', i === st.col && st.dir === -1);
+    });
+    const data = rows.filter(tr => isData(tr, ths.length)), rest = rows.filter(tr => !isData(tr, ths.length));
+    const byOrder = (a, b) => a.dataset.dti - b.dataset.dti;
+    data.sort(st.dir === 0 ? byOrder : (a, b) => {
+      const x = value(a.cells[st.col]), y = value(b.cells[st.col]);
+      if (x === null || y === null) return x === y ? byOrder(a, b) : x === null ? 1 : -1;  // blanks last either way
+      if (typeof x !== typeof y) return (typeof x === 'number' ? -1 : 1) * st.dir;
+      return (x < y ? -1 : x > y ? 1 : byOrder(a, b) * st.dir) * st.dir;
+    });
+    const want = [...data, ...rest];
+    if (want.some((tr, i) => rows[i] !== tr)) body.append(...want);
+  }
+  function scan(root) {
+    const tables = root.tagName === 'TABLE' ? [root] : [...root.querySelectorAll('table')];
+    tables.filter(t => !t.hasAttribute('data-nosort')).forEach(apply);
+  }
+  const obs = new MutationObserver(muts => {
+    const hit = new Set();
+    muts.forEach(m => {
+      const t = m.target.closest && m.target.closest('table');
+      if (t) hit.add(t); else m.addedNodes.forEach(n => n.nodeType === 1 && (n.tagName === 'TABLE' ? hit.add(n) : n.querySelectorAll('table').forEach(x => hit.add(x))));
+    });
+    hit.forEach(t => { if (t.isConnected && !t.hasAttribute('data-nosort')) apply(t); });
+    obs.takeRecords();  // our own reordering is not a redraw
+  });
+  document.addEventListener('click', e => {
+    const th = e.target.closest('thead th');
+    if (!th || e.target.closest('.info')) return;
+    const table = th.closest('table');
+    if (table.hasAttribute('data-nosort')) return;
+    const k = key(table), col = headers(table).indexOf(th), st = state.get(k) || { col: -1, dir: 0 };
+    const dir = st.col !== col ? 1 : st.dir === 1 ? -1 : st.dir === -1 ? 0 : 1;
+    state.set(k, { col, dir });
+    apply(table); obs.takeRecords();
+  });
+  // a clickable table's rows open on Enter or Space, as they do on a click
+  document.addEventListener('keydown', e => {
+    const tr = e.target.closest && e.target.closest('table.clickable tbody tr[tabindex]');
+    if (tr && e.target === tr && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); tr.click(); }
+  });
+  function start() { scan(document.body); obs.observe(document.body, { childList: true, subtree: true }); }
+  if (document.body) start(); else document.addEventListener('DOMContentLoaded', start);
+  return { refresh: scan };
+})();
+
+// the charts read the page's colour tokens (UI.md), so a colour is defined once, in the CSS
+const tok = n => getComputedStyle(document.documentElement).getPropertyValue('--' + n).trim();
+const C = { text: tok('text'), muted: tok('muted'), line: tok('line'), accent: tok('accent'), blue: tok('blue'),
+            good: tok('good'), bad: tok('bad'), track: tok('track'), c5: tok('c5') };
+const PALETTE = [C.blue, C.accent, C.good, C.bad, ...[5, 6, 7, 8, 9, 10, 11, 12].map(i => tok('c' + i))];
 const layout = (extra = {}) => Object.assign({
   paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
   font: { color: C.text, size: 11 }, margin: { l: 50, r: 50, t: 10, b: 36 },
@@ -103,45 +456,179 @@ const layout = (extra = {}) => Object.assign({
 const cfg = { displayModeBar: false, responsive: true };
 const fmt = (v, d = 3) => v == null || isNaN(v) ? '–' : Number(v).toFixed(d);
 const big = v => v == null ? '–' : v >= 1e9 ? (v / 1e9).toFixed(2) + 'B' : v >= 1e6 ? (v / 1e6).toFixed(1) + 'M' : v >= 1e3 ? (v / 1e3).toFixed(1) + 'k' : String(Math.round(v));
+const fmtBytes = v => !v ? '–' : v >= 1e9 ? (v / 1e9).toFixed(2) + ' GB' : v >= 1e6 ? (v / 1e6).toFixed(1) + ' MB' : (v / 1e3).toFixed(0) + ' KB';
 const esc = s => String(s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
 const get = async u => (await fetch(u)).json();
 const empty = (id, msg = 'no data yet') => { Plotly.purge(id); document.getElementById(id).innerHTML = `<div class="empty">${msg}</div>`; };
 const plot = (id, data, lay) => { const el = document.getElementById(id); if (el.querySelector('.empty')) el.innerHTML = ''; Plotly.react(id, data, lay, cfg); };
+const log10 = v => v > 0 ? Math.log10(v) : null;
+const mean = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : null;
+
+// metric keys: `<prefix>/layer_3`, `<prefix>/layer_3/attn`, `<prefix>/tok`, `<prefix>/pos`
+const groupOf = (k, prefix) => k.slice(prefix.length);
+const groupOrder = g => g === 'tok' ? -2 : g === 'pos' ? -1 : +g.split('/')[0].split('_').pop();
+const groupLabel = g => g.startsWith('layer_') ? 'layer ' + g.split('/')[0].split('_').pop() : g === 'tok' ? 'token emb' : g === 'pos' ? 'position emb' : g;
+const topKeys = (m, prefix) => Object.keys(m).filter(k => k.startsWith(prefix) && !groupOf(k, prefix).includes('/')).sort((a, b) => groupOrder(groupOf(a, prefix)) - groupOrder(groupOf(b, prefix)));
+const layerOnly = (m, prefix) => topKeys(m, prefix).filter(k => groupOf(k, prefix).startsWith('layer_'));
 
 let selected = new URLSearchParams(location.search).get('run');
+
+const TABS = ['sizes', 'rung', 'betting', 'books', 'languages', 'sieves', 'attention', 'traits-section', 'runs-section'];
+let currentRung = null;
+function showTab(id, push = true) {
+  const hash = id;
+  if (id.startsWith('rung-')) { currentRung = id.slice(5); id = 'rung'; if (ladderData) renderRung(); }
+  if (!TABS.includes(id)) id = TABS[0];
+  document.querySelectorAll('.section').forEach(s => s.classList.toggle('active', s.id === id));
+  document.querySelectorAll('nav a').forEach(a => a.classList.toggle('active', a.dataset.tab === (id === 'rung' ? 'sizes' : id)));
+  if (push && location.hash !== '#' + hash) history.replaceState(null, '', location.pathname + location.search + '#' + hash);
+  document.querySelectorAll(`#${id} .chart`).forEach(el => { if (el.data) Plotly.Plots.resize(el); });
+}
+document.querySelectorAll('nav a').forEach(a => a.onclick = e => { e.preventDefault(); showTab(a.dataset.tab); });
+document.getElementById('home').onclick = e => { e.preventDefault(); showTab(TABS[0]); window.scrollTo(0, 0); };
+window.addEventListener('hashchange', () => showTab(location.hash.slice(1), false));
+showTab(location.hash.slice(1) || TABS[0], false);
 
 function ema(xs, span) {
   const a = 2 / (span + 1); let m = null;
   return xs.map(x => (m = m == null ? x : a * x + (1 - a) * m));
 }
 
+// ---- the kink: a two-line fit to (step, log10 norm); the break is where the layer changes regime
+function linfit(x, y) {
+  const n = x.length; let sx = 0, sy = 0, sxx = 0, sxy = 0;
+  for (let i = 0; i < n; i++) { sx += x[i]; sy += y[i]; sxx += x[i] * x[i]; sxy += x[i] * y[i]; }
+  const d = n * sxx - sx * sx;
+  const b = d ? (n * sxy - sx * sy) / d : 0, a = (sy - b * sx) / n;
+  let sse = 0; for (let i = 0; i < n; i++) { const r = y[i] - (a + b * x[i]); sse += r * r; }
+  return { a, b, sse };
+}
+function kink(xs, ys) {
+  const n = xs.length; if (n < 6) return null;
+  const one = linfit(xs, ys); let best = null;
+  for (let k = 3; k <= n - 3; k++) {
+    const L = linfit(xs.slice(0, k), ys.slice(0, k)), R = linfit(xs.slice(k), ys.slice(k));
+    const sse = L.sse + R.sse;
+    if (!best || sse < best.sse) best = { k, sse, L, R };
+  }
+  const strength = one.sse > 0 ? 1 - best.sse / one.sse : 0;
+  const before = best.L.b * 100, after = best.R.b * 100;
+  // which way the push went at the break: by the signs of the two slopes
+  const kind = Math.abs(after - before) < 0.02 ? 'bent'
+    : before < 0 && after >= 0 ? 'turned up' : before > 0 && after <= 0 ? 'turned down'
+    : before < 0 ? (after > before ? 'flattened' : 'steepened') : (after > before ? 'steepened' : 'eased');
+  return { step: xs[best.k], before, after, kind, strength, tentative: n < 10 || strength < 0.25, L: best.L, R: best.R, k: best.k, xs };
+}
+// the fit starts where warmup ends (the learning-rate peak): the ramp before it is the schedule's
+// shape, not the layer's, and a hump defeats a two-line fit
+function warmEnd(m) { if (!m.lr) return 0; const [x, v] = m.lr; let b = 0; v.forEach((lr, i) => { if (lr > v[b]) b = i; }); return x[b]; }
+function kinksOf(m, prefix) {
+  const out = {}, from = warmEnd(m);
+  for (const k of topKeys(m, prefix)) {
+    const [x, v] = m[k];
+    const pts = x.map((s, i) => [s, v[i]]).filter(p => p[1] > 0 && p[0] >= from);
+    const kk = kink(pts.map(p => p[0]), pts.map(p => Math.log10(p[1])));
+    if (kk) out[k] = kk;
+  }
+  return out;
+}
+
 function stat(k, v, s = '') { return `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${s}</div></div>`; }
 
-function headline(r) {
-  const run = r.run, ch = r.chinchilla || {};
-  const latest = r.hole_bpb_latest, prev = r.hole_bpb_previous;
+function kinkSummary(m, kinks) {
+  const prefix = 'grad_norm/';
+  const keys = layerOnly(m, prefix);
+  if (!keys.length) return ['no records yet', ''];
+  const firm = keys.filter(k => kinks[k] && !kinks[k].tentative), tent = keys.filter(k => kinks[k] && kinks[k].tentative);
+  if (!firm.length) return [tent.length ? `${tent.length} tentative, none firm` : 'none yet', `${keys.length} layers, ${m[keys[0]][0].length} records`];
+  const say = k => `${groupLabel(groupOf(k, prefix)).replace('layer ', 'L')} ${kinks[k].kind} @ ${kinks[k].step}`;
+  const earliest = firm.slice().sort((a, b) => kinks[a].step - kinks[b].step)[0];
+  return [firm.map(say).join(' · '), `${firm.length} firm, ${tent.length} tentative; earliest ${say(earliest)}`];
+}
+
+function headline(r, m, kinks) {
+  const run = r.run;
   const wall = run.wall_minutes != null ? fmt(run.wall_minutes, 1) + ' min' : '–';
+  const [kinkLine, kinkNote] = kinkSummary(m, kinks);
+  // the shelf this run was fed: books, tokens under its own tokeniser, and bytes (tokens × bytes a token)
+  const rec = (r.recipe && r.recipe.data) || [];
+  const shelf = { books: rec.length, tokens: rec.reduce((a, b) => a + (b.tokens || 0), 0), bytes: rec.reduce((a, b) => a + (b.tokens || 0) * (b.bytes_per_token || 0), 0) };
   document.getElementById('strip').innerHTML = [
-    stat('run', esc(run.name || ''), `<span class="mono">${run.run_id.slice(0, 12)}</span> <span class="badge ${run.status.split(':')[0]}">${esc(run.status)}</span>`),
+    stat('ship', esc(run.ship || run.name || ''), `${esc(run.name || '')} · <span class="mono">${run.run_id.slice(0, 12)}</span> <span class="badge ${run.status.split(':')[0]}">${esc(run.status)}</span>`),
+    stat('kinks', `<span style="font-size:15px">${esc(kinkLine)}</span>`, esc(kinkNote)),
+    stat('weights', big(r.n_params_total), `${esc(r.spec.model.preset)} · ${big(r.n_params_non_embedding)} non-embedding + ${big(r.n_params_embedding)} embedding`),
+    stat('shelf', `${shelf.books} books`, `${big(shelf.tokens)} tokens · ${fmtBytes(shelf.bytes)} · read ${r.spec.data.passes}×`),
+    stat('tokens / s', big(r.tokens_per_s), 'mean of last 50 steps'),
+    stat(run.status === 'running' ? 'eta' : 'wall time', run.status === 'running' && r.eta_minutes != null ? `${fmt(r.eta_minutes, 1)} min` : wall, run.status === 'running' ? `${big(r.tokens_seen)} of ${big(r.tokens_planned)} tokens` : (run.finished || '')),
+  ].join('');
+  const ch = r.chinchilla || {}, latest = r.hole_bpb_latest, prev = r.hole_bpb_previous;
+  document.getElementById('numbers').innerHTML = [
     stat('preset', esc(r.spec.model.preset), `N = ${big(r.n_params_non_embedding)} non-embedding`),
     stat('tokens seen', big(r.tokens_seen), `of ${big(r.tokens_planned)} planned`),
-    stat('tokens / s', big(r.tokens_per_s), 'mean of last 50 steps'),
-    stat('wall time', wall, r.eta_minutes != null ? `est. finish in ${fmt(r.eta_minutes, 1)} min` : (run.finished || '')),
     stat('hole-card bpb mean', latest ? fmt(latest.value) : '–', latest ? `step ${latest.step}` + (prev ? ` · prev ${fmt(prev.value)} @ ${prev.step}` : '') : ''),
     stat('Chinchilla L(N,D)', fmt(ch.L_planned), `nats/token, indicative · D=${big(ch.D_planned)}; unique: ${fmt(ch.L_unique)}`),
     stat('gap (en hole-card CE − L)', fmt(ch.gap_planned), `en CE ${fmt(r.hole_ce_mean_en)} nats`),
   ].join('');
-  document.getElementById('title').textContent = `${run.name} · ${run.run_id.slice(0, 12)} · ${run.hardware || ''}`;
+  document.getElementById('title').textContent = `${run.ship ? run.ship + ' · ' : ''}${run.name} · ${run.run_id.slice(0, 12)} · ${run.hardware || ''}`;
 }
 
-function lossPanel(m, evals, sets) {
+// ---- the claim: the hypothesis in the order a sceptic wants it, and the ledger's reading of it
+function claimPanel(cmp) {
+  const shelves = {};
+  for (const r of cmp) {
+    if (!r.bpb.length) continue;
+    (shelves[`${r.preset} · ${r.n_books ?? '?'} books`] ||= []).push(r);
+  }
+  const finals = Object.entries(shelves).map(([key, runs]) => {
+    const done = runs.filter(r => r.status === 'finished');
+    const vals = done.map(r => r.bpb[r.bpb.length - 1]);
+    return { key, runs, seeds: new Set(done.map(r => r.seed)).size, best: vals.length ? Math.min(...vals) : null, spread: vals.length > 1 ? Math.max(...vals) - Math.min(...vals) : null };
+  });
+  const scored = finals.filter(f => f.best != null), seeded = finals.filter(f => f.spread != null);
+  let verdict, cls = 'open';
+  if (scored.length < 2) verdict = `Not testable yet: ${scored.length} finished shelf${scored.length === 1 ? '' : 'ves'} on the ledger. Two shelves at the same size and tokens are the first comparison; a second seed of one of them is the error bar.`;
+  else {
+    const sorted = scored.slice().sort((a, b) => a.best - b.best);
+    const diff = sorted[sorted.length - 1].best - sorted[0].best;
+    const spread = seeded.length ? Math.max(...seeded.map(f => f.spread)) : null;
+    verdict = `Best shelf so far: ${sorted[0].key} at ${fmt(sorted[0].best, 4)} bpb; shelf-to-shelf difference ${fmt(diff, 4)}`;
+    if (spread == null) verdict += '; no shelf has two finished seeds yet, so the difference has no error bar.';
+    else { cls = diff > 2 * spread ? 'yes' : 'no'; verdict += `; seed-to-seed spread ${fmt(spread, 4)}.` + (cls === 'yes' ? ' The shelves differ by more than the seeds: the claim stands at this size.' : ' The seeds are as wide as the shelves: the difference is noise at this size.'); }
+    verdict += ' Compared at each run’s final tokens; read the chart at matched tokens before quoting it.';
+  }
+  const rows = finals.map(f => `<tr><td>${esc(f.key)}</td><td>${f.runs.length}</td><td>${f.seeds}</td><td>${fmt(f.best, 4)}</td><td>${f.spread == null ? '–' : fmt(f.spread, 4)}</td></tr>`).join('');
+  document.getElementById('claim').innerHTML = `
+    <div><div class="k">Claim</div><div class="v">Some books make the guessing better, faster. Hold the model still, change the shelf, and the hole-card score falls faster per token on some shelves than on others. The kind of book that buys the most fall is the finding, and the next shelf is built from it.</div></div>
+    <div><div class="k">Measure</div><div class="v">Guessing accuracy: bits per byte on the hole cards, books the model is never trained on. Learning speed: how far that number falls per million tokens seen. Neither is ever read from a book on the shelf.</div></div>
+    <div><div class="k">Prediction</div><div class="v">At the same size and the same tokens, two shelves differ by more than two seeds of the same shelf do, and the order of shelves holds one size up. The per-book contribution (the heart of the dice, section 13) then names the books that carried it.</div></div>
+    <div><div class="k">What would show it wrong</div><div class="v">A seed-to-seed spread as wide as the shelf-to-shelf difference; or an order of shelves at 9M that flips at 21M. Either is published as a finding, not buried.</div></div>
+    <div class="reading"><div class="k">The ledger’s reading</div><div class="verdict ${cls}">${verdict}</div>
+      <table class="mt"><thead><tr><th>shelf</th><th>runs</th><th>finished seeds</th><th>best final bpb</th><th>seed spread</th></tr></thead><tbody>${rows || '<tr><td colspan=5 class="empty">no scored run yet</td></tr>'}</tbody></table></div>`;
+}
+
+function comparePanel(cmp) {
+  const data = [];
+  cmp.forEach((r, i) => {
+    if (!r.bpb.length) return;
+    const col = PALETTE[i % PALETTE.length];
+    const name = `${r.ship || r.name} · ${r.preset} · ${r.n_books ?? '?'} books · seed ${r.seed}`;
+    data.push({ x: r.tokens, y: r.bpb, name, mode: 'lines+markers', line: { color: col, width: 2 }, marker: { size: 6 },
+      hovertemplate: `${esc(name)}<br>%{x:,.0f} tokens<br>%{y:.4f} bpb<extra></extra>` });
+    if (r.bpb_en.length) data.push({ x: r.tokens.slice(0, r.bpb_en.length), y: r.bpb_en, name: name + ' (en)', mode: 'lines', line: { color: col, width: 1, dash: 'dot' }, showlegend: false,
+      hovertemplate: `${esc(name)} (en)<br>%{x:,.0f} tokens<br>%{y:.4f} bpb<extra></extra>` });
+  });
+  if (!data.length) return empty('compare', 'no scored run yet');
+  plot('compare', data, layout({ xaxis: { title: 'tokens seen', gridcolor: C.line }, yaxis: { title: 'hole-card bits per byte', gridcolor: C.line } }));
+}
+
+function lossPanel(m, sets) {
   if (!m.loss) return empty('loss');
   const [s, v] = m.loss;
   const data = [
-    { x: s, y: v, name: 'loss', type: 'scattergl', mode: 'lines', line: { color: '#3b4655', width: 1 } },
+    { x: s, y: v, name: 'loss', type: 'scattergl', mode: 'lines', line: { color: C.track, width: 1 } },
     { x: s, y: ema(v, 100), name: 'EMA 100', type: 'scattergl', mode: 'lines', line: { color: C.blue, width: 2 } },
   ];
-  const palette = [C.accent, C.good, C.bad, '#d2a8ff'];
+  const palette = [C.accent, C.good, C.bad, C.c5];
   sets.forEach((set, i) => {
     const k = `eval/${set}/ce_mean`;
     if (m[k]) data.push({ x: m[k][0], y: m[k][1], name: `${set} CE mean`, mode: 'markers+lines', line: { dash: 'dot', color: palette[i % 4] }, marker: { size: 8, color: palette[i % 4] } });
@@ -153,17 +640,21 @@ function lossPanel(m, evals, sets) {
     yaxis2: { overlaying: 'y', side: 'right', title: 'lr', showgrid: false, exponentformat: 'e' } }));
 }
 
+function holeMeta(r) {
+  const meta = {};
+  for (const sets of Object.values((r.eval_sets && r.eval_sets.data.sets) || {}))
+    for (const b of sets) meta[b.book_id] = b;
+  return meta;
+}
+
 function bpbPanel(evals, r) {
   if (!evals.length) return empty('bpb');
-  const titles = {};
-  for (const sets of Object.values((r.eval_sets && r.eval_sets.data.sets) || {}))
-    for (const b of sets) titles[b.book_id] = `${b.title} (${b.language})`;
+  const meta = holeMeta(r);
   const by = {};
   for (const e of evals) (by[e.book_id] ||= []).push(e);
-  const data = Object.entries(by).map(([b, rows]) => ({
-    x: rows.map(r => r.step), y: rows.map(r => r.bpb), name: titles[b] || b, mode: 'lines+markers', marker: { size: 5 },
-    hovertemplate: `${esc(titles[b] || b)}<br>step %{x}<br>%{y:.4f} bpb<extra></extra>`,
-  }));
+  const data = Object.entries(by).map(([b, rows]) => { const t = meta[b] ? `${meta[b].title} (${meta[b].language})` : b; return {
+    x: rows.map(r => r.step), y: rows.map(r => r.bpb), name: t, mode: 'lines+markers', marker: { size: 5 },
+    hovertemplate: `${esc(t)}<br>step %{x}<br>%{y:.4f} bpb<extra></extra>` }; });
   plot('bpb', data, layout({ xaxis: { title: 'step', gridcolor: C.line }, yaxis: { title: 'bits per byte', gridcolor: C.line },
     legend: { orientation: 'v', x: 1.02, y: 1, font: { size: 10 } }, margin: { l: 50, r: 10, t: 10, b: 36 } }));
 }
@@ -175,23 +666,133 @@ function speedPanel(m) {
   plot('speed', data, layout({ yaxis: { title: 'tokens / s', gridcolor: C.line }, yaxis2: { overlaying: 'y', side: 'right', title: 'GB', showgrid: false, rangemode: 'tozero' } }));
 }
 
-function gradPanel(m) {
-  const keys = Object.keys(m).filter(k => k.startsWith('grad_norm/layer_')).sort((a, b) => +a.split('_').pop() - +b.split('_').pop());
-  if (!keys.length) return empty('gradheat');
+function heat(id, m, prefix, kinks, colorbar) {
+  const keys = topKeys(m, prefix);
+  if (!keys.length) return empty(id);
   const x = m[keys[0]][0];
-  plot('gradheat', [{ type: 'heatmap', x, y: keys.map(k => 'layer ' + k.split('_').pop()), z: keys.map(k => m[k][1].map(v => Math.log10(v))),
-    colorscale: 'Viridis', colorbar: { title: 'log10', thickness: 10 }, hovertemplate: 'step %{x}<br>%{y}<br>log10 norm %{z:.2f}<extra></extra>' }],
-    layout({ margin: { l: 60, r: 10, t: 10, b: 36 } }));
+  const data = [{ type: 'heatmap', x, y: keys.map(k => groupLabel(groupOf(k, prefix))), z: keys.map(k => m[k][1].map(log10)),
+    colorscale: 'Viridis', colorbar: { title: colorbar, thickness: 10 }, hovertemplate: 'step %{x}<br>%{y}<br>log10 %{z:.2f}<extra></extra>' }];
+  const kx = [], ky = [], kt = [];
+  for (const k of keys) { const kk = kinks[k]; if (kk) { kx.push(kk.step); ky.push(groupLabel(groupOf(k, prefix))); kt.push(`kink at ${kk.step}${kk.tentative ? ' (tentative)' : ''}`); } }
+  if (kx.length) data.push({ type: 'scatter', x: kx, y: ky, text: kt, mode: 'markers', marker: { symbol: 'diamond', size: 9, color: '#fff', line: { color: '#000', width: 1 } }, hovertemplate: '%{y}<br>%{text}<extra></extra>', showlegend: false });
+  plot(id, data, layout({ margin: { l: 80, r: 10, t: 10, b: 36 }, xaxis: { title: 'step', gridcolor: C.line } }));
 }
 
-function recipePanels(r) {
+function kinkPanel(m, kinks) {
+  const prefix = 'grad_norm/';
+  const keys = layerOnly(m, prefix);
+  if (!keys.length) { empty('kinks'); document.querySelector('#kinktable tbody').innerHTML = ''; return; }
+  const data = [];
+  keys.forEach((k, i) => {
+    const g = groupOf(k, prefix), [x, v] = m[k], col = PALETTE[i % PALETTE.length];
+    data.push({ x, y: v.map(log10), name: groupLabel(g), mode: 'lines', line: { color: col, width: 1.5 }, hovertemplate: `${groupLabel(g)}<br>step %{x}<br>log10 %{y:.2f}<extra></extra>` });
+    const kk = kinks[k];
+    if (kk) {
+      const left = kk.xs.slice(0, kk.k), right = kk.xs.slice(kk.k);
+      data.push({ x: left, y: left.map(s => kk.L.a + kk.L.b * s), mode: 'lines', line: { color: col, width: 1, dash: 'dot' }, showlegend: false, hoverinfo: 'skip' });
+      data.push({ x: right, y: right.map(s => kk.R.a + kk.R.b * s), mode: 'lines', line: { color: col, width: 1, dash: 'dot' }, showlegend: false, hoverinfo: 'skip' });
+      data.push({ x: [kk.step], y: [kk.L.a + kk.L.b * kk.step], mode: 'markers', marker: { symbol: 'diamond', size: 10, color: col, line: { color: '#fff', width: 1 } }, showlegend: false,
+        hovertemplate: `${groupLabel(g)} kink at step ${kk.step}<br>before ${fmt(kk.before, 3)} / after ${fmt(kk.after, 3)} log10 per 100 steps<extra></extra>` });
+    }
+  });
+  plot('kinks', data, layout({ xaxis: { title: 'step', gridcolor: C.line }, yaxis: { title: 'log10 gradient norm', gridcolor: C.line }, legend: { orientation: 'h', y: -0.2, font: { size: 10 } } }));
+  document.querySelector('#kinktable tbody').innerHTML = keys.map(k => {
+    const kk = kinks[k], g = groupLabel(groupOf(k, prefix));
+    if (!kk) return `<tr><td>${g}</td><td colspan=6 class="t">fewer than six records</td></tr>`;
+    return `<tr><td>${g}</td><td>${kk.step}</td><td>${kk.kind}</td><td>${fmt(kk.before, 3)}</td><td>${fmt(kk.after, 3)}</td><td>${fmt(kk.strength, 2)}</td><td class="t">${kk.tentative ? 'tentative' : ''}</td></tr>`;
+  }).join('');
+  const firm = keys.map(k => kinks[k]).filter(kk => kk && !kk.tentative);
+  document.getElementById('kinknote').textContent = 'Slopes are log10 of the norm per 100 steps. ' + (!firm.length
+    ? 'The fit starts where warmup ends. A kink is tentative until ten records (500 steps) are in and the two-line fit removes at least a quarter of the one-line fit\'s residual. Turned up: the push bottomed and is rising again (the loss plateauing while the step stays large); turned down: it peaked; flattened or steepened: still falling, slower or faster; eased: still rising, slower.'
+    : `${firm.length} of ${keys.length} layers have a firm kink; the earliest is at step ${Math.min(...firm.map(kk => kk.step))}, the latest at ${Math.max(...firm.map(kk => kk.step))}. A layer whose push flattens early has settled early; one that keeps falling is still being taught.`);
+}
+
+function attnPanels(m) {
+  for (const [id, prefix, title] of [['attnpush', 'grad_norm/', 'log10 push ratio'], ['attnmove', 'update_ratio/', 'log10 move ratio']]) {
+    const layers = layerOnly(m, prefix).map(k => groupOf(k, prefix));
+    const rows = layers.filter(g => m[`${prefix}${g}/attn`] && m[`${prefix}${g}/mlp`]);
+    if (!rows.length) { empty(id, 'no attn/mlp rows yet (written by runs started after 2026-11-06)'); continue; }
+    const x = m[`${prefix}${rows[0]}/attn`][0];
+    const z = rows.map(g => { const a = m[`${prefix}${g}/attn`][1], b = m[`${prefix}${g}/mlp`][1]; return a.map((v, i) => v > 0 && b[i] > 0 ? Math.log10(v / b[i]) : null); });
+    plot(id, [{ type: 'heatmap', x, y: rows.map(groupLabel), z, colorscale: 'RdBu', zmid: 0, colorbar: { title, thickness: 10 }, hovertemplate: 'step %{x}<br>%{y}<br>%{z:.2f}<extra></extra>' }],
+      layout({ margin: { l: 80, r: 10, t: 10, b: 36 }, xaxis: { title: 'step', gridcolor: C.line } }));
+  }
+}
+
+function bookSeries(m, r) {
+  const rec = (r.recipe && r.recipe.data) || [];
+  const meta = {}; for (const b of rec) meta[b.book_id] = b;
+  return Object.keys(m).filter(k => k.startsWith('loss/book/')).map(k => {
+    const id = k.slice('loss/book/'.length), b = meta[id] || { title: id, family: '' };
+    return { id, title: b.title, family: b.family, x: m[k][0], y: m[k][1] };
+  });
+}
+const meanCurve = (books, steps) => steps.map(st => mean(books.map(b => { const j = b.x.indexOf(st); return j < 0 ? null : b.y[j]; }).filter(v => v != null)));
+
+function bookPanels(m, r, series, fams, famColour) {
+  const traits = r.traits || {};
+  if (!series.length) { empty('bookloss'); empty('kindloss'); empty('halflife'); return; }
+  const seen = new Set();
+  plot('bookloss', series.map(s => ({ x: s.x, y: s.y, name: s.family, legendgroup: s.family, showlegend: !seen.has(s.family) && !!seen.add(s.family), mode: 'lines', line: { color: famColour(s.family), width: 1 }, opacity: 0.8,
+    hovertemplate: `${esc(s.title)} (${esc(s.family)})<br>step %{x}<br>%{y:.3f} nats<extra></extra>` })),
+    layout({ xaxis: { title: 'step', gridcolor: C.line }, yaxis: { title: 'nats / token', gridcolor: C.line } }));
+
+  const steps = [...new Set(series.flatMap(s => s.x))].sort((a, b) => a - b);
+  const kdata = [];
+  ['fiction', 'verse', 'first_person'].forEach((t, i) => {
+    for (const val of [1, 0]) {
+      const books = series.filter(s => traits[s.id] && traits[s.id][t] === val);
+      if (!books.length) continue;
+      kdata.push({ x: steps, y: meanCurve(books, steps), name: `${t.replace('_', ' ')}${val ? '' : ': not'} (${books.length})`, mode: 'lines', line: { color: PALETTE[i], width: val ? 2.5 : 1.5, dash: val ? 'solid' : 'dot' } });
+    }
+  });
+  if (!kdata.length) empty('kindloss', 'no traits for these books (lists/traits.csv)');
+  else plot('kindloss', kdata, layout({ xaxis: { title: 'step', gridcolor: C.line }, yaxis: { title: 'nats / token, mean over books', gridcolor: C.line } }));
+
+  const hl = series.map(s => {
+    const y0 = s.y[0], ymin = Math.min(...s.y), target = y0 - (y0 - ymin) / 2;
+    const j = s.y.findIndex(v => v <= target), n = s.y.length;
+    const last = s.y[n - 1], prev = s.y[Math.max(0, n - 3)], dstep = s.x[n - 1] - s.x[Math.max(0, n - 3)];
+    return { ...s, half: j < 0 ? null : s.x[j], drop: y0 - ymin, last, slope: dstep ? (last - prev) / dstep * 100 : 0 };
+  }).filter(h => h.half != null && h.drop > 0).sort((a, b) => a.half - b.half || b.drop - a.drop);
+  if (!hl.length) return empty('halflife');
+  const kind = h => { const t = traits[h.id]; return t ? [t.fiction ? 'fiction' : 'non-fiction', t.verse ? 'verse' : null, t.first_person ? 'first person' : null].filter(Boolean).join(', ') : ''; };
+  // labels must be unique: Plotly puts bars with the same category in one slot, and two volumes of
+  // one book cut to 40 characters collide (The Gaming Table vols 1 and 2, Edith Wharton parts 1 and 2)
+  const short = hl.map(h => h.title.slice(0, 40)), count = {};
+  short.forEach(t => count[t] = (count[t] || 0) + 1);
+  const labels = hl.map((h, i) => count[short[i]] > 1 ? `${short[i].slice(0, 32)}… (${h.id})` : short[i]);
+  plot('halflife', [{ type: 'bar', x: labels, y: hl.map(h => h.half), marker: { color: hl.map(h => famColour(h.family)) },
+    text: hl.map(h => `${h.family}${kind(h) ? ' · ' + kind(h) : ''}<br>half-life step ${h.half} · drop so far ${fmt(h.drop, 2)} nats<br>latest ${fmt(h.last, 3)} · slope ${fmt(h.slope, 3)} per 100 steps`), hovertemplate: '%{x}<br>%{text}<extra></extra>' }],
+    layout({ margin: { l: 50, r: 10, t: 10, b: 140 }, xaxis: { tickangle: -60, tickfont: { size: 9 }, gridcolor: C.line }, yaxis: { title: 'half-life (step)', gridcolor: C.line } }));
+}
+
+function languagePanels(r, evals, series, fams, famColour) {
   const rec = r.recipe && r.recipe.data;
-  if (!rec) { empty('families'); empty('fallback'); return; }
+  if (!rec) { empty('families'); empty('familyloss'); empty('familybpb'); return; }
   const fam = {};
   for (const b of rec) fam[b.family] = (fam[b.family] || 0) + b.tokens;
   const fk = Object.keys(fam).sort((a, b) => fam[b] - fam[a]);
-  plot('families', [{ type: 'bar', x: fk, y: fk.map(k => fam[k]), marker: { color: C.blue }, hovertemplate: '%{x}<br>%{y:,} tokens<extra></extra>' }],
+  plot('families', [{ type: 'bar', x: fk, y: fk.map(k => fam[k]), marker: { color: fk.map(famColour) }, hovertemplate: '%{x}<br>%{y:,} tokens<extra></extra>' }],
     layout({ yaxis: { title: 'tokens per pass', gridcolor: C.line } }));
+  if (!series.length) empty('familyloss');
+  else {
+    const steps = [...new Set(series.flatMap(s => s.x))].sort((a, b) => a - b);
+    plot('familyloss', fams.map(f => { const books = series.filter(s => s.family === f); return { x: steps, y: meanCurve(books, steps), name: `${f} (${books.length})`, mode: 'lines', line: { color: famColour(f), width: 2 } }; }).filter(t => t.y.some(v => v != null)),
+      layout({ xaxis: { title: 'step', gridcolor: C.line }, yaxis: { title: 'nats / token, mean over books', gridcolor: C.line } }));
+  }
+  if (!evals.length) return empty('familybpb');
+  const meta = holeMeta(r), last = Math.max(...evals.map(e => e.step));
+  const byFam = {};
+  for (const e of evals.filter(e => e.step === last)) { const f = (meta[e.book_id] || {}).family || '?'; (byFam[f] ||= []).push(e.bpb); }
+  const ff = Object.keys(byFam).sort((a, b) => mean(byFam[a]) - mean(byFam[b]));
+  plot('familybpb', [{ type: 'bar', x: ff, y: ff.map(f => mean(byFam[f])), marker: { color: ff.map(famColour) }, text: ff.map(f => `${byFam[f].length} book${byFam[f].length > 1 ? 's' : ''}`), hovertemplate: '%{x}<br>%{y:.4f} bpb · %{text}<extra></extra>' }],
+    layout({ yaxis: { title: `bits per byte at step ${last}`, gridcolor: C.line } }));
+}
+
+function fallbackPanel(r) {
+  const rec = r.recipe && r.recipe.data;
+  if (!rec) return empty('fallback');
   const stats = (r.tokeniser && r.tokeniser.stats) || {};
   const rows = rec.map(b => ({ ...b, rate: (stats[b.book_id] || {}).byte_fallback_rate ?? b.byte_fallback_rate ?? 0 }))
     .sort((a, b) => b.rate - a.rate).slice(0, 25);
@@ -200,30 +801,566 @@ function recipePanels(r) {
     layout({ margin: { l: 230, r: 10, t: 10, b: 36 }, xaxis: { title: '% of tokens that are byte pieces (top 25)', gridcolor: C.line }, yaxis: { tickfont: { size: 10 } } }));
 }
 
+// the Traits tab reads any eval step's probes and sorts the traits by the layer they live in (with
+// that layer's kink beside it), by the step they first reached YES, by AUC, or by name
+const traitView = { sort: 'layer', step: null };
+try { traitView.sort = localStorage.getItem('thorp.traitsort') || 'layer'; } catch (e) {}
+function probePanel(r, kinks = {}) {
+  const all = r.probes_all || [];
+  const el = document.getElementById('traits');
+  const sortSel = document.getElementById('traitsort'), stepSel = document.getElementById('traitstep');
+  if (!all.length) { el.innerHTML = '<div class="empty">no probe rows yet: add <span class="mono">probes</span> to eval.evaluators in the spec</div>'; empty('probeheat', ''); stepSel.innerHTML = ''; return; }
+  const steps = all.map(a => a.step);
+  if (traitView.step == null || !steps.includes(traitView.step) || traitView.followLatest) { traitView.step = steps[steps.length - 1]; traitView.followLatest = true; }
+  if (stepSel.dataset.steps !== steps.join(',')) { // rebuild only when a step arrives, so an open list stays open
+    stepSel.innerHTML = steps.map(s => `<option value="${s}">${s}${s === steps[steps.length - 1] ? ' (latest)' : ''}</option>`).join('');
+    stepSel.dataset.steps = steps.join(',');
+  }
+  stepSel.value = String(traitView.step);
+  sortSel.value = traitView.sort;
+  sortSel.onchange = () => { traitView.sort = sortSel.value; try { localStorage.setItem('thorp.traitsort', sortSel.value); } catch (e) {} probePanel(r, kinks); };
+  stepSel.onchange = () => { traitView.step = +stepSel.value; traitView.followLatest = traitView.step === steps[steps.length - 1]; probePanel(r, kinks); };
+  const p = all.find(a => a.step === traitView.step).data;
+  document.getElementById('probesh').firstChild.textContent = `Traits at step ${traitView.step}: is there a direction? `;
+  // the first step at which each trait was found, over every step on the ledger
+  const first = {};
+  for (const a of all) for (const [n, t] of Object.entries(a.data.traits)) if (t.status === 'found' && first[n] == null) first[n] = a.step;
+  const best = t => t.auc ? Math.max(...t.auc) : -1;
+  const kinkAt = L => { const k = kinks['grad_norm/layer_' + L]; return k ? k : null; };
+  const byName = (a, b) => (a.includes('/') - b.includes('/')) || a.localeCompare(b);
+  const names = Object.keys(p.traits).sort((a, b) => {
+    const A = p.traits[a], B = p.traits[b];
+    if (traitView.sort === 'name') return byName(a, b);
+    if (traitView.sort === 'auc') return best(B) - best(A) || byName(a, b);
+    if (traitView.sort === 'first') return (first[a] ?? Infinity) - (first[b] ?? Infinity) || best(B) - best(A) || byName(a, b);
+    return (A.best_layer ?? Infinity) - (B.best_layer ?? Infinity) || best(B) - best(A) || byName(a, b);
+  });
+  document.getElementById('traitnote').textContent = traitView.sort === 'layer' ? 'traits grouped by the layer where the held-out AUC peaks; the kink is that layer’s, from the Sieves tab' : traitView.sort === 'first' ? 'first step found is over every eval step on the ledger, not only the one shown' : '';
+  el.innerHTML = names.map(n => {
+    const t = p.traits[n];
+    // YES is split by the floors when they exist: emergent (beats the bag of tokens and the untrained
+    // model) or in the tokens (a floor finds it too, so the model need not have built anything)
+    const hasFloors = t.floor_bow !== undefined;
+    const a = t.status === 'found' ? (hasFloors ? (t.emergent ? ['YES · emergent', 'yes'] : ['YES · in the tokens', 'na']) : ['YES', 'yes'])
+      : t.status === 'not_found' ? ['NO', 'no'] : ['n/a', 'na'];
+    const where = t.auc ? `layer ${t.best_layer}, AUC ${fmt(Math.max(...t.auc), 3)}` : t.reason;
+    const k = t.auc ? kinkAt(t.best_layer) : null;
+    const kink = k ? `<br>layer ${t.best_layer} kink @ ${k.step} (${k.kind}${k.tentative ? ', tentative' : ''})` : '';
+    const firstLine = first[n] != null ? `<br>first found @ step ${first[n]}` : '';
+    const floors = hasFloors ? `<br>floors: tokens ${fmt(t.floor_bow, 3)} · untrained ${fmt(t.floor_init, 3)}` : '';
+    return `<div class="trait"><div class="n">${esc(n.replace('_', ' '))}</div><div class="a ${a[1]}">${a[0]}</div><div class="r">${esc(where)}${kink}${firstLine}${floors}<br>shelf ${t.n_train[0]}/${t.n_train[1]} · held out ${t.n_test[0]}/${t.n_test[1]}</div></div>`;
+  }).join('');
+  const tested = names.filter(n => p.traits[n].auc);
+  if (!tested.length) return empty('probeheat', 'no trait has two held-out books on each side');
+  const L = p.traits[tested[0]].auc.length;
+  const rows = tested.slice().reverse(); // heatmap rows read top-down in the strip's order
+  plot('probeheat', [{ type: 'heatmap', x: [...Array(L).keys()].map(i => { const k = kinkAt(i); return `layer ${i}` + (k ? `<br>kink ${k.step}` : ''); }), y: rows.map(n => n.replace('_', ' ')), z: rows.map(n => p.traits[n].auc),
+    zmin: 0.5, zmax: 1, colorscale: 'Viridis', colorbar: { title: 'AUC', thickness: 10 }, hovertemplate: '%{y}<br>%{x}<br>held-out AUC %{z:.3f}<extra></extra>' }],
+    layout({ margin: { l: 130, r: 10, t: 10, b: 48 }, yaxis: { type: 'category', categoryorder: 'array', categoryarray: rows.map(n => n.replace('_', ' ')) } }));
+}
+
+const LADDER = [
+  [1, "knowing what it doesn't know", 'r1_calibration', 'correlation of its uncertainty with its loss'],
+  [2, 'noticing the strange', 'r2_novelty_auc', 'AUC, unseen books against shelf books'],
+  [3, 'learning from the page', 'r3_copy_gain', 'nats saved on a repeated span (and late minus early loss)'],
+  [4, 'knowing a question', 'r4_question_auc', 'AUC, questions against statements, punctuation removed'],
+  [5, 'expecting an answer', 'r5_expectancy', 'nats more uncertain after "?" than after "."'],
+  [6, 'asking', 'r6_asking', 'log ratio of "?" where unsure, beyond the text'],
+];
+function ladderPanel(r, m) {
+  const c = r.curiosity && r.curiosity.data, el = document.getElementById('ladder'), vd = document.getElementById('ladderverdict');
+  if (!c) { el.innerHTML = '<div class="empty">no ladder rows yet: add <span class="mono">curiosity</span> to eval.evaluators, or re-score with <span class="mono">thorp eval RUN --evaluators curiosity</span></div>'; vd.innerHTML = ''; empty('laddertime', ''); return; }
+  document.getElementById('ladderh').firstChild.textContent = `The curiosity ladder at step ${r.curiosity.step} `;
+  const order = c.highest === 0 ? 'No rung is present yet.' : c.in_order ? `In order: every rung up to ${c.highest} that could be tested is present, none above an absent one.` : `Out of order: rung ${c.highest} is present above an absent rung. That is a finding against the ladder at this size.`;
+  vd.innerHTML = `<div class="reading"><div class="k">The ledger’s reading</div><div class="verdict ${c.highest === 0 ? 'open' : c.in_order ? 'yes' : 'no'}">${order}</div></div>`;
+  const floorOf = k => k === 2 ? c.floor_bow.r2 : k === 4 ? c.floor_bow.r4 : null;
+  el.innerHTML = `<table><thead><tr><th>rung</th><th>measure</th><th>trained</th><th>untrained</th><th>token floor</th><th>status</th><th>reading</th></tr></thead><tbody>${
+    LADDER.slice().reverse().map(([k, name, key, what]) => {
+      const s = c.rungs[k] || { status: 'untestable', reason: '' };
+      const cls = s.status === 'present' ? 'finished' : s.status === 'absent' ? 'failed' : 'running';
+      return `<tr><td><b>${k}</b> ${esc(name)}</td><td class="note">${esc(what)}</td><td>${fmt(c.values[key], 3)}</td><td>${fmt(c.untrained[key], 3)}</td><td>${fmt(floorOf(k), 3)}</td>
+        <td><span class="badge ${cls}">${s.status}</span></td><td class="note">${esc(s.reason)}</td></tr>`;
+    }).join('')}</tbody></table>`;
+  // when each rung appears: one row per rung, a mark at every eval step, filled where present
+  const data = [];
+  for (const [k, name] of LADDER) {
+    const s = m[`curiosity/rung_${k}`];
+    if (!s) continue;
+    data.push({ x: s[0], y: s[0].map(() => k), mode: 'markers', name: `${k} ${name}`, showlegend: false,
+      marker: { size: 10, symbol: 'square', color: s[1].map(v => v ? C.good : C.muted + '59') },
+      hovertemplate: `${esc(name)}<br>step %{x}<extra></extra>` });
+  }
+  if (!data.length) return empty('laddertime', '');
+  plot('laddertime', data, layout({ xaxis: { title: 'step', gridcolor: C.line }, yaxis: { title: 'rung', dtick: 1, range: [0.5, 6.5], gridcolor: C.line } }));
+}
+
 function samplesPanel(r) {
   const el = document.getElementById('samples');
   if (!r.samples) { el.innerHTML = '<div class="empty">no samples yet</div>'; empty('top10'); return; }
   document.getElementById('samplesh').textContent = `Samples at step ${r.samples.step}`;
   el.innerHTML = r.samples.data.map(s => `<div><span class="p">${esc(s.prompt)}</span> <span class="t">${s.temperature ? 'T=' + s.temperature : 'greedy'}</span><pre>${esc(s.prompt)}${esc(s.text)}</pre></div>`).join('');
   if (r.top10) {
+    document.getElementById('top10h').textContent = `Next token after “${r.top10.data.prompt}”`;
     const t = r.top10.data.top.slice().reverse();
     plot('top10', [{ type: 'bar', orientation: 'h', y: t.map(x => JSON.stringify(x.token.replace(/▁/g, ' '))), x: t.map(x => x.p), marker: { color: C.good },
       hovertemplate: '%{y}<br>p = %{x:.4f}<extra></extra>' }], layout({ margin: { l: 110, r: 10, t: 10, b: 36 }, xaxis: { title: 'probability', gridcolor: C.line } }));
   }
 }
 
+// ---- matched tokens: a run's score where its curve crosses a token count, by linear interpolation
+const MATCH_AT = [16e6, 32e6, 64e6];
+function interp(xs, ys, x) {
+  if (!xs.length || x < xs[0] || x > xs[xs.length - 1]) return null;
+  for (let i = 1; i < xs.length; i++) if (xs[i] >= x) { const t = (x - xs[i - 1]) / (xs[i] - xs[i - 1] || 1); return ys[i - 1] + t * (ys[i] - ys[i - 1]); }
+  return ys[ys.length - 1];
+}
+function earliestKink(r) {
+  const ks = kinksOf(r.push || {}, 'grad_norm/');
+  const firm = Object.entries(ks).filter(([k, v]) => k.split('/')[1].startsWith('layer_') && !v.tentative).sort((a, b) => a[1].step - b[1].step);
+  return firm.length ? `L${firm[0][0].split('_').pop()} ${firm[0][1].kind} @ ${firm[0][1].step}` : '–';
+}
+function matchedPanel(cmp) {
+  const runs = cmp.filter(r => r.bpb.length);
+  if (!runs.length) { document.getElementById('matched').innerHTML = '<div class="empty">no scored run yet</div>'; return; }
+  const rows = runs.map(r => {
+    const last = r.bpb.length - 1;
+    return `<tr><td>${esc(r.ship || r.name)}</td><td>${r.seed ?? ''}</td><td class="mono">${esc(r.set)}</td><td>${r.n_books ?? '?'}</td><td>${big(r.tokens[last])}</td>
+      ${MATCH_AT.map(x => `<td>${fmt(interp(r.tokens, r.bpb, x), 4)}</td>`).join('')}
+      <td><b>${fmt(r.bpb[last], 4)}</b></td><td>${fmt(r.bpb_en[r.bpb_en.length - 1], 4)}</td><td>${esc(earliestKink(r))}</td>
+      <td><span class="badge ${(r.status || '').split(':')[0]}">${esc((r.status || '').split(':')[0])}</span></td></tr>`;
+  }).join('');
+  document.getElementById('matched').innerHTML = `<table><thead><tr><th>ship</th><th>seed</th><th>set</th><th>books</th><th>tokens seen</th>
+    ${MATCH_AT.map(x => `<th>bpb @ ${big(x)}</th>`).join('')}<th>final bpb</th><th>final en</th><th>earliest firm kink</th><th>status</th></tr></thead><tbody>${rows}</tbody></table>
+    <div class="note" style="margin-top:6px">Compare only rows on the same set: hole-cards (13 books) and hole-cards-v2 (20 books, without Darwin and Einstein) are different decks.</div>`;
+}
+function truthGapPanel(cmp) {
+  const lit = r => r.by_set['hole-cards-v2'] ? 'hole-cards-v2' : 'hole-cards';
+  const runs = cmp.filter(r => r.by_set && r.by_set.truths && r.by_set[lit(r)]);
+  const el = document.getElementById('truthgap');
+  if (!runs.length) { el.innerHTML = '<div class="empty">no run has been scored on the truths deck yet (lists/truths.csv): re-score a finished run with <span class="mono">thorp eval RUN --sets lists/hole-cards-v2.csv lists/truths.csv</span></div>'; return; }
+  const rows = runs.map(r => {
+    const T = r.by_set.truths, L = r.by_set[lit(r)];
+    const pts = T.steps.map((s, i) => [s, T.tokens[i], T.bpb[i], L.bpb[L.steps.indexOf(s)]]).filter(p => p[3] != null);
+    const first = pts[0], last = pts[pts.length - 1];
+    if (!last) return '';
+    const trend = pts.length > 1 ? fmt((last[2] - last[3]) - (first[2] - first[3]), 4) : '– (one step)';
+    return `<tr><td>${esc(r.ship || r.name)}</td><td>${r.seed ?? ''}</td><td class="mono">${lit(r)}</td><td>${big(last[1])}</td><td>${fmt(last[2], 4)}</td><td>${fmt(last[3], 4)}</td><td><b>${fmt(last[2] - last[3], 4)}</b></td><td>${trend}</td></tr>`;
+  }).join('');
+  el.innerHTML = `<table><thead><tr><th>ship</th><th>seed</th><th>against</th><th>at tokens</th><th>truths bpb</th><th>literature bpb</th><th>truth gap</th><th>change since first scored</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+// ---- the content experiment: the pre-registered rule applied to every outcome, from the rows
+const SHELF_OF = n => (n.match(/^content-([a-z]+)-v1/) || [])[1];
+const SHELF_LABEL = { random: 'Flotsam · random (the null)', greek: 'Paralus · Greek polis', islamic: 'Dhow · Islamic golden age', renaissance: 'Santa Maria · Renaissance', about: 'Cutty Sark · about the ages' };
+const CURATED = ['greek', 'islamic', 'renaissance', 'about'];
+const meanOf = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : null;
+const rangeOf = a => a.length > 1 ? Math.max(...a) - Math.min(...a) : null;
+function ruleVerdict(groups, unit, digits) {
+  // groups: {shelf: [values]}; the null is Flotsam's spread (S = its range); a shelf clears it when
+  // its mean lies more than 2S from Flotsam's centre
+  const F = (groups.random || []).filter(v => v != null);
+  if (F.length < 2) return { line: `waiting for the random shelves (${F.length} of 3 finished)`, cls: 'open', rows: [] };
+  const c = meanOf(F), S = rangeOf(F);
+  const rows = CURATED.map(k => {
+    const v = (groups[k] || []).filter(x => x != null);
+    if (!v.length) return { k, text: 'not yet', cls: 'open' };
+    const m = meanOf(v), d = m - c, out = Math.abs(d) > 2 * S;
+    return { k, m, d, n: v.length, spread: rangeOf(v), out, text: `${fmt(m, digits)} (${v.length} ship${v.length > 1 ? 's' : ''}), ${d >= 0 ? '+' : ''}${fmt(d, digits)} from random`, cls: out ? 'yes' : 'no' };
+  });
+  const moved = rows.filter(r => r.out);
+  const line = moved.length ? `Content has a detectable bearing: ${moved.map(r => SHELF_LABEL[r.k].split(' · ')[0]).join(', ')} ${moved.length > 1 ? 'lie' : 'lies'} more than 2S from the random shelves (centre ${fmt(c, digits)}, S ${fmt(S, digits)}${unit}).`
+    : `No detectable bearing so far: every curated shelf lies within 2S of the random shelves (centre ${fmt(c, digits)}, S ${fmt(S, digits)}${unit}).`;
+  return { line, cls: moved.length ? 'yes' : 'no', rows, c, S };
+}
+function pairVerdict(groups, a, b, digits) {
+  const A = (groups[a] || []).filter(v => v != null), B = (groups[b] || []).filter(v => v != null);
+  if (A.length < 2 || B.length < 2) return null;
+  const d = meanOf(A) - meanOf(B), bar = 2 * Math.max(rangeOf(A), rangeOf(B));
+  return { d, bar, out: Math.abs(d) > bar };
+}
+function contentPanel(ships) {
+  const el = document.getElementById('contentverdict'), tb = document.getElementById('contentships');
+  if (!ships.length) { el.innerHTML = '<div class="empty">no content ship on the ledger yet: they run after the night queue and the re-score (scripts/queue_content.sh)</div>'; tb.innerHTML = ''; empty('contentchart', ''); return; }
+  // matched tokens: the smallest final tokens-seen among the ships that have finished
+  const score = r => r.by_set && r.by_set.neutral;
+  const done = ships.filter(r => r.status === 'finished' && score(r));
+  const T = done.length ? Math.min(...done.map(r => score(r).tokens[score(r).tokens.length - 1])) : null;
+  const at = r => T == null || !score(r) ? null : interp(score(r).tokens, score(r).bpb, T);
+  const shelfOf = r => SHELF_OF(r.name);
+  const group = f => { const g = {}; for (const r of done) (g[shelfOf(r)] ||= []).push(f(r)); return g; };
+  const primary = ruleVerdict(group(at), ' bpb', 4);
+  // secondary outcomes, each by the same rule
+  const lastTraits = r => (r.traits.length ? r.traits[r.traits.length - 1].traits : {});
+  const traitNames = [...new Set(done.flatMap(r => Object.keys(lastTraits(r))))].filter(n => !n.startsWith('family/')).sort();
+  const kinkOf = r => { const ks = kinksOf(r.push || {}, 'grad_norm/'); const f = Object.entries(ks).filter(([k, v]) => k.split('/')[1].startsWith('layer_') && !v.tentative).map(([, v]) => v.step); return f.length ? Math.min(...f) : null; };
+  const lastQuarter = (series, steps) => { if (!series) return null; const [x, v] = series; const cut = Math.max(...x) * 0.75; const vals = v.filter((_, i) => x[i] >= cut && v[i] > 0).map(Math.log10); return meanOf(vals); };
+  const sieveOf = (r, key, src) => { const ks = Object.keys(src || {}).filter(k => k.startsWith(key)); return meanOf(ks.map(k => lastQuarter(src[k])).filter(v => v != null)); };
+  const secondary = [
+    ...traitNames.map(t => [`trait: ${t.replace('_', ' ')} (best held-out AUC)`, ruleVerdict(group(r => (lastTraits(r)[t] || {}).best ?? null), '', 3)]),
+    ['kinks: earliest firm kink (step)', ruleVerdict(group(kinkOf), ' steps', 0)],
+    ['sieves: push, last quarter (mean log10 over layers)', ruleVerdict(group(r => sieveOf(r, 'grad_norm/layer_', r.push)), '', 3)],
+    ['sieves: move, last quarter (mean log10 update ratio)', ruleVerdict(group(r => sieveOf(r, 'update_ratio/layer_', r.move)), '', 3)],
+    ['curiosity ladder: highest rung present', ruleVerdict(group(r => r.ladder.length ? r.ladder[r.ladder.length - 1][1] : null), '', 1)],
+  ];
+  const g = group(at);
+  const pairs = [['quality: Greek against Cutty Sark', 'greek', 'about'], ['quality: Islamic against Cutty Sark', 'islamic', 'about'], ['quality: Renaissance against Cutty Sark', 'renaissance', 'about'],
+    ['type: Greek against Islamic', 'greek', 'islamic'], ['type: Greek against Renaissance', 'greek', 'renaissance'], ['type: Islamic against Renaissance', 'islamic', 'renaissance']]
+    .map(([label, a, b]) => { const p = pairVerdict(g, a, b, 4); return `<tr><td>${label}</td><td>${p ? `${p.d >= 0 ? '+' : ''}${fmt(p.d, 4)} bpb` : '–'}</td><td>${p ? fmt(p.bar, 4) : '–'}</td><td>${p ? `<span class="badge ${p.out ? 'finished' : 'failed'}">${p.out ? 'differ' : 'within noise'}</span>` : 'needs two ships a side'}</td></tr>`; }).join('');
+  el.innerHTML = `<div class="reading"><div class="k">The ledger’s reading: guessing (neutral deck, English bits per byte at ${T ? big(T) : '–'} tokens, ${done.length} of ${ships.length} ships finished)</div><div class="verdict ${primary.cls}">${primary.line}</div>
+    <table class="mt"><thead><tr><th>shelf</th><th>against the random shelves</th></tr></thead><tbody>${primary.rows.map(r => `<tr><td>${SHELF_LABEL[r.k]}</td><td><span class="verdict ${r.cls}" style="display:inline">${esc(r.text)}</span></td></tr>`).join('')}</tbody></table>
+    <table class="mt"><thead><tr><th>quality and type</th><th>difference</th><th>twice the larger spread</th><th>reading</th></tr></thead><tbody>${pairs}</tbody></table>
+    <table class="mt"><thead><tr><th>secondary outcome</th><th>reading (same rule: more than 2S from the random shelves)</th></tr></thead><tbody>${secondary.map(([label, v]) => `<tr><td>${esc(label)}</td><td><span class="verdict ${v.cls}" style="display:inline">${esc(v.line)}</span></td></tr>`).join('')}</tbody></table></div>`;
+  tb.innerHTML = `<table style="margin-top:12px"><thead><tr><th>ship</th><th>shelf</th><th>its question</th><th>status</th><th>tokens</th><th>neutral bpb at T</th><th>earliest firm kink</th><th>highest rung</th></tr></thead><tbody>${
+    ships.map(r => `<tr><td><b>${esc(r.ship || r.name)}</b></td><td>${esc(SHELF_LABEL[shelfOf(r)] || '')}</td><td class="note">${esc(r.question || '')}</td><td><span class="badge ${(r.status || '').split(':')[0]}">${esc((r.status || '').split(':')[0])}</span></td>
+      <td>${score(r) ? big(score(r).tokens[score(r).tokens.length - 1]) : '–'}</td><td>${fmt(at(r), 4)}</td><td>${kinkOf(r) ?? '–'}</td><td>${r.ladder.length ? r.ladder[r.ladder.length - 1][1] : '–'}</td></tr>`).join('')}</tbody></table>`;
+  const col = { random: C.muted, greek: C.blue, islamic: C.good, renaissance: C.accent, about: C.c5 };
+  const data = ships.filter(score).map(r => ({ x: score(r).tokens, y: score(r).bpb, name: r.ship, mode: 'lines+markers', line: { color: col[shelfOf(r)], width: 2 }, marker: { size: 5 },
+    hovertemplate: `${esc(r.ship)}<br>%{x:,.0f} tokens<br>%{y:.4f} neutral bpb<extra></extra>` }));
+  if (!data.length) return empty('contentchart', '');
+  plot('contentchart', data, layout({ xaxis: { title: 'tokens seen', gridcolor: C.line }, yaxis: { title: 'neutral-deck bits per byte', gridcolor: C.line } }));
+}
+
+// the header's run picker: every per-run panel follows it; panels marked ALL RUNS do not
+function runPicker(runs) {
+  const sel = document.getElementById('runpick');
+  const key = runs.map(r => r.run_id + r.status).join(',');
+  if (sel.dataset.key !== key) { // rebuild only when the run list changes, so an open list stays open
+    sel.innerHTML = runs.map(r => `<option value="${r.run_id}">${esc(r.ship || r.name || r.run_id.slice(0, 12))} · ${esc(r.name || '')} · ${esc((r.status || '').split(':')[0])}</option>`).join('');
+    sel.dataset.key = key;
+  }
+  sel.value = selected;
+  sel.onchange = () => { selected = sel.value; history.replaceState(null, '', '?run=' + selected + location.hash); refresh(); };
+}
+
 function runsTable(runs) {
   const tb = document.querySelector('#runs tbody');
   tb.innerHTML = runs.map(r => `<tr data-run="${r.run_id}" class="${r.run_id === selected ? 'sel' : ''}">
-    <td>${esc(r.name || '')}</td><td class="mono">${r.run_id.slice(0, 12)}</td><td>${esc(r.preset || '')}</td><td>${r.seed ?? ''}</td>
+    <td>${esc(r.ship || '')}</td><td>${esc(r.name || '')}</td><td class="mono">${r.run_id.slice(0, 12)}</td><td>${esc(r.preset || '')}</td><td>${r.seed ?? ''}</td>
     <td><span class="badge ${(r.status || '').split(':')[0]}">${esc(r.status || '')}</span></td><td>${big(r.tokens_seen)}</td>
     <td>${fmt(r.wall_minutes, 1)}</td><td>${fmt(r.hole_bpb_mean, 4)}</td><td>${esc(r.started || '')}</td></tr>`).join('');
   tb.querySelectorAll('tr').forEach(tr => tr.onclick = () => {
-    selected = tr.dataset.run; history.replaceState(null, '', '?run=' + selected); refresh();
+    selected = tr.dataset.run; history.replaceState(null, '', '?run=' + selected + location.hash); refresh();
   });
 }
 
+
+// what each speller metric means, which way is better, and why (popovers on the 9m page)
+const HELP = {
+  bpb: ['Bits per byte on English held-out books', 'Lower', 'How many bits the model needs, on average, to guess each byte of books it never saw. Fewer bits means better bets on unseen text. It is the headline score every rung shares.'],
+  word_inside: ['Bits per byte inside a word', 'Lower', 'Letters after the first one in a word. Once a word has begun, how surely does the model know how it goes on? This is spelling.'],
+  word_start: ['Bits per byte at a word start', 'Lower', 'The first letter of each word: which word comes next. That depends on grammar and meaning more than spelling, so expect it to stay high at 9m.'],
+  punct: ['Bits per byte on punctuation', 'Lower', 'Commas, full stops, quotation marks, dashes. How well the model knows where punctuation goes.'],
+  space: ['Bits per byte on spaces', 'Lower', 'Knowing where a word ends. A spelling skill as much as a layout one.'],
+  newline: ['Bits per byte on line breaks', 'Lower', 'Paragraph and verse layout: where lines end.'],
+  nonword_rate: ['Non-words', 'Lower, down to the books\' own rate', 'Share of the words the model writes that never appear anywhere on its shelf: invented spellings. The books\' own rate (ref) is the floor, because real text also holds words the shelf lacks. Reaching ref means it spells like a book.'],
+  zipf: ['Zipf slope', 'Closer to the books', 'How fast word frequency falls with rank (the 10th commonest word is about a tenth as common as the 1st). Below the books: words used too evenly, as in noise. Above: too much repetition of a few common words. Real English sits near 1.'],
+  heaps: ['Heaps slope', 'Closer to the books', 'How fast new words keep appearing as text goes on. Above the books usually means inventing words; below means a small, repetitive vocabulary.'],
+  word_len: ['Mean word length', 'Closer to the books', 'Average letters per word. Real text prefers short common words (brevity law); a model that writes long strings of letters scores high here.'],
+  punct_per_100w: ['Punctuation per 100 words', 'Closer to the books', 'How much punctuation it uses at all. Too much is a common early failure: commas and quote marks sprayed everywhere.'],
+  unbalanced_per_kw: ['Unbalanced brackets and quotes per 1,000 words', 'Lower, down to the books\' own rate', 'Brackets and curly quotes closed without being opened, or left open. The books have a few because the excerpts are cut mid-passage; that is the floor.'],
+  cap_after_stop: ['Capital after a full stop', 'Higher, up to the books', 'Share of sentence ends followed by a capital letter. Books score about 0.9 (abbreviations such as "Mr." account for the rest).'],
+  word_len_js: ['Word-length divergence', 'Lower (0 is identical)', 'Jensen–Shannon divergence, in bits, between the model\'s mix of word lengths and the books\'. 0 means the same shape.'],
+  punct_js: ['Punctuation-mix divergence', 'Lower (0 is identical)', 'Divergence between which punctuation marks the model uses and which the books use: the right marks in the right proportions.'],
+  traits: ['Traits as they emerge', 'Earlier and stronger', 'Can a probe read fiction, verse or first person off the model\'s hidden state, at which layer, from which step? Shown on the Traits tab for each run.'],
+  ft: ['The Forgotten Tomes score', 'Lower', 'Bits per byte on 16 period books released on Gutenberg after Qwen 3.8 appeared, so no Qwen model can have trained on them. The same number for Thorp and for Qwen, whatever their tokenisers: the yardstick for the order-of-magnitude gate.'],
+  rank: ['Rank agreement with 9m', 'Higher (1 is perfect)', 'Spearman correlation between the order 9m puts the shelves in and the order 1m puts them in. At 0.8 or above the proxy is trusted to explore those kinds of questions.'],
+  modelref: ['model / ref', 'Model close to ref', 'Each law is measured on text the model writes (left) and on excerpts of the held-out books (ref, right), at the same length. The target is the books\' own value.'],
+};
+const info = k => { const h = HELP[k]; return h ? `<span class="info" tabindex="0">ⓘ<span class="pop"><b>${esc(h[0])}</b><br>Better: <b>${esc(h[1])}</b><br>${esc(h[2])}</span></span>` : ''; };
+// popovers sit in scrolling tables, so they are placed against the window, kept on screen
+function placePop(el) {
+  const pop = el.querySelector('.pop'), r = el.getBoundingClientRect(), w = 280;
+  pop.style.left = Math.max(8, Math.min(r.left - 8, window.innerWidth - w - 8)) + 'px';
+  pop.style.top = (r.bottom + 6) + 'px';
+}
+window.addEventListener('scroll', () => document.querySelectorAll('.info.open').forEach(x => x.classList.remove('open')), true);
+['mouseover', 'focusin'].forEach(ev => document.addEventListener(ev, e => { const el = e.target.closest && e.target.closest('.info'); if (el) placePop(el); }));
+document.addEventListener('click', e => {
+  const el = e.target.closest('.info');
+  if (el) placePop(el);
+  document.querySelectorAll('.info.open').forEach(x => { if (x !== el) x.classList.remove('open'); });
+  if (el) el.classList.toggle('open');
+});
+const METRIC_KEY = { 'inside a word': 'word_inside', 'word start': 'word_start', 'punctuation': 'punct', 'layout': 'space', 'non-words': 'nonword_rate',
+  'Zipf and Heaps': 'zipf', 'word length, punctuation mix': 'word_len_js', 'balance and capitals': 'cap_after_stop', 'traits as they emerge': 'traits',
+  'Forgotten Tomes score': 'ft', 'rank agreement with 9m': 'rank' };
+
+
+// ---- the books on a rung page: the Forgotten Tomes with every score, each run's training shelf, a reader
+let bookTab = 'tomes', tomesData = null;
+let booksKey = null;
+async function renderBooks(r, runs, force = false) {
+  // the page refreshes every 5 s; the book table only re-renders when its view changes (or each minute)
+  const key = [r.preset, bookTab, document.getElementById('shelfpick').value, document.getElementById('bookfilter').value, runs.length, Math.floor(Date.now() / 60000)].join('|');
+  if (!force && key === booksKey) return;
+  booksKey = key;
+  document.querySelectorAll('.booktabs button').forEach(b => b.classList.toggle('on', b.dataset.bt === bookTab));
+  const pick = document.getElementById('shelfpick'), filt = document.getElementById('bookfilter');
+  pick.style.display = filt.style.display = bookTab === 'shelf' ? '' : 'none';
+  const head = document.querySelector('#bookstable thead'), body = document.querySelector('#bookstable tbody');
+  if (bookTab === 'tomes') {
+    try { tomesData = await get('/api/tomes'); } catch (e) { body.innerHTML = '<tr><td class="empty">could not load the deck</td></tr>'; return; }
+    const ships = new Set(runs.map(x => x.ship || x.name));
+    const cols = Object.keys(tomesData.scores).filter(k => ships.has(k) || !ladderData.runs.some(x => (x.ship || x.name) === k));
+    head.innerHTML = `<tr><th>title</th><th>author</th><th>released</th><th>size</th>${cols.map(c => `<th>${esc(c)}${info('ft')}</th>`).join('')}</tr>`;
+    body.innerHTML = tomesData.books.map(b => `<tr data-book="${b.book_id}"><td>${esc(b.title)}</td><td>${esc(b.author)}</td><td>${esc(b.released)}</td>
+      <td>${fmtBytes(b.bytes)}</td>${cols.map(c => `<td>${fmt(tomesData.scores[c][b.book_id])}</td>`).join('')}</tr>`).join('');
+    return;
+  }
+  const names = runs.map(x => x.name);
+  if (!names.length) { head.innerHTML = ''; body.innerHTML = '<tr><td class="empty">no runs at this size yet</td></tr>'; return; }
+  if (!names.includes(pick.value)) pick.innerHTML = runs.map(x => `<option value="${esc(x.name)}">${esc(x.ship || x.name)} · ${esc(x.name)}</option>`).join('');
+  const shelf = await get('/api/shelf?run=' + encodeURIComponent(pick.value || names[0]));
+  const q = filt.value.trim().toLowerCase();
+  const rows = shelf.filter(b => !q || (b.title + ' ' + b.family).toLowerCase().includes(q));
+  head.innerHTML = `<tr><th>title</th><th>family</th><th>language</th><th>tokens</th><th>bytes per token</th></tr>`;
+  body.innerHTML = rows.map(b => `<tr data-book="${b.book_id}"><td>${esc(b.title)}</td><td>${esc(b.family)}</td><td>${esc(b.language)}</td>
+    <td>${big(b.tokens)}</td><td>${fmt(b.bytes_per_token, 2)}</td></tr>`).join('') + `<tr><td colspan="5" class="note">${rows.length} of ${shelf.length} books</td></tr>`;
+}
+document.querySelectorAll('.booktabs button').forEach(b => b.onclick = () => { bookTab = b.dataset.bt; renderRung(); });
+document.getElementById('shelfpick').onchange = () => renderRung();
+document.getElementById('bookfilter').oninput = () => renderRung();
+
+// ---- the reader: a book read the way a Kindle Paperwhite shows one, after the Atlas essay reader.
+// The whole stripped text is fetched once and cut into parts at paragraph breaks; each part is laid out
+// as pages (CSS columns, one per page) and turning past its last page opens the next part. Arrow keys,
+// Page Up/Down, Space, or a click on the left or right third of the page turn it. "Scroll" reads a
+// part as one long page instead. Text size, the mode and where you stopped in each book are kept.
+const RD = {
+  SIZES: [15, 17, 19, 21, 24], GAP: 56, PART: 60000, CPM: 1300,  // characters read a minute, for "min left"
+  book: null, parts: [], part: 0, page: 0, pages: 1, pageW: 0,
+  size: (() => { const v = rget('thorp.read.size'), n = v === null ? NaN : +v; return Number.isInteger(n) && n >= 0 && n < 5 ? n : 2; })(),
+  mode: rget('thorp.read.mode') === 'scroll' ? 'scroll' : 'page',
+};
+function rget(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+function rset(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+
+// Gutenberg text is hard-wrapped: lines inside a paragraph join with a space; a block of short lines
+// (verse, a title page, a table of contents) keeps its lines; a short line in capitals is a heading.
+function rParas(text) {
+  return text.split(/\n[ \t]*\n+/).map(b => b.replace(/^\n+|\s+$/g, '')).filter(b => b.trim()).map(b => {
+    const lines = b.split('\n'), longest = Math.max(...lines.map(l => l.trim().length));
+    if (lines.length <= 2 && longest < 60 && /[A-Z]/.test(b) && b === b.toUpperCase()) return `<p class="h">${esc(b.trim())}</p>`;
+    if (lines.length > 1 && (longest < 56 || lines.filter(l => /^\s{2,}/.test(l)).length > lines.length / 2)) return `<p class="v">${esc(b)}</p>`;
+    return `<p>${esc(lines.map(l => l.trim()).join(' '))}</p>`;
+  }).join('');
+}
+function rSplit(text) {
+  const parts = [];
+  for (let s = 0; s < text.length;) {
+    let e = Math.min(text.length, s + RD.PART);
+    if (e < text.length) { const b = text.indexOf('\n\n', e); e = b < 0 ? text.length : b + 2; }
+    parts.push({ start: s, end: e });
+    s = e;
+  }
+  return parts.length ? parts : [{ start: 0, end: 0 }];
+}
+const rEl = id => document.getElementById(id);
+
+async function openBook(id) {
+  rEl('rtitle').textContent = 'loading…';
+  rEl('reader').hidden = false;
+  // the server hands out at most 100k characters at a time
+  const url = o => `/api/book?id=${encodeURIComponent(id)}&offset=${o}&length=100000`;
+  const d = await get(url(0));
+  while (d.text.length < d.chars) { const more = await get(url(d.text.length)); if (!more.text) break; d.text += more.text; }
+  RD.book = d; RD.parts = rSplit(d.text);
+  const at = +rget('thorp.read.at:' + id) || 0;
+  RD.part = Math.max(0, RD.parts.findIndex(p => at < p.end));
+  rEl('rtitle').textContent = d.title;
+  rRender(at);
+}
+// lay out the current part; `at` is a character offset in the book to open at (null: the part's first page, -1: its last)
+function rRender(at = null) {
+  const d = RD.book, p = RD.parts[RD.part], stage = rEl('rstage');
+  const title = RD.part === 0 ? `<div class="title"><h1>${esc(d.title)}</h1><div class="by">${esc(d.author || '')}${d.author ? ' · ' : ''}${esc(d.book_id)}</div><hr></div>` : '';
+  const more = RD.part < RD.parts.length - 1 ? '' : '<p class="more">— the end —</p>';
+  const text = `<div class="rtext" style="font-size:${RD.SIZES[RD.size]}px">${title}${rParas(d.text.slice(p.start, p.end))}${more}</div>`;
+  const cs = getComputedStyle(stage);
+  const w = stage.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  const h = stage.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+  RD.pageW = Math.max(0, Math.min(w, 660));
+  if (RD.mode === 'page') {
+    stage.innerHTML = `<div class="rpage" style="width:${RD.pageW}px;height:${h}px"><div id="rcols" style="height:${h}px;width:${RD.pageW}px;column-width:${RD.pageW}px;column-gap:${RD.GAP}px;column-fill:auto">${text}</div></div>`;
+    RD.pages = Math.max(1, Math.ceil((rEl('rcols').scrollWidth + RD.GAP - 1) / (RD.pageW + RD.GAP)));
+    // one characters-per-page figure for the whole book at this size and width, so page numbers do not jump between parts
+    const key = RD.book.book_id + '|' + RD.size + '|' + RD.pageW + '|' + h;
+    if (RD.cppKey !== key && (p.end - p.start > RD.PART / 2 || RD.parts.length === 1)) { RD.cpp = (p.end - p.start) / RD.pages; RD.cppKey = key; }
+    RD.page = at === -1 ? RD.pages - 1 : at == null ? 0 : Math.min(RD.pages - 1, Math.round((at - p.start) / Math.max(1, p.end - p.start) * RD.pages));
+  } else {
+    stage.innerHTML = `<div class="rscroll" id="rscroll">${text}</div>`;
+    const sc = rEl('rscroll'); RD.pages = 1; RD.page = 0;
+    const max = sc.scrollHeight - sc.clientHeight;
+    sc.scrollTop = at === -1 ? max : at == null ? 0 : (at - p.start) / Math.max(1, p.end - p.start) * max;
+    sc.onscroll = () => rFoot();
+  }
+  rEl('rmode').textContent = RD.mode === 'page' ? 'Scroll' : 'Pages';
+  rEl('rsmaller').disabled = RD.size === 0; rEl('rlarger').disabled = RD.size === RD.SIZES.length - 1;
+  rShow();
+}
+function rShow() {
+  const c = rEl('rcols');
+  if (c) c.style.transform = `translateX(${-RD.page * (RD.pageW + RD.GAP)}px)`;
+  rFoot();
+}
+// where the reader is, as a character offset into the book
+function rAt() {
+  const p = RD.parts[RD.part], len = p.end - p.start, sc = rEl('rscroll');
+  const f = RD.mode === 'page' ? RD.page / RD.pages : sc && sc.scrollHeight > sc.clientHeight ? sc.scrollTop / (sc.scrollHeight - sc.clientHeight) : 0;
+  return Math.round(p.start + f * len);
+}
+function rFoot() {
+  const d = RD.book, at = rAt(), p = RD.parts[RD.part];
+  rset('thorp.read.at:' + d.book_id, at);
+  const done = d.chars ? at / d.chars : 0;
+  const perPage = Math.max(1, RD.cppKey && RD.cppKey.startsWith(d.book_id + '|') ? RD.cpp : (p.end - p.start) / RD.pages);
+  const where = RD.mode === 'page' ? `Page ${Math.floor(at / perPage) + 1} of ${Math.max(1, Math.ceil(d.chars / perPage))}` : `Part ${RD.part + 1} of ${RD.parts.length}`;
+  rEl('rpos').textContent = `${where}  ·  ${Math.round(done * 100)}%`;
+  const mins = Math.max(0, (d.chars - at) / RD.CPM);
+  rEl('rleft').textContent = mins >= 90 ? `${(mins / 60).toFixed(1)} h left in book` : `${Math.max(1, Math.round(mins))} min left in book`;
+}
+function rTurn(by) {
+  if (RD.mode === 'page' && RD.page + by >= 0 && RD.page + by < RD.pages) { RD.page += by; return rShow(); }
+  if (RD.mode === 'scroll') {
+    const sc = rEl('rscroll'), max = sc.scrollHeight - sc.clientHeight;
+    if ((by > 0 && sc.scrollTop < max - 2) || (by < 0 && sc.scrollTop > 2)) return sc.scrollBy({ top: by * sc.clientHeight * 0.9 });
+  }
+  const next = RD.part + by;
+  if (next < 0 || next >= RD.parts.length) return;
+  RD.part = next; rRender(by > 0 ? null : -1);
+}
+const closeReader = () => { rEl('reader').hidden = true; };
+rEl('rclose').onclick = closeReader;
+rEl('rsmaller').onclick = () => { const at = rAt(); RD.size--; rset('thorp.read.size', RD.size); rRender(at); };
+rEl('rlarger').onclick = () => { const at = rAt(); RD.size++; rset('thorp.read.size', RD.size); rRender(at); };
+rEl('rmode').onclick = () => { const at = rAt(); RD.mode = RD.mode === 'page' ? 'scroll' : 'page'; rset('thorp.read.mode', RD.mode); rRender(at); };
+rEl('rstage').addEventListener('click', e => {
+  if (RD.mode !== 'page' || e.target.closest('a') || !window.getSelection().isCollapsed) return;
+  const b = rEl('rstage').getBoundingClientRect(), x = (e.clientX - b.left) / b.width;
+  if (x > 0.7) rTurn(1); else if (x < 0.3) rTurn(-1);
+});
+window.addEventListener('resize', () => { if (!rEl('reader').hidden && RD.book) rRender(rAt()); });
+document.addEventListener('keydown', e => {
+  if (rEl('reader').hidden || e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.key === 'Escape') return closeReader();
+  if (e.key === 'ArrowRight' || e.key === 'PageDown' || (e.key === ' ' && !e.shiftKey)) { e.preventDefault(); rTurn(1); }
+  else if (e.key === 'ArrowLeft' || e.key === 'PageUp' || (e.key === ' ' && e.shiftKey)) { e.preventDefault(); rTurn(-1); }
+});
+document.getElementById('bookstable').addEventListener('click', e => { const tr = e.target.closest('tr[data-book]'); if (tr && !e.target.closest('.info')) openBook(tr.dataset.book); });
+
+// ---- the ladder: home cards, then one page per rung with the metrics that judge its job
+const SPLIT_LABEL = { word_inside: 'inside a word', word_start: 'word start', punct: 'punctuation', space: 'space', newline: 'newline' };
+const LAW_COLS = [
+  ['nonword_rate', 'non-words', 3], ['zipf', 'Zipf', 2], ['heaps', 'Heaps', 2], ['word_len', 'word length', 2],
+  ['punct_per_100w', 'punct /100 w', 1], ['unbalanced_per_kw', 'unbalanced /1k w', 1], ['cap_after_stop', 'capital after stop', 2],
+  ['word_len_js', 'word-length JS', 3], ['punct_js', 'punct mix JS', 3],
+];
+var ladderData = null;  // var: showTab reads it before this line runs
+const rungRuns = p => ladderData.runs.filter(r => r.preset === p && !(r.name || '').startsWith('smoke'));
+async function loadLadder() {
+  try { ladderData = await get('/api/ladder'); } catch (e) { return; }
+  const d = ladderData;
+  document.getElementById('rungcards').innerHTML = d.rungs.map(r => {
+    const runs = rungRuns(r.preset), live = runs.filter(x => x.status === 'running').length, done = runs.filter(x => x.status === 'finished').length;
+    const nlive = r.metrics.filter(m => m[2] === 'live').length;
+    return `<a class="card" href="#rung-${esc(r.preset)}">
+      <div class="top"><span class="preset">${esc(r.preset)}</span><span class="nm">${esc(r.name)}</span></div>
+      <div class="job">${esc(r.job)}</div><div class="ov">${esc(r.overview)}</div>
+      <div class="foot"><span>${big(r.total)} params · ${esc(r.where.split(' (')[0])}</span>
+      <span class="pill${live ? ' live' : ''}">${live ? live + ' running' : esc(r.status)}</span></div>
+      <div class="foot"><span>${done} finished run${done === 1 ? '' : 's'}</span><span>${nlive} of ${r.metrics.length} metrics live</span></div></a>`;
+  }).join('');
+  document.querySelector('#queue tbody').innerHTML = d.queue.map((q, i) => `<tr${q.status === 'running' ? ' class="sel"' : ''}><td>${i + 1}</td>
+    <td>${esc(q.name)}</td><td>${esc(q.status.split(':')[0])}</td></tr>`).join('');
+  if (currentRung) renderRung();
+}
+function renderRung() {
+  const r = ladderData.rungs.find(x => x.preset === currentRung) || ladderData.rungs[0];
+  document.getElementById('rungtitle').textContent = `${r.preset} · ${r.name}`;
+  document.getElementById('rungjob').textContent = r.job;
+  document.getElementById('rungover').innerHTML = [
+    ['overview', r.overview], ['shape', `${r.layers} layers × ${r.width} wide, ${r.heads} heads`],
+    ['parameters', `${big(r.total)} (${big(r.non_embedding)} non-embedding)`], ['where it trains', r.where],
+    ['judged by', r.scored], ['status', r.status],
+  ].map(([k, v]) => `<div><div class="k">${k}</div><div>${esc(v)}</div></div>`).join('');
+  document.querySelector('#rungmetrics tbody').innerHTML = r.metrics.map(m => `<tr><td><b>${esc(m[0])}</b>${info(METRIC_KEY[m[0]])}</td><td>${esc(m[1])}</td>
+    <td>${HELP[METRIC_KEY[m[0]]] ? esc(HELP[METRIC_KEY[m[0]]][1]) : '–'}</td>
+    <td><span class="pill${m[2] === 'live' ? ' live' : ''}">${esc(m[2])}</span></td></tr>`).join('');
+  const runs = rungRuns(r.preset);
+  const cell = (m, ref, dg) => m == null ? '–' : `${fmt(m, dg)}${ref == null ? '' : ` <span class="s">/ ${fmt(ref, dg)}</span>`}`;
+  document.querySelector('#rungboard thead').innerHTML = `<tr><th>ship</th><th>name</th><th>vocab</th><th>context</th><th>seed</th><th>status</th>
+    <th>bpb (en)${info('bpb')}</th>${Object.entries(SPLIT_LABEL).map(([k, l]) => `<th>${l}${info(k)}</th>`).join('')}${LAW_COLS.map(c => `<th>${c[1]}${info(c[0])}<br><span class="s">model / ref</span>${info('modelref')}</th>`).join('')}</tr>`;
+  document.querySelector('#rungboard tbody').innerHTML = runs.length ? runs.map(x => `<tr><td>${esc(x.ship || '')}</td><td>${esc(x.name)}</td>
+    <td>${x.vocab ?? '–'}</td><td>${x.context ?? '–'}</td><td>${x.seed ?? '–'}</td><td>${esc((x.status || '').split(':')[0])}</td>
+    <td>${fmt(x.bpb_en)}</td>${Object.keys(SPLIT_LABEL).map(c => `<td>${fmt(x.split[c])}</td>`).join('')}
+    ${LAW_COLS.map(([k, , dg]) => `<td>${cell(x.laws[k], x.ref[k], dg)}</td>`).join('')}</tr>`).join('')
+    : `<tr><td colspan="25" class="empty">no runs at ${esc(r.preset)} yet</td></tr>`;
+  const split = runs.filter(x => Object.values(x.split).some(v => v != null));
+  if (!split.length) empty('splitchart', runs.length ? 'the split arrives when scripts/queue_9m.sh re-scores the finished runs, after tonight\'s pool runs' : 'no runs at this size yet');
+  else plot('splitchart', split.map((x, i) => ({ type: 'bar', name: x.ship || x.name, x: Object.values(SPLIT_LABEL),
+    y: Object.keys(SPLIT_LABEL).map(c => x.split[c]), marker: { color: PALETTE[i % PALETTE.length] } })),
+    layout({ barmode: 'group', yaxis: { title: 'bits per byte', gridcolor: C.line } }));
+  const ratioKeys = LAW_COLS.filter(c => !c[0].endsWith('_js'));
+  const laws = runs.filter(x => Object.values(x.laws).some(v => v != null));
+  if (!laws.length) empty('lawchart', runs.length ? 'the laws arrive with the same re-score' : 'no runs at this size yet');
+  else plot('lawchart', laws.map((x, i) => ({ type: 'bar', name: x.ship || x.name, x: ratioKeys.map(c => c[1]),
+    y: ratioKeys.map(([k]) => x.laws[k] != null && x.ref[k] ? x.laws[k] / x.ref[k] : null), marker: { color: PALETTE[i % PALETTE.length] } })),
+    layout({ barmode: 'group', yaxis: { title: 'model ÷ books', gridcolor: C.line },
+      shapes: [{ type: 'line', xref: 'paper', x0: 0, x1: 1, y0: 1, y1: 1, line: { color: C.accent, dash: 'dot' } }] }));
+  rungExtras(r, runs);
+  renderBooks(r, runs);
+  document.querySelectorAll('#rung .chart').forEach(el => { if (el.data) Plotly.Plots.resize(el); });
+}
+
+// the Forgotten Tomes beside Qwen, training loss, and (for the proxy) calibration against 9m
+async function rungExtras(r, runs) {
+  const ext = (ladderData.external || []).filter(x => x.set === 'hole-cards-unseen' && x.bpb_mean_en != null);
+  const scored = runs.filter(x => x.ft_en != null);
+  if (!scored.length) empty('ftchart', 'no run at this size has a Forgotten Tomes score yet');
+  else plot('ftchart', [{ type: 'bar', x: scored.map(x => x.ship || x.name), y: scored.map(x => x.ft_en),
+      marker: { color: scored.map((_, i) => PALETTE[i % PALETTE.length]) }, hovertemplate: '%{x}: %{y:.3f}<extra></extra>' }],
+    layout({ yaxis: { title: 'bits per byte', gridcolor: C.line },
+      shapes: ext.map((x, i) => ({ type: 'line', xref: 'paper', x0: 0, x1: 1, y0: x.bpb_mean_en, y1: x.bpb_mean_en, line: { color: PALETTE[(i + 4) % PALETTE.length], dash: 'dot' } })),
+      annotations: ext.map((x, i) => ({ xref: 'paper', x: 1, xanchor: 'right', y: x.bpb_mean_en, yanchor: 'bottom', showarrow: false,
+        text: `${x.model.split('/').pop()} ${x.bpb_mean_en.toFixed(3)}`, font: { size: 10, color: PALETTE[(i + 4) % PALETTE.length] } })) }));
+  try {
+    const curves = await get('/api/rung?preset=' + encodeURIComponent(r.preset));
+    const withLoss = curves.filter(c => c.steps.length);
+    if (!withLoss.length) empty('losschart', 'no training at this size yet');
+    else plot('losschart', withLoss.map((c, i) => ({ type: 'scatter', mode: 'lines', name: c.ship || c.name, x: c.steps, y: ema(c.loss, 9),
+      line: { color: PALETTE[i % PALETTE.length], width: 1.5 } })), layout({ xaxis: { title: 'step', gridcolor: C.line }, yaxis: { title: 'loss', gridcolor: C.line } }));
+  } catch (e) { empty('losschart', 'could not load the curves'); }
+  const cal = document.getElementById('calpanel');
+  cal.style.display = r.kind === 'proxy' ? '' : 'none';
+  if (r.kind !== 'proxy') return;
+  const big9 = ladderData.runs.filter(x => x.preset === ladderData.rungs.find(q => q.kind !== 'proxy').preset);
+  const pairs = runs.map(p => ({ p, n: big9.find(n => n.recipe === p.recipe && n.passes === p.passes && n.seed === p.seed && n.status === 'finished') }));
+  document.querySelector('#caltable tbody').innerHTML = pairs.map(({ p, n }) => `<tr><td>${esc((p.recipe || '').replace('lists/', '').replace('.csv', ''))}</td>
+    <td>${p.passes ?? '–'}</td><td>${n ? esc(n.ship || n.name) : '–'}</td><td>${fmt(n && n.ft_en)}</td><td>${esc(p.ship || p.name)}</td><td>${fmt(p.ft_en)}</td></tr>`).join('');
+  const both = pairs.filter(({ p, n }) => n && n.ft_en != null && p.ft_en != null);
+  const rank = a => a.map(v => a.filter(w => w < v).length);
+  let verdict = `${both.length} of ${pairs.length} shelves scored at both sizes.`;
+  if (both.length >= 3) {
+    const a = rank(both.map(x => x.n.ft_en)), b = rank(both.map(x => x.p.ft_en)), k = a.length;
+    const rho = 1 - 6 * a.reduce((s, v, i) => s + (v - b[i]) ** 2, 0) / (k * (k * k - 1));
+    verdict += ` Rank agreement (Spearman) ${rho.toFixed(2)}: ${rho >= 0.8 ? 'the proxy orders the shelves as 9m does' : 'not yet trustworthy'}.`;
+  } else verdict += ' Rank agreement needs at least three; the 9m runs are re-scored on the Forgotten Tomes by the queue.';
+  document.getElementById('calverdict').textContent = verdict;
+  if (!both.length) empty('calchart', 'points appear when a shelf has a Forgotten Tomes score at both sizes');
+  else plot('calchart', [{ type: 'scatter', mode: 'markers+text', x: both.map(x => x.n.ft_en), y: both.map(x => x.p.ft_en),
+    text: both.map(x => x.n.ship || x.n.name), textposition: 'top center', marker: { size: 10, color: C.accent } }],
+    layout({ xaxis: { title: '9m score', gridcolor: C.line }, yaxis: { title: '1m score', gridcolor: C.line } }));
+}
+
+
+// the run overview folds away; the choice is remembered per viewer
+(() => {
+  const el = document.getElementById('stripwrap');
+  try { if (localStorage.getItem('thorp.strip') === 'closed') el.open = false; } catch (e) {}
+  el.addEventListener('toggle', () => { try { localStorage.setItem('thorp.strip', el.open ? 'open' : 'closed'); } catch (e) {} });
+})();
 async function refresh() {
+  loadLadder();
   try {
     const runs = await get('/api/runs');
     if (!runs.length) { document.getElementById('title').textContent = 'no runs in the ledger yet'; return; }
@@ -231,13 +1368,33 @@ async function refresh() {
       selected = (runs.find(r => r.status === 'running' && r.name && !r.name.startsWith('smoke')) || runs.find(r => r.status === 'running') || runs[0]).run_id;
     }
     runsTable(runs);
-    const [r, m, evals] = await Promise.all([get('/api/run?run=' + selected), get('/api/metrics?run=' + selected), get('/api/evals?run=' + selected)]);
-    headline(r);
-    lossPanel(m, evals, r.sets || []);
+    runPicker(runs);
+    const cur = runs.find(x => x.run_id === selected);
+    if (cur) document.getElementById('stripsum').textContent = `${cur.ship || cur.name} · ${(cur.status || '').split(':')[0]}`;
+    const [r, m, evals, cmp, content] = await Promise.all([get('/api/run?run=' + selected), get('/api/metrics?run=' + selected), get('/api/evals?run=' + selected), get('/api/compare'), get('/api/experiment?prefix=content-')]);
+    const rec = (r.recipe && r.recipe.data) || [];
+    const fams = [...new Set(rec.map(b => b.family).concat(Object.values(holeMeta(r)).map(b => b.family)))].filter(Boolean).sort();
+    const famColour = f => PALETTE[Math.max(0, fams.indexOf(f)) % PALETTE.length];
+    const series = bookSeries(m, r);
+    const gk = kinksOf(m, 'grad_norm/');
+    headline(r, m, gk);
+    contentPanel(content);
+    claimPanel(cmp);
+    comparePanel(cmp);
+    matchedPanel(cmp);
+    truthGapPanel(cmp);
+    lossPanel(m, r.sets || []);
     bpbPanel(evals, r);
+    bookPanels(m, r, series, fams, famColour);
+    fallbackPanel(r);
+    languagePanels(r, evals, series, fams, famColour);
+    heat('gradheat', m, 'grad_norm/', gk, 'log10');
+    heat('moveheat', m, 'update_ratio/', kinksOf(m, 'update_ratio/'), 'log10');
+    kinkPanel(m, gk);
+    attnPanels(m);
     speedPanel(m);
-    gradPanel(m);
-    recipePanels(r);
+    probePanel(r, gk);
+    ladderPanel(r, m);
     samplesPanel(r);
     document.getElementById('updated').textContent = 'updated ' + new Date().toLocaleTimeString();
   } catch (e) {

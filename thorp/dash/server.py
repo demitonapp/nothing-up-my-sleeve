@@ -1,7 +1,9 @@
 """The dashboard: index.html plus JSON read straight from the ledger. Standard library only.
 
-Endpoints: /api/runs, /api/metrics?run=, /api/evals?run=, and /api/run?run= (headline numbers,
-latest samples, recipe composition and tokeniser stats, which the panels also need).
+Endpoints: /api/runs, /api/metrics?run=, /api/evals?run=, /api/run?run= (headline numbers,
+latest samples, probes, recipe composition, traits and tokeniser stats, which the panels need),
+/api/ladder (each rung's job, its scores, the queue)
+and /api/compare (every run's hole-card score against tokens seen: the experiment's observation).
 """
 
 from __future__ import annotations
@@ -13,6 +15,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from thorp import chinchilla, paths
+from thorp.evaluators.probes import load_traits
 from thorp.ledger import connect
 
 INDEX = Path(__file__).with_name("index.html")
@@ -33,7 +36,8 @@ def _rows(sql: str, params=()) -> list[dict]:
 def _metric(run: str, name: str, which: str = "last"):
     order = "desc" if which == "last" else "asc"
     r = _rows(
-        f"select step, value from metrics where run_id=? and name=? order by step {order} limit 1",
+        f"select step, value from metrics where run_id=? and name=?"
+        f" order by step {order}, rowid {order} limit 1",
         [run, name],
     )
     return r[0]["value"] if r else None
@@ -41,7 +45,7 @@ def _metric(run: str, name: str, which: str = "last"):
 
 def api_runs() -> list[dict]:
     runs = _rows(
-        "select run_id, name, status, started, finished, tokens_seen, wall_minutes,"
+        "select run_id, name, ship, status, started, finished, tokens_seen, wall_minutes,"
         ' "commit", hardware, spec_json from runs order by started desc'
     )
     for r in runs:
@@ -58,10 +62,13 @@ def api_metrics(run: str) -> dict:
     con = _con()
     try:
         cur = con.execute(
-            "select name, step, value from metrics where run_id=? order by step", [run]
+            "select name, step, value from metrics where run_id=? order by step, rowid", [run]
         )
         for name, step, value in cur:
             s = out.setdefault(name, [[], []])
+            if s[0] and s[0][-1] == step:  # a re-score at the same step: the later row stands
+                s[1][-1] = value
+                continue
             s[0].append(step)
             s[1].append(value)
     finally:
@@ -76,7 +83,7 @@ def api_evals(run: str) -> list[dict]:
 def _artifact(run: str, kind: str, latest=True):
     r = _rows(
         f"select step, path, sha1, text from artifacts where run_id=? and kind=?"
-        f" order by step {'desc' if latest else 'asc'} limit 1",
+        f" order by step {'desc' if latest else 'asc'}, rowid desc limit 1",
         [run, kind],
     )
     return r[0] if r else None
@@ -97,6 +104,8 @@ def api_run(run: str) -> dict:
     unique = _metric(run, "plan/unique_tokens")
     seen = _metric(run, "tokens_seen") or 0
     out.update(
+        n_params_total=_metric(run, "model/params_total"),
+        n_params_embedding=_metric(run, "model/params_embedding"),
         n_params_non_embedding=n,
         tokens_planned=planned,
         tokens_seen=seen,
@@ -132,11 +141,28 @@ def api_run(run: str) -> dict:
         if ce_en is not None and out.get("chinchilla"):
             out["chinchilla"]["gap_planned"] = ce_en - out["chinchilla"]["L_planned"]
 
-    for kind in ("samples", "top10", "recipe", "eval_sets"):
+    for kind in ("samples", "top10", "recipe", "eval_sets", "probes", "curiosity"):
         a = _artifact(run, kind)
         out[kind] = (
             {"step": a["step"], **{"data": json.loads(a["text"])}} if a and a["text"] else None
         )
+    # every eval step's probes, so the Traits tab can step through them and say when each trait
+    # first appeared (a re-score at the same step replaces the earlier artifact: later rowid wins)
+    by_step: dict[int, dict] = {}
+    for a in _rows(
+        "select step, text from artifacts where run_id=? and kind='probes' order by step, rowid",
+        [run],
+    ):
+        if a["text"]:
+            by_step[a["step"]] = json.loads(a["text"])
+    out["probes_all"] = [{"step": k, "data": v} for k, v in sorted(by_step.items())]
+    # the traits each book carries (lists/traits.csv, joined by title), for grouping by kind
+    traits = load_traits()
+    out["traits"] = {}
+    if out.get("recipe"):
+        for b in out["recipe"]["data"]:
+            if b["title"] in traits:
+                out["traits"][b["book_id"]] = traits[b["title"]]
     t = _artifact(run, "tokeniser")
     if t:
         stats = Path(t["path"]) / "stats.json"
@@ -145,6 +171,340 @@ def api_run(run: str) -> dict:
             "stats": json.loads(stats.read_text()) if stats.exists() else None,
         }
     return out
+
+
+def api_compare() -> list[dict]:
+    """Per run: the first eval set's bpb mean at each eval step, with tokens seen at that step."""
+    out = []
+    for r in api_runs():
+        rid = r["run_id"]
+        total = _metric(rid, "plan/tokens_total")
+        steps = _metric(rid, "plan/total_steps")
+        per_step = total / steps if total and steps else None
+        spec_sets = _rows("select spec_json from runs where run_id=?", [rid])
+        spec = json.loads(spec_sets[0]["spec_json"] or "{}") if spec_sets else {}
+        sets = [Path(s).stem for s in spec.get("eval", {}).get("sets", [])]
+        if not sets or not per_step:
+            continue
+        series = _rows(
+            "select step, value from metrics where run_id=? and name=? order by step",
+            [rid, f"eval/{sets[0]}/bpb_mean"],
+        )
+        en = _rows(
+            "select step, value from metrics where run_id=? and name=? order by step",
+            [rid, f"eval/{sets[0]}/bpb_mean_en"],
+        )
+        # every held-out set this run has been scored on (its own, and any re-score), so the page
+        # can read the truth gap and compare runs set by set
+        by_set: dict[str, dict] = {}
+        for x in _rows(
+            "select name, step, value from metrics where run_id=? and name like 'eval/%/bpb_mean'"
+            " order by step, rowid",
+            [rid],
+        ):
+            d = by_set.setdefault(x["name"].split("/")[1], {"steps": [], "tokens": [], "bpb": []})
+            if d["steps"] and d["steps"][-1] == x["step"]:
+                d["bpb"][-1] = x["value"]
+                continue
+            d["steps"].append(x["step"])
+            d["tokens"].append(x["step"] * per_step)
+            d["bpb"].append(x["value"])
+        # the push per layer and the learning rate, so the page computes each run's kinks itself
+        push: dict[str, list] = {}
+        for x in _rows(
+            "select name, step, value from metrics where run_id=? and"
+            " (name like 'grad_norm/layer_%' or name='lr') order by step",
+            [rid],
+        ):
+            if x["name"].count("/") > 1:
+                continue
+            p = push.setdefault(x["name"], [[], []])
+            p[0].append(x["step"])
+            p[1].append(x["value"])
+        recipe = _artifact(rid, "recipe", latest=False)
+        n_books = len(json.loads(recipe["text"])) if recipe and recipe["text"] else None
+        out.append(
+            {
+                "run_id": rid,
+                "name": r["name"],
+                "ship": r.get("ship"),
+                "preset": r["preset"],
+                "seed": r["seed"],
+                "status": r["status"],
+                "n_books": n_books,
+                "tokens_per_step": per_step,
+                "tokens_planned": total,
+                "steps": [x["step"] for x in series],
+                "tokens": [x["step"] * per_step for x in series],
+                "bpb": [x["value"] for x in series],
+                "bpb_en": [x["value"] for x in en],
+                "set": sets[0],
+                "by_set": by_set,
+                "push": push,
+            }
+        )
+    return out
+
+
+def api_experiment(prefix: str) -> list[dict]:
+    """Every run whose name starts with `prefix`, with what the experiment panel needs: the compare
+    series (every held-out set, the push per layer, the learning rate), the move per layer, each
+    eval step's trait summary, the curiosity ladder's highest rung, and the ship's question."""
+    out = []
+    for r in api_compare():
+        if not (r.get("name") or "").startswith(prefix):
+            continue
+        rid = r["run_id"]
+        spec = json.loads(
+            _rows("select spec_json from runs where run_id=?", [rid])[0]["spec_json"] or "{}"
+        )
+        move: dict[str, list] = {}
+        for x in _rows(
+            "select name, step, value from metrics where run_id=? and name like 'update_ratio/layer_%'"
+            " order by step",
+            [rid],
+        ):
+            if x["name"].count("/") > 1:
+                continue
+            m = move.setdefault(x["name"], [[], []])
+            m[0].append(x["step"])
+            m[1].append(x["value"])
+        traits: dict[int, dict] = {}
+        for a in _rows(
+            "select step, text from artifacts where run_id=? and kind='probes' order by step, rowid",
+            [rid],
+        ):
+            if a["text"]:
+                t = json.loads(a["text"])["traits"]
+                traits[a["step"]] = {
+                    n: {
+                        "status": v["status"],
+                        "best": max(v["auc"]) if v.get("auc") else None,
+                        "layer": v.get("best_layer"),
+                        "emergent": v.get("emergent"),
+                    }
+                    for n, v in t.items()
+                }
+        ladder = _rows(
+            "select step, value from metrics where run_id=? and name='curiosity/highest' order by step",
+            [rid],
+        )
+        out.append(
+            {
+                **r,
+                "experiment": spec.get("experiment"),
+                "question": spec.get("question"),
+                "move": move,
+                "traits": [{"step": k, "traits": v} for k, v in sorted(traits.items())],
+                "ladder": [[x["step"], x["value"]] for x in ladder],
+            }
+        )
+    return out
+
+
+SPLIT_CLASSES = ("word_inside", "word_start", "punct", "space", "newline")
+LAWS = (
+    "nonword_rate",
+    "zipf",
+    "heaps",
+    "word_len",
+    "word_len_js",
+    "punct_per_100w",
+    "punct_js",
+    "unbalanced_per_kw",
+    "cap_after_stop",
+)
+QUEUES = ("9m-order.txt", "content-order.txt")
+
+
+def api_ladder() -> dict:
+    """The ladder (each rung's job and how it is judged), every run's rung scores (the bits-per-byte
+    split on its first held-out set and the laws, model beside reference), and tonight's queue."""
+    from thorp.models.registry import LADDER, PRESETS
+
+    rungs = []
+    for r in LADDER:
+        c = PRESETS[r["preset"]]
+        ne = 12 * c["layers"] * c["width"] ** 2
+        rungs.append(
+            {
+                **r,
+                **c,
+                "non_embedding": ne,
+                "total": ne + (r.get("vocab", 16384) + 1024) * c["width"],
+            }
+        )
+    runs = []
+    for r in _rows(
+        "select run_id, name, ship, status, tokens_seen, spec_json from runs order by started"
+    ):
+        spec = json.loads(r.pop("spec_json") or "{}")
+        sets = [Path(s).stem for s in spec.get("eval", {}).get("sets", [])]
+        first = sets[0] if sets else None
+        row = {
+            **r,
+            "preset": spec.get("model", {}).get("preset"),
+            "vocab": spec.get("tokeniser", {}).get("vocab"),
+            "context": spec.get("model", {}).get("context"),
+            "seed": spec.get("seed"),
+            "experiment": spec.get("experiment"),
+            "recipe": spec.get("data", {}).get("recipe"),
+            "passes": spec.get("data", {}).get("passes"),
+            "ft_en": _metric(r["run_id"], "eval/hole-cards-unseen/bpb_mean_en"),
+            "set": first,
+            "bpb_en": _metric(r["run_id"], f"eval/{first}/bpb_mean_en") if first else None,
+            "split": {},
+            "laws": {},
+            "ref": {},
+        }
+        if first:
+            for c in SPLIT_CLASSES:
+                row["split"][c] = _metric(r["run_id"], f"eval/{first}/split/{c}/bpb_mean_en")
+        for k in LAWS:
+            row["laws"][k] = _metric(r["run_id"], f"laws/model/{k}")
+            row["ref"][k] = _metric(r["run_id"], f"laws/ref/{k}")
+        runs.append(row)
+    done = {r["name"]: r["status"] for r in runs}
+    queue = []
+    for f in QUEUES:
+        p = Path(__file__).resolve().parents[2] / "specs" / f
+        if p.exists():
+            for name in p.read_text().split():
+                queue.append({"name": name, "status": done.get(name, "queued")})
+    for name in (
+        "hundred-traits-v1",
+        "hundred-traits-v1-seed2",
+        "pool-400-traits-v1",
+        "pool-400-traits-v1-seed2",
+    ):
+        queue.append({"name": name, "status": done.get(name, "queued")})  # queue_9m.sh's tail
+    external = []
+    for f in sorted((paths.data_dir() / "compare").glob("*.json")):
+        try:
+            x = json.loads(f.read_text())
+        except (OSError, ValueError):
+            continue
+        external.append(
+            {
+                "model": x.get("model"),
+                "set": x.get("set"),
+                "bpb_mean_en": x.get("bpb_mean_en"),
+                "books": [
+                    {"book_id": b["book_id"], "title": b["title"], "bpb": b["bpb"]}
+                    for b in x.get("books", [])
+                ],
+            }
+        )
+    return {"rungs": rungs, "runs": runs, "queue": queue, "external": external}
+
+
+def api_rung(preset: str) -> list[dict]:
+    """Training-loss curves (at most 300 points each) for every run at one preset."""
+    out = []
+    for r in _rows("select run_id, name, ship, spec_json from runs order by started"):
+        spec = json.loads(r["spec_json"] or "{}")
+        if spec.get("model", {}).get("preset") != preset:
+            continue
+        pts = _rows(
+            "select step, value from metrics where run_id=? and name='loss' order by step",
+            [r["run_id"]],
+        )
+        k = max(1, len(pts) // 300)
+        out.append(
+            {
+                "name": r["name"],
+                "ship": r["ship"],
+                "steps": [p["step"] for p in pts[::k]],
+                "loss": [p["value"] for p in pts[::k]],
+            }
+        )
+    return out
+
+
+TOMES = "lists/hole-cards-unseen.csv"
+_tome_ids: list[str] | None = None
+
+
+def _tomes_ids() -> list[str]:
+    global _tome_ids
+    if _tome_ids is None:
+        from thorp.sources.gutenberg import resolve_list
+
+        _tome_ids = [f"pg{r.chosen}" for r in resolve_list(TOMES) if r.chosen]
+    return _tome_ids
+
+
+def api_tomes() -> dict:
+    """The Forgotten Tomes: each book's catalogue facts, every Thorp run's latest score on it, and
+    every outside model's."""
+    from thorp import manifest
+
+    ids = _tomes_ids()
+    books = manifest.get_many(ids)
+    released = {}
+    with open(paths.resolve(TOMES), encoding="utf-8", newline="") as f:
+        import csv
+
+        for row, b in zip(csv.DictReader(f), ids, strict=False):
+            released[b] = (row.get("text") or "").replace("released ", "")
+    scores: dict[str, dict] = {}
+    for r in _rows(
+        """select r.name, r.ship, e.book_id, e.bpb from evals e join runs r using(run_id)
+           where e."set"='hole-cards-unseen'
+             and e.step=(select max(step) from evals x where x.run_id=e.run_id and x."set"='hole-cards-unseen')"""
+    ):
+        scores.setdefault(r["ship"] or r["name"], {})[r["book_id"]] = r["bpb"]
+    for f in sorted((paths.data_dir() / "compare").glob("*__hole-cards-unseen.json")):
+        try:
+            x = json.loads(f.read_text())
+        except (OSError, ValueError):
+            continue
+        scores[x["model"].split("/")[-1]] = {b["book_id"]: b["bpb"] for b in x.get("books", [])}
+    return {
+        "books": [
+            {
+                "book_id": b,
+                "title": books[b].title if b in books else b,
+                "author": books[b].author if b in books else "",
+                "bytes": books[b].bytes if b in books else None,
+                "released": released.get(b, ""),
+            }
+            for b in ids
+        ],
+        "scores": scores,
+    }
+
+
+def api_shelf(run: str) -> list[dict]:
+    """A run's training shelf, from its step-0 recipe artifact."""
+    a = _rows(
+        "select a.text from artifacts a join runs r using(run_id) where (r.name=? or r.run_id=?)"
+        " and a.kind='recipe' order by a.rowid desc limit 1",
+        [run, run],
+    )
+    return json.loads(a[0]["text"]) if a and a[0]["text"] else []
+
+
+def api_book(book_id: str, offset: int = 0, length: int = 20000) -> dict:
+    """A slice of a fetched book's stripped text (the text Thorp trains and scores on)."""
+    from thorp import manifest
+    from thorp.sources import load_text
+
+    book = manifest.get(book_id)
+    if book is None:
+        raise LookupError(f"no book {book_id}")
+    text = load_text(book_id)
+    offset = max(0, min(int(offset), len(text)))
+    length = max(1000, min(int(length), 100000))
+    return {
+        "book_id": book_id,
+        "title": book.title,
+        "author": book.author,
+        "language": book.language,
+        "chars": len(text),
+        "offset": offset,
+        "text": text[offset : offset + length],
+    }
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -170,6 +530,13 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/metrics": lambda: api_metrics(q["run"]),
                 "/api/evals": lambda: api_evals(q["run"]),
                 "/api/run": lambda: api_run(q["run"]),
+                "/api/compare": lambda: api_compare(),
+                "/api/ladder": lambda: api_ladder(),
+                "/api/rung": lambda: api_rung(q["preset"]),
+                "/api/tomes": lambda: api_tomes(),
+                "/api/shelf": lambda: api_shelf(q["run"]),
+                "/api/book": lambda: api_book(q["id"], q.get("offset", 0), q.get("length", 20000)),
+                "/api/experiment": lambda: api_experiment(q.get("prefix", "content-")),
             }
             if u.path not in routes:
                 return self._send(404, b"not found", "text/plain")

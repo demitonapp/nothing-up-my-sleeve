@@ -1,0 +1,51 @@
+# specs/spell-vocab8k-v1-seed2.yaml: the 9m rung's tuning sweep (2026-11-06), written by scripts/make_9m_specs.py.
+# Endeavour's shelf and passes; one setting changed: {'tokeniser': {'vocab': 8192}}.
+name: spell-vocab8k-v1-seed2
+ship: Half The Pieces, Rolled Again
+experiment: '9m tuning: which settings let the 9m model learn spelling, punctuation and the laws of text
+  best?'
+question: 'Does an 8,192-piece vocabulary spell and punctuate better than 16,384 at 9m, at the same bytes?
+  (seed 2: the error bar)'
+data:
+  recipe: lists/pool-400.csv
+  passes: 2
+  order: shuffled
+  refuse:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+tokeniser:
+  kind: spm-bpe
+  vocab: 8192
+  byte_fallback: true
+  train_on: recipe
+model:
+  family: gpt
+  preset: 9m
+  context: 1024
+optim:
+  name: adamw
+  lr: 0.001
+  betas:
+  - 0.9
+  - 0.95
+  weight_decay: 0.1
+  warmup_steps: 200
+  schedule: cosine
+  min_lr_ratio: 0.1
+  batch_tokens: 32768
+  grad_clip: 1.0
+  precision: bf16
+eval:
+  sets:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+  every_steps: 250
+  evaluators:
+  - ce_bpb
+  - bpb_split
+  - laws
+  - samples
+  - probes
+checkpoint:
+  every_steps: 500
+seed: 2

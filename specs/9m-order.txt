@@ -1,0 +1,12 @@
+spell-vocab4k-v1
+spell-vocab8k-v1
+spell-ctx256-v1
+spell-vocab4k-v1-seed2
+spell-vocab8k-v1-seed2
+spell-ctx256-v1-seed2
+spell-mixed-v1
+spell-first-v1
+spell-mantra-v1
+spell-mixed-v1-seed2
+spell-first-v1-seed2
+spell-mantra-v1-seed2

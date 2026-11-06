@@ -34,6 +34,28 @@ Run `49bd401ea915434b44f350f00e04fb0c43016073` (`hundred-by-reach-v1`, preset 9m
 
 The gap is a yardstick, not a residual: the constants were fitted on MassiveText with a different tokeniser and much larger models, and cross-entropy per token depends on the tokeniser (this one averages about 3.6 bytes per English token). This shelf's own curve gets fitted later from this harness's runs at several sizes. A seed-2 run of the same spec (`specs/hundred-by-reach-v1-seed2.yaml`) started at 19:35 behind this one; it runs the working tree as it stood then, including those uncommitted edits; the difference between the two means is the error bar for later comparisons.
 
+## The ladder
+
+Five model sizes, each with one job. The 9m, 21m and 100m train on this Mac mini; 50m and 350m on rented GPUs (that needs a PyTorch backend, not built yet). Each rung is tuned once against its own job, then frozen for its shelf experiments. Details and reasons in `DECISIONS.md` ("The ladder").
+
+| preset | total params | the job | how it is scored |
+| --- | ---: | --- | --- |
+| `9m` | 6.0M | spelling, punctuation, the statistical laws of text | `bpb_split` (bits per byte inside words, at word starts, on punctuation, on layout) and `laws` (non-word rate, Zipf, Heaps, word length, punctuation mix, balanced brackets and quotes, capitals after a full stop) |
+| `21m` | 15.4M | grammar and style | to come: minimal pairs, loss by position in the window, a register probe |
+| `50m` | 46.7M | paragraphs; the third point of this corpus's own size curve | to come |
+| `100m` | 98.3M | the Origin test: trained on English before 1858, does it bet on natural selection over its rivals? | to come: matched rival passages; the precursor shelf removed at equal bytes |
+| `350m` | 319.8M | the top of the Origin curve | as for 100m |
+
+## The next runs
+
+Queued the evening of 2026-11-06. `scripts/queue_next.sh` runs *Endeavour* (`pool-400-v1`), *Hispaniola* (`pool-400-fiction-v1`), *Mayflower* (`pool-400-nonfiction-v1`), then each with seed 2; `scripts/queue_rescore.sh` then re-scores finished runs on the v2 hole cards and the truths deck. The pool is the hundred plus 300 catalogue books cut by `scripts/cut_pool.py` (see `DECISIONS.md`), read twice; the fiction and non-fiction halves are matched in bytes, so a difference between them is the kind of book.
+
+At 22:00 the order changed (`DECISIONS.md`): Endeavour's seed 2 was stopped and the phase-2 re-score dropped, so the 9m rung's job runs now. `scripts/queue_9m.sh` (log `data/runs/queue-9m.out`) gives every finished 9m run the bits-per-byte split and the laws, runs the 9m tuning sweep (vocabulary 4,096 and 8,192 against 16,384, context 256 against 1,024, two seeds each: *Smaller Pieces*, *Half The Pieces*, *Short Memory*, each "Rolled Again"; every 250 steps also scored on the v2 hole cards with the trait probes, for the traits that emerge while spelling is learned), then the fifteen content ships and the four traits ships, all carrying the split and the laws. Every run carries a `ship` name in its spec (a label, not part of the run id).
+
+After the sweep, the speller curriculum (DECISIONS.md, 22:10): *Mixed Lessons* (the 13-book speller shelf shuffled into the pool), *Primer First* (the same books first) and *Lines Written a Hundred Times* (the six rule books read a hundred times first), two seeds each.
+
+From 22:30 the queue is `scripts/queue.sh`, which runs `specs/queue.txt` top to bottom and can be edited while it runs (log `data/runs/queue.out`). After the sweep's seed-1 runs come the data levers (DECISIONS.md): distinct text against total reading, five runs around Endeavour.
+
 ## Running it
 
 ```bash
@@ -42,7 +64,7 @@ uv run ruff check .
 uv run pytest
 uv run thorp fetch lists/hole-cards.csv
 uv run thorp fetch lists/hundred-by-reach.csv
-uv run thorp run specs/smoke-10.yaml
+uv run thorp run specs/smoke-10-v2.yaml   # with the trait probes
 uv run thorp run specs/hundred-by-reach-v1.yaml
 uv run thorp dash          # http://localhost:8787
 uv run thorp ledger "select book_id, bpb, ce_nats from evals where run_id=? and step=(select max(step) from evals where run_id=?) order by bpb"
@@ -54,5 +76,7 @@ uv run thorp ledger "select book_id, bpb, ce_nats from evals where run_id=? and 
 
 - `specs/`: run specs. `lists/`: the recipe, the hole cards, and `overrides.csv` (title, author → Gutenberg id).
 - `thorp/`: the harness (see `DECISIONS.md` for every choice the brief left open).
+- `scripts/`: `make_pool.py` (draw the pool from the catalogue), `cut_pool.py` (cut it to recipes by bytes), `queue_next.sh` and `queue_9m.sh` (the night's runs), `make_9m_specs.py` (the 9m sweep).
+- `lists/traits.csv`: fiction, verse and first-person labels per title, read by the probes evaluator and the page.
 - `data/` (not committed): catalogue, texts, tokenisers, shards, checkpoints, `manifest.sqlite`, run logs.
 - `ledger.sqlite`: every run, metric, eval and artifact.

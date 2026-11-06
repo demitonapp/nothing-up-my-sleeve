@@ -1,0 +1,51 @@
+# The standing queue (scripts/queue.sh): one spec name per line, run top to bottom. Edit freely.
+# Thorp against Qwen first (Justin, 23:40): the outside models on the unseen deck, then every finished Thorp run on it
+cmd: uv run --group compare python scripts/score_external.py mlx-community/Qwen3.5-0.8B-bf16 lists/hole-cards-unseen.csv > data/runs/score-qwen3.5-0.8b.out 2>&1
+cmd: uv run --group compare python scripts/score_external.py mlx-community/Qwen3-0.6B-bf16 lists/hole-cards-unseen.csv > data/runs/score-qwen3-0.6b.out 2>&1
+cmd: sh scripts/score_thorp_unseen.sh >> data/runs/queue.out 2>&1
+# The 1m proxy's calibration (Justin, 23:55: ahead of 9m); proxy-hundred-v1 was run by hand at 23:55
+proxy-hundred-v1-seed2
+proxy-pool400-v1
+proxy-fiction-v1
+proxy-nonfiction-v1
+# The 9m sweep, seed 1 (spell-vocab4k-v1 is running as this is written)
+spell-vocab8k-v1
+spell-ctx256-v1
+# The data levers: distinct text against total reading (DECISIONS.md, 22:30)
+lever-u800-p1
+lever-u200-p4
+lever-u100-p8
+lever-u400-p1
+lever-u400-p4
+# The 9m sweep, seed 2
+spell-vocab4k-v1-seed2
+spell-vocab8k-v1-seed2
+spell-ctx256-v1-seed2
+# The speller curriculum
+spell-mixed-v1
+spell-first-v1
+spell-mantra-v1
+spell-mixed-v1-seed2
+spell-first-v1-seed2
+spell-mantra-v1-seed2
+# The content experiment
+content-random-v1
+content-greek-v1
+content-islamic-v1
+content-renaissance-v1
+content-about-v1
+content-random-v1-seed2
+content-greek-v1-seed2
+content-islamic-v1-seed2
+content-renaissance-v1-seed2
+content-about-v1-seed2
+content-random-v1-seed3
+content-greek-v1-seed3
+content-islamic-v1-seed3
+content-renaissance-v1-seed3
+content-about-v1-seed3
+# The traits ships
+hundred-traits-v1
+hundred-traits-v1-seed2
+pool-400-traits-v1
+pool-400-traits-v1-seed2

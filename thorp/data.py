@@ -4,6 +4,13 @@ Per pass: the books are concatenated in a seeded shuffle, cut into non-overlappi
 context + 1 tokens, and the windows are dealt in a seeded shuffle into batches of
 batch_tokens / context windows. A remainder that does not fill a batch is dropped. The stream
 can start at any step, which is how a resumed run gets exactly the batches it would have had.
+
+A curriculum (`first`, 2026-11-06): in the first pass only, the `first` books come before the rest.
+Pass 0 is then two phases: the `first` books, each read `first_repeats` times (every repeat in its
+own seeded shuffle), cut into windows dealt in a seeded shuffle; then every other recipe book, as
+usual. Later passes are ordinary shuffled passes over the whole recipe. With `first_repeats` 1 a
+curriculum run reads exactly the tokens a shuffled run of the same recipe reads, only in another
+order; with more, the extra reads come on top.
 """
 
 from __future__ import annotations
@@ -40,6 +47,8 @@ class Stream:
         context: int,
         passes: int,
         families: dict[str, str] | None = None,
+        first: list[str] | None = None,
+        first_repeats: int = 1,
     ):
         self.book_ids = sorted(book_ids)
         self.seed = seed
@@ -51,13 +60,48 @@ class Stream:
         self.unique_tokens = int(sum(len(a) for a in self.arrays))
         self.windows_per_pass = self.unique_tokens // (context + 1)
         self.steps_per_pass = self.windows_per_pass // self.batch_size
-        self.total_steps = self.steps_per_pass * passes
+        self.first = sorted(set(first or []))
+        missing = [b for b in self.first if b not in self.book_ids]
+        if missing:
+            raise ValueError(f"curriculum books not in the recipe: {missing}")
+        self.first_repeats = int(first_repeats)
+        if self.first:
+            fi = {self.book_ids.index(b) for b in self.first}
+            a_tokens = sum(len(self.arrays[i]) for i in fi) * self.first_repeats
+            b_tokens = sum(len(a) for i, a in enumerate(self.arrays) if i not in fi)
+            self.phase_windows = (a_tokens // (context + 1), b_tokens // (context + 1))
+            pass0 = sum(self.phase_windows) // self.batch_size
+        else:
+            pass0 = self.steps_per_pass
+        self.pass_steps = [pass0] + [self.steps_per_pass] * (passes - 1)
+        self.total_steps = sum(self.pass_steps)
         self.tokens_per_step = self.batch_size * context
         self._pass_cache: tuple[int, np.ndarray, np.ndarray, np.ndarray] | None = None
+
+    def _cut(self, order: list[int], n_windows: int) -> tuple[np.ndarray, np.ndarray]:
+        flat = np.concatenate([self.arrays[i] for i in order]).astype(np.int32)
+        owner = np.concatenate([np.full(len(self.arrays[i]), i, np.int32) for i in order])
+        n = n_windows * (self.context + 1)
+        return flat[:n].reshape(n_windows, self.context + 1), owner[: n : self.context + 1]
+
+    def _curriculum_pass(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        rng = np.random.default_rng([self.seed, 0, 1])
+        fi = [self.book_ids.index(b) for b in self.first]
+        rest = [i for i in range(len(self.book_ids)) if i not in set(fi)]
+        a_order = [int(fi[j]) for _ in range(self.first_repeats) for j in rng.permutation(len(fi))]
+        b_order = [int(rest[j]) for j in rng.permutation(len(rest))]
+        wa, ba = self._cut(a_order, self.phase_windows[0])
+        wb, bb = self._cut(b_order, self.phase_windows[1])
+        deal = np.concatenate([rng.permutation(len(wa)), len(wa) + rng.permutation(len(wb))])
+        return np.concatenate([wa, wb]), np.concatenate([ba, bb]), deal
 
     def _pass(self, p: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         if self._pass_cache and self._pass_cache[0] == p:
             return self._pass_cache[1:]
+        if self.first and p == 0:
+            windows, window_book, deal = self._curriculum_pass()
+            self._pass_cache = (p, windows, window_book, deal)
+            return windows, window_book, deal
         rng = np.random.default_rng([self.seed, p])
         order = rng.permutation(len(self.book_ids))
         flat = np.concatenate([self.arrays[i] for i in order]).astype(np.int32)
@@ -70,7 +114,10 @@ class Stream:
         return windows, window_book, deal
 
     def batch(self, step: int) -> Batch:
-        p, k = divmod(step, self.steps_per_pass)
+        p, k = 0, step
+        while p < len(self.pass_steps) - 1 and k >= self.pass_steps[p]:
+            k -= self.pass_steps[p]
+            p += 1
         windows, window_book, deal = self._pass(p)
         idx = deal[k * self.batch_size : (k + 1) * self.batch_size]
         return Batch(step, p, windows[idx], window_book[idx])
@@ -83,5 +130,17 @@ class Stream:
             yield self.batch(s)
 
 
-def stream(recipe, tokeniser_id, seed, batch_tokens, context, passes, families=None) -> Stream:
-    return Stream(recipe, tokeniser_id, seed, batch_tokens, context, passes, families)
+def stream(
+    recipe,
+    tokeniser_id,
+    seed,
+    batch_tokens,
+    context,
+    passes,
+    families=None,
+    first=None,
+    first_repeats=1,
+) -> Stream:
+    return Stream(
+        recipe, tokeniser_id, seed, batch_tokens, context, passes, families, first, first_repeats
+    )

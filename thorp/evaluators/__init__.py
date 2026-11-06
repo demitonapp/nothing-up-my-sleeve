@@ -15,6 +15,9 @@ class EvalContext:
     context: int
     sets: dict[str, list[str]]  # set name -> book ids
     languages: dict[str, str] = field(default_factory=dict)  # book id -> language
+    recipe: list[str] = field(default_factory=list)  # the books trained on (probes fit on these)
+    # () -> the same architecture at initialisation, the run's own seed: the untrained floor
+    init_model: Any = None
 
 
 @dataclass
@@ -33,6 +36,14 @@ def get(name: str) -> Evaluator:
         from thorp.evaluators.ce_bpb import evaluate
     elif name == "samples":
         from thorp.evaluators.samples import evaluate
+    elif name == "probes":
+        from thorp.evaluators.probes import evaluate
+    elif name == "bpb_split":
+        from thorp.evaluators.bpb_split import evaluate
+    elif name == "laws":
+        from thorp.evaluators.laws import evaluate
+    elif name == "curiosity":
+        from thorp.evaluators.curiosity import evaluate
     else:
         raise KeyError(f"unknown evaluator {name!r}")
     return evaluate

@@ -1,0 +1,855 @@
+title,author,language,family,text
+"The Bible, King James Version",,en,Afroasiatic,original
+The Koran,,en,Afroasiatic,Rodwell 1861
+The Epic of Gilgamish,,en,Afroasiatic,R. Campbell Thompson 1928
+"The Book of the Thousand Nights and a Night, volume 1",Burton,en,Afroasiatic,Burton 1885
+The Analects of Confucius,Confucius,en,Sino-Tibetan,Legge
+Tao Te Ching,Laozi,en,Sino-Tibetan,Legge
+The Art of War,Sun Tzu,en,Sino-Tibetan,Giles 1910
+Chuang Tzu,Zhuangzi,en,Sino-Tibetan,Giles 1889
+西遊記,吳承恩,zh,Sino-Tibetan,original
+Romance of the Three Kingdoms,Luo Guanzhong,en,Sino-Tibetan,Brewitt-Taylor 1925
+Botchan,Natsume Soseki,en,Japonic,Morri 1918
+Kalevala,Lonnrot,en,Uralic,Kirby 1907
+The Song Celestial,,en,Indo-Iranian,Arnold 1885
+The Dhammapada,,en,Indo-Iranian,Max Muller 1881
+The Ramayan of Valmiki,Valmiki,en,Indo-Iranian,Griffith 1870
+The Shah Nameh,Firdausi,en,Indo-Iranian,Atkinson 1832
+Rubaiyat of Omar Khayyam,Omar Khayyam,en,Indo-Iranian,FitzGerald 1859
+Gitanjali,Tagore,en,Indo-Iranian,Tagore 1912
+The Iliad,Homer,en,Hellenic,Butler 1898
+The Odyssey,Homer,en,Hellenic,Butler 1900
+The Republic,Plato,en,Hellenic,Jowett
+"Apology, Crito, and Phaedo of Socrates",Plato,en,Hellenic,Jowett
+The Nicomachean Ethics,Aristotle,en,Hellenic,Peters 1893
+Oedipus King of Thebes,Sophocles,en,Hellenic,Storr 1912
+The History of Herodotus,Herodotus,en,Hellenic,Macaulay 1890
+Meditations,Marcus Aurelius,en,Hellenic,Long 1862
+Aesop's Fables,Aesop,en,Hellenic,Townsend 1867
+The Aeneid,Virgil,en,Italic,Dryden 1697
+Metamorphoses,Ovid,en,Italic,More 1922
+The Confessions of Saint Augustine,Augustine,en,Italic,Pusey 1838
+The Imitation of Christ,Thomas a Kempis,en,Italic,Benham 1874
+The Consolation of Philosophy,Boethius,en,Italic,James 1897
+The Divine Comedy,Dante,en,Romance,Longfellow 1867
+The Decameron,Boccaccio,en,Romance,Rigg 1903
+The Prince,Machiavelli,en,Romance,Marriott 1908
+The Adventures of Pinocchio,Collodi,en,Romance,Murray 1892
+The Betrothed,Manzoni,en,Romance,1834
+Candide,Voltaire,en,Romance,1762
+Les Miserables,Hugo,en,Romance,Hapgood 1887
+Notre-Dame de Paris,Hugo,en,Romance,Hapgood 1888
+The Count of Monte Cristo,Dumas,en,Romance,1846
+The Three Musketeers,Dumas,en,Romance,1846
+Madame Bovary,Flaubert,en,Romance,Eleanor Marx 1886
+Germinal,Zola,en,Romance,Havelock Ellis 1894
+"The Works of Guy de Maupassant, volume 1",Maupassant,en,Romance,1903
+Twenty Thousand Leagues under the Sea,Verne,en,Romance,Mercier 1872
+Around the World in Eighty Days,Verne,en,Romance,Towle 1873
+Discourse on the Method,Descartes,en,Romance,Veitch 1850
+The Social Contract,Rousseau,en,Romance,Tozer 1895
+Tartuffe,Moliere,en,Romance,Page 1908
+The Life of Lazarillo de Tormes,,en,Romance,Markham 1908
+Life Is a Dream,Calderon,en,Romance,MacCarthy 1853
+The Lusiads,Camoes,en,Romance,Burton 1880
+Dom Casmurro,Machado de Assis,pt,Romance,original
+"Faust, part 1",Goethe,en,Germanic,Bayard Taylor 1870
+The Sorrows of Young Werther,Goethe,en,Germanic,1779
+"Grimm's Household Tales, volume 1",Grimm,en,Germanic,Hunt 1884
+Thus Spake Zarathustra,Nietzsche,en,Germanic,Common 1909
+The Communist Manifesto,Marx,en,Germanic,Moore 1888
+Heidi,Spyri,en,Germanic,Brooks 1884
+The Nibelungenlied,,en,Germanic,Needler 1904
+Die Verwandlung,Kafka,de,Germanic,original
+The Poetic Edda,,en,Germanic,Bellows 1923
+Beowulf,,en,Germanic,Gummere 1910
+Andersen's Fairy Tales,Andersen,en,Germanic,1870s
+A Doll's House,Ibsen,en,Germanic,Archer 1889
+Hunger,Hamsun,en,Germanic,Egerton 1899
+Max Havelaar,Multatuli,en,Germanic,Nahuys 1868
+Crime and Punishment,Dostoyevsky,en,Slavic,Garnett 1914
+The Idiot,Dostoyevsky,en,Slavic,Martin 1915
+Anna Karenina,Tolstoy,en,Slavic,Garnett 1901
+Fathers and Sons,Turgenev,en,Slavic,Garnett 1895
+The Lady with the Dog and Other Stories,Chekhov,en,Slavic,Garnett 1917
+Eugene Oneguine,Pushkin,en,Slavic,Spalding 1881
+Quo Vadis,Sienkiewicz,en,Slavic,Curtin 1896
+Pan Tadeusz,Mickiewicz,en,Slavic,Biggs 1885
+Hamlet,Shakespeare,en,Germanic,original
+Macbeth,Shakespeare,en,Germanic,original
+The Pilgrim's Progress,Bunyan,en,Germanic,original
+Robinson Crusoe,Defoe,en,Germanic,original
+Gulliver's Travels,Swift,en,Germanic,original
+Pride and Prejudice,Austen,en,Germanic,original
+Jane Eyre,Bronte,en,Germanic,original
+Frankenstein,Shelley,en,Germanic,original
+A Christmas Carol,Dickens,en,Germanic,original
+Alice's Adventures in Wonderland,Carroll,en,Germanic,original
+Treasure Island,Stevenson,en,Germanic,original
+Dracula,Stoker,en,Germanic,original
+The Adventures of Sherlock Holmes,Doyle,en,Germanic,original
+The Picture of Dorian Gray,Wilde,en,Germanic,original
+Uncle Tom's Cabin,Stowe,en,Germanic,original
+Adventures of Huckleberry Finn,Twain,en,Germanic,original
+The Call of the Wild,London,en,Germanic,original
+The Jungle Book,Kipling,en,Germanic,original
+Through the Looking-Glass,Carroll,en,Germanic,original
+Peter Pan,Barrie,en,Germanic,original
+The Federalist Papers,Hamilton,en,Germanic,original
+Paradise Lost,Milton,en,Germanic,original
+Roget's Thesaurus,Roget,en,Germanic,original
+"Narrative of the Life of Frederick Douglass, an American Slave",Douglass,en,Germanic,original
+O Pioneers!,Cather,en,Germanic,original
+Far from the Madding Crowd,Hardy,en,Germanic,original
+Herland,Gilman,en,Germanic,original
+The Scarlet Letter,Hawthorne,en,Germanic,original
+The Time Machine,Wells,en,Germanic,original
+The war of the worlds,Wells,en,Germanic,original
+The strange case of Dr. Jekyll and Mr. Hyde,Stevenson,en,Germanic,original
+The Song of the Lark,Cather,en,Germanic,original
+Anne of Green Gables,Montgomery,en,Germanic,original
+Anne of Avonlea,Montgomery,en,Germanic,original
+Anne of the Island,Montgomery,en,Germanic,original
+The Marvelous Land of Oz,Baum,en,Germanic,original
+The Wonderful Wizard of Oz,Baum,en,Germanic,original
+The Scarlet Pimpernel,Orczy,en,Germanic,original
+A princess of Mars,Burroughs,en,Germanic,original
+The gods of Mars,Burroughs,en,Germanic,original
+The warlord of Mars,Burroughs,en,Germanic,original
+What Is Man? and Other Essays,Twain,en,Germanic,original
+"Thuvia, maid of Mars",Burroughs,en,Germanic,original
+The Red Badge of Courage: An Episode of the American Civil War,Crane,en,Germanic,original
+"The Adventures of Tom Sawyer, Complete",Twain,en,Germanic,original
+The House of the Seven Gables,Hawthorne,en,Germanic,original
+Tarzan of the Apes,Burroughs,en,Germanic,original
+The Return of Tarzan,Burroughs,en,Germanic,original
+Ivanhoe: A Romance,Scott,en,Germanic,original
+"From the Earth to the moon; and, round the moon",Verne,en,Germanic,original
+The Beasts of Tarzan,Burroughs,en,Germanic,original
+A Connecticut Yankee in King Arthur's Court,Twain,en,Germanic,original
+The Son of Tarzan,Burroughs,en,Germanic,original
+Tom Sawyer Abroad,Twain,en,Germanic,original
+Tarzan and the Jewels of Opar,Burroughs,en,Germanic,original
+"Tom Sawyer, Detective",Twain,en,Germanic,original
+Alexander's Bridge,Cather,en,Germanic,original
+The prisoner of Zenda,Hope,en,Germanic,original
+The Monster Men,Burroughs,en,Germanic,original
+Flatland: A Romance of Many Dimensions,Abbott,en,Germanic,original
+A Tale of Two Cities,Dickens,en,Germanic,original
+The Complete Works of William Shakespeare,Shakespeare,en,Germanic,original
+The Tragedy of Pudd'nhead Wilson,Twain,en,Germanic,original
+Persuasion,Austen,en,Germanic,original
+Jungle Tales of Tarzan,Burroughs,en,Germanic,original
+The Return of Sherlock Holmes,Doyle,en,Germanic,original
+Tess of the d'Urbervilles: A Pure Woman,Hardy,en,Germanic,original
+Freckles,Stratton-Porter,en,Germanic,original
+The Secret Garden,Burnett,en,Germanic,original
+A Tramp Abroad,Twain,en,Germanic,original
+Northanger Abbey,Austen,en,Germanic,original
+The Return of the Native,Hardy,en,Germanic,original
+At the Earth's Core,Burroughs,en,Germanic,original
+A Girl of the Limberlost,Stratton-Porter,en,Germanic,original
+The Poison Belt,Doyle,en,Germanic,original
+The Arabian Nights Entertainments,Lang,en,Germanic,original
+Orthodoxy,Chesterton,en,Germanic,original
+The Damnation of Theron Ware,Frederic,en,Germanic,original
+"Maria; Or, The Wrongs of Woman",Wollstonecraft,en,Germanic,original
+The Lost World,Doyle,en,Germanic,original
+Mansfield Park,Austen,en,Germanic,original
+"The $30,000 Bequest, and Other Stories",Twain,en,Germanic,original
+The Mayor of Casterbridge,Hardy,en,Germanic,original
+The Voyage Out,Woolf,en,Germanic,original
+Middlemarch,Eliot,en,Germanic,original
+A Little Princess Being the whole story of Sara Crewe now told for the first time,Burnett,en,Germanic,original
+Common Sense,Paine,en,Germanic,original
+The Autobiography of Benjamin Franklin,Franklin,en,Germanic,original
+The Lost Continent,Burroughs,en,Germanic,original
+Jude the Obscure,Hardy,en,Germanic,original
+The Rise of Silas Lapham,Howells,en,Germanic,original
+The Moonstone,Collins,en,Germanic,original
+Daddy-Long-Legs,Webster,en,Germanic,original
+Emma,Austen,en,Germanic,original
+The island of Doctor Moreau,Wells,en,Germanic,original
+"The Awakening, and Selected Short Stories",Chopin,en,Germanic,original
+Sense and Sensibility,Austen,en,Germanic,original
+Flower Fables,Alcott,en,Germanic,original
+McTeague: A Story of San Francisco,Norris,en,Germanic,original
+Summer,Wharton,en,Germanic,original
+American Hand Book of the Daguerreotype,Humphrey,en,Germanic,original
+The History and Practice of the Art of Photography,Snelling,en,Germanic,original
+The Well at the World's End: A Tale,Morris,en,Germanic,original
+The Haunted Hotel: A Mystery of Modern Venice,Collins,en,Germanic,original
+Charlotte Temple,Rowson,en,Germanic,original
+The Phantom of the Opera,Leroux,en,Romance,original
+Roderick Hudson,James,en,Germanic,original
+The American,James,en,Germanic,original
+Confidence,James,en,Germanic,original
+The Europeans,James,en,Germanic,original
+My Bondage and My Freedom,Douglass,en,Germanic,original
+The innocence of Father Brown,Chesterton,en,Germanic,original
+"Walden, and On The Duty Of Civil Disobedience",Thoreau,en,Germanic,original
+Daisy Miller: A Study,James,en,Germanic,original
+The Turn of the Screw,James,en,Germanic,original
+An International Episode,James,en,Germanic,original
+The Aspern Papers,James,en,Germanic,original
+The Man from Snowy River,Paterson,en,Germanic,original
+"In the Days When the World Was Wide, and Other Verses",Lawson,en,Germanic,original
+Sons and Lovers,Lawrence,en,Germanic,original
+Heart of Darkness,Conrad,en,Germanic,original
+The wisdom of Father Brown,Chesterton,en,Germanic,original
+A pair of blue eyes,Hardy,en,Germanic,original
+At the Back of the North Wind,MacDonald,en,Germanic,original
+Sister Carrie: A Novel,Dreiser,en,Germanic,original
+Child Christopher and Goldilind the Fair,Morris,en,Germanic,original
+Dear Enemy,Webster,en,Germanic,original
+"Clotelle; Or, The Colored Heroine, a tale of the Southern States; Or, The President's Daughter",Brown,en,Germanic,original
+My Ántonia,Cather,en,Germanic,original
+"The forged coupon, and other stories",Tolstoy,en,Slavic,original
+A Study in Scarlet,Doyle,en,Germanic,original
+Life on the Mississippi,Twain,en,Germanic,original
+Webster's Unabridged Dictionary (1st 100 Pages),Webster,en,Germanic,original
+Webster's Unabridged Dictionary (2nd 100 Pages),Webster,en,Germanic,original
+Poems by Adam Lindsay Gordon,Gordon,en,Germanic,original
+An Introduction to the Study of Robert Browning's Poetry,Browning,en,Germanic,original
+The Touchstone,Wharton,en,Germanic,original
+The Octopus : A Story of California,Norris,en,Germanic,original
+Beasts and Super-Beasts,Saki,en,Germanic,original
+Dream Days,Grahame,en,Germanic,original
+Black Beauty,Sewell,en,Germanic,original
+Records of a Family of Engineers,Stevenson,en,Germanic,original
+"Eothen; Or, Traces of Travel Brought Home from the East",Kinglake,en,Germanic,original
+The Reef,Wharton,en,Germanic,original
+The House of Mirth,Wharton,en,Germanic,original
+Laddie: A True Blue Story,Stratton-Porter,en,Germanic,original
+Remember the Alamo,Barr,en,Germanic,original
+The Wind in the Willows,Grahame,en,Germanic,original
+"The Stark Munro Letters Being series of twelve letters written by J. Stark Munro, M.B., to his friend and former fellow-student, Herbert Swanborough, of Lowell, Massachusetts, during the years 1881-1884",Doyle,en,Germanic,original
+The Golden Age,Grahame,en,Germanic,original
+"Beauty and the Beast, and Tales of Home",Taylor,en,Germanic,original
+Paul Prescott's Charge,Alger,en,Germanic,original
+"The Captain of the Polestar, and Other Tales",Doyle,en,Germanic,original
+The Early Short Fiction of Edith Wharton — Part 1,Wharton,en,Germanic,original
+The Cash Boy,Alger,en,Germanic,original
+The Flirt,Tarkington,en,Germanic,original
+The Market-Place,Frederic,en,Germanic,original
+Tales from Two Hemispheres,Boyesen,en,Germanic,original
+"Rio Grande's Last Race, and Other Verses",Paterson,en,Germanic,original
+The Count's Millions,Gaboriau,en,Germanic,original
+The Early Short Fiction of Edith Wharton — Part 2,Wharton,en,Germanic,original
+"Three Elephant Power, and Other Stories",Paterson,en,Germanic,original
+Three men in a boat (to say nothing of the dog),Jerome,en,Germanic,original
+Before Adam,London,en,Germanic,original
+Bunner Sisters,Wharton,en,Germanic,original
+The Golden Road,Montgomery,en,Germanic,original
+John Barleycorn,London,en,Germanic,original
+The Ways of Men,Gregory,en,Germanic,original
+Moran of the Lady Letty,Norris,en,Germanic,original
+St. Ives: Being the Adventures of a French Prisoner in England,Stevenson,en,Germanic,original
+Verses 1889-1896,Kipling,en,Germanic,original
+A Knight of the Cumberland,Fox,en,Germanic,original
+Phantastes: A Faerie Romance for Men and Women,MacDonald,en,Germanic,original
+Steep Trails,Muir,en,Germanic,original
+The Princess Aline,Davis,en,Germanic,original
+Island Nights' Entertainments,Stevenson,en,Germanic,original
+The Mucker,Burroughs,en,Germanic,original
+The Burial of the Guns,Page,en,Germanic,original
+Frances Waldeaux: A Novel,Davis,en,Germanic,original
+Indian Heroes and Great Chieftains,Eastman,en,Germanic,original
+Indian Boyhood,Eastman,en,Germanic,original
+Old Indian Days,Eastman,en,Germanic,original
+Margaret Ogilvy,Barrie,en,Germanic,original
+"The Merry Men, and Other Tales and Fables",Stevenson,en,Germanic,original
+"The Troll Garden, and Selected Stories",Cather,en,Germanic,original
+The Harvester,Stratton-Porter,en,Germanic,original
+"In Flanders Fields, and Other Poems",McCrae,en,Germanic,original
+The Story of a Pioneer,Shaw,en,Germanic,original
+Beyond the City,Doyle,en,Germanic,original
+"A Dream of John Ball; and, A King's Lesson",Morris,en,Germanic,original
+The Scarlet Car,Davis,en,Germanic,original
+What is Property? An Inquiry into the Principle of Right and of Government,Proudhon,en,Germanic,original
+Miss Billy — Married,Porter,en,Germanic,original
+Miss Billy's Decision,Porter,en,Germanic,original
+The Oakdale Affair,Burroughs,en,Germanic,original
+The Mad King,Burroughs,en,Germanic,original
+The Land of Little Rain,Austin,en,Germanic,original
+The Country of the Pointed Firs,Jewett,en,Germanic,original
+Acres of Diamonds: Our Every-day Opportunities,Conwell,en,Germanic,original
+The outlaw of Torn,Burroughs,en,Germanic,original
+The Fortunes and Misfortunes of the Famous Moll Flanders,Defoe,en,Germanic,original
+"Literary Blunders: A Chapter in the ""History of Human Error""",Wheatley,en,Germanic,original
+"Prince Otto, a Romance",Stevenson,en,Germanic,original
+"Lay Morals, and Other Papers",Stevenson,en,Germanic,original
+Fantastic Fables,Bierce,en,Germanic,original
+"A Journal of the Plague Year Being Observations or Memorials of the Most Remarkable Occurrences, as Well Public as Private, Which Happened in London During the Last Great Visitation in 1665. Written by a Citizen Who Continued All the While in London",Defoe,en,Germanic,original
+Worldly Ways & Byways,Gregory,en,Germanic,original
+Weir of Hermiston: An Unfinished Romance,Stevenson,en,Germanic,original
+Memories and Portraits,Stevenson,en,Germanic,original
+Edinburgh: Picturesque Notes,Stevenson,en,Germanic,original
+"She Stoops to Conquer; Or, The Mistakes of a Night: A Comedy",Goldsmith,en,Germanic,original
+The Lost Prince,Burnett,en,Germanic,original
+"The Redheaded Outfield, and Other Baseball Stories",Grey,en,Germanic,original
+"Virginibus Puerisque, and Other Papers",Stevenson,en,Germanic,original
+"Vailima Letters Being Correspondence Addressed by Robert Louis Stevenson to Sidney Colvin, November 1890-October 1894",Stevenson,en,Germanic,original
+The Crossing,Churchill,en,Germanic,original
+The Great God Pan,Machen,en,Germanic,original
+A Lute of Jade : Selections from the Classical Poets of China,Cranmer-Byng,en,Sino-Tibetan,original
+The Song of Roland,Scott-Moncrieff,en,Romance,original
+The Blue Lagoon: A Romance,Stacpoole,en,Germanic,original
+Cranford,Gaskell,en,Germanic,original
+"The Holy War, Made by King Shaddai Upon Diabolus, for the Regaining of the Metropolis of the World; Or, The Losing and Taking Again of the Town of Mansoul",Bunyan,en,Germanic,original
+Cast Upon the Breakers,Alger,en,Germanic,original
+Blix,Norris,en,Germanic,original
+Penrod,Tarkington,en,Germanic,original
+Soldiers of Fortune,Davis,en,Germanic,original
+Industrial Biography: Iron Workers and Tool Makers,Smiles,en,Germanic,original
+Adventures and Letters of Richard Harding Davis,Davis,en,Germanic,original
+The King's Jackal,Davis,en,Germanic,original
+"The Bible in Spain Or, the Journeys, Adventures, and Imprisonments of an Englishman, in an Attempt to Circulate the Scriptures in the Peninsula",Borrow,en,Germanic,original
+"Winesburg, Ohio: A Group of Tales of Ohio Small Town Life",Anderson,en,Germanic,original
+The Magic of Oz,Baum,en,Germanic,original
+Dorothy and the Wizard in Oz,Baum,en,Germanic,original
+Kidnapped,Stevenson,en,Germanic,original
+The Romany Rye,Borrow,en,Germanic,original
+Round the Red Lamp: Being Facts and Fancies of Medical Life,Doyle,en,Germanic,original
+Familiar Studies of Men and Books,Stevenson,en,Germanic,original
+Tales and Fantasies,Stevenson,en,Germanic,original
+The Great War Syndicate,Stockton,en,Germanic,original
+Frivolous Cupid,Hope,en,Germanic,original
+"The Magic Egg, and Other Stories",Stockton,en,Germanic,original
+The Grain of Dust: A Novel,Phillips,en,Germanic,original
+The Fortune Hunter,Phillips,en,Germanic,original
+The Ambassadors,James,en,Germanic,original
+The Conflict,Phillips,en,Germanic,original
+"Miracle Mongers and Their Methods A Complete Exposé of the Modus Operandi of Fire Eaters, Heat Resisters, Poison Eaters, Venomous Reptile Defiers, Sword Swallowers, Human Ostriches, Strong Men, Etc.",Houdini,en,Germanic,original
+The Master Key An Electrical Fairy Tale Founded Upon the Mysteries of Electricity,Baum,en,Germanic,original
+The Vital Message,Doyle,en,Germanic,original
+Just David,Porter,en,Germanic,original
+"New Poems, and Variant Readings",Stevenson,en,Germanic,original
+The Love Affairs of a Bibliomaniac,Field,en,Germanic,original
+"System of Economical Contradictions; Or, The Philosophy of Misery",Proudhon,en,Germanic,original
+The crowd,Le Bon,en,Germanic,original
+A Book of Remarkable Criminals,Irving,en,Germanic,original
+Maggie: A Girl of the Streets,Crane,en,Germanic,original
+The Psychology of Revolution,Le Bon,en,Germanic,original
+Susan Lenox: Her Fall and Rise,Phillips,en,Germanic,original
+The Shadow Line: A Confession,Conrad,en,Germanic,original
+"Lavengro: The Scholar, the Gypsy, the Priest",Borrow,en,Germanic,original
+The Breitmann Ballads,Leland,en,Germanic,original
+The University of Hard Knocks,Parlette,en,Germanic,original
+"The Door in the Wall, and Other Stories",Wells,en,Germanic,original
+The Price She Paid,Phillips,en,Germanic,original
+Dreams and Dust,Marquis,en,Germanic,original
+The White People,Burnett,en,Germanic,original
+The Quest of the Golden Girl: A Romance,Le Gallienne,en,Germanic,original
+"The Errand Boy; Or, How Phil Brent Won Success",Alger,en,Germanic,original
+"In the South Seas Being an Account of Experiences and Observations in the Marquesas, Paumotus and Gilbert Islands in the Course of Two Cruises on the Yacht ""Casco"" (1888) and the Schooner ""Equator"" (1889)",Stevenson,en,Germanic,original
+The Mountains,White,en,Germanic,original
+The Gaming Table: Its Votaries and Victims. Volume 1 (of 2),Steinmetz,en,Germanic,original
+The Princess of Cleves,La Fayette,en,Germanic,original
+Manon Lescaut,Prévost,en,Germanic,original
+The Duchesse of Langeais,Balzac,en,Romance,original
+Heretics,Chesterton,en,Germanic,original
+The Bride of Lammermoor,Scott,en,Germanic,original
+The House Behind the Cedars,Chesnutt,en,Germanic,original
+"In Darkest England, and the Way Out",Booth,en,Germanic,original
+"James Nasmyth, Engineer: An Autobiography",Nasmyth,en,Germanic,original
+Criminal Sociology,Ferri,en,Germanic,original
+The Cost,Phillips,en,Germanic,original
+Little Lord Fauntleroy,Burnett,en,Germanic,original
+In the Bishop's Carriage,Michelson,en,Germanic,original
+The Woodlanders,Hardy,en,Germanic,original
+The Conquest of Canaan,Tarkington,en,Germanic,original
+"Poor and Proud; Or, The Fortunes of Katy Redburn: A Story for Young Folks",Optic,en,Germanic,original
+The Road to Oz,Baum,en,Germanic,original
+"Ozma of Oz A Record of Her Adventures with Dorothy Gale of Kansas, the Yellow Hen, the Scarecrow, the Tin Woodman, Tiktok, the Cowardly Lion, and the Hungry Tiger; Besides Other Good People too Numerous to Mention Faithfully Recorded Herein",Baum,en,Germanic,original
+Rezanov,Atherton,en,Germanic,original
+Essays in the Art of Writing,Stevenson,en,Germanic,original
+Falk: A Reminiscence,Conrad,en,Germanic,original
+The Little Lame Prince,Craik,en,Germanic,original
+Tracks of a Rolling Stone,Coke,en,Germanic,original
+Rebecca of Sunnybrook Farm,Wiggin,en,Germanic,original
+The Story of Doctor Dolittle,Lofting,en,Germanic,original
+Desert Gold,Grey,en,Germanic,original
+The Blue Fairy Book,Lang,en,Germanic,original
+The Fifth String,Sousa,en,Germanic,original
+History of the Warfare of Science with Theology in Christendom,White,en,Germanic,original
+The Shuttle,Burnett,en,Germanic,original
+Adam Bede,Eliot,en,Germanic,original
+Twice-Told Tales,Hawthorne,en,Germanic,original
+The Purcell Papers — Volume 1,Le Fanu,en,Germanic,original
+The Purcell Papers — Volume 2,Le Fanu,en,Germanic,original
+The Purcell Papers — Volume 3,Le Fanu,en,Germanic,original
+Mosses from an old manse,Hawthorne,en,Germanic,original
+"The snow-image, and other twice-told tales",Hawthorne,en,Germanic,original
+Little Women,Alcott,en,Germanic,original
+Margret Howth: A Story of To-day,Davis,en,Germanic,original
+The Silverado Squatters,Stevenson,en,Germanic,original
+The Emerald City of Oz,Baum,en,Germanic,original
+The Enchanted Island of Yew Whereon Prince Marvel Encountered the High Ki of Twi and Other Surprising People,Baum,en,Germanic,original
+The Life and Adventures of Santa Claus,Baum,en,Germanic,original
+The Chinese Boy and Girl,Headland,en,Germanic,original
+"Court Life in China: The Capital, Its Officials and People",Headland,en,Germanic,original
+Ann Veronica: A Modern Love Story,Wells,en,Germanic,original
+The End of the Tether,Conrad,en,Germanic,original
+"Joe the Hotel Boy; Or, Winning out by Pluck",Alger,en,Germanic,original
+"Driven from Home; Or, Carl Crawford's Experience",Alger,en,Germanic,original
+The Gaming Table: Its Votaries and Victims. Volume 2 (of 2),Steinmetz,en,Germanic,original
+At the Foot of the Rainbow,Stratton-Porter,en,Germanic,original
+The Song of the Cardinal,Stratton-Porter,en,Germanic,original
+An inland voyage,Stevenson,en,Germanic,original
+Travels with a donkey in the Cevennes,Stevenson,en,Germanic,original
+A Footnote to History: Eight Years of Trouble in Samoa,Stevenson,en,Germanic,original
+The Lost Continent,Hyne,en,Germanic,original
+Tales of Terror and Mystery,Doyle,en,Germanic,original
+Jean of the Lazy A,Bower,en,Germanic,original
+A. W. Kinglake: A Biographical and Literary Study,Tuckwell,en,Germanic,original
+The Red Fairy Book,Lang,en,Germanic,original
+The Age of Innocence,Wharton,en,Germanic,original
+Main Street,Lewis,en,Germanic,original
+Anne's House of Dreams,Montgomery,en,Germanic,original
+Baron Trigault's Vengeance,Gaboriau,en,Germanic,original
+Silas Marner,Eliot,en,Germanic,original
+The Land That Time Forgot,Burroughs,en,Germanic,original
+The People That Time Forgot,Burroughs,en,Germanic,original
+Out of Time's Abyss,Burroughs,en,Germanic,original
+The Contrast,Tyler,en,Germanic,original
+The Unbearable Bassington,Saki,en,Germanic,original
+Rewards and Fairies,Kipling,en,Germanic,original
+Puck of Pook's Hill,Kipling,en,Germanic,original
+The Thirty-Nine Steps,Buchan,en,Germanic,original
+Greenmantle,Buchan,en,Germanic,original
+Mr. Standfast,Buchan,en,Germanic,original
+The Further Adventures of Robinson Crusoe,Defoe,en,Germanic,original
+The Mystery of Edwin Drood,Dickens,en,Germanic,original
+The Zincali: An Account of the Gypsies of Spain,Borrow,en,Germanic,original
+The History of the Thirty Years' War,Schiller,en,Germanic,original
+"The Complete Works of Brann, the Iconoclast — Volume 01",Brann,en,Germanic,original
+"The Complete Works of Brann, the Iconoclast — Volume 10",Brann,en,Germanic,original
+"The Complete Works of Brann, the Iconoclast — Volume 12",Brann,en,Germanic,original
+"The Moravians in Georgia, 1735-1740",Fries,en,Germanic,original
+The Great Big Treasury of Beatrix Potter,Potter,en,Germanic,original
+"The Essays or Counsels, Civil and Moral",Bacon,en,Germanic,original
+"The Works of Samuel Johnson, in Sixteen Volumes. Volume 04",Johnson,en,Germanic,original
+The Poems of Sidney Lanier,Lanier,en,Germanic,original
+The Pickwick Papers,Dickens,en,Germanic,original
+Ginx's Baby: His Birth and Other Misfortunes; a Satire,Jenkins,en,Germanic,original
+A Collection of Beatrix Potter Stories,Potter,en,Germanic,original
+The Woman in White,Collins,en,Germanic,original
+"Our Nig; Or, Sketches from the Life of a Free Black, in a Two-story White House, North Showing That Slavery's Shadows Fall Even There",Wilson,en,Germanic,original
+"Religio Medici, Hydriotaphia, and the Letter to a Friend",Browne,en,Germanic,original
+Danny's Own Story,Marquis,en,Germanic,original
+Master Humphrey's Clock,Dickens,en,Germanic,original
+Catriona,Stevenson,en,Germanic,original
+"Robert Louis Stevenson: A Record, an Estimate, and a Memorial",Japp,en,Germanic,original
+"The Story of Burnt Njal: The Great Icelandic Tribune, Jurist, and Counsellor",Dasent,en,Germanic,original
+Vanity Fair,Thackeray,en,Germanic,original
+Notes from the Underground,Dostoyevsky,en,Germanic,original
+The Monk: A Romance,Lewis,en,Germanic,original
+Letters of George Borrow to the British and Foreign Bible Society,Borrow,en,Germanic,original
+Gulliver of Mars,Arnold,en,Germanic,original
+Pellucidar,Burroughs,en,Germanic,original
+Indian Why Stories: Sparks from War Eagle's Lodge-Fire,Linderman,en,Germanic,original
+"America, Through the Spectacles of an Oriental Diplomat",Wu,en,Germanic,original
+Idylls of the King,Tennyson,en,Germanic,original
+Prester John,Buchan,en,Germanic,original
+"Across the Plains, with Other Memories and Essays",Stevenson,en,Germanic,original
+Poems,Seeger,en,Germanic,original
+The Warden,Trollope,en,Germanic,original
+Sylvie and Bruno,Carroll,en,Germanic,original
+The Varieties of Religious Experience: A Study in Human Nature,James,en,Germanic,original
+The Letters of Robert Louis Stevenson — Volume 1,Stevenson,en,Germanic,original
+"The Battle of the Books, and other Short Pieces",Swift,en,Germanic,original
+"Looking Backward, 2000 to 1887",Bellamy,en,Germanic,original
+Ponkapog Papers,Aldrich,en,Germanic,original
+Essays of Travel,Stevenson,en,Germanic,original
+Memoirs of Extraordinary Popular Delusions — Volume 1,Mackay,en,Germanic,original
+The Letters of Robert Louis Stevenson — Volume 2,Stevenson,en,Germanic,original
+An Outcast of the Islands,Conrad,en,Germanic,original
+"The God-Idea of the Ancients; Or, Sex in Religion",Gamble,en,Germanic,original
+The Yellow Fairy Book,Lang,en,Germanic,original
+The Violet Fairy Book,Lang,en,Germanic,original
+The Haunted Man and the Ghost's Bargain,Dickens,en,Germanic,original
+The Coral Island: A Tale of the Pacific Ocean,Ballantyne,en,Germanic,original
+The Dynamiter,Stevenson,en,Germanic,original
+"Wild Wales: Its People, Language and Scenery",Borrow,en,Germanic,original
+"Ancient Poems, Ballads, and Songs of the Peasantry of England",Bell,en,Germanic,original
+Pictures from Italy,Dickens,en,Germanic,original
+"Rasselas, Prince of Abyssinia",Johnson,en,Germanic,original
+The Chimes A Goblin Story of Some Bells That Rang an Old Year out and a New Year In,Dickens,en,Germanic,original
+Grace Abounding to the Chief of Sinners,Bunyan,en,Germanic,original
+Life and Letters of Robert Browning,Orr,en,Germanic,original
+Life of Robert Browning,Sharp,en,Germanic,original
+The Anglo-Saxon Chronicle,Ingram,en,Germanic,original
+"Paul the Peddler; Or, The Fortunes of a Young Street Merchant",Alger,en,Germanic,original
+"Phil, the Fiddler",Alger,en,Germanic,original
+American Notes,Dickens,en,Germanic,original
+The Battle of Life,Dickens,en,Germanic,original
+"The Heroes; Or, Greek Fairy Tales for My Children",Kingsley,en,Germanic,original
+The Cricket on the Hearth: A Fairy Tale of Home,Dickens,en,Germanic,original
+Creatures That Once Were Men,Gorky,en,Germanic,original
+The Compleat Angler,Walton,en,Germanic,original
+A Personal Record,Conrad,en,Germanic,original
+"The Goodness of St. Rocque, and Other Stories",Dunbar-Nelson,en,Germanic,original
+The Kreutzer Sonata and Other Stories,Tolstoy,en,Germanic,original
+The Complete Works of James Whitcomb Riley — Volume 1,Riley,en,Germanic,original
+The Complete Works of James Whitcomb Riley — Volume 10,Riley,en,Germanic,original
+"The Autobiography of a Quack, and The Case of George Dedlow",Mitchell,en,Germanic,original
+"Glaucus; Or, The Wonders of the Shore",Kingsley,en,Germanic,original
+The Castle of Otranto,Walpole,en,Germanic,original
+Memoir of Fleeming Jenkin,Stevenson,en,Germanic,original
+A Child's History of England,Dickens,en,Germanic,original
+The Old Curiosity Shop,Dickens,en,Germanic,original
+Lucasta,Lovelace,en,Germanic,original
+The Roadmender,Fairless,en,Germanic,original
+The Amateur Cracksman,Hornung,en,Germanic,original
+Raffles: Further Adventures of the Amateur Cracksman,Hornung,en,Germanic,original
+The Princess and the Goblin,MacDonald,en,Germanic,original
+The Princess and Curdie,MacDonald,en,Germanic,original
+"Love of Life, and Other Stories",London,en,Germanic,original
+Allan Quatermain,Haggard,en,Germanic,original
+"Thomas Jefferson, a Character Sketch",Ellis,en,Germanic,original
+Memoirs of Extraordinary Popular Delusions — Volume 2,Mackay,en,Germanic,original
+The Moon Endureth: Tales and Fancies,Buchan,en,Germanic,original
+The Cruise of the Jasper B.,Marquis,en,Germanic,original
+Chita: A Memory of Last Island,Hearn,en,Germanic,original
+Tono-Bungay,Wells,en,Germanic,original
+The Plays of W. E. Henley and R. L. Stevenson,Henley,en,Germanic,original
+Almayer's Folly: A Story of an Eastern River,Conrad,en,Germanic,original
+"James Otis, the Pre-Revolutionist",Ridpath,en,Germanic,original
+Men of Invention and Industry,Smiles,en,Germanic,original
+Oliver Twist,Dickens,en,Germanic,original
+Editorials from the Hearst Newspapers,Brisbane,en,Germanic,original
+"Thoughts on Man, His Nature, Productions and Discoveries Interspersed with Some Particulars Respecting the Author",Godwin,en,Germanic,original
+Burning Daylight,London,en,Germanic,original
+Anomalies and Curiosities of Medicine,Gould,en,Germanic,original
+The High History of the Holy Graal,Evans,en,Germanic,original
+The Autocrat of the Breakfast-Table,Holmes,en,Germanic,original
+Arizona nights,White,en,Germanic,original
+The Story of Mankind,Van Loon,en,Germanic,original
+A Lady's Life in the Rocky Mountains,Bird,en,Germanic,original
+Arizona Sketches,Munk,en,Germanic,original
+"Fifty ""Bab"" Ballads: Much Sound and Little Sense",Gilbert,en,Germanic,original
+"Hans Brinker; Or, The Silver Skates",Dodge,en,Germanic,original
+The Moon Pool,Merritt,en,Germanic,original
+David Copperfield,Dickens,en,Germanic,original
+Agnes Grey,Brontë,en,Germanic,original
+Wuthering Heights,Brontë,en,Germanic,original
+The Book of Tea,Okakura,en,Germanic,original
+The Story of the Treasure Seekers Being the Adventures of the Bastable Children in Search of a Fortune,Nesbit,en,Germanic,original
+"Lord Arthur Savile's Crime; The Portrait of Mr. W.H., and Other Stories",Wilde,en,Germanic,original
+Essays and Lectures,Wilde,en,Germanic,original
+When the Sleeper Wakes,Wells,en,Germanic,original
+Hermione and Her Little Group of Serious Thinkers,Marquis,en,Germanic,original
+Five Children and It,Nesbit,en,Germanic,original
+The Tragical History of Doctor Faustus From the Quarto of 1604,Marlowe,en,Germanic,original
+The War in the Air,Wells,en,Germanic,original
+Sinking of the Titanic and Great Sea Disasters,Marshall,en,Germanic,original
+The Lost City,Badger,en,Germanic,original
+Boyhood in Norway: Stories of Boy-Life in the Land of the Midnight Sun,Boyesen,en,Germanic,original
+Hard Times,Dickens,en,Germanic,original
+The Man Between: An International Romance,Barr,en,Germanic,original
+The Red One,London,en,Germanic,original
+The Gathering of Brother Hilarius,Fairless,en,Germanic,original
+Lady Windermere's Fan,Wilde,en,Germanic,original
+The Princess,Tennyson,en,Germanic,original
+"Wieland; Or, The Transformation: An American Tale",Brown,en,Germanic,original
+Aeroplanes and Dirigibles of War,Talbot,en,Germanic,original
+The Wouldbegoods: Being the Further Adventures of the Treasure Seekers,Nesbit,en,Germanic,original
+A Sentimental Journey Through France and Italy,Sterne,en,Germanic,original
+This Side of Paradise,Fitzgerald,en,Germanic,original
+The Complete Plays of Gilbert and Sullivan,Sullivan,en,Germanic,original
+The Tragical History of Doctor Faustus From the Quarto of 1616,Marlowe,en,Germanic,original
+"Reminiscences of Tolstoy, by His Son",Tolstoi,en,Germanic,original
+Democracy in America — Volume 1,Tocqueville,en,Germanic,original
+Democracy in America — Volume 2,Tocqueville,en,Germanic,original
+The History of the Telephone,Casson,en,Germanic,original
+Edison: His Life and Inventions,Dyer,en,Germanic,original
+Dombey and Son,Dickens,en,Germanic,original
+Speeches: Literary and Social,Dickens,en,Germanic,original
+The Theory of the Leisure Class,Veblen,en,Germanic,original
+The Memoirs of Sherlock Holmes,Doyle,en,Germanic,original
+The Phoenix and the Carpet,Nesbit,en,Germanic,original
+The Story of the Amulet,Nesbit,en,Germanic,original
+"Jasmin: Barber, Poet, Philanthropist",Smiles,en,Germanic,original
+Lorna Doone: A Romance of Exmoor,Blackmore,en,Germanic,original
+"Men, Women and Ghosts",Lowell,en,Germanic,original
+Memoirs of Carwin the Biloquist (A Fragment),Brown,en,Germanic,original
+The Life of Francis Marion,Simms,en,Germanic,original
+The Importance of Being Earnest: A Trivial Comedy for Serious People,Wilde,en,Germanic,original
+Poems of Henry Timrod; with Memoir,Timrod,en,Germanic,original
+Lays of Ancient Rome,Macaulay,en,Germanic,original
+The Black Arrow: A Tale of the Two Roses,Stevenson,en,Germanic,original
+The Idle Thoughts of an Idle Fellow,Jerome,en,Germanic,original
+Tom Grogan,Smith,en,Germanic,original
+Narrative of the Captivity and Restoration of Mrs. Mary Rowlandson,Rowlandson,en,Germanic,original
+Democracy and Education: An Introduction to the Philosophy of Education,Dewey,en,Germanic,original
+A Woman of No Importance,Wilde,en,Germanic,original
+Polly of the Circus,Mayo,en,Germanic,original
+Baby Mine,Mayo,en,Germanic,original
+The Dominion of the Air: The Story of Aerial Navigation,Bacon,en,Germanic,original
+The Master of Ballantrae: A Winter's Tale,Stevenson,en,Germanic,original
+Reprinted Pieces,Dickens,en,Germanic,original
+A House of Pomegranates,Wilde,en,Germanic,original
+The Duchess of Padua,Wilde,en,Germanic,original
+"Sketches by Boz, Illustrative of Every-Day Life and Every-Day People",Dickens,en,Germanic,original
+Our Mutual Friend,Dickens,en,Germanic,original
+Memoirs of Extraordinary Popular Delusions — Volume 3,Mackay,en,Germanic,original
+An ideal husband,Wilde,en,Germanic,original
+Letters from the Cape,Duff Gordon,en,Germanic,original
+Intentions,Wilde,en,Germanic,original
+The Lazy Tour of Two Idle Apprentices,Dickens,en,Germanic,original
+Two Years in the Forbidden City,Der Ling,en,Germanic,original
+History of the Decline and Fall of the Roman Empire — Volume 1,Gibbon,en,Germanic,original
+History of the Decline and Fall of the Roman Empire — Volume 2,Gibbon,en,Germanic,original
+History of the Decline and Fall of the Roman Empire — Volume 3,Gibbon,en,Germanic,original
+History of the Decline and Fall of the Roman Empire — Volume 4,Gibbon,en,Germanic,original
+History of the Decline and Fall of the Roman Empire — Volume 5,Gibbon,en,Germanic,original
+History of the Decline and Fall of the Roman Empire — Volume 6,Gibbon,en,Germanic,original
+The Rose and the Ring,Thackeray,en,Germanic,original
+The Lesson of the Master,James,en,Germanic,original
+The Jew of Malta,Marlowe,en,Germanic,original
+The White Company,Doyle,en,Germanic,original
+Her Father's Daughter,Stratton-Porter,en,Germanic,original
+Within the Law: From the Play of Bayard Veiller,Dana,en,Germanic,original
+Treatise on Parents and Children,Shaw,en,Germanic,original
+White Fang,London,en,Germanic,original
+Tales of the Fish Patrol,London,en,Germanic,original
+Mudfog and Other Sketches,Dickens,en,Germanic,original
+The Uncommercial Traveller,Dickens,en,Germanic,original
+Sketches of Young Couples,Dickens,en,Germanic,original
+Barnaby Rudge: A Tale of the Riots of 'Eighty,Dickens,en,Germanic,original
+Sketches of Young Gentlemen,Dickens,en,Germanic,original
+Ethics — Part 2,Spinoza,en,Germanic,original
+A Sketch of the Life of Brig. Gen. Francis Marion and a History of His Brigade,James,en,Germanic,original
+"Ten Thousand Dreams Interpreted; Or, What's in a Dream A Scientific and Practical Exposition",Miller,en,Germanic,original
+Alice's Adventures in Wonderland HTML Edition,Carroll,en,Germanic,original
+The Bab Ballads,Gilbert,en,Germanic,original
+More Bab Ballads,Gilbert,en,Germanic,original
+Songs of a Savoyard,Gilbert,en,Germanic,original
+Self Help; with Illustrations of Conduct and Perseverance,Smiles,en,Germanic,original
+The Village Watch-Tower,Wiggin,en,Germanic,original
+"Poems: Patriotic, Religious, Miscellaneous",Ryan,en,Germanic,original
+Good Indian,Bower,en,Germanic,original
+"The Life of Thomas Telford, Civil Engineer With an Introductory History of Roads and Travelling in Great Britain",Smiles,en,Germanic,original
+The Last of the Mohicans; A narrative of 1757,Cooper,en,Germanic,original
+Green Mansions: A Romance of the Tropical Forest,Hudson,en,Germanic,original
+Misalliance,Shaw,en,Germanic,original
+The Voyage of the Beagle,Darwin,en,Germanic,original
+Dust,Haldeman-Julius,en,Germanic,original
+Lady Susan,Austen,en,Germanic,original
+"The Life of Horatio, Lord Nelson",Southey,en,Germanic,original
+Ethics — Part 3,Spinoza,en,Germanic,original
+The Patchwork Girl of Oz,Baum,en,Germanic,original
+Tik-Tok of Oz,Baum,en,Germanic,original
+The Scarecrow of Oz,Baum,en,Germanic,original
+Rinkitink in Oz Wherein Is Recorded the Perilous Quest of Prince Inga of Pingaree and King Rinkitink in the Magical Isles That Lie Beyond the Borderland of Oz,Baum,en,Germanic,original
+The Lost Princess of Oz,Baum,en,Germanic,original
+"The Tin Woodman of Oz A Faithful Story of the Astonishing Adventure Undertaken by the Tin Woodman, Assisted by Woot the Wanderer, the Scarecrow of Oz, and Polychrome, the Rainbow's Daughter",Baum,en,Germanic,original
+"Glinda of Oz In Which Are Related the Exciting Experiences of Princess Ozma of Oz, and Dorothy, in Their Hazardous Journey to the Home of the Flatheads, and to the Magic Isle of the Skeezers, and How They Were Rescued from Dire Peril by the Sorcery of Glinda the Good",Baum,en,Germanic,original
+The Poems of Henry Kendall With Biographical Note by Bertram Stevens,Kendall,en,Germanic,original
+Little Dorrit,Dickens,en,Germanic,original
+The Merry Adventures of Robin Hood,Pyle,en,Germanic,original
+The black tulip,Dumas,en,Germanic,original
+Maid Marian,Peacock,en,Germanic,original
+Nicholas Nickleby,Dickens,en,Germanic,original
+Martin Chuzzlewit,Dickens,en,Germanic,original
+The Tenant of Wildfell Hall,Brontë,en,Germanic,original
+Uncle Josh's Punkin Centre Stories,Stewart,en,Germanic,original
+Ethics — Part 4,Spinoza,en,Germanic,original
+The Devil's Dictionary,Bierce,en,Germanic,original
+"Howard Pyle's Book of Pirates Fiction, Fact & Fancy Concerning the Buccaneers & Marooners of the Spanish Main",Pyle,en,Germanic,original
+The Secret Agent: A Simple Tale,Conrad,en,Germanic,original
+Tanglewood Tales,Hawthorne,en,Germanic,original
+American Notes,Kipling,en,Germanic,original
+Heroes of the Telegraph,Munro,en,Germanic,original
+Alice Adams,Tarkington,en,Germanic,original
+"Tour through the Eastern Counties of England, 1722",Defoe,en,Germanic,original
+Who Was Who: 5000 B. C. to Date Biographical Dictionary of the Famous and Those Who Wanted to Be,Gordon,en,Germanic,original
+Master and Man,Tolstoy,en,Slavic,original
+The Education of the Child,Key,en,Germanic,original
+Theologico-Political Treatise — Part 1,Spinoza,en,Germanic,original
+Theologico-Political Treatise — Part 2,Spinoza,en,Germanic,original
+A Theological-Political Treatise [Part IV],Spinoza,en,Germanic,original
+Malbone: An Oldport Romance,Higginson,en,Germanic,original
+The First Men in the Moon,Wells,en,Germanic,original
+The Lure of the Dim Trails,Bower,en,Germanic,original
+The Oregon Trail: Sketches of Prairie and Rocky-Mountain Life,Parkman,en,Germanic,original
+The Water-Babies,Kingsley,en,Germanic,original
+"Poems by Currer, Ellis, and Acton Bell",Brontë,en,Germanic,original
+Sword Blades and Poppy Seed,Lowell,en,Germanic,original
+"The Congo, and Other Poems",Lindsay,en,Germanic,original
+Bleak House,Dickens,en,Germanic,original
+The Wrecker,Stevenson,en,Germanic,original
+"Essays; Political, Economical, and Philosophical — Volume 1",Rumford,en,Germanic,original
+The Diary of a Nobody,Grossmith,en,Germanic,original
+The Lone Star Ranger: A Romance of the Border,Grey,en,Germanic,original
+The Professor,Brontë,en,Germanic,original
+The Night-Born,London,en,Germanic,original
+The Cavalier Songs and Ballads of England from 1642 to 1684,Mackay,en,Germanic,original
+Rose o' the River,Wiggin,en,Germanic,original
+Joe Wilson and His Mates,Lawson,en,Germanic,original
+The Life of John Bunyan,Venables,en,Germanic,original
+Style,Raleigh,en,Germanic,original
+Missionary Travels and Researches in South Africa,Livingstone,en,Germanic,original
+The Three Taverns: A Book of Poems,Robinson,en,Germanic,original
+The Story of Evolution,McCabe,en,Germanic,original
+"God, the Invisible King",Wells,en,Germanic,original
+The New Machiavelli,Wells,en,Germanic,original
+The Ruling Passion: Tales of Nature and Human Nature,Van Dyke,en,Germanic,original
+Vanished Arizona: Recollections of the Army Life by a New England Woman,Summerhayes,en,Germanic,original
+Sartor Resartus: The Life and Opinions of Herr Teufelsdröckh,Carlyle,en,Germanic,original
+Within the Tides: Tales,Conrad,en,Germanic,original
+A Collection of Ballads,Lang,en,Germanic,original
+'Twixt Land & Sea: Tales,Conrad,en,Germanic,original
+Martin Eden,London,en,Germanic,original
+"Poems, with The Ballad of Reading Gaol",Wilde,en,Germanic,original
+The Mirror of the Sea,Conrad,en,Germanic,original
+The World Set Free,Wells,en,Germanic,original
+Myths and Myth-Makers Old Tales and Superstitions Interpreted by Comparative Mythology,Fiske,en,Germanic,original
+William the Conqueror,Freeman,en,Germanic,original
+Personal Memoirs of U. S. Grant — Volume 1,Grant,en,Germanic,original
+Personal Memoirs of U. S. Grant — Volume 2,Grant,en,Germanic,original
+Four Short Stories By Emile Zola,Zola,en,Germanic,original
+The Sea-Wolf,London,en,Germanic,original
+The Strength of the Strong,London,en,Germanic,original
+The Wallet of Kai Lung,Bramah,en,Germanic,original
+The Mirror of Kong Ho,Bramah,en,Germanic,original
+The Scouts of the Valley,Altsheler,en,Germanic,original
+"The life and opinions of Tristram Shandy, gentleman",Sterne,en,Germanic,original
+"Voyage of the Paper Canoe A Geographical Journey of 2500 Miles, from Quebec to the Gulf of Mexico, During the Years 1874-5",Bishop,en,Germanic,original
+The Arrow of Gold: A Story Between Two Notes,Conrad,en,Germanic,original
+Life of John Sterling,Carlyle,en,Germanic,original
+Rolf in the Woods,Seton,en,Germanic,original
+"Moon-Face, and Other Stories",London,en,Germanic,original
+"On Heroes, Hero-Worship, and the Heroic in History",Carlyle,en,Germanic,original
+Tamburlaine the Great — Part 1,Marlowe,en,Germanic,original
+The Light of the Western Stars,Grey,en,Germanic,original
+The Faith of Men,London,en,Germanic,original
+Mrs. Warren's Profession,Shaw,en,Germanic,original
+The Turmoil: A Novel,Tarkington,en,Germanic,original
+The Riverman,White,en,Germanic,original
+"King Henry VI, Part 1",Shakespeare,en,Germanic,original
+"King Henry VI, Part 2",Shakespeare,en,Germanic,original
+"King Henry VI, Part 3",Shakespeare,en,Germanic,original
+King Richard III,Shakespeare,en,Germanic,original
+The Sonnets,Shakespeare,en,Germanic,original
+Titus Andronicus,Shakespeare,en,Germanic,original
+The Taming of the Shrew,Shakespeare,en,Germanic,original
+Love's Labour's Lost,Shakespeare,en,Germanic,original
+King John,Shakespeare,en,Germanic,original
+King Richard II,Shakespeare,en,Germanic,original
+Romeo and Juliet,Shakespeare,en,Germanic,original
+The Merchant of Venice,Shakespeare,en,Germanic,original
+"King Henry IV, Part 1",Shakespeare,en,Germanic,original
+The Merry Wives of Windsor,Shakespeare,en,Germanic,original
+"King Henry IV, Part 2",Shakespeare,en,Germanic,original
+Much Ado about Nothing,Shakespeare,en,Germanic,original
+King Henry V,Shakespeare,en,Germanic,original
+Julius Caesar,Shakespeare,en,Germanic,original
+As You Like It,Shakespeare,en,Germanic,original
+Twelfth Night,Shakespeare,en,Germanic,original
+Troilus and Cressida,Shakespeare,en,Germanic,original
+All's Well That Ends Well,Shakespeare,en,Germanic,original
+Measure for Measure,Shakespeare,en,Germanic,original
+Othello,Shakespeare,en,Germanic,original
+King Lear,Shakespeare,en,Germanic,original
+Antony and Cleopatra,Shakespeare,en,Germanic,original
+Coriolanus,Shakespeare,en,Germanic,original
+Timon of Athens,Shakespeare,en,Germanic,original
+Cymbeline,Shakespeare,en,Germanic,original
+The Winter's Tale,Shakespeare,en,Germanic,original
+King Henry VIII,Shakespeare,en,Germanic,original
+The Research Magnificent,Wells,en,Germanic,original
+Fisherman's Luck and Some Other Uncertain Things,Van Dyke,en,Germanic,original
+Latter-Day Pamphlets,Carlyle,en,Germanic,original
+Typhoon,Conrad,en,Germanic,original
+Notes on Life & Letters,Conrad,en,Germanic,original
+In the Cage,James,en,Germanic,original
+Rupert of Hentzau: From The Memoirs of Fritz Von Tarlenheim Sequel to The Prisoner of Zenda,Hope,en,Germanic,original
+The Journal of a Voyage to Lisbon,Fielding,en,Germanic,original
+A Journey from This World to the Next,Fielding,en,Germanic,original
+"From London to Land's End and Two Letters from the ""Journey through England by a Gentleman""",Defoe,en,Germanic,original
+The Story of the Volsungs (Volsunga Saga); with Excerpts from the Poetic Edda,Eiríkr Magnússon,en,Germanic,original
+The Chessmen of Mars,Burroughs,en,Germanic,original
+The Voyages of Doctor Dolittle,Lofting,en,Germanic,original
+Babbitt,Lewis,en,Germanic,original
+Penrod and Sam,Tarkington,en,Germanic,original
+Jerry of the Islands,London,en,Germanic,original
+The Jacket (The Star-Rover),London,en,Germanic,original
+Adventure,London,en,Germanic,original
+The iron heel,London,en,Germanic,original
+The Little Book of Modern Verse A Selection from the Work of Contemporaneous American Poets,Rittenhouse,en,Germanic,original
+The Second Book of Modern Verse A Selection from the Work of Contemporaneous American Poets,Rittenhouse,en,Germanic,original
+A Strange Disappearance,Green,en,Germanic,original
+The Pool in the Desert,Duncan,en,Germanic,original
+History of the Conflict Between Religion and Science,Draper,en,Germanic,original
+War of the Classes,London,en,Germanic,original
+The Lair of the White Worm,Stoker,en,Germanic,original
+The Double-Dealer: A Comedy,Congreve,en,Germanic,original
+The Old Bachelor: A Comedy,Congreve,en,Germanic,original
+The Coxon Fund,James,en,Germanic,original
+The Adventures of Louis de Rougemont,Rougemont,en,Germanic,original
+Glasses,James,en,Germanic,original
+"Taras Bulba, and Other Tales",Gogol,en,Germanic,original
+Robbery under Arms A Story of Life and Adventure in the Bush and in the Australian Goldfields,Boldrewood,en,Germanic,original
+An Anthology of Australian Verse,Stevens,en,Germanic,original
+An Essay on the Trial By Jury,Spooner,en,Germanic,original
+Tales of Unrest,Conrad,en,Germanic,original
+Dolly Dialogues,Hope,en,Germanic,original
+Cabin Fever,Bower,en,Germanic,original
+The Colour of Life,Meynell,en,Germanic,original
+The Flying U Ranch,Bower,en,Germanic,original
+Nada the Lily,Haggard,en,Germanic,original
+South Sea Tales,London,en,Germanic,original
+History of the Conquest of Peru,Prescott,en,Germanic,original
+Kwaidan: Stories and Studies of Strange Things,Hearn,en,Germanic,original
+A Selection from the Lyrical Poems of Robert Herrick,Herrick,en,Germanic,original
+Love and Freindship [sic],Austen,en,Germanic,original
+"Reflections on the Decline of Science in England, and on Some of Its Causes",Babbage,en,Germanic,original
+Penelope's Experiences in Scotland Being Extracts from the Commonplace Book of Penelope Hamilton,Wiggin,en,Germanic,original
+The Adventures of Jimmie Dale,Packard,en,Germanic,original
+"A Preliminary Revision of the North American Species of Cactus, Anhalonium, and Lophophora",Coulter,en,Germanic,original
+Ursula,Balzac,en,Romance,original
+Faraday as a Discoverer,Tyndall,en,Germanic,original
+The Expression of the Emotions in Man and Animals,Darwin,en,Germanic,original
+Select Poems of Sidney Lanier,Lanier,en,Germanic,original
+On the Track,Lawson,en,Germanic,original
+The Origin and Nature of the Emotions; Miscellaneous Papers,Crile,en,Germanic,original
+Captain Fracasse,Gautier,en,Germanic,original
+First Across the Continent The Story of the Exploring Expedition of Lewis and Clark in 1804-5-6,Brooks,en,Germanic,original
+Father Goriot,Balzac,en,Romance,original
+The Spirit of the Border: A Romance of the Early Settlers in the Ohio Valley,Grey,en,Germanic,original
+The Playboy of the Western World: A Comedy in Three Acts,Synge,en,Germanic,original
+Unconscious Comedians,Balzac,en,Romance,original
+Hearts of Controversy,Meynell,en,Germanic,original
+Love for Love: A Comedy,Congreve,en,Germanic,original
+Night and Day,Woolf,en,Germanic,original
+Ten Years Later,Dumas,en,Germanic,original
+Twenty years after,Dumas,en,Germanic,original
+Betty Zane,Grey,en,Germanic,original
+The Heritage of the Desert: A Novel,Grey,en,Germanic,original
+The Glimpses of the Moon,Wharton,en,Germanic,original
+The Wheels of Chance: A Bicycling Idyll,Wells,en,Germanic,original
+Queen Victoria,Strachey,en,Germanic,original
+Lavender and Old Lace,Reed,en,Germanic,original
+Kai Lung's Golden Hours,Bramah,en,Germanic,original
+The Mysterious Island,Verne,en,Germanic,original
+The soul of a bishop,Wells,en,Germanic,original
+Bygone Beliefs: Being a Series of Excursions in the Byways of Thought,Redgrove,en,Germanic,original
+"Alexandria and Her Schools Four Lectures Delivered at the Philosophical Institution, Edinburgh",Kingsley,en,Germanic,original
+"The Rhythm of Life, and Other Essays",Meynell,en,Germanic,original
+Melmoth Reconciled,Balzac,en,Romance,original
+Penelope's English Experiences Being Extracts from the Commonplace Book of Penelope Hamilton,Wiggin,en,Germanic,original
+Poems and Songs of Robert Burns,Burns,en,Germanic,original
+Spoon River Anthology,Masters,en,Germanic,original
+Tales from Shakespeare,Lamb,en,Germanic,original
+"The Poems of Goethe, Translated in the Original Metres",Goethe,en,Germanic,original
+Three Ghost Stories,Dickens,en,Germanic,original
+Salammbo,Flaubert,en,Germanic,original
+The Way of the World,Congreve,en,Germanic,original
+Sesame and Lilies,Ruskin,en,Germanic,original
+"Ceres' Runaway, and Other Essays",Meynell,en,Germanic,original
+The Provost,Galt,en,Germanic,original
+The Iron Puddler: My Life in the Rolling Mills and What Came of It,Davis,en,Germanic,original
+The Virginian: A Horseman of the Plains,Wister,en,Germanic,original
+The Heritage of the Sioux,Bower,en,Germanic,original

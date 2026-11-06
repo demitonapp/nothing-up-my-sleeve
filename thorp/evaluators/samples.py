@@ -1,4 +1,11 @@
-"""Fixed prompts -> greedy and temperature-0.8 continuations, plus the top-10 after the Paris prompt."""
+"""Fixed prompts -> greedy and temperature-0.8 continuations, plus the top-10 after the first prompt.
+
+The first prompt asks for a law of physics rather than the capital of France (2026-11-06): a law
+does not move with the date, and no book on the hundred-by-reach shelf states it, so the bar for
+"reaction" is a tracer for the day a textbook shelf arrives. The other three are first lines of
+books on the shelf, so a perfect continuation there is memory, not prediction; they stay as a
+memory check. The top-10 artifact carries its prompt, so the page never assumes which it was.
+"""
 
 from __future__ import annotations
 
@@ -10,12 +17,12 @@ import mlx.core as mx
 from thorp.evaluators import EvalContext, EvalResult
 
 PROMPTS = [
-    "The capital of France is",
+    "For every action there is an equal and opposite",
     "It is a truth universally acknowledged",
     "The Master said",
     "In the beginning",
 ]
-PARIS = PROMPTS[0]
+PROBE = PROMPTS[0]
 NEW_TOKENS = 60
 TEMPERATURE = 0.8
 
@@ -50,7 +57,7 @@ def evaluate(ctx: EvalContext) -> EvalResult:
             samples.append({"prompt": p, "temperature": t, "text": text})
     s = json.dumps(samples, ensure_ascii=False)
     t10 = json.dumps(
-        {"prompt": PARIS, "top": top10(ctx.model, ctx.tokeniser, PARIS)}, ensure_ascii=False
+        {"prompt": PROBE, "top": top10(ctx.model, ctx.tokeniser, PROBE)}, ensure_ascii=False
     )
     sha = lambda x: hashlib.sha1(x.encode()).hexdigest()  # noqa: E731
     return EvalResult(

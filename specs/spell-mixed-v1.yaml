@@ -1,0 +1,48 @@
+# specs/spell-mixed-v1.yaml: the 9m speller curriculum (2026-11-06), written by scripts/make_curriculum_specs.py.
+name: spell-mixed-v1
+ship: Mixed Lessons
+experiment: '9m curriculum: does teaching spelling first help the 9m model spell?'
+question: Do spelling books shuffled into the pool help the 9m model spell, against the pool alone (Endeavour)?
+data:
+  recipe: lists/pool-400-spellers.csv
+  passes: 2
+  order: shuffled
+  refuse:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+tokeniser:
+  kind: spm-bpe
+  vocab: 16384
+  byte_fallback: true
+  train_on: recipe
+model:
+  family: gpt
+  preset: 9m
+  context: 1024
+optim:
+  name: adamw
+  lr: 0.001
+  betas:
+  - 0.9
+  - 0.95
+  weight_decay: 0.1
+  warmup_steps: 200
+  schedule: cosine
+  min_lr_ratio: 0.1
+  batch_tokens: 32768
+  grad_clip: 1.0
+  precision: bf16
+eval:
+  sets:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+  every_steps: 250
+  evaluators:
+  - ce_bpb
+  - bpb_split
+  - laws
+  - samples
+  - probes
+checkpoint:
+  every_steps: 500
+seed: 1

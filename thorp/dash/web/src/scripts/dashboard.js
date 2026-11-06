@@ -22,7 +22,8 @@ const rungFor = key => ladderData && ladderData.rungs.find(r => slugOf(r) === ke
 //   #/classes                    the classes of ship, one card per model size (home)
 //   #/classes/<class>[/<tab>]    one class: fleet (default), overview, training, scoring, waypoints
 //   #/ships                      every ship ever launched
-//   #/ships/<name>[/<tab>]       one ship (a run): betting (default), books, languages, sieves, attention, traits
+//   #/ships/<key>[/<sailing>[/<tab>]]  one ship (a class fitted out one way) and one of its sailings (runs):
+//                                betting (default), books, languages, sieves, attention, traits
 //   #/voyages, #/voyages/<key>   the voyages, and one voyage
 //   #/discoveries                the stars and traits followed across every ship
 // Older addresses (#sizes, #proxy, #rung-1m, #/models/…, #betting…, ?run=) land on the new ones.
@@ -31,13 +32,17 @@ const STABS = ['betting', 'books', 'languages', 'sieves', 'attention', 'traits']
 const STAB_EL = { betting: 'betting', books: 'books', languages: 'languages', sieves: 'sieves', attention: 'attention', traits: 'traits-section' };
 const OLD_SHIP = { betting: 'betting', books: 'books', languages: 'languages', sieves: 'sieves', attention: 'attention', 'traits-section': 'traits' };
 const SECTION_NAV = { sizes: 'classes', rung: 'classes', ship: 'classes', 'runs-section': 'classes', voyages: 'voyages', voyage: 'voyages', discoveries: 'discoveries' };
-let page = 'sizes', modelTab = 'fleet', shipKey = null, shipTab = 'betting', voyageKey = null, runsList = null;
+let page = 'sizes', modelTab = 'fleet', shipKey = null, sailingKey = null, shipTab = 'betting', voyageKey = null, runsList = null, shipsData = null;
 function route(h) {
   if (h.startsWith('/')) {
     const [a, b, c] = h.slice(1).split('/');
     if (a === 'classes' && b) return { page: 'rung', rung: b, mtab: MTABS.includes(c) ? c : 'fleet' };
     if (a === 'models' && b) return { page: 'rung', rung: b, mtab: MTABS.includes(c) ? c : 'overview' };
-    if (a === 'ships' && b) return { page: 'ship', ship: decodeURIComponent(b), stab: STABS.includes(c) ? c : 'betting' };
+    if (a === 'ships' && b) {
+      const d = h.slice(1).split('/')[3];
+      if (STABS.includes(c)) return { page: 'ship', ship: decodeURIComponent(b), sailing: null, stab: c };
+      return { page: 'ship', ship: decodeURIComponent(b), sailing: c ? decodeURIComponent(c) : null, stab: STABS.includes(d) ? d : 'betting' };
+    }
     if (a === 'ships') return { page: 'runs-section' };
     if (a === 'voyages' && b) return { page: 'voyage', voyage: b };
     if (a === 'voyages') return { page: 'voyages' };
@@ -51,18 +56,29 @@ function route(h) {
   return { page: 'rung', rung: h, mtab: 'fleet' };  // an old class link: #proxy
 }
 const modelHash = (r, mt = 'fleet') => `/classes/${slugOf(r)}${mt === 'fleet' ? '' : '/' + mt}`;
-const shipHash = (name, st = 'betting') => `/ships/${encodeURIComponent(name)}${st === 'betting' ? '' : '/' + st}`;
-// the run a ship address names: by name, by run id, or (for an old address) the run picked before
+const shipHash = (key, sailing = null, st = 'betting') => `/ships/${key}${sailing ? '/' + encodeURIComponent(sailing) : ''}${st === 'betting' ? '' : '/' + st}`;
+const ladderRun = id => ladderData && ladderData.runs.find(x => x.run_id === id || x.name === id);
+// The ship and sailing an address names. The first part is a ship key, or (an older address) a run
+// name or id, which names its ship and that sailing. A ship without a sailing named opens its latest.
 function shipRun(runs) {
-  if (shipKey) return runs.find(r => r.name === shipKey || r.run_id === shipKey) || runs.find(r => r.run_id.startsWith(shipKey));
-  return runs.find(r => r.run_id === selected) || runs.find(r => r.status === 'running' && r.name && !r.name.startsWith('smoke')) || runs[0];
+  const ship = shipsData && shipsData.find(x => x.key === shipKey);
+  let run = null;
+  if (ship) {
+    const sail = ship.sailings.find(x => x.name === sailingKey || x.run_id === sailingKey) || ship.sailings[ship.sailings.length - 1];
+    run = runs.find(r => r.run_id === sail.run_id);
+    return { ship, run };
+  }
+  if (shipKey) run = runs.find(r => r.name === shipKey || r.run_id === shipKey) || runs.find(r => r.run_id.startsWith(shipKey));
+  else run = runs.find(r => r.run_id === selected) || runs.find(r => r.status === 'running' && r.name && !r.name.startsWith('smoke')) || runs[0];
+  const lr = run && ladderRun(run.run_id);
+  return { ship: lr && lr.ship_key && shipsData ? shipsData.find(x => x.key === lr.ship_key) : null, run };
 }
-// go to a ship from anywhere (a fleet row, a grid square, a voyage's run)
-function goShip(key) {
-  const all = runsList || (ladderData && ladderData.runs) || [];
-  const r = all.find(x => x.run_id === key || x.name === key);
-  location.hash = '#' + shipHash(r ? (r.name || r.run_id) : key);
+// go to a run's ship and that sailing (a grid square, a training row, a discovery), or to a ship
+function goShip(id) {
+  const lr = ladderRun(id);
+  location.hash = '#' + (lr && lr.ship_key ? shipHash(lr.ship_key, lr.name) : shipHash(lr ? lr.name : id));
 }
+const goShipKey = key => { location.hash = '#' + shipHash(key); };
 function showTab(h, push = true) {
   const rt = route(h);
   let hash = null, wasShip = selected;
@@ -80,12 +96,16 @@ function showTab(h, push = true) {
     }
   }
   if (page === 'ship') {
-    shipKey = rt.ship; shipTab = rt.stab;
-    if (runsList) {
-      const run = shipRun(runsList);
-      if (run) { selected = run.run_id; shipKey = run.name || run.run_id; hash = shipHash(shipKey, shipTab); }
-      document.querySelectorAll('#shipnav a').forEach(a => { a.href = '#' + shipHash(shipKey, a.dataset.stab); });
-      shipHeader(run);
+    shipKey = rt.ship; sailingKey = rt.sailing; shipTab = rt.stab;
+    if (runsList && ladderData) {
+      const { ship, run } = shipRun(runsList);
+      if (run) {
+        selected = run.run_id;
+        if (ship) { shipKey = ship.key; sailingKey = run.name || run.run_id; } else { shipKey = run.name || run.run_id; sailingKey = null; }
+        hash = shipHash(shipKey, sailingKey, shipTab);
+      }
+      document.querySelectorAll('#shipnav a').forEach(a => { a.href = '#' + shipHash(shipKey, sailingKey, a.dataset.stab); });
+      shipHeader(ship, run);
     }
   }
   if (page === 'voyage') { voyageKey = rt.voyage; hash = '/voyages/' + voyageKey; }
@@ -107,12 +127,20 @@ function showTab(h, push = true) {
   // charts drawn while hidden have no width; size the ones now showing
   document.querySelectorAll(`#${page} .chart`).forEach(el => { if (el.data && el.offsetParent) Plotly.Plots.resize(el); });
 }
-function shipHeader(run) {
-  const cls = run && ladderData && ladderData.rungs.find(x => x.preset === run.preset);
+function shipHeader(ship, run) {
+  const preset = ship ? ship.cls : run && run.preset;
+  const cls = preset && ladderData && ladderData.rungs.find(x => x.preset === preset);
   const link = document.getElementById('shipclass');
-  link.textContent = cls ? `${cls.preset} · ${cls.name}` : (run && run.preset) || '';
+  link.textContent = cls ? `${cls.preset} · ${cls.name}` : preset || '';
   if (cls) link.href = '#' + modelHash(cls); else link.removeAttribute('href');
-  document.getElementById('shipname').textContent = run ? (run.ship || run.name || run.run_id.slice(0, 12)) : `no ship called ${shipKey}`;
+  document.getElementById('shipname').textContent = ship ? ship.name : run ? (run.ship || run.name || run.run_id.slice(0, 12)) : `no ship called ${shipKey}`;
+  document.getElementById('shipfitout').textContent = ship ? ship.subtitle : '';
+  document.getElementById('shiptags').innerHTML = ship ? (ship.archived ? '<span class="pill" title="fitted out before 7 November, 06:40">First Fleet · archived</span>' : '<span class="pill blue">in service</span>')
+    + (ship.voyage ? ` <a class="pill accent" href="#/voyages/${esc(ship.voyage)}">${esc(VOYAGE_NAME[ship.voyage] || ship.voyage)}</a>` : '') : '';
+  // its sailings: one per seed; the one shown is lit
+  const sails = ship ? ship.sailings : run ? [{ run_id: run.run_id, name: run.name, seed: run.seed, status: run.status }] : [];
+  document.getElementById('sailings').innerHTML = sails.map(x => `<a class="sailing${run && x.run_id === run.run_id ? ' on' : ''}" href="#${ship ? shipHash(ship.key, x.name, shipTab) : shipHash(x.name, null, shipTab)}"
+    title="${esc(x.label || x.name)}">seed <b>${x.seed ?? '–'}</b> ${esc(x.name)} · ${esc((x.status || '').split(':')[0])}${x.ft_en != null ? ` · ${fmt(x.ft_en)}` : ''}</a>`).join('');
 }
 window.addEventListener('hashchange', () => showTab(location.hash.slice(1), false));
 // once the whole script has run (showTab reaches state declared further down); an old ?run= address opens that ship
@@ -763,7 +791,7 @@ const LAW_COLS = [
 var ladderData = null;  // var: showTab reads it before this line runs
 const rungRuns = p => ladderData.runs.filter(r => r.preset === p && !(r.name || '').startsWith('smoke'));
 async function loadLadder() {
-  try { ladderData = await get('/api/ladder'); } catch (e) { return; }
+  try { [ladderData, shipsData] = await Promise.all([get('/api/ladder'), get('/api/ships').catch(() => [])]); } catch (e) { return; }
   const d = ladderData;
   document.getElementById('rungcards').innerHTML = d.rungs.map(r => {
     const runs = rungRuns(r.preset), live = runs.filter(x => x.status === 'running').length, done = runs.filter(x => x.status === 'finished').length;
@@ -870,13 +898,22 @@ function renderRung() {
     <td>${fmt(x.wall_minutes, 1)}</td><td>${esc(String(x.started || '–').slice(0, 16).replace('T', ' '))}</td></tr>`).join('') + more(11) : none(11);
   renderShelf(r, runs);
 
-  // ---- Fleet: every ship of this class
-  const voyageLink = x => x.voyage ? `<a href="#/voyages/${esc(x.voyage)}">${esc(VOYAGE_NAME[x.voyage] || x.voyage)}</a>` : '–';
-  document.querySelector('#fleettable tbody').innerHTML = allRuns.length ? [...allRuns].reverse().map(x => `<tr data-run="${esc(x.run_id)}">
-    <td>${esc(x.ship || '')}</td><td>${esc(x.name)}</td><td>${esc(x.fleet || '–')}</td><td>${voyageLink(x)}</td>
-    <td><span class="pill ${(x.status || '').split(':')[0]}">${esc((x.status || '').split(':')[0])}</span></td><td>${shelfName(x)}</td>
-    <td>${x.passes ?? '–'}</td><td>${x.seed ?? '–'}</td><td>${big(x.tokens_seen)}</td><td>${fmt(x.wall_minutes, 1)}</td><td>${fmt(x.ft_en)}</td>
-    <td>${esc(String(x.started || '–').slice(0, 16).replace('T', ' '))}</td></tr>`).join('') : none(12);
+  // ---- Fleet: every ship of this class, the live ones first and the First Fleet folded below
+  const fleet = (shipsData || []).filter(x => x.cls === r.preset).sort((a, b) => String(b.latest).localeCompare(String(a.latest)));
+  const shipRow = x => {
+    const last = x.sailings[x.sailings.length - 1], st = (last.status || '').split(':')[0];
+    return `<tr data-ship="${esc(x.key)}"><td><b>${esc(x.name)}</b></td><td class="s">${esc(x.subtitle)}</td>
+      <td data-sort="${x.sailings.length}">${x.sailings.length} <span class="s">(seed${x.sailings.length === 1 ? '' : 's'} ${x.sailings.map(y => y.seed ?? '–').join(', ')})</span></td>
+      <td>${x.voyage ? `<a href="#/voyages/${esc(x.voyage)}">${esc(VOYAGE_NAME[x.voyage] || x.voyage)}</a>` : '–'}</td>
+      <td><span class="pill ${st}">${esc(st)}</span></td><td>${fmt(x.ft_en_mean)}</td><td>${fmt(x.ft_en_best)}</td>
+      <td>${esc(String(x.latest || '–').slice(0, 16).replace('T', ' '))}</td></tr>`;
+  };
+  const live = fleet.filter(x => !x.archived), old = fleet.filter(x => x.archived);
+  document.querySelector('#fleettable tbody').innerHTML = live.length ? live.map(shipRow).join('')
+    : `<tr><td colspan="8" class="empty">no ship of this class in service yet${old.length ? '; the First Fleet is below' : ''}</td></tr>`;
+  document.getElementById('fleetarchivewrap').hidden = !old.length;
+  document.getElementById('fleetarchivesum').textContent = `archived: ${old.length} ship${old.length === 1 ? '' : 's'}, ${old.reduce((n, x) => n + x.sailings.length, 0)} sailings, fitted out before 7 November`;
+  document.querySelector('#fleetarchive tbody').innerHTML = old.map(shipRow).join('');
 
   // ---- Scoring: science, then art
   document.querySelector('#sciencemetrics tbody').innerHTML = metricRows(r.metrics.filter(m => !ART.has(m[0])));
@@ -1017,9 +1054,9 @@ document.querySelectorAll('[data-essay]').forEach(b => b.onclick = () => openEss
 document.getElementById('readpassage').onclick = e => { if (e.currentTarget.dataset.book) openBook(e.currentTarget.dataset.book); };
 
 // a row in a class's fleet or training table, or a voyage's ships, opens that ship
-['fleettable', 'trainruns', 'voyageruns'].forEach(id => document.getElementById(id).addEventListener('click', e => {
-  const tr = e.target.closest('tr[data-run]'); if (!tr || e.target.closest('.info') || e.target.closest('a')) return;
-  goShip(tr.dataset.run);
+['fleettable', 'fleetarchive', 'trainruns', 'voyageruns'].forEach(id => document.getElementById(id).addEventListener('click', e => {
+  const tr = e.target.closest('tr[data-run], tr[data-ship]'); if (!tr || e.target.closest('.info') || e.target.closest('a')) return;
+  if (tr.dataset.ship) goShipKey(tr.dataset.ship); else goShip(tr.dataset.run);
 }));
 
 // ---- Voyages (server.py api_voyages, from thorp/voyages.py): the list, and one voyage from one
@@ -1056,7 +1093,7 @@ async function loadVoyages() {
       <div class="goal">${esc(v.goal)}</div>
       <div class="ov">${esc(headline)}</div>
       <div class="foot"><span>${esc(v.fleet || '')} · ${esc(v.preset || '')}</span><span>${valid} of ${v.stop.max_runs} runs</span></div>
-      <div class="foot"><span>ships: ${esc((v.ships || []).join(', ') || '–')}</span></div></a>`;
+      <div class="foot"><span>${(v.ships || []).length} ship${(v.ships || []).length === 1 ? '' : 's'}${v.stars && v.stars.length ? ` · bound for ${esc(v.stars.map(k => STAR_LABEL[k] || k).join(', '))}` : ''}</span></div></a>`;
   }).join('') || '<div class="empty">no voyages yet</div>';
   if (page === 'voyage') renderVoyage();
 }
@@ -1069,7 +1106,8 @@ function renderVoyage() {
   document.getElementById('voyagegoal').textContent = v.goal;
   const valid = v.runs.filter(r => !r.set_aside);
   document.getElementById('voyageover').innerHTML = [
-    ['fleet', esc(v.fleet || '–')], ['class', classLink(v.preset)], ['ships', esc((v.ships || []).join(', ') || '–')],
+    ['fleet', esc(v.fleet || '–')], ['class', classLink(v.preset)],
+    ['bound for', esc((v.stars || []).map(k => STAR_LABEL[k] || k).join(', ') || '–')], ['ships', String((v.ships || []).length)],
     ['runs', `${valid.length} of ${v.stop.max_runs}${v.runs.length > valid.length ? ` (${v.runs.length - valid.length} set aside)` : ''}`],
     ['stop rule', esc(v.stop.about || '')], ['status', esc(v.status)],
   ].map(([k, val]) => `<div><div class="k">${k}</div><div>${val}</div></div>`).join('');
@@ -1087,19 +1125,17 @@ function renderVoyage() {
       marker: { size: 9, color: C.accent }, hovertemplate: '%{y}: %{x:.3f}<extra></extra>' }],
       layout({ xaxis: { title: 'Forgotten Tomes bits per byte (lower is better)', gridcolor: C.line }, yaxis: { automargin: true }, margin: { l: 140 } }));
   }
-  // the ships, with each star's first light
-  const starKeys = [...new Set(v.runs.flatMap(r => r.stars.map(x => x.star)))];
-  document.querySelector('#voyageruns thead').innerHTML = `<tr><th>ship</th><th>name</th><th>status</th><th>vocab</th><th>lr</th><th>shelf</th><th>passes</th><th>seed</th>
-    <th>Forgotten Tomes${info('ft')}</th>${starKeys.map(k => `<th>${esc(STAR_LABEL[k] || k)} lit</th>`).join('')}</tr>`;
-  const st = v.runs.map(r => r.settings || {});
-  document.querySelector('#voyageruns tbody').innerHTML = v.runs.length ? v.runs.map((r, i) => `<tr data-run="${esc(r.run_id)}"${r.set_aside ? ' class="aside"' : ''}>
-    <td>${esc(r.ship || '')}${r.set_aside ? ` <span class="pill" title="${esc(r.set_aside)}">set aside</span>` : ''}</td><td>${esc(r.name)}</td>
-    <td>${esc((r.status || '').split(':')[0])}</td><td>${st[i].vocab ?? '–'}</td><td>${st[i].lr ?? '–'}</td>
-    <td>${esc((st[i].recipe || '–').replace('lists/', '').replace('.csv', ''))}</td><td>${st[i].passes ?? '–'}</td><td>${st[i].seed ?? '–'}</td><td>${fmt(r.ft_en)}</td>
-    ${starKeys.map(k => { const x = r.stars.find(y => y.star === k) || {};
-      return x.steps_to_lit != null ? `<td data-sort="${x.steps_to_lit}">step ${x.steps_to_lit}</td>`
-        : x.best != null ? `<td data-sort="" class="s" title="not lit yet; its best so far">best ${fmt(x.best)}</td>` : '<td>–</td>'; }).join('')}</tr>`).join('')
-    : `<tr><td colspan="${9 + starKeys.length}" class="empty">no ships have sailed on this voyage yet</td></tr>`;
+  // the ships it fitted out, each with its sailings and, per star, how many lit it and how soon
+  const starKeys = v.stars && v.stars.length ? v.stars : [...new Set(v.runs.flatMap(r => r.stars.map(x => x.star)))];
+  const vships = v.ships && v.ships.length && typeof v.ships[0] === 'object' ? v.ships : [];
+  document.querySelector('#voyageruns thead').innerHTML = `<tr><th>ship</th><th>fitout</th><th>sailings</th><th>Forgotten Tomes (mean)${info('ft')}</th>
+    ${starKeys.map(k => `<th>${esc(STAR_LABEL[k] || k)}</th>`).join('')}</tr>`;
+  document.querySelector('#voyageruns tbody').innerHTML = vships.length ? vships.map(x => `<tr data-ship="${esc(x.key)}">
+    <td><b>${esc(x.name)}</b></td><td class="s">${esc(x.subtitle)}</td><td data-sort="${x.sailings.length}">${x.sailings.length}</td><td>${fmt(x.ft_en_mean)}</td>
+    ${starKeys.map(k => { const st = (x.stars || {})[k] || {};
+      return st.lit ? `<td data-sort="${st.soonest}">lit by ${st.lit} of ${x.sailings.length} · soonest step ${st.soonest}</td>`
+        : st.best != null ? `<td data-sort="" class="s" title="not lit yet; the best so far">best ${fmt(st.best)}</td>` : '<td>–</td>'; }).join('')}</tr>`).join('')
+    : `<tr><td colspan="${4 + starKeys.length}" class="empty">no ships have sailed on this voyage yet</td></tr>`;
   // the Forgotten Tomes score run by run, one colour per value of the setting that varies most
   const scored = v.runs.map((r, i) => ({ r, i: i + 1 })).filter(p => p.r.ft_en != null && !p.r.set_aside);
   if (!scored.length) empty('voyageft', 'no run on this voyage has a Forgotten Tomes score yet');
@@ -1141,6 +1177,8 @@ document.getElementById('voyagestar').onchange = () => { voyageSeriesKey = ''; c
 
 // ---- Discoveries (server.py api_discoveries): the stars and the traits, across every ship
 let discKey = '';
+// a discovery names the ship, and links to the sailing that made it
+const shipLink = x => `<a href="#${x.ship_key ? shipHash(x.ship_key, x.name) : shipHash(x.name)}">${esc(x.ship_name || x.ship || x.name)}</a>`;
 const TRAIT_NAME = t => t.startsWith('family/') ? `${t.slice(7)} (language family)` : ({ fiction: 'Fiction', verse: 'Verse', first_person: 'First person' }[t] || t);
 async function loadDiscoveries() {
   let d;
@@ -1157,17 +1195,17 @@ async function loadDiscoveries() {
       <div class="top"><span class="preset">${esc(s.name)}</span><span class="pill${lit.length ? ' good' : ''}">${lit.length ? 'lit' : 'not lit yet'}</span></div>
       <div class="job">level ${s.level}${s.rests_on.length ? ` · rests on ${esc(s.rests_on.map(k => byName[k] || k).join(', '))}` : ''} · lit at ${s.threshold}</div>
       <div class="ov">${esc(s.about)}</div>
-      <div class="foot"><span>${first ? `first lit by <a href="#${shipHash(first.name)}">${esc(first.ship || first.name)}</a> at step ${first.steps_to_lit}` : best && best.best != null ? `nearest: <a href="#${shipHash(best.name)}">${esc(best.ship || best.name)}</a> at ${fmt(best.best)}` : 'no readings yet'}</span></div>
-      <div class="foot"><span>lit by ${lit.length} of ${s.ships.length} ships measured</span></div></div>`;
+      <div class="foot"><span>${first ? `first lit by ${shipLink(first)} at step ${first.steps_to_lit}` : best && best.best != null ? `nearest: ${shipLink(best)} at ${fmt(best.best)}` : 'no readings yet'}</span></div>
+      <div class="foot"><span>lit on ${lit.length} of ${s.ships.length} sailings measured</span></div></div>`;
   }).join('');
   document.querySelector('#traittable thead').innerHTML = `<tr><th>trait</th><th>ships measured</th><th>found by</th><th>first found</th><th>learned by</th><th>first learned</th><th>best held-out AUC</th></tr>`;
   const firstOf = (ships, k) => ships.filter(x => x[k] != null).sort((a, b) => a[k] - b[k])[0];
   document.querySelector('#traittable tbody').innerHTML = d.traits.map(t => {
     const f = firstOf(t.ships, 'found_at'), l = firstOf(t.ships, 'learned_at'), best = [...t.ships].sort((a, b) => (b.best ?? -1) - (a.best ?? -1))[0];
-    const who = (x, k) => x ? `<a href="#${shipHash(x.name)}">${esc(x.ship || x.name)}</a> (${esc(x.preset || '')}) at step ${x[k]}` : 'not yet';
+    const who = (x, k) => x ? `${shipLink(x)} (${esc(x.preset || '')}) at step ${x[k]}` : 'not yet';
     return `<tr${(l || f) ? ` data-run="${esc((l || f).run_id)}" tabindex="0"` : ''}><td><b>${esc(TRAIT_NAME(t.key))}</b></td><td>${t.ships.length}</td>
       <td>${t.ships.filter(x => x.found_at != null).length}</td><td>${who(f, 'found_at')}</td>
-      <td>${t.ships.filter(x => x.learned_at != null).length}</td><td>${who(l, 'learned_at')}</td><td>${best && best.best != null ? `${fmt(best.best)} (${esc(best.ship || best.name)})` : '–'}</td></tr>`;
+      <td>${t.ships.filter(x => x.learned_at != null).length}</td><td>${who(l, 'learned_at')}</td><td>${best && best.best != null ? `${fmt(best.best)} (${esc(best.ship_name || best.ship || best.name)})` : '–'}</td></tr>`;
   }).join('') || '<tr><td colspan="7" class="empty">no ship has trait probes yet</td></tr>';
 }
 document.getElementById('traittable').addEventListener('click', e => { const tr = e.target.closest('tr[data-run]'); if (tr && !e.target.closest('a')) goShip(tr.dataset.run); });
@@ -1238,7 +1276,7 @@ async function rungExtras(r, runs, allRuns) {
   el.addEventListener('toggle', () => { try { localStorage.setItem('thorp.strip', el.open ? 'open' : 'closed'); } catch (e) {} });
 })();
 async function refresh() {
-  loadLadder();
+  await loadLadder();  // a ship's address resolves through the ladder and the ships
   if (page === 'voyages' || page === 'voyage') loadVoyages();
   if (page === 'discoveries') loadDiscoveries();
   try {
@@ -1249,9 +1287,10 @@ async function refresh() {
     runsTable(runs);
     if (page !== 'ship') { document.getElementById('updated').textContent = 'updated ' + new Date().toLocaleTimeString(); return; }
     if (first) return showTab(location.hash.slice(1), false);  // now the ship can be named
-    const run = shipRun(runs);
-    if (!run) { shipHeader(null); return; }
-    selected = run.run_id;
+    const { ship, run } = shipRun(runs);
+    if (!run) { shipHeader(null, null); return; }
+    if (run.run_id !== selected) return showTab(location.hash.slice(1), false);
+    shipHeader(ship, run);
     const cur = runs.find(x => x.run_id === selected);
     if (cur) document.getElementById('stripsum').textContent = `${cur.ship || cur.name} · ${(cur.status || '').split(':')[0]}`;
     const [r, m, evals, cmp, content] = await Promise.all([get('/api/run?run=' + selected), get('/api/metrics?run=' + selected), get('/api/evals?run=' + selected), get('/api/compare'), get('/api/experiment?prefix=content-')]);

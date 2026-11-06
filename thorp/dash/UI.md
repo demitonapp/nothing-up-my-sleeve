@@ -56,9 +56,13 @@ holds the three ways in, always:
   and **traits** (fiction, verse, first person, the language families), with how many ships
   found and learned each, and the first to do so.
 
-A ship (`#/ships/<name>[/<tab>]`, a run) has its own tabs: Betting, Books, Languages, Sieves,
-Attention, Traits, and a breadcrumb back to its class. `#/ships` lists every ship. Ships are
-reached from a class's fleet, a voyage or a discovery; there is no run picker.
+A ship is a class fitted out one way (`thorp/fleet.py` `Ship`: its training material and settings,
+the fitout), and each of its runs is a sailing, one per seed. A ship's page
+(`#/ships/<ship key>[/<sailing>[/<tab>]]`) shows its name, fitout line, whether it is in service or
+archived with the First Fleet, and its sailings as chips; the tabs (Betting, Books, Languages,
+Sieves, Attention, Traits) show the sailing picked, the latest by default. `#/ships` lists every
+run. Ships are reached from a class's fleet, a voyage or a discovery; there is no run picker.
+Stars are destinations, never ships.
 
 Every address is canonical: older ones (`#sizes`, `#proxy`, `#rung-1m`, `#/models/…`, `#betting`,
 `?run=`) are rewritten to the new form, never kept beside it.
@@ -71,8 +75,9 @@ template (`web/src/components/ModelPage.astro`, filled by `renderRung` in `dashb
 
 Its tabs sit under its title, each with its own address:
 
-0. **Fleet** (`#/classes/proxy`): every ship of the class, newest first, with its fleet, voyage,
-   shelf, how far it got and its Forgotten Tomes score; a row opens the ship.
+0. **Fleet** (`#/classes/proxy`): every ship of the class in service, newest first, one row per
+   ship (its fitout, its sailings and their seeds, its voyage, mean and best Forgotten Tomes
+   score); the archived First Fleet folds away below. A row opens the ship.
 1. **Overview** (`/overview`): the class's performance in as few charts as possible. The
    RunGrid (every run at this size), then the Forgotten Tomes score run by run with the best so
    far and the Qwen lines.
@@ -164,3 +169,21 @@ Each of these exists once. Use it instead of styling a new one.
 - Plain English in sentence case. Headings say what a panel shows; the `.note` says how to read it.
 - Say which way is better for every metric (`lower is better`), in the popover or the heading.
 - Units on every number that has one (`bpb`, `KB`, `min`). Missing values are `–`.
+
+### The voyage vocabulary
+
+The page speaks the project's metaphor, consistently. Each word means one thing:
+
+| word | means |
+|---|---|
+| class | a model size with one job (1m the proxy, 9m the speller…) |
+| ship | a class fitted out one way: its training material and settings (the fitout) |
+| sailing | one run of a ship, one per seed |
+| fleet | the ships of a class; the First Fleet is everything fitted out before 7 November, archived |
+| voyage | a campaign several ships sail on to find something, with a goal, levers and a stop rule |
+| star | a destination: an attention head that does one recognisable job, lit at its threshold |
+| trait | a direction in the hidden state that tells a kind of book apart on books never read |
+| the wind | the error on each guess: how far the bet was from the word that came, felt by every weight that took part |
+| a tack | the ship's response to the wind: one training update (the "bump" of a perceptron), its direction from the wind and its size from the learning rate |
+| trim | how the tack is set: which guesses count and by how much, how big the step is, where it lands |
+| the sieves | how hard the wind pushes each layer (push, `grad_norm/`) and how far the sail actually moves (move, `update_ratio/`) |

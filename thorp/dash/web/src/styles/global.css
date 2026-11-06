@@ -231,3 +231,19 @@ tr.sel td { color: var(--accent); }
 .minihand i { width: 9px; height: 13px; border-radius: 2px; border: 1px solid var(--line);
   background: linear-gradient(to top, var(--card-face) 0 var(--turn), var(--card-back) var(--turn)); }
 .minihand i.up { background: var(--card-face); border-color: var(--accent); }
+
+/* a ship's sailings (its runs, one per seed), as chips under its name */
+.sailings { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: var(--fs-sm); }
+.sailings > .k { color: var(--muted); text-transform: uppercase; letter-spacing: .06em; font-size: var(--fs-xs); margin-right: 4px; }
+.sailings #sailings { display: flex; gap: 6px; flex-wrap: wrap; }
+.sailings #title { margin-left: 8px; }
+main a.sailing { display: inline-flex; gap: 6px; align-items: baseline; padding: 3px 10px; border: 1px solid var(--line); border-radius: var(--r-pill);
+  color: var(--muted); text-decoration: none; }
+main a.sailing:hover { color: var(--accent); border-color: var(--accent); text-decoration: none; }
+main a.sailing.on { color: var(--accent); border-color: var(--accent); background: var(--panel); }
+main a.sailing b { color: var(--text); font-weight: 600; }
+/* archived ships fold away under their class's live fleet */
+details.archive { margin-top: 12px; }
+details.archive > summary { cursor: pointer; color: var(--muted); font-size: var(--fs-md); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
+details.archive > summary .note { text-transform: none; letter-spacing: 0; font-weight: 400; margin-left: 8px; }
+details.archive[open] > summary { margin-bottom: 8px; }

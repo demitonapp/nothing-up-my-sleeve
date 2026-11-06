@@ -1,6 +1,7 @@
 ---
-// One ship: a single run, at #/ships/<name>[/<tab>]. Its tabs are the per-run views: how it bets,
-// its books, its languages, its sieves, attention, and the traits found in it.
+// One ship: a class fitted out one way (thorp/fleet.py Ship), at #/ships/<ship key>[/<sailing>[/<tab>]].
+// Its runs are its sailings, one per seed, listed under its name; the tabs show one sailing: how it
+// bets, its books, its languages, its sieves, attention, and the traits found in it.
 import RunOverview from './RunOverview.astro';
 import Betting from './Betting.astro';
 import Books from './Books.astro';
@@ -10,7 +11,8 @@ import Attention from './Attention.astro';
 import Traits from './Traits.astro';
 ---
 <div class="section" id="ship">
-  <h1><a href="#/classes" class="back">← classes</a> <a class="crumb" id="shipclass"></a> <span id="shipname"></span> <span class="q" id="title"></span></h1>
+  <h1><a href="#/classes" class="back">← classes</a> <a class="crumb" id="shipclass"></a> <span id="shipname"></span> <span id="shiptags"></span> <span class="q" id="shipfitout"></span></h1>
+  <div class="sailings"><span class="k">sailings</span><span id="sailings"></span><span class="sub" id="title"></span></div>
   <nav class="subnav" id="shipnav">
     <a data-stab="betting">Betting</a><a data-stab="books">Books</a><a data-stab="languages">Languages</a><a data-stab="sieves">Sieves</a><a data-stab="attention">Attention</a><a data-stab="traits">Traits</a>
   </nav>

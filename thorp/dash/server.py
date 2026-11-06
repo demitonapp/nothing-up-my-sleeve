@@ -387,6 +387,7 @@ def api_ladder() -> dict:
         "select run_id, name, ship, status, tokens_seen, started, wall_minutes, spec_json"
         " from runs order by started"
     )
+    ships, ship_of = _ships(rows)
     last = _last_scores([r["run_id"] for r in rows])
     voyage = _voyage_of()
     for r in rows:
@@ -405,6 +406,8 @@ def api_ladder() -> dict:
             "passes": spec.get("data", {}).get("passes"),
             "ft_en": m.get("eval/hole-cards-unseen/bpb_mean_en"),
             "fleet": _fleet_of(r["ship"]),
+            "ship_key": ship_of.get(r["run_id"]),
+            "ship_name": ships[ship_of[r["run_id"]]]["name"] if r["run_id"] in ship_of else None,
             "voyage": voyage.get(r["name"]),
             "set": first,
             "bpb_en": m.get(f"eval/{first}/bpb_mean_en") if first else None,
@@ -601,6 +604,69 @@ def _voyage_of() -> dict[str, str]:
     return out
 
 
+def _ships(rows: list[dict]) -> tuple[dict[str, dict], dict[str, str]]:
+    """Ships (a class fitted out one way; thorp/fleet.py) from ledger rows that carry spec_json,
+    ship, name and started: {ship key: ship} and {run_id: ship key}. Each run is one of its ship's
+    sailings. Nothing is registered from here (save=False)."""
+    try:
+        from thorp import fleet
+    except ImportError:
+        return {}, {}
+    ships: dict[str, dict] = {}
+    of: dict[str, str] = {}
+    for r in rows:
+        if (r.get("name") or "").startswith("smoke") or not r.get("spec_json"):
+            continue
+        try:
+            sh = fleet.ship_of_run(r, save=False)
+        except Exception:  # noqa: BLE001  a spec the fitout cannot read stays unshipped
+            continue
+        of[r["run_id"]] = sh.key
+        ships.setdefault(sh.key, {**sh.__dict__, "sailings": []})["sailings"].append(r["run_id"])
+    return ships, of
+
+
+def api_ships() -> list[dict]:
+    """Every ship with its sailings (runs, one per seed) and how they did."""
+    rows = _rows(
+        "select run_id, name, ship, status, started, tokens_seen, wall_minutes, spec_json from runs order by started"
+    )
+    ships, _ = _ships(rows)
+    by_id = {r["run_id"]: r for r in rows}
+    last = _last_scores(list(by_id))
+    out = []
+    for sh in ships.values():
+        sails = []
+        for rid in sh["sailings"]:
+            r = by_id[rid]
+            spec = json.loads(r["spec_json"] or "{}")
+            sails.append(
+                {
+                    "run_id": rid,
+                    "name": r["name"],
+                    "label": r["ship"],
+                    "seed": spec.get("seed"),
+                    "status": r["status"],
+                    "started": r["started"],
+                    "tokens_seen": r["tokens_seen"],
+                    "wall_minutes": r["wall_minutes"],
+                    "ft_en": last.get(rid, {}).get("eval/hole-cards-unseen/bpb_mean_en"),
+                }
+            )
+        scored = [x["ft_en"] for x in sails if x["ft_en"] is not None]
+        out.append(
+            {
+                **{k: v for k, v in sh.items() if k != "sailings"},
+                "sailings": sails,
+                "ft_en_mean": sum(scored) / len(scored) if scored else None,
+                "ft_en_best": min(scored) if scored else None,
+                "started": sails[0]["started"],
+                "latest": sails[-1]["started"],
+            }
+        )
+    return out
+
+
 def _fleet_of(ship: str | None) -> str | None:
     try:
         from thorp import fleet
@@ -656,8 +722,14 @@ def api_discoveries() -> dict:
     from thorp import fleet, voyages
     from thorp.evaluators import probes
 
-    runs = _rows("select run_id, name, ship, status, spec_json from runs order by started")
+    runs = _rows("select run_id, name, ship, status, started, spec_json from runs order by started")
     voyage = _voyage_of()
+    shipreg, ship_of = _ships(runs)
+
+    def named(r: dict) -> dict:
+        k = ship_of.get(r["run_id"])
+        return {"ship_key": k, "ship_name": shipreg[k]["name"] if k else None}
+
     stars = []
     for star in fleet.STARS.values():
         ships = []
@@ -676,6 +748,7 @@ def api_discoveries() -> dict:
                         "ship": r["ship"],
                         "preset": spec.get("model", {}).get("preset"),
                         "voyage": voyage.get(r["name"]),
+                        **named(r),
                         **t,
                     }
                 )
@@ -729,6 +802,7 @@ def api_discoveries() -> dict:
                         "name": r["name"],
                         "ship": r["ship"],
                         "preset": spec.get("model", {}).get("preset"),
+                        **named(r),
                         "found_at": found,
                         "learned_at": learned,
                         "floors": bool(floors),
@@ -883,6 +957,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/waypoints": lambda: api_waypoints(q["preset"], q.get("limit", 30)),
                 "/api/essay": lambda: api_essay(q["name"]),
                 "/api/voyages": lambda: api_voyages(),
+                "/api/ships": lambda: api_ships(),
                 "/api/voyage": lambda: api_voyage_series(q["key"]),
                 "/api/discoveries": lambda: api_discoveries(),
                 "/api/shelf": lambda: api_shelf(q["run"]),

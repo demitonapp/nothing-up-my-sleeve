@@ -1399,6 +1399,8 @@ function headState(h) {
 function trickProgress(kt) {
   const t = kt.fleet && discTricks.find(x => x.key === kt.fleet);
   if (!kt.fleet) return { cell: '<td data-sort="9" class="s">not measured yet</td>', state: 'not measured yet', cls: '' };
+  if (t && t.viable === false) return { cell: '<td data-sort="10" class="s">not viable on Gutenberg in English</td>', state: 'not viable', cls: '' };
+  if (t && !t.evaluator) return { cell: `<td data-sort="8" class="s">pre-registered${t.cutoff ? ` (cutoff ${t.cutoff})` : ''} · evaluator not built yet</td>`, state: 'pre-registered', cls: '' };
   if (!t || !t.ships.length) return { cell: '<td data-sort="8" class="s">measured · readings start with the next ship to sail</td>', state: 'measured, no readings yet', cls: '' };
   const done = t.ships.filter(x => x.performed_at != null).sort((a, b) => classRank(a.preset) - classRank(b.preset) || a.performed_at - b.performed_at);
   if (done.length) { const x = done[0]; return { cell: `<td data-sort="${classRank(x.preset)}"><span class="pill good">performed</span> at ${classLink(x.preset)} by ${shipLink(x)}, step ${x.performed_at}</td>`, state: 'performed', cls: 'good' }; }
@@ -1426,7 +1428,7 @@ function drawTricks() {
   document.querySelector('#tricktable tbody').innerHTML = rows.map(t => `<tr data-trick="${esc(t.key)}" tabindex="0"${t.fleet ? ' class="measured"' : ''}>
     <td data-sort="${wpRank(t.waypoint)}">${esc(wpName(t.waypoint))}</td><td><b>${t.gate ? '◆ ' : ''}${esc(t.name)}</b>${t.taught ? ' <span class="s">(taught)</span>' : ''}</td><td>${esc(t.does)}</td><td data-sort="${t.field_params}" title="${esc(t.field_at)}"><span class="sizeband">${esc(t.field_band)}</span></td><td class="s">${esc(t.sure)}</td>
     <td>${t.stars.length ? esc(t.stars.map(k => heads[k] || k).join(', ')) : '<span class="s">none charted yet</span>'}</td>
-    ${trickProgress(t).cell}<td data-sort="${t.target_class ? classRank(t.target_class) : 99}">${t.target_class ? classLink(t.target_class) : t.taught ? '<span class="s">a reference: taught, not read</span>' : '<span class="s">beyond the ladder</span>'}</td></tr>`).join('');
+    ${trickProgress(t).cell}<td data-sort="${t.target_class ? classRank(t.target_class) : 99}">${t.target_class ? classLink(t.target_class) : t.taught ? '<span class="s">a reference: taught, not read</span>' : trickProgress(t).state === 'not viable' ? '<span class="s">not viable</span>' : '<span class="s">beyond the ladder</span>'}</td></tr>`).join('');
 }
 document.getElementById('trickfamily').onchange = () => discData && drawTricks();
 document.getElementById('trickband').onchange = () => discData && drawTricks();
@@ -1509,6 +1511,8 @@ async function classGoals(r) {
   const onClass = t => {
     const ft = t.fleet && (reachData.tricks || []).find(x => x.key === t.fleet);
     if (!t.fleet) return { text: 'not measured yet', done: false };
+    if (ft && ft.viable === false) return { text: 'not viable on Gutenberg in English', done: false };
+    if (ft && !ft.evaluator) return { text: `pre-registered${ft.cutoff ? ` (cutoff ${ft.cutoff})` : ''} · evaluator not built yet`, done: false };
     const mine = ft ? ft.ships.filter(x => x.preset === r.preset) : [];
     if (!mine.length) return { text: 'measured · no sailing of this class has a reading yet', done: false };
     const done = mine.filter(x => x.performed_at != null), best = Math.max(...mine.map(x => x.best));
@@ -1525,8 +1529,8 @@ async function classGoals(r) {
     + `<div class="crow total"><span class="cname">the route</span>${coverageBar({ here: filled, inherited: inh, open: all - filled - inh, total: all })}<span class="cnum">${filled} here · ${inh} inherited · ${all - filled - inh} open of ${all}</span></div>`;
   document.getElementById('goalsover').innerHTML = [
     ['the goal', 'as many tricks as it can learn, building on all the tricks below it, carried up to the next class'],
-    ['the field expects', level ? `<b>${esc(level.name)}</b> (step ${wpRank(level.key) + 1} of ${wps.length}) at this size` : 'nothing from books at this size'],
-    ["the field's edge", ceiling.length ? ceiling.map(t => `<a href="#/discoveries/${esc(t.key)}">${t.gate ? '◆ ' : ''}${esc(t.name)}</a>`).join(', ') + '<br><span class="s">where the field would expect this size to stop; beyond it is pushing the envelope</span>' : '–'],
+    ['expected at this size', level ? `<b>${esc(level.name)}</b> (step ${wpRank(level.key) + 1} of ${wps.length})` : 'nothing from books at this size'],
+    ['the expected edge', ceiling.length ? ceiling.map(t => `<a href="#/discoveries/${esc(t.key)}">${t.gate ? '◆ ' : ''}${esc(t.name)}</a>`).join(', ') + '<br><span class="s">where a ship this size is expected to stop; beyond it is pushing the envelope</span>' : '–'],
     ['filled so far', `${filled} of ${all} tricks performed here${inh ? `, ${inh} more inherited to carry up` : ''} · ${done} of the ${goals.length} the field expects`],
     ['carried up', carried.length ? `${carried.length} expected of smaller classes, kept, not relearned` : 'none: the first class on the ladder; everything it learns is carried up'],
     ['next class', nextCls ? `${classLink(nextCls.preset)} takes over with ${nextGoals.length}: ${nextGoals.slice(0, 4).map(t => esc(t.name)).join(', ')}${nextGoals.length > 4 ? '…' : ''}` : 'the top of the ladder; beyond it, the horizon'],
@@ -1598,6 +1602,8 @@ const sizeBand = n => Math.min(6, Math.max(0, Math.floor(Math.log10(n)) - 5));
 function trickOnClass(t, preset, data) {
   const ft = t.fleet && (data.tricks || []).find(x => x.key === t.fleet);
   if (!t.fleet) return { text: 'not measured yet', measured: false, done: false, sort: 9 };
+  if (ft && ft.viable === false) return { text: 'not viable on Gutenberg in English', measured: false, done: false, sort: 10 };
+  if (ft && !ft.evaluator) return { text: `pre-registered${ft.cutoff ? ` (cutoff ${ft.cutoff})` : ''} · evaluator not built yet`, measured: false, done: false, sort: 8 };
   const mine = ft ? ft.ships.filter(x => x.preset === preset) : [];
   if (!mine.length) return { text: 'measured · no sailing of this class has a reading yet', measured: true, done: false, sort: 8 };
   const done = mine.filter(x => x.performed_at != null), best = Math.max(...mine.map(x => x.best));

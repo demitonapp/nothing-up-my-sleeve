@@ -62,7 +62,13 @@ holds the ways in, always:
   how it could be measured, and its **goal class**: the class of ship expected to reach it, about
   an order of magnitude smaller than the field where the depth it needs allows (None: beyond the
   ladder; `taught` marks a reference the field shows only when trained on the task). The table
-  sorts and filters by waypoint and band. A row opens the trick (`#/discoveries/<trick>`): its
+  sorts and filters by waypoint and band. Quantum physics itself is the far horizon, beyond the
+  budget; the destination the ladder proves is the bettor's three discovery tests, one per strand
+  (the Origin test for reasoning, the energy test for physics, Mendeleev's gaps for mathematics;
+  the geometry test was first choice but is not viable on Gutenberg in English), each a bet
+  between an idea and its rivals on books from before its cutoff, pre-registered in DECISIONS.md.
+  A trick in `fleet.TRICKS` with no evaluator yet shows "pre-registered (cutoff …) · evaluator not
+  built yet"; one with `viable` false shows "not viable on Gutenberg in English". A row opens the trick (`#/discoveries/<trick>`): its
   waypoint and gate, what it rests on, the field, the goal class, how it is measured, the stars
   needed to learn it, how Thorp is tracking class by class, and for measured tricks every
   sailing's score by step. One link away: **the stars** (`#/discoveries/stars`) and **traits**
@@ -109,8 +115,8 @@ Its tabs sit under its title, each with its own address:
    tricks as the class can learn**, building on every trick below it and carrying all of them up
    to the next class, so the seven steps fill as fast as they can (Justin, 7 November). The goal
    classes in `tricks.py` are what the field would expect of each size: a minimum to prove, never
-   a cap. The tab gives the goal, what the field expects (the highest step among the tricks it
-   expects of this size, and the field's edge: those tricks at that step), how much is filled,
+   a cap. The tab gives the goal, what the field is expected of this size (the highest step among its
+   goal tricks, and the expected edge: those tricks at that step), how much is filled,
    what it carries up from smaller classes, and what the next class takes over; then **Filling
    the seven steps**, a bar per step split into tricks performed by this class (green), inherited
    from a smaller class (outlined: carried up, still to show here) and open (grey). Then the seven

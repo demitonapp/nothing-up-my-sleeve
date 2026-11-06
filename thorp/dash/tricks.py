@@ -1,5 +1,9 @@
 """The tricks of the trade, on the route to quantum physics (2026-11-07, Justin).
 
+Quantum physics itself is the far horizon, beyond the budget; the destination the ladder proves is the
+bettor's three discovery tests, one per strand: the Origin test (reasoning), the energy test
+(physics) and the geometry test (mathematics), with Mendeleev's gaps as the summit's stretch.
+
 A trick is what a model can do, judged from outside by what it bets; a star is the mechanism inside
 that does it (DECISIONS.md, "Tricks and stars"). The tricks are grouped into the seven WAYPOINTS a
 model passes on the way to quantum physics: reading, knowing, counting, reasoning, mathematics,
@@ -60,7 +64,7 @@ WAYPOINTS: list[dict] = [
     {
         "key": "discovery",
         "name": "Discovery",
-        "about": "Betting on an idea the books do not yet hold: the Origin test, new constructions, and at the top, quanta.",
+        "about": "Betting on an idea the books do not yet hold: the bettor's three tests (the Origin, energy, Mendeleev's gaps); quanta are the far horizon.",
     },
 ]
 
@@ -663,20 +667,73 @@ KNOWN_TRICKS: list[dict] = [
         measure="Beyond the ladder: kept as a horizon.",
     ),
     # ------------------------------------------------------------------ discovery
+    # The bettor's three discovery tests, one per strand (Justin, 7 November): each an idea found
+    # independently by more than one person within a few years (so it was in the books, waiting),
+    # with named rivals and a cutoff year, put to a ship trained only on books from before the
+    # cutoff as a bet: does it prefer the idea over its rivals? Each has a precursor ablation (the
+    # key precursors removed, the bytes kept) to show the bet comes from combining them.
     _t(
         "origin_test",
-        "The Origin test",
+        "The Origin test (reasoning)",
         "discovery",
-        "Trained only on books written before an idea, bets on it over its rivals: natural selection over fixed species, before Darwin wrote it down.",
+        "Trained only on books from before 1859, bets on natural selection over fixed species, Lamarck's inheritance of acquired traits and special creation. Found independently by Darwin and Wallace (1858).",
         "not shown in the field: Thorp's own test",
         None,
         "rough",
         "none yet",
-        "Thorp, DECISIONS.md (the bettor's Origin and Leonardo tests)",
+        "Thorp, DECISIONS.md (the bettor's Origin test); precursors Malthus 1798, Lyell 1830-33, Paley 1802, Erasmus Darwin, Chambers 1844",
         "bettor",
         gate=True,
         rests_on=["facts", "few_shot"],
-        measure="The bettor's planned test: selection against fixed species, Lamarck and special creation, period text only.",
+        fleet="origin_test",
+        measure="The bettor's planned test: selection against fixed species, Lamarck and special creation, period text only; ablation without Malthus and Lyell.",
+    ),
+    _t(
+        "energy_test",
+        "The energy test (physics)",
+        "discovery",
+        "Trained only on books from before 1840, bets that heat is motion and energy is conserved, turning from one form to another, over heat as a weightless fluid (caloric) and over perpetual motion. Found independently by Mayer (1842), Joule (1843) and Helmholtz (1847).",
+        "not shown in the field: Thorp's own test",
+        None,
+        "rough",
+        "none yet",
+        "Thorp (proposed); precursors Rumford's cannon boring 1798, Davy's ice 1799, Young's lectures 1807",
+        "bettor",
+        gate=True,
+        rests_on=["physical_intuition", "few_shot"],
+        fleet="energy_test",
+        measure="Proposed: period-only shelf to 1840; ablation without Rumford and Davy. Is the pre-1840 English physics on Gutenberg deep enough?",
+    ),
+    _t(
+        "geometry_test",
+        "The geometry test (mathematics)",
+        "discovery",
+        "Trained only on books from before 1829, bets that a consistent geometry exists in which the parallel postulate fails (a triangle's angles summing to less than two right angles), over the two-thousand-year hope of proving the postulate from the others. Found independently by Gauss, Bolyai and Lobachevsky.",
+        "not shown in the field: Thorp's own test",
+        None,
+        "rough",
+        "none yet",
+        "Thorp (proposed); precursors Euclid, and the attempted proofs of Saccheri 1733, Lambert 1766 and Legendre",
+        None,
+        rests_on=["deduction", "few_shot"],
+        fleet="geometry_test",
+        measure="Proposed: period-only shelf to 1829; ablation without the attempted proofs. Not viable: Gutenberg holds only 9 English books from authors dead by 1829, with no Saccheri, Lambert, Legendre or usable Euclid (DECISIONS.md). Mendeleev's gaps is the mathematics test instead.",
+    ),
+    _t(
+        "mendeleev_gaps",
+        "Mendeleev's gaps (mathematics)",
+        "discovery",
+        "Trained only on books from before 1869, given the known elements, bets on the weights and properties of the missing ones (gallium, scandium, germanium) from the periodic pattern.",
+        "not shown in the field: Thorp's own test",
+        None,
+        "rough",
+        "none yet",
+        "Thorp (proposed); Mendeleev 1869, the elements found 1875-86",
+        "bettor",
+        gate=True,
+        rests_on=["counting_items", "algebra"],
+        fleet="mendeleev_gaps",
+        measure="Pre-registered (DECISIONS.md): the bettor's mathematics test in place of geometry; all English by authors dead by 1869 (36 subject books: Davy, Dalton, Faraday), ablation without Dalton and Davy, checked against the elements found 1875-86.",
     ),
     _t(
         "new_constructions",
@@ -696,15 +753,14 @@ KNOWN_TRICKS: list[dict] = [
         "quantum_bet",
         "The quantum bet",
         "discovery",
-        "Trained only on physics published up to 1899, bets on quanta: Planck's way out of the ultraviolet catastrophe, before he took it. The destination.",
-        "not shown in the field: Thorp's destination",
+        "Trained only on physics published up to 1899, bets on quanta: Planck's way out of the ultraviolet catastrophe, before he took it. The far horizon, beyond the budget.",
+        "not shown in the field: a horizon",
         None,
         "rough",
         "none yet",
         "Thorp: the Origin test carried to physics",
         None,
-        gate=True,
-        rests_on=["origin_test", "college_physics"],
-        measure="Pre-1900 physics only (does Gutenberg hold enough?): does the ship prefer quantised energy over the classical answers?",
+        rests_on=["energy_test", "college_physics"],
+        measure="Beyond the budget: kept as the far horizon the route points at.",
     ),
 ]

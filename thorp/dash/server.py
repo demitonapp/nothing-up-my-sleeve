@@ -1044,6 +1044,9 @@ def api_discoveries() -> dict:
                     "metric": tr.metric,
                     "threshold": tr.threshold,
                     "performed_by": list(tr.performed_by),
+                    "evaluator": tr.evaluator,
+                    "cutoff": getattr(tr, "cutoff", None),
+                    "viable": getattr(tr, "viable", True),
                     "about": tr.about,
                     "ships": ships,
                 }

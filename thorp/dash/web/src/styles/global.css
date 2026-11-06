@@ -254,3 +254,23 @@ details.archive[open] > summary { margin-bottom: 8px; }
 /* the star chart: measured kinds stand out from the charted ones */
 #headtable tr.measured td:first-child { border-left: 2px solid var(--accent); }
 #headtable td i { font-style: normal; color: var(--muted); }
+
+/* Journey (lib/journey.js): a sailing's layers, bottom to top */
+.journeys { display: grid; grid-template-columns: 1fr; gap: 16px; }
+.journeys.two { grid-template-columns: 1fr 1fr; }
+@media (max-width: 1100px) { .journeys.two { grid-template-columns: 1fr; } }
+.j-title { font-weight: 600; margin-bottom: 4px; }
+.j-none { margin: 4px 0 8px; }
+svg.journey text { font-family: inherit; }
+svg.journey { display: block; max-width: 720px; height: auto; }
+svg.journey .j-box { fill: var(--panel); stroke: var(--line); }
+svg.journey .j-io { fill: var(--raise); stroke: var(--line); }
+svg.journey .j-lbl { fill: var(--text); font-size: 12px; }
+svg.journey .j-sub { fill: var(--muted); font-size: 11px; }
+svg.journey .j-mod { fill: var(--muted); font-size: 10.5px; }
+svg.journey .j-star { fill: var(--accent); font-size: 11px; }
+svg.journey .j-layer { fill: var(--muted); font-size: 11px; }
+svg.journey .j-bpb { fill: var(--text); font-size: 13px; font-weight: 600; }
+svg.journey .j-good { fill: var(--good); font-size: 11px; }
+svg.journey .j-bad { fill: var(--bad); font-size: 11px; }
+#journeymods label { display: inline-flex; gap: 4px; align-items: center; font-size: var(--fs-sm); color: var(--muted); cursor: pointer; }

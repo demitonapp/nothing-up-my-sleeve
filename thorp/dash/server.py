@@ -736,6 +736,11 @@ def api_sieves() -> dict:
             {"key": k, "name": v.name, "about": v.about, "prefix": v.metric_prefix}
             for k, v in fleet.SIEVES.items()
         ],
+        # soundings: the data's journey up the stack when reading (fleet.SOUNDINGS), for the journey view
+        "soundings": [
+            {"key": k, "name": v.name, "metric": v.metric, "about": v.about}
+            for k, v in getattr(fleet, "SOUNDINGS", {}).items()
+        ],
         "kink_min_records": fleet.KINK_MIN_RECORDS,
         "kink_firm": fleet.KINK_FIRM,
         "stars": [

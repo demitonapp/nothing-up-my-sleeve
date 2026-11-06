@@ -5,6 +5,7 @@ import { fmt, big, fmtBytes, esc, get, log10, mean } from '../lib/format.js';
 import { DataTable } from '../lib/datatable.js';
 import { openBook, openEssay } from '../lib/reader.js';
 import { renderHand, miniHand } from '../lib/cards.js';
+import { drawJourney, soundingSteps } from '../lib/journey.js';
 
 // metric keys: `<prefix>/layer_3`, `<prefix>/layer_3/attn`, `<prefix>/tok`, `<prefix>/pos`
 const groupOf = (k, prefix) => k.slice(prefix.length);
@@ -1165,7 +1166,54 @@ function renderVoyage() {
   document.querySelector('#voyagelevers tbody').innerHTML = v.levers.map(l => `<tr><td class="mono">${esc(l.key)}</td>
     <td>${l.fixed ? 'fixed' : l.choices && l.choices.length ? esc(l.choices.join(', ')) : `${l.low ?? '–'} to ${l.high ?? '–'}`}</td><td>${esc(l.about || '')}</td></tr>`).join('');
   voyageStars(v);
+  journeyPanel(v);
 }
+// ---- the journey through the layers (lib/journey.js): one or two sailings of the voyage, read up
+// their stack at one step; the slider follows the latest reading unless moved
+const journey = { a: null, b: null, idx: null, cache: {} };
+async function runMetrics(id) {
+  const c = journey.cache[id];
+  if (c && Date.now() - c.t < 15000) return c.m;
+  const m = await get('/api/metrics?run=' + encodeURIComponent(id));
+  journey.cache[id] = { m, t: Date.now() };
+  return m;
+}
+const pushKinks = m => Object.fromEntries(Object.entries(kinksOf(m, 'grad_norm/')).map(([k, v]) => [groupOf(k, 'grad_norm/'), v]));
+// the steps a sailing can be read at: its soundings if it has them, else its sieves
+const journeySteps = m => { const s = soundingSteps(m); return s.length ? s : (m['grad_norm/layer_0'] ? m['grad_norm/layer_0'][0] : []); };
+async function journeyPanel(v) {
+  if (!sieveDef) { try { sieveDef = await get('/api/sieves'); } catch (e) { return; } }
+  const runs = v.runs.filter(r => !r.set_aside), selA = document.getElementById('journeyA'), selB = document.getElementById('journeyB');
+  if (!runs.length) { document.getElementById('journeyviewA').innerHTML = '<div class="empty">no sailings on this voyage yet</div>'; return; }
+  const opts = runs.map(r => r.run_id).join(',');
+  const label = r => `${r.ship_name || r.ship || r.name} · ${r.name}`;
+  if (selA.dataset.opts !== opts + v.key) {
+    const list = [...runs].reverse().map(r => `<option value="${esc(r.run_id)}">${esc(label(r))}</option>`).join('');
+    selA.innerHTML = list; selB.innerHTML = '<option value="">none</option>' + list; selA.dataset.opts = opts + v.key;
+    if (!runs.some(r => r.run_id === journey.a)) journey.a = ([...runs].reverse().find(r => r.status === 'running') || runs[runs.length - 1]).run_id;
+    if (!runs.some(r => r.run_id === journey.b)) journey.b = null;
+  }
+  selA.value = journey.a; selB.value = journey.b || '';
+  let mA, mB = null;
+  try { mA = await runMetrics(journey.a); if (journey.b) mB = await runMetrics(journey.b); } catch (e) { return; }
+  const steps = journeySteps(mA), slider = document.getElementById('journeystep');
+  const last = Math.max(0, steps.length - 1), i = journey.idx == null ? last : Math.min(journey.idx, last), step = steps[i] ?? 0;
+  slider.max = last; slider.value = i; slider.disabled = steps.length < 2;
+  document.getElementById('journeylabel').textContent = steps.length ? `step ${step} · reading ${i + 1} of ${steps.length}${journey.idx == null ? ' (latest, live)' : ''}` : 'no readings yet';
+  const modules = new Set([...document.querySelectorAll('#journeymods input:checked')].map(x => x.value));
+  const runOf = id => runs.find(r => r.run_id === id);
+  drawJourney(document.getElementById('journeyviewA'), mA, step, sieveDef, { modules, kinks: pushKinks(mA), title: label(runOf(journey.a)) });
+  const vb = document.getElementById('journeyviewB');
+  document.querySelector('#journeypanel .journeys').classList.toggle('two', !!mB);
+  if (mB) drawJourney(vb, mB, step, sieveDef, { modules, kinks: pushKinks(mB), title: label(runOf(journey.b)) + ' (at the same step)' });
+  else vb.innerHTML = '';
+}
+const currentVoyage = () => voyagesData && voyagesData.find(x => x.key === voyageKey);
+document.getElementById('journeyA').onchange = e => { journey.a = e.target.value; journey.idx = null; const v = currentVoyage(); if (v) journeyPanel(v); };
+document.getElementById('journeyB').onchange = e => { journey.b = e.target.value || null; const v = currentVoyage(); if (v) journeyPanel(v); };
+document.getElementById('journeystep').oninput = e => { const v = currentVoyage(); if (!v) return; const n = +e.target.value; journey.idx = n >= +e.target.max ? null : n; journeyPanel(v); };
+document.querySelectorAll('#journeymods input').forEach(x => x.onchange = () => { const v = currentVoyage(); if (v) journeyPanel(v); });
+
 // first light: each star's score against step for every run of the voyage, the threshold dotted
 async function voyageStars(v) {
   let d;
@@ -1437,6 +1485,7 @@ async function rungExtras(r, runs, allRuns) {
 async function refresh() {
   await loadLadder();  // a ship's address resolves through the ladder and the ships
   if (page === 'voyages' || page === 'voyage') loadVoyages();
+  if (page === 'voyage' && currentVoyage()) journeyPanel(currentVoyage());
   if (page === 'discoveries') loadDiscoveries();
   if (page === 'sievesguide') loadSieves();
   try {

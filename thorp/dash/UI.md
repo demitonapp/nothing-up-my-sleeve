@@ -167,6 +167,18 @@ Each of these exists once. Use it instead of styling a new one.
   - `renderHand` draws one eval step; the Waypoints hand panel walks the steps with a slider and
     ▶ play, and a card that turns between two steps flips over. `miniHand` gives a run's
     strongest five as tiny cards for a table row.
+- **Journey** (`src/lib/journey.js`, on every voyage page): one sailing read as the data's journey
+  up its stack, drawn bottom to top: embeddings, each layer as an attention half and a
+  feed-forward half, the output. The base is the **soundings** (`fleet.SOUNDINGS`, taken when
+  *reading*, where the sieves measure *training*): beside each depth the guess the model would make
+  if it stopped there (bits per byte) and how much that layer lowered it (green) or raised it
+  (red); out of each half an arrow sized by how hard it writes into the stream and tilted by its
+  turn, straight up along the stream (green), level across it (blue, something new), down against
+  it (red). **Modules** the viewer switches on read each layer at the step chosen: push, move and
+  heading for each half, the stars lit in that layer (one head or shared), and the push kink. One
+  step slider moves everything and follows the latest reading unless moved; a second sailing can
+  sit beside the first, read at the same step. A sailing without soundings says so and still
+  shows its modules.
 - **Info popover** (`info(key)` in the script → `ⓘ`): the help for a metric (what it is, which way
   is better, how it is measured). Every metric's first appearance in a heading carries one.
 - **Empty state** (`.empty`, or `empty(id, msg)` for charts): says why nothing is there and what

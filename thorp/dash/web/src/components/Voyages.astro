@@ -24,6 +24,19 @@
     <section class="panel"><h2>First light <span class="note">each star's score against step: per run, the best single head (solid) and the best layer's two strongest heads together (dashed); the dotted line is the threshold, and the moment a line crosses it is first light, lit or lit shared</span></h2>
       <div class="handtools"><select id="voyagestar" title="the star shown"></select></div><div class="chart" id="voyagestars"></div></section>
   </div>
+  <section class="panel" id="journeypanel">
+    <h2>The journey through the layers <span class="note">one sailing read as the data's journey up its stack, bottom to top: the guess the model would make at each depth (bits per byte, and how much each layer lowered it), and out of each half of each layer an arrow sized by how hard it writes into the stream and tilted by which way, up along it, level across it (something new), down against it. Switch on the modules to read each layer's sieves, stars and kink at the step chosen; put a second sailing beside it to compare</span></h2>
+    <div class="handtools">
+      <select id="journeyA" title="the sailing"></select><span class="note">beside</span><select id="journeyB" title="a second sailing to compare"><option value="">none</option></select>
+      <input type="range" id="journeystep" min="0" max="0" value="0"><span id="journeylabel" class="note"></span>
+    </div>
+    <div class="handtools" id="journeymods">
+      <span class="note">modules</span>
+      <label><input type="checkbox" value="push"> push</label><label><input type="checkbox" value="move"> move</label><label><input type="checkbox" value="heading"> heading</label>
+      <label><input type="checkbox" value="stars" checked> stars</label><label><input type="checkbox" value="kink" checked> kink</label>
+    </div>
+    <div class="journeys"><div id="journeyviewA"></div><div id="journeyviewB"></div></div>
+  </section>
   <div class="row">
     <section class="panel"><h2>What it measures <span class="note">the outcomes the voyage is judged by</span></h2><div class="scroll"><table id="voyageoutcomes"><thead><tr><th>outcome</th><th>metric</th><th>better is</th></tr></thead><tbody></tbody></table></div></section>
     <section class="panel"><h2>The levers <span class="note">what the voyage may change between runs, and within what limits</span></h2><div class="scroll"><table id="voyagelevers"><thead><tr><th>lever</th><th>range or choices</th><th>about</th></tr></thead><tbody></tbody></table></div></section>

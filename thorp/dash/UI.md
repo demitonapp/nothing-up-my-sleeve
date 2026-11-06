@@ -46,7 +46,8 @@ holds the ways in, always:
   ship of that class. A ship opens its own page.
 - **Voyages** (`#/voyages`): the campaigns several ships sail on to find something
   (`thorp/fleet.py` `VOYAGES`): one card each with its goal, status, fleet and headline. A voyage
-  (`#/voyages/<key>`) has one template: what it is and what it found, its ships with their
+  (`#/voyages/<key>`) has one template: what it is and what it found (a finished voyage's
+  `learned`, then its **suggested next steps** from `fleet.Voyage.next_steps`), its ships with their
   settings, Forgotten Tomes score and the step each star first lit, the score run by run, first
   light (each star's score against step, threshold dotted), outcomes and levers. A panel only one
   voyage has carries `data-voyage` (the book-value loop's fit).
@@ -67,12 +68,35 @@ holds the ways in, always:
   (the Origin test for reasoning, the energy test for physics, Mendeleev's gaps for mathematics;
   the geometry test was first choice but is not viable on Gutenberg in English), each a bet
   between an idea and its rivals on books from before its cutoff, pre-registered in DECISIONS.md.
+  Each is reached by a **chain of four rungs**, one per class, linked by `leads_to`: the speller's
+  test (the pieces as everyday knowledge), the stylist's (chained into a conclusion no sentence
+  states), the 50m's (what the precursors wrote) and the bettor's (the discovery). The Origin:
+  the breeders' test, Nature's breeder, Malthus and Lyell. Energy: the smith's test, the mill test,
+  Rumford and Davy. Mendeleev's gaps: the gap test, the between test, Döbereiner's triads. All read
+  on one evaluator and scale (lift: idea over rival, less what the words alone carry), and every
+  class is scored on every rung, so **the discovery chains** table at the top of Discoveries (the
+  chains as rows, the rungs as columns, each cell every class's best lift, ✓ at 0.1, and Qwen3
+  0.6B for scale) shows the curve. The geometry test is revived as the bettor's fourth test.
+  "→ leads to" and "← led by" notes link each pair in the trick table, the route, the Waypoints
+  and Goals tables and each trick's page, where the partner's chart sits beside the trick's own.
+  A trick's chart draws its threshold (amber), its floor (grey: the highest untrained reading among
+  its sailings, `tricks/<key>/floor_lift`) and outside models' readings (`reference` in
+  `tricks.py`, such as Qwen3 0.6B's lift), all dotted and labelled.
   A trick in `fleet.TRICKS` with no evaluator yet shows "pre-registered (cutoff …) · evaluator not
   built yet"; one with `viable` false shows "not viable on Gutenberg in English". A row opens the trick (`#/discoveries/<trick>`): its
   waypoint and gate, what it rests on, the field, the goal class, how it is measured, the stars
   needed to learn it, how Thorp is tracking class by class, and for measured tricks every
   sailing's score by step. One link away: **the stars** (`#/discoveries/stars`) and **traits**
   (`#/discoveries/traits`).
+- **The table** (`#/voyages/<key>/table`, linked from Table Talk's voyage page): talk with a ship.
+  Pick a sailing (Table Talk's own first, then any finished ship), a temperature, the longest answer
+  and an optional seed; type a line and the ship answers it as "A:" after your "Q:"
+  (`thorp.table.reply`, through server.py's POST `/api/table/reply`, the one endpoint that
+  writes). The last eight exchanges go with each question as the conversation so far; every
+  exchange is kept in the sailing's transcript (`thorp.table.transcript`, `/api/table/transcript`).
+  Beside the talk are the ship's star and trick readings at the checkpoint answering, measured
+  ones first. Each answer says why it stopped (the next turn, the length, the end of text), its
+  tokens and seconds. Ships not trained on the Q:/A: form don't converse yet, and the page says so.
 - **Sieves** (`#/sieves[/<sailing>]`): how the ship answers the wind, layer by layer. An intro in
   the voyage vocabulary, a card per sieve with its write-up from `fleet.SIEVES` (push, move,
   heading: rendered as written there, never rewritten on the page), then for a picked sailing
@@ -220,6 +244,19 @@ Each of these exists once. Use it instead of styling a new one.
   too. A voyage with transplants opens on a receiver beside its control of the same seed. On the
   first-light chart the donor run (the one the heads came from) is added and drawn dotted, the
   receivers say "(received heads)", and the star picker opens on the voyage's own first star.
+- **Stages** (`src/lib/stages.js`): a run's training read in named stages, in order, under one
+  learning-rate schedule (spec `data.stages`, the ledger's `stages` artifact; `/api/stages`). Every
+  chart whose x-axis is the training step gets them as bands, labelled by name with a dotted line
+  at each change: the ship page's charts, a class's training loss and waypoint charts, a voyage's
+  first-light chart, the Sieves heatmaps. A chart of several runs gets bands only when those runs
+  share the same stages. The ship page lists its sailing's stages (shelf, passes, steps, tokens),
+  and the journey's step slider names the stage of the step shown, with the stages as a strip
+  beneath it. A run without stages is one stage, reading, and draws none.
+- **Teachers and transplants**: a run with `optim.teacher` learns from another run's predictions;
+  on a voyage's first-light chart the teacher is drawn dotted, as a donor is, and its students say
+  "(taught)". A transplant may carry token embeddings too (`tok`), whole layers beneath (`below`,
+  outlined in the journey) and layer norms (`ln`); a lineage run's control is "lineage-ctl" of the
+  same seed, every other receiver's is "control".
 - **Info popover** (`info(key)` in the script → `ⓘ`): the help for a metric (what it is, which way
   is better, how it is measured). Every metric's first appearance in a heading carries one.
 - **Empty state** (`.empty`, or `empty(id, msg)` for charts): says why nothing is there and what

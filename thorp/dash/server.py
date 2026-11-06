@@ -168,7 +168,7 @@ def api_run(run: str) -> dict:
         if ce_en is not None and out.get("chinchilla"):
             out["chinchilla"]["gap_planned"] = ce_en - out["chinchilla"]["L_planned"]
 
-    for kind in ("samples", "top10", "recipe", "eval_sets", "probes", "curiosity"):
+    for kind in ("samples", "top10", "recipe", "eval_sets", "probes", "curiosity", "stages"):
         a = _artifact(run, kind)
         out[kind] = (
             {"step": a["step"], **{"data": json.loads(a["text"])}} if a and a["text"] else None
@@ -712,6 +712,13 @@ def api_voyage_series(key: str) -> dict:
                 series[sk]["shared_value"] = [p["value"] for p in sh]
         return series
 
+    def teacher_of(r: dict) -> dict | None:
+        try:
+            t = (json.loads(r.get("spec_json") or "{}").get("optim") or {}).get("teacher")
+        except ValueError:
+            return None
+        return t if isinstance(t, dict) else None
+
     def transplant_of(run_id: str) -> dict | None:
         row = con.execute(
             "select text from artifacts where run_id=? and kind='transplant' order by step, rowid limit 1",
@@ -731,8 +738,9 @@ def api_voyage_series(key: str) -> dict:
                     "run_id": r["run_id"],
                     "name": r["name"],
                     "ship": r["ship"],
-                    "role": "receiver" if t else None,
+                    "role": "receiver" if t else "student" if teacher_of(r) else None,
                     "transplant": t,
+                    "teacher": teacher_of(r),
                     "series": series_of(r["run_id"]),
                 }
             )
@@ -740,17 +748,25 @@ def api_voyage_series(key: str) -> dict:
         donors = (
             {x["transplant"].get("from_run_id") for x in out if x["transplant"]} - have - {None}
         )
-        for d in donors:
-            row = con.execute("select run_id, name, ship from runs where run_id=?", [d]).fetchone()
-            if row:
+        # a teacher (optim.teacher.run) joins its students the way a donor joins its receivers
+        teachers = {
+            str(x["teacher"]["run"]) for x in out if x.get("teacher") and x["teacher"].get("run")
+        }
+        for d, role in [(d, "donor") for d in donors] + [(t, "teacher") for t in sorted(teachers)]:
+            row = con.execute(
+                "select run_id, name, ship from runs where run_id=? or name=? limit 1", [d, d]
+            ).fetchone()
+            if row and row[0] not in have:
+                have.add(row[0])
                 out.insert(
                     0,
                     {
                         "run_id": row[0],
                         "name": row[1],
                         "ship": row[2],
-                        "role": "donor",
+                        "role": role,
                         "transplant": None,
+                        "teacher": None,
                         "series": series_of(row[0]),
                     },
                 )
@@ -869,6 +885,18 @@ def _known_tricks() -> list[dict]:
     return out
 
 
+def _floor(con, run_id: str, metric: str) -> float | None:
+    """A trick's floor on one run: the untrained model's reading (tricks/<key>/floor_lift beside a
+    tricks/<key>/lift), the last one recorded, or None where the trick has no floor."""
+    if not metric.endswith("/lift"):
+        return None
+    row = con.execute(
+        "select value from metrics where run_id=? and name=? order by step desc, rowid desc limit 1",
+        [run_id, metric[: -len("lift")] + "floor_lift"],
+    ).fetchone()
+    return row[0] if row else None
+
+
 def api_trick_series(key: str) -> dict:
     """One measured trick's score at every reading of every sailing, for its chart."""
     from thorp import fleet
@@ -896,6 +924,7 @@ def api_trick_series(key: str) -> dict:
                         "preset": spec.get("model", {}).get("preset"),
                         "step": [p[0] for p in pts],
                         "value": [p[1] for p in pts],
+                        "floor": _floor(con, r["run_id"], tr.metric),
                     }
                 )
     finally:
@@ -1034,6 +1063,7 @@ def api_discoveries() -> dict:
                         "best": max(p[1] for p in pts),
                         "latest": pts[-1][1],
                         "readings": len(pts),
+                        "floor": _floor(con, r["run_id"], tr.metric),
                         "stars_lit": sorted(lit_on.get(r["run_id"], set()) & set(tr.performed_by)),
                     }
                 )
@@ -1045,6 +1075,7 @@ def api_discoveries() -> dict:
                     "threshold": tr.threshold,
                     "performed_by": list(tr.performed_by),
                     "evaluator": tr.evaluator,
+                    "leads_to": getattr(tr, "leads_to", None),
                     "cutoff": getattr(tr, "cutoff", None),
                     "viable": getattr(tr, "viable", True),
                     "about": tr.about,
@@ -1068,6 +1099,66 @@ def api_discoveries() -> dict:
         "known_tricks": _known_tricks(),
         "waypoints": __import__("thorp.dash.tricks", fromlist=["WAYPOINTS"]).WAYPOINTS,
     }
+
+
+def api_stages(runs: str) -> dict:
+    """Each run's training stages (artifact 'stages' at step 0: [{index, name, recipe, passes,
+    first_step, last_step, tokens}]); a run without stages has an empty list (one stage, reading)."""
+    out = {}
+    con = _con()
+    try:
+        for rid in [x for x in runs.split(",") if x]:
+            row = con.execute(
+                "select text from artifacts where (run_id=? or run_id in (select run_id from runs where name=?))"
+                " and kind='stages' order by step desc, rowid desc limit 1",
+                [rid, rid],
+            ).fetchone()
+            try:
+                out[rid] = json.loads(row[0]) if row else []
+            except ValueError:
+                out[rid] = []
+    finally:
+        con.close()
+    return out
+
+
+class TableNotBuilt(Exception):
+    """thorp.table (the other side of the table) is not importable yet."""
+
+
+def _table():
+    try:
+        from thorp import table
+    except ImportError as e:
+        raise TableNotBuilt(f"thorp.table is not built yet ({e})") from e
+    return table
+
+
+def api_table_transcript(run: str) -> list[dict]:
+    """Every exchange at the table with one sailing, oldest first (thorp.table.transcript)."""
+    return _table().transcript(run)
+
+
+def api_table_reply(body: dict) -> dict:
+    """One answer at the table (Table Talk): the sailing named answers the question after the history,
+    at the temperature asked; thorp.table.reply keeps the exchange in the sailing's transcript."""
+    question = str(body.get("question") or "").strip()
+    if not question:
+        raise ValueError("ask a question first")
+    temperature = min(2.0, max(0.0, float(body.get("temperature", 0.8))))
+    max_tokens = min(1000, max(1, int(body.get("max_tokens", 200))))
+    seed = body.get("seed")
+    history = [
+        {"q": str(h.get("q", "")), "a": str(h.get("a", ""))} for h in body.get("history") or []
+    ]
+    return _table().reply(
+        str(body["run"]),
+        history,
+        question,
+        temperature=temperature,
+        max_tokens=max_tokens,
+        seed=None if seed in (None, "") else int(seed),
+    )
 
 
 TOMES = "lists/hole-cards-unseen.csv"
@@ -1168,6 +1259,29 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _json(self, code: int, obj) -> None:
+        self._send(code, json.dumps(obj, default=str).encode(), "application/json")
+
+    def do_POST(self):  # noqa: N802
+        """Only the table writes: POST /api/table/reply {run, question, history, temperature, ...}."""
+        u = urlparse(self.path)
+        if u.path != "/api/table/reply":
+            return self._send(404, b"not found", "text/plain")
+        try:
+            n = int(self.headers.get("Content-Length") or 0)
+            body = json.loads(self.rfile.read(min(n, 1_000_000)) or b"{}")
+            return self._json(200, api_table_reply(body))
+        except TableNotBuilt as e:
+            return self._json(503, {"error": str(e)})
+        except (
+            LookupError
+        ) as e:  # no such run, or no checkpoint to talk to (thorp.table's own words)
+            return self._json(404, {"error": str(e.args[0] if e.args else e)})
+        except (ValueError, KeyError) as e:
+            return self._json(400, {"error": str(e)})
+        except Exception as e:  # noqa: BLE001
+            return self._json(500, {"error": repr(e)})
+
     def do_GET(self):  # noqa: N802
         u = urlparse(self.path)
         q = {k: v[0] for k, v in parse_qs(u.query).items()}
@@ -1207,6 +1321,8 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/voyage": lambda: api_voyage_series(q["key"]),
                 "/api/discoveries": lambda: api_discoveries(),
                 "/api/sieves": lambda: api_sieves(),
+                "/api/table/transcript": lambda: api_table_transcript(q["run"]),
+                "/api/stages": lambda: api_stages(q.get("runs", "")),
                 "/api/trick": lambda: api_trick_series(q["key"]),
                 "/api/shelf": lambda: api_shelf(q["run"]),
                 "/api/book": lambda: api_book(q["id"], q.get("offset", 0), q.get("length", 20000)),
@@ -1216,6 +1332,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(404, b"not found", "text/plain")
             body = json.dumps(routes[u.path](), default=str).encode()
             return self._send(200, body, "application/json")
+        except TableNotBuilt as e:
+            return self._send(503, json.dumps({"error": str(e)}).encode(), "application/json")
         except Exception as e:  # noqa: BLE001
             return self._send(500, json.dumps({"error": repr(e)}).encode(), "application/json")
 

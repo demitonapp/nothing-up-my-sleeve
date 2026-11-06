@@ -334,3 +334,36 @@ main a.ccell { color: var(--text); text-decoration: none; display: block; }
 .coverage .crow.total { border-top: 1px solid var(--line); padding-top: 6px; font-weight: 600; }
 .coverage .cnum { color: var(--muted); font-size: var(--fs-sm); }
 @media (max-width: 700px) { .coverage .crow { grid-template-columns: 1fr; } }
+.nextsteps { margin: 6px 0 0; padding-left: 20px; display: grid; gap: 6px; line-height: 1.5; }
+
+/* the table: a conversation with a ship (components/TableTalk.astro) */
+.tablegrid { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; }
+@media (max-width: 900px) { .tablegrid { grid-template-columns: 1fr; } }
+.tablelog { max-height: 520px; min-height: 240px; overflow-y: auto; display: grid; gap: 12px; align-content: start; padding-right: 4px; }
+.tablelog .ex { border-bottom: 1px solid var(--line); padding-bottom: 10px; }
+.tablelog .q, .tablelog .a { white-space: pre-wrap; line-height: 1.5; }
+.tablelog .q b { color: var(--accent); }
+.tablelog .a { font-family: Georgia, "Iowan Old Style", serif; font-size: var(--fs-lg); margin-top: 4px; }
+.tablelog .a b { color: var(--good); font-family: inherit; }
+.tablelog .m { color: var(--muted); font-size: var(--fs-xs); margin-top: 4px; }
+.tableform { display: flex; gap: 8px; align-items: center; margin-top: 12px; }
+.tableform b { color: var(--accent); }
+.tableform input { flex: 1; font-size: var(--fs-base); padding: 8px 10px; }
+#tablereadings .rd { display: flex; justify-content: space-between; border-bottom: 1px solid var(--line); padding: 3px 0; }
+#tablereadings .k { color: var(--muted); text-transform: uppercase; letter-spacing: .06em; font-size: var(--fs-xs); }
+#tablereadings .rd.none { color: var(--muted); }
+
+/* stages along the journey's step slider */
+.jstages { display: flex; gap: 2px; margin: 4px 0 8px; font-size: var(--fs-xs); }
+.jstages span { background: var(--raise); border: 1px solid var(--line); border-radius: 3px; padding: 1px 6px; color: var(--muted); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.jstages span.on { color: var(--accent); border-color: var(--accent); }
+.lead { font-size: var(--fs-xs); color: var(--muted); margin-top: 2px; font-weight: 400; }
+.route .step .gt a.ld { color: var(--muted); }
+
+/* the discovery chains: each cell a rung's test, every class's best lift on it */
+#chaintable td { vertical-align: top; min-width: 150px; }
+#chaintable .cr { display: flex; justify-content: space-between; gap: 8px; font-size: var(--fs-sm); color: var(--muted); font-variant-numeric: tabular-nums; }
+#chaintable .cr b { color: var(--text); font-weight: 500; }
+#chaintable .cr.lit b { color: var(--good); }
+#chaintable .cr.ref { border-top: 1px dotted var(--line); margin-top: 2px; }
+#chaintable .cr.ref b { color: var(--muted); }

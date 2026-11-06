@@ -10,7 +10,12 @@
 <div class="section" id="voyage">
   <h1><a href="#/voyages" class="back">← voyages</a> <span id="voyagetitle"></span> <span id="voyagestatus"></span> <span class="q" id="voyagegoal"></span></h1>
   <section class="panel"><div class="rungover" id="voyageover"></div></section>
-  <section class="panel" id="voyagelearned"><h2>What it found</h2><p id="voyagelearnedtext"></p></section>
+  <section class="panel" data-voyage="table_talk" hidden>
+    <h2>The table <span class="note">talk with Table Talk's ships, or any finished ship: type a line and read its answer</span></h2>
+    <p><a href="#/voyages/table_talk/table">Sit at the table →</a></p>
+  </section>
+  <section class="panel" id="voyagelearned"><h2>What it found</h2><p id="voyagelearnedtext"></p>
+    <div id="voyagenextwrap" hidden><h2 class="mt">Suggested next steps</h2><ol id="voyagenext" class="nextsteps"></ol></div></section>
   <!-- this voyage's own panels: data-voyage names the voyage they belong to -->
   <section class="panel" data-voyage="book_value" hidden>
     <h2>The fit: what each kind of book is worth <span class="note">the Forgotten Tomes score a pure shelf of each kind would give, with 90% intervals, lower is better; <b id="fitr2"></b></span></h2>
@@ -30,6 +35,7 @@
       <select id="journeyA" title="the sailing"></select><span class="note">beside</span><select id="journeyB" title="a second sailing to compare"><option value="">none</option></select>
       <input type="range" id="journeystep" min="0" max="0" value="0"><span id="journeylabel" class="note"></span>
     </div>
+    <div class="jstages" id="journeystages" hidden></div>
     <div class="handtools" id="journeymods">
       <span class="note">modules</span>
       <label><input type="checkbox" value="push"> push</label><label><input type="checkbox" value="move"> move</label><label><input type="checkbox" value="heading"> heading</label>

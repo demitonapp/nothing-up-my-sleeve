@@ -68,7 +68,7 @@ export function drawJourney(el, m, step, defs, opts = {}) {
     <text x="${LEFT + BOX_W + GAP / 2}" y="${TOP + 13}" text-anchor="middle" class="j-lbl">the guess: next word</text>`;
   svg += `<rect x="${LEFT}" y="${depthY(0) - 4}" width="${2 * BOX_W + GAP}" height="${BASE - 8}" rx="5" class="j-io"/>
     <text x="${LEFT + BOX_W + GAP / 2}" y="${depthY(0) + 16}" text-anchor="middle" class="j-lbl">embeddings: the words as read</text>`
-    + (opts.transplant && opts.transplant.pos ? `<text x="${LEFT + 2 * BOX_W + GAP + 12}" y="${depthY(0) + 16}" class="j-tp">⇄ position embeddings transplanted</text>` : '');
+    + (opts.transplant && (opts.transplant.pos || opts.transplant.tok) ? `<text x="${LEFT + 2 * BOX_W + GAP + 12}" y="${depthY(0) + 16}" class="j-tp">⇄ ${[opts.transplant.tok ? 'token' : '', opts.transplant.pos ? 'position' : ''].filter(Boolean).join(' and ')} embeddings transplanted</text>` : '');
   // the guess at each depth, and the drop from the depth below
   for (let k = 0; k <= L; k++) {
     const v = bpb(k), below = k ? bpb(k - 1) : null, d = v != null && below != null ? v - below : null;
@@ -81,10 +81,11 @@ export function drawJourney(el, m, step, defs, opts = {}) {
     const y = depthY(i + 1) + 10, h = ROW - 26;
     const halves = [['attn', 'attention', LEFT], ['mlp', 'feed-forward', LEFT + BOX_W + GAP]];
     svg += `<text x="${LEFT - 64}" y="${y + h / 2 + 4}" text-anchor="end" class="j-layer">layer ${i}</text>`;
-    const tp = opts.transplant, here = tp && Number(tp.layer) === i;
+    // the receiving layer, and any whole layers beneath it that came too (transplant.below)
+    const tp = opts.transplant, here = tp && Number(tp.layer) === i, whole = tp && (tp.below || []).map(Number).includes(i);
     for (const [key, name, x] of halves) {
       const w = at(S(`soundings/layer_${i}/${key}_write`), step), t = at(S(`soundings/layer_${i}/${key}_turn`), step);
-      svg += `<rect x="${x}" y="${y}" width="${BOX_W}" height="${h}" rx="5" class="j-box${here && key === 'attn' ? ' j-transplant' : ''}"/>
+      svg += `<rect x="${x}" y="${y}" width="${BOX_W}" height="${h}" rx="5" class="j-box${(here && key === 'attn') || whole ? ' j-transplant' : ''}"/>
         <text x="${x + 8}" y="${y + 15}" class="j-lbl">${name}</text>`;
       if (w != null) svg += `<text x="${x + 8}" y="${y + 30}" class="j-sub">writes ${f2(w)} · ${turnWord(t)}</text>`;
       // the sieves on this half
@@ -97,7 +98,8 @@ export function drawJourney(el, m, step, defs, opts = {}) {
     }
     // the stars lit in this layer by the step shown, and the layer's push kink
     const notes = [];
-    if (here) notes.push(`⇄ heads ${(tp.heads || []).join(', ')} transplanted from ${tp.from_run || 'another run'}`);
+    if (here) notes.push(`⇄ ${tp.star ? tp.star.replace(/_/g, ' ') + ' ' : ''}heads ${(tp.heads || []).join(', ')} transplanted from ${tp.from_run || 'another run'}${tp.ln ? ', with their layer norms' : ''}${tp.restored_from_log ? ' (restored from the log)' : ''}`);
+    if (whole && !here) notes.push(`⇄ the whole layer transplanted from ${tp.from_run || 'another run'}`);
     if (mods.has('stars')) for (const st of defs.stars || []) {
       for (const [metric, layer, how] of [[st.metric, st.layer, 'one head'], [st.shared_metric, st.shared_layer, 'shared']]) {
         const sr = metric && S(metric); if (!sr) continue;

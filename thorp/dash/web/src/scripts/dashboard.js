@@ -6,6 +6,7 @@ import { DataTable } from '../lib/datatable.js';
 import { openBook, openEssay } from '../lib/reader.js';
 import { renderHand, miniHand } from '../lib/cards.js';
 import { drawJourney, soundingSteps } from '../lib/journey.js';
+import { stagesFor, common as commonStages, band as bandStages, stageAt } from '../lib/stages.js';
 
 // metric keys: `<prefix>/layer_3`, `<prefix>/layer_3/attn`, `<prefix>/tok`, `<prefix>/pos`
 const groupOf = (k, prefix) => k.slice(prefix.length);
@@ -29,7 +30,7 @@ const rungFor = key => ladderData && ladderData.rungs.find(r => slugOf(r) === ke
 //   #/ships                      every ship ever launched
 //   #/ships/<key>[/<sailing>[/<tab>]]  one ship (a class fitted out one way) and one of its sailings (runs):
 //                                betting (default), books, languages, sieves, attention, traits
-//   #/voyages, #/voyages/<key>   the voyages, and one voyage
+//   #/voyages, #/voyages/<key>   the voyages, and one voyage; #/voyages/<key>/table talks with its ships
 //   #/discoveries[/<trick>]      the tricks of the trade, and one trick; /stars and /traits beside them
 //   #/sieves[/<sailing>]         the sieves explained, and one sailing's push, move and heading
 // Older addresses (#sizes, #proxy, #rung-1m, #/models/…, #betting…, ?run=) land on the new ones.
@@ -37,7 +38,7 @@ const MTABS = ['fleet', 'goals', 'overview', 'training', 'scoring', 'waypoints']
 const STABS = ['betting', 'books', 'languages', 'sieves', 'attention', 'traits'];
 const STAB_EL = { betting: 'betting', books: 'books', languages: 'languages', sieves: 'sieves', attention: 'attention', traits: 'traits-section' };
 const OLD_SHIP = { betting: 'betting', books: 'books', languages: 'languages', sieves: 'sieves', attention: 'attention', 'traits-section': 'traits' };
-const SECTION_NAV = { sizes: 'classes', rung: 'classes', ship: 'classes', 'runs-section': 'classes', voyages: 'voyages', voyage: 'voyages', discoveries: 'discoveries', sievesguide: 'sieves' };
+const SECTION_NAV = { sizes: 'classes', rung: 'classes', ship: 'classes', 'runs-section': 'classes', voyages: 'voyages', voyage: 'voyages', table: 'voyages', discoveries: 'discoveries', sievesguide: 'sieves' };
 let discView = 'index', discTrick = null;
 let page = 'sizes', modelTab = 'fleet', shipKey = null, sailingKey = null, shipTab = 'betting', voyageKey = null, runsList = null, shipsData = null;
 function route(h) {
@@ -51,6 +52,7 @@ function route(h) {
       return { page: 'ship', ship: decodeURIComponent(b), sailing: c ? decodeURIComponent(c) : null, stab: STABS.includes(d) ? d : 'betting' };
     }
     if (a === 'ships') return { page: 'runs-section' };
+    if (a === 'voyages' && b && c === 'table') return { page: 'table', voyage: b };
     if (a === 'voyages' && b) return { page: 'voyage', voyage: b };
     if (a === 'voyages') return { page: 'voyages' };
     if (a === 'discoveries') return { page: 'discoveries', dview: !b ? 'index' : (b === 'stars' || b === 'traits') ? b : 'trick', trick: b && b !== 'stars' && b !== 'traits' ? b : null };
@@ -120,6 +122,7 @@ function showTab(h, push = true) {
     }
   }
   if (page === 'voyage') { voyageKey = rt.voyage; hash = '/voyages/' + voyageKey; }
+  if (page === 'table') { tableVoyage = rt.voyage; hash = '/voyages/' + tableVoyage + '/table'; loadTable(); }
   if (page === 'sizes') hash = '/classes';
   if (page === 'runs-section') hash = '/ships';
   if (page === 'voyages') hash = '/voyages';
@@ -146,6 +149,14 @@ function showTab(h, push = true) {
   if (page === 'ship' && (selected !== wasShip || !runsList)) refresh();
   // charts drawn while hidden have no width; size the ones now showing
   document.querySelectorAll(`#${page} .chart`).forEach(el => { if (el.data && el.offsetParent) Plotly.Plots.resize(el); });
+}
+// the ship page's stage list: the stages its sailing read, in order (empty: one stage, reading)
+function drawStageList(st) {
+  const p = document.getElementById('stagepanel');
+  p.hidden = !(st && st.length);
+  if (!st || !st.length) return;
+  document.querySelector('#stagetable tbody').innerHTML = st.map(s => `<tr><td>${s.index + 1}</td><td><b>${esc(s.name)}</b></td>
+    <td>${esc(String(s.recipe || '–').replace('lists/', '').replace('.csv', ''))}</td><td>${s.passes ?? '–'}</td><td>${s.first_step}–${s.last_step}</td><td>${big(s.tokens)}</td></tr>`).join('');
 }
 function shipHeader(ship, run) {
   const preset = ship ? ship.cls : run && run.preset;
@@ -1071,6 +1082,7 @@ async function renderWaypoints(r) {
   lines(x => x.nevermore.natural_copy_gain || x.nevermore.copy_gain, 'copychart', 'nats per token', nvMsg);
   for (const t of core) lines(x => x.traits[t] && x.traits[t].best, 'trait-' + t, 'held-out AUC',
     `no run at ${esc(r.preset)} has trait probes yet; add <span class="mono">probes</span> to eval.evaluators`, { ...hline(found), showlegend: false });
+  stagesFor(recent.map(x => x.run_id)).then(m => bandStages('#rung', commonStages(m)));
 }
 
 // the Waypoints write-ups and the Nevermore test passage open in the reader
@@ -1140,6 +1152,9 @@ function renderVoyage() {
   const learned = v.learned || starHeadline(v);
   document.getElementById('voyagelearned').hidden = !learned;
   document.getElementById('voyagelearnedtext').textContent = learned;
+  const next = v.next_steps || [];
+  document.getElementById('voyagenextwrap').hidden = !next.length;
+  document.getElementById('voyagenext').innerHTML = next.map(x => `<li>${esc(x)}</li>`).join('');
   // the fit (book_value): what a pure shelf of each kind is worth, with its interval
   if (v.fit && v.fit.coef) {
     const rows = Object.entries(v.fit.coef);
@@ -1178,8 +1193,8 @@ function renderVoyage() {
   document.querySelector('#voyageoutcomes tbody').innerHTML = v.outcomes.map(o => `<tr><td>${esc(o.about)}</td><td class="mono">${esc(o.metric)}</td><td>${esc(o.better)}</td></tr>`).join('');
   document.querySelector('#voyagelevers tbody').innerHTML = v.levers.map(l => `<tr><td class="mono">${esc(l.key)}</td>
     <td>${l.fixed ? 'fixed' : l.choices && l.choices.length ? esc(l.choices.join(', ')) : `${l.low ?? '–'} to ${l.high ?? '–'}`}</td><td>${esc(l.about || '')}</td></tr>`).join('');
-  voyageStars(v);
-  journeyPanel(v);
+  // the journey picks its default sailings from the transplant records, so it waits for them
+  voyageStars(v).then(() => journeyPanel(v));
 }
 // ---- the journey through the layers (lib/journey.js): one or two sailings of the voyage, read up
 // their stack at one step; the slider follows the latest reading unless moved
@@ -1205,11 +1220,14 @@ async function journeyPanel(v) {
     selA.innerHTML = list; selB.innerHTML = '<option value="">none</option>' + list; selA.dataset.opts = opts + v.key;
     // a voyage with transplants opens on a receiver beside its control (same seed); else the running sailing
     const tp = id => voyageSeries && (voyageSeries.runs.find(x => x.run_id === id) || {}).transplant;
-    const recv = [...runs].reverse().find(r => tp(r.run_id));
+    const roleOf = id => voyageSeries && (voyageSeries.runs.find(x => x.run_id === id) || {}).role;
+    const recv = [...runs].reverse().find(r => tp(r.run_id) || roleOf(r.run_id) === 'student');
     if (!runs.some(r => r.run_id === journey.a)) journey.a = (recv || [...runs].reverse().find(r => r.status === 'running') || runs[runs.length - 1]).run_id;
     if (!runs.some(r => r.run_id === journey.b)) {
+      // a receiver's control: the same seed, "lineage-ctl" for a lineage run, "control" for the rest
       const seed = recv && (recv.name.match(/-s(\d+)$/) || [])[1];
-      const ctl = recv && runs.find(r => !tp(r.run_id) && /control/.test(r.name) && (!seed || r.name.endsWith('-s' + seed)));
+      const want = recv && /lineage/.test(recv.name) ? /lineage-ctl/ : /control/;
+      const ctl = recv && runs.find(r => r.run_id !== recv.run_id && !tp(r.run_id) && want.test(r.name) && (!seed || r.name.endsWith('-s' + seed)));
       journey.b = ctl ? ctl.run_id : null;
     }
   }
@@ -1219,7 +1237,11 @@ async function journeyPanel(v) {
   const steps = journeySteps(mA), slider = document.getElementById('journeystep');
   const last = Math.max(0, steps.length - 1), i = journey.idx == null ? last : Math.min(journey.idx, last), step = steps[i] ?? 0;
   slider.max = last; slider.value = i; slider.disabled = steps.length < 2;
-  document.getElementById('journeylabel').textContent = steps.length ? `step ${step} · reading ${i + 1} of ${steps.length}${journey.idx == null ? ' (latest, live)' : ''}` : 'no readings yet';
+  const jst = (await stagesFor([journey.a]))[journey.a], here = stageAt(jst, step);
+  document.getElementById('journeylabel').textContent = steps.length ? `step ${step}${here ? ` · stage ${here.index + 1}: ${here.name}` : ''} · reading ${i + 1} of ${steps.length}${journey.idx == null ? ' (latest, live)' : ''}` : 'no readings yet';
+  const lastStep = steps.length ? steps[steps.length - 1] : 0, segs = document.getElementById('journeystages');
+  segs.hidden = !(jst && jst.length);
+  if (jst && jst.length) segs.innerHTML = jst.map(s => `<span class="${here && here.index === s.index ? 'on' : ''}" style="flex:${Math.max(1, Math.min(s.last_step, lastStep) - s.first_step + 1)}" title="${esc(s.name)}: steps ${s.first_step}–${s.last_step}">${esc(s.name)}</span>`).join('');
   const modules = new Set([...document.querySelectorAll('#journeymods input:checked')].map(x => x.value));
   const runOf = id => runs.find(r => r.run_id === id);
   const tpOf = id => voyageSeries && (voyageSeries.runs.find(x => x.run_id === id) || {}).transplant;
@@ -1257,8 +1279,8 @@ async function voyageStars(v) {
   const traces = rs.flatMap((r, i) => {
     // a donor (the run heads were taken from) is dotted; a receiver says so in its name
     const col = PALETTE[i % PALETTE.length], sr = r.series[k];
-    const name = `${r.ship || r.name}${r.role === 'donor' ? ' (donor)' : r.role === 'receiver' ? ' (received heads)' : ''}`;
-    const t = [{ type: 'scatter', mode: 'lines', name: `${name} · one head`, legendgroup: name, x: sr.step, y: sr.value, line: { color: col, width: 1.8, dash: r.role === 'donor' ? 'dot' : 'solid' } }];
+    const name = `${r.ship || r.name}${{ donor: ' (donor)', receiver: ' (received heads)', teacher: ' (teacher)', student: ' (taught)' }[r.role] || ''}`;
+    const t = [{ type: 'scatter', mode: 'lines', name: `${name} · one head`, legendgroup: name, x: sr.step, y: sr.value, line: { color: col, width: 1.8, dash: r.role === 'donor' || r.role === 'teacher' ? 'dot' : 'solid' } }];
     if (sr.shared_step && sr.shared_step.length) t.push({ type: 'scatter', mode: 'lines', name: `${name} · shared`, legendgroup: name,
       x: sr.shared_step, y: sr.shared_value, line: { color: col, width: 1.5, dash: 'dash' } });
     return t;
@@ -1267,6 +1289,7 @@ async function voyageStars(v) {
     layout({ xaxis: { title: 'step', gridcolor: C.line }, legend: { orientation: 'h', y: 1.12 },
       yaxis: { title: `${star.name} score`, gridcolor: C.line, range: [0, Math.max(1, ...traces.flatMap(t => t.y))] },
       shapes: [{ type: 'line', xref: 'paper', x0: 0, x1: 1, y0: star.threshold, y1: star.threshold, line: { color: C.accent, dash: 'dot' } }] }));
+  stagesFor(rs.map(r => r.run_id)).then(m => bandStages('#voyage', commonStages(m)));
 }
 document.getElementById('voyagestar').onchange = () => { voyageSeriesKey = ''; const v = voyagesData && voyagesData.find(x => x.key === voyageKey); if (v) voyageStars(v); };
 
@@ -1324,6 +1347,7 @@ async function loadSieves() {
   sieveHeat('sieve-move', m, 'update_ratio/', byGroup);
   sieveHeat('sieve-heading', m, 'heading/', byGroup, { log: false, diverging: true,
     msg: run.status === 'running' && !topKeys(m, 'heading/').length ? 'the heading sieve starts with the next ship to sail; this sailing set out before it was fitted' : 'this sailing has no heading readings: the heading sieve started with ships sailing from 08:00 on 7 November' });
+  stagesFor([run.run_id]).then(st => bandStages('#sievesguide', st[run.run_id]));
   // settled: per layer, the first step the heading holds SETTLE_AT for SETTLE_RECORDS records running
   const layers = layerOnly(m, 'grad_norm/').map(k => groupOf(k, 'grad_norm/'));
   const lit = sieveDef.stars.flatMap(st => {
@@ -1344,6 +1368,91 @@ async function loadSieves() {
   }).join('') : '<tr><td colspan="5" class="empty">no sieve readings on this sailing yet</td></tr>';
 }
 document.getElementById('sievepick').onchange = e => { location.hash = '#/sieves/' + encodeURIComponent(e.target.value); };
+
+// ---- the table (#/voyages/<key>/table, components/TableTalk.astro): talk with a ship. Each question goes
+// to POST /api/table/reply with the last exchanges of the transcript as the conversation so far; the
+// answer, why it stopped and the ship's readings come back, and the exchange is kept on the far side.
+let tableVoyage = 'table_talk', tableRun = null, tableLog = [], tableBusy = false;
+const TABLE_HISTORY = 8;
+async function loadTable() {
+  document.getElementById('tableback').href = '#/voyages/' + tableVoyage;
+  const sel = document.getElementById('tablerun');
+  let vs = voyagesData; if (!vs) { try { vs = await get('/api/voyages'); } catch (e) { vs = []; } }
+  let runs = runsList; if (!runs) { try { runs = runsList = await get('/api/runs'); } catch (e) { runs = []; } }
+  const v = (vs || []).find(x => x.key === tableVoyage), own = v ? v.runs.filter(r => r.status === 'finished' || r.status === 'running') : [];
+  const others = runs.filter(r => r.status === 'finished' && r.name && !r.name.startsWith('smoke') && !own.some(o => o.run_id === r.run_id)).reverse();
+  const label = r => `${r.ship || r.name} · ${r.name}${r.preset ? ` (${r.preset})` : ''}`;
+  const opts = own.map(r => r.run_id).join(',') + '|' + others.map(r => r.run_id).join(',');
+  if (sel.dataset.opts !== opts) {
+    sel.innerHTML = (own.length ? `<optgroup label="${esc(v ? v.name : tableVoyage)}">${own.map(r => `<option value="${esc(r.name)}">${esc(label(r))}</option>`).join('')}</optgroup>` : '')
+      + `<optgroup label="any finished ship">${others.map(r => `<option value="${esc(r.name)}">${esc(label(r))}</option>`).join('')}</optgroup>`;
+    sel.dataset.opts = opts;
+  }
+  if (!tableRun || ![...sel.options].some(o => o.value === tableRun)) tableRun = sel.options.length ? sel.options[0].value : null;
+  sel.value = tableRun || '';
+  await loadTranscript();
+}
+async function loadTranscript() {
+  const status = document.getElementById('tablestatus'), input = document.getElementById('tableq');
+  if (!tableRun) { status.textContent = 'no finished ship to talk with yet'; return; }
+  try {
+    const r = await fetch('/api/table/transcript?run=' + encodeURIComponent(tableRun));
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || r.statusText);
+    tableLog = d.map(x => ({ q: x.question, a: x.answer, meta: x }));
+    status.textContent = ''; input.disabled = false; document.getElementById('tableask').disabled = false;
+  } catch (e) {
+    tableLog = [];
+    const notBuilt = /not built yet/.test(String(e.message));
+    status.textContent = notBuilt ? "The table isn't open yet: the ship's side (thorp.table) is still being built. The page is ready for it." : 'could not load the transcript: ' + e.message;
+    input.disabled = notBuilt; document.getElementById('tableask').disabled = notBuilt;
+  }
+  drawTable();
+}
+function drawTable(pending = null) {
+  const log = document.getElementById('tablelog');
+  const meta = m => !m ? '' : [m.temperature != null ? `t ${Number(m.temperature).toFixed(2)}` : '', m.seed != null ? `seed ${m.seed}` : '', m.tokens != null ? `${m.tokens} tokens` : '',
+    m.seconds != null ? `${Number(m.seconds).toFixed(1)} s` : '', m.stopped ? { turn: 'stopped at the next turn', length: 'stopped at the length', eos: 'stopped at the end of text' }[m.stopped] || `stopped: ${m.stopped}` : ''].filter(Boolean).join(' · ');
+  log.innerHTML = (tableLog.length || pending ? '' : '<div class="empty">no exchanges with this ship yet: say something below</div>')
+    + tableLog.map(x => `<div class="ex"><div class="q"><b>Q:</b> ${esc(x.q)}</div><div class="a"><b>A:</b> ${esc(x.a)}</div><div class="m">${esc(meta(x.meta))}</div></div>`).join('')
+    + (pending ? `<div class="ex pending"><div class="q"><b>Q:</b> ${esc(pending)}</div><div class="a"><b>A:</b> <span class="s">the ship is thinking…</span></div></div>` : '');
+  log.scrollTop = log.scrollHeight;
+}
+function drawReadings(r) {
+  const el = document.getElementById('tablereadings');
+  if (!r) { el.textContent = 'no readings came back'; return; }
+  // measured readings first; one the ship has no reading for shows as a dash
+  const row = (k, v) => `<div class="rd${v == null ? ' none' : ''}"><span>${esc(STAR_LABEL[k] || k.replace(/_/g, ' '))}</span><b>${v == null ? '–' : typeof v === 'number' ? fmt(v) : esc(String(v))}</b></div>`;
+  const order = o => Object.entries(o || {}).sort((a, b) => (a[1] == null) - (b[1] == null));
+  const stars = order(r.stars), tricks = order(r.tricks);
+  el.innerHTML = (stars.length ? `<div class="k">stars</div>${stars.map(([k, v]) => row(k, v)).join('')}` : '')
+    + (tricks.length ? `<div class="k mt">tricks</div>${tricks.map(([k, v]) => row(k, v)).join('')}` : '') || 'no readings on this ship';
+}
+async function ask(question) {
+  if (tableBusy || !question.trim() || !tableRun) return;
+  tableBusy = true;
+  const input = document.getElementById('tableq'), status = document.getElementById('tablestatus');
+  input.value = ''; drawTable(question); status.textContent = '';
+  const seed = document.getElementById('tableseed').value.trim();
+  try {
+    const r = await fetch('/api/table/reply', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+      run: tableRun, question, history: tableLog.slice(-TABLE_HISTORY).map(x => ({ q: x.q, a: x.a })),
+      temperature: +document.getElementById('tabletemp').value, max_tokens: +document.getElementById('tablemax').value, seed: seed === '' ? null : seed }) });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || r.statusText);
+    tableLog.push({ q: question, a: d.answer, meta: { ...d, temperature: +document.getElementById('tabletemp').value, seed: seed === '' ? null : seed } });
+    drawReadings(d.readings);
+    if (d.prompt_tokens != null) status.textContent = `the ship read ${d.prompt_tokens} tokens of the conversation (step ${d.step ?? '–'})`;
+  } catch (e) {
+    status.textContent = /not built yet/.test(String(e.message)) ? "The table isn't open yet: the ship's side (thorp.table) is still being built." : 'no answer: ' + e.message;
+    input.value = question;
+  }
+  tableBusy = false;
+  drawTable();
+}
+document.getElementById('tableform').addEventListener('submit', e => { e.preventDefault(); ask(document.getElementById('tableq').value); });
+document.getElementById('tablerun').onchange = e => { tableRun = e.target.value; document.getElementById('tablereadings').textContent = 'ask something to see them'; loadTranscript(); };
+document.getElementById('tabletemp').oninput = e => { document.getElementById('tabletempv').textContent = (+e.target.value).toFixed(2); };
 
 // ---- Discoveries (server.py api_discoveries): the stars and the traits, across every ship
 let discKey = '';
@@ -1416,7 +1525,7 @@ function drawTricks() {
   document.getElementById('trickroute').innerHTML = wps.map((w, i) => {
     const mine = kts.filter(t => t.waypoint === w.key), gates = mine.filter(t => t.gate);
     return `<div class="step"><div class="n">${i + 1}</div><div class="nm">${esc(w.name)}</div><div class="ab">${esc(w.about)}</div>
-      <div class="gt">${gates.map(t => `<a href="#/discoveries/${esc(t.key)}">◆ ${esc(t.name)}</a>`).join('')}</div><div class="ct">${mine.length} tricks</div></div>`;
+      <div class="gt">${gates.map(t => `<a href="#/discoveries/${esc(t.key)}">◆ ${esc(t.name)}</a>`).join('')}${mine.filter(t => t.leads_to).map(t => `<a class="ld" href="#/discoveries/${esc(t.key)}" title="leads to ${esc((kts.find(x => x.key === t.leads_to) || {}).name || t.leads_to)}">↗ ${esc(t.name)}</a>`).join('')}</div><div class="ct">${mine.length} tricks</div></div>`;
   }).join('<div class="arrow">→</div>');
   // the size bands present, smallest first
   const bands = [...new Map(kts.map(t => [t.field_band_rank, t.field_band])).entries()].sort((a, b) => a[0] - b[0]);
@@ -1426,7 +1535,7 @@ function drawTricks() {
   const heads = Object.fromEntries((discData.known_heads || []).map(h => [h.key, h.name]));
   document.getElementById('trickcount').textContent = `${rows.length} tricks · ${rows.filter(t => t.fleet).length} measured by Thorp`;
   document.querySelector('#tricktable tbody').innerHTML = rows.map(t => `<tr data-trick="${esc(t.key)}" tabindex="0"${t.fleet ? ' class="measured"' : ''}>
-    <td data-sort="${wpRank(t.waypoint)}">${esc(wpName(t.waypoint))}</td><td><b>${t.gate ? '◆ ' : ''}${esc(t.name)}</b>${t.taught ? ' <span class="s">(taught)</span>' : ''}</td><td>${esc(t.does)}</td><td data-sort="${t.field_params}" title="${esc(t.field_at)}"><span class="sizeband">${esc(t.field_band)}</span></td><td class="s">${esc(t.sure)}</td>
+    <td data-sort="${wpRank(t.waypoint)}">${esc(wpName(t.waypoint))}</td><td><b>${t.gate ? '◆ ' : ''}${esc(t.name)}</b>${t.taught ? ' <span class="s">(taught)</span>' : ''}${leadNote(t, kts)}</td><td>${esc(t.does)}</td><td data-sort="${t.field_params}" title="${esc(t.field_at)}"><span class="sizeband">${esc(t.field_band)}</span></td><td class="s">${esc(t.sure)}</td>
     <td>${t.stars.length ? esc(t.stars.map(k => heads[k] || k).join(', ')) : '<span class="s">none charted yet</span>'}</td>
     ${trickProgress(t).cell}<td data-sort="${t.target_class ? classRank(t.target_class) : 99}">${t.target_class ? classLink(t.target_class) : t.taught ? '<span class="s">a reference: taught, not read</span>' : trickProgress(t).state === 'not viable' ? '<span class="s">not viable</span>' : '<span class="s">beyond the ladder</span>'}</td></tr>`).join('');
 }
@@ -1446,6 +1555,7 @@ async function drawTrickPage() {
   document.getElementById('trickover').innerHTML = [
     ['waypoint', `${esc(wp ? wp.name : t.waypoint)}${t.gate ? ' · <b>◆ a gate</b>: performed before a ship moves on' : ' · a milestone'}`],
     ['rests on', t.rests_on.length ? t.rests_on.map(k => `<a href="#/discoveries/${esc(k)}">${esc(tname[k] || k)}</a>`).join(', ') : '–'],
+    ...(leadNote(t, discData.known_tricks || []) ? [['leads', leadNote(t, discData.known_tricks || [])]] : []),
     ['the field shows it at', `<span class="sizeband">${esc(t.field_band)}</span> parameters · ${esc(t.field_at)} <span class="s">(${esc(t.sure)})</span>`], ['in', esc(t.field_models)], ['first shown by', `<span class="s">${esc(t.source)}</span>`],
     ["Thorp's goal class", t.target_class ? `${classLink(t.target_class)}${tgt ? ` · ${big(tgt.total)} parameters` : ''}` : t.taught ? 'none: the field shows it only when taught the task' : 'beyond the ladder: a horizon'],
     ['how Thorp measures it', ft ? `<span class="mono">${esc(ft.metric)}</span>, performed at ${ft.threshold}` : `not yet: ${esc(t.measure)}`],
@@ -1474,14 +1584,64 @@ async function drawTrickPage() {
   const key = JSON.stringify(d.runs.map(r => [r.run_id, r.value.length, r.value[r.value.length - 1]]));
   if (key === trickChartKey) return;
   trickChartKey = key;
-  if (!d.runs.length) return empty('trickchart', 'readings start with the next ship to sail');
-  const presets = ladderData.rungs.map(r => r.preset);
-  plot('trickchart', d.runs.map(r => ({ type: 'scatter', mode: 'lines', name: `${r.ship || r.name} (${r.preset})`, legendgroup: r.preset, x: r.step, y: r.value,
-    line: { color: PALETTE[presets.indexOf(r.preset) % PALETTE.length], width: 1.4 }, hovertemplate: `${esc(r.ship || r.name)}: %{y:.3f} at step %{x}<extra></extra>` })),
-    layout({ showlegend: d.runs.length <= 12, xaxis: { title: 'step', gridcolor: C.line }, yaxis: { title: esc(t.name), gridcolor: C.line },
-      shapes: [{ type: 'line', xref: 'paper', x0: 0, x1: 1, y0: d.threshold, y1: d.threshold, line: { color: C.accent, dash: 'dot' } }] }));
+  trickChart('trickchart', d, t);
+  // the partner beside it: the bigger test a smaller one leads to, or the smaller one that leads here
+  const partner = t.leads_to || ((discData.known_tricks || []).find(x => x.leads_to === t.key) || {}).key;
+  const pt = partner && (discData.known_tricks || []).find(x => x.key === partner);
+  document.getElementById('trickpairpanel').hidden = !pt;
+  if (!pt) return;
+  document.getElementById('trickpairtitle').innerHTML = `${t.leads_to ? 'It leads to' : 'Led by'} <a href="#/discoveries/${esc(pt.key)}">${esc(pt.name)}</a> <span class="note">${t.leads_to ? 'the bigger test this one tracks, on the same evaluator and scale' : 'the smaller test that tracks this one, on the same evaluator and scale'}</span>`;
+  const pf = pt.fleet && discTricks.find(x => x.key === pt.fleet);
+  if (!pf) return empty('trickpairchart', 'not measured yet');
+  if (pf.viable === false) return empty('trickpairchart', 'not viable on Gutenberg in English');
+  if (!pf.evaluator) return empty('trickpairchart', `pre-registered${pf.cutoff ? ` (cutoff ${pf.cutoff})` : ''}; its evaluator is not built yet`);
+  try { trickChart('trickpairchart', await get('/api/trick?key=' + encodeURIComponent(pf.key)), pt); } catch (e) { empty('trickpairchart', 'could not load it'); }
 }
-function drawDiscoveryView() { if (discView === 'index') drawTricks(); if (discView === 'trick') drawTrickPage(); }
+// one measured trick, every sailing's reading by step: the threshold (amber), the floor (grey: the
+// highest untrained reading among the sailings) and outside models' readings (labelled), dotted
+function trickChart(id, d, t) {
+  if (!d.runs.length) return empty(id, 'readings start with the next ship to sail');
+  const presets = ladderData.rungs.map(r => r.preset), floors = d.runs.map(r => r.floor).filter(v => v != null);
+  const refs = Object.entries(t.reference || {}), line = (y, color, dash = 'dot') => ({ type: 'line', xref: 'paper', x0: 0, x1: 1, y0: y, y1: y, line: { color, dash } });
+  const label = (y, text, color) => ({ xref: 'paper', x: 1, xanchor: 'right', y, yanchor: 'bottom', showarrow: false, text, font: { size: 10, color } });
+  const floor = floors.length ? Math.max(...floors) : null;
+  plot(id, d.runs.map(r => ({ type: 'scatter', mode: 'lines+markers', name: `${r.ship || r.name} (${r.preset})`, legendgroup: r.preset, x: r.step, y: r.value,
+    line: { color: PALETTE[presets.indexOf(r.preset) % PALETTE.length], width: 1.4 }, marker: { size: 7 }, hovertemplate: `${esc(r.ship || r.name)}: %{y:.3f} at step %{x}<extra></extra>` })),
+    layout({ showlegend: d.runs.length <= 12, xaxis: { title: 'step', gridcolor: C.line }, yaxis: { title: esc(t.name), gridcolor: C.line, zeroline: true, zerolinecolor: C.line },
+      shapes: [line(d.threshold, C.accent), ...(floor != null ? [line(floor, C.muted)] : []), ...refs.map(([, v], i) => line(v, PALETTE[(i + 4) % PALETTE.length], 'dash'))],
+      annotations: [label(d.threshold, `performed at ${d.threshold}`, C.accent), ...(floor != null ? [label(floor, `floor ${fmt(floor)}`, C.muted)] : []),
+        ...refs.map(([n, v], i) => label(v, `${esc(n)} ${fmt(v, 2)}`, PALETTE[(i + 4) % PALETTE.length]))] }));
+}
+// the discovery chains: each bettor test reached in rungs, one per class (leads_to from the speller's
+// tests up); rows are the chains, columns the rungs, each cell every class's best lift on that rung
+function drawChains() {
+  const kts = discData.known_tricks || [], byKey = Object.fromEntries(kts.map(t => [t.key, t]));
+  const led = new Set(kts.map(t => t.leads_to).filter(Boolean));
+  const chains = kts.filter(t => t.leads_to && !led.has(t.key)).map(start => { const c = [start]; let t = start; while (t.leads_to && byKey[t.leads_to]) { t = byKey[t.leads_to]; c.push(t); } return c; });
+  const tb = document.getElementById('chaintable');
+  if (!chains.length) { tb.tHead.innerHTML = ''; tb.tBodies[0].innerHTML = '<tr><td class="empty">no chains yet</td></tr>'; return; }
+  const width = Math.max(...chains.map(c => c.length)), presets = ladderData ? ladderData.rungs.map(r => r.preset) : [];
+  const rungClass = i => { const g = chains.map(c => c[i] && c[i].target_class).find(Boolean); return g ? classLink(g) : `rung ${i + 1}`; };
+  tb.tHead.innerHTML = `<tr><th>leads to</th>${Array.from({ length: width }, (_, i) => `<th>rung ${i + 1} · ${rungClass(i)}</th>`).join('')}</tr>`;
+  tb.tBodies[0].innerHTML = chains.map(c => {
+    const end = c[c.length - 1];
+    return `<tr><td><b>${esc(end.name)}</b></td>${c.map(t => {
+      const ft = t.fleet && discTricks.find(x => x.key === t.fleet);
+      const thr = ft ? ft.threshold : 0.1, ref = Object.entries(t.reference || {})[0];
+      let body;
+      if (!ft || (!ft.evaluator && !ft.ships.length)) body = `<div class="s">${ft && ft.viable === false ? 'not viable' : ft ? 'evaluator not built yet' : 'not measured'}</div>`;
+      else if (!ft.ships.length) body = '<div class="s">no readings yet</div>';
+      else {
+        const best = {};
+        for (const x of ft.ships) if (best[x.preset] == null || x.best > best[x.preset]) best[x.preset] = x.best;
+        body = Object.entries(best).sort((a, b) => presets.indexOf(a[0]) - presets.indexOf(b[0]))
+          .map(([p, v]) => `<div class="cr${v >= thr ? ' lit' : ''}"><span>${esc(p)}</span><b>${v >= 0 ? '+' : ''}${fmt(v, 2)}${v >= thr ? ' ✓' : ''}</b></div>`).join('');
+      }
+      return `<td><a href="#/discoveries/${esc(t.key)}"><b>${esc(t.name)}</b></a>${body}${ref ? `<div class="cr ref"><span>${esc(ref[0])}</span><b>+${fmt(ref[1], 2)}</b></div>` : ''}</td>`;
+    }).join('')}</tr>`;
+  }).join('');
+}
+function drawDiscoveryView() { if (discView === 'index') { drawChains(); drawTricks(); } if (discView === 'trick') drawTrickPage(); }
 // the trick a kind of head performs, if measured: performed or not, on how many sailings
 const trickNote = h => {
   const t = h.trick && discTricks.find(x => x.key === h.trick);
@@ -1548,7 +1708,7 @@ async function classGoals(r) {
   const gf = document.getElementById('goalfilter').value, shown = goals.filter(t => !gf || t.waypoint === gf);
   document.querySelector('#goaltable tbody').innerHTML = shown.length ? shown.sort((a, b) => wpRank(a.waypoint) - wpRank(b.waypoint)).map(t => {
     const st = onClass(t);
-    return `<tr data-trick="${esc(t.key)}" tabindex="0"><td><b>${esc(t.name)}</b></td><td data-sort="${wpRank(t.waypoint)}">${esc((wps.find(w => w.key === t.waypoint) || {}).name)}</td>
+    return `<tr data-trick="${esc(t.key)}" tabindex="0"><td><b>${esc(t.name)}</b>${leadNote(t, kts)}</td><td data-sort="${wpRank(t.waypoint)}">${esc((wps.find(w => w.key === t.waypoint) || {}).name)}</td>
       <td>${t.gate ? '◆ gate' : 'milestone'}</td><td>${t.rests_on.length ? esc(t.rests_on.map(k => tname[k] || k).join(', ')) : '–'}</td>
       <td data-sort="${t.field_params ?? ''}" title="${esc(t.field_at)}"><span class="sizeband">${esc(t.field_band)}</span></td>
       <td>${st.done ? '<span class="pill good">performed</span> ' : ''}${esc(st.text)}</td></tr>`;
@@ -1583,6 +1743,14 @@ async function routeCoverage() {
     return `<tr><td>${classLink(r.preset)}</td>${cov.map(c => `<td><a class="ccell" href="#${modelHash(r, 'goals')}">${c.here}${c.inherited ? `<span class="inh">+${c.inherited}</span>` : ''} <span class="s">of ${c.total}</span>${coverageBar(c)}</a></td>`).join('')}
       <td><b>${tot.here}</b>${tot.inherited ? `<span class="inh">+${tot.inherited}</span>` : ''} <span class="s">of ${tot.total}</span>${coverageBar(tot)}</td></tr>`;
   }).join('');
+}
+
+// a smaller test leads to a bigger one (the speller's three to the bettor's): the note under a trick's name
+function leadNote(t, kts) {
+  const name = k => (kts.find(x => x.key === k) || {}).name || k;
+  const led = kts.filter(x => x.leads_to === t.key);
+  return (t.leads_to ? `<div class="lead">→ leads to <a href="#/discoveries/${esc(t.leads_to)}">${esc(name(t.leads_to))}</a></div>` : '')
+    + (led.length ? `<div class="lead">← led by ${led.map(x => `<a href="#/discoveries/${esc(x.key)}">${esc(x.name)}</a>`).join(', ')}</div>` : '');
 }
 
 // a select of the seven steps to quantum physics, kept as chosen
@@ -1645,7 +1813,7 @@ async function classSteps(r) {
     tb.tBodies[0].innerHTML = rows.length ? rows.map(t => {
       const st = trickOnClass(t, r.preset, d);
       return `<tr data-trick="${esc(t.key)}" tabindex="0"><td data-sort="${wpRank(t.waypoint)}">${wpRank(t.waypoint) + 1}. ${esc((wps.find(w => w.key === t.waypoint) || {}).name || t.waypoint)}</td>
-        <td><b>${t.gate ? '◆ ' : ''}${esc(t.name)}</b>${t.taught ? ' <span class="s">(taught, not read)</span>' : ''}</td>
+        <td><b>${t.gate ? '◆ ' : ''}${esc(t.name)}</b>${t.taught ? ' <span class="s">(taught, not read)</span>' : ''}${leadNote(t, kts)}</td>
         <td data-sort="${t.field_params ?? ''}" title="${esc(t.field_at)}"><span class="sizeband">${esc(t.field_band)}</span></td>
         <td data-sort="${t.target_class ? classRank(t.target_class) : 99}">${t.target_class ? classLink(t.target_class) : '<span class="s">none</span>'}</td>
         <td>${t.stars.length ? t.stars.map(s => starOnClass(heads[s], r.preset, d)).join('<br>') : '<span class="s">none charted</span>'}</td>
@@ -1734,6 +1902,7 @@ async function rungExtras(r, runs, allRuns) {
     else plot('losschart', withLoss.map((c, i) => ({ type: 'scatter', mode: 'lines', name: c.ship || c.name, x: c.steps, y: ema(c.loss, 9),
       line: { color: PALETTE[i % PALETTE.length], width: 1.5 } })), layout({ xaxis: { title: 'step', gridcolor: C.line }, yaxis: { title: 'loss', gridcolor: C.line } }));
   } catch (e) { empty('losschart', 'could not load the curves'); }
+  stagesFor(allRuns.slice(-12).map(x => x.run_id)).then(m => bandStages('#rung', commonStages(m)));
   if (r.kind !== 'proxy') return;
   const big9 = ladderData.runs.filter(x => x.preset === ladderData.rungs.find(q => q.kind !== 'proxy').preset);
   // only proxy runs with a 9m twin calibrate anything; the loop's random shelves have none
@@ -1807,6 +1976,7 @@ async function refresh() {
     probePanel(r, gk);
     ladderPanel(r, m);
     samplesPanel(r);
+    stagesFor([selected]).then(st => { bandStages('#ship', st[selected]); drawStageList(st[selected]); });
     document.getElementById('updated').textContent = 'updated ' + new Date().toLocaleTimeString();
   } catch (e) {
     document.getElementById('updated').textContent = 'error: ' + e;

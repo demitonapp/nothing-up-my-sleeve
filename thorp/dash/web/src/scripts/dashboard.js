@@ -1,468 +1,9 @@
-<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Thorp</title>
-<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
-<style>
-  :root {
-    --bg: #0e1116; --panel: #161b22; --line: #2a313c; --text: #e6edf3; --muted: #8b949e;
-    --accent: #e3b341; --good: #3fb950; --bad: #f85149; --blue: #58a6ff; --raise: #1c232c; --track: #3b4655;
-    --c5: #d2a8ff; --c6: #ff9f6e; --c7: #79c0ff; --c8: #f778ba; --c9: #56d4dd; --c10: #a5d6ff; --c11: #ffd27a; --c12: #8ddb8c;
-    --fs-xs: 11px; --fs-sm: 12px; --fs-md: 13px; --fs-base: 14px; --fs-lg: 16px; --fs-xl: 18px; --fs-2xl: 22px;
-    --r-sm: 6px; --r-md: 8px; --r-pill: 10px;
-  }
-  /* the standards in UI.md: one control, one field, one pill, one clickable row, one focus ring */
-  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-  button, .btn { background: var(--bg); color: var(--muted); border: 1px solid var(--line); border-radius: var(--r-sm);
-                 padding: 4px 10px; font: inherit; font-size: var(--fs-sm); cursor: pointer; }
-  button:hover, .btn:hover, button.on { color: var(--accent); border-color: var(--accent); }
-  button:disabled { opacity: .4; cursor: default; color: var(--muted); border-color: var(--line); }
-  select, input { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-sm);
-                  padding: 4px 8px; font: inherit; font-size: var(--fs-sm); }
-  .pill, .badge { display: inline-block; padding: 1px 8px; border-radius: var(--r-pill); font-size: var(--fs-xs); border: 1px solid var(--line); }
-  .pill { white-space: nowrap; }
-  .pill.good, .pill.live, .badge.finished, .pill.finished { color: var(--good); border-color: var(--good); }
-  .pill.bad, .badge.failed, .pill.failed { color: var(--bad); border-color: var(--bad); }
-  .pill.blue, .badge.running, .pill.running { color: var(--blue); border-color: var(--blue); }
-  .pill.accent { color: var(--accent); border-color: var(--accent); }
-  .pill.solid, .allruns { color: var(--bg); background: var(--accent); border-color: var(--accent); }
-  table.clickable tbody tr[tabindex] { cursor: pointer; }
-  table.clickable tbody tr[tabindex]:hover td, table.clickable tbody tr[tabindex]:focus-visible td { background: var(--raise); color: var(--accent); }
-  table.clickable tbody tr:focus-visible { outline: none; }
-  .mt { margin-top: 8px; }
-  * { box-sizing: border-box; }
-  html { scroll-behavior: smooth; }
-  body { margin: 0; background: var(--bg); color: var(--text);
-         font: var(--fs-base)/1.45 ui-sans-serif, -apple-system, "Segoe UI", sans-serif; }
-  header { padding: 14px 20px; border-bottom: 1px solid var(--line); display: flex;
-           align-items: baseline; gap: 16px; flex-wrap: wrap; position: sticky; top: 0; background: var(--bg); z-index: 5; }
-  header h1 { margin: 0; font-size: var(--fs-xl); letter-spacing: .04em; }
-  header h1 a { color: inherit; text-decoration: none; }
-  header h1 a:hover { color: var(--accent); }
-  header .sub { color: var(--muted); }
-  nav { margin-left: auto; display: flex; gap: 4px; flex-wrap: wrap; font-size: var(--fs-sm); }
-  nav a { color: var(--muted); text-decoration: none; text-transform: uppercase; letter-spacing: .06em;
-          padding: 6px 10px; border-radius: var(--r-sm); border: 1px solid transparent; }
-  nav a:hover { color: var(--accent); }
-  nav a.active { color: var(--accent); border-color: var(--line); background: var(--panel); }
-  .section { display: none; }
-  .section.active { display: grid; }
-  main { padding: 16px 20px 40px; display: grid; gap: 16px; max-width: 1500px; margin: 0 auto; }
-  .section.active { gap: 16px; }
-  .section > h1 { margin: 18px 0 0; font-size: var(--fs-lg); letter-spacing: .08em; text-transform: uppercase; color: var(--accent); border-bottom: 1px solid var(--line); padding-bottom: 6px; }
-  .section > h1 .q { color: var(--muted); font-weight: 400; text-transform: none; letter-spacing: 0; margin-left: 12px; font-size: var(--fs-md); }
-  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-md);
-           padding: 12px 14px; min-width: 0; }
-  .panel h2 { margin: 0 0 8px; font-size: var(--fs-md); font-weight: 600; color: var(--muted);
-              text-transform: uppercase; letter-spacing: .06em; }
-  .panel h2 .note { text-transform: none; letter-spacing: 0; font-weight: 400; margin-left: 8px; }
-  .row { display: grid; gap: 16px; grid-template-columns: 1fr 1fr; }
-  .row3 { display: grid; gap: 16px; grid-template-columns: 1fr 1fr 1fr; }
-  @media (max-width: 1100px) { .row3 { grid-template-columns: 1fr; } }
-  @media (max-width: 900px) { .row { grid-template-columns: 1fr; } main { padding: 12px 16px; } nav { margin-left: 0; } }
-  .strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
-  .stat .k { color: var(--muted); font-size: var(--fs-sm); }
-  .stat .v { font-size: var(--fs-2xl); font-variant-numeric: tabular-nums; }
-  .stat .s { color: var(--muted); font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
-  .info { display: inline-block; position: relative; margin-left: 4px; color: var(--blue); cursor: help; font-size: var(--fs-xs); font-weight: 400;
-          text-transform: none; letter-spacing: 0; }
-  .info .pop { display: none; position: fixed; z-index: 50; width: 280px; padding: 10px 12px; text-align: left;
-               background: var(--raise); border: 1px solid var(--line); border-radius: var(--r-md); color: var(--text); font-size: var(--fs-sm);
-               line-height: 1.45; white-space: normal; box-shadow: 0 6px 20px rgba(0,0,0,.4); }
-  .info .pop b { color: var(--accent); font-weight: 600; }
-  .info:hover .pop, .info:focus .pop, .info.open .pop { display: block; }
-  .booktabs { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
-  #bookswrap { max-height: 420px; overflow: auto; }
-  /* the book reader: a Kindle Paperwhite page, after the Atlas essay reader (monorepo
-     packages/ui/apps/atlas/src/components/EssayReader.tsx): warm paper, black ink, no colour or shadow,
-     a justified serif with first-line indents, a quiet footer */
-  #reader { --paper: #F3F2ED; --ink: #101010; --soft: #555552; --rule: #BDBCB4;
-            --rsans: ui-sans-serif, -apple-system, "Segoe UI", sans-serif;
-            --rserif: "Iowan Old Style", "Palatino Linotype", Georgia, "Times New Roman", serif;
-            position: fixed; inset: 0; z-index: 60; background: var(--paper); color: var(--ink);
-            display: flex; flex-direction: column; font-family: var(--rserif); }
-  #reader[hidden] { display: none; }
-  #reader ::selection { background: #9C9B94; color: #000; }
-  #reader .rbar { display: flex; align-items: center; gap: 10px; padding: 0 18px; height: 42px; flex: 0 0 42px;
-                  font: var(--fs-sm) var(--rsans); color: var(--soft); border-bottom: 1px solid var(--rule); }
-  #reader .rbar.foot { border-bottom: 0; border-top: 1px solid var(--rule); height: 34px; flex-basis: 34px; justify-content: space-between; }
-  #reader .rbar .t { font: italic var(--fs-md) var(--rserif); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-  #reader .rbar .tools { margin-left: auto; display: flex; gap: 6px; align-items: center; flex: 0 0 auto; }
-  #reader button { background: transparent; color: var(--ink); border: 1px solid var(--ink); border-radius: 2px; padding: 3px 9px;
-                   font: var(--fs-sm)/1.3 var(--rsans); cursor: pointer; }
-  #reader button:disabled { opacity: .35; cursor: default; }
-  #reader button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
-  #reader .rwrap { flex: 1; min-height: 0; display: flex; justify-content: center; }
-  #reader .rstage { width: 100%; max-width: 716px; padding: 26px 28px 14px; height: 100%; overflow: hidden; }
-  #reader .rpage { overflow: hidden; position: relative; }
-  #reader .rscroll { height: 100%; overflow-y: auto; padding-right: 6px; }
-  #reader .rtext { line-height: 1.55; hyphens: auto; -webkit-hyphens: auto; text-align: justify; overflow-wrap: break-word; }
-  #reader .rtext p { margin: 0; text-indent: 1.3em; orphans: 2; widows: 2; }
-  #reader .rtext p.v { text-indent: 0; text-align: left; white-space: pre-wrap; margin: .8em 0; hyphens: none; }
-  #reader .rtext p.h { text-indent: 0; text-align: center; font-weight: 700; margin: 1.6em 0 .7em; break-after: avoid; hyphens: none; }
-  #reader .rtext p.h + p, #reader .rtext p.v + p, #reader .rtext .title + p { text-indent: 0; }
-  #reader .rtext .title { text-align: center; margin: 12% 0 2.2em; text-indent: 0; }
-  #reader .rtext .title h1 { font-size: 1.7em; line-height: 1.2; font-weight: 700; margin: 0; }
-  #reader .rtext .title .by { font: .62em var(--rsans); letter-spacing: .06em; text-transform: uppercase; color: var(--soft); margin: 1.1em 0 0; }
-  #reader .rtext .title hr { border: 0; border-top: 1px solid var(--rule); width: 30%; margin: 2em auto 0; }
-  #reader .rtext .more { text-align: center; font: var(--fs-sm) var(--rsans); color: var(--soft); margin: 2em 0 1em; text-indent: 0; }
-  .chart { width: 100%; height: 320px; }
-  #stripwrap > summary { cursor: pointer; color: var(--muted); font-size: var(--fs-md); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
-  #stripwrap > summary .note { text-transform: none; letter-spacing: 0; font-weight: 400; margin-left: 8px; }
-  #stripwrap[open] > summary { margin-bottom: 8px; }
-  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
-  .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-md); padding: 14px 16px; cursor: pointer;
-          display: flex; flex-direction: column; gap: 8px; color: var(--text); text-decoration: none; transition: border-color .15s; }
-  .card:hover, .card:focus-visible { border-color: var(--accent); outline: none; }
-  .card .top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
-  .card .preset { font-size: var(--fs-2xl); font-weight: 600; }
-  .card .nm { color: var(--accent); font-size: var(--fs-sm); text-transform: uppercase; letter-spacing: .06em; }
-  .card .job { font-weight: 600; }
-  .card .ov { color: var(--muted); font-size: var(--fs-md); flex: 1; }
-  .card .foot { display: flex; justify-content: space-between; gap: 8px; font-size: var(--fs-sm); color: var(--muted); border-top: 1px solid var(--line); padding-top: 8px; }
-  a.back { color: var(--muted); text-decoration: none; font-size: var(--fs-md); margin-right: 8px; }
-  a.back:hover { color: var(--accent); }
-  .rungover { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px 24px; }
-  .rungover .k { color: var(--muted); font-size: var(--fs-sm); } 
-  .chart.tall { height: 380px; }
-  .chart.short { height: 240px; }
-  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
-  th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--line); }
-  th { color: var(--muted); font-weight: 500; font-size: var(--fs-sm); }
-  th.dt-sortable { cursor: pointer; user-select: none; }
-  th.dt-sortable:hover { color: var(--text); }
-  th.dt-sortable::after { content: '↕'; margin-left: 4px; opacity: 0; font-size: var(--fs-xs); }
-  th.dt-sortable:hover::after { opacity: .5; }
-  th.dt-asc, th.dt-desc { color: var(--accent); }
-  th.dt-asc::after { content: '▲'; opacity: 1; } th.dt-desc::after { content: '▼'; opacity: 1; }
-  tr.sel td { color: var(--accent); }
-  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: var(--fs-sm); }
-  .samples div { margin: 0 0 10px; }
-  .samples .p { color: var(--accent); }
-  .samples .t { color: var(--muted); font-size: var(--fs-xs); }
-  .samples pre { white-space: pre-wrap; margin: 2px 0 0; font: var(--fs-sm)/1.4 ui-monospace, Menlo, monospace; }
-  #runpick { background: var(--panel); font-size: var(--fs-md); max-width: 420px; }
-  .allruns { margin-right: 8px; letter-spacing: .06em; text-transform: uppercase; vertical-align: 2px; }
-  .empty { color: var(--muted); padding: 30px 0; text-align: center; }
-  .scroll { overflow-x: auto; }
-  .claim { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
-  .claim .k { color: var(--accent); font-size: var(--fs-sm); text-transform: uppercase; letter-spacing: .06em; }
-  .claim .v { margin-top: 4px; }
-  .claim .reading { grid-column: 1 / -1; border-top: 1px solid var(--line); padding-top: 10px; }
-  .verdict { font-size: var(--fs-lg); }
-  .verdict.open { color: var(--muted); }
-  .verdict.yes { color: var(--good); }
-  .verdict.no { color: var(--bad); }
-  .traits { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin-bottom: 10px; }
-  .trait { border: 1px solid var(--line); border-radius: var(--r-sm); padding: 8px 10px; }
-  .trait .n { color: var(--muted); font-size: var(--fs-sm); }
-  .trait .a { font-size: var(--fs-2xl); font-weight: 600; }
-  .trait .a.yes { color: var(--good); } .trait .a.no { color: var(--bad); } .trait .a.na { color: var(--muted); }
-  .trait .r { color: var(--muted); font-size: var(--fs-xs); }
-  .kinks td.t { color: var(--muted); }
-  .foot { color: var(--muted); font-size: var(--fs-sm); padding-top: 10px; }
-</style>
-</head>
-<body>
-<header>
-  <h1><a href="/" id="home" title="back to the ladder">THORP</a></h1>
-  <select id="runpick" title="the run every per-run panel shows"></select>
-  <span class="sub" id="title">loading…</span>
-  <span class="sub" id="updated"></span>
-  <nav>
-    <a href="#sizes" data-tab="sizes">Ladder</a><a href="#betting" data-tab="betting">Betting</a><a href="#books" data-tab="books">Books</a><a href="#languages" data-tab="languages">Languages</a>
-    <a href="#sieves" data-tab="sieves">Sieves</a><a href="#attention" data-tab="attention">Attention</a><a href="#traits-section" data-tab="traits-section">Traits</a><a href="#runs-section" data-tab="runs-section">Runs</a>
-  </nav>
-</header>
-<main>
-  <details class="panel" id="stripwrap" open><summary>Run overview <span class="note" id="stripsum"></span></summary><div class="strip" id="strip"></div></details>
-
-  <!-- ============================================================ the ladder: home -->
-  <div class="section" id="sizes">
-    <h1>The ladder <span class="q">each model size has one job; open a card for the metrics that judge it</span></h1>
-    <div class="cards" id="rungcards"></div>
-    <section class="panel"><h2>Tonight's queue <span class="note">scripts/queue_9m.sh runs these one at a time, after the pool runs and the re-score</span></h2><div class="scroll"><table id="queue"><thead><tr><th>#</th><th>spec</th><th>status</th></tr></thead><tbody></tbody></table></div></section>
-  </div>
-
-  <!-- ============================================================ one rung -->
-  <div class="section" id="rung">
-    <h1><a href="#sizes" class="back">← ladder</a> <span id="rungtitle"></span> <span class="q" id="rungjob"></span></h1>
-    <section class="panel"><div class="rungover" id="rungover"></div></section>
-    <section class="panel"><h2>What we measure, and why <span class="note">each metric tied to this rung's job; "to come" is not built yet</span></h2>
-      <div class="scroll"><table id="rungmetrics"><thead><tr><th>metric</th><th>what it tells us</th><th>better is</th><th>state</th></tr></thead><tbody></tbody></table></div></section>
-    <section class="panel"><h2 id="boardh">Scoreboard <span class="note">English held-out books; lower bits per byte is better; laws show the model beside the books' own value (ref)</span></h2>
-      <div class="scroll"><table id="rungboard"><thead></thead><tbody></tbody></table></div></section>
-    <section class="panel" id="calpanel" style="display:none">
-      <h2>Calibration against 9m <span class="note">the same shelf and passes at both sizes; the proxy is trusted only if it orders the shelves as 9m does. Forgotten Tomes bits per byte, English, lower is better</span></h2>
-      <div class="row">
-        <div class="scroll"><table id="caltable"><thead><tr><th>shelf</th><th>passes</th><th>9m run</th><th>9m score</th><th>1m run</th><th>1m score</th></tr></thead><tbody></tbody></table>
-          <p class="note" id="calverdict"></p></div>
-        <div class="chart" id="calchart"></div>
-      </div>
-    </section>
-    <div class="row">
-      <section class="panel"><h2>The Forgotten Tomes score <span class="note">bits per byte on 16 books Qwen 3.8 cannot have read; lower is better; dotted lines are Qwen models scored the same way</span></h2><div class="chart" id="ftchart"></div></section>
-      <section class="panel"><h2>Training loss <span class="note">nats per token on the training shelf, every run at this size</span></h2><div class="chart" id="losschart"></div></section>
-    </div>
-    <section class="panel" id="bookspanel">
-      <h2>The books <span class="note">click any book to read it: the same stripped text Thorp trains and scores on</span></h2>
-      <div class="booktabs"><button data-bt="tomes" class="on">The Forgotten Tomes</button><button data-bt="shelf">Training shelves</button>
-        <select id="shelfpick" style="display:none"></select><input id="bookfilter" placeholder="filter by title or family" style="display:none"></div>
-      <div class="scroll" id="bookswrap"><table id="bookstable" class="clickable"><thead></thead><tbody></tbody></table></div>
-    </section>
-    <div class="row" id="rungcharts">
-      <section class="panel"><h2>Bits per byte by kind of byte <span class="note">spelling is "inside a word"; one bar per run; lower is better</span></h2><div class="chart" id="splitchart"></div></section>
-      <section class="panel"><h2>The laws: model against the books <span class="note">model value ÷ the books' value; closer to the dotted line at 1 is better</span></h2><div class="chart" id="lawchart"></div></section>
-    </div>
-  </div>
-
-  <!-- ============================================================ betting performance -->
-  <div class="section" id="betting">
-    <h1>Betting performance <span class="q">how well the machine bets on books it has never seen, and how fast that improves</span></h1>
-    <section class="panel"><div class="strip" id="numbers"></div></section>
-    <section class="panel" id="contentpanel">
-      <h2><span class="allruns" title="this panel compares every run on the ledger; it does not follow the run picker">all runs</span>The content experiment <span class="note">does what is on the shelf change how well the model bets on unseen books, its traits, its kinks or its sieves? Fifteen 9m ships, five shelves, the same bytes, tokens and test; the rule was written before any shelf was cut (DECISIONS.md)</span></h2>
-      <div class="claim" id="contentverdict"></div>
-      <div id="contentships"></div>
-      <div class="chart tall" id="contentchart"></div>
-    </section>
-    <section class="panel">
-      <h2><span class="allruns" title="this panel compares every run on the ledger; it does not follow the run picker">all runs</span>The claim, and what the ledger says about it</h2>
-      <div class="claim" id="claim"></div>
-    </section>
-    <section class="panel">
-      <h2><span class="allruns" title="this panel compares every run on the ledger; it does not follow the run picker">all runs</span>Shelves compared: guessing accuracy against tokens seen <span class="note">hole-card bits per byte, every run on the ledger; the slope is the learning speed</span></h2>
-      <div class="chart tall" id="compare"></div>
-    </section>
-    <section class="panel">
-      <h2><span class="allruns" title="this panel compares every run on the ledger; it does not follow the run picker">all runs</span>Matched tokens <span class="note">each run's hole-card bits per byte interpolated at the same tokens seen, so shelves of different sizes compare honestly; – where the run has not reached that point</span></h2>
-      <div id="matched"></div>
-    </section>
-    <section class="panel">
-      <h2><span class="allruns" title="this panel compares every run on the ledger; it does not follow the run picker">all runs</span>The truth gap <span class="note">bits per byte on the truths deck (one treatise per field) minus the literature hole cards, at the same step; a shelf that narrows it taught the laws, not just the register</span></h2>
-      <div id="truthgap"></div>
-    </section>
-    <section class="panel">
-      <h2>Training loss, 100-step EMA, eval cross-entropy, learning rate</h2>
-      <div class="chart tall" id="loss"></div>
-    </section>
-    <section class="panel">
-      <h2>Bits per byte per hole card</h2>
-      <div class="chart tall" id="bpb"></div>
-    </section>
-  </div>
-
-  <!-- ============================================================ books -->
-  <div class="section" id="books">
-    <h1>Books <span class="q">which books are learned fast, which teach, and which the tokeniser cannot read</span></h1>
-    <div class="row">
-      <section class="panel">
-        <h2>Loss by book <span class="note">each recipe book's own descent, mean over each 50-step window, coloured by family</span></h2>
-        <div class="chart tall" id="bookloss"></div>
-      </section>
-      <section class="panel">
-        <h2>Loss by kind <span class="note">mean over the books that carry the trait against the ones that do not</span></h2>
-        <div class="chart tall" id="kindloss"></div>
-      </section>
-    </div>
-    <section class="panel">
-      <h2>When each book is learned <span class="note">half-life: the step at which a book has made half the drop it has made so far; sooner is a book of formulae, later is a book that is still teaching</span></h2>
-      <div class="chart tall" id="halflife"></div>
-      <div class="foot">What each book contributed to the hole-card score (the heart of the dice, section 13) is not on this page yet: it is a gradient per book at the final checkpoint, computed once a run ends.</div>
-    </section>
-    <section class="panel"><h2>Byte-fallback rate per book <span class="note">the share of a book's tokens the tokeniser had to spell out in raw bytes</span></h2><div class="chart" id="fallback"></div></section>
-  </div>
-
-  <!-- ============================================================ language groups -->
-  <div class="section" id="languages">
-    <h1>Language groups <span class="q">what the shelf is made of by family, and how each family is learned and scored</span></h1>
-    <div class="row3">
-      <section class="panel"><h2>Recipe: tokens by language family</h2><div class="chart" id="families"></div></section>
-      <section class="panel"><h2>Loss by family <span class="note">mean over the family's recipe books</span></h2><div class="chart" id="familyloss"></div></section>
-      <section class="panel"><h2>Hole-card bits per byte by family <span class="note">latest eval, mean over the family's held-out books</span></h2><div class="chart" id="familybpb"></div></section>
-    </div>
-  </div>
-
-  <!-- ============================================================ sieves -->
-  <div class="section" id="sieves">
-    <h1>Sieves <span class="q">how hard each layer is pushed, how far it actually moves, and where each one changes regime</span></h1>
-    <div class="row">
-      <section class="panel"><h2>Gradient push per layer <span class="note">log10 of the pre-clip norm; ◆ the kink</span></h2><div class="chart" id="gradheat"></div></section>
-      <section class="panel"><h2>Weight move per layer <span class="note">log10 of the move since the last record over the size of the weights; ◆ the kink</span></h2><div class="chart" id="moveheat"></div></section>
-    </div>
-    <div class="row">
-      <section class="panel">
-        <h2>The kink <span class="note">each layer's push, fitted as two lines; the break is where the layer changes regime</span></h2>
-        <div class="chart" id="kinks"></div>
-      </section>
-      <section class="panel">
-        <h2>Where each layer broke</h2>
-        <div class="scroll"><table class="kinks" id="kinktable"><thead><tr>
-          <th>layer</th><th>kink at step</th><th>which way</th><th>slope before</th><th>slope after</th><th>strength</th><th></th></tr></thead><tbody></tbody></table></div>
-        <div class="foot" id="kinknote"></div>
-      </section>
-    </div>
-  </div>
-
-  <!-- ============================================================ attention -->
-  <div class="section" id="attention">
-    <h1>Attention and MLP <span class="q">within each layer, whether the learning lands in attention or in the MLP, and what the engine is doing</span></h1>
-    <div class="row3">
-      <section class="panel"><h2>Push: attention over MLP <span class="note">log10 of the ratio per layer; above zero the attention half is pushed harder</span></h2><div class="chart" id="attnpush"></div></section>
-      <section class="panel"><h2>Move: attention over MLP <span class="note">log10 of the ratio of relative moves per layer</span></h2><div class="chart" id="attnmove"></div></section>
-      <section class="panel"><h2>Throughput and memory</h2><div class="chart" id="speed"></div></section>
-    </div>
-  </div>
-
-  <!-- ============================================================ traits -->
-  <div class="section" id="traits-section">
-    <h1>Traits <span class="q">whether any direction in the machine separates a kind of book it has never seen, and what it says when asked</span></h1>
-    <section class="panel">
-      <h2 id="probesh">Traits: is there a direction? <span class="note">a difference-of-means direction fitted on the shelf, scored on the hole cards; YES needs AUC ≥ 0.8 at some layer with two or more held-out books a side</span></h2>
-      <div class="controls" id="traitctl" style="display:flex;gap:16px;align-items:center;margin:4px 0 10px;font-size:12px">
-        <label>sort by <select id="traitsort"><option value="layer">sieve layer</option><option value="first">first step found</option><option value="auc">best AUC</option><option value="name">name</option></select></label>
-        <label>step <select id="traitstep"></select></label>
-        <span class="note" id="traitnote"></span>
-      </div>
-      <div class="traits" id="traits"></div>
-      <div class="chart short" id="probeheat"></div>
-    </section>
-    <section class="panel">
-      <h2 id="ladderh">The curiosity ladder <span class="note">six precursors of curiosity, bottom first, each measured on the held-out books against the untrained model (and, for the two probe rungs, a bag of tokens); the prediction is that they appear in order</span></h2>
-      <div class="claim" id="ladderverdict"></div>
-      <div id="ladder"></div>
-      <div class="chart short" id="laddertime"></div>
-    </section>
-    <div class="row">
-      <section class="panel"><h2 id="samplesh">Samples</h2><div class="samples" id="samples"></div></section>
-      <section class="panel"><h2 id="top10h">Next token</h2><div class="chart" id="top10"></div></section>
-    </div>
-  </div>
-
-  <!-- ============================================================ runs -->
-  <div class="section" id="runs-section">
-    <h1>Runs</h1>
-    <section class="panel">
-      <div class="scroll"><table id="runs" class="clickable"><thead><tr>
-        <th>ship</th><th>name</th><th>run</th><th>preset</th><th>seed</th><th>status</th><th>tokens</th>
-        <th>minutes</th><th>hole-card bpb mean</th><th>started</th></tr></thead><tbody></tbody></table></div>
-    </section>
-  </div>
-</main>
-<div id="reader" hidden>
-  <div class="rbar"><button id="rclose" title="Esc">Books</button><span class="t" id="rtitle"></span>
-    <span class="tools"><button id="rsmaller" aria-label="Smaller text">A&minus;</button><button id="rlarger" aria-label="Larger text">A+</button><button id="rmode"></button></span></div>
-  <div class="rwrap"><div class="rstage" id="rstage"></div></div>
-  <div class="rbar foot"><span id="rpos" aria-live="polite"></span><span id="rleft"></span></div>
-</div>
-<script>
-// ---- DataTable: the one sortable table every table on the page uses. Click a header to sort by it,
-// again to reverse, a third time for the order it was drawn in. It attaches to every <table> by
-// itself (opt out with data-nosort), and keeps each table's sort while the page redraws it every
-// 5 s. A cell may carry data-sort="…" to sort by something other than its text. Rows that are not
-// data (a single colspan cell: "no runs yet", "12 of 40 books") stay at the bottom.
-const DataTable = (() => {
-  const state = new Map();  // table key -> { col, dir }
-  const UNIT = { k: 1e3, K: 1e3, M: 1e6, B: 1e9, G: 1e9, T: 1e12, KB: 1e3, MB: 1e6, GB: 1e9, TB: 1e12, '%': 1 };
-  const NUM = /^([+\-−]?\d*\.?\d+(?:e[+\-]?\d+)?)\s*(KB|MB|GB|TB|[kKMBGT%])?$/;
-  // cell text without the ⓘ popovers, which carry a paragraph of help text
-  const text = n => n.nodeType === 3 ? n.nodeValue : n.classList && n.classList.contains('info') ? '' : [...n.childNodes].map(text).join('');
-  const headers = table => [...table.querySelectorAll('thead th')];
-  const key = table => {
-    const host = table.id || (table.closest('[id]') || {}).id || '';
-    return host + '|' + headers(table).map(th => text(th).trim()).join('|');
-  };
-  const value = td => {
-    if (!td) return null;
-    const s = (td.dataset.sort ?? text(td)).trim().replace(/,/g, '');
-    if (!s || s === '–' || s === '-' || s === '—') return null;
-    const m = s.match(NUM);
-    return m ? parseFloat(m[1].replace('−', '-')) * (UNIT[m[2]] || 1) : s.toLowerCase();
-  };
-  const isData = (tr, n) => tr.cells.length === n && ![...tr.cells].some(td => td.colSpan > 1);
-  function apply(table) {
-    const body = table.tBodies[0], ths = headers(table);
-    if (!body || !ths.length) return;
-    const rows = [...body.rows];
-    const link = table.classList.contains('clickable');
-    rows.forEach((tr, i) => {
-      if (tr.dataset.dti === undefined) tr.dataset.dti = i;
-      if (link && isData(tr, ths.length) && !tr.hasAttribute('tabindex')) tr.tabIndex = 0;
-    });
-    const st = state.get(key(table)) || { col: -1, dir: 0 };
-    ths.forEach((th, i) => {
-      th.classList.add('dt-sortable');
-      th.classList.toggle('dt-asc', i === st.col && st.dir === 1);
-      th.classList.toggle('dt-desc', i === st.col && st.dir === -1);
-    });
-    const data = rows.filter(tr => isData(tr, ths.length)), rest = rows.filter(tr => !isData(tr, ths.length));
-    const byOrder = (a, b) => a.dataset.dti - b.dataset.dti;
-    data.sort(st.dir === 0 ? byOrder : (a, b) => {
-      const x = value(a.cells[st.col]), y = value(b.cells[st.col]);
-      if (x === null || y === null) return x === y ? byOrder(a, b) : x === null ? 1 : -1;  // blanks last either way
-      if (typeof x !== typeof y) return (typeof x === 'number' ? -1 : 1) * st.dir;
-      return (x < y ? -1 : x > y ? 1 : byOrder(a, b) * st.dir) * st.dir;
-    });
-    const want = [...data, ...rest];
-    if (want.some((tr, i) => rows[i] !== tr)) body.append(...want);
-  }
-  function scan(root) {
-    const tables = root.tagName === 'TABLE' ? [root] : [...root.querySelectorAll('table')];
-    tables.filter(t => !t.hasAttribute('data-nosort')).forEach(apply);
-  }
-  const obs = new MutationObserver(muts => {
-    const hit = new Set();
-    muts.forEach(m => {
-      const t = m.target.closest && m.target.closest('table');
-      if (t) hit.add(t); else m.addedNodes.forEach(n => n.nodeType === 1 && (n.tagName === 'TABLE' ? hit.add(n) : n.querySelectorAll('table').forEach(x => hit.add(x))));
-    });
-    hit.forEach(t => { if (t.isConnected && !t.hasAttribute('data-nosort')) apply(t); });
-    obs.takeRecords();  // our own reordering is not a redraw
-  });
-  document.addEventListener('click', e => {
-    const th = e.target.closest('thead th');
-    if (!th || e.target.closest('.info')) return;
-    const table = th.closest('table');
-    if (table.hasAttribute('data-nosort')) return;
-    const k = key(table), col = headers(table).indexOf(th), st = state.get(k) || { col: -1, dir: 0 };
-    const dir = st.col !== col ? 1 : st.dir === 1 ? -1 : st.dir === -1 ? 0 : 1;
-    state.set(k, { col, dir });
-    apply(table); obs.takeRecords();
-  });
-  // a clickable table's rows open on Enter or Space, as they do on a click
-  document.addEventListener('keydown', e => {
-    const tr = e.target.closest && e.target.closest('table.clickable tbody tr[tabindex]');
-    if (tr && e.target === tr && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); tr.click(); }
-  });
-  function start() { scan(document.body); obs.observe(document.body, { childList: true, subtree: true }); }
-  if (document.body) start(); else document.addEventListener('DOMContentLoaded', start);
-  return { refresh: scan };
-})();
-
-// the charts read the page's colour tokens (UI.md), so a colour is defined once, in the CSS
-const tok = n => getComputedStyle(document.documentElement).getPropertyValue('--' + n).trim();
-const C = { text: tok('text'), muted: tok('muted'), line: tok('line'), accent: tok('accent'), blue: tok('blue'),
-            good: tok('good'), bad: tok('bad'), track: tok('track'), c5: tok('c5') };
-const PALETTE = [C.blue, C.accent, C.good, C.bad, ...[5, 6, 7, 8, 9, 10, 11, 12].map(i => tok('c' + i))];
-const layout = (extra = {}) => Object.assign({
-  paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
-  font: { color: C.text, size: 11 }, margin: { l: 50, r: 50, t: 10, b: 36 },
-  xaxis: { gridcolor: C.line, zerolinecolor: C.line },
-  yaxis: { gridcolor: C.line, zerolinecolor: C.line },
-  legend: { orientation: 'h', y: -0.18, font: { size: 10 } }, hovermode: 'closest',
-}, extra);
-const cfg = { displayModeBar: false, responsive: true };
-const fmt = (v, d = 3) => v == null || isNaN(v) ? '–' : Number(v).toFixed(d);
-const big = v => v == null ? '–' : v >= 1e9 ? (v / 1e9).toFixed(2) + 'B' : v >= 1e6 ? (v / 1e6).toFixed(1) + 'M' : v >= 1e3 ? (v / 1e3).toFixed(1) + 'k' : String(Math.round(v));
-const fmtBytes = v => !v ? '–' : v >= 1e9 ? (v / 1e9).toFixed(2) + ' GB' : v >= 1e6 ? (v / 1e6).toFixed(1) + ' MB' : (v / 1e3).toFixed(0) + ' KB';
-const esc = s => String(s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
-const get = async u => (await fetch(u)).json();
-const empty = (id, msg = 'no data yet') => { Plotly.purge(id); document.getElementById(id).innerHTML = `<div class="empty">${msg}</div>`; };
-const plot = (id, data, lay) => { const el = document.getElementById(id); if (el.querySelector('.empty')) el.innerHTML = ''; Plotly.react(id, data, lay, cfg); };
-const log10 = v => v > 0 ? Math.log10(v) : null;
-const mean = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : null;
+// The dashboard: tabs, the run picker, every panel, refreshed every 5 s from the JSON API in
+// server.py. Shared pieces live in ../lib (formatters, charts, DataTable, the reader).
+import { Plotly, tok, C, PALETTE, layout, cfg, empty, plot } from '../lib/charts.js';
+import { fmt, big, fmtBytes, esc, get, log10, mean } from '../lib/format.js';
+import { DataTable } from '../lib/datatable.js';
+import { openBook } from '../lib/reader.js';
 
 // metric keys: `<prefix>/layer_3`, `<prefix>/layer_3/attn`, `<prefix>/tok`, `<prefix>/pos`
 const groupOf = (k, prefix) => k.slice(prefix.length);
@@ -475,10 +16,20 @@ let selected = new URLSearchParams(location.search).get('run');
 
 const TABS = ['sizes', 'rung', 'betting', 'books', 'languages', 'sieves', 'attention', 'traits-section', 'runs-section'];
 let currentRung = null;
+// a model page lives at its class name: #proxy, #speller, #stylist… (old #rung-1m links still open it)
+const slugOf = r => r.name.toLowerCase().replace(/^the\s+/, '').replace(/[^a-z0-9]+/g, '-');
+const rungFor = key => ladderData && ladderData.rungs.find(r => slugOf(r) === key || r.preset === key);
 function showTab(id, push = true) {
-  const hash = id;
-  if (id.startsWith('rung-')) { currentRung = id.slice(5); id = 'rung'; if (ladderData) renderRung(); }
-  if (!TABS.includes(id)) id = TABS[0];
+  let hash = id;
+  if (id.startsWith('rung-')) id = id.slice(5);
+  if (!TABS.includes(id) || id === 'rung') {
+    if (id === 'rung' || (ladderData && !rungFor(id))) { id = hash = TABS[0]; }  // not a model this ladder has
+    else {
+      currentRung = id; const r = rungFor(id);
+      if (r) { hash = slugOf(r); if (location.hash !== '#' + hash) push = true; }
+      id = 'rung'; if (ladderData) renderRung();
+    }
+  }
   document.querySelectorAll('.section').forEach(s => s.classList.toggle('active', s.id === id));
   document.querySelectorAll('nav a').forEach(a => a.classList.toggle('active', a.dataset.tab === (id === 'rung' ? 'sizes' : id)));
   if (push && location.hash !== '#' + hash) history.replaceState(null, '', location.pathname + location.search + '#' + hash);
@@ -1121,133 +672,6 @@ document.querySelectorAll('.booktabs button').forEach(b => b.onclick = () => { b
 document.getElementById('shelfpick').onchange = () => renderRung();
 document.getElementById('bookfilter').oninput = () => renderRung();
 
-// ---- the reader: a book read the way a Kindle Paperwhite shows one, after the Atlas essay reader.
-// The whole stripped text is fetched once and cut into parts at paragraph breaks; each part is laid out
-// as pages (CSS columns, one per page) and turning past its last page opens the next part. Arrow keys,
-// Page Up/Down, Space, or a click on the left or right third of the page turn it. "Scroll" reads a
-// part as one long page instead. Text size, the mode and where you stopped in each book are kept.
-const RD = {
-  SIZES: [15, 17, 19, 21, 24], GAP: 56, PART: 60000, CPM: 1300,  // characters read a minute, for "min left"
-  book: null, parts: [], part: 0, page: 0, pages: 1, pageW: 0,
-  size: (() => { const v = rget('thorp.read.size'), n = v === null ? NaN : +v; return Number.isInteger(n) && n >= 0 && n < 5 ? n : 2; })(),
-  mode: rget('thorp.read.mode') === 'scroll' ? 'scroll' : 'page',
-};
-function rget(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
-function rset(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
-
-// Gutenberg text is hard-wrapped: lines inside a paragraph join with a space; a block of short lines
-// (verse, a title page, a table of contents) keeps its lines; a short line in capitals is a heading.
-function rParas(text) {
-  return text.split(/\n[ \t]*\n+/).map(b => b.replace(/^\n+|\s+$/g, '')).filter(b => b.trim()).map(b => {
-    const lines = b.split('\n'), longest = Math.max(...lines.map(l => l.trim().length));
-    if (lines.length <= 2 && longest < 60 && /[A-Z]/.test(b) && b === b.toUpperCase()) return `<p class="h">${esc(b.trim())}</p>`;
-    if (lines.length > 1 && (longest < 56 || lines.filter(l => /^\s{2,}/.test(l)).length > lines.length / 2)) return `<p class="v">${esc(b)}</p>`;
-    return `<p>${esc(lines.map(l => l.trim()).join(' '))}</p>`;
-  }).join('');
-}
-function rSplit(text) {
-  const parts = [];
-  for (let s = 0; s < text.length;) {
-    let e = Math.min(text.length, s + RD.PART);
-    if (e < text.length) { const b = text.indexOf('\n\n', e); e = b < 0 ? text.length : b + 2; }
-    parts.push({ start: s, end: e });
-    s = e;
-  }
-  return parts.length ? parts : [{ start: 0, end: 0 }];
-}
-const rEl = id => document.getElementById(id);
-
-async function openBook(id) {
-  rEl('rtitle').textContent = 'loading…';
-  rEl('reader').hidden = false;
-  // the server hands out at most 100k characters at a time
-  const url = o => `/api/book?id=${encodeURIComponent(id)}&offset=${o}&length=100000`;
-  const d = await get(url(0));
-  while (d.text.length < d.chars) { const more = await get(url(d.text.length)); if (!more.text) break; d.text += more.text; }
-  RD.book = d; RD.parts = rSplit(d.text);
-  const at = +rget('thorp.read.at:' + id) || 0;
-  RD.part = Math.max(0, RD.parts.findIndex(p => at < p.end));
-  rEl('rtitle').textContent = d.title;
-  rRender(at);
-}
-// lay out the current part; `at` is a character offset in the book to open at (null: the part's first page, -1: its last)
-function rRender(at = null) {
-  const d = RD.book, p = RD.parts[RD.part], stage = rEl('rstage');
-  const title = RD.part === 0 ? `<div class="title"><h1>${esc(d.title)}</h1><div class="by">${esc(d.author || '')}${d.author ? ' · ' : ''}${esc(d.book_id)}</div><hr></div>` : '';
-  const more = RD.part < RD.parts.length - 1 ? '' : '<p class="more">— the end —</p>';
-  const text = `<div class="rtext" style="font-size:${RD.SIZES[RD.size]}px">${title}${rParas(d.text.slice(p.start, p.end))}${more}</div>`;
-  const cs = getComputedStyle(stage);
-  const w = stage.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
-  const h = stage.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
-  RD.pageW = Math.max(0, Math.min(w, 660));
-  if (RD.mode === 'page') {
-    stage.innerHTML = `<div class="rpage" style="width:${RD.pageW}px;height:${h}px"><div id="rcols" style="height:${h}px;width:${RD.pageW}px;column-width:${RD.pageW}px;column-gap:${RD.GAP}px;column-fill:auto">${text}</div></div>`;
-    RD.pages = Math.max(1, Math.ceil((rEl('rcols').scrollWidth + RD.GAP - 1) / (RD.pageW + RD.GAP)));
-    // one characters-per-page figure for the whole book at this size and width, so page numbers do not jump between parts
-    const key = RD.book.book_id + '|' + RD.size + '|' + RD.pageW + '|' + h;
-    if (RD.cppKey !== key && (p.end - p.start > RD.PART / 2 || RD.parts.length === 1)) { RD.cpp = (p.end - p.start) / RD.pages; RD.cppKey = key; }
-    RD.page = at === -1 ? RD.pages - 1 : at == null ? 0 : Math.min(RD.pages - 1, Math.round((at - p.start) / Math.max(1, p.end - p.start) * RD.pages));
-  } else {
-    stage.innerHTML = `<div class="rscroll" id="rscroll">${text}</div>`;
-    const sc = rEl('rscroll'); RD.pages = 1; RD.page = 0;
-    const max = sc.scrollHeight - sc.clientHeight;
-    sc.scrollTop = at === -1 ? max : at == null ? 0 : (at - p.start) / Math.max(1, p.end - p.start) * max;
-    sc.onscroll = () => rFoot();
-  }
-  rEl('rmode').textContent = RD.mode === 'page' ? 'Scroll' : 'Pages';
-  rEl('rsmaller').disabled = RD.size === 0; rEl('rlarger').disabled = RD.size === RD.SIZES.length - 1;
-  rShow();
-}
-function rShow() {
-  const c = rEl('rcols');
-  if (c) c.style.transform = `translateX(${-RD.page * (RD.pageW + RD.GAP)}px)`;
-  rFoot();
-}
-// where the reader is, as a character offset into the book
-function rAt() {
-  const p = RD.parts[RD.part], len = p.end - p.start, sc = rEl('rscroll');
-  const f = RD.mode === 'page' ? RD.page / RD.pages : sc && sc.scrollHeight > sc.clientHeight ? sc.scrollTop / (sc.scrollHeight - sc.clientHeight) : 0;
-  return Math.round(p.start + f * len);
-}
-function rFoot() {
-  const d = RD.book, at = rAt(), p = RD.parts[RD.part];
-  rset('thorp.read.at:' + d.book_id, at);
-  const done = d.chars ? at / d.chars : 0;
-  const perPage = Math.max(1, RD.cppKey && RD.cppKey.startsWith(d.book_id + '|') ? RD.cpp : (p.end - p.start) / RD.pages);
-  const where = RD.mode === 'page' ? `Page ${Math.floor(at / perPage) + 1} of ${Math.max(1, Math.ceil(d.chars / perPage))}` : `Part ${RD.part + 1} of ${RD.parts.length}`;
-  rEl('rpos').textContent = `${where}  ·  ${Math.round(done * 100)}%`;
-  const mins = Math.max(0, (d.chars - at) / RD.CPM);
-  rEl('rleft').textContent = mins >= 90 ? `${(mins / 60).toFixed(1)} h left in book` : `${Math.max(1, Math.round(mins))} min left in book`;
-}
-function rTurn(by) {
-  if (RD.mode === 'page' && RD.page + by >= 0 && RD.page + by < RD.pages) { RD.page += by; return rShow(); }
-  if (RD.mode === 'scroll') {
-    const sc = rEl('rscroll'), max = sc.scrollHeight - sc.clientHeight;
-    if ((by > 0 && sc.scrollTop < max - 2) || (by < 0 && sc.scrollTop > 2)) return sc.scrollBy({ top: by * sc.clientHeight * 0.9 });
-  }
-  const next = RD.part + by;
-  if (next < 0 || next >= RD.parts.length) return;
-  RD.part = next; rRender(by > 0 ? null : -1);
-}
-const closeReader = () => { rEl('reader').hidden = true; };
-rEl('rclose').onclick = closeReader;
-rEl('rsmaller').onclick = () => { const at = rAt(); RD.size--; rset('thorp.read.size', RD.size); rRender(at); };
-rEl('rlarger').onclick = () => { const at = rAt(); RD.size++; rset('thorp.read.size', RD.size); rRender(at); };
-rEl('rmode').onclick = () => { const at = rAt(); RD.mode = RD.mode === 'page' ? 'scroll' : 'page'; rset('thorp.read.mode', RD.mode); rRender(at); };
-rEl('rstage').addEventListener('click', e => {
-  if (RD.mode !== 'page' || e.target.closest('a') || !window.getSelection().isCollapsed) return;
-  const b = rEl('rstage').getBoundingClientRect(), x = (e.clientX - b.left) / b.width;
-  if (x > 0.7) rTurn(1); else if (x < 0.3) rTurn(-1);
-});
-window.addEventListener('resize', () => { if (!rEl('reader').hidden && RD.book) rRender(rAt()); });
-document.addEventListener('keydown', e => {
-  if (rEl('reader').hidden || e.metaKey || e.ctrlKey || e.altKey) return;
-  if (e.key === 'Escape') return closeReader();
-  if (e.key === 'ArrowRight' || e.key === 'PageDown' || (e.key === ' ' && !e.shiftKey)) { e.preventDefault(); rTurn(1); }
-  else if (e.key === 'ArrowLeft' || e.key === 'PageUp' || (e.key === ' ' && e.shiftKey)) { e.preventDefault(); rTurn(-1); }
-});
-document.getElementById('bookstable').addEventListener('click', e => { const tr = e.target.closest('tr[data-book]'); if (tr && !e.target.closest('.info')) openBook(tr.dataset.book); });
-
 // ---- the ladder: home cards, then one page per rung with the metrics that judge its job
 const SPLIT_LABEL = { word_inside: 'inside a word', word_start: 'word start', punct: 'punctuation', space: 'space', newline: 'newline' };
 const LAW_COLS = [
@@ -1263,7 +687,7 @@ async function loadLadder() {
   document.getElementById('rungcards').innerHTML = d.rungs.map(r => {
     const runs = rungRuns(r.preset), live = runs.filter(x => x.status === 'running').length, done = runs.filter(x => x.status === 'finished').length;
     const nlive = r.metrics.filter(m => m[2] === 'live').length;
-    return `<a class="card" href="#rung-${esc(r.preset)}">
+    return `<a class="card" href="#${esc(slugOf(r))}">
       <div class="top"><span class="preset">${esc(r.preset)}</span><span class="nm">${esc(r.name)}</span></div>
       <div class="job">${esc(r.job)}</div><div class="ov">${esc(r.overview)}</div>
       <div class="foot"><span>${big(r.total)} params · ${esc(r.where.split(' (')[0])}</span>
@@ -1272,10 +696,65 @@ async function loadLadder() {
   }).join('');
   document.querySelector('#queue tbody').innerHTML = d.queue.map((q, i) => `<tr${q.status === 'running' ? ' class="sel"' : ''}><td>${i + 1}</td>
     <td>${esc(q.name)}</td><td>${esc(q.status.split(':')[0])}</td></tr>`).join('');
-  if (currentRung) renderRung();
+  if (currentRung && document.getElementById('rung').classList.contains('active')) showTab(currentRung, false);
 }
+const RECENT = 30;
+// ---- RunGrid: every run at one size as a square, like a GitHub contribution graph. Bands of 7 rows
+// x 53 columns (a "year" of 371 runs) stack downwards, so a new run only ever adds a square at the
+// end. Colour is the run's Forgotten Tomes quartile among the scored runs: deepest green is best.
+const GRID_ROWS = 7, GRID_COLS = 53;
+let gridKey = '';
+function runGrid(r, runs) {
+  const el = document.getElementById('rungrid'), sum = document.getElementById('rungridsum');
+  const key = r.preset + '|' + selected + '|' + runs.map(x => x.run_id + (x.status || '')[0] + (x.ft_en ?? '')).join(',');
+  if (key === gridKey) return;
+  gridKey = key;
+  if (!runs.length) { sum.innerHTML = ''; el.innerHTML = `<div class="empty">no runs at ${esc(r.preset)} yet</div>`; return; }
+  const scored = runs.filter(x => x.ft_en != null).sort((a, b) => a.ft_en - b.ft_en);
+  const rank = new Map(scored.map((x, i) => [x.run_id, i]));
+  const level = x => !rank.has(x.run_id) ? 0 : 4 - Math.min(3, Math.floor(4 * rank.get(x.run_id) / scored.length));
+  const live = runs.filter(x => x.status === 'running').length;
+  const med = scored.length ? scored[Math.floor((scored.length - 1) / 2)].ft_en : null;
+  const latest = [...runs].reverse().find(x => x.ft_en != null);
+  sum.innerHTML = `<span><b>${runs.length}</b> run${runs.length === 1 ? '' : 's'}</span><span><b>${scored.length}</b> scored</span>${live ? `<span class="pill blue">${live} running</span>` : ''}`
+    + (scored.length ? `<span>best <b>${fmt(scored[0].ft_en)}</b> ${esc(scored[0].ship || scored[0].name)}</span><span>median <b>${fmt(med)}</b></span><span>latest <b>${fmt(latest.ft_en)}</b> ${esc(latest.ship || latest.name)}</span>` : '')
+    + `<span class="legend">worse <i class="g1"></i><i class="g2"></i><i class="g3"></i><i class="g4"></i> better · <i class="g0"></i> not scored</span>`;
+  const per = GRID_ROWS * GRID_COLS, bands = [];
+  for (let b = 0; b * per < runs.length; b++) {
+    const chunk = runs.slice(b * per, (b + 1) * per);
+    bands.push(`<div class="gridband"><div class="gridlabel">runs ${b * per + 1}–${b * per + chunk.length}</div><div class="rungrid">${chunk.map(x => {
+      const st = (x.status || '').split(':')[0];
+      return `<i class="g${level(x)}${st === 'running' ? ' run' : ''}${st === 'failed' ? ' fail' : ''}${x.run_id === selected ? ' sel' : ''}" data-run="${esc(x.run_id)}"></i>`;
+    }).join('')}</div></div>`);
+  }
+  el.innerHTML = bands.join('');
+  el._runs = new Map(runs.map(x => [x.run_id, x])); el._rank = rank; el._n = scored.length;
+}
+(() => {
+  const el = document.getElementById('rungrid'), tip = document.createElement('div');
+  tip.className = 'gridtip'; tip.hidden = true; document.body.appendChild(tip);
+  el.addEventListener('mouseover', e => {
+    const c = e.target.closest('i[data-run]'); if (!c) return;
+    const x = el._runs.get(c.dataset.run); if (!x) return;
+    const k = el._rank.get(x.run_id), st = (x.status || '').split(':')[0];
+    tip.innerHTML = `<b>${esc(x.ship || x.name)}</b> <span class="s">${esc(x.name)}</span><br>`
+      + (x.ft_en != null ? `Forgotten Tomes <b>${fmt(x.ft_en)}</b> bpb · #${k + 1} of ${el._n}` : `no Forgotten Tomes score yet`)
+      + `<br>${esc(st)}${x.passes ? ` · ${x.passes} pass${x.passes === 1 ? '' : 'es'}` : ''}${x.started ? ` · started ${esc(String(x.started).slice(0, 16).replace('T', ' '))}` : ''}`;
+    const b = c.getBoundingClientRect(); tip.hidden = false;
+    tip.style.left = Math.max(8, Math.min(b.left - 8, innerWidth - tip.offsetWidth - 8)) + 'px';
+    tip.style.top = (b.bottom + 6) + 'px';
+  });
+  el.addEventListener('mouseout', e => { if (e.target.closest('i[data-run]')) tip.hidden = true; });
+  // a square opens its run, as a row in the Runs table does
+  el.addEventListener('click', e => {
+    const c = e.target.closest('i[data-run]'); if (!c) return;
+    selected = c.dataset.run; history.replaceState(null, '', '?run=' + selected + location.hash); refresh();
+  });
+})();  // panels that draw one mark per run show the latest RECENT; the run grid shows every run
 function renderRung() {
-  const r = ladderData.rungs.find(x => x.preset === currentRung) || ladderData.rungs[0];
+  const r = rungFor(currentRung) || ladderData.rungs[0];
+  // the template's own slot: panels marked data-kind show only on that kind of model
+  document.querySelectorAll('#rung [data-kind]').forEach(el => { el.hidden = !el.dataset.kind.split(' ').includes(r.kind || slugOf(r)); });
   document.getElementById('rungtitle').textContent = `${r.preset} · ${r.name}`;
   document.getElementById('rungjob').textContent = r.job;
   document.getElementById('rungover').innerHTML = [
@@ -1286,7 +765,9 @@ function renderRung() {
   document.querySelector('#rungmetrics tbody').innerHTML = r.metrics.map(m => `<tr><td><b>${esc(m[0])}</b>${info(METRIC_KEY[m[0]])}</td><td>${esc(m[1])}</td>
     <td>${HELP[METRIC_KEY[m[0]]] ? esc(HELP[METRIC_KEY[m[0]]][1]) : '–'}</td>
     <td><span class="pill${m[2] === 'live' ? ' live' : ''}">${esc(m[2])}</span></td></tr>`).join('');
-  const runs = rungRuns(r.preset);
+  const allRuns = rungRuns(r.preset), runs = allRuns.slice(-RECENT), capped = allRuns.length > runs.length;
+  runGrid(r, allRuns);
+  document.getElementById('recentnote').textContent = capped ? `the latest ${runs.length} of ${allRuns.length} runs; the grid above has every one` : '';
   const cell = (m, ref, dg) => m == null ? '–' : `${fmt(m, dg)}${ref == null ? '' : ` <span class="s">/ ${fmt(ref, dg)}</span>`}`;
   document.querySelector('#rungboard thead').innerHTML = `<tr><th>ship</th><th>name</th><th>vocab</th><th>context</th><th>seed</th><th>status</th>
     <th>bpb (en)${info('bpb')}</th>${Object.entries(SPLIT_LABEL).map(([k, l]) => `<th>${l}${info(k)}</th>`).join('')}${LAW_COLS.map(c => `<th>${c[1]}${info(c[0])}<br><span class="s">model / ref</span>${info('modelref')}</th>`).join('')}</tr>`;
@@ -1294,6 +775,7 @@ function renderRung() {
     <td>${x.vocab ?? '–'}</td><td>${x.context ?? '–'}</td><td>${x.seed ?? '–'}</td><td>${esc((x.status || '').split(':')[0])}</td>
     <td>${fmt(x.bpb_en)}</td>${Object.keys(SPLIT_LABEL).map(c => `<td>${fmt(x.split[c])}</td>`).join('')}
     ${LAW_COLS.map(([k, , dg]) => `<td>${cell(x.laws[k], x.ref[k], dg)}</td>`).join('')}</tr>`).join('')
+      + (capped ? `<tr><td colspan="25" class="note">the latest ${runs.length} of ${allRuns.length} runs at ${esc(r.preset)}</td></tr>` : '')
     : `<tr><td colspan="25" class="empty">no runs at ${esc(r.preset)} yet</td></tr>`;
   const split = runs.filter(x => Object.values(x.split).some(v => v != null));
   if (!split.length) empty('splitchart', runs.length ? 'the split arrives when scripts/queue_9m.sh re-scores the finished runs, after tonight\'s pool runs' : 'no runs at this size yet');
@@ -1307,13 +789,13 @@ function renderRung() {
     y: ratioKeys.map(([k]) => x.laws[k] != null && x.ref[k] ? x.laws[k] / x.ref[k] : null), marker: { color: PALETTE[i % PALETTE.length] } })),
     layout({ barmode: 'group', yaxis: { title: 'model ÷ books', gridcolor: C.line },
       shapes: [{ type: 'line', xref: 'paper', x0: 0, x1: 1, y0: 1, y1: 1, line: { color: C.accent, dash: 'dot' } }] }));
-  rungExtras(r, runs);
+  rungExtras(r, runs, allRuns);
   renderBooks(r, runs);
   document.querySelectorAll('#rung .chart').forEach(el => { if (el.data) Plotly.Plots.resize(el); });
 }
 
 // the Forgotten Tomes beside Qwen, training loss, and (for the proxy) calibration against 9m
-async function rungExtras(r, runs) {
+async function rungExtras(r, runs, allRuns) {
   const ext = (ladderData.external || []).filter(x => x.set === 'hole-cards-unseen' && x.bpb_mean_en != null);
   const scored = runs.filter(x => x.ft_en != null);
   if (!scored.length) empty('ftchart', 'no run at this size has a Forgotten Tomes score yet');
@@ -1324,17 +806,16 @@ async function rungExtras(r, runs) {
       annotations: ext.map((x, i) => ({ xref: 'paper', x: 1, xanchor: 'right', y: x.bpb_mean_en, yanchor: 'bottom', showarrow: false,
         text: `${x.model.split('/').pop()} ${x.bpb_mean_en.toFixed(3)}`, font: { size: 10, color: PALETTE[(i + 4) % PALETTE.length] } })) }));
   try {
-    const curves = await get('/api/rung?preset=' + encodeURIComponent(r.preset));
+    const curves = await get('/api/rung?preset=' + encodeURIComponent(r.preset) + '&limit=12');
     const withLoss = curves.filter(c => c.steps.length);
     if (!withLoss.length) empty('losschart', 'no training at this size yet');
     else plot('losschart', withLoss.map((c, i) => ({ type: 'scatter', mode: 'lines', name: c.ship || c.name, x: c.steps, y: ema(c.loss, 9),
       line: { color: PALETTE[i % PALETTE.length], width: 1.5 } })), layout({ xaxis: { title: 'step', gridcolor: C.line }, yaxis: { title: 'loss', gridcolor: C.line } }));
   } catch (e) { empty('losschart', 'could not load the curves'); }
-  const cal = document.getElementById('calpanel');
-  cal.style.display = r.kind === 'proxy' ? '' : 'none';
   if (r.kind !== 'proxy') return;
   const big9 = ladderData.runs.filter(x => x.preset === ladderData.rungs.find(q => q.kind !== 'proxy').preset);
-  const pairs = runs.map(p => ({ p, n: big9.find(n => n.recipe === p.recipe && n.passes === p.passes && n.seed === p.seed && n.status === 'finished') }));
+  // only proxy runs with a 9m twin calibrate anything; the loop's random shelves have none
+  const pairs = allRuns.map(p => ({ p, n: big9.find(n => n.recipe === p.recipe && n.passes === p.passes && n.seed === p.seed && n.status === 'finished') })).filter(x => x.n);
   document.querySelector('#caltable tbody').innerHTML = pairs.map(({ p, n }) => `<tr><td>${esc((p.recipe || '').replace('lists/', '').replace('.csv', ''))}</td>
     <td>${p.passes ?? '–'}</td><td>${n ? esc(n.ship || n.name) : '–'}</td><td>${fmt(n && n.ft_en)}</td><td>${esc(p.ship || p.name)}</td><td>${fmt(p.ft_en)}</td></tr>`).join('');
   const both = pairs.filter(({ p, n }) => n && n.ft_en != null && p.ft_en != null);
@@ -1403,6 +884,3 @@ async function refresh() {
 }
 refresh();
 setInterval(refresh, 5000);
-</script>
-</body>
-</html>

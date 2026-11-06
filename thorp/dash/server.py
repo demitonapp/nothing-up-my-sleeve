@@ -1,4 +1,5 @@
-"""The dashboard: index.html plus JSON read straight from the ledger. Standard library only.
+"""The dashboard: the Astro build in ./static (source in ./web) plus JSON read straight from the
+ledger. Standard library only; `pnpm --dir thorp/dash/web build` makes the page.
 
 Endpoints: /api/runs, /api/metrics?run=, /api/evals?run=, /api/run?run= (headline numbers,
 latest samples, probes, recipe composition, traits and tokeniser stats, which the panels need),
@@ -18,7 +19,32 @@ from thorp import chinchilla, paths
 from thorp.evaluators.probes import load_traits
 from thorp.ledger import connect
 
-INDEX = Path(__file__).with_name("index.html")
+STATIC = Path(__file__).with_name("static")
+TYPES = {
+    ".html": "text/html; charset=utf-8",
+    ".js": "text/javascript; charset=utf-8",
+    ".css": "text/css; charset=utf-8",
+    ".svg": "image/svg+xml",
+    ".png": "image/png",
+    ".ico": "image/x-icon",
+    ".woff2": "font/woff2",
+    ".json": "application/json",
+}
+NOT_BUILT = b"""<!doctype html><meta charset="utf-8"><title>Thorp</title>
+<body style="background:#0e1116;color:#e6edf3;font:14px/1.5 ui-sans-serif,sans-serif;padding:40px">
+<h1 style="font-size:18px">The dashboard is not built yet</h1>
+<p>Build it once (and after any change under thorp/dash/web), then reload:</p>
+<pre style="color:#e3b341">pnpm --dir thorp/dash/web install
+pnpm --dir thorp/dash/web build</pre>
+<p>The JSON API under /api works without it.</p></body>"""
+
+
+def _static(path: str) -> tuple[bytes, str] | None:
+    """A file from the build, never one outside it."""
+    f = (STATIC / path.lstrip("/")).resolve()
+    if not f.is_relative_to(STATIC.resolve()) or not f.is_file():
+        return None
+    return f.read_bytes(), TYPES.get(f.suffix, "application/octet-stream")
 
 
 def _con() -> sqlite3.Connection:
@@ -317,6 +343,28 @@ LAWS = (
 QUEUES = ("9m-order.txt", "content-order.txt")
 
 
+def _last_scores(run_ids: list[str]) -> dict[str, dict[str, float]]:
+    """Every run's latest eval/* and laws/* values, on one connection: one indexed range read per
+    run instead of one connection per metric, so the ladder stays quick with thousands of runs."""
+    out: dict[str, dict[str, float]] = {}
+    con = _con()
+    try:
+        for run in run_ids:
+            got: dict[str, float] = {}
+            # ascending by step then rowid, so the last write for each name wins, as in _metric
+            for name, value in con.execute(
+                "select name, value from metrics where run_id=?"
+                " and ((name >= 'eval/' and name < 'eval0') or (name >= 'laws/' and name < 'laws0'))"
+                " order by step, rowid",
+                [run],
+            ):
+                got[name] = value
+            out[run] = got
+    finally:
+        con.close()
+    return out
+
+
 def api_ladder() -> dict:
     """The ladder (each rung's job and how it is judged), every run's rung scores (the bits-per-byte
     split on its first held-out set and the laws, model beside reference), and tonight's queue."""
@@ -335,10 +383,14 @@ def api_ladder() -> dict:
             }
         )
     runs = []
-    for r in _rows(
-        "select run_id, name, ship, status, tokens_seen, spec_json from runs order by started"
-    ):
+    rows = _rows(
+        "select run_id, name, ship, status, tokens_seen, started, wall_minutes, spec_json"
+        " from runs order by started"
+    )
+    last = _last_scores([r["run_id"] for r in rows])
+    for r in rows:
         spec = json.loads(r.pop("spec_json") or "{}")
+        m = last.get(r["run_id"], {})
         sets = [Path(s).stem for s in spec.get("eval", {}).get("sets", [])]
         first = sets[0] if sets else None
         row = {
@@ -350,19 +402,19 @@ def api_ladder() -> dict:
             "experiment": spec.get("experiment"),
             "recipe": spec.get("data", {}).get("recipe"),
             "passes": spec.get("data", {}).get("passes"),
-            "ft_en": _metric(r["run_id"], "eval/hole-cards-unseen/bpb_mean_en"),
+            "ft_en": m.get("eval/hole-cards-unseen/bpb_mean_en"),
             "set": first,
-            "bpb_en": _metric(r["run_id"], f"eval/{first}/bpb_mean_en") if first else None,
+            "bpb_en": m.get(f"eval/{first}/bpb_mean_en") if first else None,
             "split": {},
             "laws": {},
             "ref": {},
         }
         if first:
             for c in SPLIT_CLASSES:
-                row["split"][c] = _metric(r["run_id"], f"eval/{first}/split/{c}/bpb_mean_en")
+                row["split"][c] = m.get(f"eval/{first}/split/{c}/bpb_mean_en")
         for k in LAWS:
-            row["laws"][k] = _metric(r["run_id"], f"laws/model/{k}")
-            row["ref"][k] = _metric(r["run_id"], f"laws/ref/{k}")
+            row["laws"][k] = m.get(f"laws/model/{k}")
+            row["ref"][k] = m.get(f"laws/ref/{k}")
         runs.append(row)
     done = {r["name"]: r["status"] for r in runs}
     queue = []
@@ -398,13 +450,18 @@ def api_ladder() -> dict:
     return {"rungs": rungs, "runs": runs, "queue": queue, "external": external}
 
 
-def api_rung(preset: str) -> list[dict]:
-    """Training-loss curves (at most 300 points each) for every run at one preset."""
+def api_rung(preset: str, limit: int | str = 0) -> list[dict]:
+    """Training-loss curves (at most 300 points each) for the runs at one preset: all of them, or
+    the latest `limit` (the proxy loop puts thousands of runs on one size)."""
     out = []
+    picked = []
     for r in _rows("select run_id, name, ship, spec_json from runs order by started"):
         spec = json.loads(r["spec_json"] or "{}")
-        if spec.get("model", {}).get("preset") != preset:
-            continue
+        if spec.get("model", {}).get("preset") == preset:
+            picked.append(r)
+    if int(limit or 0) > 0:
+        picked = picked[-int(limit) :]
+    for r in picked:
         pts = _rows(
             "select step, value from metrics where run_id=? and name='loss' order by step",
             [r["run_id"]],
@@ -511,10 +568,10 @@ class Handler(BaseHTTPRequestHandler):
     def log_message(self, *a):
         pass
 
-    def _send(self, code: int, body: bytes, ctype: str):
+    def _send(self, code: int, body: bytes, ctype: str, cache: str = "no-store"):
         self.send_response(code)
         self.send_header("Content-Type", ctype)
-        self.send_header("Cache-Control", "no-store")
+        self.send_header("Cache-Control", cache)
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
@@ -524,7 +581,24 @@ class Handler(BaseHTTPRequestHandler):
         q = {k: v[0] for k, v in parse_qs(u.query).items()}
         try:
             if u.path in ("/", "/index.html"):
-                return self._send(200, INDEX.read_bytes(), "text/html; charset=utf-8")
+                page = _static("index.html")
+                return (
+                    self._send(200, page[0], page[1])
+                    if page
+                    else self._send(503, NOT_BUILT, "text/html; charset=utf-8")
+                )
+            if not u.path.startswith("/api/"):
+                got = _static(u.path)
+                if got is None:
+                    return self._send(404, b"not found", "text/plain")
+                # the build names its assets by content hash, so they never go stale
+                hashed = u.path.startswith("/assets/")
+                return self._send(
+                    200,
+                    got[0],
+                    got[1],
+                    "public, max-age=31536000, immutable" if hashed else "no-store",
+                )
             routes = {
                 "/api/runs": lambda: api_runs(),
                 "/api/metrics": lambda: api_metrics(q["run"]),
@@ -532,7 +606,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/run": lambda: api_run(q["run"]),
                 "/api/compare": lambda: api_compare(),
                 "/api/ladder": lambda: api_ladder(),
-                "/api/rung": lambda: api_rung(q["preset"]),
+                "/api/rung": lambda: api_rung(q["preset"], q.get("limit", 0)),
                 "/api/tomes": lambda: api_tomes(),
                 "/api/shelf": lambda: api_shelf(q["run"]),
                 "/api/book": lambda: api_book(q["id"], q.get("offset", 0), q.get("length", 20000)),

@@ -66,9 +66,12 @@ uv run thorp fetch lists/hole-cards.csv
 uv run thorp fetch lists/hundred-by-reach.csv
 uv run thorp run specs/smoke-10-v2.yaml   # with the trait probes
 uv run thorp run specs/hundred-by-reach-v1.yaml
+pnpm --dir thorp/dash/web install && pnpm --dir thorp/dash/web build   # the dashboard page, once and after UI changes
 uv run thorp dash          # http://localhost:8787
 uv run thorp ledger "select book_id, bpb, ce_nats from evals where run_id=? and step=(select max(step) from evals where run_id=?) order by bpb"
 ```
+
+The dashboard is an Astro app in `thorp/dash/web` (like Atlas in the monorepo). It builds to `thorp/dash/static` (not committed), which `thorp dash` serves beside its JSON API. While working on the page, `pnpm --dir thorp/dash/web dev` serves it with hot reload on http://localhost:4321 and forwards `/api` to a running `thorp dash`. Its standards are in `thorp/dash/UI.md`.
 
 `thorp run` on a finished spec prints its ledger row and exits; on a spec with a checkpoint it resumes from the latest one. `thorp eval RUN` re-scores a run's latest checkpoint. Each `?` in `thorp ledger` binds to the latest finished run unless you pass parameters or `--run ID`.
 
@@ -76,6 +79,7 @@ uv run thorp ledger "select book_id, bpb, ce_nats from evals where run_id=? and 
 
 - `specs/`: run specs. `lists/`: the recipe, the hole cards, and `overrides.csv` (title, author → Gutenberg id).
 - `thorp/`: the harness (see `DECISIONS.md` for every choice the brief left open).
+- `thorp/dash/web/`: the dashboard page (Astro): `src/pages/index.astro` the shell, `src/components/` one per tab, `src/scripts/dashboard.js` the panels, `src/lib/` the shared pieces (DataTable, charts, formatters, the book reader), `src/styles/global.css` the tokens.
 - `scripts/`: `make_pool.py` (draw the pool from the catalogue), `cut_pool.py` (cut it to recipes by bytes), `queue_next.sh` and `queue_9m.sh` (the night's runs), `make_9m_specs.py` (the 9m sweep).
 - `lists/traits.csv`: fiction, verse and first-person labels per title, read by the probes evaluator and the page.
 - `data/` (not committed): catalogue, texts, tokenisers, shards, checkpoints, `manifest.sqlite`, run logs.

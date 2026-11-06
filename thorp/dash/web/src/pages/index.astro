@@ -1,0 +1,48 @@
+---
+/**
+ * The Thorp dashboard: one page, hash-routed (#sizes, #proxy, #betting…), like the Atlas shell in
+ * the monorepo. Every panel is filled in the browser from server.py's JSON API and refreshed every
+ * 5 s; the build is static and `thorp dash` serves it. The standards are in ../../UI.md.
+ */
+import '../styles/global.css';
+import Header from '../components/Header.astro';
+import RunOverview from '../components/RunOverview.astro';
+import Ladder from '../components/Ladder.astro';
+import ModelPage from '../components/ModelPage.astro';
+import Betting from '../components/Betting.astro';
+import Books from '../components/Books.astro';
+import Languages from '../components/Languages.astro';
+import Sieves from '../components/Sieves.astro';
+import Attention from '../components/Attention.astro';
+import Traits from '../components/Traits.astro';
+import Runs from '../components/Runs.astro';
+import Reader from '../components/Reader.astro';
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Thorp</title>
+  </head>
+  <body>
+    <Header />
+    <main>
+      <RunOverview />
+      <Ladder />
+      <ModelPage />
+      <Betting />
+      <Books />
+      <Languages />
+      <Sieves />
+      <Attention />
+      <Traits />
+      <Runs />
+    </main>
+    <Reader />
+    <script>
+      import '../scripts/dashboard.js';
+    </script>
+  </body>
+</html>

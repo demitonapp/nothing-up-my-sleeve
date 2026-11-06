@@ -1,0 +1,4 @@
+# As in the monorepo: esbuild's postinstall has never been needed (its platform binary arrives as
+# an optional dependency), and approving it would newly run install-time code.
+allowBuilds:
+  esbuild: false

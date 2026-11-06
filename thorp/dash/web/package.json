@@ -1,0 +1,14 @@
+{
+  "name": "thorp-dash",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview"
+  },
+  "dependencies": {
+    "astro": "7.3.3",
+    "plotly.js-dist-min": "2.35.2"
+  }
+}

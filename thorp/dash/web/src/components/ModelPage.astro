@@ -1,0 +1,39 @@
+---
+// one model page: the template every model on the ladder uses (UI.md, "Model pages")
+---
+<div class="section" id="rung">
+  <h1><a href="#sizes" class="back">← ladder</a> <span id="rungtitle"></span> <span class="q" id="rungjob"></span></h1>
+  <section class="panel"><div class="rungover" id="rungover"></div></section>
+  <section class="panel" id="gridpanel">
+    <h2>Every run at this size <span class="note">one square per run in the order they started; the deeper the green, the better (lower) its Forgotten Tomes bits per byte, by quartile of the runs scored so far; an outlined square is running</span></h2>
+    <div id="rungridsum" class="gridsum"></div>
+    <div id="rungrid"></div>
+  </section>
+  <section class="panel"><h2>What we measure, and why <span class="note">each metric tied to this rung's job; "to come" is not built yet</span></h2>
+    <div class="scroll"><table id="rungmetrics"><thead><tr><th>metric</th><th>what it tells us</th><th>better is</th><th>state</th></tr></thead><tbody></tbody></table></div></section>
+  <section class="panel"><h2 id="boardh">Scoreboard <span class="note">English held-out books; lower bits per byte is better; laws show the model beside the books' own value (ref) <b id="recentnote"></b></span></h2>
+    <div class="scroll"><table id="rungboard"><thead></thead><tbody></tbody></table></div></section>
+  <!-- this model's own panels: data-kind names the kinds of model they belong to -->
+  <section class="panel" id="calpanel" data-kind="proxy" hidden>
+    <h2>Calibration against 9m <span class="note">the same shelf and passes at both sizes; the proxy is trusted only if it orders the shelves as 9m does. Forgotten Tomes bits per byte, English, lower is better</span></h2>
+    <div class="row">
+      <div class="scroll"><table id="caltable"><thead><tr><th>shelf</th><th>passes</th><th>9m run</th><th>9m score</th><th>1m run</th><th>1m score</th></tr></thead><tbody></tbody></table>
+        <p class="note" id="calverdict"></p></div>
+      <div class="chart" id="calchart"></div>
+    </div>
+  </section>
+  <div class="row">
+    <section class="panel"><h2>The Forgotten Tomes score <span class="note">bits per byte on 16 books Qwen 3.8 cannot have read; lower is better; dotted lines are Qwen models scored the same way</span></h2><div class="chart" id="ftchart"></div></section>
+    <section class="panel"><h2>Training loss <span class="note">nats per token on the training shelf, the latest 12 runs at this size</span></h2><div class="chart" id="losschart"></div></section>
+  </div>
+  <section class="panel" id="bookspanel">
+    <h2>The books <span class="note">click any book to read it: the same stripped text Thorp trains and scores on</span></h2>
+    <div class="booktabs"><button data-bt="tomes" class="on">The Forgotten Tomes</button><button data-bt="shelf">Training shelves</button>
+      <select id="shelfpick" style="display:none"></select><input id="bookfilter" placeholder="filter by title or family" style="display:none"></div>
+    <div class="scroll" id="bookswrap"><table id="bookstable" class="clickable"><thead></thead><tbody></tbody></table></div>
+  </section>
+  <div class="row" id="rungcharts">
+    <section class="panel"><h2>Bits per byte by kind of byte <span class="note">spelling is "inside a word"; one bar per run; lower is better</span></h2><div class="chart" id="splitchart"></div></section>
+    <section class="panel"><h2>The laws: model against the books <span class="note">model value ÷ the books' value; closer to the dotted line at 1 is better</span></h2><div class="chart" id="lawchart"></div></section>
+  </div>
+</div>

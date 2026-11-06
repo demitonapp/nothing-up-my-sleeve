@@ -1,0 +1,23 @@
+<div class="section" id="traits-section">
+  <h1>Traits <span class="q">whether any direction in the machine separates a kind of book it has never seen, and what it says when asked</span></h1>
+  <section class="panel">
+    <h2 id="probesh">Traits: is there a direction? <span class="note">a difference-of-means direction fitted on the shelf, scored on the hole cards; YES needs AUC ≥ 0.8 at some layer with two or more held-out books a side</span></h2>
+    <div class="controls" id="traitctl" style="display:flex;gap:16px;align-items:center;margin:4px 0 10px;font-size:12px">
+      <label>sort by <select id="traitsort"><option value="layer">sieve layer</option><option value="first">first step found</option><option value="auc">best AUC</option><option value="name">name</option></select></label>
+      <label>step <select id="traitstep"></select></label>
+      <span class="note" id="traitnote"></span>
+    </div>
+    <div class="traits" id="traits"></div>
+    <div class="chart short" id="probeheat"></div>
+  </section>
+  <section class="panel">
+    <h2 id="ladderh">The curiosity ladder <span class="note">six precursors of curiosity, bottom first, each measured on the held-out books against the untrained model (and, for the two probe rungs, a bag of tokens); the prediction is that they appear in order</span></h2>
+    <div class="claim" id="ladderverdict"></div>
+    <div id="ladder"></div>
+    <div class="chart short" id="laddertime"></div>
+  </section>
+  <div class="row">
+    <section class="panel"><h2 id="samplesh">Samples</h2><div class="samples" id="samples"></div></section>
+    <section class="panel"><h2 id="top10h">Next token</h2><div class="chart" id="top10"></div></section>
+  </div>
+</div>

@@ -90,6 +90,10 @@ Every address is canonical: older ones (`#sizes`, `#proxy`, `#rung-1m`, `#/model
 
 ## Class pages
 
+The Classes home also has **Filling the seven steps to quantum physics**: a matrix of classes
+against the seven steps, each cell the tricks that class performed, with "+n" inherited from a
+smaller class and a bar; the last column is the whole route. Taught-only tricks don't count.
+
 Every class on the ladder (`LADDER` in `thorp/models/registry.py`) gets one page, built from one
 template (`web/src/components/ModelPage.astro`, filled by `renderRung` in `dashboard.js`) at
 `#/classes/<class>`, named by class, not size: `#/classes/pilot`, `#/classes/speller`…
@@ -101,10 +105,15 @@ Its tabs sit under its title, each with its own address:
 0. **Fleet** (`#/classes/proxy`): every ship of the class in service, newest first, one row per
    ship (its fitout, its sailings and their seeds, its voyage, mean and best Forgotten Tomes
    score); the archived First Fleet folds away below. A row opens the ship.
-0. **Goals** (`/goals`): the class on the route to quantum physics. Its **target level** (the
-   highest waypoint among its goals), its **ceiling** (its goals at that waypoint: the upper limit
-   expected of this size before the next class takes over), its goals and how many are performed,
-   what it carries up from smaller classes, and what the next class takes over. Then the seven
+0. **Goals** (`/goals`): the class on the route to quantum physics. **The goal is as many
+   tricks as the class can learn**, building on every trick below it and carrying all of them up
+   to the next class, so the seven steps fill as fast as they can (Justin, 7 November). The goal
+   classes in `tricks.py` are what the field would expect of each size: a minimum to prove, never
+   a cap. The tab gives the goal, what the field expects (the highest step among the tricks it
+   expects of this size, and the field's edge: those tricks at that step), how much is filled,
+   what it carries up from smaller classes, and what the next class takes over; then **Filling
+   the seven steps**, a bar per step split into tricks performed by this class (green), inherited
+   from a smaller class (outlined: carried up, still to show here) and open (grey). Then the seven
    waypoints bottom to top with every trick as a chip: this class's goals lit, carried ones
    marked, bigger classes' faded with their class, ✓ where this class's sailings performed it.
    The goals table sorts by any column and filters by step to quantum physics.

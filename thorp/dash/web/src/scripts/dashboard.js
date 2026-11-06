@@ -827,6 +827,7 @@ async function loadLadder() {
   }).join('');
   document.querySelector('#queue tbody').innerHTML = d.queue.map((q, i) => `<tr${q.status === 'running' ? ' class="sel"' : ''}><td>${i + 1}</td>
     <td>${esc(q.name)}</td><td>${esc(q.status.split(':')[0])}</td></tr>`).join('');
+  if (page === 'sizes') routeCoverage();
   if (page === 'rung' || page === 'ship') showTab(location.hash.slice(1), false);
 }
 const RECENT = 30;
@@ -1518,11 +1519,16 @@ async function classGoals(r) {
   const ceiling = level ? goals.filter(t => t.waypoint === level.key) : [];
   const nextCls = ladderData.rungs[me + 1], nextGoals = nextCls ? kts.filter(t => t.target_class === nextCls.preset) : [];
   const done = goals.filter(t => onClass(t).done).length;
+  const cov = coverage(reachData, r.preset), filled = cov.reduce((n, c) => n + c.here, 0), inh = cov.reduce((n, c) => n + c.inherited, 0), all = cov.reduce((n, c) => n + c.total, 0);
+  document.getElementById('goalcoverage').innerHTML = cov.map((c, i) => `<div class="crow"><span class="cname">${i + 1}. ${esc(c.name)}</span>${coverageBar(c)}
+    <span class="cnum">${c.here} here${c.inherited ? ` · ${c.inherited} inherited` : ''} · ${c.open} open of ${c.total}</span></div>`).join('')
+    + `<div class="crow total"><span class="cname">the route</span>${coverageBar({ here: filled, inherited: inh, open: all - filled - inh, total: all })}<span class="cnum">${filled} here · ${inh} inherited · ${all - filled - inh} open of ${all}</span></div>`;
   document.getElementById('goalsover').innerHTML = [
-    ['target level', level ? `<b>${esc(level.name)}</b> (waypoint ${wpRank(level.key) + 1} of ${wps.length})` : 'none set'],
-    ['ceiling', ceiling.length ? ceiling.map(t => `<a href="#/discoveries/${esc(t.key)}">${t.gate ? '◆ ' : ''}${esc(t.name)}</a>`).join(', ') + '<br><span class="s">the upper limit expected of this size</span>' : '–'],
-    ['its goals', `${goals.length} trick${goals.length === 1 ? '' : 's'} · ${done} performed so far`],
-    ['carried up', carried.length ? `${carried.length} from smaller classes, kept, not relearned` : 'none: the first class on the ladder'],
+    ['the goal', 'as many tricks as it can learn, building on all the tricks below it, carried up to the next class'],
+    ['the field expects', level ? `<b>${esc(level.name)}</b> (step ${wpRank(level.key) + 1} of ${wps.length}) at this size` : 'nothing from books at this size'],
+    ["the field's edge", ceiling.length ? ceiling.map(t => `<a href="#/discoveries/${esc(t.key)}">${t.gate ? '◆ ' : ''}${esc(t.name)}</a>`).join(', ') + '<br><span class="s">where the field would expect this size to stop; beyond it is pushing the envelope</span>' : '–'],
+    ['filled so far', `${filled} of ${all} tricks performed here${inh ? `, ${inh} more inherited to carry up` : ''} · ${done} of the ${goals.length} the field expects`],
+    ['carried up', carried.length ? `${carried.length} expected of smaller classes, kept, not relearned` : 'none: the first class on the ladder; everything it learns is carried up'],
     ['next class', nextCls ? `${classLink(nextCls.preset)} takes over with ${nextGoals.length}: ${nextGoals.slice(0, 4).map(t => esc(t.name)).join(', ')}${nextGoals.length > 4 ? '…' : ''}` : 'the top of the ladder; beyond it, the horizon'],
   ].map(([k, v]) => `<div><div class="k">${k}</div><div>${v}</div></div>`).join('');
   // the route, bottom (reading) to top (discovery)
@@ -1544,6 +1550,37 @@ async function classGoals(r) {
       <td>${st.done ? '<span class="pill good">performed</span> ' : ''}${esc(st.text)}</td></tr>`;
   }).join('') : `<tr><td colspan="6" class="empty">${goals.length ? 'none of this class\'s goals at this step' : 'no goals set for this class yet'}</td></tr>`;
 }
+// ---- coverage of the route (UI.md, "Filling the seven steps"): for a class and a step, the tricks its
+// sailings performed (here), those performed only by a smaller class (inherited: carried up, still to
+// show here) and the rest (open). Only measured tricks can be performed; the rest count as open.
+function coverage(data, preset) {
+  const kts = data.known_tricks || [], wps = data.waypoints || [], me = classRank(preset);
+  const performedBy = t => { const ft = t.fleet && (data.tricks || []).find(x => x.key === t.fleet); return ft ? ft.ships.filter(x => x.performed_at != null).map(x => x.preset) : []; };
+  return wps.map(w => {
+    const ts = kts.filter(t => t.waypoint === w.key && !t.taught);
+    let here = 0, inherited = 0;
+    for (const t of ts) {
+      const by = performedBy(t);
+      if (by.includes(preset)) here++;
+      else if (by.some(p => classRank(p) < me)) inherited++;
+    }
+    return { key: w.key, name: w.name, total: ts.length, here, inherited, open: ts.length - here - inherited };
+  });
+}
+const coverageBar = c => `<span class="cbar" title="${c.here} performed here, ${c.inherited} inherited, ${c.open} open, of ${c.total}">${
+  [['here', c.here], ['inherited', c.inherited], ['open', c.open]].map(([k, n]) => n ? `<i class="${k}" style="flex:${n}"></i>` : '').join('')}</span>`;
+async function routeCoverage() {
+  if (!reachData || Date.now() - reachAt > 30000) { try { reachData = await get('/api/discoveries'); reachAt = Date.now(); } catch (e) { return; } }
+  const wps = reachData.waypoints || [];
+  const tb = document.getElementById('coveragetable');
+  tb.tHead.innerHTML = `<tr><th>class</th>${wps.map((w, i) => `<th>${i + 1}. ${esc(w.name)}</th>`).join('')}<th>the route</th></tr>`;
+  tb.tBodies[0].innerHTML = ladderData.rungs.map(r => {
+    const cov = coverage(reachData, r.preset), tot = cov.reduce((a, c) => ({ total: a.total + c.total, here: a.here + c.here, inherited: a.inherited + c.inherited, open: a.open + c.open }), { total: 0, here: 0, inherited: 0, open: 0 });
+    return `<tr><td>${classLink(r.preset)}</td>${cov.map(c => `<td><a class="ccell" href="#${modelHash(r, 'goals')}">${c.here}${c.inherited ? `<span class="inh">+${c.inherited}</span>` : ''} <span class="s">of ${c.total}</span>${coverageBar(c)}</a></td>`).join('')}
+      <td><b>${tot.here}</b>${tot.inherited ? `<span class="inh">+${tot.inherited}</span>` : ''} <span class="s">of ${tot.total}</span>${coverageBar(tot)}</td></tr>`;
+  }).join('');
+}
+
 // a select of the seven steps to quantum physics, kept as chosen
 function fillStepFilter(sel, wps) {
   if (sel.options.length === wps.length + 1) return;

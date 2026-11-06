@@ -28,8 +28,8 @@ table.clickable tbody tr[tabindex]:hover td, table.clickable tbody tr[tabindex]:
 table.clickable tbody tr:focus-visible { outline: none; }
 .mt { margin-top: 8px; }
 /* links in text and tables: one colour, underlined on hover (cards, tabs and back links have their own) */
-main a:not(.card):not(.back):not(.crumb):not(.chip):not(.sailing):not(.pill):not(.st) { color: var(--blue); text-decoration: none; }
-main a:not(.card):not(.back):not(.crumb):not(.chip):not(.sailing):not(.pill):not(.st):hover { text-decoration: underline; }
+main a:not(.card):not(.back):not(.crumb):not(.chip):not(.sailing):not(.pill):not(.st):not(.ccell) { color: var(--blue); text-decoration: none; }
+main a:not(.card):not(.back):not(.crumb):not(.chip):not(.sailing):not(.pill):not(.st):not(.ccell):hover { text-decoration: underline; }
 tr.aside td { opacity: .55; }
 /* RunGrid: a GitHub contribution graph of runs (UI.md) */
 .gridsum { display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: center; font-size: var(--fs-sm); color: var(--muted); margin-bottom: 10px; }
@@ -319,3 +319,18 @@ main a.chip .cls { color: var(--muted); font-size: var(--fs-xs); margin-left: 4p
 .wpsteps .st .c { color: var(--muted); font-size: var(--fs-sm); }
 .wpsteps .st.proven .t::after { content: ' ✓ proven'; color: var(--good); font-weight: 400; font-size: var(--fs-sm); }
 .wpsteps a.st { color: var(--text); text-decoration: none; display: block; }
+
+/* filling the seven steps: performed here, inherited from a smaller class, open */
+.cbar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; background: var(--heat0); margin-top: 4px; min-width: 60px; }
+.cbar i { display: block; }
+.cbar i.here { background: var(--good); }
+.cbar i.inherited { background: transparent; box-shadow: inset 0 0 0 1.5px var(--accent); }
+.cbar i.open { background: var(--heat0); }
+.inh { color: var(--accent); margin-left: 2px; }
+main a.ccell { color: var(--text); text-decoration: none; display: block; }
+.coverage { display: grid; gap: 6px; }
+.coverage .crow { display: grid; grid-template-columns: 140px 1fr 260px; gap: 10px; align-items: center; }
+.coverage .crow .cbar { margin-top: 0; height: 12px; }
+.coverage .crow.total { border-top: 1px solid var(--line); padding-top: 6px; font-weight: 600; }
+.coverage .cnum { color: var(--muted); font-size: var(--fs-sm); }
+@media (max-width: 700px) { .coverage .crow { grid-template-columns: 1fr; } }

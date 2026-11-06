@@ -1070,12 +1070,14 @@ const classLink = preset => { const c = classOf(preset); return c ? `<a href="#$
 function starHeadline(v) {
   return Object.values(v.runs.reduce((acc, r) => {
     r.stars.forEach(x => {
-      const a = acc[x.star] || (acc[x.star] = { star: x.star, lit: null, ship: null, best: null });
-      if (x.steps_to_lit != null && (a.lit == null || x.steps_to_lit < a.lit)) { a.lit = x.steps_to_lit; a.ship = r.ship || r.name; }
+      const a = acc[x.star] || (acc[x.star] = { star: x.star, lit: null, ship: null, shared: null, sship: null, best: null });
+      if (x.steps_to_lit != null && (a.lit == null || x.steps_to_lit < a.lit)) { a.lit = x.steps_to_lit; a.ship = r.ship_name || r.ship || r.name; }
+      if (x.shared_steps_to_lit != null && (a.shared == null || x.shared_steps_to_lit < a.shared)) { a.shared = x.shared_steps_to_lit; a.sship = r.ship_name || r.ship || r.name; }
       if (x.best != null && (a.best == null || x.best > a.best)) a.best = x.best;
     });
     return acc;
-  }, {})).filter(a => a.best != null).map(a => a.lit != null ? `${STAR_LABEL[a.star] || a.star} lit at step ${a.lit} (${esc(a.ship)})` : `${STAR_LABEL[a.star] || a.star} not lit yet, best ${fmt(a.best)}`).join('; ');
+  }, {})).filter(a => a.best != null).map(a => { const n = STAR_LABEL[a.star] || a.star;
+    return a.lit != null ? `${n} lit at step ${a.lit} (${a.ship})` : a.shared != null ? `${n} lit shared at step ${a.shared} (${a.sship}), no single head yet (best ${fmt(a.best)})` : `${n} not lit yet, best ${fmt(a.best)}`; }).join('; ');
 }
 const STAR_LABEL = { previous_word: 'the Previous Word', duplicate_word: 'the Duplicate Word', nevermore: 'Nevermore' };
 async function loadVoyages() {
@@ -1134,6 +1136,7 @@ function renderVoyage() {
     <td><b>${esc(x.name)}</b></td><td class="s">${esc(x.subtitle)}</td><td data-sort="${x.sailings.length}">${x.sailings.length}</td><td>${fmt(x.ft_en_mean)}</td>
     ${starKeys.map(k => { const st = (x.stars || {})[k] || {};
       return st.lit ? `<td data-sort="${st.soonest}">lit by ${st.lit} of ${x.sailings.length} · soonest step ${st.soonest}</td>`
+        : st.lit_shared ? `<td data-sort="${st.soonest_shared}" title="the best layer's two strongest heads together">lit shared by ${st.lit_shared} of ${x.sailings.length} · soonest step ${st.soonest_shared}</td>`
         : st.best != null ? `<td data-sort="" class="s" title="not lit yet; the best so far">best ${fmt(st.best)}</td>` : '<td>–</td>'; }).join('')}</tr>`).join('')
     : `<tr><td colspan="${4 + starKeys.length}" class="empty">no ships have sailed on this voyage yet</td></tr>`;
   // the Forgotten Tomes score run by run, one colour per value of the setting that varies most
@@ -1168,9 +1171,18 @@ async function voyageStars(v) {
   voyageSeriesKey = key;
   const rs = d.runs.filter(r => r.series[k] && r.series[k].step.length);
   if (!rs.length) return empty('voyagestars', `no run on this voyage has a reading for ${esc(star.name)} yet`);
-  plot('voyagestars', rs.map((r, i) => ({ type: 'scatter', mode: 'lines+markers', name: r.ship || r.name, x: r.series[k].step, y: r.series[k].value,
-    line: { color: PALETTE[i % PALETTE.length], width: 1.5 }, marker: { size: 4 } })),
-    layout({ xaxis: { title: 'step', gridcolor: C.line }, yaxis: { title: `${star.name} score`, gridcolor: C.line, range: [0, Math.max(1, ...rs.flatMap(r => r.series[k].value))] },
+  // per run: the best single head (solid) and, where the star can be shared, the best layer's two
+  // strongest heads together (dashed); either line crossing the dotted threshold is first light
+  const traces = rs.flatMap((r, i) => {
+    const col = PALETTE[i % PALETTE.length], sr = r.series[k], name = r.ship || r.name;
+    const t = [{ type: 'scatter', mode: 'lines', name: `${name} · one head`, legendgroup: name, x: sr.step, y: sr.value, line: { color: col, width: 1.8 } }];
+    if (sr.shared_step && sr.shared_step.length) t.push({ type: 'scatter', mode: 'lines', name: `${name} · shared`, legendgroup: name,
+      x: sr.shared_step, y: sr.shared_value, line: { color: col, width: 1.5, dash: 'dash' } });
+    return t;
+  });
+  plot('voyagestars', traces,
+    layout({ xaxis: { title: 'step', gridcolor: C.line }, legend: { orientation: 'h', y: 1.12 },
+      yaxis: { title: `${star.name} score`, gridcolor: C.line, range: [0, Math.max(1, ...traces.flatMap(t => t.y))] },
       shapes: [{ type: 'line', xref: 'paper', x0: 0, x1: 1, y0: star.threshold, y1: star.threshold, line: { color: C.accent, dash: 'dot' } }] }));
 }
 document.getElementById('voyagestar').onchange = () => { voyageSeriesKey = ''; const v = voyagesData && voyagesData.find(x => x.key === voyageKey); if (v) voyageStars(v); };
@@ -1189,14 +1201,17 @@ async function loadDiscoveries() {
   const byName = Object.fromEntries(d.stars.map(s => [s.key, s.name]));
   document.getElementById('starcards').innerHTML = d.stars.map(s => {
     const lit = s.ships.filter(x => x.steps_to_lit != null).sort((a, b) => a.steps_to_lit - b.steps_to_lit);
+    const shared = s.ships.filter(x => x.shared_steps_to_lit != null).sort((a, b) => a.shared_steps_to_lit - b.shared_steps_to_lit);
     const best = [...s.ships].sort((a, b) => (b.best ?? -1) - (a.best ?? -1))[0];
-    const first = lit[0];
+    const first = lit[0], firstShared = shared[0];
+    const state = lit.length ? ['good', 'lit'] : shared.length ? ['accent', 'lit shared'] : ['', 'not lit yet'];
     return `<div class="card${lit.length ? ' lit' : ''}">
-      <div class="top"><span class="preset">${esc(s.name)}</span><span class="pill${lit.length ? ' good' : ''}">${lit.length ? 'lit' : 'not lit yet'}</span></div>
+      <div class="top"><span class="preset">${esc(s.name)}</span><span class="pill ${state[0]}" title="lit: one head at the threshold; lit shared: the best layer's two strongest heads together">${state[1]}</span></div>
       <div class="job">level ${s.level}${s.rests_on.length ? ` · rests on ${esc(s.rests_on.map(k => byName[k] || k).join(', '))}` : ''} · lit at ${s.threshold}</div>
       <div class="ov">${esc(s.about)}</div>
       <div class="foot"><span>${first ? `first lit by ${shipLink(first)} at step ${first.steps_to_lit}` : best && best.best != null ? `nearest: ${shipLink(best)} at ${fmt(best.best)}` : 'no readings yet'}</span></div>
-      <div class="foot"><span>lit on ${lit.length} of ${s.ships.length} sailings measured</span></div></div>`;
+      ${firstShared ? `<div class="foot"><span>first lit shared by ${shipLink(firstShared)} at step ${firstShared.shared_steps_to_lit} (two heads together)</span></div>` : ''}
+      <div class="foot"><span>lit on ${lit.length}${shared.length ? `, lit shared on ${shared.length},` : ''} of ${s.ships.length} sailings measured</span></div></div>`;
   }).join('');
   document.querySelector('#traittable thead').innerHTML = `<tr><th>trait</th><th>ships measured</th><th>found by</th><th>first found</th><th>learned by</th><th>first learned</th><th>best held-out AUC</th></tr>`;
   const firstOf = (ships, k) => ships.filter(x => x[k] != null).sort((a, b) => a[k] - b[k])[0];

@@ -182,6 +182,7 @@ The page speaks the project's metaphor, consistently. Each word means one thing:
 | fleet | the ships of a class; the First Fleet is everything fitted out before 7 November, archived |
 | voyage | a campaign several ships sail on to find something, with a goal, levers and a stop rule |
 | star | a destination: an attention head that does one recognisable job, lit at its threshold |
+| lit / lit shared | a star is lit when one head reaches its threshold, and lit shared when the best layer's two strongest heads reach it together (a small model often splits one job across two heads); charts draw the single head solid and the shared pair dashed |
 | trait | a direction in the hidden state that tells a kind of book apart on books never read |
 | the wind | the error on each guess: how far the bet was from the word that came, felt by every weight that took part |
 | a tack | the ship's response to the wind: one training update (the "bump" of a perceptron), its direction from the wind and its size from the learning rate |

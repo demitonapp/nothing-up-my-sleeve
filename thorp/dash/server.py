@@ -702,6 +702,12 @@ def api_voyage_series(key: str) -> dict:
                     )
                 )
                 series[sk] = {"step": [p[0] for p in pts], "value": [p[1] for p in pts]}
+                # lit shared: the best layer's two strongest heads together (voyages.py works it
+                # out from the 'stars' artifacts where the metric was not recorded yet)
+                if getattr(star, "shared_metric", ""):
+                    sh = voyages._shared_series(r["run_id"], star)
+                    series[sk]["shared_step"] = [p["step"] for p in sh]
+                    series[sk]["shared_value"] = [p["value"] for p in sh]
             out.append(
                 {"run_id": r["run_id"], "name": r["name"], "ship": r["ship"], "series": series}
             )

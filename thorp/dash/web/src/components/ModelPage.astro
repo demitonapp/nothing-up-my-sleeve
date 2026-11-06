@@ -79,6 +79,13 @@
       <div class="scroll"><table id="waypointtable"><thead></thead><tbody></tbody></table></div>
     </section>
     <h2 class="band">Nevermores <span class="q">induction heads: at a word seen before, a head looks back to what followed it last time and bets it comes again; they form suddenly</span><span class="bandtools"><button data-essay="nevermore">Read: what a Nevermore is</button><button id="readpassage">Read the test passage</button></span></h2>
+    <section class="panel" id="handpanel">
+      <h2>The hand <span class="note">each card is one attention head, rows by layer from the top; a card turns face up (♠) when its head becomes a Nevermore, 0.3 or more on either test; until then its face shows through as far as the head has come. The big number is the real-prose score, the corner one the random test. Bigger models show their strongest five</span></h2>
+      <div class="handtools"><select id="handrun" title="the run whose hand is shown"></select>
+        <button id="handplay" title="deal the hand step by step">▶ play</button>
+        <input type="range" id="handstep" min="0" max="0" value="0"><span id="handlabel"></span></div>
+      <div id="hand"></div>
+    </section>
     <div class="row">
       <section class="panel"><h2>The strongest head <span class="note">its Nevermore score on a real passage read twice, by training step (where one shows first); the line crossing 0.3 is the moment a Nevermore forms; the latest 12 runs</span></h2><div class="chart" id="nvchart"></div></section>
       <section class="panel"><h2>Copy gain <span class="note">nats per token the model saves on the second copy of a sequence, which only a model that copies can; higher is better</span></h2><div class="chart" id="copychart"></div></section>

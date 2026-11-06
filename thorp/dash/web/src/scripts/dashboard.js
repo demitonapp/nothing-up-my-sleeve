@@ -4,6 +4,7 @@ import { Plotly, tok, C, PALETTE, layout, cfg, empty, plot } from '../lib/charts
 import { fmt, big, fmtBytes, esc, get, log10, mean } from '../lib/format.js';
 import { DataTable } from '../lib/datatable.js';
 import { openBook, openEssay } from '../lib/reader.js';
+import { renderHand, miniHand } from '../lib/cards.js';
 
 // metric keys: `<prefix>/layer_3`, `<prefix>/layer_3/attn`, `<prefix>/tok`, `<prefix>/pos`
 const groupOf = (k, prefix) => k.slice(prefix.length);
@@ -855,13 +856,60 @@ function renderRung() {
 const TRAIT_LABEL = { fiction: 'fiction', verse: 'verse', first_person: 'first person' };
 const firstAt = (sr, ok) => { if (!sr) return undefined; const i = sr.value.findIndex(ok); return i < 0 ? null : sr.step[i]; };
 const lastOf = sr => sr && sr.value.length ? sr.value[sr.value.length - 1] : null;
-let wpKey = '';
+let wpKey = '', wpData = null;
+// the hand panel: one run's heads as cards at one eval step; the slider walks the steps and ▶ deals
+// them in order, so a card can be watched turning over. Following the latest step unless moved.
+const hand = { run: null, idx: null, timer: null };
+function handRuns() { return wpData ? wpData.runs.filter(x => x.hands && x.hands.length) : []; }
+function drawHand(prevIdx = null) {
+  const el = document.getElementById('hand'), pick = document.getElementById('handrun'), slider = document.getElementById('handstep');
+  const tools = document.querySelector('#handpanel .handtools'), runs = handRuns();
+  if (!runs.length) {
+    tools.hidden = true;
+    el.innerHTML = `<div class="empty">no run at this size has per-head Nevermore scores yet; they arrive with the queue (every 250 steps) and <span class="mono">scripts/score_nevermore.sh</span></div>`;
+    return;
+  }
+  tools.hidden = false;
+  const ids = runs.map(x => x.run_id).join(',');
+  if (pick.dataset.ids !== ids) {
+    pick.innerHTML = [...runs].reverse().map(x => `<option value="${esc(x.run_id)}">${esc(x.ship || x.name)} · ${esc(x.name)}</option>`).join('');
+    pick.dataset.ids = ids;
+  }
+  if (!runs.some(x => x.run_id === hand.run)) hand.run = (runs.find(x => x.run_id === selected) || runs[runs.length - 1]).run_id;
+  pick.value = hand.run;
+  const run = runs.find(x => x.run_id === hand.run), hs = run.hands, last = hs.length - 1;
+  const i = hand.idx == null ? last : Math.min(hand.idx, last);
+  slider.max = last; slider.value = i; slider.disabled = last === 0;
+  document.getElementById('handlabel').textContent = `step ${hs[i].step} · reading ${i + 1} of ${hs.length}${hand.idx == null ? ' (latest, live)' : ''}`;
+  renderHand(el, hs[i], wpData.nevermore_threshold, prevIdx != null ? hs[prevIdx] : null);
+}
+function stopDeal() { clearInterval(hand.timer); hand.timer = null; document.getElementById('handplay').textContent = '▶ play'; }
+document.getElementById('handrun').onchange = e => { stopDeal(); hand.run = e.target.value; hand.idx = null; drawHand(); };
+document.getElementById('handstep').oninput = e => {
+  stopDeal();
+  const run = handRuns().find(x => x.run_id === hand.run), was = hand.idx ?? run.hands.length - 1, v = +e.target.value;
+  hand.idx = v >= run.hands.length - 1 ? null : v;  // back at the end: follow live again
+  drawHand(v > was ? was : null);
+};
+document.getElementById('handplay').onclick = () => {
+  if (hand.timer) return stopDeal();
+  const run = handRuns().find(x => x.run_id === hand.run); if (!run) return;
+  hand.idx = 0; drawHand();
+  document.getElementById('handplay').textContent = '❚❚ pause';
+  hand.timer = setInterval(() => {
+    const last = run.hands.length - 1, was = hand.idx;
+    if (was >= last) { hand.idx = null; stopDeal(); return drawHand(); }
+    hand.idx = was + 1; drawHand(was);
+  }, 900);
+};
 async function renderWaypoints(r) {
   let d;
   try { d = await get('/api/waypoints?preset=' + encodeURIComponent(r.preset) + '&limit=' + RECENT); } catch (e) { return; }
   const key = JSON.stringify(d);
   if (key === wpKey) return;
   wpKey = key;
+  wpData = d;
+  drawHand();
   document.getElementById('readpassage').dataset.book = d.natural_book;
   const thr = d.nevermore_threshold, found = d.trait_found, margin = d.trait_margin, core = d.core_traits;
   const stepCell = v => v === undefined ? '<td>–</td>' : v === null ? '<td data-sort="">not yet</td>' : `<td data-sort="${v}">step ${v}</td>`;
@@ -875,7 +923,7 @@ async function renderWaypoints(r) {
     return { found: fi < 0 ? null : t.best.step[fi], learned: li === -2 ? undefined : li < 0 ? null : t.best.step[li] };
   };
   document.querySelector('#waypointtable thead').innerHTML = `<tr><th>ship</th><th>name</th><th>status</th><th>Nevermore formed</th>
-    <th>real prose best${info('nevermore')}</th><th>random best${info('nevermore')}</th><th>Nevermores (real / random)</th><th>where</th><th>copy gain${info('copygain')}</th>
+    <th>real prose best${info('nevermore')}</th><th>random best${info('nevermore')}</th><th>Nevermores (real / random)</th><th>where</th><th>hand</th><th>copy gain${info('copygain')}</th>
     ${core.map(t => `<th>${TRAIT_LABEL[t] || t} found</th><th>${TRAIT_LABEL[t] || t} learned</th>`).join('')}<th>language families found</th></tr>`;
   document.querySelector('#waypointtable tbody').innerHTML = d.runs.length ? d.runs.map(x => {
     const nv = x.nevermore, fams = Object.keys(x.traits).filter(t => t.startsWith('family/'));
@@ -887,10 +935,11 @@ async function renderWaypoints(r) {
     const count = (k) => lastOf(nv[k]) == null ? '–' : String(Math.round(lastOf(nv[k])));
     return `<tr>${runCells(x)}${stepCell(formed)}<td>${fmt(lastOf(nv.natural_max_score), 3)}</td><td>${fmt(lastOf(nv.max_score), 3)}</td>
       <td>${nv.natural_count || nv.count ? `${count('natural_count')} / ${count('count')}` : '–'}</td>
-      <td>${L == null ? '–' : `layer ${Math.round(L)}, head ${Math.round(H)}`}</td><td>${fmt(lastOf(nv.natural_copy_gain) ?? lastOf(nv.copy_gain), 2)}</td>
+      <td>${L == null ? '–' : `layer ${Math.round(L)}, head ${Math.round(H)}`}</td><td>${miniHand(x.hands && x.hands[x.hands.length - 1], thr)}</td>
+      <td>${fmt(lastOf(nv.natural_copy_gain) ?? lastOf(nv.copy_gain), 2)}</td>
       ${core.map(t => { const q = traitAt(x.traits[t]); return stepCell(q.found) + stepCell(q.learned); }).join('')}
       <td>${fams.length ? `${famFound} of ${fams.length}` : '–'}</td></tr>`;
-  }).join('') : `<tr><td colspan="${10 + 2 * core.length}" class="empty">no runs at ${esc(r.preset)} yet</td></tr>`;
+  }).join('') : `<tr><td colspan="${11 + 2 * core.length}" class="empty">no runs at ${esc(r.preset)} yet</td></tr>`;
 
   const recent = d.runs.slice(-12);
   const lines = (pick, id, title, msg, extra = {}) => {

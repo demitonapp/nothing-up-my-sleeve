@@ -64,7 +64,8 @@ step aside; the header carries the model's own four tabs instead, each with its 
    (`evaluators/probes.py`), then the strongest head and copy gain by step, and each trait's
    held-out AUC by step. The thresholds come from the evaluators through `/api/waypoints`. Each
    band has a "Read" button that opens its write-up in the book reader (`/api/essay`: the
-   evaluator's own docstring), and the Nevermore test passage opens as a book.
+   evaluator's own docstring), and the Nevermore test passage opens as a book. The Nevermores
+   band opens with the model's hand of cards (below), dealt step by step.
 
 A panel that belongs to one kind of model only carries `data-kind` (the proxy's calibration
 against 9m) and sits in the tab it belongs to; never a special case in the script.
@@ -96,6 +97,21 @@ Each of these exists once. Use it instead of styling a new one.
   `--heat0` is not scored yet, red is failed, a pulsing blue outline is running, accent is the
   selected run. Hover gives the score and its rank; a click selects the run. It redraws only when
   a run or a score changes.
+- **Cards** (`src/lib/cards.js`): a model's attention heads as a hand of playing cards, the way
+  Nevermores are shown. Thorp beat blackjack by counting cards, remembering what was dealt to bet
+  on what comes next, and a Nevermore does the same in text, so each head is a card.
+  - A card is face down (the patterned back, `--card-back`) until its head becomes a Nevermore,
+    scoring at least the evaluator's threshold on either test; then it turns face up (`--card-face`,
+    ♠, an accent edge). In between, the face rises from the bottom in proportion to score ÷
+    threshold, so a head that is forming shows.
+  - The big number is the real-prose score, the corner one the random test; layer and head sit
+    top left. The score is always printed: the card never hides the number.
+  - Up to 64 heads the whole hand is laid out in rows by layer, the top layer first. Above that,
+    the strongest five are fanned out. Card games give the look only: no poker hand ranks, which
+    would mean nothing about a model.
+  - `renderHand` draws one eval step; the Waypoints hand panel walks the steps with a slider and
+    ▶ play, and a card that turns between two steps flips over. `miniHand` gives a run's
+    strongest five as tiny cards for a table row.
 - **Info popover** (`info(key)` in the script → `ⓘ`): the help for a metric (what it is, which way
   is better, how it is measured). Every metric's first appearance in a heading carries one.
 - **Empty state** (`.empty`, or `empty(id, msg)` for charts): says why nothing is there and what

@@ -515,9 +515,26 @@ def api_waypoints(preset: str, limit: int | str = 30) -> dict:
                 if k.startswith("probe/"):
                     trait, part = k[len("probe/") :].rsplit("/", 1)
                     traits.setdefault(trait, {})[part] = v
+            # the per-head scores, step by step: the model's hand, one card per attention head
+            hands = []
+            for step, text in con.execute(
+                "select step, text from artifacts where run_id=? and kind='nevermore'"
+                " order by step, rowid",
+                [r["run_id"]],
+            ):
+                try:
+                    a = json.loads(text)
+                except ValueError:
+                    continue
+                if hands and hands[-1]["step"] == step:
+                    hands.pop()  # a re-score of the same step replaces it
+                hands.append(
+                    {"step": step, "random": a.get("scores"), "real": a.get("natural_scores")}
+                )
             out.append(
                 {
                     **r,
+                    "hands": hands,
                     "nevermore": {
                         k: {"step": list(v), "value": list(v.values())} for k, v in nv.items()
                     },

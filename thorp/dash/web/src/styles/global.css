@@ -5,6 +5,7 @@
   --c5: #d2a8ff; --c6: #ff9f6e; --c7: #79c0ff; --c8: #f778ba; --c9: #56d4dd; --c10: #a5d6ff; --c11: #ffd27a; --c12: #8ddb8c;
   --fs-xs: 11px; --fs-sm: 12px; --fs-md: 13px; --fs-base: 14px; --fs-lg: 16px; --fs-xl: 18px; --fs-2xl: 22px;
   --r-sm: 6px; --r-md: 8px; --r-pill: 10px;
+  --card-face: #F3F2ED; --card-ink: #101010; --card-back: #1b2a3c; --card-back2: #22364d;
   --heat0: #1f262f; --heat1: #0e4429; --heat2: #006d32; --heat3: #26a641; --heat4: #39d353;
 }
 /* the standards in UI.md: one control, one field, one pill, one clickable row, one focus ring */
@@ -188,3 +189,37 @@ tr.sel td { color: var(--accent); }
 .trait .r { color: var(--muted); font-size: var(--fs-xs); }
 .kinks td.t { color: var(--muted); }
 .foot { color: var(--muted); font-size: var(--fs-sm); padding-top: 10px; }
+
+/* Cards: a model's attention heads as a hand of playing cards (lib/cards.js, UI.md). The back has a
+   pattern; the face rises from the bottom as a head forms (--turn), and is whole once it is a
+   Nevermore (♠). */
+.handsum { font-size: var(--fs-sm); color: var(--muted); margin-bottom: 10px; }
+.handsum b { color: var(--text); }
+.handrow { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.handlabel { width: 56px; flex: 0 0 56px; font-size: var(--fs-xs); color: var(--muted); }
+.pcard { position: relative; width: 56px; height: 80px; flex: 0 0 56px; border-radius: var(--r-sm); border: 1px solid var(--line);
+  color: var(--text); overflow: hidden; font-variant-numeric: tabular-nums;
+  background:
+    linear-gradient(to top, var(--card-face) 0 var(--turn), transparent var(--turn)),
+    repeating-linear-gradient(45deg, var(--card-back2) 0 4px, var(--card-back) 4px 8px); }
+.pcard .pc-tl { position: absolute; top: 4px; left: 5px; font-size: 9px; line-height: 1.1; color: var(--muted); }
+.pcard .pc-br { position: absolute; bottom: 4px; right: 5px; font-size: 9px; color: var(--muted); }
+.pcard .pc-mid { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
+.pcard .pc-mid b { font-size: var(--fs-sm); font-weight: 600; background: rgba(14,17,22,.65); padding: 0 4px; border-radius: 3px; }
+.pcard.up { background: var(--card-face); color: var(--card-ink); border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.pcard.up .pc-tl, .pcard.up .pc-br { color: #555552; }
+.pcard.up .pc-mid { font-size: 22px; line-height: 1; }
+.pcard.up .pc-mid b { background: none; color: var(--card-ink); }
+.pcard.flip { animation: pcflip .6s ease-out; }
+@keyframes pcflip { 0% { transform: rotateY(90deg); } 100% { transform: rotateY(0); } }
+@media (prefers-reduced-motion: reduce) { .pcard.flip { animation: none; } }
+.handrow.fan { justify-content: flex-start; padding: 6px 0 4px 8px; }
+.handrow.fan .pcard { margin-left: -10px; }
+.handrow.fan .pcard:nth-child(1) { transform: rotate(-8deg); } .handrow.fan .pcard:nth-child(2) { transform: rotate(-4deg); }
+.handrow.fan .pcard:nth-child(4) { transform: rotate(4deg); } .handrow.fan .pcard:nth-child(5) { transform: rotate(8deg); }
+.handtools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; font-size: var(--fs-sm); color: var(--muted); }
+.handtools input[type=range] { width: 220px; padding: 0; }
+.minihand { display: inline-flex; gap: 2px; vertical-align: middle; }
+.minihand i { width: 9px; height: 13px; border-radius: 2px; border: 1px solid var(--line);
+  background: linear-gradient(to top, var(--card-face) 0 var(--turn), var(--card-back) var(--turn)); }
+.minihand i.up { background: var(--card-face); border-color: var(--accent); }

@@ -25,7 +25,7 @@ const CLASS_ALIASES = Object.fromEntries(Object.entries(CLASS_RENAMES).flatMap((
 const rungFor = key => ladderData && ladderData.rungs.find(r => slugOf(r) === key || r.preset === key || slugOf(r) === CLASS_ALIASES[key]);
 // ---- Navigation (UI.md, "Navigation"). Three ways in, each a section of the header:
 //   #/classes                    the classes of ship, one card per model size (home)
-//   #/classes/<class>[/<tab>]    one class: fleet (default), overview, training, scoring, waypoints
+//   #/classes/<class>[/<tab>]    one class: fleet (default), goals, overview, training, scoring, waypoints
 //   #/ships                      every ship ever launched
 //   #/ships/<key>[/<sailing>[/<tab>]]  one ship (a class fitted out one way) and one of its sailings (runs):
 //                                betting (default), books, languages, sieves, attention, traits
@@ -33,7 +33,7 @@ const rungFor = key => ladderData && ladderData.rungs.find(r => slugOf(r) === ke
 //   #/discoveries[/<trick>]      the tricks of the trade, and one trick; /stars and /traits beside them
 //   #/sieves[/<sailing>]         the sieves explained, and one sailing's push, move and heading
 // Older addresses (#sizes, #proxy, #rung-1m, #/models/…, #betting…, ?run=) land on the new ones.
-const MTABS = ['fleet', 'overview', 'training', 'scoring', 'waypoints'];
+const MTABS = ['fleet', 'goals', 'overview', 'training', 'scoring', 'waypoints'];
 const STABS = ['betting', 'books', 'languages', 'sieves', 'attention', 'traits'];
 const STAB_EL = { betting: 'betting', books: 'books', languages: 'languages', sieves: 'sieves', attention: 'attention', traits: 'traits-section' };
 const OLD_SHIP = { betting: 'betting', books: 'books', languages: 'languages', sieves: 'sieves', attention: 'attention', 'traits-section': 'traits' };
@@ -958,6 +958,7 @@ function renderRung() {
   renderTomes(r, allRuns);
   rungExtras(r, runs, allRuns);
   if (modelTab === 'waypoints') { renderWaypoints(r); starsInReach(r); }
+  if (modelTab === 'goals') classGoals(r);
   document.querySelectorAll('#rung .chart').forEach(el => { if (el.data && el.offsetParent) Plotly.Plots.resize(el); });
 }
 // ---- Waypoints: when each run passed each waypoint (server.py api_waypoints). Fetched only while
@@ -1401,18 +1402,25 @@ function trickProgress(kt) {
 const ladderParams = p => { const r = ladderData && ladderData.rungs.find(x => x.preset === p); return r ? r.total : null; };
 function drawTricks() {
   const sel = document.getElementById('trickfamily'), bandSel = document.getElementById('trickband'), kts = discData.known_tricks || [];
-  const fams = [...new Set(kts.map(t => t.family))];
-  if (sel.options.length !== fams.length + 1) sel.innerHTML = '<option value="">all</option>' + fams.map(f => `<option value="${esc(f)}">${esc(f)}</option>`).join('');
+  const wps = discData.waypoints || [], wpRank = k => wps.findIndex(w => w.key === k), wpName = k => (wps.find(w => w.key === k) || {}).name || k;
+  if (sel.options.length !== wps.length + 1) sel.innerHTML = '<option value="">all</option>' + wps.map(w => `<option value="${esc(w.key)}">${esc(w.name)}</option>`).join('');
+  // the route: the seven waypoints in order, each with its gate tricks
+  document.getElementById('trickroute').innerHTML = wps.map((w, i) => {
+    const mine = kts.filter(t => t.waypoint === w.key), gates = mine.filter(t => t.gate);
+    return `<div class="step"><div class="n">${i + 1}</div><div class="nm">${esc(w.name)}</div><div class="ab">${esc(w.about)}</div>
+      <div class="gt">${gates.map(t => `<a href="#/discoveries/${esc(t.key)}">◆ ${esc(t.name)}</a>`).join('')}</div><div class="ct">${mine.length} tricks</div></div>`;
+  }).join('<div class="arrow">→</div>');
   // the size bands present, smallest first
   const bands = [...new Map(kts.map(t => [t.field_band_rank, t.field_band])).entries()].sort((a, b) => a[0] - b[0]);
   if (bandSel.options.length !== bands.length + 1) { const was = bandSel.value; bandSel.innerHTML = '<option value="">any size</option>' + bands.map(([r, b]) => `<option value="${r}">${esc(b)}</option>`).join(''); bandSel.value = was; }
-  const rows = kts.filter(t => (!sel.value || t.family === sel.value) && (bandSel.value === '' || String(t.field_band_rank) === bandSel.value)).sort((a, b) => a.field_params - b.field_params);
+  const rows = kts.filter(t => (!sel.value || t.waypoint === sel.value) && (bandSel.value === '' || String(t.field_band_rank) === bandSel.value))
+    .sort((a, b) => wpRank(a.waypoint) - wpRank(b.waypoint) || a.field_band_rank - b.field_band_rank);
   const heads = Object.fromEntries((discData.known_heads || []).map(h => [h.key, h.name]));
   document.getElementById('trickcount').textContent = `${rows.length} tricks · ${rows.filter(t => t.fleet).length} measured by Thorp`;
   document.querySelector('#tricktable tbody').innerHTML = rows.map(t => `<tr data-trick="${esc(t.key)}" tabindex="0"${t.fleet ? ' class="measured"' : ''}>
-    <td><b>${esc(t.name)}</b></td><td>${esc(t.does)}</td><td data-sort="${t.field_params}" title="${esc(t.field_at)}"><span class="sizeband">${esc(t.field_band)}</span></td><td class="s">${esc(t.sure)}</td>
+    <td data-sort="${wpRank(t.waypoint)}">${esc(wpName(t.waypoint))}</td><td><b>${t.gate ? '◆ ' : ''}${esc(t.name)}</b>${t.taught ? ' <span class="s">(taught)</span>' : ''}</td><td>${esc(t.does)}</td><td data-sort="${t.field_params}" title="${esc(t.field_at)}"><span class="sizeband">${esc(t.field_band)}</span></td><td class="s">${esc(t.sure)}</td>
     <td>${t.stars.length ? esc(t.stars.map(k => heads[k] || k).join(', ')) : '<span class="s">none charted yet</span>'}</td>
-    ${trickProgress(t).cell}<td data-sort="${classRank(t.target_class)}">${classLink(t.target_class)}${t.below_ladder ? ' <span class="s">(the field is already below the ladder)</span>' : ''}</td></tr>`).join('');
+    ${trickProgress(t).cell}<td data-sort="${t.target_class ? classRank(t.target_class) : 99}">${t.target_class ? classLink(t.target_class) : t.taught ? '<span class="s">a reference: taught, not read</span>' : '<span class="s">beyond the ladder</span>'}</td></tr>`).join('');
 }
 document.getElementById('trickfamily').onchange = () => discData && drawTricks();
 document.getElementById('trickband').onchange = () => discData && drawTricks();
@@ -1425,10 +1433,13 @@ async function drawTrickPage() {
   document.getElementById('tricktitle').textContent = t.name;
   document.getElementById('trickstate').innerHTML = `<span class="pill ${p.cls}">${esc(p.state)}</span>`;
   document.getElementById('trickdoes').textContent = t.does;
-  const tgt = classOf(t.target_class);
+  const tgt = t.target_class && classOf(t.target_class);
+  const wp = (discData.waypoints || []).find(w => w.key === t.waypoint), tname = Object.fromEntries((discData.known_tricks || []).map(x => [x.key, x.name]));
   document.getElementById('trickover').innerHTML = [
+    ['waypoint', `${esc(wp ? wp.name : t.waypoint)}${t.gate ? ' · <b>◆ a gate</b>: performed before a ship moves on' : ' · a milestone'}`],
+    ['rests on', t.rests_on.length ? t.rests_on.map(k => `<a href="#/discoveries/${esc(k)}">${esc(tname[k] || k)}</a>`).join(', ') : '–'],
     ['the field shows it at', `<span class="sizeband">${esc(t.field_band)}</span> parameters · ${esc(t.field_at)} <span class="s">(${esc(t.sure)})</span>`], ['in', esc(t.field_models)], ['first shown by', `<span class="s">${esc(t.source)}</span>`],
-    ["Thorp's target", `${classLink(t.target_class)}${tgt ? ` · ${big(tgt.total)} parameters` : ''}${t.below_ladder ? ' (the field already shows it below the ladder, so the smallest class)' : ', a tenth of the field\'s size or less'}`],
+    ["Thorp's goal class", t.target_class ? `${classLink(t.target_class)}${tgt ? ` · ${big(tgt.total)} parameters` : ''}` : t.taught ? 'none: the field shows it only when taught the task' : 'beyond the ladder: a horizon'],
     ['how Thorp measures it', ft ? `<span class="mono">${esc(ft.metric)}</span>, performed at ${ft.threshold}` : `not yet: ${esc(t.measure)}`],
   ].map(([k, v]) => `<div><div class="k">${k}</div><div>${v}</div></div>`).join('');
   // the stars needed
@@ -1441,9 +1452,9 @@ async function drawTrickPage() {
   const thr = ft ? ft.threshold : null;
   document.querySelector('#tricktrack tbody').innerHTML = (ladderData ? ladderData.rungs : []).map(r => {
     const mine = ft ? ft.ships.filter(x => x.preset === r.preset) : [], done = mine.filter(x => x.performed_at != null).sort((a, b) => a.performed_at - b.performed_at);
-    const orders = Math.log10(t.field_params / r.total), best = mine.length ? Math.max(...mine.map(x => x.best)) : null, isT = r.preset === t.target_class;
+    const orders = t.field_params ? Math.log10(t.field_params / r.total) : null, best = mine.length ? Math.max(...mine.map(x => x.best)) : null, isT = r.preset === t.target_class;
     return `<tr${isT ? ' class="target"' : ''}><td>${classLink(r.preset)}${isT ? ' <span class="pill accent">target</span>' : ''}</td><td data-sort="${r.total}">${big(r.total)}</td>
-      <td data-sort="${orders}">${orders >= 0 ? `${orders.toFixed(1)} orders of magnitude smaller` : `${(-orders).toFixed(1)} orders larger`}</td>
+      <td data-sort="${orders ?? ''}">${orders == null ? '<span class="s">the field has not shown it</span>' : orders >= 0 ? `${orders.toFixed(1)} orders of magnitude smaller` : `${(-orders).toFixed(1)} orders larger`}</td>
       <td>${ft ? mine.length : '–'}</td><td>${ft ? (mine.length ? `${done.length} of ${mine.length}` : '–') : '–'}</td>
       <td>${best != null ? `${fmt(best)} <span class="s">of ${thr}</span>` : '–'}</td><td>${done.length ? `${shipLink(done[0])} at step ${done[0].performed_at}` : '–'}</td></tr>`;
   }).join('');
@@ -1481,6 +1492,53 @@ function firstLitIn(h) {
   const x = lit[0], below = classRank(x.preset) < classRank(h.expected_from);
   return `<td data-sort="${classRank(x.preset)}">${classLink(x.preset)} · ${x.steps_to_lit != null ? 'lit' : 'lit shared'} by ${shipLink(x)}${below ? ' <span class="pill good" title="lit below the class expected to reach it">below expectation</span>' : ''}</td>`;
 }
+// ---- a class's goals on the route to quantum physics (the Goals tab): its own goals, those of smaller
+// classes it carries up, those left for bigger ones; its target level and ceiling
+async function classGoals(r) {
+  if (!reachData || Date.now() - reachAt > 30000) { try { reachData = await get('/api/discoveries'); reachAt = Date.now(); } catch (e) { return; } }
+  const kts = reachData.known_tricks || [], wps = reachData.waypoints || [], me = classRank(r.preset);
+  const wpRank = k => wps.findIndex(w => w.key === k), tname = Object.fromEntries(kts.map(t => [t.key, t.name]));
+  const where = t => t.target_class == null ? (t.taught ? 'taught' : 'beyond') : classRank(t.target_class) < me ? 'below' : classRank(t.target_class) === me ? 'mine' : 'above';
+  // a trick's state on this class's sailings
+  const onClass = t => {
+    const ft = t.fleet && (reachData.tricks || []).find(x => x.key === t.fleet);
+    if (!t.fleet) return { text: 'not measured yet', done: false };
+    const mine = ft ? ft.ships.filter(x => x.preset === r.preset) : [];
+    if (!mine.length) return { text: 'measured · no sailing of this class has a reading yet', done: false };
+    const done = mine.filter(x => x.performed_at != null), best = Math.max(...mine.map(x => x.best));
+    return { text: done.length ? `performed on ${done.length} of ${mine.length} sailings` : `best ${fmt(best)} of ${ft.threshold} on ${mine.length} sailings`, done: done.length > 0, best };
+  };
+  const goals = kts.filter(t => where(t) === 'mine'), carried = kts.filter(t => where(t) === 'below');
+  const level = goals.length ? wps[Math.max(...goals.map(t => wpRank(t.waypoint)))] : null;
+  const ceiling = level ? goals.filter(t => t.waypoint === level.key) : [];
+  const nextCls = ladderData.rungs[me + 1], nextGoals = nextCls ? kts.filter(t => t.target_class === nextCls.preset) : [];
+  const done = goals.filter(t => onClass(t).done).length;
+  document.getElementById('goalsover').innerHTML = [
+    ['target level', level ? `<b>${esc(level.name)}</b> (waypoint ${wpRank(level.key) + 1} of ${wps.length})` : 'none set'],
+    ['ceiling', ceiling.length ? ceiling.map(t => `<a href="#/discoveries/${esc(t.key)}">${t.gate ? '◆ ' : ''}${esc(t.name)}</a>`).join(', ') + '<br><span class="s">the upper limit expected of this size</span>' : '–'],
+    ['its goals', `${goals.length} trick${goals.length === 1 ? '' : 's'} · ${done} performed so far`],
+    ['carried up', carried.length ? `${carried.length} from smaller classes, kept, not relearned` : 'none: the first class on the ladder'],
+    ['next class', nextCls ? `${classLink(nextCls.preset)} takes over with ${nextGoals.length}: ${nextGoals.slice(0, 4).map(t => esc(t.name)).join(', ')}${nextGoals.length > 4 ? '…' : ''}` : 'the top of the ladder; beyond it, the horizon'],
+  ].map(([k, v]) => `<div><div class="k">${k}</div><div>${v}</div></div>`).join('');
+  // the route, bottom (reading) to top (discovery)
+  document.getElementById('goalroute').innerHTML = [...wps].reverse().map(w => {
+    const ts = kts.filter(t => t.waypoint === w.key).sort((a, b) => (a.target_class ? classRank(a.target_class) : 99) - (b.target_class ? classRank(b.target_class) : 99));
+    const isLevel = level && level.key === w.key;
+    return `<div class="wp${isLevel ? ' level' : ''}"><div class="wpname">${wpRank(w.key) + 1}. ${esc(w.name)}${isLevel ? ' <span class="pill accent">target level</span>' : ''}</div>
+      <div class="chips">${ts.map(t => { const s = where(t), st = s === 'mine' || s === 'below' ? onClass(t) : null;
+        const tip = `${t.name}: ${s === 'mine' ? 'a goal of this class' : s === 'below' ? `carried up from ${t.target_class}` : s === 'above' ? `a goal of ${t.target_class}` : s === 'taught' ? 'a reference, taught not read' : 'beyond the ladder'}${st ? ' · ' + st.text : ''}`;
+        return `<a class="chip ${s}${st && st.done ? ' done' : ''}" href="#/discoveries/${esc(t.key)}" title="${esc(tip)}">${t.gate ? '◆ ' : ''}${esc(t.name)}${st && st.done ? ' ✓' : ''}${s === 'above' ? ` <span class="cls">${esc(t.target_class)}</span>` : ''}</a>`; }).join('')}</div></div>`;
+  }).join('');
+  document.querySelector('#goaltable tbody').innerHTML = goals.length ? goals.sort((a, b) => wpRank(a.waypoint) - wpRank(b.waypoint)).map(t => {
+    const st = onClass(t);
+    return `<tr data-trick="${esc(t.key)}" tabindex="0"><td><b>${esc(t.name)}</b></td><td data-sort="${wpRank(t.waypoint)}">${esc((wps.find(w => w.key === t.waypoint) || {}).name)}</td>
+      <td>${t.gate ? '◆ gate' : 'milestone'}</td><td>${t.rests_on.length ? esc(t.rests_on.map(k => tname[k] || k).join(', ')) : '–'}</td>
+      <td data-sort="${t.field_params ?? ''}" title="${esc(t.field_at)}"><span class="sizeband">${esc(t.field_band)}</span></td>
+      <td>${st.done ? '<span class="pill good">performed</span> ' : ''}${esc(st.text)}</td></tr>`;
+  }).join('') : '<tr><td colspan="6" class="empty">no goals set for this class yet</td></tr>';
+}
+document.getElementById('goaltable').addEventListener('click', e => { const tr = e.target.closest('tr[data-trick]'); if (tr && !e.target.closest('a')) location.hash = '#/discoveries/' + tr.dataset.trick; });
+
 // a class's stars in reach: the kinds expected at or below it, with its own sailings' state
 let reachData = null, reachAt = 0;
 async function starsInReach(r) {

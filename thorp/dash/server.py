@@ -832,33 +832,38 @@ FIELD_BANDS = ("under 1M", "1M–10M", "10M–100M", "100M–1B", "1B–10B", "1
 
 
 def _known_tricks() -> list[dict]:
-    """The tricks of the trade (thorp/dash/tricks.py), each with Thorp's target: the largest class on
-    the ladder at a tenth of the size the field documents it at (an order of magnitude smaller),
-    or the smallest class when even that is below the ladder."""
-    from thorp.dash.tricks import KNOWN_TRICKS
-    from thorp.models.registry import LADDER, PRESETS
+    """The tricks of the trade on the route to quantum physics (thorp/dash/tricks.py): each with its
+    size band, and its goal class (named there by class name) turned into the class's preset."""
+    import re
 
-    sizes = []
-    for r in LADDER:
-        c = PRESETS[r["preset"]]
-        sizes.append(
-            (
-                12 * c["layers"] * c["width"] ** 2 + (r.get("vocab", 16384) + 1024) * c["width"],
-                r["preset"],
-            )
-        )
-    sizes.sort()
+    from thorp.dash.tricks import KNOWN_TRICKS
+    from thorp.models.registry import LADDER
+
+    by_name = {
+        re.sub(r"[^a-z0-9]+", "-", re.sub(r"^the\s+", "", r["name"].lower())): r["preset"]
+        for r in LADDER
+    }
+    for old, new in CLASS_RENAMES.items():
+        if old in by_name:
+            by_name.setdefault(new, by_name[old])
+        if new in by_name:
+            by_name.setdefault(old, by_name[new])
     out = []
     for t in KNOWN_TRICKS:
-        fit = [p for n, p in sizes if n <= t["field_params"] / 10]
-        rank = min(len(FIELD_BANDS) - 1, max(0, int(math.floor(math.log10(t["field_params"]))) - 5))
+        fp = t["field_params"]
+        rank = (
+            None
+            if fp is None
+            else min(len(FIELD_BANDS) - 1, max(0, int(math.floor(math.log10(fp))) - 5))
+        )
+        goal = by_name.get(t["goal_class"]) if t["goal_class"] else None
         out.append(
             {
                 **t,
-                "field_band": FIELD_BANDS[rank],
-                "field_band_rank": rank,
-                "target_class": fit[-1] if fit else sizes[0][1],
-                "below_ladder": not fit,
+                "field_band": "not shown in the field" if rank is None else FIELD_BANDS[rank],
+                "field_band_rank": len(FIELD_BANDS) if rank is None else rank,
+                "target_class": goal,
+                "beyond_ladder": goal is None and not t["taught"],
             }
         )
     return out
@@ -1058,6 +1063,7 @@ def api_discoveries() -> dict:
         # the star chart: every kind of head the literature describes (thorp/dash/heads.py)
         "known_heads": _known_heads(),
         "known_tricks": _known_tricks(),
+        "waypoints": __import__("thorp.dash.tricks", fromlist=["WAYPOINTS"]).WAYPOINTS,
     }
 
 

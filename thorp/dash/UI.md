@@ -50,21 +50,23 @@ holds the ways in, always:
   settings, Forgotten Tomes score and the step each star first lit, the score run by run, first
   light (each star's score against step, threshold dotted), outcomes and levers. A panel only one
   voyage has carries `data-voyage` (the book-value loop's fit).
-- **Discoveries** (`#/discoveries`): **Tricks of the trade**, one table. A trick is what a model
-  can do, judged from outside by its bets; the catalogue is `thorp/dash/tricks.py` (`KNOWN_TRICKS`:
-  what it does, the size the field documents it at, how sure that size is, the models and paper,
-  shown as a **size band** of one order of magnitude, `FIELD_BANDS` in `server.py`, from "under 1M"
-  to "100B and up", so the table sorts and filters by size even where the number is rough;
-  the kinds of head thought to do it, and the `fleet.TRICKS` key where Thorp measures it). Each row
-  shows Thorp's progress (the smallest class that performed it, or the best reading) and **Thorp's
-  target**: the largest class at a tenth of the field's size or below, an order of magnitude
-  smaller. A row opens the trick (`#/discoveries/<trick>`): the field, the target and how it is
-  measured; **the stars needed to learn it** (kinds of head from `heads.py`, each with its expected
-  class, first lit and state); **how Thorp is tracking, class by class** (parameters, orders of
-  magnitude against the field, sailings measured and performing, best, first performed; the
-  target class marked); and, for a measured trick, its score by step for every sailing, coloured
-  by class. One link away: **the stars** (`#/discoveries/stars`: the star cards and the star chart
-  of every kind of head) and **traits** (`#/discoveries/traits`).
+- **Discoveries** (`#/discoveries`): **Tricks of the trade**. A trick is what a model can do, judged
+  from outside by its bets; the catalogue is `thorp/dash/tricks.py` (`KNOWN_TRICKS`, 40 tricks).
+  The tricks are grouped into the seven **waypoints** on the route to quantum physics (`WAYPOINTS`:
+  reading, knowing, counting, reasoning, mathematics, physics, discovery), shown first as the route
+  with each waypoint's **gate** tricks (◆, performed before a ship moves on; the rest are
+  milestones). Each trick has what it does, the tricks it rests on, the field's **size band** (one
+  order of magnitude, `FIELD_BANDS` in `server.py`, the detail on hover; "not shown in the field"
+  for Thorp's own tests), how sure that is ("documented", "rough", or "today", where better data
+  moved it down), the models and paper, the kinds of head thought to do it, Thorp's measurement or
+  how it could be measured, and its **goal class**: the class of ship expected to reach it, about
+  an order of magnitude smaller than the field where the depth it needs allows (None: beyond the
+  ladder; `taught` marks a reference the field shows only when trained on the task). The table
+  sorts and filters by waypoint and band. A row opens the trick (`#/discoveries/<trick>`): its
+  waypoint and gate, what it rests on, the field, the goal class, how it is measured, the stars
+  needed to learn it, how Thorp is tracking class by class, and for measured tricks every
+  sailing's score by step. One link away: **the stars** (`#/discoveries/stars`) and **traits**
+  (`#/discoveries/traits`).
 - **Sieves** (`#/sieves[/<sailing>]`): how the ship answers the wind, layer by layer. An intro in
   the voyage vocabulary, a card per sieve with its write-up from `fleet.SIEVES` (push, move,
   heading: rendered as written there, never rewritten on the page), then for a picked sailing
@@ -99,6 +101,12 @@ Its tabs sit under its title, each with its own address:
 0. **Fleet** (`#/classes/proxy`): every ship of the class in service, newest first, one row per
    ship (its fitout, its sailings and their seeds, its voyage, mean and best Forgotten Tomes
    score); the archived First Fleet folds away below. A row opens the ship.
+0. **Goals** (`/goals`): the class on the route to quantum physics. Its **target level** (the
+   highest waypoint among its goals), its **ceiling** (its goals at that waypoint: the upper limit
+   expected of this size before the next class takes over), its goals and how many are performed,
+   what it carries up from smaller classes, and what the next class takes over. Then the seven
+   waypoints bottom to top with every trick as a chip: this class's goals lit, carried ones
+   marked, bigger classes' faded with their class, ✓ where this class's sailings performed it.
 1. **Overview** (`/overview`): the class's performance in as few charts as possible. The
    RunGrid (every run at this size), then the Forgotten Tomes score run by run with the best so
    far and the Qwen lines.

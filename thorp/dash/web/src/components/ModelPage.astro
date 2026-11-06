@@ -12,7 +12,7 @@
 <div class="section" id="rung">
   <h1><a href="#/classes" class="back">← classes</a> <span id="rungtitle"></span> <span class="q" id="rungjob"></span></h1>
   <nav class="subnav" id="modelnav">
-    <a data-mtab="fleet">Fleet</a><a data-mtab="overview">Overview</a><a data-mtab="training">Training</a><a data-mtab="scoring">Scoring</a><a data-mtab="waypoints">Waypoints</a>
+    <a data-mtab="fleet">Fleet</a><a data-mtab="goals">Goals</a><a data-mtab="overview">Overview</a><a data-mtab="training">Training</a><a data-mtab="scoring">Scoring</a><a data-mtab="waypoints">Waypoints</a>
   </nav>
 
   <!-- ============================== Fleet: the ships of this class -->
@@ -24,6 +24,19 @@
       <details class="archive" id="fleetarchivewrap"><summary>The First Fleet <span class="note" id="fleetarchivesum"></span></summary>
         <div class="scroll"><table id="fleetarchive" class="clickable"><thead><tr><th>ship</th><th>fitout</th><th>sailings</th><th>voyage</th><th>status</th>
           <th>Forgotten Tomes (mean)</th><th>best</th><th>last sailed</th></tr></thead><tbody></tbody></table></div></details>
+    </section>
+  </div>
+
+  <!-- ============================== Goals: this class on the route to quantum physics -->
+  <div class="mtab" data-mtab="goals">
+    <section class="panel"><div class="rungover" id="goalsover"></div></section>
+    <section class="panel">
+      <h2>On the route to quantum physics <span class="note">the seven waypoints, bottom to top; this class's goals are lit, the goals of smaller classes it carries up are marked, and those left for bigger classes are faded. ◆ is a gate: performed before a ship moves on to the next waypoint. Open a trick for its stars and progress</span></h2>
+      <div class="goalroute" id="goalroute"></div>
+    </section>
+    <section class="panel">
+      <h2>This class's goals <span class="note">the tricks a ship of this size is expected to reach, and how its sailings are doing on each</span></h2>
+      <div class="scroll"><table id="goaltable" class="clickable"><thead><tr><th>trick</th><th>waypoint</th><th>gate</th><th>rests on</th><th>the field shows it at</th><th>on this class</th></tr></thead><tbody></tbody></table></div>
     </section>
   </div>
 

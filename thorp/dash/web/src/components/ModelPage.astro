@@ -1,39 +1,93 @@
 ---
-// one model page: the template every model on the ladder uses (UI.md, "Model pages")
+// One model page: the template every model on the ladder uses (UI.md, "Model pages"). It lives at
+// #/models/<class>[/training|/scoring|/waypoints] and has four tabs of its own, chosen in the header:
+//   Overview  the model's performance in as few charts as possible
+//   Training  what it was trained on and how: the model, every run's setup, loss, the shelves
+//   Scoring   every score on its runs, in two parts: science (how well it predicts text it has
+//             never seen) and art (how its writing compares with real books)
+//   Waypoints the moments it passes in training: Nevermores (induction heads) forming, traits emerging
+// A panel that belongs to one kind of model only carries data-kind (the proxy's calibration).
 ---
 <div class="section" id="rung">
   <h1><a href="#sizes" class="back">← ladder</a> <span id="rungtitle"></span> <span class="q" id="rungjob"></span></h1>
-  <section class="panel"><div class="rungover" id="rungover"></div></section>
-  <section class="panel" id="gridpanel">
-    <h2>Every run at this size <span class="note">one square per run in the order they started; the deeper the green, the better (lower) its Forgotten Tomes bits per byte, by quartile of the runs scored so far; an outlined square is running</span></h2>
-    <div id="rungridsum" class="gridsum"></div>
-    <div id="rungrid"></div>
-  </section>
-  <section class="panel"><h2>What we measure, and why <span class="note">each metric tied to this rung's job; "to come" is not built yet</span></h2>
-    <div class="scroll"><table id="rungmetrics"><thead><tr><th>metric</th><th>what it tells us</th><th>better is</th><th>state</th></tr></thead><tbody></tbody></table></div></section>
-  <section class="panel"><h2 id="boardh">Scoreboard <span class="note">English held-out books; lower bits per byte is better; laws show the model beside the books' own value (ref) <b id="recentnote"></b></span></h2>
-    <div class="scroll"><table id="rungboard"><thead></thead><tbody></tbody></table></div></section>
-  <!-- this model's own panels: data-kind names the kinds of model they belong to -->
-  <section class="panel" id="calpanel" data-kind="proxy" hidden>
-    <h2>Calibration against 9m <span class="note">the same shelf and passes at both sizes; the proxy is trusted only if it orders the shelves as 9m does. Forgotten Tomes bits per byte, English, lower is better</span></h2>
-    <div class="row">
-      <div class="scroll"><table id="caltable"><thead><tr><th>shelf</th><th>passes</th><th>9m run</th><th>9m score</th><th>1m run</th><th>1m score</th></tr></thead><tbody></tbody></table>
-        <p class="note" id="calverdict"></p></div>
-      <div class="chart" id="calchart"></div>
-    </div>
-  </section>
-  <div class="row">
-    <section class="panel"><h2>The Forgotten Tomes score <span class="note">bits per byte on 16 books Qwen 3.8 cannot have read; lower is better; dotted lines are Qwen models scored the same way</span></h2><div class="chart" id="ftchart"></div></section>
-    <section class="panel"><h2>Training loss <span class="note">nats per token on the training shelf, the latest 12 runs at this size</span></h2><div class="chart" id="losschart"></div></section>
+
+  <!-- ============================== Overview -->
+  <div class="mtab" data-mtab="overview">
+    <section class="panel" id="gridpanel">
+      <h2>Every run at this size <span class="note">one square per run in the order they started; the brighter the green, the better (lower) its Forgotten Tomes bits per byte, by quartile of the runs scored so far; an outlined square is running</span></h2>
+      <div id="rungridsum" class="gridsum"></div>
+      <div id="rungrid"></div>
+    </section>
+    <section class="panel">
+      <h2>The Forgotten Tomes score, run by run <span class="note">bits per byte on 16 books Qwen 3.8 cannot have read, lower is better; one dot per scored run in the order they started, the line is the best so far, dotted lines are Qwen models scored the same way</span></h2>
+      <div class="chart tall" id="ftchart"></div>
+    </section>
   </div>
-  <section class="panel" id="bookspanel">
-    <h2>The books <span class="note">click any book to read it: the same stripped text Thorp trains and scores on</span></h2>
-    <div class="booktabs"><button data-bt="tomes" class="on">The Forgotten Tomes</button><button data-bt="shelf">Training shelves</button>
-      <select id="shelfpick" style="display:none"></select><input id="bookfilter" placeholder="filter by title or family" style="display:none"></div>
-    <div class="scroll" id="bookswrap"><table id="bookstable" class="clickable"><thead></thead><tbody></tbody></table></div>
-  </section>
-  <div class="row" id="rungcharts">
+
+  <!-- ============================== Training -->
+  <div class="mtab" data-mtab="training">
+    <section class="panel"><div class="rungover" id="rungover"></div></section>
+    <section class="panel">
+      <h2>The runs <span class="note">each run's shelf, passes and settings, and how far it got <b class="recentnote"></b></span></h2>
+      <div class="scroll"><table id="trainruns" class="clickable"><thead><tr><th>ship</th><th>name</th><th>status</th><th>shelf</th><th>passes</th><th>seed</th>
+        <th>vocab</th><th>context</th><th>tokens seen</th><th>minutes</th><th>started</th></tr></thead><tbody></tbody></table></div>
+    </section>
+    <section class="panel">
+      <h2>Training loss <span class="note">nats per token on the training shelf, the latest 12 runs at this size</span></h2>
+      <div class="chart" id="losschart"></div>
+    </section>
+    <section class="panel">
+      <h2>The training shelves <span class="note">every book a run read; click one to read it, the same stripped text Thorp trains on</span></h2>
+      <div class="booktabs"><select id="shelfpick" title="the run whose shelf is shown"></select><input id="bookfilter" placeholder="filter by title or family"></div>
+      <div class="scroll bookswrap"><table id="shelftable" class="clickable"><thead></thead><tbody></tbody></table></div>
+    </section>
+  </div>
+
+  <!-- ============================== Scoring -->
+  <div class="mtab" data-mtab="scoring">
+    <h2 class="band">Science <span class="q">how well it predicts text it has never seen: bits per byte, lower is better</span></h2>
+    <section class="panel"><h2>What we measure <span class="note">"to come" is not built yet</span></h2>
+      <div class="scroll"><table id="sciencemetrics"><thead><tr><th>metric</th><th>what it tells us</th><th>better is</th><th>state</th></tr></thead><tbody></tbody></table></div></section>
+    <section class="panel"><h2>Scoreboard <span class="note">the Forgotten Tomes and the run's English held-out books, then the held-out score by kind of byte <b class="recentnote"></b></span></h2>
+      <div class="scroll"><table id="scienceboard"><thead></thead><tbody></tbody></table></div></section>
+    <section class="panel" id="calpanel" data-kind="proxy" hidden>
+      <h2>Calibration against 9m <span class="note">the same shelf and passes at both sizes; the proxy is trusted only if it orders the shelves as 9m does. Forgotten Tomes bits per byte, English, lower is better</span></h2>
+      <div class="row">
+        <div class="scroll"><table id="caltable"><thead><tr><th>shelf</th><th>passes</th><th>9m run</th><th>9m score</th><th>1m run</th><th>1m score</th></tr></thead><tbody></tbody></table>
+          <p class="note" id="calverdict"></p></div>
+        <div class="chart" id="calchart"></div>
+      </div>
+    </section>
     <section class="panel"><h2>Bits per byte by kind of byte <span class="note">spelling is "inside a word"; one bar per run; lower is better</span></h2><div class="chart" id="splitchart"></div></section>
+    <section class="panel">
+      <h2>The Forgotten Tomes, book by book <span class="note">the best run at this size, the latest runs and Qwen; click a book to read it</span></h2>
+      <div class="scroll bookswrap"><table id="tomestable" class="clickable"><thead></thead><tbody></tbody></table></div>
+    </section>
+
+    <h2 class="band">Art <span class="q">how its writing compares with real books: the laws of text, grammar, voice</span></h2>
+    <section class="panel"><h2>What we measure <span class="note">"to come" is not built yet</span></h2>
+      <div class="scroll"><table id="artmetrics"><thead><tr><th>metric</th><th>what it tells us</th><th>better is</th><th>state</th></tr></thead><tbody></tbody></table></div></section>
+    <section class="panel"><h2>Scoreboard <span class="note">the laws on the text it writes, model beside the books' own value (ref) <b class="recentnote"></b></span></h2>
+      <div class="scroll"><table id="artboard"><thead></thead><tbody></tbody></table></div></section>
     <section class="panel"><h2>The laws: model against the books <span class="note">model value ÷ the books' value; closer to the dotted line at 1 is better</span></h2><div class="chart" id="lawchart"></div></section>
+  </div>
+
+  <!-- ============================== Waypoints -->
+  <div class="mtab" data-mtab="waypoints">
+    <section class="panel">
+      <h2>Waypoints, run by run <span class="note">the training step at which each run first passed each waypoint; "not yet" is measured but not reached, – is not measured on that run <b class="recentnote"></b></span></h2>
+      <div class="scroll"><table id="waypointtable"><thead></thead><tbody></tbody></table></div>
+    </section>
+    <h2 class="band">Nevermores <span class="q">induction heads: at a word seen before, a head looks back to what followed it last time and bets it comes again; they form suddenly</span><span class="bandtools"><button data-essay="nevermore">Read: what a Nevermore is</button><button id="readpassage">Read the test passage</button></span></h2>
+    <div class="row">
+      <section class="panel"><h2>The strongest head <span class="note">its Nevermore score on a real passage read twice, by training step (where one shows first); the line crossing 0.3 is the moment a Nevermore forms; the latest 12 runs</span></h2><div class="chart" id="nvchart"></div></section>
+      <section class="panel"><h2>Copy gain <span class="note">nats per token the model saves on the second copy of a sequence, which only a model that copies can; higher is better</span></h2><div class="chart" id="copychart"></div></section>
+    </div>
+    <h2 class="band">Traits <span class="q">can its hidden state tell fiction, verse and first person apart on books it has never read; found at the dotted line, learned when it also clears the bag-of-tokens and untrained-model floors</span><span class="bandtools"><button data-essay="traits">Read: how traits are found</button></span></h2>
+    <div class="row3">
+      <section class="panel"><h2>Fiction</h2><div class="chart short" id="trait-fiction"></div></section>
+      <section class="panel"><h2>Verse</h2><div class="chart short" id="trait-verse"></div></section>
+      <section class="panel"><h2>First person</h2><div class="chart short" id="trait-first_person"></div></section>
+    </div>
   </div>
 </div>

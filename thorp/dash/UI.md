@@ -38,23 +38,41 @@ Numbers sit in `tabular-nums` everywhere (set on `body`).
 ## Model pages
 
 Every model on the ladder (`LADDER` in `thorp/models/registry.py`) gets one page, built from one
-template (`web/src/components/ModelPage.astro`, filled by `renderRung` in `dashboard.js`). Its URL is the model's class name, not
-its size: `#proxy`, `#speller`, `#stylist`, `#paragraph`, `#bettor`, `#summit`. Old `#rung-1m` links
-redirect there. The template, in this order, the same for every model:
+template (`web/src/components/ModelPage.astro`, filled by `renderRung` in `dashboard.js`). Its URL
+is `#/models/<class>`, named by class, not size: `#/models/proxy`, `#/models/speller`… Old `#proxy`
+and `#rung-1m` links redirect there.
 
-1. Title: `← ladder`, size and class (`1m · The proxy`), the model's job.
-2. Overview: shape, parameters, where it trains, what judges it, status.
-3. **Every run at this size**: the RunGrid (below). It is the first chart on every model page.
-4. What we measure, and why: each metric tied to the model's job, live or to come.
-5. The model's own panels, and only these vary: `section.panel[data-kind="proxy"]` shows only on
-   a model of that kind (the proxy's calibration against 9m). A new model-specific panel goes
-   here with its `data-kind`, never as a special case in the script.
-6. Scoreboard, then the Forgotten Tomes beside Qwen and training loss, then the books, then
-   bits per byte by kind of byte and the laws.
+On a model page the global tabs (Ladder, Betting, Books…), the run picker and the run overview
+step aside; the header carries the model's own four tabs instead, each with its own address:
 
-Panels that draw one mark per run (the scoreboard, the bar charts) show the latest 30 runs and say
-so; training loss shows the latest 12. Only the RunGrid shows every run, so a size with thousands of
-runs (the proxy loop) stays quick to load and to redraw every 5 s.
+1. **Overview** (`#/models/proxy`): the model's performance in as few charts as possible. The
+   RunGrid (every run at this size), then the Forgotten Tomes score run by run with the best so
+   far and the Qwen lines.
+2. **Training** (`/training`): what it was trained on and how. The model (shape, parameters,
+   where it trains, status), every run's setup (shelf, passes, seed, vocabulary, context, tokens,
+   minutes), training loss, and the training shelves book by book.
+3. **Scoring** (`/scoring`): every score on its runs, in two bands.
+   - **Science**: how well it predicts text it has never seen. Bits per byte: the Forgotten Tomes,
+     the held-out books, the split by kind of byte, the Forgotten Tomes book by book, and ranking
+     shelves as a bigger model does (the proxy's calibration).
+   - **Art**: how its writing compares with real books. The laws of text, non-words, word length
+     and punctuation, balance and capitals, grammar (minimal pairs), voice (register), traits.
+   Each band opens with its own "What we measure" list. The split is the `ART` set in
+   `dashboard.js`; a metric not named there counts as science, so a new art metric must be added.
+4. **Waypoints** (`/waypoints`): the moments it passes in training. When each run first formed a
+   Nevermore (induction head, `evaluators/nevermore.py`) and first found and learned each trait
+   (`evaluators/probes.py`), then the strongest head and copy gain by step, and each trait's
+   held-out AUC by step. The thresholds come from the evaluators through `/api/waypoints`. Each
+   band has a "Read" button that opens its write-up in the book reader (`/api/essay`: the
+   evaluator's own docstring), and the Nevermore test passage opens as a book.
+
+A panel that belongs to one kind of model only carries `data-kind` (the proxy's calibration
+against 9m) and sits in the tab it belongs to; never a special case in the script.
+
+Panels that draw one mark per run (the scoreboards, the bar charts, the run tables) show the latest
+30 runs and say so; training loss and the Waypoints charts show the latest 12. Only the Overview
+shows every run, so a size with thousands of runs (the proxy loop) stays quick to load and to
+redraw every 5 s.
 
 ## Components
 

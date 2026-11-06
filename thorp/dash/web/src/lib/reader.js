@@ -36,6 +36,17 @@ function rSplit(text) {
 }
 const rEl = id => document.getElementById(id);
 
+// a waypoint's write-up (server.py api_essay: the evaluator's own docstring), read like a book
+export async function openEssay(name) {
+  rEl('rtitle').textContent = 'loading…';
+  rEl('reader').hidden = false;
+  const d = await get('/api/essay?name=' + encodeURIComponent(name));
+  RD.book = d; RD.parts = rSplit(d.text);
+  const at = +rget('thorp.read.at:' + d.book_id) || 0;
+  RD.part = Math.max(0, RD.parts.findIndex(p => at < p.end));
+  rEl('rtitle').textContent = d.title;
+  rRender(at);
+}
 export async function openBook(id) {
   rEl('rtitle').textContent = 'loading…';
   rEl('reader').hidden = false;
@@ -125,4 +136,8 @@ document.addEventListener('keydown', e => {
   if (e.key === 'ArrowRight' || e.key === 'PageDown' || (e.key === ' ' && !e.shiftKey)) { e.preventDefault(); rTurn(1); }
   else if (e.key === 'ArrowLeft' || e.key === 'PageUp' || (e.key === ' ' && e.shiftKey)) { e.preventDefault(); rTurn(-1); }
 });
-document.getElementById('bookstable').addEventListener('click', e => { const tr = e.target.closest('tr[data-book]'); if (tr && !e.target.closest('.info')) openBook(tr.dataset.book); });
+// any book row on a model page opens the reader: the Forgotten Tomes (Scoring) and the shelves (Training)
+document.addEventListener('click', e => {
+  const tr = e.target.closest('#tomestable tr[data-book], #shelftable tr[data-book]');
+  if (tr && !e.target.closest('.info')) openBook(tr.dataset.book);
+});

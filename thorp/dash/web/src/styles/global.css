@@ -66,6 +66,18 @@ main { padding: 16px 20px 40px; display: grid; gap: 16px; max-width: 1500px; mar
 .section.active { gap: 16px; }
 .section > h1 { margin: 18px 0 0; font-size: var(--fs-lg); letter-spacing: .08em; text-transform: uppercase; color: var(--accent); border-bottom: 1px solid var(--line); padding-bottom: 6px; }
 .section > h1 .q { color: var(--muted); font-weight: 400; text-transform: none; letter-spacing: 0; margin-left: 12px; font-size: var(--fs-md); }
+nav a { cursor: pointer; }
+/* a model page: its own tabs replace the global ones, and the per-run header pieces step aside */
+#modelnav, body.on-model #mainnav, body.on-model .perrun { display: none; }
+body.on-model #modelnav { display: flex; }
+.mtab { display: none; }
+.mtab.active { display: grid; gap: 16px; min-width: 0; }
+/* a band divides one tab into parts (Scoring: science, then art) */
+.band { margin: 10px 0 0; font-size: var(--fs-md); font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--text);
+        border-bottom: 1px solid var(--line); padding-bottom: 6px; }
+.band .q { color: var(--muted); font-weight: 400; text-transform: none; letter-spacing: 0; margin-left: 12px; }
+.band { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 0; }
+.band .bandtools { margin-left: auto; display: flex; gap: 6px; text-transform: none; letter-spacing: 0; font-weight: 400; }
 .panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-md);
          padding: 12px 14px; min-width: 0; }
 .panel h2 { margin: 0 0 8px; font-size: var(--fs-md); font-weight: 600; color: var(--muted);
@@ -87,7 +99,7 @@ main { padding: 16px 20px 40px; display: grid; gap: 16px; max-width: 1500px; mar
 .info .pop b { color: var(--accent); font-weight: 600; }
 .info:hover .pop, .info:focus .pop, .info.open .pop { display: block; }
 .booktabs { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
-#bookswrap { max-height: 420px; overflow: auto; }
+.bookswrap { max-height: 420px; overflow: auto; }
 /* the book reader: a Kindle Paperwhite page, after the Atlas essay reader (monorepo
    packages/ui/apps/atlas/src/components/EssayReader.tsx): warm paper, black ink, no colour or shadow,
    a justified serif with first-line indents, a quiet footer */

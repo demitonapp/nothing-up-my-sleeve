@@ -3,7 +3,7 @@
 import { Plotly, tok, C, PALETTE, layout, cfg, empty, plot } from '../lib/charts.js';
 import { fmt, big, fmtBytes, esc, get, log10, mean } from '../lib/format.js';
 import { DataTable } from '../lib/datatable.js';
-import { openBook } from '../lib/reader.js';
+import { openBook, openEssay } from '../lib/reader.js';
 
 // metric keys: `<prefix>/layer_3`, `<prefix>/layer_3/attn`, `<prefix>/tok`, `<prefix>/pos`
 const groupOf = (k, prefix) => k.slice(prefix.length);
@@ -19,23 +19,43 @@ let currentRung = null;
 // a model page lives at its class name: #proxy, #speller, #stylist… (old #rung-1m links still open it)
 const slugOf = r => r.name.toLowerCase().replace(/^the\s+/, '').replace(/[^a-z0-9]+/g, '-');
 const rungFor = key => ladderData && ladderData.rungs.find(r => slugOf(r) === key || r.preset === key);
-function showTab(id, push = true) {
-  let hash = id;
-  if (id.startsWith('rung-')) id = id.slice(5);
-  if (!TABS.includes(id) || id === 'rung') {
-    if (id === 'rung' || (ladderData && !rungFor(id))) { id = hash = TABS[0]; }  // not a model this ladder has
+// Routes: #sizes, #betting… are the global tabs; a model page is #/models/<class>[/training|/scoring|/waypoints].
+// Old model links (#proxy, #rung-1m) land on the new address.
+const MTABS = ['overview', 'training', 'scoring', 'waypoints'];
+let modelTab = 'overview';
+function route(h) {
+  if (h.startsWith('/models/')) { const [slug, mt] = h.slice(8).split('/'); return { tab: 'rung', rung: slug, mtab: MTABS.includes(mt) ? mt : 'overview' }; }
+  if (h.startsWith('rung-')) return { tab: 'rung', rung: h.slice(5), mtab: 'overview' };
+  if (TABS.includes(h) && h !== 'rung') return { tab: h };
+  if (h && h !== 'rung' && !h.startsWith('/')) return { tab: 'rung', rung: h, mtab: 'overview' };
+  return { tab: TABS[0] };
+}
+const modelHash = (r, mt = 'overview') => `/models/${slugOf(r)}${mt === 'overview' ? '' : '/' + mt}`;
+function showTab(h, push = true) {
+  const rt = route(h);
+  let id = rt.tab, hash = h || TABS[0];
+  if (id === 'rung') {
+    const r = rungFor(rt.rung);
+    if (ladderData && !r) { id = hash = TABS[0]; push = true; }  // not a model this ladder has
     else {
-      currentRung = id; const r = rungFor(id);
-      if (r) { hash = slugOf(r); if (location.hash !== '#' + hash) push = true; }
-      id = 'rung'; if (ladderData) renderRung();
+      currentRung = rt.rung; modelTab = rt.mtab;
+      if (r) {
+        hash = modelHash(r, modelTab); push = true;
+        document.querySelectorAll('#modelnav a').forEach(a => { a.href = '#' + modelHash(r, a.dataset.mtab); });
+      }
+      if (ladderData) renderRung();
     }
   }
+  document.body.classList.toggle('on-model', id === 'rung');
   document.querySelectorAll('.section').forEach(s => s.classList.toggle('active', s.id === id));
-  document.querySelectorAll('nav a').forEach(a => a.classList.toggle('active', a.dataset.tab === (id === 'rung' ? 'sizes' : id)));
+  document.querySelectorAll('#mainnav a').forEach(a => a.classList.toggle('active', a.dataset.tab === id));
+  document.querySelectorAll('#rung .mtab').forEach(t => t.classList.toggle('active', t.dataset.mtab === modelTab));
+  document.querySelectorAll('#modelnav a').forEach(a => a.classList.toggle('active', a.dataset.mtab === modelTab));
   if (push && location.hash !== '#' + hash) history.replaceState(null, '', location.pathname + location.search + '#' + hash);
-  document.querySelectorAll(`#${id} .chart`).forEach(el => { if (el.data) Plotly.Plots.resize(el); });
+  // charts drawn while hidden have no width; size the ones now showing
+  document.querySelectorAll(`#${id} .chart`).forEach(el => { if (el.data && el.offsetParent) Plotly.Plots.resize(el); });
 }
-document.querySelectorAll('nav a').forEach(a => a.onclick = e => { e.preventDefault(); showTab(a.dataset.tab); });
+document.querySelectorAll('#mainnav a').forEach(a => a.onclick = e => { e.preventDefault(); showTab(a.dataset.tab); });
 document.getElementById('home').onclick = e => { e.preventDefault(); showTab(TABS[0]); window.scrollTo(0, 0); };
 window.addEventListener('hashchange', () => showTab(location.hash.slice(1), false));
 showTab(location.hash.slice(1) || TABS[0], false);
@@ -597,6 +617,8 @@ function runsTable(runs) {
 
 // what each speller metric means, which way is better, and why (popovers on the 9m page)
 const HELP = {
+  nevermore: ['Nevermore score', 'Higher (0.3 or more is a Nevermore)', "The strongest head's attention from a repeated word to the word that followed it last time; measured on random pieces repeated twice (the standard test) and on a real passage repeated twice. A head attending evenly would score about 0.003."],
+  copygain: ['Copy gain', 'Higher', 'How much easier the second copy is to predict than the first, in nats per token. Only a model that copies can gain.'],
   bpb: ['Bits per byte on English held-out books', 'Lower', 'How many bits the model needs, on average, to guess each byte of books it never saw. Fewer bits means better bets on unseen text. It is the headline score every rung shares.'],
   word_inside: ['Bits per byte inside a word', 'Lower', 'Letters after the first one in a word. Once a word has begun, how surely does the model know how it goes on? This is spelling.'],
   word_start: ['Bits per byte at a word start', 'Lower', 'The first letter of each word: which word comes next. That depends on grammar and meaning more than spelling, so expect it to stay high at 9m.'],
@@ -638,37 +660,48 @@ const METRIC_KEY = { 'inside a word': 'word_inside', 'word start': 'word_start',
 
 
 // ---- the books on a rung page: the Forgotten Tomes with every score, each run's training shelf, a reader
-let bookTab = 'tomes', tomesData = null;
-let booksKey = null;
-async function renderBooks(r, runs, force = false) {
-  // the page refreshes every 5 s; the book table only re-renders when its view changes (or each minute)
-  const key = [r.preset, bookTab, document.getElementById('shelfpick').value, document.getElementById('bookfilter').value, runs.length, Math.floor(Date.now() / 60000)].join('|');
-  if (!force && key === booksKey) return;
-  booksKey = key;
-  document.querySelectorAll('.booktabs button').forEach(b => b.classList.toggle('on', b.dataset.bt === bookTab));
+let tomesData = null;
+let tomesKey = null, shelfKey = null;
+// the Forgotten Tomes book by book: the best run at this size, the latest few, and the outside models
+async function renderTomes(r, allRuns) {
+  const scored = allRuns.filter(x => x.ft_en != null);
+  const best = [...scored].sort((a, b) => a.ft_en - b.ft_en)[0];
+  const pick = [...new Set([best, ...scored.slice(-4)].filter(Boolean).map(x => x.ship || x.name))];
+  const key = [r.preset, pick.join(','), Math.floor(Date.now() / 60000)].join('|');
+  if (key === tomesKey) return;
+  tomesKey = key;
+  const head = document.querySelector('#tomestable thead'), body = document.querySelector('#tomestable tbody');
+  try { tomesData = await get('/api/tomes'); } catch (e) { body.innerHTML = '<tr><td class="empty">could not load the deck</td></tr>'; return; }
+  const outside = Object.keys(tomesData.scores).filter(k => !ladderData.runs.some(x => (x.ship || x.name) === k));
+  const cols = [...pick.filter(k => tomesData.scores[k]), ...outside];
+  const label = c => c === (best && (best.ship || best.name)) ? `${esc(c)} <span class="pill good">best</span>` : esc(c);
+  head.innerHTML = `<tr><th>title</th><th>author</th><th>released</th><th>size</th>${cols.map(c => `<th>${label(c)}${info('ft')}</th>`).join('')}</tr>`;
+  body.innerHTML = tomesData.books.map(b => `<tr data-book="${b.book_id}"><td>${esc(b.title)}</td><td>${esc(b.author)}</td><td>${esc(b.released)}</td>
+    <td>${fmtBytes(b.bytes)}</td>${cols.map(c => `<td>${fmt(tomesData.scores[c][b.book_id])}</td>`).join('')}</tr>`).join('');
+}
+// one run's training shelf, every book on it
+async function renderShelf(r, runs) {
   const pick = document.getElementById('shelfpick'), filt = document.getElementById('bookfilter');
-  pick.style.display = filt.style.display = bookTab === 'shelf' ? '' : 'none';
-  const head = document.querySelector('#bookstable thead'), body = document.querySelector('#bookstable tbody');
-  if (bookTab === 'tomes') {
-    try { tomesData = await get('/api/tomes'); } catch (e) { body.innerHTML = '<tr><td class="empty">could not load the deck</td></tr>'; return; }
-    const ships = new Set(runs.map(x => x.ship || x.name));
-    const cols = Object.keys(tomesData.scores).filter(k => ships.has(k) || !ladderData.runs.some(x => (x.ship || x.name) === k));
-    head.innerHTML = `<tr><th>title</th><th>author</th><th>released</th><th>size</th>${cols.map(c => `<th>${esc(c)}${info('ft')}</th>`).join('')}</tr>`;
-    body.innerHTML = tomesData.books.map(b => `<tr data-book="${b.book_id}"><td>${esc(b.title)}</td><td>${esc(b.author)}</td><td>${esc(b.released)}</td>
-      <td>${fmtBytes(b.bytes)}</td>${cols.map(c => `<td>${fmt(tomesData.scores[c][b.book_id])}</td>`).join('')}</tr>`).join('');
-    return;
-  }
+  const head = document.querySelector('#shelftable thead'), body = document.querySelector('#shelftable tbody');
   const names = runs.map(x => x.name);
-  if (!names.length) { head.innerHTML = ''; body.innerHTML = '<tr><td class="empty">no runs at this size yet</td></tr>'; return; }
-  if (!names.includes(pick.value)) pick.innerHTML = runs.map(x => `<option value="${esc(x.name)}">${esc(x.ship || x.name)} · ${esc(x.name)}</option>`).join('');
-  const shelf = await get('/api/shelf?run=' + encodeURIComponent(pick.value || names[0]));
+  if (!names.length) { head.innerHTML = ''; body.innerHTML = '<tr><td class="empty">no runs at this size yet</td></tr>'; shelfKey = null; return; }
+  const opts = runs.map(x => x.name).join(',');
+  if (pick.dataset.opts !== opts) {
+    const was = pick.value;
+    pick.innerHTML = [...runs].reverse().map(x => `<option value="${esc(x.name)}">${esc(x.ship || x.name)} · ${esc(x.name)}</option>`).join('');
+    pick.dataset.opts = opts;
+    if (names.includes(was)) pick.value = was;
+  }
+  const key = [r.preset, pick.value, filt.value].join('|');
+  if (key === shelfKey) return;
+  shelfKey = key;
+  const shelf = await get('/api/shelf?run=' + encodeURIComponent(pick.value || names[names.length - 1]));
   const q = filt.value.trim().toLowerCase();
   const rows = shelf.filter(b => !q || (b.title + ' ' + b.family).toLowerCase().includes(q));
   head.innerHTML = `<tr><th>title</th><th>family</th><th>language</th><th>tokens</th><th>bytes per token</th></tr>`;
   body.innerHTML = rows.map(b => `<tr data-book="${b.book_id}"><td>${esc(b.title)}</td><td>${esc(b.family)}</td><td>${esc(b.language)}</td>
     <td>${big(b.tokens)}</td><td>${fmt(b.bytes_per_token, 2)}</td></tr>`).join('') + `<tr><td colspan="5" class="note">${rows.length} of ${shelf.length} books</td></tr>`;
 }
-document.querySelectorAll('.booktabs button').forEach(b => b.onclick = () => { bookTab = b.dataset.bt; renderRung(); });
 document.getElementById('shelfpick').onchange = () => renderRung();
 document.getElementById('bookfilter').oninput = () => renderRung();
 
@@ -687,7 +720,7 @@ async function loadLadder() {
   document.getElementById('rungcards').innerHTML = d.rungs.map(r => {
     const runs = rungRuns(r.preset), live = runs.filter(x => x.status === 'running').length, done = runs.filter(x => x.status === 'finished').length;
     const nlive = r.metrics.filter(m => m[2] === 'live').length;
-    return `<a class="card" href="#${esc(slugOf(r))}">
+    return `<a class="card" href="#${esc(modelHash(r))}">
       <div class="top"><span class="preset">${esc(r.preset)}</span><span class="nm">${esc(r.name)}</span></div>
       <div class="job">${esc(r.job)}</div><div class="ov">${esc(r.overview)}</div>
       <div class="foot"><span>${big(r.total)} params · ${esc(r.where.split(' (')[0])}</span>
@@ -696,7 +729,7 @@ async function loadLadder() {
   }).join('');
   document.querySelector('#queue tbody').innerHTML = d.queue.map((q, i) => `<tr${q.status === 'running' ? ' class="sel"' : ''}><td>${i + 1}</td>
     <td>${esc(q.name)}</td><td>${esc(q.status.split(':')[0])}</td></tr>`).join('');
-  if (currentRung && document.getElementById('rung').classList.contains('active')) showTab(currentRung, false);
+  if (document.getElementById('rung').classList.contains('active')) showTab(location.hash.slice(1), false);
 }
 const RECENT = 30;
 // ---- RunGrid: every run at one size as a square, like a GitHub contribution graph. Bands of 7 rows
@@ -751,32 +784,55 @@ function runGrid(r, runs) {
     selected = c.dataset.run; history.replaceState(null, '', '?run=' + selected + location.hash); refresh();
   });
 })();  // panels that draw one mark per run show the latest RECENT; the run grid shows every run
+// Scoring is in two parts. Science: how well the model predicts text it has never seen (bits per
+// byte, the split by kind of byte, ranking shelves as a bigger model does, the bets). Art: how its
+// writing compares with real books (the laws of text, non-words, grammar, voice, traits). A metric
+// not named here counts as science.
+const ART = new Set(['non-words', 'Zipf and Heaps', 'word length, punctuation mix', 'balance and capitals',
+  'traits as they emerge', 'minimal pairs', 'register probe', 'the 9m laws']);
+const metricRows = list => list.length ? list.map(m => `<tr><td><b>${esc(m[0])}</b>${info(METRIC_KEY[m[0]])}</td><td>${esc(m[1])}</td>
+    <td>${HELP[METRIC_KEY[m[0]]] ? esc(HELP[METRIC_KEY[m[0]]][1]) : '–'}</td>
+    <td><span class="pill${m[2] === 'live' ? ' live' : ''}">${esc(m[2])}</span></td></tr>`).join('')
+  : '<tr><td colspan="4" class="empty">none for this model yet</td></tr>';
+const runCells = x => `<td>${esc(x.ship || '')}</td><td>${esc(x.name)}</td><td>${esc((x.status || '').split(':')[0])}</td>`;
 function renderRung() {
   const r = rungFor(currentRung) || ladderData.rungs[0];
   // the template's own slot: panels marked data-kind show only on that kind of model
   document.querySelectorAll('#rung [data-kind]').forEach(el => { el.hidden = !el.dataset.kind.split(' ').includes(r.kind || slugOf(r)); });
   document.getElementById('rungtitle').textContent = `${r.preset} · ${r.name}`;
   document.getElementById('rungjob').textContent = r.job;
+  const allRuns = rungRuns(r.preset), runs = allRuns.slice(-RECENT), capped = allRuns.length > runs.length;
+  const more = (n) => capped ? `<tr><td colspan="${n}" class="note">the latest ${runs.length} of ${allRuns.length} runs at ${esc(r.preset)}; the Overview grid has every one</td></tr>` : '';
+  const none = (n) => `<tr><td colspan="${n}" class="empty">no runs at ${esc(r.preset)} yet</td></tr>`;
+  document.querySelectorAll('#rung .recentnote').forEach(el => { el.textContent = capped ? `(the latest ${runs.length} of ${allRuns.length} runs)` : ''; });
+
+  // ---- Overview: every run, and the Forgotten Tomes score run by run
+  runGrid(r, allRuns);
+  ftProgress(allRuns);
+
+  // ---- Training: the model, each run's setup, loss, the shelves
   document.getElementById('rungover').innerHTML = [
     ['overview', r.overview], ['shape', `${r.layers} layers × ${r.width} wide, ${r.heads} heads`],
     ['parameters', `${big(r.total)} (${big(r.non_embedding)} non-embedding)`], ['where it trains', r.where],
     ['judged by', r.scored], ['status', r.status],
   ].map(([k, v]) => `<div><div class="k">${k}</div><div>${esc(v)}</div></div>`).join('');
-  document.querySelector('#rungmetrics tbody').innerHTML = r.metrics.map(m => `<tr><td><b>${esc(m[0])}</b>${info(METRIC_KEY[m[0]])}</td><td>${esc(m[1])}</td>
-    <td>${HELP[METRIC_KEY[m[0]]] ? esc(HELP[METRIC_KEY[m[0]]][1]) : '–'}</td>
-    <td><span class="pill${m[2] === 'live' ? ' live' : ''}">${esc(m[2])}</span></td></tr>`).join('');
-  const allRuns = rungRuns(r.preset), runs = allRuns.slice(-RECENT), capped = allRuns.length > runs.length;
-  runGrid(r, allRuns);
-  document.getElementById('recentnote').textContent = capped ? `the latest ${runs.length} of ${allRuns.length} runs; the grid above has every one` : '';
+  const shelfName = x => esc((x.recipe || '–').replace('lists/', '').replace('.csv', ''));
+  document.querySelector('#trainruns tbody').innerHTML = runs.length ? runs.map(x => `<tr data-run="${esc(x.run_id)}">${runCells(x)}<td>${shelfName(x)}</td>
+    <td>${x.passes ?? '–'}</td><td>${x.seed ?? '–'}</td><td>${x.vocab ?? '–'}</td><td>${x.context ?? '–'}</td><td>${big(x.tokens_seen)}</td>
+    <td>${fmt(x.wall_minutes, 1)}</td><td>${esc(String(x.started || '–').slice(0, 16).replace('T', ' '))}</td></tr>`).join('') + more(11) : none(11);
+  renderShelf(r, runs);
+
+  // ---- Scoring: science, then art
+  document.querySelector('#sciencemetrics tbody').innerHTML = metricRows(r.metrics.filter(m => !ART.has(m[0])));
+  document.querySelector('#artmetrics tbody').innerHTML = metricRows(r.metrics.filter(m => ART.has(m[0])));
+  document.querySelector('#scienceboard thead').innerHTML = `<tr><th>ship</th><th>name</th><th>status</th><th>Forgotten Tomes${info('ft')}</th>
+    <th>held-out bpb (en)${info('bpb')}</th>${Object.entries(SPLIT_LABEL).map(([k, l]) => `<th>${l}${info(k)}</th>`).join('')}</tr>`;
+  document.querySelector('#scienceboard tbody').innerHTML = runs.length ? runs.map(x => `<tr>${runCells(x)}<td>${fmt(x.ft_en)}</td><td>${fmt(x.bpb_en)}</td>
+    ${Object.keys(SPLIT_LABEL).map(c => `<td>${fmt(x.split[c])}</td>`).join('')}</tr>`).join('') + more(10) : none(10);
   const cell = (m, ref, dg) => m == null ? '–' : `${fmt(m, dg)}${ref == null ? '' : ` <span class="s">/ ${fmt(ref, dg)}</span>`}`;
-  document.querySelector('#rungboard thead').innerHTML = `<tr><th>ship</th><th>name</th><th>vocab</th><th>context</th><th>seed</th><th>status</th>
-    <th>bpb (en)${info('bpb')}</th>${Object.entries(SPLIT_LABEL).map(([k, l]) => `<th>${l}${info(k)}</th>`).join('')}${LAW_COLS.map(c => `<th>${c[1]}${info(c[0])}<br><span class="s">model / ref</span>${info('modelref')}</th>`).join('')}</tr>`;
-  document.querySelector('#rungboard tbody').innerHTML = runs.length ? runs.map(x => `<tr><td>${esc(x.ship || '')}</td><td>${esc(x.name)}</td>
-    <td>${x.vocab ?? '–'}</td><td>${x.context ?? '–'}</td><td>${x.seed ?? '–'}</td><td>${esc((x.status || '').split(':')[0])}</td>
-    <td>${fmt(x.bpb_en)}</td>${Object.keys(SPLIT_LABEL).map(c => `<td>${fmt(x.split[c])}</td>`).join('')}
-    ${LAW_COLS.map(([k, , dg]) => `<td>${cell(x.laws[k], x.ref[k], dg)}</td>`).join('')}</tr>`).join('')
-      + (capped ? `<tr><td colspan="25" class="note">the latest ${runs.length} of ${allRuns.length} runs at ${esc(r.preset)}</td></tr>` : '')
-    : `<tr><td colspan="25" class="empty">no runs at ${esc(r.preset)} yet</td></tr>`;
+  document.querySelector('#artboard thead').innerHTML = `<tr><th>ship</th><th>name</th><th>status</th>${LAW_COLS.map(c => `<th>${c[1]}${info(c[0])}<br><span class="s">model / ref</span>${info('modelref')}</th>`).join('')}</tr>`;
+  document.querySelector('#artboard tbody').innerHTML = runs.length ? runs.map(x => `<tr>${runCells(x)}
+    ${LAW_COLS.map(([k, , dg]) => `<td>${cell(x.laws[k], x.ref[k], dg)}</td>`).join('')}</tr>`).join('') + more(3 + LAW_COLS.length) : none(3 + LAW_COLS.length);
   const split = runs.filter(x => Object.values(x.split).some(v => v != null));
   if (!split.length) empty('splitchart', runs.length ? 'the split arrives when scripts/queue_9m.sh re-scores the finished runs, after tonight\'s pool runs' : 'no runs at this size yet');
   else plot('splitchart', split.map((x, i) => ({ type: 'bar', name: x.ship || x.name, x: Object.values(SPLIT_LABEL),
@@ -789,22 +845,109 @@ function renderRung() {
     y: ratioKeys.map(([k]) => x.laws[k] != null && x.ref[k] ? x.laws[k] / x.ref[k] : null), marker: { color: PALETTE[i % PALETTE.length] } })),
     layout({ barmode: 'group', yaxis: { title: 'model ÷ books', gridcolor: C.line },
       shapes: [{ type: 'line', xref: 'paper', x0: 0, x1: 1, y0: 1, y1: 1, line: { color: C.accent, dash: 'dot' } }] }));
+  renderTomes(r, allRuns);
   rungExtras(r, runs, allRuns);
-  renderBooks(r, runs);
-  document.querySelectorAll('#rung .chart').forEach(el => { if (el.data) Plotly.Plots.resize(el); });
+  if (modelTab === 'waypoints') renderWaypoints(r);
+  document.querySelectorAll('#rung .chart').forEach(el => { if (el.data && el.offsetParent) Plotly.Plots.resize(el); });
+}
+// ---- Waypoints: when each run passed each waypoint (server.py api_waypoints). Fetched only while
+// the tab is open; the thresholds come from the evaluators, never typed in here.
+const TRAIT_LABEL = { fiction: 'fiction', verse: 'verse', first_person: 'first person' };
+const firstAt = (sr, ok) => { if (!sr) return undefined; const i = sr.value.findIndex(ok); return i < 0 ? null : sr.step[i]; };
+const lastOf = sr => sr && sr.value.length ? sr.value[sr.value.length - 1] : null;
+let wpKey = '';
+async function renderWaypoints(r) {
+  let d;
+  try { d = await get('/api/waypoints?preset=' + encodeURIComponent(r.preset) + '&limit=' + RECENT); } catch (e) { return; }
+  const key = JSON.stringify(d);
+  if (key === wpKey) return;
+  wpKey = key;
+  document.getElementById('readpassage').dataset.book = d.natural_book;
+  const thr = d.nevermore_threshold, found = d.trait_found, margin = d.trait_margin, core = d.core_traits;
+  const stepCell = v => v === undefined ? '<td>–</td>' : v === null ? '<td data-sort="">not yet</td>' : `<td data-sort="${v}">step ${v}</td>`;
+  // a trait is learned at the first step where it is found and clears both floors (where they were measured)
+  const traitAt = t => {
+    if (!t || !t.best) return { found: undefined, learned: undefined };
+    const fl = i => Math.max(...['floor_bow', 'floor_init'].map(k => (t[k] && t[k].value[t[k].step.indexOf(t.best.step[i])]) ?? -Infinity));
+    const hasFloors = t.floor_bow || t.floor_init;
+    const fi = t.best.value.findIndex(v => v >= found);
+    const li = hasFloors ? t.best.value.findIndex((v, i) => v >= found && v - fl(i) >= margin) : -2;
+    return { found: fi < 0 ? null : t.best.step[fi], learned: li === -2 ? undefined : li < 0 ? null : t.best.step[li] };
+  };
+  document.querySelector('#waypointtable thead').innerHTML = `<tr><th>ship</th><th>name</th><th>status</th><th>Nevermore formed</th>
+    <th>real prose best${info('nevermore')}</th><th>random best${info('nevermore')}</th><th>Nevermores (real / random)</th><th>where</th><th>copy gain${info('copygain')}</th>
+    ${core.map(t => `<th>${TRAIT_LABEL[t] || t} found</th><th>${TRAIT_LABEL[t] || t} learned</th>`).join('')}<th>language families found</th></tr>`;
+  document.querySelector('#waypointtable tbody').innerHTML = d.runs.length ? d.runs.map(x => {
+    const nv = x.nevermore, fams = Object.keys(x.traits).filter(t => t.startsWith('family/'));
+    const famFound = fams.filter(t => traitAt(x.traits[t]).found != null).length;
+    // formed: the first step where either test has a head at the threshold
+    const a = firstAt(nv.natural_max_score, v => v >= thr), b = firstAt(nv.max_score, v => v >= thr);
+    const formed = a === undefined && b === undefined ? undefined : [a, b].filter(v => v != null).sort((p, q) => p - q)[0] ?? null;
+    const L = lastOf(nv.natural_best_layer), H = lastOf(nv.natural_best_head);
+    const count = (k) => lastOf(nv[k]) == null ? '–' : String(Math.round(lastOf(nv[k])));
+    return `<tr>${runCells(x)}${stepCell(formed)}<td>${fmt(lastOf(nv.natural_max_score), 3)}</td><td>${fmt(lastOf(nv.max_score), 3)}</td>
+      <td>${nv.natural_count || nv.count ? `${count('natural_count')} / ${count('count')}` : '–'}</td>
+      <td>${L == null ? '–' : `layer ${Math.round(L)}, head ${Math.round(H)}`}</td><td>${fmt(lastOf(nv.natural_copy_gain) ?? lastOf(nv.copy_gain), 2)}</td>
+      ${core.map(t => { const q = traitAt(x.traits[t]); return stepCell(q.found) + stepCell(q.learned); }).join('')}
+      <td>${fams.length ? `${famFound} of ${fams.length}` : '–'}</td></tr>`;
+  }).join('') : `<tr><td colspan="${10 + 2 * core.length}" class="empty">no runs at ${esc(r.preset)} yet</td></tr>`;
+
+  const recent = d.runs.slice(-12);
+  const lines = (pick, id, title, msg, extra = {}) => {
+    const rs = recent.filter(x => pick(x) && pick(x).step.length);
+    if (!rs.length) return empty(id, msg);
+    plot(id, rs.map((x, i) => ({ type: 'scatter', mode: 'lines+markers', name: x.ship || x.name, x: pick(x).step, y: pick(x).value,
+      line: { color: PALETTE[i % PALETTE.length], width: 1.5 }, marker: { size: 4 } })),
+      layout({ xaxis: { title: 'step', gridcolor: C.line }, yaxis: { title, gridcolor: C.line }, ...extra }));
+  };
+  const hline = (y) => ({ shapes: [{ type: 'line', xref: 'paper', x0: 0, x1: 1, y0: y, y1: y, line: { color: C.accent, dash: 'dot' } }] });
+  const nvMsg = `no run at ${esc(r.preset)} has Nevermore scores on the ledger yet: queued runs record them every 250 steps, loop runs at their last step, and <span class="mono">scripts/score_nevermore.sh</span> scores every finished 1m and 9m run once. First test readings: none formed anywhere yet; Smaller Pieces (9m, vocabulary 4,096) has one forming in its top layer, 0.12 on real prose`;
+  lines(x => x.nevermore.natural_max_score || x.nevermore.max_score, 'nvchart', 'Nevermore score', nvMsg, { ...hline(thr), yaxis: { title: 'Nevermore score', gridcolor: C.line, range: [0, 1] } });
+  lines(x => x.nevermore.natural_copy_gain || x.nevermore.copy_gain, 'copychart', 'nats per token', nvMsg);
+  for (const t of core) lines(x => x.traits[t] && x.traits[t].best, 'trait-' + t, 'held-out AUC',
+    `no run at ${esc(r.preset)} has trait probes yet; add <span class="mono">probes</span> to eval.evaluators`, { ...hline(found), showlegend: false });
 }
 
-// the Forgotten Tomes beside Qwen, training loss, and (for the proxy) calibration against 9m
-async function rungExtras(r, runs, allRuns) {
+// the Waypoints write-ups and the Nevermore test passage open in the reader
+document.querySelectorAll('[data-essay]').forEach(b => b.onclick = () => openEssay(b.dataset.essay));
+document.getElementById('readpassage').onclick = e => { if (e.currentTarget.dataset.book) openBook(e.currentTarget.dataset.book); };
+
+// a Training row opens its run, as the Runs table does
+document.getElementById('trainruns').addEventListener('click', e => {
+  const tr = e.target.closest('tr[data-run]'); if (!tr || e.target.closest('.info')) return;
+  selected = tr.dataset.run; history.replaceState(null, '', '?run=' + selected + location.hash); refresh();
+});
+
+// Overview's second chart: every scored run's Forgotten Tomes score in start order, the best so far,
+// and the outside models as dotted lines. One trace of dots, so thousands of runs stay quick.
+let ftKey = '';
+function ftProgress(allRuns) {
   const ext = (ladderData.external || []).filter(x => x.set === 'hole-cards-unseen' && x.bpb_mean_en != null);
-  const scored = runs.filter(x => x.ft_en != null);
-  if (!scored.length) empty('ftchart', 'no run at this size has a Forgotten Tomes score yet');
-  else plot('ftchart', [{ type: 'bar', x: scored.map(x => x.ship || x.name), y: scored.map(x => x.ft_en),
-      marker: { color: scored.map((_, i) => PALETTE[i % PALETTE.length]) }, hovertemplate: '%{x}: %{y:.3f}<extra></extra>' }],
-    layout({ yaxis: { title: 'bits per byte', gridcolor: C.line },
-      shapes: ext.map((x, i) => ({ type: 'line', xref: 'paper', x0: 0, x1: 1, y0: x.bpb_mean_en, y1: x.bpb_mean_en, line: { color: PALETTE[(i + 4) % PALETTE.length], dash: 'dot' } })),
-      annotations: ext.map((x, i) => ({ xref: 'paper', x: 1, xanchor: 'right', y: x.bpb_mean_en, yanchor: 'bottom', showarrow: false,
-        text: `${x.model.split('/').pop()} ${x.bpb_mean_en.toFixed(3)}`, font: { size: 10, color: PALETTE[(i + 4) % PALETTE.length] } })) }));
+  const pts = allRuns.map((x, i) => ({ x, i: i + 1 })).filter(p => p.x.ft_en != null);
+  const key = pts.map(p => p.x.run_id + p.x.ft_en).join(',') + '|' + ext.length;
+  if (key === ftKey) return;
+  ftKey = key;
+  if (!pts.length) return empty('ftchart', 'no run at this size has a Forgotten Tomes score yet');
+  let best = Infinity;
+  const bestSoFar = pts.map(p => (best = Math.min(best, p.x.ft_en)));
+  plot('ftchart', [
+    { type: 'scattergl', mode: 'markers', name: 'a run', x: pts.map(p => p.i), y: pts.map(p => p.x.ft_en),
+      text: pts.map(p => `${p.x.ship || p.x.name} · ${p.x.name}`), hovertemplate: 'run %{x}: %{text}<br>%{y:.3f} bpb<extra></extra>',
+      marker: { size: 6, color: C.blue, opacity: 0.55 } },
+    { type: 'scatter', mode: 'lines', name: 'best so far', x: pts.map(p => p.i), y: bestSoFar, line: { color: C.good, width: 2, shape: 'hv' },
+      hovertemplate: 'best so far %{y:.3f}<extra></extra>' },
+  ], layout({ xaxis: { title: 'run, in the order they started', gridcolor: C.line },
+    yaxis: { title: 'bits per byte', gridcolor: C.line, range: (() => {  // wide enough for the Qwen lines too
+      const ys = [...pts.map(p => p.x.ft_en), ...ext.map(x => x.bpb_mean_en)], lo = Math.min(...ys), hi = Math.max(...ys), pad = (hi - lo) * 0.06 || 0.05;
+      return [lo - pad, hi + pad]; })() },
+    legend: { orientation: 'h', y: 1.08 },
+    shapes: ext.map((x, i) => ({ type: 'line', xref: 'paper', x0: 0, x1: 1, y0: x.bpb_mean_en, y1: x.bpb_mean_en, line: { color: PALETTE[(i + 4) % PALETTE.length], dash: 'dot' } })),
+    annotations: ext.map((x, i) => ({ xref: 'paper', x: 1, xanchor: 'right', y: x.bpb_mean_en, yanchor: 'bottom', showarrow: false,
+      text: `${x.model.split('/').pop()} ${x.bpb_mean_en.toFixed(3)}`, font: { size: 10, color: PALETTE[(i + 4) % PALETTE.length] } })) }));
+}
+
+// training loss, and (for the proxy) calibration against 9m
+async function rungExtras(r, runs, allRuns) {
   try {
     const curves = await get('/api/rung?preset=' + encodeURIComponent(r.preset) + '&limit=12');
     const withLoss = curves.filter(c => c.steps.length);

@@ -478,6 +478,96 @@ def api_rung(preset: str, limit: int | str = 0) -> list[dict]:
     return out
 
 
+def api_waypoints(preset: str, limit: int | str = 30) -> dict:
+    """The waypoints a model passes in training, for the latest `limit` runs at one preset, step by
+    step: Nevermores (induction heads; evaluators/nevermore.py) and the trait probes
+    (evaluators/probes.py), with the thresholds that say when each counts as reached."""
+    from thorp.evaluators import nevermore, probes
+
+    picked = []
+    for r in _rows("select run_id, name, ship, status, spec_json from runs order by started"):
+        spec = json.loads(r.pop("spec_json") or "{}")
+        if spec.get("model", {}).get("preset") == preset and not (r["name"] or "").startswith(
+            "smoke"
+        ):
+            picked.append(r)
+    if int(limit or 0) > 0:
+        picked = picked[-int(limit) :]
+    out = []
+    con = _con()
+    try:
+        for r in picked:
+            series: dict[str, dict[int, float]] = {}
+            for name, step, value in con.execute(
+                "select name, step, value from metrics where run_id=?"
+                " and ((name >= 'nevermore/' and name < 'nevermore0') or (name >= 'probe/' and name < 'probe0'))"
+                " order by step, rowid",
+                [r["run_id"]],
+            ):
+                if name.startswith("probe/") and not name.endswith(
+                    ("/best", "/floor_bow", "/floor_init")
+                ):
+                    continue  # the per-layer AUCs stay on the Traits tab
+                series.setdefault(name, {})[step] = value
+            nv = {k.split("/", 1)[1]: v for k, v in series.items() if k.startswith("nevermore/")}
+            traits: dict[str, dict] = {}
+            for k, v in series.items():
+                if k.startswith("probe/"):
+                    trait, part = k[len("probe/") :].rsplit("/", 1)
+                    traits.setdefault(trait, {})[part] = v
+            out.append(
+                {
+                    **r,
+                    "nevermore": {
+                        k: {"step": list(v), "value": list(v.values())} for k, v in nv.items()
+                    },
+                    "traits": {
+                        t: {
+                            p: {"step": list(v), "value": list(v.values())}
+                            for p, v in parts.items()
+                        }
+                        for t, parts in traits.items()
+                    },
+                }
+            )
+    finally:
+        con.close()
+    return {
+        "runs": out,
+        "nevermore_threshold": nevermore.THRESHOLD,
+        "trait_found": probes.AUC_FOUND,
+        "trait_margin": probes.EMERGE_MARGIN,
+        "core_traits": list(probes.TRAIT_COLUMNS),
+        "natural_book": nevermore.NATURAL_BOOK,
+    }
+
+
+ESSAYS = {
+    "nevermore": ("Nevermores", "thorp.evaluators.nevermore"),
+    "traits": ("Traits", "thorp.evaluators.probes"),
+}
+
+
+def api_essay(name: str) -> dict:
+    """A waypoint explained, for the reader: the evaluator's own docstring, so the page and the code
+    never disagree. Shaped like /api/book."""
+    import importlib
+
+    if name not in ESSAYS:
+        raise LookupError(f"no essay {name}")
+    title, module = ESSAYS[name]
+    text = (importlib.import_module(module).__doc__ or "").strip()
+    return {
+        "book_id": f"essay-{name}",
+        "title": title,
+        "author": f"Thorp · {module.replace('.', '/')}.py",
+        "language": "en",
+        "chars": len(text),
+        "offset": 0,
+        "text": text,
+    }
+
+
 TOMES = "lists/hole-cards-unseen.csv"
 _tome_ids: list[str] | None = None
 
@@ -608,6 +698,8 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/ladder": lambda: api_ladder(),
                 "/api/rung": lambda: api_rung(q["preset"], q.get("limit", 0)),
                 "/api/tomes": lambda: api_tomes(),
+                "/api/waypoints": lambda: api_waypoints(q["preset"], q.get("limit", 30)),
+                "/api/essay": lambda: api_essay(q["name"]),
                 "/api/shelf": lambda: api_shelf(q["run"]),
                 "/api/book": lambda: api_book(q["id"], q.get("offset", 0), q.get("length", 20000)),
                 "/api/experiment": lambda: api_experiment(q.get("prefix", "content-")),

@@ -274,3 +274,5 @@ svg.journey .j-bpb { fill: var(--text); font-size: 13px; font-weight: 600; }
 svg.journey .j-good { fill: var(--good); font-size: 11px; }
 svg.journey .j-bad { fill: var(--bad); font-size: 11px; }
 #journeymods label { display: inline-flex; gap: 4px; align-items: center; font-size: var(--fs-sm); color: var(--muted); cursor: pointer; }
+svg.journey .j-box.j-transplant { stroke: var(--accent); stroke-width: 2; }
+svg.journey .j-tp { fill: var(--accent); font-size: 11px; font-weight: 600; }

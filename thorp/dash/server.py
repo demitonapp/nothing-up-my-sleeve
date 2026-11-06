@@ -684,37 +684,80 @@ def api_voyages() -> list[dict]:
 
 def api_voyage_series(key: str) -> dict:
     """For one voyage's runs, each star's score at every reading, so a chart can show the step at
-    which a line crosses its threshold: first light."""
+    which a line crosses its threshold: first light. A run that received heads from another
+    (a `transplant` artifact: the Magician's Apprentice) carries the record, and the donor run is
+    added (role "donor") so its curve sits beside the receivers'."""
     from thorp import fleet, voyages
 
     v = fleet.VOYAGES[key]
-    runs = voyages.runs_of(v)
+    runs = [{**r, "role": None} for r in voyages.runs_of(v)]
     con = _con()
+
+    def series_of(run_id: str) -> dict:
+        series = {}
+        for sk, star in fleet.STARS.items():
+            pts = list(
+                con.execute(
+                    "select step, value from metrics where run_id=? and name=? order by step, rowid",
+                    [run_id, star.metric],
+                )
+            )
+            series[sk] = {"step": [p[0] for p in pts], "value": [p[1] for p in pts]}
+            # lit shared: the best layer's two strongest heads together (voyages.py works it
+            # out from the 'stars' artifacts where the metric was not recorded yet)
+            if getattr(star, "shared_metric", ""):
+                sh = voyages._shared_series(run_id, star)
+                series[sk]["shared_step"] = [p["step"] for p in sh]
+                series[sk]["shared_value"] = [p["value"] for p in sh]
+        return series
+
+    def transplant_of(run_id: str) -> dict | None:
+        row = con.execute(
+            "select text from artifacts where run_id=? and kind='transplant' order by step, rowid limit 1",
+            [run_id],
+        ).fetchone()
+        try:
+            return json.loads(row[0]) if row else None
+        except ValueError:
+            return None
+
     try:
         out = []
         for r in runs:
-            series = {}
-            for sk, star in fleet.STARS.items():
-                pts = list(
-                    con.execute(
-                        "select step, value from metrics where run_id=? and name=? order by step, rowid",
-                        [r["run_id"], star.metric],
-                    )
-                )
-                series[sk] = {"step": [p[0] for p in pts], "value": [p[1] for p in pts]}
-                # lit shared: the best layer's two strongest heads together (voyages.py works it
-                # out from the 'stars' artifacts where the metric was not recorded yet)
-                if getattr(star, "shared_metric", ""):
-                    sh = voyages._shared_series(r["run_id"], star)
-                    series[sk]["shared_step"] = [p["step"] for p in sh]
-                    series[sk]["shared_value"] = [p["value"] for p in sh]
+            t = transplant_of(r["run_id"])
             out.append(
-                {"run_id": r["run_id"], "name": r["name"], "ship": r["ship"], "series": series}
+                {
+                    "run_id": r["run_id"],
+                    "name": r["name"],
+                    "ship": r["ship"],
+                    "role": "receiver" if t else None,
+                    "transplant": t,
+                    "series": series_of(r["run_id"]),
+                }
             )
+        have = {r["run_id"] for r in out}
+        donors = (
+            {x["transplant"].get("from_run_id") for x in out if x["transplant"]} - have - {None}
+        )
+        for d in donors:
+            row = con.execute("select run_id, name, ship from runs where run_id=?", [d]).fetchone()
+            if row:
+                out.insert(
+                    0,
+                    {
+                        "run_id": row[0],
+                        "name": row[1],
+                        "ship": row[2],
+                        "role": "donor",
+                        "transplant": None,
+                        "series": series_of(row[0]),
+                    },
+                )
     finally:
         con.close()
     return {
         "runs": out,
+        "voyage_stars": list(getattr(v, "stars", ()) or ()),
         "stars": {
             k: {"name": s.name, "threshold": s.threshold, "metric": s.metric}
             for k, s in fleet.STARS.items()

@@ -7,6 +7,8 @@
 // is across it (turn 1, something new), down is against it (turn 2, pushing back).
 // Modules the viewer switches on draw per layer: the three sieves (push, move, heading) for each
 // half, the stars lit in that layer, and the layer's push kink, all at the step chosen.
+// A sailing that received heads from another (opts.transplant: the Magician's Apprentice) has the
+// receiving attention half outlined and labelled, and the embeddings marked if positions came too.
 import { esc } from './format.js';
 
 const ROW = 74, BOX_W = 112, GAP = 10, LEFT = 118, TOP = 34, BASE = 40;
@@ -65,7 +67,8 @@ export function drawJourney(el, m, step, defs, opts = {}) {
   svg += `<rect x="${LEFT}" y="${TOP - 4}" width="${2 * BOX_W + GAP}" height="26" rx="5" class="j-io"/>
     <text x="${LEFT + BOX_W + GAP / 2}" y="${TOP + 13}" text-anchor="middle" class="j-lbl">the guess: next word</text>`;
   svg += `<rect x="${LEFT}" y="${depthY(0) - 4}" width="${2 * BOX_W + GAP}" height="${BASE - 8}" rx="5" class="j-io"/>
-    <text x="${LEFT + BOX_W + GAP / 2}" y="${depthY(0) + 16}" text-anchor="middle" class="j-lbl">embeddings: the words as read</text>`;
+    <text x="${LEFT + BOX_W + GAP / 2}" y="${depthY(0) + 16}" text-anchor="middle" class="j-lbl">embeddings: the words as read</text>`
+    + (opts.transplant && opts.transplant.pos ? `<text x="${LEFT + 2 * BOX_W + GAP + 12}" y="${depthY(0) + 16}" class="j-tp">⇄ position embeddings transplanted</text>` : '');
   // the guess at each depth, and the drop from the depth below
   for (let k = 0; k <= L; k++) {
     const v = bpb(k), below = k ? bpb(k - 1) : null, d = v != null && below != null ? v - below : null;
@@ -78,9 +81,10 @@ export function drawJourney(el, m, step, defs, opts = {}) {
     const y = depthY(i + 1) + 10, h = ROW - 26;
     const halves = [['attn', 'attention', LEFT], ['mlp', 'feed-forward', LEFT + BOX_W + GAP]];
     svg += `<text x="${LEFT - 64}" y="${y + h / 2 + 4}" text-anchor="end" class="j-layer">layer ${i}</text>`;
+    const tp = opts.transplant, here = tp && Number(tp.layer) === i;
     for (const [key, name, x] of halves) {
       const w = at(S(`soundings/layer_${i}/${key}_write`), step), t = at(S(`soundings/layer_${i}/${key}_turn`), step);
-      svg += `<rect x="${x}" y="${y}" width="${BOX_W}" height="${h}" rx="5" class="j-box"/>
+      svg += `<rect x="${x}" y="${y}" width="${BOX_W}" height="${h}" rx="5" class="j-box${here && key === 'attn' ? ' j-transplant' : ''}"/>
         <text x="${x + 8}" y="${y + 15}" class="j-lbl">${name}</text>`;
       if (w != null) svg += `<text x="${x + 8}" y="${y + 30}" class="j-sub">writes ${f2(w)} · ${turnWord(t)}</text>`;
       // the sieves on this half
@@ -93,6 +97,7 @@ export function drawJourney(el, m, step, defs, opts = {}) {
     }
     // the stars lit in this layer by the step shown, and the layer's push kink
     const notes = [];
+    if (here) notes.push(`⇄ heads ${(tp.heads || []).join(', ')} transplanted from ${tp.from_run || 'another run'}`);
     if (mods.has('stars')) for (const st of defs.stars || []) {
       for (const [metric, layer, how] of [[st.metric, st.layer, 'one head'], [st.shared_metric, st.shared_layer, 'shared']]) {
         const sr = metric && S(metric); if (!sr) continue;
@@ -102,7 +107,7 @@ export function drawJourney(el, m, step, defs, opts = {}) {
       }
     }
     if (mods.has('kink')) { const kk = (opts.kinks || {})[`layer_${i}`]; if (kk && kk.step <= step) notes.push(`◆ push kink at ${kk.step}${kk.tentative ? ' (tentative)' : ''}`); }
-    notes.slice(0, 3).forEach((n, j) => { svg += `<text x="${LEFT + 2 * BOX_W + GAP + 12}" y="${y + 14 + j * 15}" class="${n.startsWith('★') ? 'j-star' : 'j-mod'}">${esc(n)}</text>`; });
+    notes.slice(0, 3).forEach((n, j) => { svg += `<text x="${LEFT + 2 * BOX_W + GAP + 12}" y="${y + 14 + j * 15}" class="${n.startsWith('★') ? 'j-star' : n.startsWith('⇄') ? 'j-tp' : 'j-mod'}">${esc(n)}</text>`; });
   }
   svg += '</svg>';
   el.innerHTML = `<div class="j-title">${esc(opts.title || '')}${out != null ? ` · guess ${f2(out)} bits per byte` : ''}</div>`

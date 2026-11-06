@@ -179,6 +179,12 @@ Each of these exists once. Use it instead of styling a new one.
   step slider moves everything and follows the latest reading unless moved; a second sailing can
   sit beside the first, read at the same step. A sailing without soundings says so and still
   shows its modules.
+  A sailing that received heads from another (a `transplant` artifact, as in the Magician's
+  Apprentice) has the receiving attention half outlined in the accent colour with "⇄ heads …
+  transplanted from …" beside it, and "⇄ position embeddings transplanted" when positions came
+  too. A voyage with transplants opens on a receiver beside its control of the same seed. On the
+  first-light chart the donor run (the one the heads came from) is added and drawn dotted, the
+  receivers say "(received heads)", and the star picker opens on the voyage's own first star.
 - **Info popover** (`info(key)` in the script → `ⓘ`): the help for a metric (what it is, which way
   is better, how it is measured). Every metric's first appearance in a heading carries one.
 - **Empty state** (`.empty`, or `empty(id, msg)` for charts): says why nothing is there and what

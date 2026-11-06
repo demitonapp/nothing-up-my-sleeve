@@ -1190,8 +1190,15 @@ async function journeyPanel(v) {
   if (selA.dataset.opts !== opts + v.key) {
     const list = [...runs].reverse().map(r => `<option value="${esc(r.run_id)}">${esc(label(r))}</option>`).join('');
     selA.innerHTML = list; selB.innerHTML = '<option value="">none</option>' + list; selA.dataset.opts = opts + v.key;
-    if (!runs.some(r => r.run_id === journey.a)) journey.a = ([...runs].reverse().find(r => r.status === 'running') || runs[runs.length - 1]).run_id;
-    if (!runs.some(r => r.run_id === journey.b)) journey.b = null;
+    // a voyage with transplants opens on a receiver beside its control (same seed); else the running sailing
+    const tp = id => voyageSeries && (voyageSeries.runs.find(x => x.run_id === id) || {}).transplant;
+    const recv = [...runs].reverse().find(r => tp(r.run_id));
+    if (!runs.some(r => r.run_id === journey.a)) journey.a = (recv || [...runs].reverse().find(r => r.status === 'running') || runs[runs.length - 1]).run_id;
+    if (!runs.some(r => r.run_id === journey.b)) {
+      const seed = recv && (recv.name.match(/-s(\d+)$/) || [])[1];
+      const ctl = recv && runs.find(r => !tp(r.run_id) && /control/.test(r.name) && (!seed || r.name.endsWith('-s' + seed)));
+      journey.b = ctl ? ctl.run_id : null;
+    }
   }
   selA.value = journey.a; selB.value = journey.b || '';
   let mA, mB = null;
@@ -1202,10 +1209,11 @@ async function journeyPanel(v) {
   document.getElementById('journeylabel').textContent = steps.length ? `step ${step} · reading ${i + 1} of ${steps.length}${journey.idx == null ? ' (latest, live)' : ''}` : 'no readings yet';
   const modules = new Set([...document.querySelectorAll('#journeymods input:checked')].map(x => x.value));
   const runOf = id => runs.find(r => r.run_id === id);
-  drawJourney(document.getElementById('journeyviewA'), mA, step, sieveDef, { modules, kinks: pushKinks(mA), title: label(runOf(journey.a)) });
+  const tpOf = id => voyageSeries && (voyageSeries.runs.find(x => x.run_id === id) || {}).transplant;
+  drawJourney(document.getElementById('journeyviewA'), mA, step, sieveDef, { modules, kinks: pushKinks(mA), title: label(runOf(journey.a)), transplant: tpOf(journey.a) });
   const vb = document.getElementById('journeyviewB');
   document.querySelector('#journeypanel .journeys').classList.toggle('two', !!mB);
-  if (mB) drawJourney(vb, mB, step, sieveDef, { modules, kinks: pushKinks(mB), title: label(runOf(journey.b)) + ' (at the same step)' });
+  if (mB) drawJourney(vb, mB, step, sieveDef, { modules, kinks: pushKinks(mB), title: label(runOf(journey.b)) + ' (at the same step)', transplant: tpOf(journey.b) });
   else vb.innerHTML = '';
 }
 const currentVoyage = () => voyagesData && voyagesData.find(x => x.key === voyageKey);
@@ -1219,10 +1227,12 @@ async function voyageStars(v) {
   let d;
   try { d = await get('/api/voyage?key=' + encodeURIComponent(v.key)); } catch (e) { return; }
   const sel = document.getElementById('voyagestar');
+  voyageSeries = d;
   const keys = Object.keys(d.stars), lit = k => d.runs.some(r => r.series[k] && r.series[k].step.length);
   if (sel.dataset.voyage !== v.key) {
-    sel.innerHTML = keys.map(k => `<option value="${k}">${esc(d.stars[k].name)}</option>`).join('');
-    sel.value = keys.find(lit) || keys[0]; sel.dataset.voyage = v.key;
+    const own = (d.voyage_stars || []).filter(k => d.stars[k]);
+    sel.innerHTML = [...own, ...keys.filter(k => !own.includes(k))].map(k => `<option value="${k}">${esc(d.stars[k].name)}</option>`).join('');
+    sel.value = own.find(lit) || own[0] || keys.find(lit) || keys[0]; sel.dataset.voyage = v.key;
   }
   const k = sel.value, star = d.stars[k], key = JSON.stringify(d.runs.map(r => r.series[k])) + k;
   if (key === voyageSeriesKey) return;
@@ -1232,8 +1242,10 @@ async function voyageStars(v) {
   // per run: the best single head (solid) and, where the star can be shared, the best layer's two
   // strongest heads together (dashed); either line crossing the dotted threshold is first light
   const traces = rs.flatMap((r, i) => {
-    const col = PALETTE[i % PALETTE.length], sr = r.series[k], name = r.ship || r.name;
-    const t = [{ type: 'scatter', mode: 'lines', name: `${name} · one head`, legendgroup: name, x: sr.step, y: sr.value, line: { color: col, width: 1.8 } }];
+    // a donor (the run heads were taken from) is dotted; a receiver says so in its name
+    const col = PALETTE[i % PALETTE.length], sr = r.series[k];
+    const name = `${r.ship || r.name}${r.role === 'donor' ? ' (donor)' : r.role === 'receiver' ? ' (received heads)' : ''}`;
+    const t = [{ type: 'scatter', mode: 'lines', name: `${name} · one head`, legendgroup: name, x: sr.step, y: sr.value, line: { color: col, width: 1.8, dash: r.role === 'donor' ? 'dot' : 'solid' } }];
     if (sr.shared_step && sr.shared_step.length) t.push({ type: 'scatter', mode: 'lines', name: `${name} · shared`, legendgroup: name,
       x: sr.shared_step, y: sr.shared_value, line: { color: col, width: 1.5, dash: 'dash' } });
     return t;

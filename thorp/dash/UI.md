@@ -39,7 +39,7 @@ Numbers sit in `tabular-nums` everywhere (set on `body`).
 
 The site is organised the way the project is: classes of ship (model sizes), the ships of each
 class (runs), the voyages they sail on, and the discoveries followed across all of them. The header
-holds the three ways in, always:
+holds the ways in, always:
 
 - **Classes** (`#/classes`, home): one card per class of ship, each a model size with one job.
   A class opens its page (`#/classes/<class>`, below), whose first tab is its **fleet**: every
@@ -55,6 +55,15 @@ holds the three ways in, always:
   each with its threshold, what it rests on, and the first ship to light it or the nearest so far;
   and **traits** (fiction, verse, first person, the language families), with how many ships
   found and learned each, and the first to do so.
+- **Sieves** (`#/sieves[/<sailing>]`): how the ship answers the wind, layer by layer. An intro in
+  the voyage vocabulary, a card per sieve with its write-up from `fleet.SIEVES` (push, move,
+  heading: rendered as written there, never rewritten on the page), then for a picked sailing
+  (the one running by default) a heatmap per sieve, layers as rows with the bottom of the stack at
+  the bottom and each layer's push kink marked (◆); heading uses a diverging scale centred on 0.
+  **Settled** gives, per layer, the first step its heading holds 0.8 for three records running,
+  its push kink, and any star lit in that layer (one head or shared): do headings settle from the
+  bottom up, and does a layer settle when its star lights? The kink rule (`KINK_MIN_RECORDS`,
+  `KINK_FIRM`) is read from `fleet.py`, so page and code use one rule.
 
 A ship is a class fitted out one way (`thorp/fleet.py` `Ship`: its training material and settings,
 the fitout), and each of its runs is a sailing, one per seed. A ship's page

@@ -722,6 +722,39 @@ def api_voyage_series(key: str) -> dict:
     }
 
 
+def api_sieves() -> dict:
+    """The sieves (fleet.SIEVES: push, move, heading), each with the plain-English write-up the page
+    shows, the kink rule, and for each star the metrics that say when and in which layer it lit."""
+    from thorp import fleet
+
+    def layer_of(metric: str) -> str:
+        # stars/<star>/max_score -> stars/<star>/best_layer; nevermore/natural_max_score -> .../natural_best_layer
+        return metric.replace("shared_score", "shared_layer").replace("max_score", "best_layer")
+
+    return {
+        "sieves": [
+            {"key": k, "name": v.name, "about": v.about, "prefix": v.metric_prefix}
+            for k, v in fleet.SIEVES.items()
+        ],
+        "kink_min_records": fleet.KINK_MIN_RECORDS,
+        "kink_firm": fleet.KINK_FIRM,
+        "stars": [
+            {
+                "key": k,
+                "name": st.name,
+                "threshold": st.threshold,
+                "metric": st.metric,
+                "layer": layer_of(st.metric),
+                "shared_metric": getattr(st, "shared_metric", "") or None,
+                "shared_layer": layer_of(st.shared_metric)
+                if getattr(st, "shared_metric", "")
+                else None,
+            }
+            for k, st in fleet.STARS.items()
+        ],
+    }
+
+
 def api_discoveries() -> dict:
     """The two things followed across every ship: stars (heads that light, fleet.STARS) and traits
     (directions the probes find, evaluators/probes.py). For each, which ships have it and when."""
@@ -966,6 +999,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/ships": lambda: api_ships(),
                 "/api/voyage": lambda: api_voyage_series(q["key"]),
                 "/api/discoveries": lambda: api_discoveries(),
+                "/api/sieves": lambda: api_sieves(),
                 "/api/shelf": lambda: api_shelf(q["run"]),
                 "/api/book": lambda: api_book(q["id"], q.get("offset", 0), q.get("length", 20000)),
                 "/api/experiment": lambda: api_experiment(q.get("prefix", "content-")),

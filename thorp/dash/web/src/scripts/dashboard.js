@@ -26,12 +26,13 @@ const rungFor = key => ladderData && ladderData.rungs.find(r => slugOf(r) === ke
 //                                betting (default), books, languages, sieves, attention, traits
 //   #/voyages, #/voyages/<key>   the voyages, and one voyage
 //   #/discoveries                the stars and traits followed across every ship
+//   #/sieves[/<sailing>]         the sieves explained, and one sailing's push, move and heading
 // Older addresses (#sizes, #proxy, #rung-1m, #/models/…, #betting…, ?run=) land on the new ones.
 const MTABS = ['fleet', 'overview', 'training', 'scoring', 'waypoints'];
 const STABS = ['betting', 'books', 'languages', 'sieves', 'attention', 'traits'];
 const STAB_EL = { betting: 'betting', books: 'books', languages: 'languages', sieves: 'sieves', attention: 'attention', traits: 'traits-section' };
 const OLD_SHIP = { betting: 'betting', books: 'books', languages: 'languages', sieves: 'sieves', attention: 'attention', 'traits-section': 'traits' };
-const SECTION_NAV = { sizes: 'classes', rung: 'classes', ship: 'classes', 'runs-section': 'classes', voyages: 'voyages', voyage: 'voyages', discoveries: 'discoveries' };
+const SECTION_NAV = { sizes: 'classes', rung: 'classes', ship: 'classes', 'runs-section': 'classes', voyages: 'voyages', voyage: 'voyages', discoveries: 'discoveries', sievesguide: 'sieves' };
 let page = 'sizes', modelTab = 'fleet', shipKey = null, sailingKey = null, shipTab = 'betting', voyageKey = null, runsList = null, shipsData = null;
 function route(h) {
   if (h.startsWith('/')) {
@@ -47,6 +48,7 @@ function route(h) {
     if (a === 'voyages' && b) return { page: 'voyage', voyage: b };
     if (a === 'voyages') return { page: 'voyages' };
     if (a === 'discoveries') return { page: 'discoveries' };
+    if (a === 'sieves') return { page: 'sievesguide', run: b ? decodeURIComponent(b) : null };
     return { page: 'sizes' };
   }
   if (h.startsWith('rung-')) return { page: 'rung', rung: h.slice(5), mtab: 'fleet' };
@@ -113,6 +115,7 @@ function showTab(h, push = true) {
   if (page === 'runs-section') hash = '/ships';
   if (page === 'voyages') hash = '/voyages';
   if (page === 'discoveries') hash = '/discoveries';
+  if (page === 'sievesguide') { sieveRun = rt.run; hash = '/sieves' + (sieveRun ? '/' + encodeURIComponent(sieveRun) : ''); }
   document.querySelectorAll('main > .section').forEach(s => s.classList.toggle('active', s.id === page));
   document.querySelectorAll('#mainnav a').forEach(a => a.classList.toggle('active', a.dataset.nav === SECTION_NAV[page]));
   document.querySelectorAll('#rung .mtab').forEach(t => t.classList.toggle('active', t.dataset.mtab === modelTab));
@@ -123,6 +126,7 @@ function showTab(h, push = true) {
   if (hash && (location.hash !== '#' + hash || location.search)) history.replaceState(null, '', location.pathname + '#' + hash);
   if (page === 'voyages' || page === 'voyage') loadVoyages();
   if (page === 'discoveries') loadDiscoveries();
+  if (page === 'sievesguide') loadSieves();
   if (page === 'ship' && (selected !== wasShip || !runsList)) refresh();
   // charts drawn while hidden have no width; size the ones now showing
   document.querySelectorAll(`#${page} .chart`).forEach(el => { if (el.data && el.offsetParent) Plotly.Plots.resize(el); });
@@ -163,6 +167,8 @@ function linfit(x, y) {
   let sse = 0; for (let i = 0; i < n; i++) { const r = y[i] - (a + b * x[i]); sse += r * r; }
   return { a, b, sse };
 }
+// the kink rule is fleet.py's (KINK_MIN_RECORDS, KINK_FIRM), read from /api/sieves when it loads
+let KINK_MIN = 10, KINK_FIRM = 0.25;
 function kink(xs, ys) {
   const n = xs.length; if (n < 6) return null;
   const one = linfit(xs, ys); let best = null;
@@ -177,7 +183,7 @@ function kink(xs, ys) {
   const kind = Math.abs(after - before) < 0.02 ? 'bent'
     : before < 0 && after >= 0 ? 'turned up' : before > 0 && after <= 0 ? 'turned down'
     : before < 0 ? (after > before ? 'flattened' : 'steepened') : (after > before ? 'steepened' : 'eased');
-  return { step: xs[best.k], before, after, kind, strength, tentative: n < 10 || strength < 0.25, L: best.L, R: best.R, k: best.k, xs };
+  return { step: xs[best.k], before, after, kind, strength, tentative: n < KINK_MIN || strength < KINK_FIRM, L: best.L, R: best.R, k: best.k, xs };
 }
 // the fit starts where warmup ends (the learning-rate peak): the ramp before it is the schedule's
 // shape, not the layer's, and a hump defeats a two-line fit
@@ -1187,6 +1193,81 @@ async function voyageStars(v) {
 }
 document.getElementById('voyagestar').onchange = () => { voyageSeriesKey = ''; const v = voyagesData && voyagesData.find(x => x.key === voyageKey); if (v) voyageStars(v); };
 
+// ---- Sieves (#/sieves): the three sieves from fleet.SIEVES, one sailing's heatmaps, and when each
+// layer's heading settled beside the stars lit in it
+let sieveDef = null, sieveRun = null, sieveKey = '';
+const SETTLE_AT = 0.8, SETTLE_RECORDS = 3;
+function sieveHeat(id, m, prefix, kinksByGroup, { log = true, diverging = false, msg = 'no readings for this sieve on this sailing' } = {}) {
+  const keys = topKeys(m, prefix);
+  if (!keys.length) return empty(id, msg);
+  const x = m[keys[0]][0], y = keys.map(k => groupLabel(groupOf(k, prefix)));
+  const z = keys.map(k => m[k][1].map(v => log ? log10(v) : v));
+  const data = [{ type: 'heatmap', x, y, z, hovertemplate: `step %{x}<br>%{y}<br>${log ? 'log10 ' : ''}%{z:.2f}<extra></extra>`,
+    ...(diverging ? { colorscale: [[0, C.bad], [0.5, tok('panel')], [1, C.good]], zmin: -1, zmax: 1, zmid: 0 } : { colorscale: 'Viridis' }),
+    colorbar: { title: log ? 'log10' : 'cosine', thickness: 10 } }];
+  const kx = [], ky = [], kt = [];
+  keys.forEach((k, i) => { const kk = kinksByGroup[groupOf(k, prefix)]; if (kk) { kx.push(kk.step); ky.push(y[i]); kt.push(`push kink at ${kk.step}${kk.tentative ? ' (tentative)' : ''}`); } });
+  if (kx.length) data.push({ type: 'scatter', x: kx, y: ky, text: kt, mode: 'markers', marker: { symbol: 'diamond', size: 9, color: '#fff', line: { color: '#000', width: 1 } },
+    hovertemplate: '%{y}<br>%{text}<extra></extra>', showlegend: false });
+  plot(id, data, layout({ margin: { l: 80, r: 10, t: 10, b: 36 }, xaxis: { title: 'step', gridcolor: C.line } }));
+}
+// the first step a value is reached, and the value of a companion series (the layer) at that step
+const firstReach = (m, metric, thr) => { const sr = metric && m[metric]; if (!sr) return null; const i = sr[1].findIndex(v => v >= thr); return i < 0 ? null : sr[0][i]; };
+const valueAt = (m, metric, step) => { const sr = metric && m[metric]; if (!sr) return null; const i = sr[0].indexOf(step); return i < 0 ? null : sr[1][i]; };
+async function loadSieves() {
+  if (!sieveDef) {
+    try { sieveDef = await get('/api/sieves'); } catch (e) { return; }
+    KINK_MIN = sieveDef.kink_min_records; KINK_FIRM = sieveDef.kink_firm;
+    document.getElementById('kinkrule').textContent = `${KINK_MIN} records when the two lines remove at least ${Math.round(KINK_FIRM * 100)}% of one line's error`;
+    document.getElementById('sievecards').innerHTML = sieveDef.sieves.map(v => `<div class="card"><div class="top"><span class="preset">${esc(v.name)}</span>
+      <span class="mono">${esc(v.prefix)}</span></div><div class="ov">${esc(v.about)}</div></div>`).join('');
+  }
+  const runs = (runsList || (runsList = await get('/api/runs').catch(() => []))).filter(r => r.name && !r.name.startsWith('smoke'));
+  if (!runs.length) return;
+  const pick = document.getElementById('sievepick');
+  const label = r => { const lr = ladderRun(r.run_id); return `${(lr && lr.ship_name) || r.ship || r.name} · ${r.name} (${r.preset || '–'})`; };
+  const opts = runs.map(r => r.run_id).join(',');
+  if (pick.dataset.opts !== opts) {
+    pick.innerHTML = [...runs].reverse().map(r => `<option value="${esc(r.name)}">${esc(label(r))}</option>`).join('');
+    pick.dataset.opts = opts;
+  }
+  const run = runs.find(r => r.name === sieveRun || r.run_id === sieveRun)
+    || [...runs].reverse().find(r => r.status === 'running') || runs[runs.length - 1];
+  pick.value = run.name;
+  const lr = ladderRun(run.run_id), sh = lr && lr.ship_key && shipsData && shipsData.find(x => x.key === lr.ship_key);
+  document.getElementById('sievenote').innerHTML = `${sh ? `<a href="#${shipHash(sh.key, run.name, 'sieves')}">${esc(sh.name)}</a> · ${esc(sh.subtitle)}` : esc(run.ship || run.name)} · ${esc((run.status || '').split(':')[0])}`;
+  let m;
+  try { m = await get('/api/metrics?run=' + encodeURIComponent(run.run_id)); } catch (e) { return; }
+  const key = run.run_id + '|' + Object.keys(m).filter(k => /^(grad_norm|update_ratio|heading|stars|nevermore)\//.test(k)).map(k => k + m[k][0].length).join(',');
+  if (key === sieveKey) return;
+  sieveKey = key;
+  const pk = kinksOf(m, 'grad_norm/'), byGroup = {};
+  for (const [k, v] of Object.entries(pk)) byGroup[groupOf(k, 'grad_norm/')] = v;
+  sieveHeat('sieve-push', m, 'grad_norm/', byGroup);
+  sieveHeat('sieve-move', m, 'update_ratio/', byGroup);
+  sieveHeat('sieve-heading', m, 'heading/', byGroup, { log: false, diverging: true,
+    msg: run.status === 'running' && !topKeys(m, 'heading/').length ? 'the heading sieve starts with the next ship to sail; this sailing set out before it was fitted' : 'this sailing has no heading readings: the heading sieve started with ships sailing from 08:00 on 7 November' });
+  // settled: per layer, the first step the heading holds SETTLE_AT for SETTLE_RECORDS records running
+  const layers = layerOnly(m, 'grad_norm/').map(k => groupOf(k, 'grad_norm/'));
+  const lit = sieveDef.stars.flatMap(st => {
+    const out = [], a = firstReach(m, st.metric, st.threshold), b = firstReach(m, st.shared_metric, st.threshold);
+    if (a != null) out.push({ name: st.name, step: a, layer: valueAt(m, st.layer, a), how: 'one head' });
+    if (b != null) out.push({ name: st.name, step: b, layer: valueAt(m, st.shared_layer, b), how: 'shared' });
+    return out;
+  });
+  document.querySelector('#settledtable tbody').innerHTML = layers.length ? [...layers].reverse().map(g => {
+    const sr = m['heading/' + g], i = groupOrder(g);
+    let settled = null;
+    if (sr) for (let j = 0; j + SETTLE_RECORDS <= sr[1].length; j++) if (sr[1].slice(j, j + SETTLE_RECORDS).every(v => v >= SETTLE_AT)) { settled = sr[0][j]; break; }
+    const here = lit.filter(x => x.layer != null && Math.round(x.layer) === i);
+    const kk = byGroup[g];
+    return `<tr><td>${esc(groupLabel(g))}</td><td data-sort="${settled ?? ''}">${sr ? (settled != null ? `step ${settled}` : 'not yet') : '–'}</td>
+      <td>${sr ? fmt(sr[1][sr[1].length - 1], 2) : '–'}</td><td data-sort="${kk ? kk.step : ''}">${kk ? `step ${kk.step}${kk.tentative ? ' (tentative)' : ''}` : '–'}</td>
+      <td>${here.length ? here.map(x => `${esc(x.name)} at step ${x.step} (${x.how})`).join('; ') : '–'}</td></tr>`;
+  }).join('') : '<tr><td colspan="5" class="empty">no sieve readings on this sailing yet</td></tr>';
+}
+document.getElementById('sievepick').onchange = e => { location.hash = '#/sieves/' + encodeURIComponent(e.target.value); };
+
 // ---- Discoveries (server.py api_discoveries): the stars and the traits, across every ship
 let discKey = '';
 // a discovery names the ship, and links to the sailing that made it
@@ -1294,6 +1375,7 @@ async function refresh() {
   await loadLadder();  // a ship's address resolves through the ladder and the ships
   if (page === 'voyages' || page === 'voyage') loadVoyages();
   if (page === 'discoveries') loadDiscoveries();
+  if (page === 'sievesguide') loadSieves();
   try {
     const runs = await get('/api/runs');
     const first = !runsList;

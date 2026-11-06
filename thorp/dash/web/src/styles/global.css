@@ -247,3 +247,6 @@ details.archive { margin-top: 12px; }
 details.archive > summary { cursor: pointer; color: var(--muted); font-size: var(--fs-md); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
 details.archive > summary .note { text-transform: none; letter-spacing: 0; font-weight: 400; margin-left: 8px; }
 details.archive[open] > summary { margin-bottom: 8px; }
+
+.lede { margin: 0; line-height: 1.6; max-width: 980px; }
+.lede b { color: var(--accent); font-weight: 600; }

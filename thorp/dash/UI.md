@@ -50,8 +50,11 @@ holds the ways in, always:
   settings, Forgotten Tomes score and the step each star first lit, the score run by run, first
   light (each star's score against step, threshold dotted), outcomes and levers. A panel only one
   voyage has carries `data-voyage` (the book-value loop's fit).
-- **Discoveries** (`#/discoveries`): the two things followed across every ship to find our
-  bearings. **Stars** (`fleet.STARS`: the Previous Word, the Duplicate Word, Nevermore), one card
+- **Discoveries** (`#/discoveries`): what is followed across every ship to find our bearings.
+  **Tricks** first ("can it do it?", `fleet.TRICKS`): one card each with its threshold, the first
+  ship to perform it or the nearest, the stars thought to perform it, and the two telling
+  mismatches counted: performed with none of its stars lit (done some other way) and a star lit
+  with the trick not performed (a performer with no act). Then **Stars** (`fleet.STARS`: the Previous Word, the Duplicate Word, Nevermore), one card
   each with its threshold, what it rests on, and the first ship to light it or the nearest so far;
   and **traits** (fiction, verse, first person, the language families), with how many ships
   found and learned each, and the first to do so. Under the star cards, **the star chart**: every
@@ -221,7 +224,8 @@ The page speaks the project's metaphor, consistently. Each word means one thing:
 | sailing | one run of a ship, one per seed |
 | fleet | the ships of a class; the First Fleet is everything fitted out before 7 November, archived |
 | voyage | a campaign several ships sail on to find something, with a goal, levers and a stop rule |
-| star | a destination: an attention head that does one recognisable job, lit at its threshold |
+| trick | something a model can do, judged from outside by what it bets (copying what followed last time; Wednesday after Tuesday); `fleet.TRICKS`, performed at its threshold |
+| star | a destination: the mechanism inside that does a trick, an attention head that does one recognisable job, lit at its threshold |
 | lit / lit shared | a star is lit when one head reaches its threshold, and lit shared when the best layer's two strongest heads reach it together (a small model often splits one job across two heads); charts draw the single head solid and the shared pair dashed |
 | trait | a direction in the hidden state that tells a kind of book apart on books never read |
 | the wind | the error on each guess: how far the bet was from the word that came, felt by every weight that took part |

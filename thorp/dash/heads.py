@@ -15,6 +15,10 @@ so a mechanism of k heads in sequence needs at least k layers; width, data, voca
 decide the rest. `expected_why` says why in a line. The page sets it beside "first lit in", the
 smallest class where a sailing actually lit it: a star lit below its expected class is a discovery.
 
+`trick` names the trick in `thorp.fleet.TRICKS` the kind is thought to perform, where one is
+measured: a trick is what a model can do, judged by its bets from outside; a star is the mechanism
+inside that does it (DECISIONS.md, "Tricks and stars").
+
 `rests_on` lists only dependencies the source reports (the indirect-object circuit's chain, and
 induction resting on a previous-token head); a blank list means none reported, not none exists.
 
@@ -129,6 +133,7 @@ KNOWN_HEADS: list[dict] = [
     },
     {
         "key": "induction",
+        "trick": "copying",
         "expected_class": "keel",
         "expected_why": "two hops, a previous-token head below and the induction head above; two layers is the minimum",
         "name": "Induction head (Nevermore)",
@@ -168,6 +173,7 @@ KNOWN_HEADS: list[dict] = [
     },
     {
         "key": "successor",
+        "trick": "successor",
         "expected_class": "stylist",
         "expected_why": "needs the order of numbers, days and months held in its weights",
         "name": "Successor head",

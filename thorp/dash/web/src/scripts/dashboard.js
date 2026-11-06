@@ -1344,6 +1344,23 @@ async function loadDiscoveries() {
   if (key === discKey) return;
   discKey = key;
   const byName = Object.fromEntries(d.stars.map(s => [s.key, s.name]));
+  // tricks: can it do it? each with the stars thought to perform it, and the two telling mismatches
+  const starLitAnywhere = k => { const s = d.stars.find(x => x.key === k); return s && s.ships.some(x => x.steps_to_lit != null || x.shared_steps_to_lit != null); };
+  document.getElementById('trickcards').innerHTML = (d.tricks || []).map(t => {
+    const done = t.ships.filter(x => x.performed_at != null).sort((a, b) => a.performed_at - b.performed_at);
+    const best = [...t.ships].sort((a, b) => b.best - a.best)[0], first = done[0];
+    const otherWay = done.filter(x => t.performed_by.length && !x.stars_lit.length).length;
+    const noAct = t.ships.filter(x => x.performed_at == null && x.stars_lit.length).length;
+    const by = t.performed_by.length ? t.performed_by.map(k => `${esc(byName[k] || k)} <span class="pill ${starLitAnywhere(k) ? 'good' : ''}">${starLitAnywhere(k) ? 'lit somewhere' : 'not lit yet'}</span>`).join(', ')
+      : ((d.known_heads || []).find(h => h.trick === t.key) ? `its star, the ${esc((d.known_heads || []).find(h => h.trick === t.key).name.toLowerCase())}, is charted but not yet measured` : 'no star linked yet');
+    return `<div class="card${done.length ? ' lit' : ''}">
+      <div class="top"><span class="preset">${esc(t.name)}</span><span class="pill ${done.length ? 'good' : ''}">${done.length ? 'performed' : 'not performed yet'}</span></div>
+      <div class="job">performed at ${t.threshold} · <span class="mono">${esc(t.metric)}</span></div>
+      <div class="ov">${esc(t.about)}</div>
+      <div class="foot"><span>${first ? `first performed by ${shipLink(first)} (${esc(first.preset || '')}) at step ${first.performed_at}` : best ? `nearest: ${shipLink(best)} at ${fmt(best.best)}` : 'readings start with the next ship to sail'}</span></div>
+      <div class="foot"><span>performed by: ${by}</span></div>
+      ${t.ships.length ? `<div class="foot"><span>performed on ${done.length} of ${t.ships.length} sailings${t.performed_by.length ? ` · ${done.length - otherWay} with a performing star lit, <b>${otherWay} done some other way</b> · <b>${noAct}</b> with a star lit but the trick not performed` : ''}</span></div>` : ''}</div>`;
+  }).join('') || '<div class="empty">no tricks measured yet</div>';
   document.getElementById('starcards').innerHTML = d.stars.map(s => {
     const lit = s.ships.filter(x => x.steps_to_lit != null).sort((a, b) => a.steps_to_lit - b.steps_to_lit);
     const shared = s.ships.filter(x => x.shared_steps_to_lit != null).sort((a, b) => a.shared_steps_to_lit - b.shared_steps_to_lit);
@@ -1359,7 +1376,7 @@ async function loadDiscoveries() {
       <div class="foot"><span>lit on ${lit.length}${shared.length ? `, lit shared on ${shared.length},` : ''} of ${s.ships.length} sailings measured</span></div></div>`;
   }).join('');
   // the star chart: every known kind of head; the measured ones carry their state
-  discHeads = d.known_heads || []; discStars = d.stars; drawHeads();
+  discHeads = d.known_heads || []; discStars = d.stars; discTricks = d.tricks || []; drawHeads();
   document.querySelector('#traittable thead').innerHTML = `<tr><th>trait</th><th>ships measured</th><th>found by</th><th>first found</th><th>learned by</th><th>first learned</th><th>best held-out AUC</th></tr>`;
   const firstOf = (ships, k) => ships.filter(x => x[k] != null).sort((a, b) => a[k] - b[k])[0];
   document.querySelector('#traittable tbody').innerHTML = d.traits.map(t => {
@@ -1370,7 +1387,14 @@ async function loadDiscoveries() {
       <td>${t.ships.filter(x => x.learned_at != null).length}</td><td>${who(l, 'learned_at')}</td><td>${best && best.best != null ? `${fmt(best.best)} (${esc(best.ship_name || best.ship || best.name)})` : '–'}</td></tr>`;
   }).join('') || '<tr><td colspan="7" class="empty">no ship has trait probes yet</td></tr>';
 }
-let discHeads = [], discStars = [];
+let discHeads = [], discStars = [], discTricks = [];
+// the trick a kind of head performs, if measured: performed or not, on how many sailings
+const trickNote = h => {
+  const t = h.trick && discTricks.find(x => x.key === h.trick);
+  if (!t) return '';
+  const n = t.ships.filter(x => x.performed_at != null).length;
+  return `<br><span class="s">its trick, ${esc(t.name)}: ${t.ships.length ? `performed on ${n} of ${t.ships.length} sailings` : 'readings start with the next ship to sail'}</span>`;
+};
 // classes in ladder order, smallest first; a kind beyond the ladder ranks after them all
 const classRank = p => { const i = ladderData ? ladderData.rungs.findIndex(r => r.preset === p) : -1; return i < 0 ? 99 : i; };
 // the smallest class where any sailing has lit a measured kind (one head first, else shared)
@@ -1411,14 +1435,14 @@ function drawHeads() {
   if (sel.options.length !== fams.length + 1) sel.innerHTML = '<option value="">all</option>' + fams.map(f => `<option value="${f}">${esc(FAMILY[f] || f)}</option>`).join('');
   const rows = discHeads.filter(h => !sel.value || h.family === sel.value), byKey = Object.fromEntries(discHeads.map(h => [h.key, h.name]));
   const state = h => {
-    if (!h.star) return `<td data-sort="9" class="s" title="${esc(h.measure)}">not measured yet · <i>${esc(h.measure)}</i></td>`;
+    if (!h.star) return `<td data-sort="9" class="s" title="${esc(h.measure)}">not measured yet · <i>${esc(h.measure)}</i>${trickNote(h)}</td>`;
     const st = discStars.find(x => x.key === h.star);
     if (!st) return '<td data-sort="5">measured</td>';
     if (!st.ships.length) return `<td data-sort="3"><span class="pill">measured</span> a star: ${esc(st.name)} · readings start with the next ship to sail · threshold ${st.threshold}</td>`;
     const lit = st.ships.filter(x => x.steps_to_lit != null), sh = st.ships.filter(x => x.shared_steps_to_lit != null);
     const best = Math.max(-1, ...st.ships.map(x => x.best ?? -1));
     const pill = lit.length ? '<span class="pill good">lit</span>' : sh.length ? '<span class="pill accent">lit shared</span>' : '<span class="pill">not lit yet</span>';
-    return `<td data-sort="${lit.length ? 0 : sh.length ? 1 : 2}">${pill} a star: ${esc(st.name)} · ${lit.length ? `lit on ${lit.length}` : sh.length ? `lit shared on ${sh.length}` : `best ${fmt(best)}`} of ${st.ships.length} sailings · threshold ${st.threshold}</td>`;
+    return `<td data-sort="${lit.length ? 0 : sh.length ? 1 : 2}">${pill} a star: ${esc(st.name)} · ${lit.length ? `lit on ${lit.length}` : sh.length ? `lit shared on ${sh.length}` : `best ${fmt(best)}`} of ${st.ships.length} sailings · threshold ${st.threshold}${trickNote(h)}</td>`;
   };
   document.getElementById('headcount').textContent = `${rows.length} kinds · ${rows.filter(h => h.star).length} measured by Thorp`;
   document.querySelector('#headtable tbody').innerHTML = rows.map(h => `<tr${h.star ? ' class="measured"' : ''}><td><b>${esc(h.name)}</b></td><td>${esc(FAMILY[h.family] || h.family)}</td>

@@ -1,12 +1,15 @@
 ---
-// Discoveries: the two things followed across every ship to find our bearings. The star chart lists
+// Discoveries: what we follow across every ship to find our bearings. Tricks: what a ship can do,
+// judged by its bets (fleet.TRICKS); stars: the mechanism inside that does it (fleet.STARS). The star chart lists
 // every kind of head described in the literature (thorp/dash/heads.py). Stars: attention
 // heads that light up (thorp/fleet.py STARS: the previous word, the duplicate word, Nevermore).
 // Traits: directions in the hidden state that tell kinds of book apart (evaluators/probes.py).
 ---
 <div class="section" id="discoveries">
-  <h1>Discoveries <span class="q">the two things we follow across every ship to find our bearings: stars that light, and traits that emerge</span></h1>
-  <h2 class="band">Stars <span class="q">attention heads that do one recognisable job; a star is lit when one head reaches its threshold, and lit shared when the best layer's two strongest heads reach it together; some rest on others</span><span class="bandtools"><button data-essay="nevermore">Read: what a Nevermore is</button></span></h2>
+  <h1>Discoveries <span class="q">what we follow across every ship to find our bearings: tricks it can do, the stars inside that do them, and traits that emerge</span></h1>
+  <h2 class="band">Tricks <span class="q">can it do it? what a ship can do, judged from outside by its bets (copying what followed last time; Wednesday after Tuesday), each linked to the stars thought to perform it</span></h2>
+  <div class="cards" id="trickcards"></div>
+  <h2 class="band">Stars <span class="q">what inside does it? attention heads that do one recognisable job; a star is lit when one head reaches its threshold, and lit shared when the best layer's two strongest heads reach it together; some rest on others</span><span class="bandtools"><button data-essay="nevermore">Read: what a Nevermore is</button></span></h2>
   <div class="cards" id="starcards"></div>
   <section class="panel">
     <h2>The star chart <span class="note">every kind of attention head described so far, induction heads among them. The three Thorp measures carry their state from the ledger; the rest are charted but not yet measured, each with how Thorp could measure it. "Rests on" is the dependency its source reports; a blank means none reported. "Expected from" is the smallest class predicted to reach it (the floor is depth: one hop per layer), set beside the smallest class where a sailing has lit it</span></h2>

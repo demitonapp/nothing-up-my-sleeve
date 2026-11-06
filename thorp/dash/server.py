@@ -922,7 +922,59 @@ def api_discoveries() -> dict:
                 )
     finally:
         con.close()
+    # tricks (fleet.TRICKS): what a sailing can do, judged by its bets from outside, beside which
+    # of the stars that perform it (performed_by) lit on that same sailing
+    lit_on: dict[str, set] = {}
+    for st in stars:
+        for x in st["ships"]:
+            if x["steps_to_lit"] is not None or x.get("shared_steps_to_lit") is not None:
+                lit_on.setdefault(x["run_id"], set()).add(st["key"])
+    tricks = []
+    con = _con()
+    try:
+        for tr in getattr(fleet, "TRICKS", {}).values():
+            ships = []
+            for r in runs:
+                if r["name"] and r["name"].startswith("smoke"):
+                    continue
+                pts = list(
+                    con.execute(
+                        "select step, value from metrics where run_id=? and name=? order by step, rowid",
+                        [r["run_id"], tr.metric],
+                    )
+                )
+                if not pts:
+                    continue
+                spec = json.loads(r["spec_json"] or "{}")
+                ships.append(
+                    {
+                        "run_id": r["run_id"],
+                        "name": r["name"],
+                        "ship": r["ship"],
+                        "preset": spec.get("model", {}).get("preset"),
+                        **named(r),
+                        "performed_at": next((p[0] for p in pts if p[1] >= tr.threshold), None),
+                        "best": max(p[1] for p in pts),
+                        "latest": pts[-1][1],
+                        "readings": len(pts),
+                        "stars_lit": sorted(lit_on.get(r["run_id"], set()) & set(tr.performed_by)),
+                    }
+                )
+            tricks.append(
+                {
+                    "key": tr.key,
+                    "name": tr.name,
+                    "metric": tr.metric,
+                    "threshold": tr.threshold,
+                    "performed_by": list(tr.performed_by),
+                    "about": tr.about,
+                    "ships": ships,
+                }
+            )
+    finally:
+        con.close()
     return {
+        "tricks": tricks,
         "stars": stars,
         "traits": [
             {"key": t, "ships": v}

@@ -107,6 +107,7 @@ Its tabs sit under its title, each with its own address:
    what it carries up from smaller classes, and what the next class takes over. Then the seven
    waypoints bottom to top with every trick as a chip: this class's goals lit, carried ones
    marked, bigger classes' faded with their class, ✓ where this class's sailings performed it.
+   The goals table sorts by any column and filters by step to quantum physics.
 1. **Overview** (`/overview`): the class's performance in as few charts as possible. The
    RunGrid (every run at this size), then the Forgotten Tomes score run by run with the best so
    far and the Qwen lines.
@@ -121,7 +122,17 @@ Its tabs sit under its title, each with its own address:
      and punctuation, balance and capitals, grammar (minimal pairs), voice (register), traits.
    Each band opens with its own "What we measure" list. The split is the `ART` set in
    `dashboard.js`; a metric not named there counts as science, so a new art metric must be added.
-4. **Waypoints** (`/waypoints`): opens with **stars in reach**, the kinds of head this class is
+4. **Waypoints** (`/waypoints[/envelope|/stars]`): three sub-tabs, the steps a class proves in
+   order, each a table of tricks (step to quantum physics, trick, the field's band, goal class,
+   the stars needed with their state on this class, the trick's state on this class), sortable
+   by any column and filtered by step:
+   1. **Expected**: tricks the field already shows at this size or smaller (the field's band at
+      or below the class's band): matched first.
+   2. **Pushing the envelope**: this class's goals, and those it carries up from smaller classes,
+      that the field shows only in bigger models.
+   3. **Exploring the stars**: goals of the bigger classes, nearest first: the ambitious ones.
+   A card per step counts its tricks, how many are measured and how many performed, and says
+   "proven" when all are performed. Below the steps, **the instruments**:  the kinds of head this class is
    expected to reach (the star chart's "expected from" at or below it) with its own sailings'
    state on each, and what comes into reach one class up. Then the moments it passes in training. When each run first formed a
    Nevermore (induction head, `evaluators/nevermore.py`) and first found and learned each trait

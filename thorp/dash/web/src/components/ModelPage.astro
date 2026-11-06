@@ -35,7 +35,8 @@
       <div class="goalroute" id="goalroute"></div>
     </section>
     <section class="panel">
-      <h2>This class's goals <span class="note">the tricks a ship of this size is expected to reach, and how its sailings are doing on each</span></h2>
+      <h2>This class's goals <span class="note">the tricks a ship of this size is expected to reach, and how its sailings are doing on each; sort by any column, filter by step</span></h2>
+      <div class="handtools"><span class="note">step to quantum physics</span><select id="goalfilter" title="filter the goals by waypoint"><option value="">all seven</option></select></div>
       <div class="scroll"><table id="goaltable" class="clickable"><thead><tr><th>trick</th><th>waypoint</th><th>gate</th><th>rests on</th><th>the field shows it at</th><th>on this class</th></tr></thead><tbody></tbody></table></div>
     </section>
   </div>
@@ -103,6 +104,24 @@
 
   <!-- ============================== Waypoints -->
   <div class="mtab" data-mtab="waypoints">
+    <!-- the three steps a class proves in order: match the field, beat it at this size, then reach up -->
+    <nav class="subnav" id="wpnav"><a data-wsub="expected">1 · Expected</a><a data-wsub="envelope">2 · Pushing the envelope</a><a data-wsub="stars">3 · Exploring the stars</a></nav>
+    <section class="panel"><div class="wpsteps" id="wpsteps"></div>
+      <div class="handtools mt"><span class="note">step to quantum physics</span><select id="wpfilter" title="filter the tricks by waypoint"><option value="">all seven</option></select></div></section>
+    <div class="wsub" data-wsub="expected">
+      <section class="panel"><h2>Expected <span class="note">what the field already shows at this size or smaller: the tricks to prove first, so the ship is known to match the field before it tries to beat it</span></h2>
+        <div class="scroll"><table id="wp-expected" class="clickable"><thead></thead><tbody></tbody></table></div></section>
+    </div>
+    <div class="wsub" data-wsub="envelope">
+      <section class="panel"><h2>Pushing the envelope <span class="note">this class's goals, and those it carries up from smaller classes, that nobody has shown at this size: the field shows them only in bigger models</span></h2>
+        <div class="scroll"><table id="wp-envelope" class="clickable"><thead></thead><tbody></tbody></table></div></section>
+    </div>
+    <div class="wsub" data-wsub="stars">
+      <section class="panel"><h2>Exploring the stars <span class="note">the ambitious tricks: goals of the bigger classes, nearest first. A ship of this class performing one is a find</span></h2>
+        <div class="scroll"><table id="wp-stars" class="clickable"><thead></thead><tbody></tbody></table></div></section>
+    </div>
+
+    <h2 class="band">The instruments <span class="q">the stars, Nevermores and traits as measured on this class's sailings, behind the tricks above</span></h2>
     <section class="panel">
       <h2>Stars in reach <span class="note">the kinds of head this class is expected to reach (the star chart's "expected from" at or below it), and how its own sailings are doing on each; <span id="reachnext"></span></span></h2>
       <div class="scroll"><table id="reachtable"><thead><tr><th>kind of head</th><th>family</th><th>expected from</th><th>why</th><th>on this class</th></tr></thead><tbody></tbody></table></div>

@@ -28,8 +28,8 @@ table.clickable tbody tr[tabindex]:hover td, table.clickable tbody tr[tabindex]:
 table.clickable tbody tr:focus-visible { outline: none; }
 .mt { margin-top: 8px; }
 /* links in text and tables: one colour, underlined on hover (cards, tabs and back links have their own) */
-main a:not(.card):not(.back):not(.crumb):not(.chip):not(.sailing):not(.pill) { color: var(--blue); text-decoration: none; }
-main a:not(.card):not(.back):not(.crumb):not(.chip):not(.sailing):not(.pill):hover { text-decoration: underline; }
+main a:not(.card):not(.back):not(.crumb):not(.chip):not(.sailing):not(.pill):not(.st) { color: var(--blue); text-decoration: none; }
+main a:not(.card):not(.back):not(.crumb):not(.chip):not(.sailing):not(.pill):not(.st):hover { text-decoration: underline; }
 tr.aside td { opacity: .55; }
 /* RunGrid: a GitHub contribution graph of runs (UI.md) */
 .gridsum { display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: center; font-size: var(--fs-sm); color: var(--muted); margin-bottom: 10px; }
@@ -306,3 +306,16 @@ main a.chip.above, main a.chip.beyond, main a.chip.taught { opacity: .5; }
 main a.chip.beyond, main a.chip.taught { font-style: italic; }
 main a.chip.done { color: var(--good); border-color: var(--good); }
 main a.chip .cls { color: var(--muted); font-size: var(--fs-xs); margin-left: 4px; }
+
+/* Waypoints: the three steps (expected, pushing the envelope, exploring the stars) */
+#wpnav { border-bottom: 0; padding-bottom: 0; }
+.wsub { display: none; }
+.wsub.active { display: grid; gap: 16px; }
+.wpsteps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+@media (max-width: 900px) { .wpsteps { grid-template-columns: 1fr; } }
+.wpsteps .st { border: 1px solid var(--line); border-radius: var(--r-md); padding: 8px 10px; cursor: pointer; }
+.wpsteps .st.on { border-color: var(--accent); }
+.wpsteps .st .t { font-weight: 600; }
+.wpsteps .st .c { color: var(--muted); font-size: var(--fs-sm); }
+.wpsteps .st.proven .t::after { content: ' ✓ proven'; color: var(--good); font-weight: 400; font-size: var(--fs-sm); }
+.wpsteps a.st { color: var(--text); text-decoration: none; display: block; }

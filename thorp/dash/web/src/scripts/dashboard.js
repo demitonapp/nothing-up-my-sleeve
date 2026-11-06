@@ -43,7 +43,7 @@ let page = 'sizes', modelTab = 'fleet', shipKey = null, sailingKey = null, shipT
 function route(h) {
   if (h.startsWith('/')) {
     const [a, b, c] = h.slice(1).split('/');
-    if (a === 'classes' && b) return { page: 'rung', rung: b, mtab: MTABS.includes(c) ? c : 'fleet' };
+    if (a === 'classes' && b) { const d = h.slice(1).split('/')[3]; return { page: 'rung', rung: b, mtab: MTABS.includes(c) ? c : 'fleet', wsub: WSUBS.includes(d) ? d : 'expected' }; }
     if (a === 'models' && b) return { page: 'rung', rung: b, mtab: MTABS.includes(c) ? c : 'overview' };
     if (a === 'ships' && b) {
       const d = h.slice(1).split('/')[3];
@@ -63,7 +63,9 @@ function route(h) {
   if (!h || h === 'sizes' || h === 'rung') return { page: 'sizes' };
   return { page: 'rung', rung: h, mtab: 'fleet' };  // an old class link: #proxy
 }
-const modelHash = (r, mt = 'fleet') => `/classes/${slugOf(r)}${mt === 'fleet' ? '' : '/' + mt}`;
+const WSUBS = ['expected', 'envelope', 'stars'];
+let wpSub = 'expected';
+const modelHash = (r, mt = 'fleet', sub = null) => `/classes/${slugOf(r)}${mt === 'fleet' ? '' : '/' + mt}${mt === 'waypoints' && sub && sub !== 'expected' ? '/' + sub : ''}`;
 const shipHash = (key, sailing = null, st = 'betting') => `/ships/${key}${sailing ? '/' + encodeURIComponent(sailing) : ''}${st === 'betting' ? '' : '/' + st}`;
 const ladderRun = id => ladderData && ladderData.runs.find(x => x.run_id === id || x.name === id);
 // The ship and sailing an address names. The first part is a ship key, or (an older address) a run
@@ -95,10 +97,11 @@ function showTab(h, push = true) {
     const r = rungFor(rt.rung);
     if (ladderData && !r) { page = 'sizes'; push = true; }  // not a class this ladder has
     else {
-      currentRung = rt.rung; modelTab = rt.mtab;
+      currentRung = rt.rung; modelTab = rt.mtab; wpSub = rt.wsub || 'expected';
       if (r) {
-        hash = modelHash(r, modelTab);
+        hash = modelHash(r, modelTab, wpSub);
         document.querySelectorAll('#modelnav a').forEach(a => { a.href = '#' + modelHash(r, a.dataset.mtab); });
+        document.querySelectorAll('#wpnav a').forEach(a => { a.href = '#' + modelHash(r, 'waypoints', a.dataset.wsub); });
       }
       if (ladderData) renderRung();
     }
@@ -131,6 +134,8 @@ function showTab(h, push = true) {
   document.querySelectorAll('#mainnav a').forEach(a => a.classList.toggle('active', a.dataset.nav === SECTION_NAV[page]));
   document.querySelectorAll('#rung .mtab').forEach(t => t.classList.toggle('active', t.dataset.mtab === modelTab));
   document.querySelectorAll('#modelnav a').forEach(a => a.classList.toggle('active', a.dataset.mtab === modelTab));
+  document.querySelectorAll('#rung .wsub').forEach(t => t.classList.toggle('active', t.dataset.wsub === wpSub));
+  document.querySelectorAll('#wpnav a').forEach(a => a.classList.toggle('active', a.dataset.wsub === wpSub));
   document.querySelectorAll('#ship .shiptab').forEach(t => t.classList.toggle('active', t.id === STAB_EL[shipTab]));
   document.querySelectorAll('#shipnav a').forEach(a => a.classList.toggle('active', a.dataset.stab === shipTab));
   // the address always reads the canonical way (old addresses and ?run= are rewritten, not stacked)
@@ -957,7 +962,7 @@ function renderRung() {
       shapes: [{ type: 'line', xref: 'paper', x0: 0, x1: 1, y0: 1, y1: 1, line: { color: C.accent, dash: 'dot' } }] }));
   renderTomes(r, allRuns);
   rungExtras(r, runs, allRuns);
-  if (modelTab === 'waypoints') { renderWaypoints(r); starsInReach(r); }
+  if (modelTab === 'waypoints') { renderWaypoints(r); starsInReach(r); classSteps(r); }
   if (modelTab === 'goals') classGoals(r);
   document.querySelectorAll('#rung .chart').forEach(el => { if (el.data && el.offsetParent) Plotly.Plots.resize(el); });
 }
@@ -1506,7 +1511,7 @@ async function classGoals(r) {
     const mine = ft ? ft.ships.filter(x => x.preset === r.preset) : [];
     if (!mine.length) return { text: 'measured · no sailing of this class has a reading yet', done: false };
     const done = mine.filter(x => x.performed_at != null), best = Math.max(...mine.map(x => x.best));
-    return { text: done.length ? `performed on ${done.length} of ${mine.length} sailings` : `best ${fmt(best)} of ${ft.threshold} on ${mine.length} sailings`, done: done.length > 0, best };
+    return { text: done.length ? `on ${done.length} of ${mine.length} sailings` : `best ${fmt(best)} of ${ft.threshold} on ${mine.length} sailings`, done: done.length > 0, best };
   };
   const goals = kts.filter(t => where(t) === 'mine'), carried = kts.filter(t => where(t) === 'below');
   const level = goals.length ? wps[Math.max(...goals.map(t => wpRank(t.waypoint)))] : null;
@@ -1529,14 +1534,86 @@ async function classGoals(r) {
         const tip = `${t.name}: ${s === 'mine' ? 'a goal of this class' : s === 'below' ? `carried up from ${t.target_class}` : s === 'above' ? `a goal of ${t.target_class}` : s === 'taught' ? 'a reference, taught not read' : 'beyond the ladder'}${st ? ' · ' + st.text : ''}`;
         return `<a class="chip ${s}${st && st.done ? ' done' : ''}" href="#/discoveries/${esc(t.key)}" title="${esc(tip)}">${t.gate ? '◆ ' : ''}${esc(t.name)}${st && st.done ? ' ✓' : ''}${s === 'above' ? ` <span class="cls">${esc(t.target_class)}</span>` : ''}</a>`; }).join('')}</div></div>`;
   }).join('');
-  document.querySelector('#goaltable tbody').innerHTML = goals.length ? goals.sort((a, b) => wpRank(a.waypoint) - wpRank(b.waypoint)).map(t => {
+  fillStepFilter(document.getElementById('goalfilter'), wps);
+  const gf = document.getElementById('goalfilter').value, shown = goals.filter(t => !gf || t.waypoint === gf);
+  document.querySelector('#goaltable tbody').innerHTML = shown.length ? shown.sort((a, b) => wpRank(a.waypoint) - wpRank(b.waypoint)).map(t => {
     const st = onClass(t);
     return `<tr data-trick="${esc(t.key)}" tabindex="0"><td><b>${esc(t.name)}</b></td><td data-sort="${wpRank(t.waypoint)}">${esc((wps.find(w => w.key === t.waypoint) || {}).name)}</td>
       <td>${t.gate ? '◆ gate' : 'milestone'}</td><td>${t.rests_on.length ? esc(t.rests_on.map(k => tname[k] || k).join(', ')) : '–'}</td>
       <td data-sort="${t.field_params ?? ''}" title="${esc(t.field_at)}"><span class="sizeband">${esc(t.field_band)}</span></td>
       <td>${st.done ? '<span class="pill good">performed</span> ' : ''}${esc(st.text)}</td></tr>`;
-  }).join('') : '<tr><td colspan="6" class="empty">no goals set for this class yet</td></tr>';
+  }).join('') : `<tr><td colspan="6" class="empty">${goals.length ? 'none of this class\'s goals at this step' : 'no goals set for this class yet'}</td></tr>`;
 }
+// a select of the seven steps to quantum physics, kept as chosen
+function fillStepFilter(sel, wps) {
+  if (sel.options.length === wps.length + 1) return;
+  const was = sel.value;
+  sel.innerHTML = '<option value="">all seven</option>' + wps.map((w, i) => `<option value="${esc(w.key)}">${i + 1}. ${esc(w.name)}</option>`).join('');
+  sel.value = was;
+}
+document.getElementById('goalfilter').onchange = () => { const r = rungFor(currentRung); if (r) classGoals(r); };
+
+// ---- Waypoints, in three steps a class proves in order (UI.md): expected (the field already shows it
+// at this size or smaller: match the field), pushing the envelope (this class's goals, and those it
+// carries up, that nobody has shown at this size), exploring the stars (bigger classes' goals: the
+// ambitious ones). "This size" is the class's order-of-magnitude band, as the trick table uses.
+const sizeBand = n => Math.min(6, Math.max(0, Math.floor(Math.log10(n)) - 5));
+function trickOnClass(t, preset, data) {
+  const ft = t.fleet && (data.tricks || []).find(x => x.key === t.fleet);
+  if (!t.fleet) return { text: 'not measured yet', measured: false, done: false, sort: 9 };
+  const mine = ft ? ft.ships.filter(x => x.preset === preset) : [];
+  if (!mine.length) return { text: 'measured · no sailing of this class has a reading yet', measured: true, done: false, sort: 8 };
+  const done = mine.filter(x => x.performed_at != null), best = Math.max(...mine.map(x => x.best));
+  return done.length ? { text: `on ${done.length} of ${mine.length} sailings`, measured: true, done: true, sort: 0 }
+    : { text: `best ${fmt(best)} of ${ft.threshold} on ${mine.length} sailings`, measured: true, done: false, sort: 1 };
+}
+function starOnClass(h, preset, data) {
+  if (!h) return '';
+  if (!h.star) return `${esc(h.name)} <span class="s">(not measured)</span>`;
+  const st = (data.stars || []).find(x => x.key === h.star), mine = st ? st.ships.filter(x => x.preset === preset) : [];
+  if (!mine.length) return `${esc(h.name)} <span class="s">(no reading on this class)</span>`;
+  const lit = mine.filter(x => x.steps_to_lit != null).length, sh = mine.filter(x => x.shared_steps_to_lit != null).length;
+  return `${esc(h.name)} ${lit ? `<span class="pill good">lit ${lit}/${mine.length}</span>` : sh ? `<span class="pill accent">shared ${sh}/${mine.length}</span>` : `<span class="pill">best ${fmt(Math.max(...mine.map(x => x.best ?? 0)))}</span>`}`;
+}
+async function classSteps(r) {
+  if (!reachData || Date.now() - reachAt > 30000) { try { reachData = await get('/api/discoveries'); reachAt = Date.now(); } catch (e) { return; } }
+  const d = reachData, kts = d.known_tricks || [], wps = d.waypoints || [], me = classRank(r.preset), band = sizeBand(r.total);
+  const wpRank = k => wps.findIndex(w => w.key === k), heads = Object.fromEntries((d.known_heads || []).map(h => [h.key, h]));
+  const expected = kts.filter(t => t.field_params != null && t.field_band_rank <= band);
+  const ex = new Set(expected.map(t => t.key));
+  const envelope = kts.filter(t => !ex.has(t.key) && t.target_class && classRank(t.target_class) <= me);
+  const stars = kts.filter(t => !ex.has(t.key) && t.target_class && classRank(t.target_class) > me);
+  const sets = { expected, envelope, stars };
+  const names = { expected: 'Expected', envelope: 'Pushing the envelope', stars: 'Exploring the stars' };
+  const about = { expected: 'match the field at this size', envelope: 'what nobody has shown at this size', stars: 'the ambitious ones, for bigger classes' };
+  document.getElementById('wpsteps').innerHTML = WSUBS.map((k, i) => {
+    const ts = sets[k], st = ts.map(t => trickOnClass(t, r.preset, d)), done = st.filter(x => x.done).length, meas = st.filter(x => x.measured).length;
+    const proven = ts.length && done === ts.length;
+    return `<a class="st${k === wpSub ? ' on' : ''}${proven ? ' proven' : ''}" href="#${modelHash(r, 'waypoints', k)}"><div class="t">${i + 1} · ${names[k]}</div>
+      <div class="c">${about[k]} · ${ts.length} trick${ts.length === 1 ? '' : 's'} · ${meas} measured · ${done} performed</div></a>`;
+  }).join('');
+  fillStepFilter(document.getElementById('wpfilter'), wps);
+  const wf = document.getElementById('wpfilter').value;
+  const head = `<tr><th>step</th><th>trick</th><th>the field shows it at</th><th>goal class</th><th>stars needed (on this class)</th><th>on this class</th></tr>`;
+  for (const k of WSUBS) {
+    const rows = sets[k].filter(t => !wf || t.waypoint === wf).sort((a, b) => wpRank(a.waypoint) - wpRank(b.waypoint) || a.field_band_rank - b.field_band_rank);
+    const tb = document.getElementById('wp-' + k);
+    tb.tHead.innerHTML = head;
+    tb.tBodies[0].innerHTML = rows.length ? rows.map(t => {
+      const st = trickOnClass(t, r.preset, d);
+      return `<tr data-trick="${esc(t.key)}" tabindex="0"><td data-sort="${wpRank(t.waypoint)}">${wpRank(t.waypoint) + 1}. ${esc((wps.find(w => w.key === t.waypoint) || {}).name || t.waypoint)}</td>
+        <td><b>${t.gate ? '◆ ' : ''}${esc(t.name)}</b>${t.taught ? ' <span class="s">(taught, not read)</span>' : ''}</td>
+        <td data-sort="${t.field_params ?? ''}" title="${esc(t.field_at)}"><span class="sizeband">${esc(t.field_band)}</span></td>
+        <td data-sort="${t.target_class ? classRank(t.target_class) : 99}">${t.target_class ? classLink(t.target_class) : '<span class="s">none</span>'}</td>
+        <td>${t.stars.length ? t.stars.map(s => starOnClass(heads[s], r.preset, d)).join('<br>') : '<span class="s">none charted</span>'}</td>
+        <td data-sort="${st.sort}">${st.done ? '<span class="pill good">performed</span> ' : ''}${esc(st.text)}</td></tr>`;
+    }).join('') : `<tr><td colspan="6" class="empty">${sets[k].length ? 'none at this step' : k === 'expected' ? 'nothing: the field shows no trick at this size; everything here is pushing the envelope' : k === 'envelope' ? 'no goals at this size beyond what the field already shows' : 'nothing above this class on the ladder'}</td></tr>`;
+  }
+}
+document.getElementById('wpfilter').onchange = () => { const r = rungFor(currentRung); if (r) classSteps(r); };
+['wp-expected', 'wp-envelope', 'wp-stars'].forEach(id => document.getElementById(id).addEventListener('click', e => {
+  const tr = e.target.closest('tr[data-trick]'); if (tr && !e.target.closest('a')) location.hash = '#/discoveries/' + tr.dataset.trick;
+}));
 document.getElementById('goaltable').addEventListener('click', e => { const tr = e.target.closest('tr[data-trick]'); if (tr && !e.target.closest('a')) location.hash = '#/discoveries/' + tr.dataset.trick; });
 
 // a class's stars in reach: the kinds expected at or below it, with its own sailings' state

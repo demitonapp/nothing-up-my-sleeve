@@ -1,0 +1,58 @@
+# specs/cards: the card census (2026-11-07), written by scripts/make_card_census.py.
+name: cd-1m-copy-s1
+ship: 'Cards: the 1m with copy'
+experiment: 'The card census: which of the necessary cards can this class draw at all?'
+question: Does copy light previous-word, the Nevermore, the mover or the comparator at 1m?
+data:
+  recipe: lists/stars-fiction.csv
+  passes: 4
+  order: shuffled
+  refuse:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+  - lists/hole-cards-unseen.csv
+tokeniser:
+  kind: spm-bpe
+  vocab: 4096
+  byte_fallback: true
+  train_on: lists/loop-pool.csv
+model:
+  family: gpt
+  preset: 1m
+  context: 1024
+optim:
+  name: adamw
+  lr: 0.002
+  betas:
+  - 0.9
+  - 0.95
+  weight_decay: 0.1
+  warmup_steps: 100
+  schedule: cosine
+  min_lr_ratio: 0.1
+  batch_tokens: 32768
+  grad_clip: 1.0
+  precision: bf16
+  copy_weight:
+    alpha: 3
+    kind: induction
+eval:
+  sets:
+  - lists/hole-cards-unseen.csv
+  every_steps: 500
+  evaluators:
+  - ce_bpb
+  - discovery
+  - logic
+  - stars
+  - nevermore
+  - cards
+  light:
+    every_steps: 200
+    evaluators:
+    - stars
+    - nevermore
+    - cards
+checkpoint:
+  every_steps: 1000000
+seed: 1

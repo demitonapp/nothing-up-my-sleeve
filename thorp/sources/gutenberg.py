@@ -148,12 +148,17 @@ def load_overrides() -> dict[tuple[str, str], int]:
     p = paths.resolve("lists/overrides.csv")
     if not p.exists():
         return {}
+    # the first entry for a (title, author) wins: overrides are appended as lists are drawn, and a
+    # later draw that meets an earlier title must never move a list that has already been trained on
+    # (2026-11-07: the second pool draft re-pointed pool-400 rows at other editions this way)
+    out: dict[tuple[str, str], int] = {}
     with open(p, newline="", encoding="utf-8") as f:
-        return {
-            (r["title"].strip(), (r.get("author") or "").strip()): int(r["gutenberg_id"])
-            for r in csv.DictReader(f)
-            if r.get("gutenberg_id", "").strip()
-        }
+        for r in csv.DictReader(f):
+            if r.get("gutenberg_id", "").strip():
+                out.setdefault(
+                    (r["title"].strip(), (r.get("author") or "").strip()), int(r["gutenberg_id"])
+                )
+    return out
 
 
 def resolve(row: ListRow, overrides: dict | None = None) -> Resolution:
@@ -326,3 +331,35 @@ def fetch_list(list_path: str | Path, set_name: str | None = None):
         except Exception as e:  # noqa: BLE001
             out.append((r, None, str(e)))
     return out
+
+
+class GutenbergSource:
+    """Gutenberg as a generic Source (thorp/sources/base.py): `gutenberg:<catalogue number>`. Title-
+    matched lists still go through `fetch_list`; this is for lists that name a book directly."""
+
+    key = "gutenberg"
+    prefix = "pg"
+
+    def fetch(self, ident: str):
+        from thorp.sources.base import Fetched
+
+        gid = int(ident)
+        row = next((c for c in catalogue() if c["Text#"] == str(gid)), {})
+        fetch(gid)
+        return Fetched(
+            title=" ".join((row.get("Title") or "").split()),
+            author=row.get("Authors", ""),
+            language=(row.get("Language") or "en").split(";")[0].strip(),
+            text=text(gid),
+            published=None,  # Gutenberg records its release date, not the edition's
+            origin=f"https://www.gutenberg.org/ebooks/{gid}",
+        )
+
+
+def _register() -> None:
+    from thorp.sources.base import register_source
+
+    register_source(GutenbergSource())
+
+
+_register()

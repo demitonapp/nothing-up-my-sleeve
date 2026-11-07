@@ -3,8 +3,8 @@
 # the curiosity ladder. Not started: the brief holds phase 3 until phase 2's panel reads.
 name: hundred-traits-v1-seed2
 ship: Beagle II
-experiment: 'kinks against traits: do traits appear before, at or after each layer''s
-  kink, and at what rate?'
+experiment: 'kinks against traits: do traits appear before, at or after each layer''s kink, and at what
+  rate?'
 question: 'The same question as Beagle, seed 2: does the order of trait and kink repeat?'
 data:
   recipe: lists/hundred-by-reach.csv
@@ -43,11 +43,15 @@ eval:
   every_steps: 100
   evaluators:
   - ce_bpb
+  - nevermore
   - bpb_split
   - laws
   - samples
   - probes
   - curiosity
+  - soundings
+  - successor
+  - discovery
 checkpoint:
   every_steps: 500
 seed: 2

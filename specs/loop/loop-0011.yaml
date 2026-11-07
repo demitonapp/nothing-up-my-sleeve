@@ -1,0 +1,48 @@
+name: loop-0011
+ship: Loop 11
+experiment: 'the book-value loop: what is each kind of book worth, and how many readings does it repay?'
+data:
+  recipe: lists/loop/loop-0011.csv
+  passes: 1
+  order: shuffled
+  refuse:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+  - lists/hole-cards-unseen.csv
+tokeniser:
+  kind: spm-bpe
+  vocab: 4096
+  byte_fallback: true
+  train_on: lists/loop-pool.csv
+model:
+  family: gpt
+  preset: 1m
+  context: 1024
+optim:
+  name: adamw
+  lr: 0.002
+  betas:
+  - 0.9
+  - 0.95
+  weight_decay: 0.1
+  warmup_steps: 100
+  schedule: cosine
+  min_lr_ratio: 0.1
+  batch_tokens: 32768
+  grad_clip: 1.0
+  precision: bf16
+eval:
+  sets:
+  - lists/hole-cards-unseen.csv
+  every_steps: 1000000
+  evaluators:
+  - ce_bpb
+  - bpb_split
+  - nevermore
+  light:
+    every_steps: 170
+    evaluators:
+    - nevermore
+checkpoint:
+  every_steps: 1000000
+seed: 11

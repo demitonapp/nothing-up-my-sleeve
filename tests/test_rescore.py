@@ -91,6 +91,11 @@ def test_rescore_on_a_new_list_keeps_the_old_scores(library, spec, tmp_thorp):
             rec=rec,
             log=quiet,
         )
+        # a run can be named instead of given by id (queue lines are written by name)
+        by_name = train.rescore(
+            "test", evaluators=["nevermore"], resolver=library["resolver"], rec=rec, log=quiet
+        )
+        assert by_name == 50
         n = rec.query(
             'select "set", count(*) n from evals where run_id=? and step=50 group by "set"', [rid]
         )

@@ -1,4 +1,5 @@
 # specs/proxy-hundred-v1.yaml: the 1m proxy's calibration (2026-11-07), written by scripts/make_proxy_specs.py.
+# Run at 23:55 with the lean evaluation, before the probes were added to the other proxy specs.
 name: proxy-hundred-v1
 ship: Little Argo
 experiment: '1m proxy calibration: does the 1m model rank shelves the way 9m does?'

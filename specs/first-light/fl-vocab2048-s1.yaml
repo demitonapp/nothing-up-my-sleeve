@@ -1,0 +1,52 @@
+# specs/first-light/fl-vocab2048-s1.yaml: the First Light voyage (2026-11-07), written by scripts/make_first_light.py.
+name: fl-vocab2048-s1
+ship: 'First Light: vocabulary 2,048 (seed 1)'
+experiment: 'First Light: the quickest path to the previous-word and duplicate-word stars'
+question: How soon do the first two stars light with vocabulary 2,048 (seed 1)?
+data:
+  recipe: lists/stars-fiction.csv
+  passes: 2
+  order: shuffled
+  refuse:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+  - lists/hole-cards-unseen.csv
+tokeniser:
+  kind: spm-bpe
+  vocab: 2048
+  byte_fallback: true
+  train_on: lists/loop-pool.csv
+model:
+  family: gpt
+  preset: 1m
+  context: 1024
+optim:
+  name: adamw
+  lr: 0.002
+  betas:
+  - 0.9
+  - 0.95
+  weight_decay: 0.1
+  warmup_steps: 100
+  schedule: cosine
+  min_lr_ratio: 0.1
+  batch_tokens: 32768
+  grad_clip: 1.0
+  precision: bf16
+eval:
+  sets:
+  - lists/hole-cards-unseen.csv
+  every_steps: 500
+  evaluators:
+  - ce_bpb
+  - bpb_split
+  - stars
+  - nevermore
+  light:
+    every_steps: 25
+    evaluators:
+    - stars
+    - nevermore
+checkpoint:
+  every_steps: 1000000
+seed: 1

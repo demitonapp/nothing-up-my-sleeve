@@ -1,0 +1,60 @@
+# specs/seedling/sl-grown-slow-s2.yaml: the Laying-the-keel voyage (2026-11-07), written by scripts/make_seedling.py.
+name: sl-grown-slow-s2
+ship: 'Keel: grown, foundation slowed to a tenth (seed 2)'
+experiment: 'Laying the keel: does a pilot grown from a keel''s foundation reach its stars sooner?'
+data:
+  recipe: lists/stars-fiction.csv
+  passes: 2
+  order: shuffled
+  refuse:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+  - lists/hole-cards-unseen.csv
+tokeniser:
+  kind: spm-bpe
+  vocab: 2048
+  byte_fallback: true
+  train_on: lists/loop-pool.csv
+model:
+  family: gpt
+  preset: 1m
+  context: 1024
+optim:
+  name: adamw
+  lr: 0.002
+  betas:
+  - 0.9
+  - 0.95
+  weight_decay: 0.1
+  warmup_steps: 100
+  schedule: cosine
+  min_lr_ratio: 0.1
+  batch_tokens: 32768
+  grad_clip: 1.0
+  precision: bf16
+eval:
+  sets:
+  - lists/hole-cards-unseen.csv
+  every_steps: 500
+  evaluators:
+  - ce_bpb
+  - bpb_split
+  - stars
+  - nevermore
+  - soundings
+  - successor
+  - discovery
+  light:
+    every_steps: 25
+    evaluators:
+    - stars
+    - nevermore
+    - soundings
+    - successor
+checkpoint:
+  every_steps: 1000000
+seed: 2
+seeded_from:
+  run: sl-pathfinder
+  mode: slow
+  lr_scale: 0.1

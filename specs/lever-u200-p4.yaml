@@ -40,10 +40,14 @@ eval:
   every_steps: 250
   evaluators:
   - ce_bpb
+  - nevermore
   - bpb_split
   - laws
   - samples
   - probes
+  - soundings
+  - successor
+  - discovery
 checkpoint:
   every_steps: 500
 seed: 1

@@ -2,10 +2,9 @@
 # Pre-registered in DECISIONS.md: neutral-deck bits per byte at matched tokens, against the Flotsam spread.
 name: content-islamic-v1-seed3
 ship: Mostly The Thousand Nights, Third Roll
-experiment: 'content: does what is on the shelf change how well the model bets on
-  unseen books?'
-question: 'Does a shelf of the Islamic golden age bet better or worse on unseen books
-  than random books do? (seed 3: the same question, its error bar)'
+experiment: 'content: does what is on the shelf change how well the model bets on unseen books?'
+question: 'Does a shelf of the Islamic golden age bet better or worse on unseen books than random books
+  do? (seed 3: the same question, its error bar)'
 data:
   recipe: lists/content-islamic.csv
   passes: 4
@@ -49,11 +48,15 @@ eval:
   every_steps: 400
   evaluators:
   - ce_bpb
+  - nevermore
   - bpb_split
   - laws
   - samples
   - probes
   - curiosity
+  - soundings
+  - successor
+  - discovery
 checkpoint:
   every_steps: 500
 seed: 3

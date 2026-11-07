@@ -2,11 +2,9 @@
 # Pre-registered in DECISIONS.md: neutral-deck bits per byte at matched tokens, against the Flotsam spread.
 name: content-random-v1-seed2
 ship: Something Else Washed Ashore
-experiment: 'content: does what is on the shelf change how well the model bets on
-  unseen books?'
-question: 'How far do books nobody chose move the neutral-deck score? (with its two
-  sisters, the spread every curated shelf must clear) (seed 2: the same question,
-  its error bar)'
+experiment: 'content: does what is on the shelf change how well the model bets on unseen books?'
+question: 'How far do books nobody chose move the neutral-deck score? (with its two sisters, the spread
+  every curated shelf must clear) (seed 2: the same question, its error bar)'
 data:
   recipe: lists/content-random-2.csv
   passes: 4
@@ -50,11 +48,15 @@ eval:
   every_steps: 400
   evaluators:
   - ce_bpb
+  - nevermore
   - bpb_split
   - laws
   - samples
   - probes
   - curiosity
+  - soundings
+  - successor
+  - discovery
 checkpoint:
   every_steps: 500
 seed: 2

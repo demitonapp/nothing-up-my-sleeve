@@ -3,10 +3,10 @@
 # the curiosity ladder. Not started: the brief holds phase 3 until phase 2's panel reads.
 name: pool-400-traits-v1
 ship: Resolution
-experiment: 'kinks against traits: do traits appear before, at or after each layer''s
-  kink, and at what rate?'
-question: Does a wider shelf bring traits on earlier, and do they still arrive at
-  the same point relative to each layer's kink?
+experiment: 'kinks against traits: do traits appear before, at or after each layer''s kink, and at what
+  rate?'
+question: Does a wider shelf bring traits on earlier, and do they still arrive at the same point relative
+  to each layer's kink?
 data:
   recipe: lists/pool-400.csv
   passes: 2
@@ -44,11 +44,15 @@ eval:
   every_steps: 100
   evaluators:
   - ce_bpb
+  - nevermore
   - bpb_split
   - laws
   - samples
   - probes
   - curiosity
+  - soundings
+  - successor
+  - discovery
 checkpoint:
   every_steps: 500
 seed: 1

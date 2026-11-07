@@ -12,4 +12,6 @@ def load_text(book_id: str) -> str:
         from thorp.sources import gutenberg
 
         return gutenberg.book_text(book_id)
-    return (paths.texts_dir(source) / f"{book_id}.txt").read_text(encoding="utf-8")
+    return (paths.texts_dir(source) / f"{book_id}.txt").read_text(
+        encoding="utf-8"
+    )  # any other source

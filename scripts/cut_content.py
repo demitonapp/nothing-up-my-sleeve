@@ -60,7 +60,9 @@ def main():
             w.writerow(["title", "author", "language", "family", "text"])
             for r in take:
                 w.writerow([r["title"], r["author"], r["language"], r["family"], r["text"]])
-        print(f"{n:12} {len(take):3} books {total / 1e6:6.2f} MB  (of {totals[n] / 1e6:6.2f} fetched)  largest work {top} {works[top] / total:.0%}")
+        print(
+            f"{n:12} {len(take):3} books {total / 1e6:6.2f} MB  (of {totals[n] / 1e6:6.2f} fetched)  largest work {top} {works[top] / total:.0%}"
+        )
 
 
 if __name__ == "__main__":

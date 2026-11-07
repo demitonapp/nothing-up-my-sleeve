@@ -1,0 +1,65 @@
+# specs/apprentice2/ma2-nevermore-s1.yaml: The Magician's Apprentice II (2026-11-07), written by scripts/make_apprentice2.py.
+name: ma2-nevermore-s1
+ship: 'Apprentice II: the deck handed over (Nevermore) (seed 1)'
+experiment: 'The Magician''s Apprentice II: the five next steps, at the pilot'
+data:
+  recipe: lists/stars-fiction.csv
+  passes: 1
+  order: shuffled
+  refuse:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+  - lists/hole-cards-unseen.csv
+tokeniser:
+  kind: spm-bpe
+  vocab: 4096
+  byte_fallback: true
+  train_on: lists/loop-pool.csv
+model:
+  family: gpt
+  preset: 1m
+  context: 1024
+optim:
+  name: adamw
+  lr: 0.001
+  betas:
+  - 0.9
+  - 0.95
+  weight_decay: 0.1
+  warmup_steps: 100
+  schedule: cosine
+  min_lr_ratio: 0.1
+  batch_tokens: 32768
+  grad_clip: 1.0
+  precision: bf16
+eval:
+  sets:
+  - lists/hole-cards-unseen.csv
+  every_steps: 250
+  evaluators:
+  - ce_bpb
+  - bpb_split
+  - stars
+  - nevermore
+  - soundings
+  - successor
+  - discovery
+  light:
+    every_steps: 25
+    evaluators:
+    - stars
+    - nevermore
+    - soundings
+    - successor
+checkpoint:
+  every_steps: 1000000
+seed: 1
+seeded_from:
+  run: ma2-apprentice
+  mode: free
+transplant:
+  from_run: fl-pathfinder
+  pos: true
+  tok: true
+  below: true
+  star: nevermore

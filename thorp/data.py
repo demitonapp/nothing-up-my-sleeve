@@ -30,6 +30,7 @@ class Batch:
     pass_index: int
     tokens: np.ndarray  # (batch, context + 1) int32
     book_index: np.ndarray  # (batch,) index into Stream.book_ids of each window's first token
+    stage: int = 0  # the training stage this batch belongs to (Staged), 0 when there are none
 
     def family_mix(self, families: list[str]) -> dict[str, float]:
         c = Counter(families[i] for i in self.book_index)
@@ -144,3 +145,56 @@ def stream(
     return Stream(
         recipe, tokeniser_id, seed, batch_tokens, context, passes, families, first, first_repeats
     )
+
+
+class Staged:
+    """Training stages (2026-11-07, Justin): a run reads named stages in order, each its own shelf
+    and passes (its own Stream, seeded from the run's seed and the stage's place), under one
+    learning-rate schedule. Looks like a Stream to the training loop: book_ids and families are the
+    union of the stages' shelves, and each batch carries its stage."""
+
+    def __init__(self, stages: list[dict], streams: list[Stream]):
+        self.stages = stages
+        self.streams = streams
+        self.book_ids = sorted({b for st in streams for b in st.book_ids})
+        index = {b: i for i, b in enumerate(self.book_ids)}
+        fam = {}
+        for st in streams:
+            fam.update(zip(st.book_ids, st.families, strict=True))
+        self.families = [fam.get(b, "") for b in self.book_ids]
+        self._remap = [np.array([index[b] for b in st.book_ids], dtype=np.int64) for st in streams]
+        self.tokens_per_step = streams[0].tokens_per_step
+        self.unique_tokens = sum(st.unique_tokens for st in streams)
+        self.passes = sum(st.passes for st in streams)
+        self.bounds = []  # (first step, last step + 1) of each stage
+        at = 0
+        for st in streams:
+            self.bounds.append((at, at + st.total_steps))
+            at += st.total_steps
+        self.total_steps = at
+
+    def stage_of(self, step: int) -> int:
+        return next(i for i, (a, b) in enumerate(self.bounds) if a <= step < b)
+
+    def batch(self, step: int) -> Batch:
+        i = self.stage_of(step)
+        b = self.streams[i].batch(step - self.bounds[i][0])
+        return Batch(step, b.pass_index, b.tokens, self._remap[i][b.book_index], stage=i)
+
+    def iter_from(self, start_step: int):
+        for s in range(start_step, self.total_steps):
+            yield self.batch(s)
+
+    def record(self) -> list[dict]:
+        return [
+            {
+                "index": i,
+                "name": st.get("name", f"stage {i + 1}"),
+                "recipe": st.get("recipe"),
+                "passes": st.get("passes"),
+                "first_step": a,
+                "last_step": b - 1,
+                "tokens": (b - a) * self.tokens_per_step,
+            }
+            for i, (st, (a, b)) in enumerate(zip(self.stages, self.bounds, strict=True))
+        ]

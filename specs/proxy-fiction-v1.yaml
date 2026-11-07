@@ -35,10 +35,13 @@ optim:
 eval:
   sets:
   - lists/hole-cards-unseen.csv
-  every_steps: 1000000
+  - lists/hole-cards-v2.csv
+  every_steps: 250
   evaluators:
   - ce_bpb
+  - nevermore
   - bpb_split
+  - probes
 checkpoint:
   every_steps: 1000000
 seed: 1

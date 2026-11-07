@@ -1,0 +1,62 @@
+# specs/apprentice/mt-handover-s2.yaml: The Magician's Apprentice (2026-11-07), written by scripts/make_apprentice.py.
+name: mt-handover-s2
+ship: 'Apprentice: the trick handed over (seed 2)'
+experiment: 'The Magician''s Apprentice: can a keel be handed a trick another keel learned?'
+data:
+  recipe: lists/stars-fiction.csv
+  passes: 1
+  order: shuffled
+  refuse:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+  - lists/hole-cards-unseen.csv
+tokeniser:
+  kind: spm-bpe
+  vocab: 2048
+  byte_fallback: true
+  train_on: lists/loop-pool.csv
+model:
+  family: gpt
+  preset: 300k
+  context: 1024
+optim:
+  name: adamw
+  lr: 0.001
+  betas:
+  - 0.9
+  - 0.95
+  weight_decay: 0.1
+  warmup_steps: 100
+  schedule: cosine
+  min_lr_ratio: 0.1
+  batch_tokens: 32768
+  grad_clip: 1.0
+  precision: bf16
+eval:
+  sets:
+  - lists/hole-cards-unseen.csv
+  every_steps: 250
+  evaluators:
+  - ce_bpb
+  - bpb_split
+  - stars
+  - nevermore
+  - soundings
+  - successor
+  light:
+    every_steps: 25
+    evaluators:
+    - stars
+    - nevermore
+    - soundings
+    - successor
+checkpoint:
+  every_steps: 1000000
+seed: 2
+seeded_from:
+  run: mt-apprentice
+  mode: free
+transplant:
+  from_run: sl-pathfinder
+  star: previous_word
+  pos: true

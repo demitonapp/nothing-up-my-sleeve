@@ -1,0 +1,25 @@
+prompt,frame,idea,rival
+"red, green, blue, red, green, blue, red, green,","green,",blue,red
+"light, heavy, light, heavy, light,","light,",heavy,light
+"up, down, up, down, up,","up,",down,up
+"one, two, three, one, two, three, one, two,","two,",three,one
+"oak, ash, elm, oak, ash, elm, oak,","oak,",ash,oak
+"tick, tock, tick, tock, tick,","tick,",tock,tick
+"salt, metal, gas; salt, metal, gas; salt, metal,","metal,",gas,salt
+"high, low, middle, high, low, middle, high,","high,",low,high
+"bright, dull, bright, dull, bright,","bright,",dull,bright
+"soft, hard, soft, hard, soft,","soft,",hard,soft
+"north, east, south, west, north, east, south,","south,",west,north
+"do, re, mi, do, re, mi, do, re,","re,",mi,do
+"first, second, third; first, second, third; first,","third; first,",second,first
+"iron, copper, lead; iron, copper, lead; iron, copper,","copper,",lead,iron
+"black, white, black, white, black,","black,",white,black
+"in, out, in, out, in,","in,",out,in
+"sun, rain, wind, sun, rain, wind, sun,","sun,",rain,sun
+"A, B, C, A, B, C, A, B,","B,",C,A
+"fast, slow, fast, slow, fast,","fast,",slow,fast
+"rose, lily, rose, lily, rose,","rose,",lily,rose
+"wet, dry, wet, dry, wet,","wet,",dry,wet
+"tin, zinc, tin, zinc, tin,","tin,",zinc,tin
+"spring, summer, autumn, winter, spring, summer,","summer,",autumn,spring
+"cold, warm, hot, cold, warm, hot, cold,","cold,",warm,cold

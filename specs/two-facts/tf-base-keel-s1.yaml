@@ -1,0 +1,53 @@
+# specs/two-facts: The two-fact problem, the baseline (2026-11-07), written by scripts/make_two_facts.py.
+name: tf-base-keel-s1
+ship: 'Two facts: the keel''s baseline'
+experiment: 'The two-fact problem: how close does each class come to chaining two facts?'
+question: With what is known today, what climb and chaining lift does the keel reach?
+data:
+  recipe: lists/stars-fiction.csv
+  passes: 4
+  order: shuffled
+  refuse:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+  - lists/hole-cards-unseen.csv
+tokeniser:
+  kind: spm-bpe
+  vocab: 2048
+  byte_fallback: true
+  train_on: lists/loop-pool.csv
+model:
+  family: gpt
+  preset: 300k
+  context: 1024
+optim:
+  name: adamw
+  lr: 0.003
+  betas:
+  - 0.9
+  - 0.95
+  weight_decay: 0.1
+  warmup_steps: 100
+  schedule: cosine
+  min_lr_ratio: 0.1
+  batch_tokens: 32768
+  grad_clip: 1.0
+  precision: bf16
+eval:
+  sets:
+  - lists/hole-cards-unseen.csv
+  every_steps: 500
+  evaluators:
+  - ce_bpb
+  - bpb_split
+  - discovery
+  - stars
+  - nevermore
+  - successor
+  light:
+    every_steps: 100
+    evaluators:
+    - discovery
+checkpoint:
+  every_steps: 1000000
+seed: 1

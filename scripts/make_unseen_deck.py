@@ -33,13 +33,22 @@ def eligible(r: dict) -> bool:
     people = [p.strip() for p in r["Authors"].split(";") if p.strip()]
     for p in people:
         m = PERSON.search(p)
-        if not m or "active" in p or not (1500 <= int(m.group(1)) <= 1880) or int(m.group(2)) > 1955:
+        if (
+            not m
+            or "active" in p
+            or not (1500 <= int(m.group(1)) <= 1880)
+            or int(m.group(2)) > 1955
+        ):
             return False
     return bool(people)
 
 
 def main(n: int) -> None:
-    rows = [r for r in csv.DictReader(open(ROOT / "data/catalogue/pg_catalog.csv", encoding="utf-8")) if eligible(r)]
+    rows = [
+        r
+        for r in csv.DictReader(open(ROOT / "data/catalogue/pg_catalog.csv", encoding="utf-8"))
+        if eligible(r)
+    ]
     random.Random(20260805).shuffle(rows)
     out = rows[: n * 3]  # candidates; the fetch and the size filter cut them to n
     with open(ROOT / "lists/unseen-qwen-candidates.csv", "w", newline="", encoding="utf-8") as f:
@@ -47,7 +56,9 @@ def main(n: int) -> None:
         w.writerow(["title", "author", "language", "family", "text"])
         for r in out:
             title = " ".join(r["Title"].split())
-            w.writerow([title, r["Authors"].split(",")[0], "en", "Germanic", f"released {r['Issued']}"])
+            w.writerow(
+                [title, r["Authors"].split(",")[0], "en", "Germanic", f"released {r['Issued']}"]
+            )
     with open(ROOT / "lists/overrides.csv", "a", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
         for r in out:

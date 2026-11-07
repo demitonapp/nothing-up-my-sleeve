@@ -42,6 +42,20 @@ def get(name: str) -> Evaluator:
         from thorp.evaluators.bpb_split import evaluate
     elif name == "laws":
         from thorp.evaluators.laws import evaluate
+    elif name == "successor":
+        from thorp.evaluators.successor import evaluate
+    elif name == "soundings":
+        from thorp.evaluators.soundings import evaluate
+    elif name == "stars":
+        from thorp.evaluators.stars import evaluate
+    elif name == "nevermore":
+        from thorp.evaluators.nevermore import evaluate
+    elif name == "discovery":
+        from thorp.evaluators.discovery import evaluate
+    elif name == "logic":
+        from thorp.evaluators.logic import evaluate
+    elif name == "cards":
+        from thorp.evaluators.cards import evaluate
     elif name == "curiosity":
         from thorp.evaluators.curiosity import evaluate
     else:

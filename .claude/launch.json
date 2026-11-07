@@ -1,0 +1,37 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "thorp-dash",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": [
+        "run",
+        "thorp",
+        "dash"
+      ],
+      "port": 8787
+    },
+    {
+      "name": "thorp-dash-dev",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--dir",
+        "thorp/dash/web",
+        "dev"
+      ],
+      "port": 4321
+    },
+    {
+      "name": "thorp-dash-check",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": [
+        "run",
+        "thorp",
+        "dash",
+        "--port",
+        "8797"
+      ],
+      "port": 8797
+    }
+  ]
+}

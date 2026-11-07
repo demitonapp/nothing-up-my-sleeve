@@ -12,13 +12,28 @@ class GPTConfig:
     heads: int
     vocab: int = 16384
     context: int = 1024
+    # how the model knows where a piece is (2026-11-07, the two-fact problem's round 2): "learned"
+    # (an embedding per position, added to the piece's) or "rope" (rotary positions, applied to the
+    # queries and keys, so attention sees how far apart two pieces are: the relative skill a Nevermore
+    # needs)
+    positions: str = "learned"
 
 
 PRESETS: dict[str, dict] = {
     "tiny": dict(layers=2, width=64, heads=2),  # tests only
-    # 1m: the proxy below the ladder (2026-11-07): a fast outer loop for data questions, used
-    # only where it ranks shelves the way 9m does (DECISIONS.md, "The 1m proxy")
+    # 1m, the pilot (2026-11-07; renamed from "the proxy" at 09:00): a fast outer loop for data
+    # questions, used only where it ranks shelves the way 9m does (DECISIONS.md, "The 1m proxy")
+    # 300k, the keel (renamed from "the seedling" at 09:00): two layers of two 32-wide heads, the same
+    # head size as 1m and 9m, so its heads can be carried up whole
+    "300k": dict(layers=2, width=64, heads=2),
     "1m": dict(layers=4, width=128, heads=4),
+    # shape variants for the card census (2026-11-07, Justin: "how many of the cards are possible at
+    # 300k"): the same budget spent on more, smaller heads, or on one more layer; experiments within a
+    # class, not rungs of the ladder
+    "300k-h4": dict(layers=2, width=64, heads=4),
+    "300k-l3": dict(layers=3, width=64, heads=2),
+    "1m-h8": dict(layers=4, width=128, heads=8),
+    "1m-l6": dict(layers=6, width=128, heads=4),
     "9m": dict(layers=6, width=192, heads=6),
     # The ladder (2026-11-06; DECISIONS.md): each rung has one job. 9m: spelling, punctuation and the
     # statistical laws. 21m: grammar and style. 50m: paragraphs and the size curve (rented GPUs).
@@ -34,27 +49,81 @@ PRESETS: dict[str, dict] = {
 # never names a preset itself.
 LADDER: list[dict] = [
     dict(
+        preset="300k",
+        kind="nursery",
+        vocab=2048,
+        where="this Mac (a minute or two a run)",
+        status="planned",
+        name="The keel",
+        job="Laid first, and everything is built on it: light the first stars in minutes, then become the foundation a 1m is built on",
+        overview="2 layers x 64, two heads of 32 (the same head size as 1m and 9m, so a head can "
+        "be carried up whole), vocabulary 2,048: about 0.3M parameters. Too small to judge books "
+        "on; its job is the bottom of the stack. Can it light a previous-word head at all, how "
+        "fast, and does a 1m built on its frozen layers reach the Nevermore sooner?",
+        # scored on the card census and cause and effect (Justin, 13:25): the cards first, then cause
+        scored="The four necessary cards held, then cause and effect, then chaining two facts",
+        metrics=[
+            [
+                "cards held",
+                "of the four every chaining model holds (previous-word, the Nevermore, the mover, the "
+                "comparator), how many it draws, by one head or a layer's best two; the card census "
+                "around its fitout says which are possible at 300k at all",
+                "live",
+            ],
+            [
+                "cause and effect",
+                "the logic deck's chaining gain on its cause items (invented words, so no knowledge helps); "
+                "0.1 to count, eight items",
+                "live",
+            ],
+            [
+                "chaining two facts",
+                "the chaining lift on the four public chaining tests; above 0.03 it leaves the noise and "
+                "joins the chaining board",
+                "live",
+            ],
+            [
+                "the 1m on top",
+                "whether a 1m grown from it draws the cards sooner than one built from nothing",
+                "to come",
+            ],
+        ],
+    ),
+    dict(
         preset="1m",
         kind="proxy",
         vocab=4096,
         where="this Mac (about 4 minutes a run)",
         status="calibrating against 9m",
-        name="The proxy",
-        job="A fast outer loop for data questions, trusted only where it ranks shelves as 9m does",
+        name="The pilot",
+        job="A pilot study and the harbour pilot: scouts data questions fast, trusted only where it ranks shelves as 9m does, and brings the bigger ships in",
         overview="4 layers x 128, vocabulary 4,096, about 1.4M parameters. Scored only on the "
         "Forgotten Tomes, once at the end. First it re-runs comparisons already made at 9m; if its "
         "ranking agrees, it explores and 9m confirms the winners.",
-        scored="The Forgotten Tomes score and its split; agreement with 9m's ranking",
+        # scored on the cards and cause and effect, as the keel (Justin, 13:25); still the shelf scout
+        scored="The four necessary cards held, then cause and effect, then chaining two facts; the Forgotten Tomes beside",
         metrics=[
             [
-                "Forgotten Tomes score",
-                "bits per byte on 16 books Qwen 3.8 cannot have read",
+                "cards held",
+                "of the four every chaining model holds (previous-word, the Nevermore, the mover, the "
+                "comparator), how many it draws; the card census around its fitout says which are "
+                "possible at 1m",
                 "live",
             ],
             [
-                "rank agreement with 9m",
-                "does it order Argo, Endeavour, fiction and non-fiction as 9m does",
-                "to come",
+                "cause and effect",
+                "the logic deck's chaining gain on its cause items; 0.1 to count, eight items",
+                "live",
+            ],
+            [
+                "chaining two facts",
+                "the chaining lift on the four public chaining tests; above 0.03 it joins the chaining board",
+                "live",
+            ],
+            [
+                "Forgotten Tomes score",
+                "bits per byte on 16 books Qwen 3.8 cannot have read: the shelf scout's measure",
+                "live",
             ],
         ],
     ),
@@ -200,13 +269,15 @@ def _gpt_mlx(cfg: GPTConfig):
 FAMILIES = {"gpt": _gpt_mlx}
 
 
-def config(preset: str, vocab: int, context: int) -> GPTConfig:
+def config(preset: str, vocab: int, context: int, positions: str = "learned") -> GPTConfig:
     if preset not in PRESETS:
         raise KeyError(f"unknown preset {preset!r}; known: {sorted(PRESETS)}")
-    return GPTConfig(**PRESETS[preset], vocab=vocab, context=context)
+    if positions not in ("learned", "rope"):
+        raise KeyError(f"unknown positions {positions!r}; known: learned, rope")
+    return GPTConfig(**PRESETS[preset], vocab=vocab, context=context, positions=positions)
 
 
-def build(family: str, preset: str, vocab: int, context: int):
+def build(family: str, preset: str, vocab: int, context: int, positions: str = "learned"):
     if family not in FAMILIES:
         raise KeyError(f"unknown model family {family!r}; known: {sorted(FAMILIES)}")
-    return FAMILIES[family](config(preset, vocab, context))
+    return FAMILIES[family](config(preset, vocab, context, positions))

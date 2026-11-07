@@ -1,0 +1,52 @@
+# specs/best-keel: The best keel (2026-11-07), written by scripts/make_best_keel.py.
+name: kb-shelf-pool-s1
+ship: 'Best keel: shelf pool'
+experiment: 'The best keel: which 300k performs best on its four discovery rungs?'
+question: Does shelf pool make a better keel than the baseline?
+data:
+  recipe: lists/stars-pool.csv
+  passes: 2
+  order: shuffled
+  refuse:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+  - lists/hole-cards-unseen.csv
+tokeniser:
+  kind: spm-bpe
+  vocab: 2048
+  byte_fallback: true
+  train_on: lists/loop-pool.csv
+model:
+  family: gpt
+  preset: 300k
+  context: 1024
+optim:
+  name: adamw
+  lr: 0.003
+  betas:
+  - 0.9
+  - 0.95
+  weight_decay: 0.1
+  warmup_steps: 100
+  schedule: cosine
+  min_lr_ratio: 0.1
+  batch_tokens: 32768
+  grad_clip: 1.0
+  precision: bf16
+eval:
+  sets:
+  - lists/hole-cards-unseen.csv
+  every_steps: 500
+  evaluators:
+  - ce_bpb
+  - discovery
+  - logic
+  - cards
+  light:
+    every_steps: 100
+    evaluators:
+    - discovery
+    - logic
+checkpoint:
+  every_steps: 1000000
+seed: 1

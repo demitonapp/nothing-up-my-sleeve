@@ -1,0 +1,56 @@
+# specs/apprentice2/ma2-magician.yaml: The Magician's Apprentice II (2026-11-07), written by scripts/make_apprentice2.py.
+name: ma2-magician
+ship: 'Apprentice II: the magician, keeping its early selves'
+experiment: 'The Magician''s Apprentice II: the five next steps, at the pilot'
+data:
+  recipe: lists/stars-fiction.csv
+  passes: 2
+  order: shuffled
+  refuse:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+  - lists/hole-cards-unseen.csv
+tokeniser:
+  kind: spm-bpe
+  vocab: 4096
+  byte_fallback: true
+  train_on: lists/loop-pool.csv
+model:
+  family: gpt
+  preset: 1m
+  context: 1024
+optim:
+  name: adamw
+  lr: 0.002
+  betas:
+  - 0.9
+  - 0.95
+  weight_decay: 0.1
+  warmup_steps: 100
+  schedule: cosine
+  min_lr_ratio: 0.1
+  batch_tokens: 32768
+  grad_clip: 1.0
+  precision: bf16
+eval:
+  sets:
+  - lists/hole-cards-unseen.csv
+  every_steps: 250
+  evaluators:
+  - ce_bpb
+  - bpb_split
+  - stars
+  - nevermore
+  - soundings
+  - successor
+  - discovery
+  light:
+    every_steps: 25
+    evaluators:
+    - stars
+    - nevermore
+    - soundings
+    - successor
+checkpoint:
+  every_steps: 250
+seed: 1

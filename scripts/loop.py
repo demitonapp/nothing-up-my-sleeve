@@ -170,7 +170,10 @@ def main() -> None:
             "eval": {
                 "sets": ["lists/hole-cards-unseen.csv"],
                 "every_steps": 1000000,
-                "evaluators": ["ce_bpb", "bpb_split"],
+                "evaluators": ["ce_bpb", "bpb_split", "nevermore"],
+                # Nevermores five times over training as well (about a second each at 1m), so a
+                # loop run's hand of heads can be watched forming; the full eval stays at the end
+                "light": {"every_steps": 170, "evaluators": ["nevermore"]},
             },
             "checkpoint": {"every_steps": 1000000},
             "seed": i,

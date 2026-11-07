@@ -16,7 +16,8 @@ while :; do
   echo "[$(date +%H:%M:%S)] starting $s"
   case "$s" in
     cmd:*) sh -c "${s#cmd:}"; code=$? ;;
-    *) uv run thorp run "specs/$s.yaml" > "data/runs/$s.out" 2>&1; code=$? ;;
+    *) mkdir -p "$(dirname "data/runs/$s.out")"  # a voyage's log folder is made here, never forgotten (7 Nov: twice)
+       uv run thorp run "specs/$s.yaml" > "data/runs/$s.out" 2>&1; code=$? ;;
   esac
   echo "[$(date +%H:%M:%S)] $s exited $code"
   echo "$(date +%Y-%m-%dT%H:%M:%S) $s $code" >> specs/queue-done.txt

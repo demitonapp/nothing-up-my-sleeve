@@ -141,6 +141,7 @@ class Prepared:
     missing: dict[str, list[str]] = field(default_factory=dict)
     tokeniser: tokmod.Tokeniser | None = None
     first: list[str] = field(default_factory=list)  # a curriculum's opening books (data.first)
+    stage_recipes: list[list[str]] = field(default_factory=list)  # each training stage's books
 
     def books(self) -> dict[str, manifest.Book]:
         ids = set(self.recipe) | {b for s in self.eval_sets.values() for b in s}
@@ -151,8 +152,24 @@ ListResolver = Callable[[str], tuple[list[str], list[str]]]  # path -> (book ids
 
 
 def gutenberg_resolver(list_path: str) -> tuple[list[str], list[str]]:
-    from thorp.sources import gutenberg
+    from thorp.sources import base, gutenberg
 
+    # rows naming a book directly ("<source>:<identifier>" in the text column: archive:<id>,
+    # gutenberg:<number>, local:<book id>) go through the general fetcher; the rest are matched by
+    # title on Gutenberg as before (2026-11-07)
+    rows = gutenberg.read_list(list_path)
+    if rows and all(base.is_ref(r.text) for r in rows):
+        ids, missing = [], []
+        for r in rows:
+            try:
+                ids.append(
+                    base.fetch_ref(
+                        r.text, family=r.family, set_name=gutenberg.set_for_list(list_path)
+                    ).id
+                )
+            except Exception as e:  # noqa: BLE001
+                missing.append(f"{r.text} ({e})")
+        return ids, missing
     ids, missing = [], []
     for res, book, err in gutenberg.fetch_list(list_path):
         if book is not None:
@@ -171,7 +188,20 @@ def check_refusals(recipe: list[str], refused: dict[str, list[str]]) -> None:
 
 def prepare(spec: dict, resolver: ListResolver = gutenberg_resolver, log=print) -> Prepared:
     d = spec["data"]
-    recipe, missing_recipe = resolver(d["recipe"])
+    # S3, the gate (thorp/vsm.py): every enforced S5 policy applied to a new run, before it reads a page
+    from thorp import vsm
+
+    known = bool(Ledger().query("select 1 from runs where run_id=? limit 1", [run_id(spec)]))
+    for note in vsm.gate(spec, known_run=known):
+        log(f"S3 gate: {note}")
+    stage_recipes = [resolver(st["recipe"]) for st in d.get("stages", [])]
+    if stage_recipes:  # training stages: the recipe is every stage's shelf together
+        seen: dict[str, None] = {}
+        for ids, _ in stage_recipes:
+            seen.update(dict.fromkeys(ids))
+        recipe, missing_recipe = list(seen), [m for _, miss in stage_recipes for m in miss]
+    else:
+        recipe, missing_recipe = resolver(d["recipe"])
     refused = {set_name(p): resolver(p)[0] for p in d.get("refuse", [])}
     eval_sets, missing = {}, {}
     for p in spec["eval"]["sets"]:
@@ -181,6 +211,7 @@ def prepare(spec: dict, resolver: ListResolver = gutenberg_resolver, log=print) 
     check_refusals(recipe, {**refused, **eval_sets})
     missing["recipe"] = missing_recipe
     prep = Prepared(recipe=recipe, eval_sets=eval_sets, missing=missing)
+    prep.stage_recipes = [ids for ids, _ in stage_recipes]
     if d.get("first"):
         prep.first, missing["first"] = resolver(d["first"])
     t = spec["tokeniser"]
@@ -247,7 +278,9 @@ def lr_at(step: int, total: int, o: dict) -> float:
 def build_model(spec: dict, vocab: int):
     m = spec["model"]
     mx.random.seed(spec["seed"])
-    return registry.build(m["family"], m["preset"], vocab, m["context"])
+    return registry.build(
+        m["family"], m["preset"], vocab, m["context"], m.get("positions", "learned")
+    )
 
 
 def init_model(spec: dict, vocab: int):
@@ -263,6 +296,241 @@ def init_model(spec: dict, vocab: int):
 def to_compute(master, precision: str):
     dt = mx.bfloat16 if precision == "bf16" else mx.float32
     return tree_map(lambda p: p.astype(dt), master)
+
+
+def seeded_master(spec: dict, seed: dict, master, vocab: int, log) -> tuple:
+    """The finished run `seed["run"]` grown into this spec's model (thorp/growth.py): the new fp32
+    master weights, and {"mask", "values"} for the inherited part (flat, by weight name)."""
+    import numpy as np
+
+    from thorp import growth
+    from thorp.ledger import spec_of
+
+    rows = Ledger().query(
+        "select * from runs where name=? and status='finished' order by started desc", [seed["run"]]
+    )
+    if not rows:
+        raise LookupError(f"seeded_from: no finished run named {seed['run']!r}")
+    src_spec, src_rid = spec_of(rows[0]), rows[0]["run_id"]
+    if src_spec.get("tokeniser", {}).get("vocab") != spec["tokeniser"]["vocab"] or src_spec[
+        "tokeniser"
+    ].get("train_on") != spec["tokeniser"].get("train_on"):
+        raise ValueError("seeded_from: the seed must share this run's tokeniser")
+    src_pos = src_spec["model"].get("positions", "learned")
+    dst_pos = spec["model"].get("positions", "learned")
+    if src_pos != dst_pos:
+        raise ValueError("seeded_from: the seed must use the same kind of positions as this run")
+    src_cfg = registry.config(
+        src_spec["model"]["preset"], vocab, src_spec["model"]["context"], src_pos
+    )
+    dst_cfg = registry.config(spec["model"]["preset"], vocab, spec["model"]["context"], dst_pos)
+    ck = latest_checkpoint(src_rid)
+    if seed.get("step") is not None:  # an earlier checkpoint of the seed run (its own lineage)
+        ck = checkpoint_root(src_rid) / f"step-{int(seed['step'])}"
+        if not (ck / "state.json").exists():
+            raise LookupError(
+                f"seeded_from: {seed['run']} has no checkpoint at step {seed['step']}"
+            )
+    src = {k: np.array(v) for k, v in tree_flatten(load_master(ck))}
+    dst = {k: np.array(v) for k, v in tree_flatten(master)}
+    new, mask = growth.grow(src, src_cfg, dst, dst_cfg)
+    share = sum(m.sum() for m in mask.values()) / sum(m.size for m in mask.values())
+    log(
+        f"seeded from {seed['run']} ({src_rid[:12]}, {src_cfg.layers}x{src_cfg.width}), mode {seed.get('mode', 'free')}: {share:.1%} of the weights inherited"
+    )
+    # rebuilt on the master's own structure, so empty branches (a rotary layer's "rope": {}) survive
+    from mlx.utils import tree_map_with_path
+
+    grown = tree_map_with_path(
+        lambda path, v: mx.array(new[path], dtype=mx.float32) if path in new else v, master
+    )
+    inherit = {
+        "mask": {k: mx.array(v, dtype=mx.float32) for k, v in mask.items() if v.any()},
+        "values": {k: mx.array(new[k], dtype=mx.float32) for k, v in mask.items() if v.any()},
+    }
+    return grown, inherit
+
+
+def load_teacher(teach: dict, spec: dict, vocab: int, log):
+    """A finished run's model, frozen, to teach from: same tokeniser, any class."""
+    from thorp.ledger import spec_of
+
+    rows = Ledger().query(
+        "select * from runs where name=? and status='finished' order by started desc",
+        [teach["run"]],
+    )
+    if not rows:
+        raise LookupError(f"teacher: no finished run named {teach['run']!r}")
+    t_spec, t_rid = spec_of(rows[0]), rows[0]["run_id"]
+    if t_spec["tokeniser"].get("vocab") != spec["tokeniser"]["vocab"] or t_spec["tokeniser"].get(
+        "train_on"
+    ) != spec["tokeniser"].get("train_on"):
+        raise ValueError("teacher: must share this run's tokeniser")
+    t_model = build_model(t_spec, vocab)
+    t_model.update(
+        to_compute(load_master(latest_checkpoint(t_rid)), t_spec["optim"].get("precision", "bf16"))
+    )
+    t_model.freeze()
+    mx.eval(t_model.parameters())
+    log(
+        f"teacher: {teach['run']} ({t_rid[:12]}), alpha {teach.get('alpha', 0.5)}, temperature {teach.get('temperature', 1.0)}"
+    )
+    return t_model
+
+
+def transplant_heads(spec: dict, master, log) -> tuple:
+    """Copy a finished run's heads for a star into this model (same class and tokeniser): the heads,
+    chosen from the donor's last 'stars' artifact, are the best layer's two strongest for the star
+    (one if it alone reaches the star's threshold); their query, key and value rows and their columns
+    of the output projection are copied into the same layer and head slots, and with `pos` the
+    position embeddings they read too. Returns the new master and a record of what was handed over."""
+    import numpy as np
+
+    from thorp.fleet import STARS
+    from thorp.ledger import spec_of
+
+    t = spec["transplant"]
+    rows = Ledger().query(
+        "select * from runs where name=? and status='finished' order by started desc",
+        [t["from_run"]],
+    )
+    if not rows:
+        raise LookupError(f"transplant: no finished run named {t['from_run']!r}")
+    donor_spec, donor_rid = spec_of(rows[0]), rows[0]["run_id"]
+    if (
+        donor_spec["model"]["preset"] != spec["model"]["preset"]
+        or donor_spec["tokeniser"] != spec["tokeniser"]
+    ):
+        raise ValueError("transplant: the donor must be the same class with the same tokeniser")
+    star = t.get("star", "previous_word")
+    # the Nevermore's per-head scores live in its own artifact (real prose); the other stars in 'stars'
+    kind, key = ("nevermore", "natural_scores") if star == "nevermore" else ("stars", star)
+    art = Ledger().query(
+        "select text from artifacts where run_id=? and kind=? order by step desc, rowid desc limit 1",
+        [donor_rid, kind],
+    )
+    scores = np.array(json.loads(art[0]["text"])[key])  # layers x heads
+    layer = int(np.sort(scores, axis=1)[:, -2:].sum(axis=1).argmax())
+    order = list(np.argsort(scores[layer])[::-1])
+    heads = order[:1] if scores[layer][order[0]] >= STARS[star].threshold else order[:2]
+    donor = dict(tree_flatten(load_master(latest_checkpoint(donor_rid))))
+    flat = dict(tree_flatten(master))
+    cfg = registry.config(
+        spec["model"]["preset"], flat["tok.weight"].shape[0], spec["model"]["context"]
+    )
+    D, hd = cfg.width, cfg.width // cfg.heads
+    qkv, proj = f"layers.{layer}.attn.qkv.weight", f"layers.{layer}.attn.proj.weight"
+    q_new, p_new = np.array(flat[qkv]), np.array(flat[proj])
+    q_don, p_don = np.array(donor[qkv]), np.array(donor[proj])
+    for h in heads:
+        for b in range(3):  # q, k, v rows of this head
+            r = slice(b * D + h * hd, b * D + (h + 1) * hd)
+            q_new[r] = q_don[r]
+        p_new[:, h * hd : (h + 1) * hd] = p_don[:, h * hd : (h + 1) * hd]
+    flat[qkv], flat[proj] = mx.array(q_new), mx.array(p_new)
+    if t.get("pos", True):
+        flat["pos.weight"] = donor["pos.weight"]
+    if t.get("tok"):  # the deck: the token embeddings the heads learned to read
+        flat["tok.weight"] = donor["tok.weight"]
+    below = list(range(layer)) if t.get("below") else []
+    for (
+        i
+    ) in below:  # and the layers beneath them, whole, so the stream they read is the one they knew
+        for k in [k for k in donor if k.startswith(f"layers.{i}.")]:
+            flat[k] = donor[k]
+    if t.get("ln", t.get("below")):  # the heads' own LayerNorm, which scales what they read
+        flat[f"layers.{layer}.ln1.weight"] = donor[f"layers.{layer}.ln1.weight"]
+    handed = {
+        "from_run": t["from_run"],
+        "from_run_id": donor_rid,
+        "star": star,
+        "layer": layer,
+        "heads": [int(h) for h in heads],
+        "donor_scores": [float(scores[layer][h]) for h in heads],
+        "pos": bool(t.get("pos", True)),
+        "tok": bool(t.get("tok")),
+        "below": below,
+        "ln": bool(t.get("ln", t.get("below"))),
+    }
+    log(
+        f"transplant: {star} heads {handed['heads']} of layer {layer} from {t['from_run']} (scores {handed['donor_scores']}), position embeddings {'too' if handed['pos'] else 'not'}"
+    )
+    return tree_unflatten(list(flat.items())), handed
+
+
+def scale_inherited(grads, mask: dict, scale: float):
+    flat = dict(tree_flatten(grads))
+    for k, m in mask.items():
+        flat[k] = flat[k] * (m * scale + (1.0 - m))
+    return tree_unflatten(list(flat.items()))
+
+
+def restore_inherited(master, inherit: dict):
+    flat = dict(tree_flatten(master))
+    for k, m in inherit["mask"].items():
+        flat[k] = flat[k] * (1.0 - m) + inherit["values"][k] * m
+    return tree_unflatten(list(flat.items()))
+
+
+# the words that open a conclusion: the conclusion-weighted tack (the two-fact problem, round 2)
+CONCLUSION_WORDS = (
+    "so",
+    "therefore",
+    "hence",
+    "thus",
+    "consequently",
+    "accordingly",
+    "follows",
+    "wherefore",
+)
+CONCLUSION_SPAN = 8  # pieces after the word that count as its conclusion
+
+
+def conclusion_ids(tok) -> list[int]:
+    """The pieces that open a conclusion, as the tokeniser writes them after a space, capitalised or not."""
+    out = set()
+    for w in CONCLUSION_WORDS:
+        for form in (w, w.capitalize()):
+            ids = tok.encode(" " + form)
+            if (
+                len(ids) == 1
+            ):  # whole-word pieces only: a fragment of a longer word would mark noise
+                out.add(int(ids[0]))
+    return sorted(out)
+
+
+def copy_mask(x, y, kind: str, markers: mx.array | None = None):
+    """(batch, time) bool: the guesses the earlier text in the window could answer. "induction": the
+    target at t followed an earlier occurrence of the token at t (what a Nevermore can get right);
+    "duplicate": the target at t appeared earlier in the window; "conclusion": the target is one of
+    the CONCLUSION_SPAN pieces after a word that opens a conclusion ("so", "therefore", "hence"...),
+    the moment of concluding, where two facts must be put together."""
+    T = x.shape[1]
+    if kind == "conclusion":
+        if markers is None or markers.size == 0:
+            return mx.zeros(x.shape, dtype=mx.bool_)
+        is_mark = (x[:, :, None] == markers[None, None, :]).any(axis=-1)  # (batch, time)
+        # t is in a conclusion when a marker sits at some j with t - SPAN < j <= t
+        win = mx.tril(mx.ones((T, T), dtype=mx.bool_), k=0) & ~mx.tril(
+            mx.ones((T, T), dtype=mx.bool_), k=-CONCLUSION_SPAN
+        )
+        return (is_mark[:, None, :] & win[None, :, :]).any(axis=-1)
+    if kind == "induction":
+        before = mx.tril(mx.ones((T, T), dtype=mx.bool_), k=-1)  # j < t
+        hit = (x[:, :, None] == x[:, None, :]) & (y[:, :, None] == y[:, None, :]) & before
+    elif kind == "duplicate":
+        upto = mx.tril(mx.ones((T, T), dtype=mx.bool_), k=0)  # j <= t
+        hit = (y[:, :, None] == x[:, None, :]) & upto
+    else:
+        raise ValueError(f"unknown copy_weight kind {kind!r}")
+    return hit.any(axis=-1)
+
+
+def copy_weighted(ce, x, y, cw: dict, markers: mx.array | None = None):
+    w = 1.0 + float(cw["alpha"]) * copy_mask(x, y, cw.get("kind", "induction"), markers).astype(
+        mx.float32
+    )
+    return (ce * w).sum() / w.sum()
 
 
 def run_evaluators(spec, rid, step, model, prep, rec: Ledger, log) -> dict:
@@ -352,6 +620,9 @@ def record_setup(spec, rid, prep: Prepared, stream: data.Stream, counts: dict, r
         for b in prep.recipe
     ]
     rec.artifact(rid, 0, "recipe", "", "", json.dumps(recipe, ensure_ascii=False))
+    from thorp import library  # the library aboard this voyage, as it was when it sailed
+
+    rec.artifact(rid, 0, "library", "", "", json.dumps(library.carried(spec), ensure_ascii=False))
     record_eval_sets(rid, 0, prep, rec)
     rec.artifact(rid, 0, "tokeniser", str(prep.tokeniser.dir), prep.tokeniser.id, "")
     rec.metrics(
@@ -381,17 +652,35 @@ def train(
     tok = prep.tokeniser
     books = prep.books()
     families = {b: books[b].family for b in books}
-    stream = data.stream(
-        prep.recipe,
-        tok.id,
-        spec["seed"],
-        o["batch_tokens"],
-        m["context"],
-        spec["data"]["passes"],
-        families,
-        first=prep.first,
-        first_repeats=spec["data"].get("first_repeats", 1),
-    )
+    stages = spec["data"].get("stages")
+    if stages:  # training stages, read in order under one schedule (data.Staged)
+        stream = data.Staged(
+            stages,
+            [
+                data.stream(
+                    ids,
+                    tok.id,
+                    spec["seed"] * 1000 + i,
+                    o["batch_tokens"],
+                    m["context"],
+                    st["passes"],
+                    families,
+                )
+                for i, (st, ids) in enumerate(zip(stages, prep.stage_recipes, strict=True))
+            ],
+        )
+    else:
+        stream = data.stream(
+            prep.recipe,
+            tok.id,
+            spec["seed"],
+            o["batch_tokens"],
+            m["context"],
+            spec["data"]["passes"],
+            families,
+            first=prep.first,
+            first_repeats=spec["data"].get("first_repeats", 1),
+        )
     total = stream.total_steps
 
     model = build_model(spec, tok.vocab_size)
@@ -401,6 +690,17 @@ def train(
 
     start, tokens_seen, wall_before = 0, 0, 0.0
     ckpt = latest_checkpoint(rid)
+    seed = spec.get("seeded_from")  # grow a finished smaller run into this model (growth.py)
+    inherit = None
+    if seed:
+        grown, inherit = seeded_master(spec, seed, master, tok.vocab_size, log)
+        if ckpt is None:
+            master = grown
+    handed = None
+    if (
+        spec.get("transplant") and ckpt is None
+    ):  # hand over another run's trick (Magician's Apprentice)
+        master, handed = transplant_heads(spec, master, log)
     if ckpt is not None:
         st = json.loads((ckpt / "state.json").read_text())
         start, tokens_seen, wall_before = st["step"], st["tokens_seen"], st["wall_seconds"]
@@ -426,17 +726,52 @@ def train(
     if start == 0:
         rec.truncate_after(rid, -1)
         record_setup(spec, rid, prep, stream, counts, rec)
+        if hasattr(stream, "record"):  # the stages, with the steps each covers
+            rec.artifact(rid, 0, "stages", "", "", json.dumps(stream.record()))
+        if (
+            handed is not None
+        ):  # after the step-0 clear-out, or it is wiped (as on 7 November, 08:19)
+            rec.artifact(rid, 0, "transplant", "", "", json.dumps(handed))
     log(
         f"run {rid} ({spec.get('name')}): {m['preset']} {counts}, {total} steps x "
         f"{stream.tokens_per_step} tokens, {stream.unique_tokens} unique tokens/pass"
     )
+
+    cw = o.get("copy_weight")  # the copy-weighted tack (2026-11-07): {"alpha": a, "kind": ...}
+    markers = (
+        mx.array(conclusion_ids(tok), dtype=mx.int32)
+        if cw and cw.get("kind") == "conclusion"
+        else None
+    )
+    if markers is not None:
+        log(f"conclusion-weighted tack: {markers.size} marker pieces, alpha {cw['alpha']}")
+    teach = o.get(
+        "teacher"
+    )  # learning from a teacher run's predictions (2026-11-07): {run, alpha, temperature}
+    teacher = load_teacher(teach, spec, tok.vocab_size, log) if teach else None
 
     def loss_fn(mdl, x, y):
         # (batch, time) -> the mean per window, so the loss can be attributed to the window's book;
         # every window is the same length, so the mean of the window means is the batch mean.
         ce = nn.losses.cross_entropy(mdl(x).astype(mx.float32), y, reduction="none")
         per_window = ce.mean(axis=1)
-        return per_window.mean(), per_window
+        if teacher is not None:
+            # distillation: the student's loss is (1 - alpha) x its own cross-entropy plus alpha x
+            # the KL divergence from the teacher's softened bets to its own (times T^2, so the
+            # gradient's size does not shrink with the temperature)
+            T, a = float(teach.get("temperature", 1.0)), float(teach.get("alpha", 0.5))
+            t_logits = mx.stop_gradient(teacher(x).astype(mx.float32)) / T
+            s_logits = mdl(x).astype(mx.float32) / T
+            t_lp = t_logits - mx.logsumexp(t_logits, axis=-1, keepdims=True)
+            s_lp = s_logits - mx.logsumexp(s_logits, axis=-1, keepdims=True)
+            kl = (mx.exp(t_lp) * (t_lp - s_lp)).sum(axis=-1).mean()
+            return (1 - a) * per_window.mean() + a * T * T * kl, per_window
+        if not cw or not cw.get("alpha"):
+            return per_window.mean(), per_window
+        # the copy-weighted tack: guesses the earlier text in the window could answer weigh
+        # 1 + alpha, the rest 1, normalised by the total weight so the tack's size is comparable.
+        # The per-window losses (and so the logged loss) stay unweighted.
+        return copy_weighted(ce, x, y, cw, markers), per_window
 
     value_and_grad = nn.value_and_grad(model, loss_fn)
     step_fn = mx.compile(
@@ -445,10 +780,12 @@ def train(
     groups = model.param_groups()
     # the sieves: the weights as they stood at the last record, so the move per group is measured
     prev_flat, prev_step = dict(tree_flatten(master)), start
+    prev_delta: dict = {}  # the last window's move per weight, for the heading sieve
     # the loss per book: window losses summed per recipe book since the last record
     book_loss: dict[int, float] = {}
     book_n: dict[int, int] = {}
     every_eval = spec["eval"]["every_steps"]
+    light = spec["eval"].get("light")  # {"every_steps": N, "evaluators": [...]}, optional
     every_ckpt = spec["checkpoint"]["every_steps"]
     t_run = time.time()
 
@@ -461,7 +798,11 @@ def train(
         (loss, per_window), grads = step_fn(tokens[:, :-1], tokens[:, 1:])
         grads = tree_map(lambda g: g.astype(mx.float32), grads)
         grads, gnorm = optim.clip_grad_norm(grads, o["grad_clip"])
+        if inherit and seed.get("mode") == "slow":  # the inherited weights learn at lr_scale
+            grads = scale_inherited(grads, inherit["mask"], float(seed.get("lr_scale", 0.1)))
         master = opt.apply_gradients(grads, master)
+        if inherit and seed.get("mode") == "freeze":  # the inherited weights stay as they were
+            master = restore_inherited(master, inherit)
         model.update(to_compute(master, precision))
         mx.eval(loss, per_window, gnorm, master, opt.state)
         step += 1
@@ -470,7 +811,7 @@ def train(
             book_n[bi] = book_n.get(bi, 0) + 1
         tokens_seen += stream.tokens_per_step
         dt = time.time() - t0
-        loss_v = loss.item()
+        loss_v = per_window.mean().item() if (cw and cw.get("alpha")) or teach else loss.item()
         if not math.isfinite(loss_v):
             raise FloatingPointError(f"loss is {loss_v} at step {step}")
         vals = {
@@ -503,8 +844,27 @@ def train(
                     un = math.sqrt(sum(((mflat[k] - prev_flat[k]) ** 2).sum().item() for k in keys))
                     vals[f"update_norm/{g}"] = un
                     vals[f"update_ratio/{g}"] = un / pn if pn else 0.0
+                    # the heading sieve (2026-11-07): the cosine between this window's move and the
+                    # last window's, per group. Near 1 the tacks keep one angle (the layer has found
+                    # its heading); near 0 they wander; below 0 they come about.
+                    if prev_delta and all(k in prev_delta for k in keys):
+                        dot = sum(
+                            ((mflat[k] - prev_flat[k]) * prev_delta[k]).sum().item() for k in keys
+                        )
+                        pdn = math.sqrt(
+                            sum((prev_delta[k] * prev_delta[k]).sum().item() for k in keys)
+                        )
+                        if un and pdn:
+                            vals[f"heading/{g}"] = dot / (un * pdn)
             if step % METRICS_EVERY == 0:
+                prev_delta = (
+                    {k: mflat[k] - prev_flat[k] for k in mflat if k in prev_flat}
+                    if step - prev_step == METRICS_EVERY
+                    else {}
+                )
                 prev_flat, prev_step = mflat, step
+            if hasattr(stream, "stages"):
+                vals["stage"] = float(batch.stage)
             for fam, frac in batch.family_mix(stream.families).items():
                 vals[f"data/family/{fam}"] = frac
             # the loss per book over the window since the last record
@@ -519,6 +879,18 @@ def train(
 
         if step % every_eval == 0 or step == total:
             run_evaluators(spec, rid, step, model, prep, rec, log)
+        elif light and step % light["every_steps"] == 0:
+            # a light eval between full ones (eval.light, 2026-11-07): only the cheap evaluators,
+            # such as the Nevermores, so a lean run can still be watched forming
+            run_evaluators(
+                {**spec, "eval": {**spec["eval"], "evaluators": light["evaluators"]}},
+                rid,
+                step,
+                model,
+                prep,
+                rec,
+                log,
+            )
         if step % every_ckpt == 0 or step == total:
             wall = wall_before + time.time() - t_run
             d = save_checkpoint(
@@ -573,7 +945,10 @@ def rescore(
     from thorp.ledger import spec_of
 
     rec = rec or Ledger()
-    rows = rec.query("select * from runs where run_id like ? order by started desc", [run + "%"])
+    # a run id, a unique prefix of one, or a run name (2026-11-07: queue lines are written by name)
+    rows = rec.query("select * from runs where name = ? order by started desc", [run]) or rec.query(
+        "select * from runs where run_id like ? order by started desc", [run + "%"]
+    )
     if not rows:
         raise LookupError(f"no run {run}")
     spec, rid = spec_of(rows[0]), rows[0]["run_id"]
@@ -595,6 +970,15 @@ def rescore(
 
 
 def run(spec_path: str | Path, rec: Ledger | None = None) -> dict:
+    """One voyage. S2 (thorp/vsm.py): it takes the helm first, so one voyage is at sea at a time."""
+    from thorp import vsm
+
+    name = load_spec(spec_path).get("name") or str(spec_path)
+    with vsm.at_sea(name):
+        return _run(spec_path, rec)
+
+
+def _run(spec_path: str | Path, rec: Ledger | None = None) -> dict:
     spec = load_spec(spec_path)
     rid = run_id(spec)
     rec = rec or Ledger()
@@ -604,6 +988,15 @@ def run(spec_path: str | Path, rec: Ledger | None = None) -> dict:
         return existing
     log = Log(paths.runs_dir() / f"{rid}.log")
     log(f"spec {spec_path} -> run id {rid}")
+    try:  # every run sails on a ship: a class and a fitout (thorp/fleet.py); never blocks a run
+        from thorp import fleet
+
+        ship = fleet.ship_for(
+            spec, voyage=fleet.expedition_of_label(spec.get("name"), spec.get("ship"))
+        )
+        log(f"ship {ship.name} ({ship.key}): {ship.subtitle}")
+    except Exception as e:  # noqa: BLE001
+        log(f"ship not registered: {e!r}")
     prep = prepare(spec, log=log)
     for name, miss in prep.missing.items():
         if miss:

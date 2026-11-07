@@ -27,6 +27,8 @@ create table if not exists artifacts (
     run_id text, step integer, kind text, path text, sha1 text, text text
 );
 create index if not exists artifacts_run on artifacts(run_id, kind, step);
+-- a ship's run is a voyage (2026-11-07, Justin); the table keeps its name, the view gives the new one
+create view if not exists voyages as select run_id as voyage_id, * from runs;
 """
 
 EVAL_COLUMNS = ("run_id", "step", "set", "book_id", "ce_nats", "bpb", "tokens", "bytes")

@@ -25,7 +25,7 @@ from pathlib import Path
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
-EVALUATORS = ["ce_bpb", "bpb_split", "laws", "samples", "probes"]
+EVALUATORS = ["ce_bpb", "nevermore", "bpb_split", "laws", "samples", "probes", "discovery"]
 SHIPS = [  # (name, ship, change, question)
     (
         "spell-vocab4k-v1",

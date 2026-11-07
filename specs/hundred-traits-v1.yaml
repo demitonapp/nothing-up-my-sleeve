@@ -3,10 +3,10 @@
 # the curiosity ladder. Not started: the brief holds phase 3 until phase 2's panel reads.
 name: hundred-traits-v1
 ship: Beagle
-experiment: 'kinks against traits: do traits appear before, at or after each layer''s
-  kink, and at what rate?'
-question: When does each trait first appear on the hundred, at which layer, and is
-  that before, at or after the layer's kink?
+experiment: 'kinks against traits: do traits appear before, at or after each layer''s kink, and at what
+  rate?'
+question: When does each trait first appear on the hundred, at which layer, and is that before, at or
+  after the layer's kink?
 data:
   recipe: lists/hundred-by-reach.csv
   passes: 4
@@ -44,11 +44,15 @@ eval:
   every_steps: 100
   evaluators:
   - ce_bpb
+  - nevermore
   - bpb_split
   - laws
   - samples
   - probes
   - curiosity
+  - soundings
+  - successor
+  - discovery
 checkpoint:
   every_steps: 500
 seed: 1

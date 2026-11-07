@@ -2,8 +2,9 @@
 
 The proxy (4 layers x 128, vocabulary 4,096, about 1.4M parameters) re-runs comparisons already
 made at 9m, on the same shelves and passes, so its ranking can be checked against 9m's before it
-is trusted with new questions. Evaluation is lean: only the Forgotten Tomes
-(lists/hole-cards-unseen.csv), with the score and the split, once at the end.
+is trusted with new questions. Evaluation: the Forgotten Tomes (lists/hole-cards-unseen.csv) with the score
+and the split, and the trait probes on the v2 hole cards, every 250 steps (from 00:50; the first
+run, proxy-hundred-v1, was lean and is re-scored for traits at its last step).
 
     proxy-hundred-v1 (and -seed2)   Argo's shelf: the hundred by reach, four passes
     proxy-pool400-v1                Endeavour's: 400 books, two passes
@@ -33,6 +34,9 @@ RUNS = [
 def main() -> None:
     order = []
     for name, ship, recipe, passes, seed in RUNS:
+        if (ROOT / f"specs/{name}.yaml").exists():  # never rewrite a spec that may have run
+            order.append(name)
+            continue
         spec = {
             "name": name,
             "ship": ship,
@@ -57,10 +61,12 @@ def main() -> None:
                 "grad_clip": 1.0,
                 "precision": "bf16",
             },
+            # the Forgotten Tomes first (the calibration score); the v2 hole cards for the trait
+            # probes every 250 steps, to see whether any trait forms at 1m (Justin, 00:50)
             "eval": {
-                "sets": ["lists/hole-cards-unseen.csv"],
-                "every_steps": 1000000,
-                "evaluators": ["ce_bpb", "bpb_split"],
+                "sets": ["lists/hole-cards-unseen.csv", "lists/hole-cards-v2.csv"],
+                "every_steps": 250,
+                "evaluators": ["ce_bpb", "nevermore", "bpb_split", "probes"],
             },
             "checkpoint": {"every_steps": 1000000},
             "seed": seed,

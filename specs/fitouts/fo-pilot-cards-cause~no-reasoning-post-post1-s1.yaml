@@ -1,0 +1,65 @@
+# specs/fitouts: a hand-curated fitout (2026-11-07), compiled by scripts/make_fitout.py.
+name: fo-pilot-cards-cause~no-reasoning-post-post1-s1
+ship: 'Fitout: Thorp 1m: the four cards, leaning on cause and effect ~ no-reasoning-post, post-training
+  1 (cause again)'
+experiment: 'Fitout pilot-cards-cause: The keel''s fitout one class up (the same stages, shelves and tacks;
+  the pilot''s vocabulary and learning rate), so the two classes'' card censuses compare stage for stage.'
+question: What does post-training on cause again add? cause and effect, last and heaviest
+data:
+  recipe: lists/cause-shelf.csv
+  passes: 2
+  order: shuffled
+  refuse:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+  - lists/hole-cards-unseen.csv
+tokeniser:
+  kind: spm-bpe
+  vocab: 4096
+  byte_fallback: true
+  train_on: lists/loop-pool.csv
+model:
+  family: gpt
+  preset: 1m
+  context: 1024
+  positions: rope
+optim:
+  name: adamw
+  lr: 0.0007
+  betas:
+  - 0.9
+  - 0.95
+  weight_decay: 0.1
+  warmup_steps: 20
+  schedule: cosine
+  min_lr_ratio: 0.1
+  batch_tokens: 32768
+  grad_clip: 1.0
+  precision: bf16
+  copy_weight:
+    alpha: 3
+    kind: conclusion
+eval:
+  sets:
+  - lists/hole-cards-unseen.csv
+  every_steps: 500
+  evaluators:
+  - ce_bpb
+  - discovery
+  - logic
+  - stars
+  - nevermore
+  - cards
+  light:
+    every_steps: 100
+    evaluators:
+    - stars
+    - nevermore
+    - cards
+    - logic
+checkpoint:
+  every_steps: 1000000
+seed: 1
+seeded_from:
+  run: fo-pilot-cards-cause-pre-s1
+  mode: free

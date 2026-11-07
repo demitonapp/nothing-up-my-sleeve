@@ -951,3 +951,4 @@ button[aria-busy="true"] { cursor: progress; opacity: .7; }
 
 #askpanel .askset { display: flex; gap: 6px; width: 100%; margin-bottom: 4px; }
 #askpanel .askchip.on { border-color: var(--accent); color: var(--accent); }
+#wagerpanel .wclaude { color: var(--blue); }

@@ -190,6 +190,10 @@ def rounds_for(preset: str) -> list[dict]:
                 f"fu-ogden-v0-1~{tag}@{deeper}-pre-s{seed}", f"fu-ogden-v0-1~{tag}-copy@{deeper}-pre-s{seed}")
     add("seed", "Seed", "the second seed of the same voyage (the noise: should move nothing)",
         f"fu-ogden-v0-1@{cls}-pre-s1", f"fu-ogden-v0-1@{cls}-pre-s2")
+    prv = _prev_class(cls)
+    if prv:
+        add(f"class-from-{prv}", "Class", f"the next class up on the same corpus ({prv} to {cls})",
+            f"fu-ogden-v0-1@{prv}-pre-s1", f"fu-ogden-v0-1@{cls}-pre-s1")
     nxt = _next_class(cls)
     if nxt:
         add(f"class-{nxt}", "Class", f"the next class up on the same corpus ({cls} to {nxt})",
@@ -248,7 +252,8 @@ def payload(preset: str, bets_for=None) -> dict:
         settled = control["status"] == "finished" and pull["status"] == "finished"
         house = house_bets(control) if control.get("falls") else {}
         mine = bets_for(r["key"]) if bets_for else {}
-        cards, you, them = [], 0, 0
+        claude = bets(r["key"], "Claude")
+        cards, you, them, cl = [], 0, 0, 0
         for card in deck.CARDS:
             cf = (control.get("falls") or {}).get(card.key)
             pf = (pull.get("falls") or {}).get(card.key)
@@ -256,14 +261,18 @@ def payload(preset: str, bets_for=None) -> dict:
             hb, nb = house.get(card.key), mine.get(card.key)
             hp = points(hb, outcome, pf) if outcome and hb else None
             np_ = points(nb, outcome, pf) if outcome and nb and not nb.get("practice") else None
+            cb = claude.get(card.key)
+            cp = points(cb, outcome, pf) if outcome and cb and not cb.get("practice") else None
             them += hp or 0
             you += np_ or 0
+            cl += cp or 0
             cards.append({"card": card.key, "control": cf, "pull": pf, "outcome": outcome,
-                          "house": hb, "house_points": hp, "bet": nb, "points": np_})  # fmt: skip
+                          "house": hb, "house_points": hp, "bet": nb, "points": np_,
+                          "claude": cb, "claude_points": cp})  # fmt: skip
         rounds.append({
             **r, "control_voyage": {k: v for k, v in control.items() if k != "falls"},
             "pull_voyage": {k: v for k, v in pull.items() if k != "falls"},
-            "settled": settled, "cards": cards, "score": {"navigator": you, "house": them},
+            "settled": settled, "cards": cards, "score": {"navigator": you, "house": them, "claude": cl},
             "winner": (None if not settled else "navigator" if you > them else "house"),
             "open": pull["status"] == "queued",
             "in_queue": _in_queue(r["pull"]),
@@ -310,6 +319,14 @@ def _variant(preset: str, field: str) -> str | None:
         and all(cfg[k] == base[k] for k in ("layers", "heads", "width") if k != field)
     ]
     return min(options)[1] if options else None
+
+
+def _prev_class(preset: str) -> str | None:
+    from thorp.models.registry import LADDER
+
+    order = [r["preset"] for r in LADDER]
+    c = _class_of(preset)
+    return order[order.index(c) - 1] if c in order and order.index(c) > 0 else None
 
 
 def _next_class(preset: str) -> str | None:
@@ -445,8 +462,8 @@ def deal(preset: str, control: str, lever: str) -> dict:
     return {"key": spec["name"], "lever": LEVERS[lever][0], "control": control, "pull": spec["name"]}
 
 
-def place(round_key: str, card: str, move_: str | None, layer: int | None = None) -> dict:
-    """Place (or take back, with move None) a chip on a card; five a round."""
+def place(round_key: str, card: str, move_: str | None, layer: int | None = None, player: str = "Justin") -> dict:
+    """Place (or take back, with move None) a player's chip on a card; five a round, each."""
     from sqlalchemy import delete, func, select
 
     from thorp.viable.s3_control.models import WagerBet
@@ -461,16 +478,17 @@ def place(round_key: str, card: str, move_: str | None, layer: int | None = None
     sailed = _voyage(round_key) is not None
     with _store().session() as s, s.begin():
         if move_ is None:
-            s.execute(delete(WagerBet).where(WagerBet.round_key == round_key, WagerBet.card == card))
+            s.execute(delete(WagerBet).where(WagerBet.round_key == round_key, WagerBet.card == card, WagerBet.player == player))
             return {"removed": card}
-        held = s.scalar(select(func.count()).select_from(WagerBet).where(WagerBet.round_key == round_key, WagerBet.card != card))
+        held = s.scalar(select(func.count()).select_from(WagerBet).where(
+            WagerBet.round_key == round_key, WagerBet.card != card, WagerBet.player == player))
         if held >= CHIPS:
             raise ValueError("five chips a round: take one back before placing another")
-        s.merge(WagerBet(round_key=round_key, card=card, move=move_, layer=layer, practice=sailed))
-    return {"placed": card, "move": move_, "layer": layer, "practice": sailed}
+        s.merge(WagerBet(round_key=round_key, card=card, player=player, move=move_, layer=layer, practice=sailed))
+    return {"placed": card, "move": move_, "layer": layer, "practice": sailed, "player": player}
 
 
-def bets(round_key: str) -> dict[str, dict]:
+def bets(round_key: str, player: str = "Justin") -> dict[str, dict]:
     from sqlalchemy import select
 
     from thorp.viable.s3_control.models import WagerBet
@@ -478,7 +496,7 @@ def bets(round_key: str) -> dict[str, dict]:
     with _store().session() as s:
         return {
             b.card: {"move": b.move, "layer": b.layer, "practice": b.practice, "placed_at": b.placed_at.isoformat()}
-            for b in s.scalars(select(WagerBet).where(WagerBet.round_key == round_key))
+            for b in s.scalars(select(WagerBet).where(WagerBet.round_key == round_key, WagerBet.player == player))
         }
 
 

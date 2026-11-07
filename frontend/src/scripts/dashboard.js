@@ -1058,7 +1058,9 @@ async function postJSON(url, body) {
 async function classWager(r, keep = true) {
   const el = document.getElementById('wagertable'); if (!el) return;
   if (wagerPreset !== r.preset) { wagerPreset = r.preset; wagerRound = null; }
-  let d; try { d = await get(`/api/wager?preset=${encodeURIComponent(r.preset)}`); } catch (e) { el.innerHTML = `<div class="${emptyCls()}">the wager could not be read: ${esc(String(e.message || e))}</div>`; return; }
+  let d; try { d = await get(`/api/wager?preset=${encodeURIComponent(r.preset)}`); } catch (e) {
+    const old = /not valid JSON|not found|404/i.test(String(e.message || e));
+    el.innerHTML = `<div class="${emptyCls()}">${old ? 'this dashboard server was started before the Bet tab existed, so it has no wager to give: restart it (<span class="mono">uv run --project backend thorp dash</span>) and reload' : 'the wager could not be read: ' + esc(String(e.message || e))}</div>`; return; }
   wagerData = d;
   const csel = document.getElementById('wagercontrol'), lsel = document.getElementById('wagerlever');
   if (csel.options.length !== d.controls.length) csel.innerHTML = d.controls.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
@@ -1081,7 +1083,7 @@ async function classWager(r, keep = true) {
     const canQueue = R.pull_voyage.status === 'queued' && !R.in_queue;
     head.innerHTML = `<div class="whead"><div><b>${esc(R.lever)}</b> · ${esc(R.about || '')}</div>
       <div class="s">control <span class="mono">${esc(R.control)}</span> (${esc(R.control_voyage.status)}) → pull <span class="mono">${esc(R.pull)}</span> (${esc(R.in_queue ? 'in the queue' : R.pull_voyage.status)})</div>
-      <div class="wscore"><span>chips ${chips} of ${d.chips}</span>${R.settled ? `<span>you <b>${R.score.navigator}</b> · the House <b>${R.score.house}</b> · <b>${R.winner === 'navigator' ? 'you win' : 'the House wins'}</b></span>` : '<span class="s">the outcome shows when both voyages are home</span>'}
+      <div class="wscore"><span>chips ${chips} of ${d.chips}</span>${R.settled ? `<span>you <b>${R.score.navigator}</b> · Claude <b>${R.score.claude}</b> · the House <b>${R.score.house}</b> · <b>${R.winner === 'navigator' ? 'you win' : 'the House wins'}</b></span>` : '<span class="s">the outcome shows when both voyages are home</span>'}
       ${canQueue ? `<button class="${btnCls('default')}" type="button" id="wagerqueue">Queue the experiment</button>` : ''}</div></div>`;
     const layers = 6;
     const byKey = Object.fromEntries(d.deck.map(c => [c.key, c]));
@@ -1100,7 +1102,8 @@ async function classWager(r, keep = true) {
           <div class="wbet"><select class="${selectCls()} wmove"${disabled}><option value="">no chip</option>${d.moves.map(m => `<option value="${m}"${bet.move === m ? ' selected' : ''}>${MOVE_LABEL[m]}</option>`).join('')}</select>
             <select class="${selectCls()} wlayer"${disabled}><option value="">any layer</option>${Array.from({ length: layers }, (_, i) => `<option value="${i}"${bet.layer === i ? ' selected' : ''}>layer ${i}</option>`).join('')}</select></div>
           <div class="s">${h ? `the House: ${esc(h.move)}${h.layer != null ? `, layer ${h.layer}` : ''}` : 'the House: no chip'}${bet.practice ? ' · <b>practice</b> (placed after sailing)' : ''}</div>
-          ${c.outcome ? `<div class="woutcome">moved: <b>${esc(c.outcome)}</b>${c.points != null ? ` · you ${c.points > 0 ? '+' : ''}${c.points}` : ''}${c.house_points != null ? ` · the House ${c.house_points > 0 ? '+' : ''}${c.house_points}` : ''}</div>` : ''}
+          ${c.claude ? `<div class="s wclaude">Claude: <b>${esc(c.claude.move)}</b>${c.claude.layer != null ? `, layer ${c.claude.layer}` : ''}${c.claude.practice ? ' (practice)' : ''}</div>` : ''}
+          ${c.outcome ? `<div class="woutcome">moved: <b>${esc(c.outcome)}</b>${c.points != null ? ` · you ${c.points > 0 ? '+' : ''}${c.points}` : ''}${c.claude_points != null ? ` · Claude ${c.claude_points > 0 ? '+' : ''}${c.claude_points}` : ''}${c.house_points != null ? ` · the House ${c.house_points > 0 ? '+' : ''}${c.house_points}` : ''}</div>` : ''}
         </div>`;
       }).join('')}</div>`).join('');
   }

@@ -4,7 +4,7 @@ name: fu-ogden-v0-1~metre@21m-pre-s1
 ship: 'Fitout: Ogden v0.1 @ 21m ~ metre (the Ogden 21m v0.2), pretraining in phases'
 experiment: 'Fitout ogden-v0-1: one fixed Ogden corpus for every class; what cards and stars form at each size?'
 question: 'The night of 7 November: the 21m with the metre scaffold (previous-word pinned in layer 1, induction
-  on two heads of layer 3, the 21m''s own layout), weight 1.0 to 5% of the voyage, faded out by 25%. Is it a much
+  on two heads of layer 3, the 21m''s own layout), weight 1.0 to 10% of the voyage, faded out by 60%. Is it a much
   improved Ogden 21m (v0.2) against v0.1?'
 fitout:
   key: ogden-v0-1
@@ -43,8 +43,8 @@ optim:
   precision: bf16
   scaffold:
     weight: 1.0
-    hold: 0.05
-    fade: 0.25
+    hold: 0.1
+    fade: 0.6
     heads:
     - layer: 1
       head: 0

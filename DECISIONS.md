@@ -773,3 +773,23 @@ Fixed before any of it sails. Claude runs the night; the queue (`ships/specs/que
 - **The 9m's schedule, by the rule:** only the held arm kept induction, so the longer pull (full to 10%, faded by 60%), previous-word on layer 1 and induction on two heads of layer 3. Sailed at 01:19 (`fu-ogden-v0-1~metre@9m-pre-s1`).
 - **The 21m v0.1's bars** (home at 00:37): bpb 1.397, natural copy gain 0.639, induction 0.154 one head and **0.298 two heads** (peaked 0.335 at step 4,480; just under the mark at the end), Versus median share of Qwen3 0.6B 0.598 (24 ranked readings).
 - **Fixed on the way:** `score_checkpoints.py` read the ledger's spec, which leaves out the fitout label, and the S3 gate refused it; it now takes the labels back from the voyage's spec file.
+
+### The night, 02:45: the 9m with metre is home; it competes, two of three; the 21m v0.2 sails
+
+| | 9m with metre (3.05M) | 21m v0.1 (10.5M) |
+|---|---|---|
+| judge-book bpb | 1.547 | **1.397** |
+| natural copy gain | **0.737** | 0.639 |
+| induction, one head / two heads (layer 3) | **0.42 / 0.84** | 0.15 / 0.30 |
+| previous-word (layer 1) | **1.00** | 0.71 |
+| the comparator (two heads) | **0.80** | 0.58 |
+| period test lift / refrain test lift | **0.43 / 1.27** | 0.30 / 1.08 |
+| the counter (R²) / premise-marker | 0.30 / 1.92 | not read |
+| one-hop lift | 0.14 | **0.25** |
+| part of speech / keyed word right | 43% / 25% | **48% / 30%** |
+| Versus median share of Qwen3 0.6B | 0.500 | 0.598 |
+
+- **The rule (pre-registered 23:30):** copying holds (0.737 against 0.639); language does not (0.150 behind, the mark 0.08); Versus holds by 0.2 of a point (0.098 behind, the mark 0.10). Two of three: **it competes, by the letter**, and narrowly on the third. Read plainly: a model a third the size out-copies the 21m and holds its circuits far more cleanly, while the 21m still knows the language better (bpb, parts of speech, keyed words) and follows one premise better.
+- **The longer pull kept induction by heart at 9m:** two heads 1.21 through the metre, 0.84 at the end (the fade ended at step 4,930), well past the mark; the keel's short fade had lost it.
+- **The 21m v0.2** (`fu-ogden-v0-1~metre@21m-pre-s1`): v0.1's spec with only `optim.scaffold` added (full to 10%, out by 60%; previous-word layer 1 head 0, induction layer 3 heads 0 and 1); the same data, model and seed. Sailed 02:43.
+- **No control yet for the 9m:** the plain 9m sails after the v0.2, so what metre did at 9m (against the 9m itself) is known by mid-morning.

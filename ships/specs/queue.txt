@@ -18,7 +18,8 @@
 # the 21m v0.1's shared induction score on every checkpoint, while the GPU waits on the 9m's hold (for the leaderboard and the night's comparisons)
 # the 9m with metre (01:25): the keel's fade arm kept previous-word but not induction (0.14 at the end); the held arm kept both
 # (0.60, copy gain 1.04): by the rule, the longer pull (full to 10%, faded by 60%)
-cmd: n=0; while [ -e ships/specs/night-21m.hold ] && [ $n -lt 90 ]; do sleep 30; n=$((n+1)); done
+# the 21m v0.2 (02:45): the 9m with metre competes, two of three (copy gain 0.737 against 0.639; Versus median 0.500 against
+# 0.598, within 10 points; bpb 1.547 against 1.397, not within 0.08): the 9m's schedule (full to 10%, out by 60%), the 21m's layout
 # after the night's line: the plain 9m (the 9m's control), the keel arms' second seeds, the re-scores, the rest
 fitouts/fu-ogden-v0-1@9m-pre-s1
 fitouts/fu-ogden-v0-1~metre@300k-pre-s2

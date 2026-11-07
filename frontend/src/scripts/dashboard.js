@@ -1204,8 +1204,17 @@ async function classDeck(r) {
       ${c.on.length ? `<div class="s">evolves from ${c.on.map(o => esc(byKey[o] ? byKey[o].name : o)).join(' + ')}</div>` : ''}
     </div>`;
   };
-  el.innerHTML = `<div class="s dsum">${d.voyages} voyage${d.voyages === 1 ? '' : 's'} of the ${esc(d.class)} class on the ledger, ${d.read} with card readings${d.read ? '' : ': the deck fills in as its first voyage reads'}</div>` +
-    d.constellations.map(k => `<div class="drow"><div class="dsuit"><span class="suit">${esc(k.suit)}</span><b>${esc(k.name)}</b><span class="s">${esc(k.about)}</span></div>${d.cards.filter(c => c.constellation === k.key).map(tile).join('')}</div>`).join('');
+  let arrange = 'constellation'; try { arrange = localStorage.getItem('thorp.deck.arrange') || 'constellation'; } catch (e) { /* storage blocked */ }
+  if (arrange === 'scansion' && !d.scansions) arrange = 'constellation';
+  const order = Object.fromEntries(d.cards.map((c, i) => [c.key, i]));  // the deck's own order: constellation, then stage
+  const sw = `<div class="darrange" role="tablist" aria-label="arrange the deck"><span class="s">arrange by</span>${[['constellation', 'constellation'], ['scansion', 'scansion']].map(([k, l]) => `<button type="button" role="tab" class="${toggleCls()}" data-state="${arrange === k ? 'on' : 'off'}" aria-selected="${arrange === k}" data-arrange="${k}"${k === 'scansion' && !d.scansions ? ' disabled' : ''}>${l}</button>`).join('')}</div>`;
+  const body = arrange === 'scansion'
+    ? d.scansions.map(s => { const cs = d.cards.filter(c => c.scansion === s.key).sort((a, b) => order[a.key] - order[b.key]);
+        return `<div class="dscanrow"><div class="dscanhead"><b>${esc(s.name)}</b> <span class="s">${esc(s.about)} · ${cs.length} card${cs.length === 1 ? '' : 's'}</span></div><div class="dgrid">${cs.map(tile).join('')}</div></div>`; }).join('')
+      + (d.cards.some(c => !c.scansion) ? `<div class="dscanrow"><div class="dscanhead"><b>Unscanned</b></div><div class="dgrid">${d.cards.filter(c => !c.scansion).map(tile).join('')}</div></div>` : '')
+    : d.constellations.map(k => `<div class="drow"><div class="dsuit"><span class="suit">${esc(k.suit)}</span><b>${esc(k.name)}</b><span class="s">${esc(k.about)}</span></div>${d.cards.filter(c => c.constellation === k.key).map(tile).join('')}</div>`).join('');
+  el.innerHTML = `<div class="dtop"><div class="s dsum">${d.voyages} voyage${d.voyages === 1 ? '' : 's'} of the ${esc(d.class)} class on the ledger, ${d.read} with card readings${d.read ? '' : ': the deck fills in as its first voyage reads'}</div>${sw}</div>` + body;
+  el.querySelectorAll('[data-arrange]').forEach(b => b.onclick = () => { try { localStorage.setItem('thorp.deck.arrange', b.dataset.arrange); } catch (e) { /* storage blocked */ } classDeckKey = null; classDeck(r); });
 }
 // ---- Watch it train (the Training tab's head; /api/watch): the class's voyage at sea, read every 30 seconds while
 // the tab is open: where it is, its stages and passes, the cards drawn and when, and the readings by tokens read

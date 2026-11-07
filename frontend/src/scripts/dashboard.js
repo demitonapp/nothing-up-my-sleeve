@@ -1219,6 +1219,7 @@ async function classShapes(r) {
 // this class's record of each: played in how many voyages (Ogden apart), first at how many tokens, in which layer,
 // and the best reading against its mark
 let classDeckKey = null;
+const flippedCards = new Set();  // the cards turned over, kept across redraws of the deck
 async function classDeck(r) {
   const el = document.getElementById('deckclass'); if (!el) return;
   let d; try { d = await get(`/api/class_deck?preset=${encodeURIComponent(r.preset)}`); } catch (e) { el.innerHTML = `<div class="${emptyCls()}">the deck could not be read (a dashboard server started before it existed has to be restarted)</div>`; return; }
@@ -1226,10 +1227,32 @@ async function classDeck(r) {
   const tok = t => t == null ? '' : t >= 1e6 ? `${Math.round(t / 1e6)}M` : `${Math.round(t / 1e3)}k`;
   const byKey = Object.fromEntries(d.cards.map(c => [c.key, c]));
   const scanAbout = Object.fromEntries((d.scansions || []).map(s => [s.key, `${s.name}: ${s.about}`]));
+  const scanOf = Object.fromEntries((d.scansions || []).map(s => [s.key, s]));
+  const conOf = Object.fromEntries(d.constellations.map(k => [k.key, k]));
+  const sentence = t => t ? `${t.charAt(0).toUpperCase()}${t.slice(1)}${/[.!?]$/.test(t) ? '' : '.'}` : '';
+  const stageRule = { 'Basic': 'A Basic: one attention head, in one layer.',
+    'Stage 1': 'A Stage 1: played only above a Basic of its suit held in an earlier layer.',
+    'Face': 'A Face: traded in when the cards beneath it are held in order and what it does passes its mark.' };
+  // the back of a card (click to turn it over): what it does, its stage's rule, its scansion and what is known to break it
+  const back = c => {
+    const k = conOf[c.constellation] || {}, s = scanOf[c.scansion];
+    const fragile = c.fragility && !/^(none known|not yet seen|uncharted)$/.test(c.fragility) ? c.fragility : '';
+    return `<div class="dface dback" aria-hidden="${flippedCards.has(c.key) ? 'false' : 'true'}">
+      <div class="dbhead"><span class="suit">${esc(k.suit || '')}</span><b>${esc(c.name)}</b></div>
+      <div class="s">${esc(c.stage)} · ${esc(k.name || '')}: ${esc(k.about || '')}</div>
+      <div class="dwhat">${esc(sentence(c.ability))}</div>
+      <div class="s">${esc(stageRule[c.stage] || '')}</div>
+      ${s ? `<div class="s"><b>${esc(s.name)}.</b> ${esc(sentence(s.about))}</div>` : ''}
+      ${fragile ? `<div class="s"><b>Fragile:</b> ${esc(sentence(fragile))}</div>` : ''}
+      <div class="dhint s">click to turn back</div>
+    </div>`;
+  };
   const tile = c => {
     const pct = c.voyages_read ? Math.round(100 * c.played / c.voyages_read) : 0;
     const barTo = c.best != null && c.mark ? Math.min(100, Math.round(100 * c.best / (c.mark * 2))) : 0;
-    return `<div class="dcard r-${esc(c.rarity)}">
+    const up = flippedCards.has(c.key);
+    return `<div class="dcard r-${esc(c.rarity)}${up ? ' flipped' : ''}" data-card="${esc(c.key)}" role="button" tabindex="0" aria-pressed="${up}" title="click to turn the card over">
+      <div class="dface dfront" aria-hidden="${up}">
       <div class="dart"><img src="art/${esc(c.key)}.png" alt="" loading="lazy" onerror="this.style.display='none'"><span class="dstage">${esc(c.stage)}</span><span class="dcost" title="layers that must stand in order">${c.cost}</span><span class="drarity">${esc(c.rarity)}</span>${c.scansion ? `<span class="dscan" title="${esc(scanAbout[c.scansion] || '')}">${esc(c.scansion)}</span>` : ''}</div>
       <div class="dname">${esc(c.name)}</div>
       ${!c.charted ? '<div class="s">uncharted: Thorp has no reading for it yet</div>' : `
@@ -1238,6 +1261,7 @@ async function classDeck(r) {
       ${c.first_tokens_median != null ? `<div class="s">first played at ${tok(c.first_tokens_median)} tokens (median)${c.usual_layer != null ? `, usually layer ${c.usual_layer}` : ''}</div>` : ''}
       ${c.best != null ? `<div class="dbar" title="its best reading against its mark (the line)"><i style="width:${barTo}%"></i><b style="left:50%"></b></div><div class="s">best ${c.best.toFixed(2)} (mark ${c.mark})${c.best_voyage ? ` · <span class="mono">${esc(c.best_voyage.replace('fu-ogden-v0-1', 'Ogden'))}</span>` : ''}</div>` : (c.mark != null ? `<div class="s">read by its ability (mark ${c.mark})</div>` : '')}`}
       ${c.on.length ? `<div class="s">evolves from ${c.on.map(o => esc(byKey[o] ? byKey[o].name : o)).join(' + ')}</div>` : ''}
+      </div>${back(c)}
     </div>`;
   };
   let arrange = 'constellation'; try { arrange = localStorage.getItem('thorp.deck.arrange') || 'constellation'; } catch (e) { /* storage blocked */ }
@@ -1251,6 +1275,17 @@ async function classDeck(r) {
     : d.constellations.map(k => `<div class="drow"><div class="dsuit"><span class="suit">${esc(k.suit)}</span><b>${esc(k.name)}</b><span class="s">${esc(k.about)}</span></div>${d.cards.filter(c => c.constellation === k.key).map(tile).join('')}</div>`).join('');
   el.innerHTML = `<div class="dtop"><div class="s dsum">${d.voyages} voyage${d.voyages === 1 ? '' : 's'} of the ${esc(d.class)} class on the ledger, ${d.read} with card readings${d.read ? '' : ': the deck fills in as its first voyage reads'}</div>${sw}</div>` + body;
   el.querySelectorAll('[data-arrange]').forEach(b => b.onclick = () => { try { localStorage.setItem('thorp.deck.arrange', b.dataset.arrange); } catch (e) { /* storage blocked */ } classDeckKey = null; classDeck(r); });
+  el.querySelectorAll('.dcard[data-card]').forEach(card => {
+    const turn = () => {
+      const up = card.classList.toggle('flipped');
+      card.setAttribute('aria-pressed', String(up));
+      card.querySelector('.dfront').setAttribute('aria-hidden', String(up));
+      card.querySelector('.dback').setAttribute('aria-hidden', String(!up));
+      if (up) flippedCards.add(card.dataset.card); else flippedCards.delete(card.dataset.card);
+    };
+    card.onclick = turn;
+    card.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); turn(); } };
+  });
 }
 // ---- Watch it train (the Training tab's head; /api/watch): the class's voyage at sea, read every 30 seconds while
 // the tab is open: where it is, its stages and passes, the cards drawn and when, and the readings by tokens read

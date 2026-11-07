@@ -959,12 +959,23 @@ button[aria-busy="true"] { cursor: progress; opacity: .7; }
 .deckclass .drow { display: grid; grid-template-columns: 150px repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
 .deckclass .dsuit { display: flex; flex-direction: column; gap: 4px; padding-top: 8px; }
 .deckclass .dsuit .suit { font-size: 28px; line-height: 1; }
-.deckclass .dcard { background: var(--raise); border: 1px solid var(--line); border-top: 3px solid var(--line); border-radius: var(--r-md); padding: 8px; display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-sm); min-width: 0; }
+.deckclass .dcard { background: var(--raise); border: 1px solid var(--line); border-top: 3px solid var(--line); border-radius: var(--r-md); padding: 8px; display: grid; font-size: var(--fs-sm); min-width: 0;
+  cursor: pointer; transform-style: preserve-3d; transform: perspective(1000px) rotateY(0deg); transition: transform .5s ease; }
+.deckclass .dcard.flipped { transform: perspective(1000px) rotateY(180deg); }
+.deckclass .dcard:hover { box-shadow: 0 0 0 1px var(--muted); }
+.deckclass .dcard:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.deckclass .dface { grid-area: 1 / 1; display: flex; flex-direction: column; gap: 4px; min-width: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; transform: translateZ(1px); }
+.deckclass .dback { transform: rotateY(180deg) translateZ(1px); }
+.deckclass .dback .dbhead { display: flex; align-items: baseline; gap: 6px; font-size: var(--fs-md); }
+.deckclass .dback .dbhead .suit { font-size: 20px; line-height: 1; }
+.deckclass .dback .dwhat { font-size: var(--fs-md); line-height: 1.4; margin: 6px 0; }
+.deckclass .dback .dhint { margin-top: auto; padding-top: 6px; font-style: italic; }
+@media (prefers-reduced-motion: reduce) { .deckclass .dcard { transition: none; } }
 .deckclass .dcard.r-common { border-top-color: var(--good); }
 .deckclass .dcard.r-uncommon { border-top-color: var(--blue); }
 .deckclass .dcard.r-rare, .deckclass .dcard.r-legendary { border-top-color: var(--accent); }
 .deckclass .dcard.r-unseen { border-top-color: var(--bad); }
-.deckclass .dcard.r-uncharted { opacity: .55; }
+.deckclass .dcard.r-uncharted > .dface { opacity: .55; }  /* on the faces: opacity on the card would flatten the flip */
 .deckclass .dart { position: relative; aspect-ratio: 3 / 4; background: #000; border-radius: var(--r-sm); overflow: hidden; }
 .deckclass .dart img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .deckclass .dscan { bottom: 6px; right: 6px; font-style: italic; }

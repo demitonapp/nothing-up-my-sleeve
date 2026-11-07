@@ -1217,6 +1217,7 @@ function renderVoyage() {
   // the journey picks its default sailings from the transplant records, so it waits for them
   voyageStars(v).then(() => journeyPanel(v));
   voyageClimb(v);
+  if (v.key === 'card_census') drawCensus();
 }
 // ---- the journey through the layers (lib/journey.js): one or two sailings of the voyage, read up
 // their stack at one step; the slider follows the latest reading unless moved
@@ -2712,4 +2713,31 @@ function drawLbApproach(rows, thr) {
       <td>${r.src.one_hop != null ? signed(r.src.one_hop) : '–'}</td>
       <td class="noise" title="below +0.03 the chaining lift is noise">${r.lift != null ? signed(r.lift) : '–'}</td></tr>`;
   }).join('') || '<tr><td colspan="6" class="empty">nothing below the line</td></tr>';
+}
+
+
+// ---- the card census (the card_census voyage page; /api/census): per class, a grid of variations × the four necessary
+// cards, each cell the best reading coloured lit or dark, and the headline "possible at <class>: n of 4"
+let censusKey = null;
+async function drawCensus() {
+  const el = document.getElementById('censusgrid'); if (!el) return;
+  let d; try { d = await get('/api/census'); } catch (e) { return; }
+  const key = JSON.stringify(d); if (key === censusKey) return; censusKey = key;
+  const cards = d.cards || [], classes = Object.keys(d.classes || {}).sort((a, b) => classRank(a) - classRank(b));
+  if (!classes.length) { el.innerHTML = '<div class="empty">no census runs queued or sailed yet</div>'; return; }
+  el.innerHTML = classes.map(cls => {
+    const c = d.classes[cls], sailed = c.rows.filter(r => r.status !== 'queued').length;
+    const head = `<div class="censushead"><span class="cenposs"><b>${c.possible.length} of ${cards.length}</b> possible at ${classLink(cls)}</span>
+      <span class="miniset">${cards.map(k => { const f = CARD_FACE[k.key] || {}; return `<span class="minicard${c.possible.includes(k.key) ? ' on' : ''}" title="${esc(k.name)}: ${c.possible.includes(k.key) ? 'lit by some variation' : 'not lit by any variation yet'}"><b>${f.rank || ''}</b><i>${f.suit || ''}</i></span>`; }).join('')}</span>
+      <span class="s">${sailed} of ${c.rows.length} variations sailed${c.summary ? ' · census written' : ''}</span></div>`;
+    const cell = (r, k) => {
+      if (r.status === 'queued') return '<td class="cen q">queued</td>';
+      const x = (r.cards || {})[k.key];
+      if (!x || x.best == null) return `<td class="cen q">${r.status === 'running' ? 'no reading yet' : '–'}</td>`;
+      const near = Math.max(0, Math.min(1, x.best / k.threshold));
+      return `<td class="cen${x.lit ? ' lit' : ''}" style="--near:${(100 * near).toFixed(0)}%" title="${esc(k.name)}: best ${x.best.toFixed(3)} of ${k.threshold}${x.lit ? `, lit at step ${x.step}` : ''}">${x.best.toFixed(2)}${x.lit ? ' ✓' : ''}</td>`;
+    };
+    return `${head}<div class="scroll"><table class="censustable" data-nosort><thead><tr><th>variation</th><th></th>${cards.map(k => { const f = CARD_FACE[k.key] || {}; return `<th title="${esc(k.name)}, lit at ${k.threshold}">${f.rank || ''}${f.suit || ''} ${esc((f.short || k.name))}</th>`; }).join('')}</tr></thead>
+      <tbody>${c.rows.map(r => `<tr><td>${r.run_id ? `<a href="#${shipHash(r.name)}">${esc(r.variant)}</a>` : esc(r.variant)}<div class="s" title="${esc(r.question || '')}">${esc(r.preset || '')}</div></td><td>${statusPill(r.status === 'queued' ? 'queued' : r.status)}</td>${cards.map(k => cell(r, k)).join('')}</tr>`).join('')}</tbody></table></div>`;
+  }).join('');
 }

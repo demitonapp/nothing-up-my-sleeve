@@ -610,3 +610,11 @@ main a.ccell { color: var(--text); text-decoration: none; display: block; }
 #lbapproach td.noise { color: var(--muted); opacity: .6; }
 #lbapproach td { vertical-align: middle; }
 #lbapproach .tiehint { font-size: 10px; white-space: nowrap; }
+
+/* the card census grid */
+.censushead { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin: 12px 0 6px; }
+.cenposs b { font-size: 18px; }
+.censustable td.cen { text-align: center; font-variant-numeric: tabular-nums; font-size: var(--fs-sm);
+  background: linear-gradient(to right, rgba(227,179,65,.18) 0 var(--near, 0%), transparent var(--near, 0%)); }
+.censustable td.cen.lit { background: rgba(63,185,80,.22); color: var(--good); font-weight: 600; }
+.censustable td.cen.q { color: var(--muted); font-size: 11px; }

@@ -1407,6 +1407,118 @@ def api_competitor(model: str) -> dict:
     }
 
 
+CENSUS_CARDS = ("previous_word", "nevermore", "mover", "comparator")
+
+
+def api_census() -> dict:
+    """The card census (fleet.VOYAGES["card_census"]): which of the four necessary cards each class can
+    draw at all. A row per variation (cd-<class>-<variant>, and round 2's tf-r2-pilot-* for the 1m),
+    from the queue and the ledger, each card its best reading (one head or shared) and whether it lit;
+    per class, the cards possible, and data/runs/cards/census-<class>.json where it has been written."""
+    import yaml
+
+    from thorp import fleet
+
+    root = Path(__file__).resolve().parents[2]
+    stars = {k: fleet.STARS[k] for k in CENSUS_CARDS if k in fleet.STARS}
+    rows: dict[str, dict] = {}
+
+    def is_census(name: str) -> bool:
+        return name.startswith("cd-") or name.startswith("tf-r2-pilot-")
+
+    def add(name: str, spec: dict, status: str) -> dict:
+        preset = str(spec.get("model", {}).get("preset", ""))
+        cls = (
+            preset.split("-")[0]
+            if preset
+            else (
+                name.split("-")[1] if name.startswith("cd-") else _class_presets().get("pilot", "")
+            )
+        )
+        variant = (
+            name[len(f"cd-{cls}-") :]
+            if name.startswith(f"cd-{cls}-")
+            else name[len("tf-r2-pilot-") :]
+            if name.startswith("tf-r2-pilot-")
+            else name
+        )
+        variant = variant.rsplit("-s", 1)[0] if variant.rsplit("-s", 1)[-1].isdigit() else variant
+        r = rows.setdefault(
+            name,
+            {
+                "name": name,
+                "class": cls,
+                "preset": preset,
+                "variant": variant + (" (round 2)" if name.startswith("tf-r2-") else ""),
+                "ship": spec.get("ship"),
+                "question": spec.get("question"),
+                "status": status,
+                "cards": {},
+            },
+        )
+        r["status"] = status
+        return r
+
+    q = root / "specs" / "queue.txt"
+    if q.exists():
+        for line in q.read_text().splitlines():
+            line = line.strip()
+            if not line or line.startswith(("#", "cmd:")):
+                continue
+            name = line.split("/")[-1]
+            if is_census(name):
+                p = root / "specs" / f"{line}.yaml"
+                spec = yaml.safe_load(p.read_text()) if p.exists() else {}
+                add(name, spec or {}, "queued")
+    con = _con()
+    try:
+        for r in con.execute("select run_id, name, status, spec_json from runs"):
+            run_id, name, status, spec_json = r
+            if not name or not is_census(name):
+                continue
+            row = add(name, json.loads(spec_json or "{}"), status or "")
+            row["run_id"] = run_id
+            for k, st in stars.items():
+                best, lit_step = None, None
+                for metric in (st.metric, getattr(st, "shared_metric", None)):
+                    if not metric:
+                        continue
+                    for step, value in con.execute(
+                        "select step, value from metrics where run_id=? and name=? order by step, rowid",
+                        [run_id, metric],
+                    ):
+                        if value is None or value != value:
+                            continue
+                        best = value if best is None else max(best, value)
+                        if value >= st.threshold and (lit_step is None or step < lit_step):
+                            lit_step = step
+                row["cards"][k] = {"best": best, "lit": lit_step is not None, "step": lit_step}
+    finally:
+        con.close()
+    classes: dict[str, dict] = {}
+
+    def order(r: dict) -> tuple:  # the baseline first, round 2's runs last
+        return (r["class"], r["name"].startswith("tf-"), r["variant"] != "baseline", r["name"])
+
+    for r in sorted(rows.values(), key=order):
+        c = classes.setdefault(r["class"], {"rows": [], "possible": set()})
+        c["rows"].append(r)
+        c["possible"].update(k for k, v in r["cards"].items() if v["lit"])
+    for cls, c in classes.items():
+        c["possible"] = [k for k in CENSUS_CARDS if k in c["possible"]]
+        f = root / "data" / "runs" / "cards" / f"census-{cls}.json"
+        try:
+            c["summary"] = json.loads(f.read_text()) if f.exists() else None
+        except ValueError:
+            c["summary"] = None
+    return {
+        "cards": [
+            {"key": k, "name": st.name, "threshold": st.threshold} for k, st in stars.items()
+        ],
+        "classes": classes,
+    }
+
+
 def api_climb(runs: str) -> dict:
     """Each run's climb over training (thorp.leaderboard.climb, read at every step that has
     discovery readings, carrying each trick's latest lift and share forward)."""
@@ -1917,6 +2029,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/shelves": api_shelves,
                 "/api/shelf_books": lambda: api_shelf_books(q["path"]),
                 "/api/leaderboard": api_leaderboard,
+                "/api/census": api_census,
                 "/api/competitor": lambda: api_competitor(q["model"]),
                 "/api/thorp": lambda: api_thorp(q["ship"]),
                 "/api/bridge": api_bridge,

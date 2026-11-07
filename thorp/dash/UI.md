@@ -202,6 +202,12 @@ holds the ways in, always:
   trust (`valid` false) keeps its place, in the hand or the deck, but carries an amber dashed edge,
   sepia art and a "not trusted" stamp across it, so it can't pass for a sound card. The readings, the mark
   and the judge's verdict sit in a table beneath, and the bridge's curve over layers below that.
+  **The card census** (the `card_census` voyage's page, `/api/census`): which of the four necessary
+  cards each class can draw at all. Per class, "n of 4 possible at <class>" with the four small cards,
+  then a grid of variations (cd-<class>-<variant>, and round 2's tf-r2-pilot-* counted for the 1m;
+  from the queue and the ledger, baseline first) by the four cards, each cell the best reading (one
+  head or shared) shaded by how far to the mark, green with ✓ where lit, "queued" where the variation
+  waits its turn. `data/runs/cards/census-<class>.json`, once written, is noted.
 - **Shelves** (`#/shelves`): every list of books (`thorp.shelves.payload`, `/api/shelves`). It takes
   seconds to compute, so the server keeps it warm (computed at start, served from memory and
   recomputed in the background every five minutes); until the first is ready the page says it is

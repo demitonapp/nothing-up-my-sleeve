@@ -179,6 +179,12 @@ holds the ways in, always:
   position carries the middle term), one line per run, the provisional threshold dotted. The
   logic deck (`logic_test`) is in the registry; the comparator and bridge are kinds in the star
   chart, and the name mover is the mover card.
+  **The card judge** (`thorp.card_check` verdicts, served as `card_verdicts`): each card carries a
+  badge on the star chart, the methodology and the competitor pages: **necessary card** (green:
+  every model that chains plays it), **marker** (blue: only the chainers play it), **not trusted**
+  (amber: the reading isn't valid yet), with the counts behind it on hover.
+  The server never sends NaN: a failed reading (NaN or infinity) goes out as null, since one NaN
+  makes a whole JSON response unreadable to the browser.
 - **Shelves** (`#/shelves`): every list of books (`thorp.shelves.payload`, `/api/shelves`). It takes
   seconds to compute, so the server keeps it warm (computed at start, served from memory and
   recomputed in the background every five minutes); until the first is ready the page says it is

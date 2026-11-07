@@ -541,3 +541,10 @@ main a.ccell { color: var(--text); text-decoration: none; display: block; }
 #competitor .cpcard .foot { margin-top: 8px; font-size: var(--fs-sm); }
 #competitor .cpbridge { height: 120px; margin-top: 6px; }
 #cprungs td { vertical-align: top; font-size: var(--fs-sm); min-width: 120px; }
+
+/* the card judge's badge (necessary card, marker, not trusted) */
+.vrow { margin-bottom: 6px; }
+.vbadge { display: inline-block; font-size: 10px; letter-spacing: .06em; text-transform: uppercase; padding: 1px 6px; border-radius: 3px; border: 1px solid var(--line); color: var(--muted); }
+.vbadge.need { color: var(--good); border-color: var(--good); }
+.vbadge.marker { color: var(--blue); border-color: var(--blue); }
+.vbadge.warn { color: var(--accent); border-color: var(--accent); }

@@ -1492,7 +1492,8 @@ async function loadDiscoveries() {
     const best = [...s.ships].sort((a, b) => (b.best ?? -1) - (a.best ?? -1))[0];
     const first = lit[0], firstShared = shared[0];
     const state = lit.length ? ['good', 'lit'] : shared.length ? ['accent', 'lit shared'] : ['', 'not lit yet'];
-    return `<div class="card${lit.length ? ' lit' : ''}">
+    const vb = cardBadge(d.card_verdicts, s.key);
+    return `<div class="card${lit.length ? ' lit' : ''}">${vb ? `<div class="vrow">${vb}</div>` : ''}
       <div class="top"><span class="preset">${esc(s.name)}</span><span class="pill ${state[0]}" title="lit: one head at the threshold; lit shared: the best layer's two strongest heads together">${state[1]}</span></div>
       <div class="job">level ${s.level}${s.rests_on.length ? ` · rests on ${esc(s.rests_on.map(k => byName[k] || k).join(', '))}` : ''} · lit at ${s.threshold}</div>
       <div class="ov">${esc(s.about)}</div>
@@ -2549,7 +2550,8 @@ function drawMethod(key) {
         foot = `<div class="foot s">not lit by any class yet${near ? `; nearest ${esc(near.preset)} at ${fmt(near.best)} of ${st.threshold}` : ''}</div>`;
       }
     }
-    const inner = `<div class="top"><span class="preset">${esc(c.card)}</span><span class="pill ${planned ? '' : lit ? 'good' : 'blue'}">${planned ? 'planned' : lit ? 'lit' : 'in the deck'}</span></div><div class="ov">${esc(c.operation)}</div>${foot}`;
+    const vb = st ? cardBadge((discData || {}).card_verdicts, st.key) : '';
+    const inner = `${vb ? `<div class="vrow">${vb}</div>` : ''}<div class="top"><span class="preset">${esc(c.card)}</span><span class="pill ${planned ? '' : lit ? 'good' : 'blue'}">${planned ? 'planned' : lit ? 'lit' : 'in the deck'}</span></div><div class="ov">${esc(c.operation)}</div>${foot}`;
     return planned ? `<div class="card planned">${inner}</div>` : `<div class="card${lit ? ' lit pulse' : ''}">${inner}<div class="foot"><a href="#/discoveries/stars">${st ? esc(st.name) : 'the star chart'} on the star chart →</a></div></div>`;
   }).join('');
 }
@@ -2612,23 +2614,23 @@ async function loadCompetitor() {
   } else { empty('cpvariants', 'the logic deck is not read on this model yet'); empty('cprelations', '–'); }
   // the cards
   const C = d.cards, readable = !C || C.attention_readable !== false;
-  const card = (name, does, body, state) => `<div class="card cpcard ${state}"><div class="top"><span class="preset">${esc(name)}</span><span class="pill ${state === 'lit' ? 'good' : state === 'unlit' ? 'blue' : ''}">${{ lit: 'lit', unlit: 'not lit', unread: 'not read', unreadable: 'unreadable' }[state]}</span></div><div class="ov">${esc(does)}</div>${body}</div>`;
+  const card = (name, does, body, state, key) => `<div class="card cpcard ${state}">${key ? `<div class="vrow">${cardBadge(d.card_verdicts, key)}</div>` : ''}<div class="top"><span class="preset">${esc(name)}</span><span class="pill ${state === 'lit' ? 'good' : state === 'unlit' ? 'blue' : ''}">${{ lit: 'lit', unlit: 'not lit', unread: 'not read', unreadable: 'unreadable' }[state]}</span></div><div class="ov">${esc(does)}</div>${body}</div>`;
   const headCard = (key, name, does) => {
-    if (!C) return card(name, does, '<div class="foot s">the cards are being read on this model</div>', 'unread');
-    if (!readable) return card(name, does, '<div class="foot s">its attention can\'t be read through MLX-LM</div>', 'unreadable');
-    const x = C[key]; if (!x) return card(name, does, '', 'unread');
+    if (!C) return card(name, does, '<div class="foot s">the cards are being read on this model</div>', 'unread', key);
+    if (!readable) return card(name, does, '<div class="foot s">its attention can\'t be read through MLX-LM</div>', 'unreadable', key);
+    const x = C[key]; if (!x) return card(name, does, '', 'unread', key);
     const st = (discStars || []).find(s => s.key === key);
     return card(name, does, `<div class="foot">one head ${x.max != null ? fmt(x.max) : '–'}${x.shared != null ? ` · shared ${fmt(x.shared)}${x.shared_layer != null ? ` (layer ${x.shared_layer})` : ''}` : ''}${st ? ` <span class="s">of ${st.threshold}</span>` : ''}</div>`
-      + (x.copy_gain != null ? `<div class="foot s" title="the loss drop from the first copy of a passage to the second, nats per token">copy gain ${fmt(x.copy_gain)} nats/token</div>` : ''), x.lit || x.lit_shared ? 'lit' : 'unlit');
+      + (x.copy_gain != null ? `<div class="foot s" title="the loss drop from the first copy of a passage to the second, nats per token">copy gain ${fmt(x.copy_gain)} nats/token</div>` : ''), x.lit || x.lit_shared ? 'lit' : 'unlit', key);
   };
   let html = headCard('previous_word', 'Previous-word', 'attends from each word to the one before it, the first step of copying')
     + headCard('nevermore', 'Nevermore (induction)', 'finds an earlier occurrence and copies what followed it: retrieves the premises')
     + headCard('mover', 'Mover', 'carries a fact\'s attribute from where it was stated to where it is needed')
     + headCard('comparator', 'Comparator', 'orders two quantities: for the between and order items');
   const B = C && C.bridge;
-  html += !C ? card('Bridge', 'the shared middle term at the answer\'s position in the middle layers', '<div class="foot s">the cards are being read on this model</div>', 'unread')
-    : !B ? card('Bridge', 'the shared middle term at the answer\'s position in the middle layers', '', 'unread')
-    : card('Bridge', 'the shared middle term at the answer\'s position in the middle layers', `<div class="foot">best ${B.max != null ? fmt(B.max) : '–'} nats${B.best_layer != null ? ` at layer ${B.best_layer}${B.layers ? ` of ${B.layers}` : ''}` : ''}</div><div class="chart cpbridge" id="cpbridge"></div>`, B.lit ? 'lit' : 'unlit');
+  html += !C ? card('Bridge', 'the shared middle term at the answer\'s position in the middle layers', '<div class="foot s">the cards are being read on this model</div>', 'unread', 'bridge')
+    : !B ? card('Bridge', 'the shared middle term at the answer\'s position in the middle layers', '', 'unread', 'bridge')
+    : card('Bridge', 'the shared middle term at the answer\'s position in the middle layers', `<div class="foot">best ${B.max != null ? fmt(B.max) : '–'} nats${B.best_layer != null ? ` at layer ${B.best_layer}${B.layers ? ` of ${B.layers}` : ''}` : ''}</div><div class="chart cpbridge" id="cpbridge"></div>`, B.lit ? 'lit' : 'unlit', 'bridge');
   document.getElementById('cpcards').innerHTML = html;
   if (B && B.curve && B.curve.length) {
     const thr = ((discStars || []).find(s => s.key === 'bridge') || {}).threshold;
@@ -2639,4 +2641,16 @@ async function loadCompetitor() {
   const width = Math.max(...d.chains.map(c => c.rungs.length - 1));
   document.querySelector('#cprungs thead').innerHTML = `<tr><th>chain</th>${d.chains[0].rungs.slice(0, width).map(r => `<th>${esc(r.rung || '')}</th>`).join('')}</tr>`;
   document.querySelector('#cprungs tbody').innerHTML = d.chains.map(c => `<tr><td><a href="#/discoveries/chains/${esc(c.key)}"><b>${esc(c.name)}</b></a></td>${c.rungs.slice(0, width).map(r => `<td><a href="#/discoveries/${esc(r.key)}">${esc(r.name)}</a><div class="${r.performed ? 'good' : 's'}">${r.lift != null ? `${signed(r.lift)} · ${r.score != null ? Math.round(100 * r.score) + '%' : ''}${r.performed ? ' ✓' : ''}` : 'not read'}</div></td>`).join('')}</tr>`).join('');
+}
+
+
+// ---- the card judge (thorp.card_check verdicts): a NECESSARY card is played by every model that chains two facts; a MARKER
+// is played only by them; a card whose reading isn't trusted is "not trusted"; else it is neither
+function cardBadge(verdicts, key) {
+  const v = (verdicts || {})[key]; if (!v) return '';
+  const tip = `played by ${v.chainers_lit} of the models that chain two facts; dark in ${v.non_chainers_dark} that don't`;
+  if (v.valid === false) return `<span class="vbadge warn" title="${esc(tip)}: the reading is not trusted yet">not trusted</span>`;
+  if (v.marker) return `<span class="vbadge marker" title="${esc(tip)}: only the chainers play it">marker</span>`;
+  if (v.necessary) return `<span class="vbadge need" title="${esc(tip)}: every chainer plays it, so a ship must draw it">necessary card</span>`;
+  return `<span class="vbadge" title="${esc(tip)}">neither necessary nor a marker</span>`;
 }

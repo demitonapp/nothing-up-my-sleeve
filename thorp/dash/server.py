@@ -48,6 +48,18 @@ def _static(path: str) -> tuple[bytes, str] | None:
     return f.read_bytes(), TYPES.get(f.suffix, "application/octet-stream")
 
 
+def _finite(obj):
+    """NaN and infinity become null: JSON has no NaN, and one in a payload (a reading that failed)
+    would stop the browser from reading the whole response."""
+    if isinstance(obj, float):
+        return obj if math.isfinite(obj) else None
+    if isinstance(obj, dict):
+        return {k: _finite(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_finite(v) for v in obj]
+    return obj
+
+
 def _con() -> sqlite3.Connection:
     return connect(paths.ledger_path(), readonly=True)
 
@@ -865,6 +877,17 @@ def _class_presets() -> dict[str, str]:
     return by_name
 
 
+def _card_verdicts() -> dict:
+    """Which cards the chainers need (thorp.card_check: necessary when every model that chains plays
+    it, a marker when only the chainers do, valid when the reading is trusted), by star key."""
+    try:
+        from thorp import card_check
+
+        return card_check.payload().get("verdicts", {})
+    except Exception:  # noqa: BLE001
+        return {}
+
+
 def _methods() -> dict:
     """How each trick is proved (fleet.METHODS): the trick, its parts and whether the tests cover them,
     the gaps, the planned controls, the metric, the cards (stars) it needs, and the status."""
@@ -1316,6 +1339,7 @@ def api_competitor(model: str) -> dict:
         "chains": chains,
         "logic": logic or None,
         "cards": v.get("cards"),
+        "card_verdicts": _card_verdicts(),
         "tenth": tenth,
     }
 
@@ -1598,6 +1622,7 @@ def api_discoveries() -> dict:
         "known_tricks": _known_tricks(),
         "chain_rungs": _rungs(),
         "methods": _methods(),
+        "card_verdicts": _card_verdicts(),
         "waypoints": __import__("thorp.dash.tricks", fromlist=["WAYPOINTS"]).WAYPOINTS,
     }
 
@@ -1761,7 +1786,7 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def _json(self, code: int, obj) -> None:
-        self._send(code, json.dumps(obj, default=str).encode(), "application/json")
+        self._send(code, json.dumps(_finite(obj), default=str).encode(), "application/json")
 
     def do_POST(self):  # noqa: N802
         """Only the table writes: POST /api/table/reply {run, question, history, temperature, ...}."""
@@ -1840,7 +1865,7 @@ class Handler(BaseHTTPRequestHandler):
             }
             if u.path not in routes:
                 return self._send(404, b"not found", "text/plain")
-            body = json.dumps(routes[u.path](), default=str).encode()
+            body = json.dumps(_finite(routes[u.path]()), default=str).encode()
             return self._send(200, body, "application/json")
         except TableNotBuilt as e:
             return self._send(503, json.dumps({"error": str(e)}).encode(), "application/json")

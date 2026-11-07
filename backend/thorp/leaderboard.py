@@ -442,7 +442,12 @@ def thorp_entry(ship_key: str) -> dict | None:
                 "stars/previous_word/shared_score",
                 "stars/previous_word/shared_layer",
             ),
-            ("nevermore", "nevermore/natural_max_score", None, "nevermore/natural_best_layer"),
+            (  # two heads of a layer together as well (2026-11-07, 23:45), as the deck reads induction
+                "nevermore",
+                "nevermore/natural_max_score",
+                "nevermore/natural_shared_score",
+                "nevermore/natural_best_layer",
+            ),
             (
                 "mover",
                 "stars/mover/max_score",

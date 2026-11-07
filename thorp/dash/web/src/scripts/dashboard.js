@@ -2618,10 +2618,11 @@ async function loadCompetitor() {
     if (!readable) return card(name, does, '<div class="foot s">its attention can\'t be read through MLX-LM</div>', 'unreadable');
     const x = C[key]; if (!x) return card(name, does, '', 'unread');
     const st = (discStars || []).find(s => s.key === key);
-    return card(name, does, `<div class="foot">one head ${x.max != null ? fmt(x.max) : '–'}${x.shared != null ? ` · shared ${fmt(x.shared)}${x.shared_layer != null ? ` (layer ${x.shared_layer})` : ''}` : ''}${st ? ` <span class="s">of ${st.threshold}</span>` : ''}</div>`, x.lit || x.lit_shared ? 'lit' : 'unlit');
+    return card(name, does, `<div class="foot">one head ${x.max != null ? fmt(x.max) : '–'}${x.shared != null ? ` · shared ${fmt(x.shared)}${x.shared_layer != null ? ` (layer ${x.shared_layer})` : ''}` : ''}${st ? ` <span class="s">of ${st.threshold}</span>` : ''}</div>`
+      + (x.copy_gain != null ? `<div class="foot s" title="the loss drop from the first copy of a passage to the second, nats per token">copy gain ${fmt(x.copy_gain)} nats/token</div>` : ''), x.lit || x.lit_shared ? 'lit' : 'unlit');
   };
-  let html = card('Previous-word', 'attends from each word to the one before it, the first step of copying', '<div class="foot s">not read for outside models yet</div>', 'unread')
-    + card('Nevermore (induction)', 'finds an earlier occurrence and copies what followed it: retrieves the premises', '<div class="foot s">not read for outside models yet</div>', 'unread')
+  let html = headCard('previous_word', 'Previous-word', 'attends from each word to the one before it, the first step of copying')
+    + headCard('nevermore', 'Nevermore (induction)', 'finds an earlier occurrence and copies what followed it: retrieves the premises')
     + headCard('mover', 'Mover', 'carries a fact\'s attribute from where it was stated to where it is needed')
     + headCard('comparator', 'Comparator', 'orders two quantities: for the between and order items');
   const B = C && C.bridge;

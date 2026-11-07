@@ -32,4 +32,6 @@ def encode(tokeniser_id: str, book_id: str, tok: tokmod.Tokeniser | None = None)
 
 
 def load(tokeniser_id: str, book_id: str, tok: tokmod.Tokeniser | None = None) -> np.ndarray:
+    if tok is not None and hasattr(tok, "book_ids"):  # an outside model's tokeniser brings its own (thorp/outside_deck.py)
+        return tok.book_ids(book_id)
     return np.load(encode(tokeniser_id, book_id, tok), mmap_mode="r")

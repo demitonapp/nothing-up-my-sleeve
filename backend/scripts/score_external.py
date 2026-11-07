@@ -65,6 +65,9 @@ def main() -> None:
     ap.add_argument("list")
     ap.add_argument("--window", type=int, default=1024)
     ap.add_argument("--batch", type=int, default=4)
+    # the text cleaned as the voyages read it (thorp/cleaning.py; 2026-11-08: Ogden voyages score their judge books
+    # on unwrap-v2 text, so an outside model compared with them is scored on the same)
+    ap.add_argument("--clean", default="raw")
     a = ap.parse_args()
 
     from thorp import vsm
@@ -83,7 +86,7 @@ def score(a) -> None:
     books = [f"pg{r.chosen}" for r in resolve_list(ROOT / a.list) if r.chosen]
     rows, t0 = [], time.time()
     for b in books:
-        text = load_text(b)
+        text = load_text(b, a.clean)
         nbytes = len(text.encode("utf-8"))
         ids = tok.encode(text, add_special_tokens=False)
         nats, n = book_nats(model, ids, start, a.window, a.batch)
@@ -111,6 +114,7 @@ def score(a) -> None:
         "list": a.list,
         "set": Path(a.list).stem,
         "window": a.window,
+        "clean": a.clean,
         "start_token": start,
         "scored": time.strftime("%Y-%m-%dT%H:%M:%S"),
         "seconds": time.time() - t0,
@@ -120,7 +124,7 @@ def score(a) -> None:
     }
     d = paths.data_dir() / "compare"
     d.mkdir(parents=True, exist_ok=True)
-    f = d / f"{a.model.replace('/', '--')}__{Path(a.list).stem}.json"
+    f = d / f"{a.model.replace('/', '--')}__{Path(a.list).stem}{'' if a.clean == 'raw' else '__' + a.clean}.json"
     f.write_text(json.dumps(out, indent=1))
     print(f"mean {out['bpb_mean']:.4f} bpb (English {out['bpb_mean_en']}); written {f}")
 

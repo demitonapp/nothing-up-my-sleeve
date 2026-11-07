@@ -36,6 +36,8 @@ APOSTROPHES = {"'", "’"}
 
 def piece_bytes(tok) -> list[bytes]:
     """The bytes each vocabulary id decodes to (control pieces decode to nothing)."""
+    if hasattr(tok, "piece_bytes_list"):  # an outside model's tokeniser (thorp/outside_deck.py)
+        return tok.piece_bytes_list
     sp = tok.sp
     out = []
     for i in range(sp.get_piece_size()):

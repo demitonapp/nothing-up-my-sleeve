@@ -2890,6 +2890,19 @@ VS_LOGIC = (
     ("lift_second", "Logic: the second premise alone", "lift from the second premise"),
 )  # fmt: skip
 VS_LIFT_FLOOR = 0.1  # a logic lift is ranked only when the reference's reaches it: below, a ratio is noise over noise
+VS_DECK = (  # the other cards, read on an outside model by thorp/outside_deck.py (data/compare/deck-<model>.json)
+    ("sink", "The sink", "stars/attention_sink/max_score", True, "parks attention on the first piece"),
+    ("delimiter", "The delimiter", "stars/delimiter/max_score", False, "attends to punctuation and breaks"),
+    ("words_back", "Words back (two heads)", "stars/offset_2/shared_score", True, "attends two pieces back"),
+    ("duplicate_word", "Duplicate-word (two heads)", "stars/duplicate_word/shared_score", True, "attends to an earlier copy"),
+    ("rare_word", "The rare word", "stars/rare_word/max_score", True, "attention follows rarity"),
+    ("number_spotter", "Number-spotter", "stars/number_spotter/max_score", False, "attends to numbers"),
+    ("order_word", "Order-word", "stars/order_word/max_score", False, "attends to more, less, before, after"),
+    ("premise_marker", "Premise-marker", "stars/premise_marker/max_score", False, "attends to if, because, so"),
+    ("counter", "The counter (R²)", "counter/probe_r2", True, "knows how far into the sentence it is"),
+    ("bridge", "The bridge (nats)", "stars/bridge/max_score", True, "the middle term at the conclusion"),
+)  # fmt: skip
+# (a class card's reading is a ratio over its share of the keys: a pinned head's runs to the hundreds, so it is shown, not ranked)
 VS_PAIRS = 24  # the matched pairs in a trick test: one pair is 1/24 of the score
 
 
@@ -2898,16 +2911,25 @@ def _vs_references() -> dict[str, dict]:
     bits per byte from data/compare/<model>__hole-cards-unseen.json where it was scored."""
     cg = paths.data_dir() / "compare" / "chain-grades.json"
     models = json.loads(cg.read_text())["models"] if cg.exists() else {}
-    bpb = {}
-    for f in (paths.data_dir() / "compare").glob("*__hole-cards-unseen.json"):
+    from thorp import cleaning
+
+    bpb, cleaned = {}, {}
+    for f in (paths.data_dir() / "compare").glob("*__hole-cards-unseen*.json"):
         d = json.loads(f.read_text())
-        bpb[d["model"].split("/")[-1].removesuffix("-bf16").removesuffix("-4bit").lower()] = d.get("bpb_mean")
+        short = d["model"].split("/")[-1].removesuffix("-bf16").removesuffix("-4bit").lower()
+        if d.get("clean", "raw") == cleaning.CURRENT:  # scored on the text the voyages read: preferred
+            cleaned[short] = d.get("bpb_mean")
+        elif d.get("clean", "raw") == "raw":
+            bpb[short] = d.get("bpb_mean")
+    bpb.update(cleaned)
     out = {}
     for name, m in models.items():
         if "/" not in name:  # Thorp's own voyages graded alongside
             continue
         short = name.split("/")[-1].removesuffix("-bf16").removesuffix("-4bit").lower()
-        out[name] = {**m, "bpb": bpb.get(short)}
+        dk = paths.data_dir() / "compare" / f"deck-{name.replace('/', '--')}.json"
+        out[name] = {**m, "bpb": bpb.get(short), "bpb_clean": short in cleaned,
+                     "deck": json.loads(dk.read_text()) if dk.exists() else None}  # fmt: skip
     return out
 
 
@@ -2980,11 +3002,26 @@ def api_class_vs(preset: str, ref: str | None = None, voyage: str | None = None)
             note = "one head: the two-head reading is not on the ledger for this voyage yet" if used != metrics[0] else None
             add(f"card/{k}", "card", name, about, mine, theirs, mine / theirs if theirs > 0 else None,
                 "nats a token" if k == "copy_gain" else "attention", step, note=note)  # fmt: skip
+        dk = R.get("deck") or {}
+        for k, name, metric, ranked, about in VS_DECK:
+            theirs = (dk.get("metrics") or {}).get(metric)
+            mine, step = last(rid, metric)
+            if theirs is None or mine is None or any(x["key"] == f"card/{k}" for x in rows):
+                continue
+            add(f"card/{k}", "card", name, about, mine, theirs, mine / theirs if ranked and theirs > 0 else None,
+                "attention", step, note=None if ranked else "a class card's ratio: shown, not ranked")  # fmt: skip
+        if dk.get("played") is not None:
+            from thorp.viable.s4_intelligence import wager
+
+            ours = [c for c, v in wager.falls(rid, int(v.get("bt") or 32768)).items() if v["played"]]
+            add("deck/played", "card", "Cards played (the deck's rules, of 16)", "every card whose look (and ability) "
+                "passes, above what it sits on", len(ours), len(dk["played"]), len(ours) / max(1, len(dk["played"])),
+                "cards", None, note=f"ours: {', '.join(sorted(ours))}; theirs: {', '.join(dk['played'])}")  # fmt: skip
         mine, step = last(rid, "eval/hole-cards-unseen/bpb_mean")
         if mine is not None and R.get("bpb"):
             add("bpb", "language", "Judge-book bits per byte (lower is better)", "the 16 Forgotten Tomes, every byte",
                 mine, R["bpb"], R["bpb"] / mine, "bits a byte", step,
-                note="the reference was scored before the hard-wrap cleaning; ours reads the cleaned text")  # fmt: skip
+                note=None if R.get("bpb_clean") else "the reference was scored on raw text; ours reads the cleaned text")  # fmt: skip
         tot = last(rid, "plan/total_steps")[0]
     finally:
         con.close()

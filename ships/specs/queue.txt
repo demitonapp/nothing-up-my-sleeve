@@ -25,6 +25,11 @@
 # Ogden keels that sailed before it; only the new reading is recorded
 # Score the four new cards (pips) on every checkpoint of the voyages that sailed before them: the 21m first (Justin, 22:20: "yes, score them"), then the Ogden keels
 # the full deck on the 9m (Justin, 2026-11-08 07:50): every metre and riddle card, next after the 1m at sea
+# A 100m to score against (Justin, 08:45: "do it"): Pythia-70m and -160m on the judge books in bits per byte, on the text the
+# voyages read (unwrap-v2), and Qwen3 0.6B again on it (it was scored raw); then the whole deck read on Pythia 14m to 160m and
+# Qwen3 0.6B (thorp/outside_deck.py). Scored on the Versus tab
+cmd: for m in EleutherAI/pythia-70m EleutherAI/pythia-160m mlx-community/Qwen3-0.6B-bf16; do uv run --project backend --group compare python backend/scripts/score_external.py "$m" lists/hole-cards-unseen.csv --clean unwrap-v2; done >> data/runs/score-external.out 2>&1
+cmd: uv run --project backend --group compare python -m thorp.outside_deck EleutherAI/pythia-14m EleutherAI/pythia-31m EleutherAI/pythia-70m EleutherAI/pythia-160m Qwen/Qwen3-0.6B >> data/runs/outside-deck.out 2>&1
 # The Smallest Bridge, leg 1 (Justin, 08:25: "yes, pre-register it"): waits until Ogden v0.2's prechecks pass (its lexicon is being
 # tagged), up to 4 hours; then the staged 9m on v0.2 and v0.2's plain 9m (its control)
 cmd: n=0; until uv run --project backend python -c "import sys; from thorp.viable.s3_control import fitout_store as f; sys.exit(0 if (f.readiness('ogden-v0-2') or {}).get('ready') else 1)" >/dev/null 2>&1 || [ $n -ge 240 ]; do sleep 60; n=$((n+1)); done

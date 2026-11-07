@@ -70,9 +70,11 @@ def _needed() -> set[str]:
     return out
 
 
-def falls(run_id: str, batch_tokens: int) -> dict[str, dict]:
-    """Where each card falls in a voyage: {card: {played, step, tokens, layer}} (played False: never so far)."""
-    s = _series(run_id, _needed())
+def falls(run_id: str | None, batch_tokens: int, series: dict | None = None) -> dict[str, dict]:
+    """Where each card falls in a voyage: {card: {played, step, tokens, layer}} (played False: never so far).
+    `series` ({metric: [(step, value), ...]}) reads readings from elsewhere instead of the ledger: an outside
+    model's single reading (thorp/outside_deck.py), at step 0."""
+    s = series if series is not None else _series(run_id, _needed())
     steps = sorted({st for name in s for st, _ in s[name]})
 
     def at(name: str, step: int):

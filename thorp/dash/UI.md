@@ -230,6 +230,15 @@ holds the ways in, always:
   each (seed 1 solid, seed 2 dashed), the 0.3 mark dotted and a star where each run first lights it;
   then previous-word (0.5) and the copy gain (0.5). Above, the verdict by the pre-registered rule: lit
   on two seeds or not, and "repetition did it" when the engine lights it and its twin does not.
+- **Governance** (`#/governance`, after Leaderboard; `thorp/vsm.py`, `/api/governance`): Thorp's rules
+  as Beer's Viable System Model, five Card bands from S5 at the top to S1, each with its name, purpose,
+  its code as Badge chips and its live numbers from `vsm.audit()`. S5 policy: each policy's
+  statement, when Justin adopted it, and an enforced or advisory Badge. S4 intelligence: the
+  competitors and the reference ladder, linked to the leaderboard. S3 control: per policy, the
+  queued runs breaking it and those excepted with the exception's reason (the stores policy large;
+  an Alert while it is advisory and runs break it), each list one ghost Button open. S2 coordination: the queue's lints in an Alert, or a
+  green "no collisions". S1 operations: the runs queued and every voyage with its status, linked.
+  Read-only: a policy is switched in `data/policies.json`, by Justin.
 - **Shelves** (`#/shelves`) opens on **Fitouts** (`thorp.shelves.fitouts`, kept warm like the
   shelves): a fitout is the training material matched to its stages. A card per fitout: its aim,
   positions, vocabulary, tack and tokens; two lanes, **pretraining** (its stages in order, one run)
@@ -245,7 +254,10 @@ holds the ways in, always:
   drag (within or across lanes) and are sized by tokens × passes. Above the lanes, the fitout's name,
   aim, positions and tack; below, the total tokens and how much of it is the repetition engine.
   **Save** posts to `fitouts.save` (a readable error if it doesn't validate); **Queue** builds the
-  saved fitout for a class (the first four rungs) with its seeds, at the top or the end of the queue
+  saved fitout for a class (the first four rungs) with its seeds, at the top or the end of the queue.
+  The queue passes the S3 gate first: a refusal (`vsm.GateRefused`) shows its own words. The ship's
+  stores (`lists/stores/`) head the palette, since a fitout that reads only them passes the stores
+  rule; any other shelf opens an **opt-in** field for the reason in words (`opt_in` on the fitout)
   (`fitouts.queue`), only after a confirmation, since it changes what the Mac trains next. The saved
   fitouts and the hand-curated ones (opened as a copy) sit beneath, each one click from the builder.
   tokens per pass × passes, and purpose; then its runs and their status. Each class page has the

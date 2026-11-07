@@ -1440,6 +1440,21 @@ def api_series(runs: str, metrics: str) -> dict:
     return out
 
 
+def api_governance() -> dict:
+    """Thorp's rules as Beer's Viable System Model (thorp/vsm.py): the five systems (S1 operations to
+    S5 policy) with their code, and the live audit: the voyages, the queue's collisions, each policy's
+    enforcement and the queued runs that break it, the outside world Thorp measures itself against.
+    Read-only: switching a policy is Justin's S5 decision, made in data/policies.json."""
+    import dataclasses
+
+    from thorp import vsm
+
+    return {
+        "systems": [dataclasses.asdict(s) for s in vsm.SYSTEMS.values()],
+        "audit": vsm.audit(),
+    }
+
+
 def api_leaderboard() -> dict:
     """The best of each class on the climb to chaining two facts (thorp.leaderboard.payload)."""
     from thorp import leaderboard
@@ -2273,6 +2288,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/shelves": api_shelves,
                 "/api/shelf_books": lambda: api_shelf_books(q["path"]),
                 "/api/leaderboard": api_leaderboard,
+                "/api/governance": api_governance,
                 "/api/series": lambda: api_series(q.get("runs", ""), q.get("metrics", "")),
                 "/api/fitout_builder": api_fitout_builder,
                 "/api/shelf_trigrams": lambda: api_shelf_trigrams(q["path"]),

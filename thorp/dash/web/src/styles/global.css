@@ -704,3 +704,30 @@ main a.pc2-more:hover { color: #000; }
 .indverdict { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
 [data-voyage="induction"] .row > div { flex: 1; min-width: 280px; }
 [data-voyage="induction"] .k { font-size: var(--fs-sm); color: var(--muted); }
+
+/* governance: the viable system model, S5 to S1 (layout only; the cards, badges, buttons and alert are shadcn's) */
+#govbands { display: grid; gap: 12px; }
+.govband { border-left: 4px solid var(--line); }
+.govband[data-sys="S5"] { border-left-color: var(--accent); }
+.govband[data-sys="S4"] { border-left-color: var(--blue); }
+.govband[data-sys="S3"] { border-left-color: var(--bad); }
+.govband[data-sys="S2"] { border-left-color: var(--good); }
+.govhead { display: flex; gap: 12px; align-items: center; }
+.govhead h2 { margin: 0; }
+.govkey { font-size: 22px; font-weight: 700; color: var(--muted); font-family: Georgia, serif; min-width: 38px; }
+.govchips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.govchip { font-size: 11px; }
+.govlive { font-size: var(--fs-sm); display: grid; gap: 8px; }
+.govstats { display: flex; flex-wrap: wrap; gap: 10px 24px; }
+.govstat { display: flex; flex-direction: column; text-decoration: none; color: inherit; }
+.govstat > b { font-size: 22px; font-weight: 600; }
+.govstat span { color: var(--muted); font-size: var(--fs-sm); }
+.govstat.big > b { font-size: 36px; }
+.govstat.warn > b { color: var(--accent); }
+.govstat.ok > b { color: var(--good); }
+.govlines { display: flex; flex-wrap: wrap; gap: 4px 12px; padding: 6px 0 6px 16px; font-size: 11px; }
+.govvoy { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.govsep { width: 14px; }
+.govlints { margin: 0; padding-left: 18px; }
+.govexc { color: var(--text); }
+.fboptin { margin-top: 6px; }

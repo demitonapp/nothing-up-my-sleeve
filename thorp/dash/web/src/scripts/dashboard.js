@@ -41,7 +41,7 @@ const MTABS = ['fleet', 'goals', 'overview', 'training', 'scoring', 'waypoints',
 const STABS = ['betting', 'books', 'languages', 'sieves', 'attention', 'traits'];
 const STAB_EL = { betting: 'betting', books: 'books', languages: 'languages', sieves: 'sieves', attention: 'attention', traits: 'traits-section' };
 const OLD_SHIP = { betting: 'betting', books: 'books', languages: 'languages', sieves: 'sieves', attention: 'attention', 'traits-section': 'traits' };
-const SECTION_NAV = { sizes: 'classes', rung: 'classes', ship: 'classes', 'runs-section': 'classes', voyages: 'voyages', voyage: 'voyages', table: 'voyages', discoveries: 'discoveries', sievesguide: 'sieves', leaderboard: 'leaderboard', competitor: 'leaderboard', shelves: 'shelves' };
+const SECTION_NAV = { sizes: 'classes', rung: 'classes', ship: 'classes', 'runs-section': 'classes', voyages: 'voyages', voyage: 'voyages', table: 'voyages', discoveries: 'discoveries', sievesguide: 'sieves', leaderboard: 'leaderboard', competitor: 'leaderboard', governance: 'governance', shelves: 'shelves' };
 let discView = 'index', discTrick = null, discChain = null, discSub = 'two-facts';
 // the Discoveries subtabs: the trick in focus (chaining two facts), the road to quantum mechanics, the registry of every trick
 const DSUBS = ['two-facts', 'quantum', 'registry'];
@@ -70,6 +70,7 @@ function route(h) {
     if (a === 'leaderboard' && b === 'thorp' && c) return { page: 'competitor', thorp: decodeURIComponent(c) };
     if (a === 'leaderboard' && b === 'competitor' && c) return { page: 'competitor', model: decodeURIComponent(h.slice(1).split('/').slice(2).join('/')) };
     if (a === 'leaderboard') return { page: 'leaderboard' };
+    if (a === 'governance') return { page: 'governance' };
     if (a === 'shelves') return { page: 'shelves', shelf: b ? decodeURIComponent(b) : null };
     return { page: 'sizes' };
   }
@@ -151,6 +152,7 @@ function showTab(h, push = true) {
   }
   if (page === 'sievesguide') { sieveRun = rt.run; hash = '/sieves' + (sieveRun ? '/' + encodeURIComponent(sieveRun) : ''); }
   if (page === 'leaderboard') hash = '/leaderboard';
+  if (page === 'governance') hash = '/governance';
   if (page === 'competitor') { cpThorp = rt.thorp || null; cpModel = rt.thorp || rt.model; hash = cpThorp ? '/leaderboard/thorp/' + encodeURIComponent(cpThorp) : '/leaderboard/competitor/' + encodeURIComponent(cpModel); }
   if (page === 'shelves') { shelfOpen = rt.shelf || shelfOpen; hash = '/shelves'; }
   document.querySelectorAll('main > .section').forEach(s => s.classList.toggle('active', s.id === page));
@@ -167,6 +169,7 @@ function showTab(h, push = true) {
   if (page === 'discoveries') loadDiscoveries();
   if (page === 'sievesguide') loadSieves();
   if (page === 'leaderboard') loadLeaderboard();
+  if (page === 'governance') loadGovernance();
   if (page === 'competitor') loadCompetitor();
   if (page === 'shelves') loadShelves();
   if (page === 'ship' && (selected !== wasShip || !runsList)) refresh();
@@ -2112,6 +2115,7 @@ async function refresh() {
   if (page === 'discoveries') loadDiscoveries();
   if (page === 'sievesguide') loadSieves();
   if (page === 'leaderboard') loadLeaderboard();
+  if (page === 'governance') loadGovernance();
   if (page === 'competitor') loadCompetitor();
   if (page === 'shelves') loadShelves();
   try {
@@ -2982,7 +2986,7 @@ async function competitorKnockout(model) {
 // reordered by drag and sized by tokens × passes; the fitout's settings and its total; Save, then Build for a class and
 // Queue (after a confirmation, since it changes what the Mac trains next); and the fitouts to open.
 const FB_SELECT = { all: 'all of it', random: 'random books', repeat: 'highest repetition', frontier: 'Pareto frontier' };
-const fb = { name: '', aim: '', positions: 'rope', tack: { alpha: 3, kind: 'induction' }, stages: [], key: null, saved: null, dirty: false };
+const fb = { name: '', aim: '', positions: 'rope', tack: { alpha: 3, kind: 'induction' }, stages: [], opt_in: '', key: null, saved: null, dirty: false };
 let fbShelves = [], fbMeta = null, fbInit = false, fbDrag = null;
 const fbTri = new Map();
 const fbShelf = path => fbShelves.find(x => x.path === path);
@@ -3007,11 +3011,13 @@ function triScatter(path) {
 }
 function drawPalette() {
   const el = document.getElementById('fbpalette'); if (!el) return;
-  const sorted = [...fbShelves].sort((a, b) => (b.trigrams && b.trigrams.measured ? 1 : 0) - (a.trigrams && a.trigrams.measured ? 1 : 0) || a.name.localeCompare(b.name));
+  // the ship's stores first: a fitout that reads only them passes the stores rule (S3) with no opt-in
+  const isStore = x => x.path.startsWith('lists/stores/');
+  const sorted = [...fbShelves].sort((a, b) => isStore(b) - isStore(a) || (b.trigrams && b.trigrams.measured ? 1 : 0) - (a.trigrams && a.trigrams.measured ? 1 : 0) || a.name.localeCompare(b.name));
   el.innerHTML = sorted.map(x => {
     const t = x.trigrams;
     return `<div class="fbtile" draggable="true" data-shelf="${esc(x.path)}" title="${esc(x.about || x.path)}">
-      <div class="fbtn"><b>${esc(x.name)}</b>${x.kind !== 'training' ? ` <span class="${pillCls('')}">${esc(x.kind)}</span>` : ''}</div>
+      <div class="fbtn"><b>${esc(x.name)}</b>${isStore(x) ? ` <span class="${pillCls('good')}">the ship's stores</span>` : x.kind !== 'training' ? ` <span class="${pillCls('')}">${esc(x.kind)}</span>` : ''}</div>
       <div class="s">${x.books} books · ${big(x.tokens_est)} tokens</div>
       <div class="s">${t && t.measured ? `repetition <b>${(100 * t.repeat_rate).toFixed(1)}%</b> · variety ${(100 * t.variety).toFixed(0)}%` : 'trigrams not measured'}</div>
       <div class="fbsc" data-sc="${esc(x.path)}">${t && t.measured ? triScatter(x.path) : ''}</div></div>`;
@@ -3035,9 +3041,11 @@ function drawSettings() {
     <label>positions <select class="${selectCls('')}" id="fbpos"><option value="rope"${fb.positions === 'rope' ? ' selected' : ''}>rope</option><option value="learned"${fb.positions === 'learned' ? ' selected' : ''}>learned</option></select></label>
     <label>tack <select class="${selectCls('')}" id="fbtack"><option value="">none</option><option value="induction"${fb.tack && fb.tack.kind === 'induction' ? ' selected' : ''}>induction</option><option value="conclusion"${fb.tack && fb.tack.kind === 'conclusion' ? ' selected' : ''}>conclusion</option></select></label>
     <label>× <input class="${fieldCls('')}" id="fbalpha" type="number" min="0" step="0.5" value="${fb.tack ? fb.tack.alpha ?? 3 : 3}" style="width:56px"${fb.tack ? '' : ' disabled'}></label></div>
-    <label class="fbaim">aim <textarea id="fbaim" rows="2" placeholder="what this fitout is for">${esc(fb.aim)}</textarea></label>`;
+    <label class="fbaim">aim <textarea id="fbaim" rows="2" placeholder="what this fitout is for">${esc(fb.aim)}</textarea></label>
+    <label class="fbaim fboptin" id="fboptinwrap" hidden>opt-in <textarea id="fboptin" rows="2" placeholder="why this fitout reads outside the ship's stores (the stores rule, S3: required for any shelf not in lists/stores/)">${esc(fb.opt_in || '')}</textarea></label>`;
   el.querySelector('#fbname').oninput = e => { fb.name = e.target.value; fbMark(); };
   el.querySelector('#fbaim').oninput = e => { fb.aim = e.target.value; fbMark(); };
+  el.querySelector('#fboptin').oninput = e => { fb.opt_in = e.target.value; fbMark(); };
   el.querySelector('#fbpos').onchange = e => { fb.positions = e.target.value; fbMark(); };
   el.querySelector('#fbtack').onchange = e => { fb.tack = e.target.value ? { alpha: +el.querySelector('#fbalpha').value || 3, kind: e.target.value } : null; el.querySelector('#fbalpha').disabled = !fb.tack; fbMark(); };
   el.querySelector('#fbalpha').oninput = e => { if (fb.tack) fb.tack.alpha = +e.target.value; fbMark(); };
@@ -3104,6 +3112,9 @@ function wireLanes() {
 }
 function drawTotals() {
   const el = document.getElementById('fbtotal'); if (!el) return;
+  const outside = fb.stages.filter(st => !String(st.shelf).startsWith('lists/stores/'));
+  const ow = document.getElementById('fboptinwrap');
+  if (ow) { ow.hidden = !outside.length; ow.title = outside.length ? `${outside.length} stage${outside.length === 1 ? '' : 's'} read outside the ship's stores: ${outside.map(st => st.name).join(', ')}` : ''; }
   const tot = st => fbStageTokens(st) * (st.passes || 1);
   const all = fb.stages.reduce((a, st) => a + tot(st), 0);
   const rep = fb.stages.filter(st => st.select === 'repeat' || st.select === 'frontier').reduce((a, st) => a + tot(st), 0);
@@ -3130,7 +3141,7 @@ async function fbPost(url, body) {
   const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || r.statusText); return j;
 }
 async function fbSave() {
-  const body = { key: fb.key || undefined, name: fb.name, aim: fb.aim, positions: fb.positions, tack: fb.tack, stages: fb.stages };
+  const body = { key: fb.key || undefined, name: fb.name, aim: fb.aim, positions: fb.positions, tack: fb.tack, stages: fb.stages, opt_in: fb.opt_in || undefined };
   try {
     const r = await fbPost('/api/fitouts/save', { fitout: body });
     fb.key = r.key; fb.dirty = false; fbMeta = null; fbMeta = await get('/api/fitout_builder');
@@ -3147,10 +3158,10 @@ async function fbQueue() {
   try {
     const r = await fbPost('/api/fitouts/queue', { key: fb.key, preset, seeds, where });
     fbMsg(`queued ${r.lines.length} run${r.lines.length === 1 ? '' : 's'} ${where === 'top' ? 'at the top' : 'at the end'}: ${r.lines.map(l => `<span class="mono">${esc(l)}</span>`).join(', ')}`, 'good');
-  } catch (e) { fbMsg(`not queued: ${esc(e.message)}`, 'bad'); }
+  } catch (e) { fbMsg(`not queued, the gate (S3) refused it: ${esc(e.message)}`, 'bad'); }
 }
 function fbLoad(f, key) {
-  fb.name = f.name || ''; fb.aim = f.aim || ''; fb.positions = f.positions || 'rope'; fb.tack = f.tack ? { ...f.tack } : null;
+  fb.name = f.name || ''; fb.aim = f.aim || ''; fb.opt_in = f.opt_in || ''; fb.positions = f.positions || 'rope'; fb.tack = f.tack ? { ...f.tack } : null;
   fb.stages = (f.stages || []).map(st => ({ ...st, tack: st.tack ? { ...st.tack } : null })); fb.key = key; fb.dirty = !key;
   drawBuilder(); fbMsg(key ? `opened <b>${esc(key)}</b>` : f.name ? `a copy of <b>${esc(f.name)}</b>: save it under its own name` : '');
 }
@@ -3211,4 +3222,46 @@ async function drawInduction(v) {
   document.getElementById('indverdict').innerHTML = `<span class="${pillCls(success ? 'good' : '')}">${success ? 'lit on two seeds' : 'not lit on two seeds yet'}</span>
     ${byRepetition ? `<span class="${pillCls('good')}">repetition did it</span>` : ''}
     <span class="s">trigram engine: ${engLit} of ${eng.length} seeds lit${isFinite(best(eng)) ? `, best ${best(eng).toFixed(3)}` : ''} · random twin: ${twLit} of ${tw.length}${isFinite(best(tw)) ? `, best ${best(tw).toFixed(3)}` : ''} · earlier 300k Nevermores: 0.00 to 0.01</span>`;
+}
+
+
+// ==================================================================================== governance
+// (#/governance; thorp/vsm.py, /api/governance; UI.md "Governance"): Beer's Viable System Model, S5 at the top down to S1.
+// Each band a Card with its name, purpose and code, then that system's live numbers from the audit. Read-only.
+let govKey = null;
+const govOpen = new Set();
+async function loadGovernance() {
+  const el = document.getElementById('govbands'); if (!el) return;
+  let d; try { d = await get('/api/governance'); } catch (e) { return; }
+  const key = JSON.stringify(d) + [...govOpen].join(','); if (key === govKey) return; govKey = key;
+  const A = d.audit || {}, sys = Object.fromEntries((d.systems || []).map(x => [x.key, x]));
+  const pol = (A.S3 || {}).policies || {}, stmt = A.S5 || {}, breaking = A.breaking || {};
+  const chips = s => (s.members || []).map(m => `<span class="${pillCls('')} mono govchip">${esc(m)}</span>`).join('');
+  const band = (k, live) => { const s = sys[k] || { key: k }; return `<section class="${cardCls(false, 'panel govband')}" data-sys="${k}"><div class="govhead"><span class="govkey">${k}</span><div><h2>${esc(s.name || '')}</h2><div class="s">${esc(s.purpose || '')}</div></div></div>
+    <div class="govchips">${chips(s)}</div><div class="govlive">${live}</div></section>`; };
+  const enforcedBadge = on => on ? `<span class="${pillCls('good')}">enforced</span>` : `<span class="${pillCls('accent')}">advisory</span>`;
+  // S5 policy
+  const s5 = `<table data-nosort><thead><tr><th>policy</th><th>statement</th><th>adopted</th><th></th></tr></thead><tbody>${Object.entries(stmt).map(([k, p]) => `<tr><td><b>${esc(k)}</b></td><td>${esc(p.statement)}</td><td class="s">${esc(p.adopted || '')}</td><td>${enforcedBadge(p.enforced)}</td></tr>`).join('')}</tbody></table>
+    <p class="s">A policy is switched on (enforced at the gate, S3) or left advisory by Justin, in data/policies.json; not from here.</p>`;
+  // S4 intelligence
+  const s4a = A.S4 || {};
+  const s4 = `<div class="govstats"><a href="#/leaderboard" class="govstat"><b>${(s4a.competitors || []).length}</b><span>2–4B competitors</span></a><a href="#/leaderboard" class="govstat"><b>${(s4a.reference_ladder || []).length}</b><span>models on the reference ladder</span></a></div>
+    <div class="s">${(s4a.competitors || []).map(m => `<a href="#/leaderboard/competitor/${encodeURIComponent(m)}">${esc(_shortModel(m))}</a>`).join(' · ')}</div>`;
+  // S3 control: each policy's breaking runs, the stores policy first and large
+  const order = Object.keys(pol).sort((a, b) => (b === 'stores') - (a === 'stores') || (pol[b].queued_runs_breaking_it || 0) - (pol[a].queued_runs_breaking_it || 0));
+  const s3 = `<div class="govstats">${order.map(k => { const p = pol[k], n = p.queued_runs_breaking_it || 0, x = p.queued_runs_excepted || 0; return `<div class="govstat${k === 'stores' ? ' big' : ''}${n ? ' warn' : ' ok'}"><b>${n}</b><span>queued run${n === 1 ? '' : 's'} breaking <b>${esc(k)}</b> ${enforcedBadge(p.enforced)}${x ? `<br><b class="govexc">${x}</b> excepted${p.exception ? `: ${esc(p.exception)}` : ''}` : ''}</span></div>`; }).join('')}
+      <div class="govstat"><b>${(A.S3 || {}).runs_not_finished ?? '–'}</b><span>runs started and not finished</span></div></div>
+    ${pol.stores && !pol.stores.enforced && pol.stores.queued_runs_breaking_it ? `<div class="${alertCls('open')}">The stores policy: ${pol.stores.queued_runs_breaking_it} of ${(A.S1 || {}).queued ?? '–'} queued runs read outside the ship's stores. Whether to enforce it is the decision pending with Justin.</div>` : ''}
+    ${order.filter(k => (breaking[k] || []).length).map(k => { const open = govOpen.has(k), lines = breaking[k];
+      return `<div class="govbreak"><button class="${btnCls('ghost')}" data-gov="${esc(k)}">${open ? '▾' : '▸'} the runs breaking ${esc(k)} (${pol[k].queued_runs_breaking_it}${lines.length < pol[k].queued_runs_breaking_it ? `, the first ${lines.length} shown` : ''})</button>${open ? `<div class="govlines">${lines.map(l => `<span class="mono">${esc(l)}</span>`).join('')}</div>` : ''}</div>`; }).join('')}`;
+  // S2 coordination
+  const lints = (A.S2 || {}).queue_lints || [];
+  const s2 = lints.length ? `<div class="${alertCls('no')}"><ul class="govlints">${lints.map(l => `<li>${esc(l)}</li>`).join('')}</ul></div>` : `<span class="${pillCls('good')}">no collisions</span> <span class="s">the queue lints clean: one GPU, one queue, no shared file written twice</span>`;
+  // S1 operations
+  const vs = (A.S1 || {}).voyages || {}, rank = st => ['running', 'planned', 'done'].indexOf(st);
+  const s1 = `<div class="govstats"><div class="govstat"><b>${(A.S1 || {}).queued ?? '–'}</b><span>runs queued</span></div>${['running', 'planned', 'done'].map(st => `<div class="govstat"><b>${Object.values(vs).filter(x => x === st).length}</b><span>voyages ${st}</span></div>`).join('')}</div>
+    <div class="govvoy">${Object.entries(vs).sort((a, b) => rank(a[1]) - rank(b[1])).map(([k, st]) => `<a href="#/voyages/${esc(k)}">${esc(VOYAGE_NAME[k] || k)}</a> ${statusPill(st)}`).join('<span class="govsep"></span>')}</div>`;
+  el.innerHTML = band('S5', s5) + band('S4', s4) + band('S3', s3) + band('S2', s2) + band('S1', s1);
+  el.querySelectorAll('[data-gov]').forEach(b => b.onclick = () => { const k = b.dataset.gov; govOpen.has(k) ? govOpen.delete(k) : govOpen.add(k); govKey = null; loadGovernance(); });
+  if (!Object.keys(VOYAGE_NAME).length) get('/api/voyages').then(v => { v.forEach(x => { VOYAGE_NAME[x.key] = x.name; }); govKey = null; loadGovernance(); }).catch(() => {});
 }

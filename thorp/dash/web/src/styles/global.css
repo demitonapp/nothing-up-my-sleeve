@@ -10,26 +10,14 @@
 }
 /* the standards in UI.md: one control, one field, one pill, one clickable row, one focus ring */
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-button, .btn { background: var(--bg); color: var(--muted); border: 1px solid var(--line); border-radius: var(--r-sm);
-               padding: 4px 10px; font: inherit; font-size: var(--fs-sm); cursor: pointer; }
-button:hover, .btn:hover, button.on { color: var(--accent); border-color: var(--accent); }
-button:disabled { opacity: .4; cursor: default; color: var(--muted); border-color: var(--line); }
-select, input { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-sm);
-                padding: 4px 8px; font: inherit; font-size: var(--fs-sm); }
-.pill, .badge { display: inline-block; padding: 1px 8px; border-radius: var(--r-pill); font-size: var(--fs-xs); border: 1px solid var(--line); }
-.pill { white-space: nowrap; }
-.pill.good, .pill.live, .badge.finished, .pill.finished { color: var(--good); border-color: var(--good); }
-.pill.bad, .badge.failed, .pill.failed { color: var(--bad); border-color: var(--bad); }
-.pill.blue, .badge.running, .pill.running { color: var(--blue); border-color: var(--blue); }
-.pill.accent { color: var(--accent); border-color: var(--accent); }
-.pill.solid, .allruns { color: var(--bg); background: var(--accent); border-color: var(--accent); }
+/* Pill: a shadcn Badge, drawn by pillCls() in src/lib/ui.ts (UI.md, Components) */
 table.clickable tbody tr[tabindex] { cursor: pointer; }
 table.clickable tbody tr[tabindex]:hover td, table.clickable tbody tr[tabindex]:focus-visible td { background: var(--raise); color: var(--accent); }
 table.clickable tbody tr:focus-visible { outline: none; }
 .mt { margin-top: 8px; }
 /* links in text and tables: one colour, underlined on hover (cards, tabs and back links have their own) */
-main a:not(.card):not(.back):not(.crumb):not(.chip):not(.sailing):not(.pill):not(.st):not(.ccell) { color: var(--blue); text-decoration: none; }
-main a:not(.card):not(.back):not(.crumb):not(.chip):not(.sailing):not(.pill):not(.st):not(.ccell):hover { text-decoration: underline; }
+main a:not(.card):not(.back):not(.crumb):not(.chip):not(.sailing):not(.pill):not(.st):not(.ccell):not(.pc2-more) { color: var(--blue); text-decoration: none; }
+main a:not(.card):not(.back):not(.crumb):not(.chip):not(.sailing):not(.pill):not(.st):not(.ccell):not(.pc2-more):hover { text-decoration: underline; }
 tr.aside td { opacity: .55; }
 /* RunGrid: a GitHub contribution graph of runs (UI.md) */
 .gridsum { display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: center; font-size: var(--fs-sm); color: var(--muted); margin-bottom: 10px; }
@@ -47,9 +35,9 @@ tr.aside td { opacity: .55; }
 .rungrid i:hover { outline: 1.5px solid var(--text); }
 @keyframes gridpulse { 50% { opacity: .45; } }
 @media (prefers-reduced-motion: reduce) { .rungrid i.run { animation: none; } }
-.gridtip { position: fixed; z-index: 50; padding: 8px 10px; background: var(--raise); border: 1px solid var(--line); border-radius: var(--r-md);
-           font-size: var(--fs-sm); line-height: 1.45; pointer-events: none; box-shadow: 0 6px 20px rgba(0,0,0,.4); max-width: 320px; }
-.gridtip .s { color: var(--muted); }
+/* the RunGrid's hover: the look is shadcn's Tooltip (tooltipCls); here only where it sits */
+.gridtip { position: fixed; z-index: 50; max-width: 320px; }
+.gridtip .s { opacity: .7; }
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
 body { margin: 0; background: var(--bg); color: var(--text);
@@ -60,26 +48,18 @@ header h1 { margin: 0; font-size: var(--fs-xl); letter-spacing: .04em; }
 header h1 a { color: inherit; text-decoration: none; }
 header h1 a:hover { color: var(--accent); }
 header .sub { color: var(--muted); }
-nav { margin-left: auto; display: flex; gap: 4px; flex-wrap: wrap; font-size: var(--fs-sm); }
-nav a { color: var(--muted); text-decoration: none; text-transform: uppercase; letter-spacing: .06em;
-        padding: 6px 10px; border-radius: var(--r-sm); border: 1px solid transparent; }
-nav a:hover { color: var(--accent); }
-nav a.active { color: var(--accent); border-color: var(--line); background: var(--panel); }
 .section { display: none; }
 .section.active { display: grid; }
 main { padding: 16px 20px 40px; display: grid; gap: 16px; max-width: 1500px; margin: 0 auto; }
 .section.active { gap: 16px; }
 .section > h1, #discoveries .dview > h1 { margin: 18px 0 0; font-size: var(--fs-lg); letter-spacing: .08em; text-transform: uppercase; color: var(--accent); border-bottom: 1px solid var(--line); padding-bottom: 6px; }
 .section > h1 .q, #discoveries .dview > h1 .q { color: var(--muted); font-weight: 400; text-transform: none; letter-spacing: 0; margin-left: 12px; font-size: var(--fs-md); }
-nav a { cursor: pointer; }
 /* a page's own tabs (a class, a ship) sit under its title, below the three main sections */
-.subnav { display: flex; gap: 4px; flex-wrap: wrap; font-size: var(--fs-sm); border-bottom: 1px solid var(--line); padding-bottom: 8px; margin-left: 0; }
 .mtab, .shiptab { display: none; }
 .mtab.active, .shiptab.active { display: grid; gap: 16px; min-width: 0; }
 .shiptab > h1 { margin: 4px 0 0; font-size: var(--fs-md); letter-spacing: .08em; text-transform: uppercase; color: var(--text); }
 .shiptab > h1 .q { color: var(--muted); font-weight: 400; text-transform: none; letter-spacing: 0; margin-left: 12px; font-size: var(--fs-md); }
-a.crumb { color: var(--muted); text-decoration: none; margin-right: 8px; }
-a.crumb:hover { color: var(--accent); }
+/* back links and crumbs are shadcn's BreadcrumbLink (crumbCls); a crumb ends in its separator */
 a.crumb:not(:empty)::after { content: ' ›'; }
 .cards .card .goal { color: var(--text); font-size: var(--fs-md); }
 /* a band divides one tab into parts (Scoring: science, then art) */
@@ -88,8 +68,6 @@ a.crumb:not(:empty)::after { content: ' ›'; }
 .band .q { color: var(--muted); font-weight: 400; text-transform: none; letter-spacing: 0; margin-left: 12px; }
 .band { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 0; }
 .band .bandtools { margin-left: auto; display: flex; gap: 6px; text-transform: none; letter-spacing: 0; font-weight: 400; }
-.panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-md);
-         padding: 12px 14px; min-width: 0; }
 .panel h2 { margin: 0 0 8px; font-size: var(--fs-md); font-weight: 600; color: var(--muted);
             text-transform: uppercase; letter-spacing: .06em; }
 .panel h2 .note { text-transform: none; letter-spacing: 0; font-weight: 400; margin-left: 8px; }
@@ -103,9 +81,8 @@ a.crumb:not(:empty)::after { content: ' ›'; }
 .stat .s { color: var(--muted); font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
 .info { display: inline-block; position: relative; margin-left: 4px; color: var(--blue); cursor: help; font-size: var(--fs-xs); font-weight: 400;
         text-transform: none; letter-spacing: 0; }
-.info .pop { display: none; position: fixed; z-index: 50; width: 280px; padding: 10px 12px; text-align: left;
-             background: var(--raise); border: 1px solid var(--line); border-radius: var(--r-md); color: var(--text); font-size: var(--fs-sm);
-             line-height: 1.45; white-space: normal; box-shadow: 0 6px 20px rgba(0,0,0,.4); }
+/* ⓘ: the look is shadcn's HoverCard (hoverCardCls); here only how it opens */
+.info .pop { display: none; position: fixed; z-index: 50; }
 .info .pop b { color: var(--accent); font-weight: 600; }
 .info:hover .pop, .info:focus .pop, .info.open .pop { display: block; }
 .booktabs { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
@@ -148,24 +125,16 @@ a.crumb:not(:empty)::after { content: ' ›'; }
 #stripwrap > summary .note { text-transform: none; letter-spacing: 0; font-weight: 400; margin-left: 8px; }
 #stripwrap[open] > summary { margin-bottom: 8px; }
 .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
-.card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-md); padding: 14px 16px; cursor: pointer;
-        display: flex; flex-direction: column; gap: 8px; color: var(--text); text-decoration: none; transition: border-color .15s; }
-.card:hover, .card:focus-visible { border-color: var(--accent); outline: none; }
 .card .top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
 .card .preset { font-size: var(--fs-2xl); font-weight: 600; }
 .card .nm { color: var(--accent); font-size: var(--fs-sm); text-transform: uppercase; letter-spacing: .06em; }
 .card .job { font-weight: 600; }
 .card .ov { color: var(--muted); font-size: var(--fs-md); flex: 1; }
 .card .foot { display: flex; justify-content: space-between; gap: 8px; font-size: var(--fs-sm); color: var(--muted); border-top: 1px solid var(--line); padding-top: 8px; }
-a.back { color: var(--muted); text-decoration: none; font-size: var(--fs-md); margin-right: 8px; }
-a.back:hover { color: var(--accent); }
 .rungover { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px 24px; }
 .rungover .k { color: var(--muted); font-size: var(--fs-sm); } 
 .chart.tall { height: 380px; }
 .chart.short { height: 240px; }
-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
-th, td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--line); }
-th { color: var(--muted); font-weight: 500; font-size: var(--fs-sm); }
 th.dt-sortable { cursor: pointer; user-select: none; }
 th.dt-sortable:hover { color: var(--text); }
 th.dt-sortable::after { content: '↕'; margin-left: 4px; opacity: 0; font-size: var(--fs-xs); }
@@ -179,7 +148,6 @@ tr.sel td { color: var(--accent); }
 .samples .t { color: var(--muted); font-size: var(--fs-xs); }
 .samples pre { white-space: pre-wrap; margin: 2px 0 0; font: var(--fs-sm)/1.4 ui-monospace, Menlo, monospace; }
 .allruns { margin-right: 8px; letter-spacing: .06em; text-transform: uppercase; vertical-align: 2px; }
-.empty { color: var(--muted); padding: 30px 0; text-align: center; }
 .scroll { overflow-x: auto; }
 .claim { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
 .claim .k { color: var(--accent); font-size: var(--fs-sm); text-transform: uppercase; letter-spacing: .06em; }
@@ -424,7 +392,6 @@ main a.ccell { color: var(--text); text-decoration: none; display: block; }
 .cstrip em u { position: absolute; left: 0; top: 0; bottom: 0; background: var(--good); opacity: 0.45; }
 
 /* the shelves */
-#shelves .handtools input[type=search] { background: var(--raise); border: 1px solid var(--line); color: var(--text); border-radius: 4px; padding: 3px 8px; }
 .shelftable td { vertical-align: top; }
 .shelftable tr.open > td { background: var(--raise); }
 .shelftable tr.shelfdetail > td { background: var(--raise); padding: 10px 14px 14px; }
@@ -601,6 +568,34 @@ main a.ccell { color: var(--text); text-decoration: none; display: block; }
   background: rgba(227,179,65,.92); color: #1a1405; font: 700 12px/1.9 ui-sans-serif, system-ui, sans-serif; letter-spacing: .18em; text-transform: uppercase; box-shadow: 0 2px 6px rgba(0,0,0,.4); }
 .pc2.back .pc2-stamp { font-size: 9px; }
 
+/* a card turns over on a click to what it does (deck.js): the box keeps its place in the fan and its shadow,
+   the inside turns; each side is a face of its own, so the box itself shows nothing */
+.pc2.flip { background: none; border: 0; overflow: visible; perspective: 900px; cursor: pointer; }
+.pc2-turn { position: absolute; inset: 0; transform-style: preserve-3d; transition: transform .45s ease; }
+.pc2.flip.flipped .pc2-turn { transform: rotateY(180deg); }
+.pc2-face, .pc2-rear { position: absolute; inset: 0; border-radius: 10px; overflow: hidden; backface-visibility: hidden;
+  background: var(--card-face); color: var(--card-ink); }
+.pc2.back.flip .pc2-face { background: repeating-linear-gradient(45deg, var(--card-back) 0 6px, var(--card-back2) 6px 12px); border: 4px solid var(--card-face); }
+.pc2.flip.untrusted { outline: none; }
+.pc2.flip.untrusted .pc2-face { outline: 2px dashed var(--accent); outline-offset: -8px; }
+.pc2-rear { transform: rotateY(180deg); display: flex; flex-direction: column; gap: 6px; padding: 38px 12px 10px; text-align: left;
+  font: var(--fs-xs)/1.25 Georgia, serif; box-shadow: inset 0 0 0 1px rgba(0,0,0,.15); }
+.pc2-rear .pc2-rt { font-size: var(--fs-md); letter-spacing: .02em; }
+.pc2-rear .pc2-about { flex: 1; overflow: hidden; }
+.pc2-rear .pc2-why { color: #555552; font-style: italic; }
+main a.pc2-more { color: var(--card-ink); text-decoration: underline; text-underline-offset: 2px; font-size: var(--fs-xs); }
+main a.pc2-more:hover { color: #000; }
+/* a card set aside is small: turned over, it grows to a hand card's size to be read, and sits on top */
+.pc2.back.flip { transition: transform .3s ease; transform-origin: 100% 100%; }
+.pc2.back.flip.flipped { transform: rotate(0deg) scale(1.8); z-index: 30; }
+.pc2.back.flip .pc2-rear { padding: 22px 7px 6px; gap: 3px; font-size: 6.5px; }
+.pc2.back.flip .pc2-rear .pc2-rt { font-size: 8px; }
+.pc2.back.flip .pc2-rear .pc2-corner b { font-size: 9px; } .pc2.back.flip .pc2-rear .pc2-corner i { font-size: 8px; }
+.pc2.back.flip .pc2-rear a.pc2-more { font-size: 6.5px; }
+.pc2.back.flip .pc2-rear .pc2-why { display: none; }  /* its standing is printed under the card already */
+.pc2.back.void.flipped { opacity: 1; filter: none; }
+@media (prefers-reduced-motion: reduce) { .pc2-turn, .pc2.back.flip { transition: none; } }
+
 /* the approaching board: four small cards (lit or dark) and the chaining lift greyed as noise */
 .miniset { display: inline-flex; gap: 3px; vertical-align: middle; }
 .minicard { width: 20px; height: 28px; border-radius: 3px; display: inline-flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1;
@@ -672,8 +667,6 @@ main a.ccell { color: var(--text); text-decoration: none; display: block; }
 .triscatter .tsb { fill: var(--muted); opacity: .6; }
 .triscatter .tsf { fill: var(--accent); stroke: var(--card-face); stroke-width: .6; }
 .fbsettings label { font-size: var(--fs-sm); color: var(--muted); display: inline-flex; gap: 6px; align-items: center; }
-.fbsettings input, .fbsettings select, .fbsettings textarea, .fbblock input, .fbblock select, .fbactions select, .fbactions input {
-  background: var(--panel); border: 1px solid var(--line); color: var(--text); border-radius: 4px; padding: 3px 6px; font: inherit; font-size: var(--fs-sm); }
 .fbrow { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
 .fbrow #fbname { width: 260px; }
 .fbaim { display: flex !important; width: 100%; }

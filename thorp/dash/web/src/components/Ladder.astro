@@ -1,13 +1,16 @@
 ---
 // Classes: the home page. One card per class of ship (a model size, each with one job); a card
 // opens the class and its fleet. Below, the standing queue and the way to every ship.
+import { Panel } from './Panel';
 ---
 <div class="section" id="sizes">
   <h1>Classes of ship <span class="q">each class is a model size with one job; open a class for its fleet of ships</span></h1>
   <div class="cards" id="rungcards"></div>
-  <section class="panel">
-    <h2>Filling the seven steps to quantum physics <span class="note">every class learns as many tricks as it can and carries all of them up to the next: each cell is how much of a step that class has filled. Performed here, inherited from a smaller class (to carry up and show again here), and still open</span></h2>
+  <Panel title="Filling the seven steps to quantum physics" note="every class learns as many tricks as it can and carries all of them up to the next: each cell is how much of a step that class has filled. Performed here, inherited from a smaller class (to carry up and show again here), and still open">
     <div class="scroll"><table id="coveragetable" data-nosort><thead></thead><tbody></tbody></table></div>
-  </section>
-  <section class="panel"><h2>Tonight's queue <span class="note">the ships waiting to sail, one at a time; <a href="#/ships">every ship ever launched</a></span></h2><div class="scroll"><table id="queue"><thead><tr><th>#</th><th>spec</th><th>status</th></tr></thead><tbody></tbody></table></div></section>
+  </Panel>
+  <Panel title="Tonight's queue">
+    <Fragment slot="note">the ships waiting to sail, one at a time; <a href="#/ships">every ship ever launched</a></Fragment>
+    <div class="scroll"><table id="queue"><thead><tr><th>#</th><th>spec</th><th>status</th></tr></thead><tbody></tbody></table></div>
+  </Panel>
 </div>

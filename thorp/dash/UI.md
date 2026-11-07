@@ -2,7 +2,7 @@
 
 The dashboard is one hash-routed page, an Astro app in `web/` (built to `static/`, served by
 `server.py`): `src/pages/index.astro` is the shell, `src/components/` holds one component per tab,
-`src/styles/global.css` the tokens and components below, `src/lib/` the shared script pieces
+`src/styles/global.css` the tokens and components below (`src/components/ui` the shadcn primitives, see "shadcn"), `src/lib/` the shared script pieces
 (DataTable, charts, formatters, the reader) and `src/scripts/dashboard.js` the panels. These rules keep it reading as one
 system. When a change needs something not covered here, add the rule here in the same change.
 
@@ -203,7 +203,11 @@ holds the ways in, always:
   close each came (a bar on the back), or greyed where unreadable or not read. Suits are printed in ink, never
   red: colour on a card means something (green lit, amber not trusted). A card the judge doesn't
   trust (`valid` false) keeps its place, in the hand or the deck, but carries an amber dashed edge,
-  sepia art and a "not trusted" stamp across it, so it can't pass for a sound card. The readings, the mark
+  sepia art and a "not trusted" stamp across it, so it can't pass for a sound card. Any card turns
+  over on a click (or Enter / Space) to what it does: the star's `about`, cut to fit (whole
+  sentences up to about 170 characters, else the first up to its colon), how it stands, and a link to
+  the stars; a set-aside card grows to a hand card's size while turned. A card stays turned through
+  the page's redraw until clicked again. The readings, the mark
   and the judge's verdict sit in a table beneath, and the bridge's curve over layers below that.
   **The card census** (the `card_census` voyage's page, `/api/census`): which of the four necessary
   cards each class can draw, and its cause-and-effect score, run as ablations of the class's own
@@ -360,17 +364,18 @@ chaining lift (marked "in the noise" at or below 0.03), and the census's best ca
 
 Each of these exists once. Use it instead of styling a new one.
 
-- **DataTable** (`src/lib/datatable.js`): every `<table>` sorts by clicking a header, keeps its sort through
+- **DataTable** (`src/lib/datatable.js`): every `<table>` takes shadcn's Table look from here, sorts by clicking a header, keeps its sort through
   the 5 s redraw, and keeps footer rows (one `colspan` cell) at the bottom. `data-sort="…"` on a
   cell sorts by a hidden value; `data-nosort` on a table opts out.
   A table whose rows open something gets the class `clickable`: its rows then show a hover, take
   keyboard focus, and open on Enter or Space.
-- **Pill** (`.pill`): a small rounded label. Colour variants `.good`, `.bad`, `.blue`, `.accent`,
-  and `.solid` for a filled one. Run status uses `.pill.running / .finished / .failed`.
-  (`.badge` is an alias kept for existing markup.)
-- **Button** (`button`, `.btn`): one look for every button on the dark page; `.on` marks the
-  selected one in a group (`.booktabs`).
-- **Field** (`select`, `input`): one look for every field.
+- **Pill**: a shadcn Badge. In string-built markup, `class="${pillCls('good')}"` (`src/lib/ui.ts`);
+  in an island, `<Badge variant="good">`. Tones: `good`, `bad`, `blue`, `accent`, `solid`, and the
+  run statuses `running / finished / failed`, each mapped to a Badge variant (`good`, `bad`, `info`,
+  `highlight`, `solid`; `outline` when none). Never write `class="pill …"` by hand.
+- **Button**: a shadcn Button, `btnCls()` (see "shadcn"); one look for every button on the dark page.
+  A choice among several (the sailings) is a ToggleGroup, `toggleCls()` with `data-state="on"`.
+- **Field**: shadcn's Input and NativeSelect, `fieldCls()` and `selectCls()`; one look for every field.
 - **RunGrid** (`runGrid(rung, runs)`): every run at one size as a square, like a GitHub
   contribution graph, in the order the runs started. Bands of 7 × 53 squares (371 runs) stack
   downwards, so a new run only adds a square at the end. Colour is the run's Forgotten Tomes
@@ -424,14 +429,66 @@ Each of these exists once. Use it instead of styling a new one.
   "(taught)". A transplant may carry token embeddings too (`tok`), whole layers beneath (`below`,
   outlined in the journey) and layer norms (`ln`); a lineage run's control is "lineage-ctl" of the
   same seed, every other receiver's is "control".
-- **Info popover** (`info(key)` in the script → `ⓘ`): the help for a metric (what it is, which way
+- **Info popover** (`info(key)` in the script → `ⓘ`, a shadcn HoverCard): the help for a metric (what it is, which way
   is better, how it is measured). Every metric's first appearance in a heading carries one.
-- **Empty state** (`.empty`, or `empty(id, msg)` for charts): says why nothing is there and what
+- **Empty state** (shadcn Empty: `emptyCls()`, or `empty(id, msg)` for charts): says why nothing is there and what
   command fills it, e.g. `thorp eval RUN --evaluators curiosity`. Never a bare blank.
 - **Book reader** (`#reader`): a book is read the way a Kindle Paperwhite shows one, after the
   Atlas essay reader in the monorepo (`packages/ui/apps/atlas/src/components/EssayReader.tsx`):
   paper, ink, a justified serif, pages or scroll, A−/A+, a quiet footer. It is the one place the
   page leaves the dark theme, on purpose.
+
+## shadcn
+
+shadcn/ui is the component kit, set up as in the monorepo's `shared-components` (`components.json`:
+new-york, neutral, CSS variables, `@/components/ui`). React and Tailwind v4 are in the build for it.
+
+- `src/components/ui/` holds the primitives, added with `pnpm dlx shadcn@latest add <name>`. They
+  stay stock apart from Thorp's Badge variants; `*-variants.ts` hold the cva definitions apart from
+  the `.tsx` so plain scripts can import them without React.
+- `src/styles/ui.css` maps shadcn's colour, radius and font-size names onto the tokens above in
+  `@theme`; it never redefines them on `:root`. Two names collide: Thorp `--muted` is grey **text**
+  (shadcn `text-muted-foreground`), Thorp `--accent` is the gold **highlight** (shadcn `primary`,
+  `ring`; shadcn `accent` is the hover surface, `--raise`). Tailwind's preflight is left out, so
+  the hand-written CSS in `global.css` keeps working while it is replaced.
+- Markup Astro writes uses the React components directly; they render at build time with no
+  client JS (`Panel` in `src/components/Panel.tsx`). Markup `dashboard.js` builds as strings takes
+  the same class lists from `src/lib/ui.ts` (`pillCls`, `btnCls`).
+- A component that has a shadcn match below is built from it. A new look starts from a primitive,
+  not from new CSS in `global.css`.
+
+### Component map
+
+Every Thorp component with a shadcn match is now built from it. In Astro markup, a `class={…}` from
+`src/lib/ui.ts`; in `dashboard.js` strings, `class="${…}"` from the same helpers; tables are styled
+by DataTable, so their markup names no classes.
+
+| Thorp component | shadcn | how |
+|---|---|---|
+| Pill / badge / run status | Badge (+ `good`, `bad`, `info`, `highlight`, `solid`) | `pillCls(tone)` |
+| Panel (`section.panel`, `h2`, `.note`) | Card | `cardCls(false, 'panel')`, or `<Panel>` in Astro; `.panel h2` keeps the title style |
+| Class, voyage, star and sieve cards (`.card`) | Card; a link when it opens something | `cardCls(true, 'card')`; the card art layout stays in `global.css` |
+| Button | Button (`outline`, `ghost`), size `xs` | `btnCls()` |
+| Sailing picker (`a.sailing`) | ToggleGroup item, `data-state="on"` | `toggleCls()` |
+| Header nav | Tabs (default), hash links as triggers | `tabsCls()`, `tabCls()`; `setTab()` sets `data-state` and `aria-current` |
+| A page's own tabs (`.subnav`: class, ship, discoveries, waypoints) | Tabs (`line`) | `tabsCls('line', 'subnav')` |
+| Field: `select` | NativeSelect, keeping the browser's arrow | `selectCls()` |
+| Field: `input` (text, number, search) | Input | `fieldCls()` |
+| `input[type=range]` | Slider colours on the native range | `rangeCls()` |
+| `input[type=checkbox]` | Checkbox colours on the native box | `checkCls()` |
+| DataTable (`<table>`) | Table (header, body, row, head, cell) | stamped by `datatable.js`, with `data-slot`; sorting unchanged |
+| Back link, `a.crumb` | BreadcrumbLink | `crumbCls('back')` |
+| Empty state (`.empty`, `empty()`) | Empty; EmptyDescription in a table cell | `emptyCls()`, `emptyCls(true)` |
+| Info popover (`ⓘ`) | HoverCard look; opens on hover and focus as before | `hoverCardCls` |
+| RunGrid hover (`.gridtip`) | Tooltip | `tooltipCls` |
+| The ledger's reading (`div.verdict`) | Alert, edged in the verdict's colour | `alertCls('yes' / 'no' / 'open')`; a verdict inside a table cell stays text |
+| Fitout builder's "lose your changes?" | AlertDialog, on a native `<dialog>` (focus trap, Esc) | `await confirmDialog(text, { title, ok })`; never `confirm()` |
+| Book reader (`#reader`) | Dialog: `role="dialog"`, focus in on open and back on close | the paper theme stays its own |
+| `details` (archive, folds, the ship at a glance) | Collapsible: the native element, which is what it renders | n/a |
+| `.band` heading rule | none: a heading with a rule, not a separator element | n/a |
+| Stat strip (`.stat`) | none: Thorp's own, inside a Card | n/a |
+| Playing cards, journey SVG, RunGrid squares, climb and family bars, fitout lanes | none: domain drawings | n/a |
+| Charts (Plotly) | none (shadcn Chart is Recharts) | n/a |
 
 ## Interaction
 

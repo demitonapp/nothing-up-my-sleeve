@@ -455,6 +455,10 @@ def api_ladder() -> dict:
             x = json.loads(f.read_text())
         except (OSError, ValueError):
             continue
+        if not isinstance(
+            x, dict
+        ):  # a list of runs (nevermore-vs-trigrams.json), not one model's comparison
+            continue
         external.append(
             {
                 "model": x.get("model"),

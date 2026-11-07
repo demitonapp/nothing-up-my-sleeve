@@ -39,7 +39,7 @@ const rEl = id => document.getElementById(id);
 // a waypoint's write-up (server.py api_essay: the evaluator's own docstring), read like a book
 export async function openEssay(name) {
   rEl('rtitle').textContent = 'loading…';
-  rEl('reader').hidden = false;
+  openReader();
   const d = await get('/api/essay?name=' + encodeURIComponent(name));
   RD.book = d; RD.parts = rSplit(d.text);
   const at = +rget('thorp.read.at:' + d.book_id) || 0;
@@ -49,7 +49,7 @@ export async function openEssay(name) {
 }
 export async function openBook(id) {
   rEl('rtitle').textContent = 'loading…';
-  rEl('reader').hidden = false;
+  openReader();
   // the server hands out at most 100k characters at a time
   const url = o => `/api/book?id=${encodeURIComponent(id)}&offset=${o}&length=100000`;
   const d = await get(url(0));
@@ -119,7 +119,15 @@ function rTurn(by) {
   if (next < 0 || next >= RD.parts.length) return;
   RD.part = next; rRender(by > 0 ? null : -1);
 }
-const closeReader = () => { rEl('reader').hidden = true; };
+// a Dialog: focus moves in when it opens and back to what opened it when it closes
+let rFrom = null;
+function openReader() {
+  const el = rEl('reader');
+  if (el.hidden) rFrom = document.activeElement;
+  el.hidden = false;
+  rEl('rclose').focus();
+}
+const closeReader = () => { rEl('reader').hidden = true; if (rFrom && rFrom.isConnected) rFrom.focus(); rFrom = null; };
 rEl('rclose').onclick = closeReader;
 rEl('rsmaller').onclick = () => { const at = rAt(); RD.size--; rset('thorp.read.size', RD.size); rRender(at); };
 rEl('rlarger').onclick = () => { const at = rAt(); RD.size++; rset('thorp.read.size', RD.size); rRender(at); };

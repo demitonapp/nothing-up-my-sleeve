@@ -1,1 +1,4 @@
-<details class="panel" id="stripwrap" open><summary>The ship at a glance <span class="note" id="stripsum"></span></summary><div class="strip" id="strip"></div></details>
+---
+import { cardCls } from '../lib/ui';
+---
+<details class={cardCls(false, 'panel')} id="stripwrap" open><summary>The ship at a glance <span class="note" id="stripsum"></span></summary><div class="strip" id="strip"></div></details>

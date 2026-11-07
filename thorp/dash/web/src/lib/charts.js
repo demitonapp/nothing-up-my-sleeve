@@ -1,3 +1,4 @@
+import { emptyCls } from './ui';
 import Plotly from 'plotly.js-dist-min';
 
 // the charts read the page's colour tokens (UI.md), so a colour is defined once, in the CSS
@@ -13,7 +14,7 @@ export const layout = (extra = {}) => Object.assign({
   legend: { orientation: 'h', y: -0.18, font: { size: 10 } }, hovermode: 'closest',
 }, extra);
 export const cfg = { displayModeBar: false, responsive: true };
-export const empty = (id, msg = 'no data yet') => { Plotly.purge(id); document.getElementById(id).innerHTML = `<div class="empty">${msg}</div>`; };
+export const empty = (id, msg = 'no data yet') => { Plotly.purge(id); document.getElementById(id).innerHTML = `<div class="${emptyCls()}">${msg}</div>`; };
 export const plot = (id, data, lay) => { const el = document.getElementById(id); if (el.querySelector('.empty')) el.innerHTML = ''; Plotly.react(id, data, lay, cfg); };
 
 export { Plotly };

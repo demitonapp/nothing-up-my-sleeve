@@ -4,6 +4,7 @@
 // reaches the Nevermore threshold on either test; until then its face shows through from the bottom
 // in proportion to how far it has come (score ÷ threshold), so a head that is forming is visible.
 // The big number is the real-prose score, the corner one the random-sequence score.
+import { emptyCls } from './ui';
 import { esc } from './format.js';
 
 const FULL_MAX = 64;  // up to this many heads the whole hand is laid out by layer; above, the best five
@@ -35,7 +36,7 @@ function card(c, thr, flipped) {
 // the hand at one step. `prev` is the hand shown before, so a card that has just turned can flip.
 export function renderHand(el, hand, thr, prev = null) {
   const all = heads(hand);
-  if (!all.length) { el.innerHTML = '<div class="empty">no per-head scores at this step</div>'; return; }
+  if (!all.length) { el.innerHTML = `<div class="${emptyCls()}">no per-head scores at this step</div>`; return; }
   const wasUp = new Set(prev ? heads(prev).filter(c => c.top >= thr).map(c => c.layer + '.' + c.head) : []);
   const flipped = c => prev && c.top >= thr && !wasUp.has(c.layer + '.' + c.head);
   const up = all.filter(c => c.top >= thr).length;

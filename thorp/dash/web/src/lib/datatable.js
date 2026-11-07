@@ -3,6 +3,9 @@
 // itself (opt out with data-nosort), and keeps each table's sort while the page redraws it every
 // 5 s. A cell may carry data-sort="…" to sort by something other than its text. Rows that are not
 // data (a single colspan cell: "no runs yet", "12 of 40 books") stay at the bottom.
+// Every table, sortable or not, also takes shadcn's Table classes here (UI.md, "shadcn"), so the
+// markup that builds tables never has to name them.
+import { tableCls } from './ui';
 const DataTable = (() => {
   const state = new Map();  // table key -> { col, dir }
   const UNIT = { k: 1e3, K: 1e3, M: 1e6, B: 1e9, G: 1e9, T: 1e12, KB: 1e3, MB: 1e6, GB: 1e9, TB: 1e12, '%': 1 };
@@ -48,17 +51,27 @@ const DataTable = (() => {
     const want = [...data, ...rest];
     if (want.some((tr, i) => rows[i] !== tr)) body.append(...want);
   }
+  // the Table look: once per element, marked so a redraw only styles what is new
+  const STYLE = [['', 'table'], ['thead', 'head'], ['tbody', 'body'], ['tr', 'row'], ['th', 'th'], ['td', 'td']];
+  function style(table) {
+    STYLE.forEach(([sel, k]) => (sel ? table.querySelectorAll(sel) : [table]).forEach(el => {
+      if (el.dataset.slot) return;
+      el.dataset.slot = k === 'th' ? 'table-head' : k === 'td' ? 'table-cell' : k === 'head' ? 'table-header' : k === 'body' ? 'table-body' : k === 'row' ? 'table-row' : 'table';
+      el.classList.add(...tableCls[k].split(' '));
+    }));
+  }
   function scan(root) {
     const tables = root.tagName === 'TABLE' ? [root] : [...root.querySelectorAll('table')];
+    tables.forEach(style);
     tables.filter(t => !t.hasAttribute('data-nosort')).forEach(apply);
   }
   const obs = new MutationObserver(muts => {
     const hit = new Set();
     muts.forEach(m => {
-      const t = m.target.closest && m.target.closest('table');
+      const t = m.target.closest && m.target.closest('table');  // also a table drawn with data-nosort, for its look
       if (t) hit.add(t); else m.addedNodes.forEach(n => n.nodeType === 1 && (n.tagName === 'TABLE' ? hit.add(n) : n.querySelectorAll('table').forEach(x => hit.add(x))));
     });
-    hit.forEach(t => { if (t.isConnected && !t.hasAttribute('data-nosort')) apply(t); });
+    hit.forEach(t => { if (!t.isConnected) return; style(t); if (!t.hasAttribute('data-nosort')) apply(t); });
     obs.takeRecords();  // our own reordering is not a redraw
   });
   document.addEventListener('click', e => {

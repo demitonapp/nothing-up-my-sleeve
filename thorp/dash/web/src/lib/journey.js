@@ -9,6 +9,7 @@
 // half, the stars lit in that layer, and the layer's push kink, all at the step chosen.
 // A sailing that received heads from another (opts.transplant: the Magician's Apprentice) has the
 // receiving attention half outlined and labelled, and the embeddings marked if positions came too.
+import { emptyCls } from './ui';
 import { esc } from './format.js';
 
 const ROW = 74, BOX_W = 112, GAP = 10, LEFT = 118, TOP = 34, BASE = 40;
@@ -55,7 +56,7 @@ function arrow(cx, cy, write, turn) {
 // 'push' 'move' 'heading' 'stars' 'kink'; opts.kinks: {layer_i: kink}; opts.title: the sailing's name
 export function drawJourney(el, m, step, defs, opts = {}) {
   const L = layersOf(m);
-  if (!L) { el.innerHTML = `<div class="empty">${esc(opts.title || 'this sailing')}: no layers on the ledger yet</div>`; return; }
+  if (!L) { el.innerHTML = `<div class="${emptyCls()}">${esc(opts.title || 'this sailing')}: no layers on the ledger yet</div>`; return; }
   const mods = opts.modules || new Set(), S = k => m[k];
   const hasSound = Object.keys(m).some(k => k.startsWith('soundings/'));
   const depthY = k => TOP + (L + 1 - k) * ROW;  // depth k = after k layers; 0 is the embeddings

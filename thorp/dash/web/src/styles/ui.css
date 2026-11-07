@@ -1,0 +1,76 @@
+/* shadcn/ui on Thorp's tokens (UI.md, "shadcn").
+ *
+ * Tailwind's theme and utilities, without its preflight: global.css already sets the page's base
+ * look, and a reset would restyle every hand-written panel at once. Utilities sit in a cascade
+ * layer, so the unlayered rules in global.css still win where they target the same element.
+ *
+ * Thorp's own tokens (global.css :root) stay the source of truth. shadcn's names are mapped onto
+ * them here, in @theme, and never redefined on :root, because two of them collide:
+ *   Thorp --muted  is grey TEXT       → shadcn text-muted-foreground, not bg-muted
+ *   Thorp --accent is the gold HIGHLIGHT → shadcn primary / ring, not bg-accent (a hover surface)
+ */
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+@import "tw-animate-css";
+
+@source "../components";
+@source "../lib";
+@source "../scripts";
+
+/* the one piece of preflight the primitives need: `border` utilities give a solid line in --line */
+@layer base {
+  *, ::before, ::after { border-width: 0; border-style: solid; border-color: var(--line); }
+}
+
+@theme inline {
+  --color-background: var(--bg);
+  --color-foreground: var(--text);
+  --color-card: var(--panel);
+  --color-card-foreground: var(--text);
+  --color-popover: var(--raise);
+  --color-popover-foreground: var(--text);
+  --color-primary: var(--accent);
+  --color-primary-foreground: var(--bg);
+  --color-secondary: var(--raise);
+  --color-secondary-foreground: var(--text);
+  --color-muted: var(--raise);
+  --color-muted-foreground: var(--muted);
+  --color-accent: var(--raise);
+  --color-accent-foreground: var(--accent);
+  --color-destructive: var(--bad);
+  --color-border: var(--line);
+  --color-input: var(--line);
+  --color-ring: var(--accent);
+  /* Thorp's status colours, for the Badge variants (status only, never decoration) */
+  --color-good: var(--good);
+  --color-bad: var(--bad);
+  --color-info: var(--blue);
+  --color-chart-1: var(--blue);
+  --color-chart-2: var(--accent);
+  --color-chart-3: var(--good);
+  --color-chart-4: var(--bad);
+  --color-chart-5: var(--c5);
+
+  --radius-sm: 4px;
+  --radius-md: var(--r-sm);
+  --radius-lg: var(--r-md);
+  --radius-xl: var(--r-md);
+  --radius-full: 9999px;
+
+  /* the only font sizes (UI.md, Tokens): Tailwind's names on Thorp's scale */
+  --text-xs: var(--fs-xs);
+  --text-xs--line-height: 1.4;
+  --text-sm: var(--fs-sm);
+  --text-sm--line-height: 1.45;
+  --text-md: var(--fs-md);
+  --text-md--line-height: 1.45;
+  --text-base: var(--fs-base);
+  --text-base--line-height: 1.45;
+  --text-lg: var(--fs-lg);
+  --text-lg--line-height: 1.4;
+  --text-xl: var(--fs-xl);
+  --text-xl--line-height: 1.35;
+  --text-2xl: var(--fs-2xl);
+  --text-2xl--line-height: 1.25;
+}

@@ -1,4 +1,5 @@
 ---
+import { cardCls, emptyCls, fieldCls, selectCls } from '../lib/ui';
 // Shelves (#/shelves): every list of books Thorp reads, keeps or drafts (thorp.shelves.payload,
 // /api/shelves, served warm): the training shelves first, then the decks it is scored on, the probes,
 // the rest, and the drafts folded away. A row opens to the runs that use it and its books, each one
@@ -6,16 +7,16 @@
 ---
 <div class="section" id="shelves">
   <h1>Shelves <span class="q">every list of books Thorp reads from, is scored on or is drafting: how many books are fetched, about how many tokens they hold, their language families, and the runs that read them</span></h1>
-  <section class="panel" id="fitoutpanel">
+  <section class={cardCls(false, 'panel')} id="fitoutpanel">
     <h2>Fitouts <span class="note">a fitout is the training material matched to the stages it is read in: pretraining (its stages in order, one run) and post-training (its stages in order, each seeded from the one before, with its own learning rate and tack). Each stage is a block sized by its tokens, its shelf one click away below</span></h2>
-    <div id="fitouts"><div class="empty">reading the fitouts…</div></div>
+    <div id="fitouts"><div class={emptyCls()}>reading the fitouts…</div></div>
   </section>
-  <section class="panel" id="builderpanel">
+  <section class={cardCls(false, 'panel')} id="builderpanel">
     <h2>Fitout builder <span class="note">mix and match: drag a shelf from the palette into a lane, choose how much of it to read and which books (all, random, the most repetitive, or the Pareto frontier of repetition and variety), how many passes and what it is for; save it, then build it for a class and queue it</span></h2>
     <div class="fbwrap">
       <div class="fbpalette">
         <div class="k">The shelves <span class="s">drag one into a lane; the scatter is each book's variety against its in-window trigram repetition, the frontier books ringed</span></div>
-        <div id="fbpalette"><div class="empty">reading the shelves…</div></div>
+        <div id="fbpalette"><div class={emptyCls()}>reading the shelves…</div></div>
       </div>
       <div class="fbmain">
         <div class="fbsettings" id="fbsettings"></div>
@@ -29,6 +30,6 @@
     <div class="k mt">Fitouts to open <span class="s">the hand-curated ones open as a copy; the saved ones open to edit</span></div>
     <div class="fblibrary" id="fblibrary"></div>
   </section>
-  <div class="handtools"><span class="note">show</span><select id="shelfkind"><option value="">every kind</option></select><input id="shelfsearch" type="search" placeholder="find a shelf" /><span class="note" id="shelfcount"></span></div>
-  <div id="shelfgroups"><div class="empty">reading the shelves…</div></div>
+  <div class="handtools"><span class="note">show</span><select class={selectCls('')} id="shelfkind"><option value="">every kind</option></select><input class={fieldCls('')} id="shelfsearch" type="search" placeholder="find a shelf" /><span class="note" id="shelfcount"></span></div>
+  <div id="shelfgroups"><div class={emptyCls()}>reading the shelves…</div></div>
 </div>

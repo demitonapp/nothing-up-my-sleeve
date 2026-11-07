@@ -1,9 +1,11 @@
 ---
+import { btnCls } from '../lib/ui';
 // the book reader: a Kindle Paperwhite page, after the Atlas essay reader
 ---
-<div id="reader" hidden>
-  <div class="rbar"><button id="rclose" title="Esc">Books</button><span class="t" id="rtitle"></span>
-    <span class="tools"><button id="rsmaller" aria-label="Smaller text">A&minus;</button><button id="rlarger" aria-label="Larger text">A+</button><button id="rmode"></button></span></div>
+<!-- a full-screen Dialog (UI.md, shadcn): dialog semantics, focus in on open and back on close, Esc closes -->
+<div id="reader" role="dialog" aria-modal="true" aria-labelledby="rtitle" tabindex="-1" hidden>
+  <div class="rbar"><button class={btnCls('ghost', '')} id="rclose" title="Esc">Books</button><span class="t" id="rtitle"></span>
+    <span class="tools"><button class={btnCls('ghost', '')} id="rsmaller" aria-label="Smaller text">A&minus;</button><button class={btnCls('ghost', '')} id="rlarger" aria-label="Larger text">A+</button><button class={btnCls('ghost', '')} id="rmode"></button></span></div>
   <div class="rwrap"><div class="rstage" id="rstage"></div></div>
   <div class="rbar foot"><span id="rpos" aria-live="polite"></span><span id="rleft"></span></div>
 </div>

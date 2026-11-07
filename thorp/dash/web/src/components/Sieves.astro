@@ -1,15 +1,18 @@
+---
+import { cardCls } from '../lib/ui';
+---
 <div class="shiptab" id="sieves">
   <h1>Sieves <span class="q">how hard each layer is pushed, how far it actually moves, and where each one changes regime</span></h1>
   <div class="row">
-    <section class="panel"><h2>Gradient push per layer <span class="note">log10 of the pre-clip norm; ◆ the kink</span></h2><div class="chart" id="gradheat"></div></section>
-    <section class="panel"><h2>Weight move per layer <span class="note">log10 of the move since the last record over the size of the weights; ◆ the kink</span></h2><div class="chart" id="moveheat"></div></section>
+    <section class={cardCls(false, 'panel')}><h2>Gradient push per layer <span class="note">log10 of the pre-clip norm; ◆ the kink</span></h2><div class="chart" id="gradheat"></div></section>
+    <section class={cardCls(false, 'panel')}><h2>Weight move per layer <span class="note">log10 of the move since the last record over the size of the weights; ◆ the kink</span></h2><div class="chart" id="moveheat"></div></section>
   </div>
   <div class="row">
-    <section class="panel">
+    <section class={cardCls(false, 'panel')}>
       <h2>The kink <span class="note">each layer's push, fitted as two lines; the break is where the layer changes regime</span></h2>
       <div class="chart" id="kinks"></div>
     </section>
-    <section class="panel">
+    <section class={cardCls(false, 'panel')}>
       <h2>Where each layer broke</h2>
       <div class="scroll"><table class="kinks" id="kinktable"><thead><tr>
         <th>layer</th><th>kink at step</th><th>which way</th><th>slope before</th><th>slope after</th><th>strength</th><th></th></tr></thead><tbody></tbody></table></div>

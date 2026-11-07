@@ -1,0 +1,169 @@
+{
+ "from": "lists/ogden-v0.1.csv",
+ "clean": "unwrap-v2",
+ "keel": {
+  "words_back": 1,
+  "questions": [
+   {
+    "context": "part",
+    "hope": "of",
+    "share": 0.577,
+    "count": 18265
+   },
+   {
+    "context": "going",
+    "hope": "to",
+    "share": 0.52,
+    "count": 18976
+   },
+   {
+    "context": "across",
+    "hope": "the",
+    "share": 0.637,
+    "count": 7400
+   },
+   {
+    "context": "covered",
+    "hope": "with",
+    "share": 0.516,
+    "count": 4695
+   },
+   {
+    "context": "thank",
+    "hope": "you",
+    "share": 0.659,
+    "count": 3528
+   }
+  ]
+ },
+ "pilot": {
+  "words_back": 2,
+  "questions": [
+   {
+    "context": "part of",
+    "hope": "the",
+    "share": 0.524,
+    "count": 10536
+   },
+   {
+    "context": "the end",
+    "hope": "of",
+    "share": 0.705,
+    "count": 7667
+   },
+   {
+    "context": "i do",
+    "hope": "not",
+    "share": 0.601,
+    "count": 8160
+   },
+   {
+    "context": "as well",
+    "hope": "as",
+    "share": 0.713,
+    "count": 6627
+   },
+   {
+    "context": "in order",
+    "hope": "to",
+    "share": 0.66,
+    "count": 4718
+   },
+   {
+    "context": "what do",
+    "hope": "you",
+    "share": 0.814,
+    "count": 3676
+   },
+   {
+    "context": "it may",
+    "hope": "be",
+    "share": 0.595,
+    "count": 4510
+   },
+   {
+    "context": "the fact",
+    "hope": "that",
+    "share": 0.561,
+    "count": 3122
+   },
+   {
+    "context": "as shown",
+    "hope": "in",
+    "share": 0.687,
+    "count": 2063
+   },
+   {
+    "context": "half an",
+    "hope": "hour",
+    "share": 0.792,
+    "count": 1588
+   }
+  ]
+ },
+ "speller": {
+  "words_back": 3,
+  "questions": [
+   {
+    "context": "at the same",
+    "hope": "time",
+    "share": 0.783,
+    "count": 3794
+   },
+   {
+    "context": "at the end",
+    "hope": "of",
+    "share": 0.891,
+    "count": 2449
+   },
+   {
+    "context": "the top of",
+    "hope": "the",
+    "share": 0.607,
+    "count": 3019
+   },
+   {
+    "context": "that is to",
+    "hope": "say",
+    "share": 0.765,
+    "count": 1488
+   },
+   {
+    "context": "the dawn of",
+    "hope": "day",
+    "share": 0.941,
+    "count": 1145
+   },
+   {
+    "context": "it hath reached",
+    "hope": "me",
+    "share": 0.995,
+    "count": 1080
+   },
+   {
+    "context": "dawn of day",
+    "hope": "and",
+    "share": 0.968,
+    "count": 1094
+   },
+   {
+    "context": "i am going",
+    "hope": "to",
+    "share": 0.733,
+    "count": 1288
+   },
+   {
+    "context": "o auspicious king",
+    "hope": "that",
+    "share": 0.853,
+    "count": 1003
+   },
+   {
+    "context": "it would have",
+    "hope": "been",
+    "share": 0.63,
+    "count": 1164
+   }
+  ]
+ }
+}

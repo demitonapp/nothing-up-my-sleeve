@@ -2779,6 +2779,155 @@ def api_table_guesses(run: str, text: str, k: str | int = 10, mode: str = "1") -
     return out
 
 
+# The Scoring tab's subjects (Justin, 2026-11-07 21:35: "break scoring into different subtabs. I have no way of
+# knowing the counting ability of thorp ogden 300k or how good its maths is ... or its physics"): each a
+# discovery track, the ladder of tests a class climbs one step at a time towards a historical discovery.
+SUBJECTS = {
+    "number": ("Number", "counting, order and series, towards Mendeleev's gaps (no arithmetic test yet: sums are not measured)",
+               ["successor", "counting_test", "period_test", "gap_test", "between_test", "triads_test", "mendeleev_gaps"]),
+    "physics": ("Physics", "heat, motion and work, towards the energy test",
+                ["fire_test", "workshop_test", "smiths_test", "mill_test", "rumford_test", "energy_test"]),
+    "life": ("Life", "kin, breeding and selection, towards the Origin test",
+             ["kin_test", "pedigree_test", "breeders_test", "nature_test", "malthus_test", "origin_test"]),
+    "return": ("Return", "what comes round comes round again, towards the eternal return",
+               ["again_test", "refrain_test", "seasons_test", "pigeonhole_test", "lucretius_test", "recurrence_test"]),
+    "logic": ("Logic", "chaining two facts on invented words, so no knowledge helps; geometry without the parallel postulate",
+              ["logic_test", "geometry_test"]),
+}  # fmt: skip
+
+
+def _slug(preset: str) -> str:
+    from thorp.models.registry import LADDER
+
+    row = next((r for r in LADDER if r["preset"] == preset.split("-")[0]), None)
+    return (row["name"].lower().removeprefix("the ").strip() if row else preset)
+
+
+def _class_voyages(preset: str, limit: int = 12) -> list[dict]:
+    """The class's voyages to read: Ogden's first (its fitout is the one that sails), then the latest others."""
+    cls = preset.split("-")[0]
+    rows = _rows(
+        """select run_id, name, status, started, json_extract(spec_json,'$.model.preset') p,
+                  json_extract(spec_json,'$.optim.batch_tokens') bt
+           from runs where status in ('finished','running') order by started desc"""
+    )
+    seen: set[str] = set()
+    mine = []
+    for r in rows:  # the latest sailing of each voyage (a recalled one sails again under its name)
+        if (r["p"] or "").split("-")[0] == cls and r["name"] not in seen:
+            seen.add(r["name"])
+            mine.append(r)
+    ogden = [r for r in mine if r["name"].startswith("fu-ogden")]
+    rest = [r for r in mine if not r["name"].startswith("fu-ogden")]
+    return (ogden + rest)[:limit]
+
+
+def api_class_subjects(preset: str) -> dict:
+    """Each subject's ladder of tests, this class's own step marked, and every recent voyage of the class read
+    against each test (the latest value of its metric, its score, and whether it passed its mark), with the
+    class's own steps as series over tokens read."""
+    from thorp import fleet
+
+    slug = _slug(preset)
+    voyages = _class_voyages(preset)
+    con = _con()
+    try:
+        def last(rid, name):
+            r = con.execute(
+                "select value, step from metrics where run_id=? and name=? order by step desc limit 1", [rid, name]
+            ).fetchone()
+            return (r[0], r[1]) if r else (None, None)
+
+        def series(rid, name, bt):
+            return [
+                [s * (bt or 32768), v]
+                for s, v in con.execute(
+                    "select step, value from metrics where run_id=? and name=? order by step", [rid, name]
+                )
+                if v is not None
+            ]
+
+        out = {}
+        for key, (title, about, tests) in SUBJECTS.items():
+            rows = []
+            for k in tests:
+                tr = fleet.TRICKS.get(k)
+                if tr is None:
+                    continue
+                score_metric = tr.metric.rsplit("/", 1)[0] + "/score"
+                readings = []
+                for v in voyages:
+                    val, step = last(v["run_id"], tr.metric)
+                    sc, _ = last(v["run_id"], score_metric)
+                    readings.append({
+                        "voyage": v["name"], "status": v["status"], "value": val, "score": sc, "step": step,
+                        "passed": None if val is None else val >= tr.threshold,
+                        "series": series(v["run_id"], tr.metric, v["bt"]) if tr.goal_class == slug and val is not None else None,
+                    })  # fmt: skip
+                rows.append({
+                    "key": k, "name": tr.name, "about": tr.about, "goal_class": tr.goal_class,
+                    "mine": tr.goal_class == slug, "metric": tr.metric, "threshold": tr.threshold, "readings": readings,
+                })  # fmt: skip
+            out[key] = {"title": title, "about": about, "tests": rows}
+    finally:
+        con.close()
+    return {"preset": preset, "class": slug, "voyages": [v["name"] for v in voyages], "subjects": out}
+
+
+def api_class_shapes(preset: str) -> dict:
+    """The shapes readings (the parts-of-speech taxonomy) for the class's voyages that carry them: each
+    accuracy as a series over tokens read, and the latest share of probability on each kind of word."""
+    from thorp.viable.s5_policy import taxonomy
+
+    con = _con()
+    try:
+        out = []
+        for v in _class_voyages(preset):
+            rid, bt = v["run_id"], v["bt"] or 32768
+            got = {}
+            for m in ("shapes/upos_top1", "shapes/ogden_top1", "shapes/keyed_top1"):
+                got[m] = [[s * bt, val] for s, val in con.execute(
+                    "select step, value from metrics where run_id=? and name=? order by step", [rid, m]) if val is not None]  # fmt: skip
+            if not got["shapes/upos_top1"]:
+                continue
+            last_step = got["shapes/upos_top1"][-1][0] // bt
+            mass = {t: con.execute("select value from metrics where run_id=? and name=? and step=?",
+                                   [rid, f"shapes/mass/{t}", last_step]).fetchone() for t in taxonomy.FINE}  # fmt: skip
+            truth = {t: con.execute("select value from metrics where run_id=? and name=? and step=?",
+                                    [rid, f"shapes/truth/{t}", last_step]).fetchone() for t in taxonomy.FINE}  # fmt: skip
+            out.append({
+                "voyage": v["name"], "status": v["status"], "series": got,
+                "mass": {t: (x[0] if x else None) for t, x in mass.items()},
+                "truth": {t: (x[0] if x else None) for t, x in truth.items()},
+            })  # fmt: skip
+    finally:
+        con.close()
+    return {"preset": preset, "fine": list(taxonomy.FINE), "about": taxonomy.ABOUT, "voyages": out}
+
+
+def api_ask_questions(preset: str) -> dict:
+    """The ask panel's questions for a class, drawn from the Ogden corpus (ships/lists/ogden-v0.1-questions.json):
+    the keel's from one word back, the pilot's from two, the speller's (and every larger class's) from three:
+    each a context the corpus continues with one word at least half the time (Justin, 21:35: "wouldn't these
+    examples need to be simpler for the 300k")."""
+    p = paths.resolve("lists/ogden-v0.1-questions.json")
+    if not p.exists():
+        return {"preset": preset, "questions": [], "words_back": None}
+    d = json.loads(p.read_text())
+    slug = _slug(preset)
+    key = slug if slug in ("keel", "pilot") else "speller"
+    s = d.get(key) or {}
+    return {
+        "preset": preset, "set": key, "words_back": s.get("words_back"),
+        "questions": [
+            {"text": q["context"].capitalize() if q["context"].split()[0] != "i" else q["context"], "hope": q["hope"],
+             "about": f"{s.get('words_back')} word{'s' if s.get('words_back') != 1 else ''} back: the corpus continues it "
+                      f"with '{q['hope']}' {round(100 * q['share'])}% of {q['count']:,} times"}
+            for q in s.get("questions", [])
+        ],
+    }  # fmt: skip
+
+
 def api_wager(preset: str) -> dict:
     """The Bet tab (the Navigator's Wager, thorp/viable/s4_intelligence/wager.py): the 16-card deck, the levers,
     and every round on this class with both voyages' falls, the House's calls, the Navigator's bets, the
@@ -3035,6 +3184,9 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/class_cards": lambda: api_class_cards(q["preset"]),
                 "/api/class_best": lambda: api_class_best(q["preset"]),
                 "/api/wager": lambda: api_wager(q["preset"]),
+                "/api/ask_questions": lambda: api_ask_questions(q["preset"]),
+                "/api/class_subjects": lambda: api_class_subjects(q["preset"]),
+                "/api/class_shapes": lambda: api_class_shapes(q["preset"]),
                 "/api/table/guesses": lambda: api_table_guesses(
                     q["run"], q.get("text", ""), q.get("k", 10), q.get("mode", "1")
                 ),

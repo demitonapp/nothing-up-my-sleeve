@@ -60,7 +60,7 @@ let page = 'sizes', modelTab = 'fleet', shipKey = null, sailingKey = null, shipT
 function route(h) {
   if (h.startsWith('/')) {
     const [a, b, c] = h.slice(1).split('/');
-    if (a === 'classes' && b) { const d = h.slice(1).split('/')[3]; return { page: 'rung', rung: b, mtab: MTABS.includes(c) ? c : 'fleet', wsub: WSUBS.includes(d) ? d : 'expected' }; }
+    if (a === 'classes' && b) { const d = h.slice(1).split('/')[3]; return { page: 'rung', rung: b, mtab: MTABS.includes(c) ? c : 'fleet', wsub: WSUBS.includes(d) ? d : 'expected', ssub: SSUBS.includes(d) ? d : 'ask' }; }
     if (a === 'models' && b) return { page: 'rung', rung: b, mtab: MTABS.includes(c) ? c : 'overview' };
     if (a === 'ships' && b) {
       const d = h.slice(1).split('/')[3];
@@ -93,7 +93,9 @@ function route(h) {
 }
 const WSUBS = ['expected', 'envelope', 'stars'];
 let wpSub = 'expected';
-const modelHash = (r, mt = 'fleet', sub = null) => `/classes/${slugOf(r)}${mt === 'fleet' ? '' : '/' + mt}${mt === 'waypoints' && sub && sub !== 'expected' ? '/' + sub : ''}`;
+const SSUBS = ['ask', 'language', 'shapes', 'number', 'physics', 'life', 'return', 'logic'];
+let scSub = 'ask';
+const modelHash = (r, mt = 'fleet', sub = null) => `/classes/${slugOf(r)}${mt === 'fleet' ? '' : '/' + mt}${mt === 'waypoints' && sub && sub !== 'expected' ? '/' + sub : ''}${mt === 'scoring' && sub && sub !== 'ask' ? '/' + sub : ''}`;
 const shipHash = (key, sailing = null, st = 'betting') => `/ships/${key}${sailing ? '/' + encodeURIComponent(sailing) : ''}${st === 'betting' ? '' : '/' + st}`;
 const ladderRun = id => ladderData && ladderData.runs.find(x => x.run_id === id || x.name === id);
 // The ship and sailing an address names. The first part is a ship key, or (an older address) a run
@@ -125,11 +127,12 @@ function showTab(h, push = true) {
     const r = rungFor(rt.rung);
     if (ladderData && !r) { page = 'sizes'; push = true; }  // not a class this ladder has
     else {
-      currentRung = rt.rung; modelTab = rt.mtab; wpSub = rt.wsub || 'expected';
+      currentRung = rt.rung; modelTab = rt.mtab; wpSub = rt.wsub || 'expected'; scSub = rt.ssub || 'ask';
       if (r) {
-        hash = modelHash(r, modelTab, wpSub);
+        hash = modelHash(r, modelTab, modelTab === 'scoring' ? scSub : wpSub);
         document.querySelectorAll('#modelnav a').forEach(a => { a.href = '#' + modelHash(r, a.dataset.mtab); });
         document.querySelectorAll('#wpnav a').forEach(a => { a.href = '#' + modelHash(r, 'waypoints', a.dataset.wsub); });
+        document.querySelectorAll('#scnav a').forEach(a => { a.href = '#' + modelHash(r, 'scoring', a.dataset.ssub); });
       }
       if (ladderData) renderRung();
     }
@@ -191,6 +194,8 @@ function showTab(h, push = true) {
   document.querySelectorAll('#modelnav a').forEach(a => setTab(a, a.dataset.mtab === modelTab));
   document.querySelectorAll('#rung .wsub').forEach(t => t.classList.toggle('active', t.dataset.wsub === wpSub));
   document.querySelectorAll('#wpnav a').forEach(a => setTab(a, a.dataset.wsub === wpSub));
+  document.querySelectorAll('#rung .ssub').forEach(t => t.classList.toggle('active', t.dataset.ssub === scSub));
+  document.querySelectorAll('#scnav a').forEach(a => setTab(a, a.dataset.ssub === scSub));
   document.querySelectorAll('#ship .shiptab').forEach(t => t.classList.toggle('active', t.id === STAB_EL[shipTab]));
   document.querySelectorAll('#shipnav a').forEach(a => setTab(a, a.dataset.stab === shipTab));
   // the address always reads the canonical way (old addresses and ?run= are rewritten, not stacked)
@@ -953,7 +958,7 @@ const ASK_QUESTIONS = [
   { text: 'The man went to the baker to buy some', hope: 'bread', about: 'common sense' },
   { text: 'Q: What colour is the sky?\nA: The sky is', hope: 'blue', about: 'a question' },
 ];
-let askWired = false, askPreset = null, askBest = null;
+let askWired = false, askPreset = null, askBest = null, askQuestions = ASK_QUESTIONS, askSet = 'world', classQuestions = null;
 const hopeRank = (gs, hope) => {  // where the hoped-for word is among the guesses (a whole word; a piece may start it)
   const h = hope.toLowerCase();
   const i = gs.findIndex(g => {
@@ -981,8 +986,14 @@ async function askPanel(r) {
       + `<optgroup label="every finished voyage of this class">${d.voyages.filter(v => !best.includes(v.name)).map(v => `<option value="${esc(v.name)}">${esc(v.name)}</option>`).join('')}</optgroup>`;
     if (b && b.run) sel.value = b.run;
     ['askguess', 'askanswer', 'askall'].forEach(id => { document.getElementById(id).disabled = !sel.value; });
+    try {  // the class's own questions, from the Ogden corpus (one word back for the keel, two for the pilot, three above)
+      const q = await get(`/api/ask_questions?preset=${encodeURIComponent(r.preset)}`);
+      classQuestions = q.questions.length ? q : null;
+    } catch (e) { classQuestions = null; }
+    askSet = classQuestions ? 'class' : 'world';
   }
-  document.getElementById('askchips').innerHTML = ASK_QUESTIONS.map((q, i) => `<button type="button" class="askchip" data-i="${i}" title="${esc(q.about)}: we hope for “${esc(q.hope)}”">${esc(q.text.replace('\n', ' '))}</button>`).join('');
+  askQuestions = askSet === 'class' && classQuestions ? classQuestions.questions : ASK_QUESTIONS;
+  document.getElementById('askchips').innerHTML = (classQuestions ? `<div class="askset"><button type="button" class="askchip${askSet === 'class' ? ' on' : ''}" data-set="class">its own size: ${classQuestions.words_back} word${classQuestions.words_back === 1 ? '' : 's'} back, from the Ogden corpus</button><button type="button" class="askchip${askSet === 'world' ? ' on' : ''}" data-set="world">world knowledge (beyond the keel)</button></div>` : '') + askQuestions.map((q, i) => `<button type="button" class="askchip" data-i="${i}" title="${esc(q.about)}: we hope for “${esc(q.hope)}”">${esc(q.text.replace('\n', ' '))}</button>`).join('');
   if (askWired) return; askWired = true;
   const out = document.getElementById('askout'), ta = document.getElementById('asktext');
   const run = () => document.getElementById('askvoyage').value;
@@ -1003,8 +1014,10 @@ async function askPanel(r) {
     try { out.innerHTML = guessTable(await guessesFor(text), hope); } catch (e) { out.innerHTML = `<div class="${emptyCls()}">${esc(String(e.message || e))}</div>`; }
     busy(false);
   };
-  document.getElementById('askguess').onclick = () => guess(ta.value, (ASK_QUESTIONS.find(q => q.text === ta.value) || {}).hope);
-  document.getElementById('askchips').onclick = e => { const b = e.target.closest('.askchip'); if (!b) return; const q = ASK_QUESTIONS[+b.dataset.i]; ta.value = q.text; guess(q.text, q.hope); };
+  document.getElementById('askguess').onclick = () => guess(ta.value, (askQuestions.find(q => q.text === ta.value) || {}).hope);
+  document.getElementById('askchips').onclick = e => { const b = e.target.closest('.askchip'); if (!b) return;
+    if (b.dataset.set) { askSet = b.dataset.set; askPanel(rungFor(currentRung)); return; }
+    const q = askQuestions[+b.dataset.i]; ta.value = q.text; guess(q.text, q.hope); };
   document.getElementById('askanswer').onclick = async () => {
     const q = ta.value.trim(); if (!q || noVoyage()) return;
     busy(true); out.innerHTML = `<div class="${emptyCls()}">it is answering…</div>`;
@@ -1020,11 +1033,11 @@ async function askPanel(r) {
     busy(true); const rows = [];
     const draw = () => {
       const hit = rows.filter(x => x.rank).length;
-      out.innerHTML = `<div class="s">${esc(run())} · ${hit} of ${rows.length} hoped-for answers among its ten guesses${rows.length < ASK_QUESTIONS.length ? ' · reading…' : ''}</div>
+      out.innerHTML = `<div class="s">${esc(run())} · ${hit} of ${rows.length} hoped-for answers among its ten guesses${rows.length < askQuestions.length ? ' · reading…' : ''}</div>
         <div class="scroll"><table class="asktable"><thead><tr><th>question</th><th>about</th><th>hoped for</th><th>its rank</th><th>its first three guesses</th></tr></thead><tbody>${rows.map(x => `<tr${x.rank === 1 ? ' class="sel"' : ''}><td class="mono">${esc(x.q.text.replace('\n', ' '))}</td><td class="s">${esc(x.q.about)}</td><td>${esc(x.q.hope)}</td>
           <td>${x.err ? '<span class="s">failed</span>' : x.rank ? `<b>${x.rank}</b>` : '<span class="s">not in ten</span>'}</td><td class="mono">${x.g ? x.g.guesses.slice(0, 3).map(g => `${esc(g.piece === true ? showPiece(g.word) : g.word)} <span class="s">${(100 * g.p).toFixed(0)}%</span>`).join(' · ') : ''}</td></tr>`).join('')}</tbody></table></div>`;
     };
-    for (const q of ASK_QUESTIONS) {
+    for (const q of askQuestions) {
       try { const g = await guessesFor(q.text); rows.push({ q, g, rank: hopeRank(g.guesses, q.hope) }); } catch (e) { rows.push({ q, err: true }); }
       draw();
     }
@@ -1114,6 +1127,53 @@ async function classWager(r, keep = true) {
     catch (err) { alert(String(err.message || err)); }
     classWager(rr());
   };
+}
+// ---- the Scoring tab's subjects (/api/class_subjects): each discovery track's ladder of tests, this class's own
+// step first and marked, every recent voyage of the class against each test, and the own steps over tokens read
+let subjData = null, subjAt = 0, subjPreset = null;
+async function classSubject(r, key) {
+  const el = document.getElementById('subj-' + key); if (!el) return;
+  if (!subjData || subjPreset !== r.preset || Date.now() - subjAt > 60000) {
+    try { subjData = await get(`/api/class_subjects?preset=${encodeURIComponent(r.preset)}`); subjAt = Date.now(); subjPreset = r.preset; }
+    catch (e) { el.innerHTML = `<div class="${emptyCls()}">the tests could not be read</div>`; return; }
+  }
+  const S = subjData.subjects[key]; if (!S) return;
+  document.getElementById(`subj-${key}-about`).textContent = S.about;
+  const short = n => n.replace('fu-ogden-v0-1', 'Ogden').replace('-pre', '');
+  const tests = [...S.tests].sort((a, b) => (b.mine - a.mine));
+  const vs = subjData.voyages;
+  const cell = rd => rd.value == null ? '<td class="s">–</td>' : `<td class="${rd.passed ? 'pass' : ''}" title="score ${rd.score == null ? '–' : rd.score.toFixed(2)} at step ${rd.step}">${rd.value >= 0 ? '+' : ''}${rd.value.toFixed(2)}${rd.passed ? ' ✓' : ''}</td>`;
+  const mine = tests.filter(t => t.mine);
+  el.innerHTML = `<p class="s">${mine.length ? `This class's own step${mine.length > 1 ? 's' : ''} on this track: <b>${mine.map(t => esc(t.name)).join(', ')}</b>. The others are other classes' goals, shown for where it stands on the way up.` : `This class has no step of its own on this track; the readings show where it stands.`} A test passes when its lift (the true answer's share over the floor) reaches its mark; each test has only a few dozen items, so seeds differ.</p>
+    <div class="scroll"><table class="subjtable"><thead><tr><th>test</th><th>whose step</th><th>mark</th>${vs.map(v => `<th class="mono" title="${esc(v)}">${esc(short(v))}</th>`).join('')}</tr></thead>
+    <tbody>${tests.map(t => `<tr${t.mine ? ' class="mine"' : ''}><td title="${esc(t.about)}"><b>${esc(t.name)}</b><div class="s">${esc(t.about.slice(0, 140))}${t.about.length > 140 ? '…' : ''}</div></td>
+      <td>${t.goal_class ? esc(t.goal_class) : '<span class="s">the bettor</span>'}${t.mine ? ' <b>(this class)</b>' : ''}</td><td>≥ ${t.threshold}</td>${t.readings.map(cell).join('')}</tr>`).join('')}</tbody></table></div>
+    <div class="chart" id="subjchart-${key}"></div>`;
+  const traces = [];
+  mine.forEach(t => t.readings.forEach((rd, i) => { if (rd.series && rd.series.length) traces.push({ type: 'scatter', mode: 'lines', name: `${t.name} · ${short(rd.voyage)}`, x: rd.series.map(p => p[0] / 1e6), y: rd.series.map(p => p[1]), line: { color: PALETTE[traces.length % PALETTE.length] } }); }));
+  if (traces.length) plot(`subjchart-${key}`, traces, layout({ xaxis: { title: 'tokens read (millions)', gridcolor: C.line }, yaxis: { title: 'lift', gridcolor: C.line, zeroline: true },
+    shapes: mine.map(t => ({ type: 'line', xref: 'paper', x0: 0, x1: 1, y0: t.threshold, y1: t.threshold, line: { color: C.accent, dash: 'dot' } })) }));
+  else document.getElementById(`subjchart-${key}`).innerHTML = `<div class="${emptyCls()}">no voyage of this class has read its own step on this track yet</div>`;
+}
+
+// ---- the Scoring tab's Shapes (/api/class_shapes): the parts-of-speech readings over tokens, and what kind of
+// word the latest reading expects against what the judge books hold
+async function classShapes(r) {
+  const el = document.getElementById('shapesmass'); if (!el) return;
+  let d; try { d = await get(`/api/class_shapes?preset=${encodeURIComponent(r.preset)}`); } catch (e) { el.innerHTML = `<div class="${emptyCls()}">the shapes could not be read</div>`; return; }
+  if (!d.voyages.length) { empty('shapeschart', 'no voyage of this class carries the shapes readings yet'); el.innerHTML = ''; return; }
+  const short = n => n.replace('fu-ogden-v0-1', 'Ogden').replace('-pre', '');
+  const names = { 'shapes/upos_top1': 'part of speech', 'shapes/ogden_top1': 'Ogden kind', 'shapes/keyed_top1': 'keyed word' };
+  const dash = { 'shapes/upos_top1': 'solid', 'shapes/ogden_top1': 'dot', 'shapes/keyed_top1': 'dash' };
+  const traces = [];
+  d.voyages.forEach((v, i) => Object.keys(names).forEach(m => { const s = v.series[m] || []; if (s.length) traces.push({ type: 'scatter', mode: 'lines', name: `${names[m]} · ${short(v.voyage)}`, x: s.map(p => p[0] / 1e6), y: s.map(p => p[1]), line: { color: PALETTE[i % PALETTE.length], dash: dash[m] } }); }));
+  plot('shapeschart', traces, layout({ xaxis: { title: 'tokens read (millions)', gridcolor: C.line }, yaxis: { title: 'top guess right', tickformat: '.0%', gridcolor: C.line } }));
+  const v = d.voyages[0];
+  const pct = x => x == null ? '–' : `${Math.round(100 * x)}%`;
+  el.innerHTML = `<h3>What kind of word it expects <span class="s">${esc(short(v.voyage))}, its latest reading: its probability on each kind of word against the judge books' own share</span></h3>
+    <div class="scroll"><table class="subjtable"><thead><tr><th>kind of word</th><th>expects</th><th>the text holds</th><th></th></tr></thead><tbody>${d.fine.filter(t => (v.truth[t] || 0) > 0.004 || (v.mass[t] || 0) > 0.004).map(t => {
+      const m = v.mass[t] || 0, h = v.truth[t] || 0, gap = m - h;
+      return `<tr><td><b>${esc(t)}</b> <span class="s">${esc(d.about[t] || '')}</span></td><td>${pct(m)}</td><td>${pct(h)}</td><td class="s">${Math.abs(gap) < 0.02 ? 'about right' : gap > 0 ? 'over-expects' : 'under-expects'}</td></tr>`; }).join('')}</tbody></table></div>`;
 }
 const RECENT = 30;
 // ---- RunGrid: every run at one size as a square, like a GitHub contribution graph. Bands of 7 rows
@@ -1253,7 +1313,7 @@ function renderRung() {
   if (modelTab === 'waypoints') { renderWaypoints(r); starsInReach(r); classSteps(r); }
   if (modelTab === 'goals') classGoals(r);
   if (modelTab === 'fitouts') classFitouts(r);
-  if (modelTab === 'scoring') askPanel(r);
+  if (modelTab === 'scoring') { askPanel(r); if (scSub === 'shapes') classShapes(r); else if (!['ask', 'language'].includes(scSub)) classSubject(r, scSub); }
   if (modelTab === 'bet') classWager(r);
   document.querySelectorAll('#rung .chart').forEach(el => { if (el.data && el.offsetParent) Plotly.Plots.resize(el); });
 }

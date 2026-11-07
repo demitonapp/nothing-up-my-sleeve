@@ -362,8 +362,38 @@ main a.ccell { color: var(--text); text-decoration: none; display: block; }
 
 /* the discovery chains: each cell a rung's test, every class's best lift on it */
 #chaintable td { vertical-align: top; min-width: 150px; }
-#chaintable .cr { display: flex; justify-content: space-between; gap: 8px; font-size: var(--fs-sm); color: var(--muted); font-variant-numeric: tabular-nums; }
-#chaintable .cr b { color: var(--text); font-weight: 500; }
-#chaintable .cr.lit b { color: var(--good); }
-#chaintable .cr.ref { border-top: 1px dotted var(--line); margin-top: 2px; }
-#chaintable .cr.ref b { color: var(--muted); }
+#chaintable .cr, .cevid .cr { display: flex; justify-content: space-between; gap: 8px; font-size: var(--fs-sm); color: var(--muted); font-variant-numeric: tabular-nums; }
+#chaintable .cr b, .cevid .cr b { color: var(--text); font-weight: 500; }
+#chaintable .cr.lit b, .cevid .cr.lit b { color: var(--good); }
+#chaintable .cr i, .cevid .cr i { font-style: normal; color: var(--muted); font-size: 0.9em; }
+#chaintable .cr.audit b, .cevid .cr.audit b { color: var(--accent); }
+#chaintable tr.rungsum td { border-top: 2px solid var(--line); background: var(--raise); }
+#chaintable tr.rungsum b { color: var(--accent); }
+#chaintable .cr.ref, .cevid .cr.ref { border-top: 1px dotted var(--line); margin-top: 2px; }
+#chaintable .cr.ref b, .cevid .cr.ref b { color: var(--muted); }
+
+/* one chain (#/discoveries/chains/<key>): the climb, step by step, keel first */
+#chainsteps { position: relative; }
+#chainsteps .cstep { display: flex; gap: 14px; position: relative; }
+#chainsteps .cstep + .cstep::before { content: ''; position: absolute; left: 31px; top: -14px; height: 14px; border-left: 2px solid var(--line); }
+#chainsteps .cnum { flex: 0 0 34px; height: 34px; border-radius: 50%; border: 2px solid var(--line); display: flex; align-items: center; justify-content: center; font-weight: 600; color: var(--muted); }
+#chainsteps .cstep.bet .cnum { border-color: var(--accent); color: var(--accent); }
+#chainsteps .cbody { flex: 1; min-width: 0; }
+#chainsteps .crung { font-size: var(--fs-sm); color: var(--muted); }
+#chainsteps .crung b { color: var(--accent); font-weight: 600; }
+#chainsteps h2 { margin: 2px 0 4px; }
+#chainsteps .cadds { margin: 0 0 10px; max-width: 75ch; line-height: 1.5; }
+#chainsteps .cev { gap: 18px; align-items: flex-start; flex-wrap: wrap; }
+#chainsteps .cevid { flex: 0 0 240px; }
+#chainsteps .cpairs { flex: 1; min-width: 280px; }
+#chainsteps .k { font-size: var(--fs-sm); color: var(--muted); margin-bottom: 4px; }
+.cevid .cr em { font-style: normal; color: var(--muted); font-size: 0.85em; min-width: 72px; text-align: right; }
+#chainsteps table.pairs td, #chainsteps table.pairs th { padding: 3px 8px; font-size: var(--fs-sm); }
+#chainsteps .pq { color: var(--muted); }
+#chainsteps .pi { color: var(--good); }
+#chainsteps .pr { color: var(--bad); opacity: 0.85; }
+#chainsteps .pok { color: var(--good); text-align: center; }
+#chainsteps .pno { color: var(--muted); text-align: center; }
+#chainsteps details summary { cursor: pointer; color: var(--blue); font-size: var(--fs-sm); margin-top: 6px; }
+@media (max-width: 700px) { #chainsteps .cevid { flex-basis: 100%; } }
+#chainsteps .cevid > .s { font-size: var(--fs-sm); color: var(--muted); margin-top: 6px; }

@@ -68,15 +68,37 @@ holds the ways in, always:
   (the Origin test for reasoning, the energy test for physics, Mendeleev's gaps for mathematics;
   the geometry test was first choice but is not viable on Gutenberg in English), each a bet
   between an idea and its rivals on books from before its cutoff, pre-registered in DECISIONS.md.
-  Each is reached by a **chain of four rungs**, one per class, linked by `leads_to`: the speller's
-  test (the pieces as everyday knowledge), the stylist's (chained into a conclusion no sentence
-  states), the 50m's (what the precursors wrote) and the bettor's (the discovery). The Origin:
-  the breeders' test, Nature's breeder, Malthus and Lyell. Energy: the smith's test, the mill test,
-  Rumford and Davy. Mendeleev's gaps: the gap test, the between test, Döbereiner's triads. All read
-  on one evaluator and scale (lift: idea over rival, less what the words alone carry), and every
-  class is scored on every rung, so **the discovery chains** table at the top of Discoveries (the
-  chains as rows, the rungs as columns, each cell every class's best lift, ✓ at 0.1, and Qwen3
-  0.6B for scale) shows the curve. The geometry test is revived as the bettor's fourth test.
+  Each is reached by a **chain of six rungs**, one per class, keel to bettor, linked by `leads_to`
+  (`fleet.chains()`): the words of the idea (keel), the copying trick put to it (pilot), its pieces
+  as everyday knowledge (speller), chained into a conclusion no sentence states (stylist), what the
+  precursors wrote (the 50m) and the discovery (bettor). The Origin: like father, like son, the
+  pedigree test, the breeders' test, Nature's breeder, Malthus and Lyell. Energy: fire and ice, the
+  workshop test, the smith's test, the mill test, Rumford and Davy. Mendeleev's gaps: one, two,
+  three, the period test, the gap test, the between test, Döbereiner's triads. The eternal return
+  (the philosophy test, cutoff 1872): again and again, the refrain test, the seasons test, the
+  pigeonhole test, Hume and Lucretius. All read on one evaluator and scale (lift: idea over rival,
+  less what the words alone carry), and every class is scored on every rung.
+  **The discovery chains** table at the top of Discoveries has the four chains as rows in that fixed
+  order (from `fleet.chains()`) and the classes as columns, smallest first, so rungs line up class by
+  class (a chain with no rung for a class shows "no rung"). Each cell is every class's best lift and
+  best share of pairs right, with Qwen3 0.6B for scale. The last row, from `fleet.RUNGS`, says what
+  a model at each rung is according to the four tests (title in bold, summary beneath); it is read
+  from fleet so it stays in one place. A matched-pairs test is **performed** under the share rule
+  (`fleet.performed`; DECISIONS.md, "The share rule"): its lift at the threshold *and* its share of
+  pairs right at `min_score` (two in three), at the same reading. The server applies it to
+  `performed_at`, so every performed count on the dashboard follows it; tricks without `min_score`
+  keep lift ≥ threshold. ✓ is performed; ▲ marks a class that performed a rung set for a bigger
+  class, ⚠ (amber) one that did so while a bigger class measured on it fails, a sign the pairs want
+  auditing. The geometry test is revived as the bettor's fifth test, outside the chains.
+  **One chain** (`#/discoveries/chains/<key>`, keyed by the bettor's test, linked from each row of
+  the chains table and from every rung's trick page) tells that test as a climb: the idea, who found
+  it and the shelf (with the cutoff), all `fleet.CHAINS` copy, then the six steps keel first, each
+  with its class and `fleet.RUNGS` title, the test (linked to its page), what the step adds to the
+  one below, the evidence class by class as in the table plus the floor, Qwen3 0.6B, and the rule
+  (lift and share), and its pairs: six shown, all on demand, each with ✓ or ✗ for each class's best
+  sailing (that pair's lift in the latest `discovery` artifact, in the CSV's order). The bettor's
+  step reads "pairs not written yet" until `lists/discovery-<test>.csv` exists, with the rivals
+  and the ablation from its `about`.
   "→ leads to" and "← led by" notes link each pair in the trick table, the route, the Waypoints
   and Goals tables and each trick's page, where the partner's chart sits beside the trick's own.
   A trick's chart draws its threshold (amber), its floor (grey: the highest untrained reading among

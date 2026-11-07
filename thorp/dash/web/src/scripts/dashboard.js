@@ -39,7 +39,7 @@ const STABS = ['betting', 'books', 'languages', 'sieves', 'attention', 'traits']
 const STAB_EL = { betting: 'betting', books: 'books', languages: 'languages', sieves: 'sieves', attention: 'attention', traits: 'traits-section' };
 const OLD_SHIP = { betting: 'betting', books: 'books', languages: 'languages', sieves: 'sieves', attention: 'attention', 'traits-section': 'traits' };
 const SECTION_NAV = { sizes: 'classes', rung: 'classes', ship: 'classes', 'runs-section': 'classes', voyages: 'voyages', voyage: 'voyages', table: 'voyages', discoveries: 'discoveries', sievesguide: 'sieves' };
-let discView = 'index', discTrick = null;
+let discView = 'index', discTrick = null, discChain = null;
 let page = 'sizes', modelTab = 'fleet', shipKey = null, sailingKey = null, shipTab = 'betting', voyageKey = null, runsList = null, shipsData = null;
 function route(h) {
   if (h.startsWith('/')) {
@@ -55,6 +55,7 @@ function route(h) {
     if (a === 'voyages' && b && c === 'table') return { page: 'table', voyage: b };
     if (a === 'voyages' && b) return { page: 'voyage', voyage: b };
     if (a === 'voyages') return { page: 'voyages' };
+    if (a === 'discoveries' && b === 'chains' && c) return { page: 'discoveries', dview: 'chain', chain: c };
     if (a === 'discoveries') return { page: 'discoveries', dview: !b ? 'index' : (b === 'stars' || b === 'traits') ? b : 'trick', trick: b && b !== 'stars' && b !== 'traits' ? b : null };
     if (a === 'sieves') return { page: 'sievesguide', run: b ? decodeURIComponent(b) : null };
     return { page: 'sizes' };
@@ -127,8 +128,8 @@ function showTab(h, push = true) {
   if (page === 'runs-section') hash = '/ships';
   if (page === 'voyages') hash = '/voyages';
   if (page === 'discoveries') {
-    discView = rt.dview || 'index'; discTrick = rt.trick || null;
-    hash = '/discoveries' + (discView === 'index' ? '' : '/' + (discView === 'trick' ? discTrick : discView));
+    discView = rt.dview || 'index'; discTrick = rt.trick || null; discChain = rt.chain || null;
+    hash = '/discoveries' + (discView === 'index' ? '' : '/' + (discView === 'trick' ? discTrick : discView === 'chain' ? 'chains/' + discChain : discView));
     document.querySelectorAll('#discoveries .dview').forEach(v => v.classList.toggle('active', v.dataset.dview === discView));
     if (discData) drawDiscoveryView();
   }
@@ -1556,6 +1557,9 @@ async function drawTrickPage() {
     ['waypoint', `${esc(wp ? wp.name : t.waypoint)}${t.gate ? ' · <b>◆ a gate</b>: performed before a ship moves on' : ' · a milestone'}`],
     ['rests on', t.rests_on.length ? t.rests_on.map(k => `<a href="#/discoveries/${esc(k)}">${esc(tname[k] || k)}</a>`).join(', ') : '–'],
     ...(leadNote(t, discData.known_tricks || []) ? [['leads', leadNote(t, discData.known_tricks || [])]] : []),
+    ...(() => { const ch = ((discData.chain_rungs || {}).chains || []).find(c => c.includes(t.key) || c.includes(t.fleet)); if (!ch) return [];
+      const end = ch[ch.length - 1], en = (discData.known_tricks || []).find(x => x.key === end || x.fleet === end);
+      return [['the climb', `${ch.indexOf(t.fleet || t.key) === ch.length - 1 ? '' : `step ${ch.indexOf(t.fleet || t.key) + 1} of ${ch.length} on `}<a href="#/discoveries/chains/${esc(end)}"><b>${esc(en ? en.name : end)}</b>: the climb, step by step</a>`]]; })(),
     ['the field shows it at', `<span class="sizeband">${esc(t.field_band)}</span> parameters · ${esc(t.field_at)} <span class="s">(${esc(t.sure)})</span>`], ['in', esc(t.field_models)], ['first shown by', `<span class="s">${esc(t.source)}</span>`],
     ["Thorp's goal class", t.target_class ? `${classLink(t.target_class)}${tgt ? ` · ${big(tgt.total)} parameters` : ''}` : t.taught ? 'none: the field shows it only when taught the task' : 'beyond the ladder: a horizon'],
     ['how Thorp measures it', ft ? `<span class="mono">${esc(ft.metric)}</span>, performed at ${ft.threshold}` : `not yet: ${esc(t.measure)}`],
@@ -1614,34 +1618,130 @@ function trickChart(id, d, t) {
 }
 // the discovery chains: each bettor test reached in rungs, one per class (leads_to from the speller's
 // tests up); rows are the chains, columns the rungs, each cell every class's best lift on that rung
+// one rung's evidence, class by class (the chains table and the chain pages): the best lift and best share of pairs
+// right, ✓ performed under the share rule, ▲ passed below its class, ⚠ while a bigger class fails it; opts.floor adds
+// the floor (the highest untrained reading)
+function rungEvidence(t, ft, rank, opts = {}) {
+  const thr = ft ? ft.threshold : 0.1;
+  let body;
+  if (!ft || (!ft.evaluator && !ft.ships.length)) body = `<div class="s">${ft && ft.viable === false ? 'not viable' : ft ? 'evaluator not built yet' : 'not measured'}</div>`;
+  else if (!ft.ships.length) body = '<div class="s">no readings yet</div>';
+  else {
+    // per class: the best lift, its best share of pairs right, and whether any sailing performed it under the
+    // share rule (lift at the threshold and share at min_score at the same reading; the server's performed_at)
+    const by = {};
+    for (const x of ft.ships) {
+      const b = by[x.preset] || (by[x.preset] = { best: -Infinity, share: null, done: false });
+      b.best = Math.max(b.best, x.best); b.done = b.done || x.performed_at != null;
+      if (x.best_share != null) b.share = Math.max(b.share ?? 0, x.best_share);
+      if (x.floor != null) b.floor = Math.max(b.floor ?? -Infinity, x.floor);
+    }
+    // a class that performs a rung set for a bigger class has passed below its class; when a bigger class was
+    // measured on it and did not perform it, the pair set wants auditing (DECISIONS.md, "The share rule")
+    const goal = rank(t.target_class);
+    const failedAbove = p => Object.entries(by).some(([q, b]) => rank(q) > rank(p) && !b.done);
+    body = Object.entries(by).sort((a, b) => rank(a[0]) - rank(b[0])).map(([p, b]) => {
+      const below = b.done && rank(p) < goal, audit = below && failedAbove(p);
+      const why = b.done ? (audit ? 'passed below its class while a bigger class fails it: audit the pairs' : below ? 'passed below its class' : 'performed')
+        : b.best >= thr ? `lift at the mark but ${b.share != null ? Math.round(100 * b.share) + '%' : 'too few'} of pairs right, under ${Math.round(100 * (ft.min_score || 0))}%` : 'not performed';
+      return `<div class="cr${b.done ? ' lit' : ''}${audit ? ' audit' : ''}" title="${esc(why)}"><span>${esc(p)}</span><b>${b.best >= 0 ? '+' : ''}${fmt(b.best, 2)}${b.share != null ? ` <i>${Math.round(100 * b.share)}%</i>` : ''}${b.done ? ' ✓' : ''}${below ? (audit ? ' ⚠' : ' ▲') : ''}</b>${opts.floor ? `<em>${b.floor != null ? `floor ${b.floor >= 0 ? '+' : ''}${fmt(b.floor, 2)}` : ''}</em>` : ''}</div>`;
+    }).join('');
+  }
+  return body;
+}
 function drawChains() {
   const kts = discData.known_tricks || [], byKey = Object.fromEntries(kts.map(t => [t.key, t]));
   const led = new Set(kts.map(t => t.leads_to).filter(Boolean));
   const chains = kts.filter(t => t.leads_to && !led.has(t.key)).map(start => { const c = [start]; let t = start; while (t.leads_to && byKey[t.leads_to]) { t = byKey[t.leads_to]; c.push(t); } return c; });
   const tb = document.getElementById('chaintable');
   if (!chains.length) { tb.tHead.innerHTML = ''; tb.tBodies[0].innerHTML = '<tr><td class="empty">no chains yet</td></tr>'; return; }
-  const width = Math.max(...chains.map(c => c.length)), presets = ladderData ? ladderData.rungs.map(r => r.preset) : [];
-  const rungClass = i => { const g = chains.map(c => c[i] && c[i].target_class).find(Boolean); return g ? classLink(g) : `rung ${i + 1}`; };
-  tb.tHead.innerHTML = `<tr><th>leads to</th>${Array.from({ length: width }, (_, i) => `<th>rung ${i + 1} · ${rungClass(i)}</th>`).join('')}</tr>`;
+  // the columns are the classes the chains' rungs belong to, smallest first, so a chain that starts at the keel and one
+  // that starts at the speller line up class by class; the longest chains are featured first
+  const presets = ladderData ? ladderData.rungs.map(r => r.preset) : [];
+  const rank = p => { const i = presets.indexOf(p); return i < 0 ? 99 : i; };
+  const cols = [...new Set(chains.flat().map(t => t.target_class).filter(Boolean))].sort((a, b) => rank(a) - rank(b));
+  // the chains in the order fleet.chains() gives (Origin, energy, Mendeleev's gaps, the eternal return); any it
+  // does not name follow, longest first
+  const cr = discData.chain_rungs || {}, order = (cr.chains || []).map(c => c[c.length - 1]);
+  const pos = c => { const i = order.indexOf(c[c.length - 1].fleet || c[c.length - 1].key); return i < 0 ? 99 : i; };
+  chains.sort((a, b) => pos(a) - pos(b) || b.length - a.length);
+  tb.tHead.innerHTML = `<tr><th>leads to</th>${cols.map((p, i) => `<th>rung ${i + 1} · ${classLink(p)}</th>`).join('')}</tr>`;
   tb.tBodies[0].innerHTML = chains.map(c => {
-    const end = c[c.length - 1];
-    return `<tr><td><b>${esc(end.name)}</b></td>${c.map(t => {
-      const ft = t.fleet && discTricks.find(x => x.key === t.fleet);
-      const thr = ft ? ft.threshold : 0.1, ref = Object.entries(t.reference || {})[0];
-      let body;
-      if (!ft || (!ft.evaluator && !ft.ships.length)) body = `<div class="s">${ft && ft.viable === false ? 'not viable' : ft ? 'evaluator not built yet' : 'not measured'}</div>`;
-      else if (!ft.ships.length) body = '<div class="s">no readings yet</div>';
-      else {
-        const best = {};
-        for (const x of ft.ships) if (best[x.preset] == null || x.best > best[x.preset]) best[x.preset] = x.best;
-        body = Object.entries(best).sort((a, b) => presets.indexOf(a[0]) - presets.indexOf(b[0]))
-          .map(([p, v]) => `<div class="cr${v >= thr ? ' lit' : ''}"><span>${esc(p)}</span><b>${v >= 0 ? '+' : ''}${fmt(v, 2)}${v >= thr ? ' ✓' : ''}</b></div>`).join('');
-      }
+    const end = c[c.length - 1], at = Object.fromEntries(c.map(t => [t.target_class, t]));
+    const chainKey = end.fleet || end.key, hasPage = (cr.chains || []).some(x => x[x.length - 1] === chainKey);
+    return `<tr><td>${hasPage ? `<a href="#/discoveries/chains/${esc(chainKey)}"><b>${esc(end.name)}</b></a><div class="s">the climb, step by step →</div>` : `<b>${esc(end.name)}</b>`}</td>${cols.map(p => at[p]).map(t => {
+      if (!t) return '<td class="none"><div class="s">no rung</div></td>';
+      const ft = t.fleet && discTricks.find(x => x.key === t.fleet), ref = Object.entries(t.reference || {})[0];
+      const body = rungEvidence(t, ft, rank);
       return `<td><a href="#/discoveries/${esc(t.key)}"><b>${esc(t.name)}</b></a>${body}${ref ? `<div class="cr ref"><span>${esc(ref[0])}</span><b>+${fmt(ref[1], 2)}</b></div>` : ''}</td>`;
     }).join('')}</tr>`;
+  }).join('')
+  // what a model at each rung is, according to the chains (fleet.RUNGS)
+  + ((cr.rungs || []).length ? `<tr class="rungsum"><td><b>What a model at this rung is</b></td>${cols.map(p => {
+      const r = cr.rungs.find(x => x.preset === p);
+      return r ? `<td><b>${esc(r.title)}</b><div class="s">${esc(r.summary)}</div></td>` : '<td></td>';
+    }).join('')}</tr>` : '');
+}
+function drawDiscoveryView() { if (discView === 'index') { drawChains(); drawTricks(); } if (discView === 'trick') drawTrickPage(); if (discView === 'chain') drawChainPage(); }
+
+// ---- One chain (#/discoveries/chains/<key>): a bettor's test told as a climb, keel to bettor (fleet.CHAINS). The copy is
+// fleet's; the evidence per class is /api/discoveries' (as in the chains table), the pairs and per-pair lifts /api/chain's.
+const chainCache = new Map();
+async function drawChainPage() {
+  const key = discChain, el = document.getElementById('chainsteps');
+  let d = chainCache.get(key);
+  if (!d) {
+    try { d = await get('/api/chain?key=' + encodeURIComponent(key)); } catch (e) { d = null; }
+    if (!d || !d.steps) {
+      document.getElementById('chaintitle').textContent = `no chain called ${key}`;
+      ['chainstrand', 'chainover'].forEach(id => { document.getElementById(id).innerHTML = ''; });
+      el.innerHTML = '<div class="empty">the chains are the bettor\'s four tests; <a href="#/discoveries">back to the chains table</a></div>'; return;
+    }
+    chainCache.set(key, d);
+  }
+  if (discChain !== key) return;
+  document.getElementById('chaintitle').textContent = d.name;
+  document.getElementById('chainstrand').innerHTML = `<span class="pill accent">${esc(d.strand)}</span>`;
+  document.getElementById('chainover').innerHTML = [
+    ['the idea', esc(d.idea)], ['found by', esc(d.found)],
+    ['the shelf', `${esc(d.shelf)}${d.cutoff ? ` <span class="s">(cutoff ${d.cutoff})</span>` : ''}`],
+    ['the climb', `${d.steps.length} steps, one per class, each resting on the one before; step ${d.steps.length} is the bet itself`],
+  ].map(([k, v]) => `<div><div class="k">${k}</div><div>${v}</div></div>`).join('');
+  const kts = discData.known_tricks || [], presets = ladderData ? ladderData.rungs.map(r => r.preset) : [];
+  const rank = p => { const i = presets.indexOf(p); return i < 0 ? 99 : i; };
+  const sign = v => v == null ? '–' : `${v >= 0 ? '+' : ''}${fmt(v, 2)}`;
+  el.innerHTML = d.steps.map((st, i) => {
+    const t = kts.find(x => x.key === st.key) || { key: st.key, name: st.name, target_class: st.rung && st.rung.preset };
+    const ft = discTricks.find(x => x.key === st.key), r = st.rung || {}, ref = Object.entries(t.reference || st.reference || {})[0];
+    const last = i === d.steps.length - 1;
+    // the pairs, with each class's best sailing on this test marked right (lift above zero) or wrong, pair by pair
+    const best = {};
+    for (const x of st.runs) if (x.preset && (!best[x.preset] || (x.lift ?? -9) > (best[x.preset].lift ?? -9))) best[x.preset] = x;
+    const cls = Object.keys(best).sort((a, b) => rank(a) - rank(b));
+    const row = (p, j) => `<tr><td class="pq">${esc(p.prompt)} …</td><td class="pi">${esc(p.idea)}</td><td class="pr">${esc(p.rival)}</td>${cls.map(c => {
+      const v = best[c].pairs[j]; return v == null ? '<td>–</td>' : `<td class="${v > 0 ? 'pok' : 'pno'}" title="${esc(best[c].name)}: lift ${sign(v)}">${v > 0 ? '✓' : '✗'}</td>`;
+    }).join('')}</tr>`;
+    const head = `<thead><tr><th>the passage</th><th>the idea</th><th>its rival</th>${cls.map(c => `<th title="${esc(best[c].name)}">${esc(c)}</th>`).join('')}</tr></thead>`;
+    const pairs = st.pairs && st.pairs.length
+      ? `<div class="scroll"><table class="pairs" data-nosort>${head}<tbody>${st.pairs.slice(0, 6).map(row).join('')}</tbody></table></div>`
+        + (st.pairs.length > 6 ? `<details><summary>all ${st.pairs.length} pairs</summary><div class="scroll"><table class="pairs" data-nosort>${head}<tbody>${st.pairs.map(row).join('')}</tbody></table></div></details>` : '')
+      : `<div class="empty">pairs not written yet${st.pairs_file ? ` (<span class="mono">${esc(st.pairs_file)}</span>)` : ''}</div>`;
+    return `<section class="panel cstep${last ? ' bet' : ''}">
+      <div class="cnum">${i + 1}</div>
+      <div class="cbody">
+        <div class="crung">${r.preset ? classLink(r.preset) : ''}${r.title ? ` · <b>${esc(r.title)}</b>` : ''}</div>
+        <h2><a href="#/discoveries/${esc(st.key)}">${esc(st.name)}</a></h2>
+        <p class="cadds">${esc(st.adds)}</p>
+        ${last && st.about ? `<p class="s">${esc(st.about)}</p>` : ''}
+        <div class="row cev">
+          <div class="cevid"><div class="k">class by class <span class="s">best lift · share right · floor</span></div>${rungEvidence(t, ft, rank, { floor: true })}
+            ${ref ? `<div class="cr ref"><span>${esc(ref[0])}</span><b>${sign(ref[1])}</b></div>` : ''}
+            <div class="s">performed at lift ${st.threshold ?? '–'}${st.min_score != null ? ` and ${Math.round(100 * st.min_score)}% of pairs right` : ''}, at the same reading</div></div>
+          <div class="cpairs"><div class="k">the pairs <span class="s">each class's best sailing, ✓ where it bets on the idea</span></div>${pairs}</div>
+        </div>
+      </div></section>`;
   }).join('');
 }
-function drawDiscoveryView() { if (discView === 'index') { drawChains(); drawTricks(); } if (discView === 'trick') drawTrickPage(); }
 // the trick a kind of head performs, if measured: performed or not, on how many sailings
 const trickNote = h => {
   const t = h.trick && discTricks.find(x => x.key === h.trick);

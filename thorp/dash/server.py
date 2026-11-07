@@ -847,12 +847,10 @@ def _known_heads() -> list[dict]:
 FIELD_BANDS = ("under 1M", "1M–10M", "10M–100M", "100M–1B", "1B–10B", "10B–100B", "100B and up")
 
 
-def _known_tricks() -> list[dict]:
-    """The tricks of the trade on the route to quantum physics (thorp/dash/tricks.py): each with its
-    size band, and its goal class (named there by class name) turned into the class's preset."""
+def _class_presets() -> dict[str, str]:
+    """Each class name (keel, pilot, speller...) to its preset, old names included."""
     import re
 
-    from thorp.dash.tricks import KNOWN_TRICKS
     from thorp.models.registry import LADDER
 
     by_name = {
@@ -864,6 +862,34 @@ def _known_tricks() -> list[dict]:
             by_name.setdefault(new, by_name[old])
         if new in by_name:
             by_name.setdefault(old, by_name[new])
+    return by_name
+
+
+def _rungs() -> dict:
+    """The discovery chains' rungs (fleet.RUNGS): what a model at each class is according to the
+    chains, with the class turned into its preset; and the chains' order (fleet.chains())."""
+    from thorp import fleet
+
+    by_name = _class_presets()
+    rungs = [
+        {
+            "class": r.goal_class,
+            "preset": by_name.get(r.goal_class),
+            "title": r.title,
+            "summary": r.summary,
+        }
+        for r in getattr(fleet, "RUNGS", ())
+    ]
+    chains = fleet.chains() if hasattr(fleet, "chains") else []
+    return {"rungs": rungs, "chains": chains}
+
+
+def _known_tricks() -> list[dict]:
+    """The tricks of the trade on the route to quantum physics (thorp/dash/tricks.py): each with its
+    size band, and its goal class (named there by class name) turned into the class's preset."""
+    from thorp.dash.tricks import KNOWN_TRICKS
+
+    by_name = _class_presets()
     out = []
     for t in KNOWN_TRICKS:
         fp = t["field_params"]
@@ -895,6 +921,91 @@ def _floor(con, run_id: str, metric: str) -> float | None:
         [run_id, metric[: -len("lift")] + "floor_lift"],
     ).fetchone()
     return row[0] if row else None
+
+
+def _pairs(path: str | None) -> list[dict] | None:
+    """A matched-pairs list (prompt, idea, rival), or None when it is not written yet."""
+    import csv
+
+    if not path or not Path(path).exists():
+        return None
+    with open(path, newline="") as f:
+        return [
+            {"prompt": r.get("prompt", ""), "idea": r.get("idea", ""), "rival": r.get("rival", "")}
+            for r in csv.DictReader(f)
+        ]
+
+
+def api_chain(key: str) -> dict:
+    """One of the bettor's tests told as a climb (fleet.CHAINS): the idea, who found it, the shelf,
+    and each step keel to bettor with what it adds, the class it belongs to (fleet.RUNGS), its pairs
+    and, per sailing, the latest per-pair lifts from the 'discovery' artifacts (in the pairs' order).
+    The evidence per class (best lift, share, performed) comes from /api/discoveries."""
+    from thorp import fleet
+
+    ch = getattr(fleet, "CHAINS", {}).get(key)
+    if ch is None:
+        return {"key": key, "error": f"no chain called {key}"}
+    rungs = _rungs()["rungs"]
+    known = {t["key"]: t for t in _known_tricks()}
+    # the latest discovery artifact holding each test, per sailing
+    latest: dict[str, dict[str, dict]] = {}
+    runs = {}
+    for r in _rows(
+        "select a.run_id, a.text, r.name, r.spec_json from artifacts a join runs r using(run_id)"
+        " where a.kind='discovery' order by a.step, a.rowid"
+    ):
+        try:
+            body = json.loads(r["text"] or "{}")
+        except ValueError:
+            continue
+        runs[r["run_id"]] = {
+            "run_id": r["run_id"],
+            "name": r["name"],
+            "preset": json.loads(r["spec_json"] or "{}").get("model", {}).get("preset"),
+        }
+        for k, v in body.items():
+            if isinstance(v, dict) and "pairs" in v:
+                latest.setdefault(k, {})[r["run_id"]] = v
+    steps = []
+    for i, (k, text) in enumerate(ch.steps.items()):
+        tr = fleet.TRICKS.get(k)
+        kt = known.get(k, {})
+        steps.append(
+            {
+                "key": k,
+                "name": tr.name if tr else kt.get("name", k),
+                "adds": text,
+                "rung": rungs[i] if i < len(rungs) else None,
+                "threshold": tr.threshold if tr else None,
+                "min_score": getattr(tr, "min_score", None) if tr else None,
+                "evaluator": tr.evaluator if tr else None,
+                "about": tr.about if tr else "",
+                "pairs_file": tr.pairs if tr else None,
+                "pairs": _pairs(tr.pairs if tr else None),
+                "reference": kt.get("reference", {}),
+                "runs": [
+                    {
+                        **runs[rid],
+                        "lift": v.get("lift"),
+                        "share": v.get("score"),
+                        "pairs": v.get("pairs") or [],
+                    }
+                    for rid, v in latest.get(k, {}).items()
+                ],
+            }
+        )
+    bet = fleet.TRICKS.get(key)
+    return {
+        "key": ch.key,
+        "name": ch.name,
+        "strand": ch.strand,
+        "idea": ch.idea,
+        "found": ch.found,
+        "shelf": ch.shelf,
+        "cutoff": getattr(bet, "cutoff", None),
+        "steps": steps,
+    }
 
 
 def api_trick_series(key: str) -> dict:
@@ -1051,6 +1162,27 @@ def api_discoveries() -> dict:
                 )
                 if not pts:
                     continue
+                # the share rule (fleet.performed): a matched-pairs test is performed only where its
+                # lift is at the threshold and its share of pairs right at min_score, at the same reading
+                min_score = getattr(tr, "min_score", None)
+                share = {}
+                if min_score is not None:
+                    share = dict(
+                        con.execute(
+                            "select step, value from metrics where run_id=? and name=? order by step, rowid",
+                            [r["run_id"], tr.metric.rsplit("/", 1)[0] + "/score"],
+                        )
+                    )
+                done = [
+                    p[0]
+                    for p in pts
+                    if p[1] >= tr.threshold
+                    and (
+                        min_score is None
+                        or (share.get(p[0]) is not None and share[p[0]] >= min_score)
+                    )
+                ]
+                top = max(pts, key=lambda p: p[1])
                 spec = json.loads(r["spec_json"] or "{}")
                 ships.append(
                     {
@@ -1059,8 +1191,10 @@ def api_discoveries() -> dict:
                         "ship": r["ship"],
                         "preset": spec.get("model", {}).get("preset"),
                         **named(r),
-                        "performed_at": next((p[0] for p in pts if p[1] >= tr.threshold), None),
-                        "best": max(p[1] for p in pts),
+                        "performed_at": done[0] if done else None,
+                        "best": top[1],
+                        "share_at_best": share.get(top[0]),
+                        "best_share": max(share.values()) if share else None,
                         "latest": pts[-1][1],
                         "readings": len(pts),
                         "floor": _floor(con, r["run_id"], tr.metric),
@@ -1073,6 +1207,7 @@ def api_discoveries() -> dict:
                     "name": tr.name,
                     "metric": tr.metric,
                     "threshold": tr.threshold,
+                    "min_score": getattr(tr, "min_score", None),
                     "performed_by": list(tr.performed_by),
                     "evaluator": tr.evaluator,
                     "leads_to": getattr(tr, "leads_to", None),
@@ -1097,6 +1232,7 @@ def api_discoveries() -> dict:
         # the star chart: every kind of head the literature describes (thorp/dash/heads.py)
         "known_heads": _known_heads(),
         "known_tricks": _known_tricks(),
+        "chain_rungs": _rungs(),
         "waypoints": __import__("thorp.dash.tricks", fromlist=["WAYPOINTS"]).WAYPOINTS,
     }
 
@@ -1324,6 +1460,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/table/transcript": lambda: api_table_transcript(q["run"]),
                 "/api/stages": lambda: api_stages(q.get("runs", "")),
                 "/api/trick": lambda: api_trick_series(q["key"]),
+                "/api/chain": lambda: api_chain(q["key"]),
                 "/api/shelf": lambda: api_shelf(q["run"]),
                 "/api/book": lambda: api_book(q["id"], q.get("offset", 0), q.get("length", 20000)),
                 "/api/experiment": lambda: api_experiment(q.get("prefix", "content-")),

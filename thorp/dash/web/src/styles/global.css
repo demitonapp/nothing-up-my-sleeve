@@ -472,25 +472,58 @@ main a.ccell { color: var(--text); text-decoration: none; display: block; }
 #leaderboard details.lbfold[open] > summary::before { content: '▾ '; }
 #leaderboard .handtools label { font-size: var(--fs-sm); color: var(--muted); }
 
-/* the leaderboard table fits the page: compact bars and strips, and the least needed columns drop first on narrow screens */
+/* the leaderboard table fits the page: the four test columns drop first on narrow screens, then the rank and size */
 #lbtable { width: 100%; }
-#lbtable th, #lbtable td { padding-left: 6px; padding-right: 6px; }
+#lbtable th, #lbtable td { padding-left: 6px; padding-right: 6px; vertical-align: top; }
 #lbtable td:nth-child(2) { min-width: 130px; }
 #lbtable td:nth-child(4) { white-space: nowrap; }
-#lbtable td:nth-child(5), #lbtable td:nth-child(6) { font-size: var(--fs-sm); }
-#lbtable td:nth-child(7) { white-space: nowrap; }
-#lbtable .climb { width: 84px; }
-#lbtable .climb b { right: -36px; }
-#lbtable td:nth-child(7) { padding-right: 42px; }
-#lbtable .cstrip .csr { grid-template-columns: 54px repeat(5, 9px); }
-#lbtable td:nth-child(8) { width: 1%; }
-#lbtable .cstrip em { height: 8px; }
-@media (max-width: 1000px) { #lbtable th:nth-child(8), #lbtable td:nth-child(8) { display: none; } }
-@media (max-width: 760px) { #lbtable th:nth-child(7), #lbtable td:nth-child(7), #lbtable th:nth-child(1), #lbtable td:nth-child(1) { display: none; } }
-@media (max-width: 560px) { #lbtable th:nth-child(6), #lbtable td:nth-child(6), #lbtable th:nth-child(3), #lbtable td:nth-child(3) { display: none; } }
+#lbtable td:last-child { font-size: var(--fs-sm); min-width: 150px; }
+#lbtable .tcol, #lbruns td { font-size: var(--fs-sm); white-space: nowrap; }
+#lbtable th.tcol { white-space: normal; max-width: 80px; }
+.tc i { font-style: normal; color: var(--muted); }
+.tc.lit { color: var(--good); }
+@media (max-width: 980px) { #lbtable .tcol { display: none; } }
+@media (max-width: 600px) { #lbtable th:nth-child(1), #lbtable td:nth-child(1), #lbtable th:nth-child(3), #lbtable td:nth-child(3), #lbtable th:nth-child(5), #lbtable td:nth-child(5) { display: none; } }
 
 /* the Discoveries subtabs */
 #discoveries .dsub { display: none; }
 #discoveries .dsub.active { display: grid; gap: 16px; min-width: 0; }
 #discnav { margin-bottom: 4px; }
 #discoveries .dsubintro { margin: 0; max-width: 90ch; line-height: 1.5; }
+
+/* Chaining two facts: the method */
+#discoveries .tfstep { display: flex; gap: 14px; }
+#discoveries .tfn { flex: 0 0 30px; height: 30px; border-radius: 50%; border: 2px solid var(--accent); color: var(--accent); display: flex; align-items: center; justify-content: center; font-weight: 600; }
+#discoveries .tfb { flex: 1; min-width: 0; }
+#discoveries .tfb p, #discoveries .tflead { max-width: 85ch; line-height: 1.55; margin: 0 0 10px; }
+#discoveries .tflead { font-size: 1.05em; }
+#discoveries .tfformula { font-family: var(--mono, ui-monospace, monospace); font-size: var(--fs-sm); background: var(--raise); border: 1px solid var(--line); border-radius: 4px; padding: 8px 12px; margin: 0 0 10px; overflow-x: auto; white-space: nowrap; }
+#discoveries .good { color: var(--good); }
+#discoveries .bad { color: var(--bad); }
+#discoveries .pframe { font-weight: 600; color: var(--text); }
+#discoveries .pfsep { color: var(--line); }
+#tfexamples td { vertical-align: top; font-size: var(--fs-sm); }
+.tfstatus { display: flex; flex-wrap: wrap; gap: 10px 26px; align-items: flex-end; }
+.tfs { display: flex; flex-direction: column; }
+.tfs b { font-size: 20px; font-weight: 600; }
+.tfs span { font-size: var(--fs-sm); color: var(--muted); max-width: 220px; }
+.tfcomp { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: var(--fs-sm); }
+.tfcomp i { font-style: normal; color: var(--muted); }
+.tfgrades { display: grid; gap: 6px; }
+.tfg { font-size: var(--fs-sm); }
+#tfbacktest .sqbk.good { color: var(--good); } #tfbacktest .sqbk.bad { color: var(--bad); }
+@media (max-width: 600px) { #discoveries .tfstep { flex-direction: column; } }
+
+/* a trick's methodology (fleet.METHODS) */
+#method .mtrick, #method .mmetric { max-width: 85ch; line-height: 1.55; margin: 0 0 6px; }
+#method .mrow { gap: 18px; align-items: flex-start; flex-wrap: wrap; }
+#method .mcol { flex: 1; min-width: 300px; }
+#method .k { font-size: var(--fs-sm); color: var(--muted); margin-bottom: 4px; text-transform: uppercase; letter-spacing: .05em; }
+#method .k .s { text-transform: none; letter-spacing: 0; }
+#method .mgaps { margin: 0; padding-left: 18px; line-height: 1.5; }
+#method .mgaps li { margin-bottom: 4px; }
+#method td { vertical-align: top; font-size: var(--fs-sm); }
+#method .mcards .card.planned { opacity: 0.45; border-style: dashed; }
+#method .mcards .card.pulse { animation: cardpulse 2.2s ease-in-out infinite; }
+@keyframes cardpulse { 50% { box-shadow: 0 0 0 3px rgba(63,185,80,0.35); } }
+#discoveries .tfhead { margin: 8px 0 0; font-size: var(--fs-md); letter-spacing: .08em; text-transform: uppercase; }

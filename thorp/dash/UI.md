@@ -52,8 +52,14 @@ holds the ways in, always:
   light (each star's score against step, threshold dotted), outcomes and levers. A panel only one
   voyage has carries `data-voyage` (the book-value loop's fit).
 - **Discoveries** (`#/discoveries`): **Tricks of the trade**, in three subtabs: **Chaining two
-  facts** (`#/discoveries`, the trick in focus: the discovery chains table, whose 50m rung is two
-  facts chained), **Quantum mechanics** (`#/discoveries/quantum`, the route of seven waypoints)
+  facts** (`#/discoveries`, the trick in focus: where the claim stands, live; then **Methodology:
+  chaining two facts**, rendered as written in `fleet.METHODS["chaining"]` (the trick; its parts,
+  each covered, partly or not; the gaps; the planned controls of the logic deck; the metric,
+  chaining gain; the cards it needs, a card in the deck linking to the star chart and pulsing when
+  lit, a planned one dimmed; the status); then how it is measured and judged today: the matched
+  pairs with an example from each chaining test, lift, the rule, grading, the chaining lift, the
+  forecast and backtest, the pre-registered rule), **Quantum mechanics** (`#/discoveries/quantum`, the route of seven waypoints, then the
+  discovery chains table)
   and **Registry of tricks** (`#/discoveries/registry`, every trick, with the star chart and traits
   a link away). A trick, a chain, the stars and the traits keep their own addresses beneath. A trick is what a model can do, judged
   from outside by its bets; the catalogue is `thorp/dash/tricks.py` (`KNOWN_TRICKS`, 40 tricks).
@@ -136,37 +142,25 @@ holds the ways in, always:
   Beside the talk are the ship's star and trick readings at the checkpoint answering, measured
   ones first. Each answer says why it stopped (the next turn, the length, the end of text), its
   tokens and seconds. Ships not trained on the Q:/A: form don't converse yet, and the page says so.
-- **Leaderboard** (`#/leaderboard`): one ranked table on chaining two facts, the **chaining lift**
-  (the mean lift on the four 50m rungs; performed at the threshold, within about 0.03 of zero is
-  noise). Rows: the outside models (`leaderboard.reference`, scored into
-  `data/compare/chain-grades.json`, sized from `smoking_qwen.REFERENCE_PARAMS`): the **2–4B
-  competitors** (`fleet.COMPETITORS`: Qwen3 4B, Phi-2, Phi-4-mini, Llama 3.2 3B, Gemma 2 2B and 3 4B,
-  SmolLM3 3B; marked 2–4B, by their labels; listed unranked as "being scored" until read; they
-  never grade the chains) and the reference ladder (Pythia, the smaller Qwens; a switch hides it),
-  Thorp's
-  classes (each class's best run, shaded), and Thorp's **forecasts** (italic, unranked): the two
-  fits through Thorp's class points (polynomials in log10 parameters, refitted in the page as
-  `smoking_qwen` fits them), read at each class not yet measured and at 400M, bending (probable)
-  first and straight (conservative) beneath, the bootstrap band in the tooltip; faded while fewer
-  than three classes are above the noise. Each outside model has **Thorp matches it at**: the size
-  where each fit first reaches its lift, and how many times smaller or larger than it that is.
-  A competitor also has **a tenth its size** (`smoking_qwen.payload()["range"]`): each fit's reading
-  at a tenth of its parameters and, once forecastable, P that it reaches the competitor's lift.
-  Each row also has its climb bar and four-chain strip. Switches hide the forecasts or Pythia.
-  The table fits the page without scrolling sideways: compact climb bars and chain strips, and on
-  narrow screens the least needed columns drop first (the four chains under 1000px, the rank and
-  climb under 760px, the size and a tenth its size under 560px).
-  Folded beneath: **Smoking the 2–4B range** (the least P over the competitors that a Thorp a tenth
-  each one's size chains two facts as well as it, `p_range_linear` and `p_range_bending`, on each
-  fit, with the hardest competitor named; or "not yet forecastable: N of 3 classes above the noise"; claimed, probable or not by the
-  pre-registered rule; the chart of chaining lift against parameters with both fits and their
-  bands at 400M, Qwen3 4B's lift, the threshold, the noise, the competitors as red diamonds and the
-  reference ladder in grey; the backtest), **the climb, class by class** (each class's best run by its climb, 0 to 5, ticked at
-  each rung, stalled in amber when no higher than the class beneath, and the reference ladder on
-  the same bars), and **every run** with chain readings, filterable by class. The two-fact
-  voyage's page draws each run's climb over training (`/api/climb`: `leaderboard.climb` read at
-  every step the chains were read, each trick's latest reading carried forward), coloured by
-  class, the reference ladder as dotted levels, with a switch to the chaining lift.
+- **Leaderboard** (`#/leaderboard`): one ranked table on chaining two facts, the public measure
+  only (`thorp.leaderboard.payload`: the four chaining tests, Nature's breeder, the mill test, the
+  between test, the pigeonhole test; Thorp's other tests are internal). Columns: rank, model,
+  parameters, **chaining lift** (the mean lift on the four), passed (of 4, by the rule: lift 0.1 and
+  two in three pairs right), each test's lift and share (✓ performed), and **Thorp must match it
+  at**. Rows: the 2–4B competitors (`fleet.COMPETITORS`, marked 2–4B; unscored ones listed as
+  being scored) and the reference ladder (a switch hides it); Thorp's classes, each its **best
+  ship** with its sailings averaged; and Thorp's **forecasts** (italic, unranked; the two fits
+  through Thorp's class points read at each class not yet measured and at 400M, faded while fewer
+  than three classes are above the noise). A competitor's last cell: a tenth its size, each fit's
+  reading there (with P once forecastable, the band in the tooltip), and the size each fit first
+  reaches it at. The test columns drop first on narrow screens. Folded beneath: **Smoking the 2–4B
+  range** (the least P over the competitors on each fit, or "not yet forecastable: N of 3 classes
+  above the noise"; claimed, probable or not by the pre-registered rule; the chart of chaining
+  lift against parameters with both fits and their bands, the competitors as red diamonds and
+  the reference ladder in grey; the backtest) and **every ship** with chaining readings, filterable
+  by class. The climb (internal: `leaderboard.internal`, `/api/leaderboard/internal`) lives on the
+  two-fact voyage's page: each run's climb over training (`/api/climb`), coloured by class, the
+  reference ladder as dotted levels, with a switch to the chaining lift.
 - **Shelves** (`#/shelves`): every list of books (`thorp.shelves.payload`, `/api/shelves`). It takes
   seconds to compute, so the server keeps it warm (computed at start, served from memory and
   recomputed in the background every five minutes); until the first is ready the page says it is

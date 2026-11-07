@@ -1,20 +1,21 @@
 ---
 // Leaderboard (#/leaderboard): one ranked table on chaining two facts (the chaining lift: the mean lift on
-// the four 50m rungs). Outside models (Qwen, Phi, Llama, Pythia: leaderboard.reference) beside Thorp's
+// the four chaining tests). Outside models (Qwen, Phi, Llama, Pythia: leaderboard.reference) beside Thorp's
 // classes (each class's best run) and Thorp's forecasts (smoking_qwen's two fits, carried to the classes
 // not yet sailed and to 400M), each outside model with the size Thorp is forecast to match it at.
-// The detail (Smoking Qwen, the climb by class, every run) folds away beneath. UI.md, "Leaderboard".
+// Chaining-only: the climb is internal (the two-fact voyage's page). Smoking the 2–4B range and every ship fold
+// away beneath. UI.md, "Leaderboard".
 ---
 <div class="section" id="leaderboard">
-  <h1>Leaderboard <span class="q">chaining two facts: every model ranked by its chaining lift, the mean lift on the four 50m rungs (a premise and a frame chained into a conclusion no sentence states). Every class must climb closer than the class beneath; the 50m attempts it</span></h1>
+  <h1>Leaderboard <span class="q">chaining two facts: every model ranked by its chaining lift, the mean lift on the four 50m rungs (a premise and a frame chained into a conclusion no sentence states). the method is under <a href="#/discoveries">Discoveries, chaining two facts</a></span></h1>
   <section class="panel">
     <div class="handtools">
       <label><input type="checkbox" id="lbshowfc" checked> Thorp's forecasts</label>
       <label><input type="checkbox" id="lbshowpythia" checked> the reference ladder (Pythia, smaller Qwen)</label>
       <span class="note" id="lbfcnote"></span>
     </div>
-    <div class="scroll"><table id="lbtable" data-nosort><thead><tr><th>#</th><th>model</th><th>parameters</th><th>chaining lift</th><th>Thorp matches it at</th><th>a tenth its size</th><th>climb</th><th>the four chains</th></tr></thead><tbody></tbody></table></div>
-    <p class="note mt">Measured rows are read on the same pairs; a Thorp class is its best run. The 2–4B models (Qwen, Phi, Llama, Gemma, SmolLM, base checkpoints where one exists) are the competitors: Thorp must chain two facts as well as each at a tenth its size, and they never grade the chains (the reference ladder does). Forecast rows (italic) are Thorp's own classes fitted against size, straight (conservative) and bending (probable), as Smoking Qwen fits them; while fewer than three classes are above the noise (0.03) they are curves through noise, shown but not trusted. "Thorp matches it at" is the size where each fit reaches that model's lift; "a tenth its size" is each fit's reading there, with the probability it reaches that model's lift once forecastable. Performed at <b id="lbthr"></b>.</p>
+    <div class="scroll"><table id="lbtable" data-nosort><thead></thead><tbody></tbody></table></div>
+    <p class="note mt">The leaderboard is the four chaining tests only (Nature's breeder, the mill test, the between test, the pigeonhole test; 96 pairs), each cell its lift and share of pairs right, ✓ when performed (lift 0.1 and two in three right); Thorp's other tests are internal. A Thorp class is its best ship, its sailings averaged. The 2–4B models (Qwen, Phi, Llama, Gemma, SmolLM, base checkpoints where one exists) are the competitors: Thorp must chain two facts as well as each at a tenth its size, and they never grade the chains (the reference ladder does). Forecast rows (italic) are Thorp's own classes fitted against size, straight (conservative) and bending (probable), as Smoking Qwen fits them; while fewer than three classes are above the noise (0.03) they are curves through noise, shown but not trusted. "Thorp matches it at" is the size where each fit reaches that model's lift; "a tenth its size" is each fit's reading there, with the probability it reaches that model's lift once forecastable. Performed at <b id="lbthr"></b>.</p>
   </section>
 
   <details class="panel lbfold" id="lbfoldsmoke">
@@ -34,14 +35,8 @@
   </details>
 
   <details class="panel lbfold">
-    <summary><h2>The climb, class by class <span class="note">each class's best run by its climb (0 to 5: on each chain the rungs performed from the bottom, plus the next rung's share of its mark; the mean of the four), stalled when a class climbs no higher than the class beneath; the reference ladder on the same bars</span></h2></summary>
-    <div class="scroll"><table id="lbboard" data-nosort><thead><tr><th>class</th><th>best run</th><th>climb</th><th>chaining lift</th><th>the four chains</th></tr></thead><tbody></tbody></table></div>
-    <div class="scroll mt"><table id="lbref" data-nosort><thead><tr><th>model</th><th>climb</th><th>chaining lift</th><th>the four chains</th></tr></thead><tbody></tbody></table></div>
-  </details>
-
-  <details class="panel lbfold">
-    <summary><h2>Every run <span class="note">every run with chain readings (its latest), by climb</span></h2></summary>
+    <summary><h2>Every ship <span class="note">every ship with chaining readings, its sailings averaged, by chaining lift</span></h2></summary>
     <div class="handtools"><span class="note">class</span><select id="lbclass"><option value="">every class</option></select><span class="note" id="lbcount"></span></div>
-    <div class="scroll"><table id="lbruns"><thead><tr><th>run</th><th>ship</th><th>class</th><th>status</th><th>climb</th><th>chaining lift</th><th>the four chains</th></tr></thead><tbody></tbody></table></div>
+    <div class="scroll"><table id="lbruns"><thead></thead><tbody></tbody></table></div>
   </details>
 </div>

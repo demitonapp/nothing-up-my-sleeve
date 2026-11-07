@@ -1732,7 +1732,7 @@ function drawChains() {
       return r ? `<td><b>${esc(r.title)}</b><div class="s">${esc(r.summary)}</div></td>` : '<td></td>';
     }).join('')}</tr>` : '');
 }
-function drawDiscoveryView() { if (discView === 'index') { drawChains(); drawTricks(); } if (discView === 'trick') drawTrickPage(); if (discView === 'chain') drawChainPage(); }
+function drawDiscoveryView() { if (discView === 'index') { drawChains(); drawTricks(); if (discSub === 'two-facts') drawTwoFacts(); } if (discView === 'trick') drawTrickPage(); if (discView === 'chain') drawChainPage(); }
 
 // ---- One chain (#/discoveries/chains/<key>): a bettor's test told as a climb, keel to bettor (fleet.CHAINS). The copy is
 // fleet's; the evidence per class is /api/discoveries' (as in the chains table), the pairs and per-pair lifts /api/chain's.
@@ -2165,25 +2165,12 @@ function chainStrip(chains) {
   return `<div class="cstrip">${Object.entries(chains).map(([k, c]) => `<div class="csr" title="${esc(CHAIN_LABEL[k] || k)}: ${c.rungs} rung${c.rungs === 1 ? '' : 's'} performed${c.next ? `, next ${esc(c.next.replace(/_test$/, ''))} at ${Math.round(100 * c.partial)}% of its mark` : ', all five'}"><span>${esc(CHAIN_SHORT[k] || k)}</span>${RUNG_CLASS.map((r, i) => `<em class="${i < c.rungs ? 'on' : ''}">${i === c.rungs && c.partial ? `<u style="width:${Math.round(100 * c.partial)}%"></u>` : ''}</em>`).join('')}</div>`).join('')}</div>`;
 }
 const runLink = x => x.run ? `<a href="#${shipHash(x.run)}">${esc(x.run)}</a>` : '–';
+// The leaderboard is chaining-only (leaderboard.payload: the four chaining tests, public; the climb is internal and lives on
+// the two-fact voyage's page). Best in class is a SHIP, its sailings averaged.
 async function loadLeaderboard() {
   let d; try { d = await get('/api/leaderboard'); } catch (e) { return; }
   const key = JSON.stringify(d) + !!ladderData; if (key === lbKey) return; lbKey = key; lbData = d;
-  const thr = d.chaining_threshold ?? 0.1;
-  document.getElementById('lbthr').textContent = thr;
-  document.querySelector('#lbboard tbody').innerHTML = d.board.map(b => {
-    const preset = ((ladderData && ladderData.rungs) || []).find(r => classOf(r.preset) && (classOf(r.preset).name || '').toLowerCase().replace(/^the\s+/, '') === b.class);
-    const cl = preset ? classLink(preset.preset) : esc(b.class);
-    return `<tr${b.stalled ? ' class="stalled"' : ''}><td>${cl}<div class="s">${esc(b.title)}</div></td>
-      <td>${b.best ? `${runLink(b.best)}<div class="s">${esc(b.best.ship || '')}</div>` : '<span class="s">no run read yet</span>'}</td>
-      <td>${b.best ? climbBar(b.best.climb) : ''}${b.stalled ? ' <span class="pill accent" title="this class climbs no higher than the class beneath">stalled</span>' : ''}</td>
-      <td>${b.best ? chainingCell(b.best.chaining_lift, thr) : ''}${b.chaining_rising && b.best && b.best.chaining_lift > 0.03 ? '<div class="good s" title="a higher chaining lift than the class beneath, clear of the noise">chaining rising</div>' : ''}</td>
-      <td>${b.best ? chainStrip(b.best.chains) : ''}</td></tr>`;
-  }).join('');
-  const perch = d.reference.reduce((a, r) => (!a || r.climb > a.climb || (r.climb === a.climb && (r.chaining_lift ?? -9) > (a.chaining_lift ?? -9)) ? r : a), null);
-  document.querySelector('#lbref tbody').innerHTML = d.reference.length ? d.reference.map(r => `<tr${r === perch ? ' class="perch"' : ''}><td><b>${esc(r.model.split('/').pop())}</b>${r === perch ? ' <span class="pill good">the perch</span>' : ''}</td>
-    <td>${climbBar(r.climb)}</td><td>${chainingCell(r.chaining_lift, thr)}</td><td>${chainStrip(r.chains)}</td></tr>`).join('')
-    : '<tr><td colspan="4" class="empty">no reference readings yet (data/compare/chain-grades.json)</td></tr>';
-  const sel = document.getElementById('lbclass'), presets = [...new Set(d.runs.map(r => r.preset).filter(Boolean))].sort((a, b) => classRank(a) - classRank(b));
+  const sel = document.getElementById('lbclass'), presets = [...new Set((d.ships || []).map(r => r.preset).filter(Boolean))].sort((a, b) => classRank(a) - classRank(b));
   const keep = sel.value;
   sel.innerHTML = '<option value="">every class</option>' + presets.map(p => `<option value="${esc(p)}">${esc(p)}${classOf(p) ? ' · ' + esc(classOf(p).name) : ''}</option>`).join('');
   sel.value = presets.includes(keep) ? keep : '';
@@ -2192,14 +2179,21 @@ async function loadLeaderboard() {
   drawLbTable();
   drawSmokingQwen();
 }
+// one chaining test's reading in a cell: lift, share right, ✓ when performed under the rule
+function testCell(t) {
+  if (!t || t.lift == null) return '<span class="s">–</span>';
+  return `<span class="tc${t.performed ? ' lit' : ''}" title="${esc(t.name || '')}: lift ${signed(t.lift)}, ${t.score != null ? Math.round(100 * t.score) + '% of pairs right' : ''}${t.performed ? ', performed' : ''}">${signed(t.lift)} <i>${t.score != null ? Math.round(100 * t.score) + '%' : ''}</i>${t.performed ? ' ✓' : ''}</span>`;
+}
 function drawLbRuns() {
   if (!lbData) return;
-  const want = document.getElementById('lbclass').value, thr = lbData.chaining_threshold ?? 0.1;
-  const rows = lbData.runs.filter(r => !want || r.preset === want);
-  document.getElementById('lbcount').textContent = `${rows.length} run${rows.length === 1 ? '' : 's'}`;
-  document.querySelector('#lbruns tbody').innerHTML = rows.map(r => `<tr><td>${runLink(r)}</td><td>${esc(r.ship || '')}</td><td data-sort="${classRank(r.preset)}">${classLink(r.preset)}</td><td>${statusPill(r.status)}</td>
-    <td data-sort="${r.climb}">${climbBar(r.climb)}</td><td data-sort="${r.chaining_lift ?? -9}">${chainingCell(r.chaining_lift, thr)}</td><td>${chainStrip(r.chains)}</td></tr>`).join('')
-    || '<tr><td colspan="7" class="empty">no runs with chain readings in this class</td></tr>';
+  const want = document.getElementById('lbclass').value, thr = lbData.threshold ?? 0.1, tests = lbData.tests || [];
+  const rows = (lbData.ships || []).filter(r => !want || r.preset === want).sort((a, b) => (b.chaining_lift ?? -9) - (a.chaining_lift ?? -9));
+  document.getElementById('lbcount').textContent = `${rows.length} ship${rows.length === 1 ? '' : 's'}`;
+  document.querySelector('#lbruns thead').innerHTML = `<tr><th>ship</th><th>class</th><th>sailings</th><th>chaining lift</th><th>passed</th>${tests.map(t => `<th>${esc(t.name)}</th>`).join('')}</tr>`;
+  document.querySelector('#lbruns tbody').innerHTML = rows.map(r => `<tr><td>${r.ship_key ? `<a href="#${shipHash(r.ship_key)}">${esc(r.ship || r.run)}</a>` : esc(r.ship || r.run)}</td><td data-sort="${classRank(r.preset)}">${classLink(r.preset)}</td>
+    <td data-sort="${r.sailings ?? 1}">${r.sailings ?? 1}</td><td data-sort="${r.chaining_lift ?? -9}">${chainingCell(r.chaining_lift, thr)}</td><td data-sort="${r.passed ?? 0}">${r.passed ?? 0} of ${tests.length}</td>
+    ${tests.map(t => `<td>${testCell((r.tests || {})[t.key])}</td>`).join('')}</tr>`).join('')
+    || `<tr><td colspan="${5 + tests.length}" class="empty">no ships with chaining readings in this class</td></tr>`;
 }
 
 // ==================================================================================== the shelves
@@ -2278,7 +2272,7 @@ async function voyageClimb(v) {
   const el = document.getElementById('voyageclimb'); if (!el || v.key !== 'two_facts') return;
   const runs = v.runs.filter(r => r.run_id);
   if (!runs.length) { empty('voyageclimb', 'no runs yet: the baseline (keel, pilot, speller and stylist, two seeds each) is at the top of the queue'); return; }
-  let d, lb; try { [d, lb] = await Promise.all([get('/api/climb?runs=' + runs.map(r => r.run_id).join(',')), lbData ? lbData : get('/api/leaderboard')]); } catch (e) { return; }
+  let d, lb; try { [d, lb] = await Promise.all([get('/api/climb?runs=' + runs.map(r => r.run_id).join(',')), get('/api/leaderboard/internal')]); } catch (e) { return; }
   const what = document.getElementById('voyageclimbwhat').value || 'climb';
   runs.forEach(r => { r.preset = r.preset || r.class; });
   const presets = [...new Set(runs.map(r => r.preset))].sort((a, b) => classRank(a) - classRank(b));
@@ -2388,78 +2382,147 @@ document.querySelectorAll('#leaderboard details.lbfold').forEach(d => d.addEvent
 }));
 function drawLbTable() {
   const tb = document.querySelector('#lbtable tbody'); if (!tb || !lbData) return;
-  const thr = lbData.chaining_threshold ?? 0.1, sq = sqData || {}, noise = sq.noise ?? 0.03;
+  const thr = lbData.threshold ?? 0.1, sq = sqData || {}, tests = lbData.tests || [];
   document.getElementById('lbthr').textContent = thr;
+  document.querySelector('#lbtable thead').innerHTML = `<tr><th>#</th><th>model</th><th>parameters</th><th>chaining lift</th><th>passed</th>${tests.map(t => `<th class="tcol">${esc(t.name.replace(/^The /, ''))}</th>`).join('')}<th>Thorp must match it at</th></tr>`;
   const showFc = document.getElementById('lbshowfc').checked, showPy = document.getElementById('lbshowpythia').checked;
-  const size = Object.fromEntries((sq.reference || []).map(r => [r.model, r.params]));
   const rungs = (ladderData && ladderData.rungs) || [];
-  // the two fits through Thorp's class points
+  // the two fits through Thorp's class points (smoking_qwen's)
   const pts = ((sq.thorp || {}).points || []).filter(p => p.params && p.chaining_lift != null);
   const xs = pts.map(p => Math.log10(p.params)), ys = pts.map(p => p.chaining_lift), top = xs.length ? Math.max(...xs) : 6;
   const fits = { straight: pts.length >= 2 ? polyfit(xs, ys, 1) : null, bending: pts.length >= 3 ? polyfit(xs, ys, 2) : null };
   const trusted = !!sq.forecastable;
   document.getElementById('lbfcnote').innerHTML = !pts.length ? '' : trusted ? 'forecasts trusted: three classes above the noise'
     : `<span class="accent">forecasts not yet trusted</span>: ${(sq.classes_above_noise || []).length} of 3 classes above the noise`;
-  const rows = [];
-  // outside models
   const range = Object.fromEntries((sq.range || []).map(c => [c.model, c]));
-  const seen = new Set();
+  const rows = [], seen = new Set();
   for (const r of lbData.reference || []) {
     if (!showPy && !r.competitor) continue;
     seen.add(r.model);
-    const y = r.chaining_lift;
-    const at = k => fits[k] && y != null ? fitReachAt(fits[k], y, top) : undefined;
-    rows.push({ kind: 'outside', name: r.competitor && r.label ? r.label : _shortModel(r.model), maker: makerOf(r.model), competitor: !!r.competitor, params: size[r.model] ?? (range[r.model] || {}).params ?? null,
-      lift: y, climb: r.climb, chains: r.chains, tenth: range[r.model], match: y == null ? null : { straight: at('straight'), bending: at('bending') } });
+    rows.push({ kind: 'outside', name: r.competitor && r.label ? r.label : _shortModel(r.model), maker: makerOf(r.model), competitor: !!r.competitor, params: r.params ?? (range[r.model] || {}).params ?? ((sq.reference || []).find(x => x.model === r.model) || {}).params ?? null,
+      lift: r.chaining_lift, passed: r.passed, tests: r.tests, tenth: range[r.model] });
   }
-  // competitors not scored yet: listed, unranked, so the range is whole
   for (const c of sq.range || []) if (!seen.has(c.model)) rows.push({ kind: 'outside', name: c.label, maker: makerOf(c.model), competitor: true, params: c.params, lift: null, pending: true });
-  // Thorp's classes: each class's best run
+  // Thorp's classes: the best ship of each (its sailings averaged)
   for (const b of lbData.board || []) {
     if (!b.best) continue;
     const rr = rungs.find(r => r.preset === b.best.preset);
-    rows.push({ kind: 'thorp', name: `Thorp ${b.best.preset}`, cls: b.best.preset, maker: 'Thorp', params: rr ? rr.total : null, lift: b.best.chaining_lift, climb: b.best.climb, chains: b.best.chains, run: b.best });
+    rows.push({ kind: 'thorp', cls: b.best.preset, ship: b.best, params: rr ? rr.total : null, lift: b.best.chaining_lift, passed: b.best.passed, tests: b.best.tests });
   }
-  // Thorp's forecasts: each class not yet measured, and 400M (Smoking Qwen's size)
+  // Thorp's forecasts: each class not yet measured, and 400M
   if (showFc && (fits.straight || fits.bending)) {
     const measured = new Set(rows.filter(r => r.kind === 'thorp').map(r => r.cls));
-    const at = rungs.filter(r => !measured.has(r.preset) && r.total).map(r => ({ label: `Thorp ${r.preset}`, cls: r.preset, params: r.total }));
+    const at = rungs.filter(r => !measured.has(r.preset) && r.total).map(r => ({ cls: r.preset, params: r.total }));
     if (sq.smoke_at && !at.some(a => Math.abs(a.params - sq.smoke_at) / sq.smoke_at < 0.1)) at.push({ label: `Thorp ${fmtParams(sq.smoke_at)}`, params: sq.smoke_at, smoke: true });
     for (const a of at) {
       const x = Math.log10(a.params), st = fits.straight ? polyval(fits.straight, x) : null, be = fits.bending ? polyval(fits.bending, x) : null;
-      const band = a.smoke ? sq.thorp : null;
-      rows.push({ kind: 'forecast', name: a.label, cls: a.cls, maker: 'Thorp (forecast)', params: a.params, lift: be ?? st, straight: st, bending: be, band, smoke: a.smoke });
+      rows.push({ kind: 'forecast', name: a.label, cls: a.cls, params: a.params, lift: be ?? st, straight: st, bending: be, smoke: a.smoke });
     }
   }
   rows.sort((a, b) => (b.lift ?? -9) - (a.lift ?? -9) || (b.params ?? 0) - (a.params ?? 0));
-  const liftCell = r => {
-    if (r.kind === 'forecast') {
-      const bb = r.band && r.band.bending, sb = r.band && r.band.linear;
-      const tip = `bending (probable) ${signed(r.bending)}${bb ? `, 5–95% ${signed(bb.band[0])} to ${signed(bb.band[1])}` : ''}; straight (conservative) ${signed(r.straight)}${sb ? `, 5–95% ${signed(sb.band[0])} to ${signed(sb.band[1])}` : ''}`;
-      return `<span title="${esc(tip)}"><b>${signed(r.bending)}</b> <span class="s">bending</span><div class="s">${signed(r.straight)} straight</div></span>`;
-    }
-    if (r.pending) return '<span class="s">being scored</span>';
-    return chainingCell(r.lift, thr);
-  };
-  const tenthCell = r => {
-    const c = r.tenth; if (!c || !c.scored) return '';
-    const p = k => c[k] && c[k].p_at_or_above_target != null ? ` · <b>P ${Math.round(100 * c[k].p_at_or_above_target)}%</b>` : '';
-    const tip = k => c[k] ? `5–95% ${signed(c[k].band[0])} to ${signed(c[k].band[1])}` : '';
-    return `<div class="s">${fmtParams(c.smoke_at)}</div>${['bending', 'linear'].filter(k => c[k]).map(k => `<div title="${esc(tip(k))}"><span class="s">${k === 'linear' ? 'straight' : k}</span> ${signed(c[k].predicted)}${p(k)}</div>`).join('')}`;
-  };
+  const liftCell = r => r.pending ? '<span class="s">being scored</span>'
+    : r.kind === 'forecast' ? `<span title="bending (probable) ${signed(r.bending)}; straight (conservative) ${signed(r.straight)}"><b>${signed(r.bending)}</b> <span class="s">bending</span><div class="s">${signed(r.straight)} straight</div></span>`
+    : chainingCell(r.lift, thr);
+  // a competitor: Thorp must match it at a tenth its size; each fit's reading there (and P, once forecastable), and the size
+  // where each fit first reaches it
   const matchCell = r => {
-    if (r.kind !== 'outside' || !r.match) return '';
-    if (!fits.straight && !fits.bending) return '<span class="s">no fit yet</span>';
-    const one = (k, v) => fits[k] ? `<div><span class="s">${k}</span> ${v === undefined ? '–' : v == null ? '<span class="s">never</span>' : `<b>${fmtParams(v)}</b>${r.params ? ` <span class="s">${v < r.params ? `${(r.params / v).toFixed(v < r.params / 10 ? 0 : 1)}× smaller` : `${(v / r.params).toFixed(1)}× larger`}</span>` : ''}`}</div>` : '';
-    return one('bending', r.match.bending) + one('straight', r.match.straight);
+    if (r.kind !== 'outside' || !r.competitor) return '';
+    const tenth = r.tenth && r.tenth.smoke_at || (r.params ? r.params / 10 : null);
+    let out = `<div><b>${fmtParams(tenth)}</b> <span class="s">a tenth its size</span></div>`;
+    const c = r.tenth;
+    if (c && c.scored) out += ['bending', 'linear'].filter(k => c[k]).map(k => `<div title="5–95% ${signed(c[k].band[0])} to ${signed(c[k].band[1])}"><span class="s">${k === 'linear' ? 'straight' : k}</span> ${signed(c[k].predicted)}${c[k].p_at_or_above_target != null ? ` · <b>P ${Math.round(100 * c[k].p_at_or_above_target)}%</b>` : ''}</div>`).join('');
+    if (r.lift != null && (fits.bending || fits.straight)) {
+      const reach = k => fits[k] ? fitReachAt(fits[k], r.lift, top) : undefined;
+      out += `<div class="s">fits reach it at: ${['bending', 'straight'].filter(k => fits[k]).map(k => `${k} ${reach(k) == null ? 'never' : fmtParams(reach(k))}`).join(' · ')}</div>`;
+    }
+    return out;
   };
   let rank = 0;
   tb.innerHTML = rows.map(r => {
-    if (r.kind !== 'forecast' && !r.pending) rank++;
-    const name = r.kind === 'thorp' ? `${classLink(r.cls)}<div class="s">best run ${runLink(r.run)}</div>`
+    const ranked = r.kind !== 'forecast' && !r.pending; if (ranked) rank++;
+    const name = r.kind === 'thorp' ? `${classLink(r.cls)}<div class="s">${r.ship.ship_key ? `<a href="#${shipHash(r.ship.ship_key)}">${esc(r.ship.ship)}</a>` : esc(r.ship.ship || '')} · ${r.ship.sailings ?? 1} sailing${(r.ship.sailings ?? 1) === 1 ? '' : 's'}</div>`
       : r.kind === 'forecast' ? `${r.cls ? classLink(r.cls) : `<b>${esc(r.name)}</b>`} <span class="pill accent">forecast</span>${r.smoke ? '<div class="s">a tenth of Qwen3 4B</div>' : ''}`
       : `<b>${esc(r.name)}</b>${r.competitor ? ' <span class="pill blue" title="a 2–4B competitor: Thorp must match it at a tenth its size">2–4B</span>' : ''}<div class="s">${esc(r.maker)}</div>`;
-    return `<tr class="lb-${r.kind}${r.kind === 'forecast' && !trusted ? ' untrusted' : ''}${r.pending ? ' pending' : ''}"><td>${r.kind === 'forecast' || r.pending ? '' : rank}</td><td>${name}</td><td data-sort="${r.params ?? ''}">${fmtParams(r.params)}</td>
-      <td>${liftCell(r)}</td><td>${matchCell(r)}</td><td>${tenthCell(r)}</td><td>${r.climb != null ? climbBar(r.climb) : ''}</td><td>${r.chains ? chainStrip(r.chains) : ''}</td></tr>`;
-  }).join('') || '<tr><td colspan="8" class="empty">no readings yet</td></tr>';
+    return `<tr class="lb-${r.kind}${r.kind === 'forecast' && !trusted ? ' untrusted' : ''}${r.pending ? ' pending' : ''}"><td>${ranked ? rank : ''}</td><td>${name}</td><td>${fmtParams(r.params)}</td>
+      <td>${liftCell(r)}</td><td>${r.passed != null ? `${r.passed} of ${tests.length}` : ''}</td>${tests.map(t => `<td class="tcol">${r.tests ? testCell(r.tests[t.key]) : ''}</td>`).join('')}<td>${matchCell(r)}</td></tr>`;
+  }).join('') || `<tr><td colspan="${6 + tests.length}" class="empty">no readings yet</td></tr>`;
+}
+
+
+// ---- Chaining two facts (#/discoveries, the first subtab): the method, with the live numbers beside it. Where the claim
+// stands (Smoking the 2-4B range), an example pair from each chaining test (/api/chain), each chain's grade, the backtest.
+// The copy is in Discoveries.astro; thresholds are read from fleet through the payloads, so page and code agree.
+let tfKey = null;
+async function drawTwoFacts() {
+  const el = document.getElementById('tfstatus'); if (!el || !discData) return;
+  const cr = discData.chain_rungs || {}, chains = cr.chains || [];
+  drawMethod('chaining');
+  let sq, lb; try { [sq, lb] = await Promise.all([get('/api/smoking_qwen'), lbData ? lbData : get('/api/leaderboard')]); } catch (e) { return; }
+  // the chaining test of each chain: the rung whose class is the 50m (fleet.RUNGS' "Chains two facts into a third")
+  const rungIdx = (cr.rungs || []).findIndex(r => /chains two facts/i.test(r.title || ''));
+  const tests = chains.map(c => ({ chain: c[c.length - 1], key: c[rungIdx >= 0 ? rungIdx : 4] }));
+  const pulls = await Promise.all(tests.map(t => chainCache.get(t.chain) ? chainCache.get(t.chain) : get('/api/chain?key=' + encodeURIComponent(t.chain)).then(d => { if (d && d.steps) chainCache.set(t.chain, d); return d; }).catch(() => null)));
+  const key = JSON.stringify([sq, lb && lb.reference, cr.grades, pulls.map(p => p && p.key)]); if (key === tfKey) return; tfKey = key;
+  const thr = sq.threshold ?? 0.1, noise = sq.noise ?? 0.03;
+  const ft = discTricks.find(x => x.key === (tests[0] || {}).key);
+  document.getElementById('tfthr').textContent = thr;
+  document.getElementById('tfnoise').textContent = noise;
+  if (ft && ft.min_score) document.getElementById('tfshare').textContent = `${Math.round(100 * ft.min_score)}% (two in three)`;
+  // where the claim stands
+  const rng = sq.range || [], scored = rng.filter(c => c.scored), above = (sq.classes_above_noise || []).length;
+  const pLin = sq.p_range_linear, pBend = sq.p_range_bending;
+  const state = sq.forecastable && pLin >= 0.9 ? ['good', 'claimed'] : sq.forecastable && pBend >= 0.9 ? ['accent', 'probable'] : ['', 'not claimed'];
+  const best = (lb.board || []).filter(b => b.best && b.best.chaining_lift != null).sort((a, b) => b.best.chaining_lift - a.best.chaining_lift)[0];
+  el.innerHTML = `<div class="tfs"><span class="pill ${state[0]}">${state[1]}</span></div>
+    <div class="tfs"><b>${scored.length} of ${rng.length}</b><span>2–4B competitors scored${sq.hardest ? `; the hardest, ${esc(sq.hardest)}` : ''}</span></div>
+    <div class="tfs"><b>${above} of 3</b><span>Thorp classes above the noise, needed before any forecast</span></div>
+    <div class="tfs"><b>${best ? signed(best.best.chaining_lift) : '–'}</b><span>Thorp's best chaining lift so far${best ? ` (${esc(best.best.preset)}, ${esc(best.best.ship || best.best.run)})` : ''}</span></div>
+    <div class="tfs"><b>${sq.forecastable ? `${pLin == null ? '–' : Math.round(100 * pLin) + '%'} · ${pBend == null ? '–' : Math.round(100 * pBend) + '%'}` : 'not yet'}</b><span>P over the range, straight · bending</span></div>
+    <div class="tfcomp">${rng.map(c => `<span title="${esc(c.model)}">${esc(c.label)} <b>${c.scored && c.chaining_lift != null ? signed(c.chaining_lift) : '…'}</b> <i>at ${fmtParams(c.params)} → Thorp at ${fmtParams(c.smoke_at || c.params / 10)}</i></span>`).join('')}</div>`;
+  // an example pair from each chaining test
+  const passage = p => p.frame && p.prompt.endsWith(p.frame) && p.prompt.length > p.frame.length
+    ? `${esc(p.prompt.slice(0, p.prompt.length - p.frame.length).trimEnd())} <span class="pfsep">/</span> <span class="pframe">${esc(p.frame)}</span> …` : `${esc(p.prompt)} …`;
+  document.querySelector('#tfexamples tbody').innerHTML = tests.map((t, i) => {
+    const d = pulls[i], st = d && d.steps && d.steps.find(x => x.key === t.key), p = st && st.pairs && st.pairs[0];
+    return `<tr><td><a href="#/discoveries/chains/${esc(t.chain)}">${esc(d ? d.name : t.chain)}</a><div class="s"><a href="#/discoveries/${esc(t.key)}">${esc(st ? st.name : t.key)}</a></div></td>
+      <td>${p ? passage(p) : '<span class="s">pairs not written yet</span>'}</td><td class="good">${p ? esc(p.idea) : ''}</td><td class="bad">${p ? esc(p.rival) : ''}</td></tr>`;
+  }).join('');
+  // each chain's grade
+  const nameOf = k => ((discData.known_tricks || []).find(x => x.key === k) || {}).name || k;
+  document.getElementById('tfgrades').innerHTML = chains.map(c => {
+    const end = c[c.length - 1], g = (cr.grades || {})[end];
+    return `<div class="tfg"><a href="#/discoveries/chains/${esc(end)}"><b>${esc(nameOf(end))}</b></a> ${gradeNote(g, nameOf)}${g && g.counts ? `<div class="s">${Object.entries(g.counts).map(([k, n]) => n).join(' → ')} of ${(cr.graded_on || []).length || '–'} models pass each rung, keel up</div>` : ''}</div>`;
+  }).join('');
+  // the backtest
+  const fmtBand = f => `${signed(f.predicted)} <span class="s">(${signed(f.band[0])} to ${signed(f.band[1])})</span>`;
+  document.getElementById('tfbacktest').innerHTML = (sq.backtest || []).map(b => `<div class="sqbt"><b>${esc(b.test)}</b> · actual ${signed(b.actual)}
+    ${['linear', 'bending'].filter(k => b[k]).map(k => `<div class="sqbk ${b[k].inside_band ? 'good' : 'bad'}">${k === 'linear' ? 'straight' : 'bending'}: ${fmtBand(b[k])} · ${b[k].inside_band ? 'inside the band' : b[k].predicted < b.actual ? 'missed, too low' : 'missed, too high'}</div>`).join('')}</div>`).join('')
+    + '<p class="s">The straight line has missed low both times, which is why it is the conservative curve and the claim is held to it.</p>';
+}
+
+
+// ---- a trick's methodology (fleet.METHODS, /api/discoveries methods): rendered as written in fleet. The cards are the stars
+// the trick needs; one in the deck links to the star chart and pulses when any sailing has lit it, a planned one is dimmed.
+const COVERED = { yes: ['good', 'covered'], partly: ['accent', 'partly'], no: ['bad', 'not covered'] };
+function starOfCard(name) {
+  const n = name.toLowerCase().replace(/\(.*?\)/g, '').replace(/[^a-z]+/g, ' ').trim();
+  return (discStars || []).find(st => { const sn = (st.name || st.key).toLowerCase().replace(/^the\s+/, '').replace(/[^a-z]+/g, ' ').trim(); return sn === n || st.key.replace(/_/g, ' ') === n; }) || null;
+}
+function drawMethod(key) {
+  const m = ((discData || {}).methods || {})[key], el = document.getElementById('method'); if (!el) return;
+  el.hidden = !m; if (!m) return;
+  document.getElementById('mname').textContent = m.name.toLowerCase();
+  document.getElementById('mstatus').textContent = m.status || '';
+  document.getElementById('mtrick').textContent = m.trick || '';
+  document.querySelector('#mparts tbody').innerHTML = (m.parts || []).map(p => { const c = COVERED[p.covered] || ['', p.covered];
+    return `<tr><td><b>${esc(p.part)}</b></td><td>${esc(p.meaning)}</td><td><span class="pill ${c[0]}">${esc(c[1])}</span></td></tr>`; }).join('');
+  document.getElementById('mgaps').innerHTML = (m.gaps || []).map(g => `<li>${esc(g)}</li>`).join('');
+  document.querySelector('#mcontrols tbody').innerHTML = (m.controls || []).map(c => `<tr><td><b>${esc(c.control)}</b></td><td>${esc(c.does)}</td></tr>`).join('');
+  document.getElementById('mmetric').textContent = m.metric || '';
+  document.getElementById('mcards').innerHTML = (m.cards || []).map(c => {
+    const planned = c.status !== 'in the deck', st = planned ? null : starOfCard(c.card);
+    const lit = st && (st.ships || []).some(x => x.steps_to_lit != null || x.shared_steps_to_lit != null);
+    const inner = `<div class="top"><span class="preset">${esc(c.card)}</span><span class="pill ${planned ? '' : lit ? 'good' : 'blue'}">${planned ? 'planned' : lit ? 'lit' : 'in the deck'}</span></div><div class="ov">${esc(c.operation)}</div>`;
+    return planned ? `<div class="card planned">${inner}</div>` : `<a class="card${lit ? ' lit pulse' : ''}" href="#/discoveries/stars" title="${st ? esc(st.name) + ': the star chart' : 'the star chart'}">${inner}</a>`;
+  }).join('');
 }

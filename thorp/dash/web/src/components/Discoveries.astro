@@ -13,21 +13,105 @@
     <h1>Tricks of the trade</h1>
     <nav class="subnav" id="discnav"><a data-dsub="two-facts" href="#/discoveries">Chaining two facts</a><a data-dsub="quantum" href="#/discoveries/quantum">Quantum mechanics</a><a data-dsub="registry" href="#/discoveries/registry">Registry of tricks</a></nav>
 
-    <!-- the trick in focus: chaining two facts, the 50m rung of every chain, and the climb to it -->
+    <!-- the trick in focus: how Thorp proves a model chains two facts (the heart of the leaderboard, and of the claim) -->
     <div class="dsub" data-dsub="two-facts">
-      <p class="q dsubintro">The trick in focus: chaining two facts into a conclusion no sentence states. It is the 50m's rung on each of the bettor's four chains (Nature's breeder, the mill test, the between test, the pigeonhole test), and every class below must climb closer to it than the class beneath. <a href="#/leaderboard">The leaderboard</a> ranks every model on it; the two-fact voyage sails for it.</p>
-      <section class="panel">
-      <h2>The discovery chains <span class="note">the bettor's four tests (the Origin, energy, Mendeleev's gaps, the eternal return), each reached in six rungs, one per class, keel to bettor; the last row says what a model at each rung is, according to the four. Every class is scored on every rung; each cell is every class's best lift and best share of pairs right; ✓ is performed under the share rule (lift at 0.1 and two pairs in three right, at the same reading), ▲ passed below its class, ⚠ passed below its class while a bigger class fails it, so the pairs want auditing; Qwen3 0.6B for scale. Under each chain's name, its grade: graded when it gets harder at every rung across all the models read (no model passes a rung it fails below, fewer pass each rung, every rung reached)</span></h2>
-      <div class="handtools"><label><input type="checkbox" id="chainrefidx"> show the reference ladder <span class="note">(Pythia 14m to 410m and Qwen3 0.6B to 4B, read on the same pairs)</span></label></div>
-      <div class="scroll"><table id="chaintable" data-nosort><thead></thead><tbody></tbody></table></div>
-    </section>
+      <section class="panel tfclaim">
+        <h2>The claim</h2>
+        <p class="tflead">A Thorp model <b>a tenth the size</b> of each 2–4B model chains two facts as well as it does. Chaining two facts is the trick: two premises, neither of which states the conclusion, put together into one that no sentence on the shelf states. This is how Thorp proves a model can do it, and how the claim is judged.</p>
+        <div class="tfstatus" id="tfstatus"></div>
+      </section>
+
+      <!-- the methodology, as written in fleet.METHODS["chaining"] (rendered as written there, never rewritten here) -->
+      <section class="panel method" id="method">
+        <h2>Methodology: <span id="mname">chaining two facts</span> <span class="note" id="mstatus"></span></h2>
+        <div class="k">The trick</div>
+        <p class="mtrick" id="mtrick"></p>
+        <div class="row mrow">
+          <div class="mcol">
+            <div class="k">Its parts <span class="s">and whether today's tests cover each</span></div>
+            <div class="scroll"><table id="mparts" data-nosort><thead><tr><th>part</th><th>what it means</th><th>covered</th></tr></thead><tbody></tbody></table></div>
+          </div>
+          <div class="mcol">
+            <div class="k">The gaps <span class="s">what the tests cannot yet rule out</span></div>
+            <ul class="mgaps" id="mgaps"></ul>
+          </div>
+        </div>
+        <div class="k mt">The controls <span class="s">planned: the logic deck</span></div>
+        <div class="scroll"><table id="mcontrols" data-nosort><thead><tr><th>control</th><th>what it does</th></tr></thead><tbody></tbody></table></div>
+        <div class="k mt">The metric</div>
+        <p class="mmetric" id="mmetric"></p>
+        <div class="k mt">The cards it needs <span class="s">the stars that do the trick: in the deck (measured; pulsing when lit on any sailing) or planned</span></div>
+        <div class="cards mcards" id="mcards"></div>
+      </section>
+
+      <h2 class="tfhead">How it is measured and judged today</h2>
+
+      <section class="panel tfstep">
+        <div class="tfn">1</div><div class="tfb">
+        <h2>The test: matched pairs</h2>
+        <p>Each chaining test is 24 pairs. A pair is a passage that ends mid-sentence, then two endings matched in length and plainness: <b class="good">the idea</b>, which follows only if the two facts in the passage are put together, and <b class="bad">a rival</b>, which reads as naturally but does not follow. The passage is split into its <b>premise</b> (the facts) and its <b>frame</b> (the closing words the ending hangs on). There are four chaining tests, one on each of the bettor's chains, 96 pairs in all; a model bets on every pair and never sees any of them in training.</p>
+        <div class="scroll"><table class="pairs" id="tfexamples" data-nosort><thead><tr><th>chain</th><th>the passage: premise / <b>frame</b></th><th>the idea</th><th>its rival</th></tr></thead><tbody></tbody></table></div>
+        </div>
+      </section>
+
+      <section class="panel tfstep">
+        <div class="tfn">2</div><div class="tfb">
+        <h2>The measure: lift, what the premise adds</h2>
+        <p>For each ending the model's surprise is read in <b>bits per byte</b> (so tokenisers of different sizes compare). Its <b>preference</b> is the rival's surprise less the idea's: positive means it bets on the idea. But an ending can win on its words alone (a commoner word, a frame that leans one way), so the same preference is read again after <b>the frame alone</b>, and taken away:</p>
+        <div class="tfformula">lift = [ bpb(rival | premise + frame) − bpb(idea | premise + frame) ] − [ bpb(rival | frame) − bpb(idea | frame) ]</div>
+        <p>So <b>lift is what the premise adds</b>: zero for a model that only knows which words go together, positive only when the facts before the frame move the bet toward the idea. The <b>share right</b> is the fraction of pairs whose lift is above zero.</p>
+        </div>
+      </section>
+
+      <section class="panel tfstep">
+        <div class="tfn">3</div><div class="tfb">
+        <h2>Performed: the mark and the share</h2>
+        <p>A test is <b>performed</b> when, at the same reading, the mean lift is at least <b id="tfthr">0.1</b> <i>and</i> at least <b id="tfshare">two in three</b> pairs are right, so a few large lifts cannot carry a model that is guessing on the rest. The untrained model, same seed, is the <b>floor</b>; untrained and small models sit within about <b id="tfnoise">0.03</b> of zero, which is the <b>noise</b>: nothing inside it counts as a reading.</p>
+        </div>
+      </section>
+
+      <section class="panel tfstep">
+        <div class="tfn">4</div><div class="tfb">
+        <h2>The test is graded before it is trusted</h2>
+        <p>Each chaining test is the fifth rung of a chain of six (keel to bettor), and a chain is <b>graded</b> only when it gets harder at every rung across a ladder of outside models (Pythia 14m to 410m, Qwen3 0.6B to 4B): no model passes a rung while failing one below it, fewer pass each rung than the one below, and every rung is passed by someone. A test that a small model passes and a large one fails is a broken test, not a discovery. The 2–4B models the claim is judged against <b>never grade the test</b> they are scored on.</p>
+        <div class="tfgrades" id="tfgrades"></div>
+        </div>
+      </section>
+
+      <section class="panel tfstep">
+        <div class="tfn">5</div><div class="tfb">
+        <h2>The score: the chaining lift</h2>
+        <p>A model's <b>chaining lift</b> is its mean lift on the four chaining tests. It is the one number <a href="#/leaderboard">the leaderboard</a> ranks every model on, outside and Thorp alike, read on the same 96 pairs. Below the 50m, where a class is not yet expected to chain, its progress is its <b>climb</b>: on each chain the rungs performed from the bottom, plus the next rung's share of its mark, the mean of the four (0 to 5).</p>
+        </div>
+      </section>
+
+      <section class="panel tfstep">
+        <div class="tfn">6</div><div class="tfb">
+        <h2>The forecast: from the classes Thorp can train to the size it can't</h2>
+        <p>The Mac cannot train a 400M model, so the claim is a forecast. Each Thorp class's best run gives one point, chaining lift against parameters, and two curves are fitted in log parameters: a <b>straight line</b> (conservative) and a <b>bending curve</b> (probable, since chaining bends upward with size in the outside models). Each is read at a tenth of each competitor's size. A <b>bootstrap</b> (1,000 draws, resampling the pairs and the seeds) gives a 5–95% band and <b>P</b>, the share of draws at or above the competitor's chaining lift. No forecast is made until <b>three classes</b> are above the noise: a curve through noise extrapolates nothing.</p>
+        <p>The method is <b>backtested</b> where the answer is known, fitting the smaller outside models to predict the larger:</p>
+        <div id="tfbacktest"></div>
+        </div>
+      </section>
+
+      <section class="panel tfstep">
+        <div class="tfn">7</div><div class="tfb">
+        <h2>The rule, pre-registered</h2>
+        <p>The claim is <b>made</b> when the forecast is trusted (three classes above the noise) and P ≥ 0.9 on the straight line for <b>every</b> competitor in the 2–4B range. It is <b>probable</b> when only the bending curve reaches 0.9. Anything less is not claimed. The rule was written down before the readings (DECISIONS.md, "Smoking Qwen, pre-registered"), so it cannot bend to them.</p>
+        </div>
+      </section>
     </div>
 
-    <!-- the long road: seven waypoints to quantum mechanics -->
+    <!-- the long road: seven waypoints to quantum mechanics, and the bettor's four discovery chains on it -->
     <div class="dsub" data-dsub="quantum">
     <section class="panel">
       <h2>The route to quantum physics <span class="note">seven waypoints, each resting on the one before; a waypoint's gate tricks (◆) are the ones a ship must perform before it moves on</span></h2>
       <div class="route" id="trickroute"></div>
+    </section>
+    <section class="panel">
+      <h2>The discovery chains <span class="note">the bettor's four tests (the Origin, energy, Mendeleev's gaps, the eternal return), each reached in six rungs, one per class, keel to bettor; the last row says what a model at each rung is, according to the four. Every class is scored on every rung; each cell is every class's best lift and best share of pairs right; ✓ is performed under the share rule (lift at 0.1 and two pairs in three right, at the same reading), ▲ passed below its class, ⚠ passed below its class while a bigger class fails it, so the pairs want auditing; Qwen3 0.6B for scale. Under each chain's name, its grade: graded when it gets harder at every rung across all the models read (no model passes a rung it fails below, fewer pass each rung, every rung reached)</span></h2>
+      <div class="handtools"><label><input type="checkbox" id="chainrefidx"> show the reference ladder <span class="note">(Pythia 14m to 410m and Qwen3 0.6B to 4B, read on the same pairs)</span></label></div>
+      <div class="scroll"><table id="chaintable" data-nosort><thead></thead><tbody></tbody></table></div>
     </section>
     </div>
 

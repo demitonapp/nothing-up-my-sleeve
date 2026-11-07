@@ -865,6 +865,29 @@ def _class_presets() -> dict[str, str]:
     return by_name
 
 
+def _methods() -> dict:
+    """How each trick is proved (fleet.METHODS): the trick, its parts and whether the tests cover them,
+    the gaps, the planned controls, the metric, the cards (stars) it needs, and the status."""
+    import dataclasses
+
+    from thorp import fleet
+
+    out = {}
+    for k, m in getattr(fleet, "METHODS", {}).items():
+        d = dataclasses.asdict(m) if dataclasses.is_dataclass(m) else dict(m)
+        d["parts"] = [
+            dict(zip(("part", "meaning", "covered"), p, strict=False)) for p in d.get("parts", [])
+        ]
+        d["controls"] = [
+            dict(zip(("control", "does"), c, strict=False)) for c in d.get("controls", [])
+        ]
+        d["cards"] = [
+            dict(zip(("card", "operation", "status"), c, strict=False)) for c in d.get("cards", [])
+        ]
+        out[k] = d
+    return out
+
+
 def _rungs() -> dict:
     """The discovery chains' rungs (fleet.RUNGS): what a model at each class is according to the
     chains, with the class turned into its preset; and the chains' order (fleet.chains())."""
@@ -918,7 +941,11 @@ def _grades(pairs: bool = False) -> dict:
         for m in ladder
         if m in models
     ]
-    return {"grades": d.get("chains", {}), "reference": reference, "graded_on": sorted(models)}
+    # the models that grade the chains: all read, less the competitors (they never grade the test they
+    # are scored on), though a competitor on the reference ladder (Qwen3 4B) grades as a ladder model
+    competitors = set(getattr(fleet, "COMPETITORS", {})) - set(ladder)
+    graded_on = sorted(m for m in models if m not in competitors)
+    return {"grades": d.get("chains", {}), "reference": reference, "graded_on": graded_on}
 
 
 def _known_tricks() -> list[dict]:
@@ -1172,10 +1199,17 @@ def api_smoking_qwen() -> dict:
         for r in leaderboard.payload().get("reference", [])
         if sizes.get(r["model"])
     ]
-    d["threshold"] = leaderboard.payload().get("chaining_threshold", 0.1)
+    d["threshold"] = leaderboard.payload().get("threshold", 0.1)
     d["noise"] = getattr(smoking_qwen, "NOISE", 0.03)
     _SMOKE.update(at=time.time(), value=d)
     return d
+
+
+def api_leaderboard_internal() -> dict:
+    """The internal measure (thorp.leaderboard.internal): the climb, for the two-fact voyage's page."""
+    from thorp import leaderboard
+
+    return leaderboard.internal()
 
 
 def api_climb(runs: str) -> dict:
@@ -1451,6 +1485,7 @@ def api_discoveries() -> dict:
         "known_heads": _known_heads(),
         "known_tricks": _known_tricks(),
         "chain_rungs": _rungs(),
+        "methods": _methods(),
         "waypoints": __import__("thorp.dash.tricks", fromlist=["WAYPOINTS"]).WAYPOINTS,
     }
 
@@ -1682,6 +1717,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/shelves": api_shelves,
                 "/api/shelf_books": lambda: api_shelf_books(q["path"]),
                 "/api/leaderboard": api_leaderboard,
+                "/api/leaderboard/internal": api_leaderboard_internal,
                 "/api/smoking_qwen": api_smoking_qwen,
                 "/api/climb": lambda: api_climb(q.get("runs", "")),
                 "/api/shelf": lambda: api_shelf(q["run"]),

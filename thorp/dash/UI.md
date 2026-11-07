@@ -161,7 +161,12 @@ holds the ways in, always:
   above the noise"; claimed, probable or not by the pre-registered rule; the chart of chaining
   lift against parameters with both fits and their bands, the competitors as red diamonds and
   the reference ladder in grey; the backtest) and **every ship** with chaining readings, filterable
-  by class. Each outside model's name opens **its page** (`#/leaderboard/competitor/<model>`,
+  by class. A Thorp row is named by version ("Thorp 300k v1": `leaderboard.payload` best's `name`;
+  the register `data/thorp-versions.json`, a version crowned only when a ship beats the last by more
+  than the noise), its ship and sailings beneath, and opens **its page** (`#/leaderboard/thorp/
+  <ship_key>`, `/api/thorp`, from `leaderboard.thorp_entry`: the mean of its sailings' latest
+  readings) on the competitor page's template: the class, the ship, its runs, the version and its
+  history, then the same chaining result, cards and rungs. Each outside model's name opens **its page** (`#/leaderboard/competitor/<model>`,
   `/api/competitor`, from `data/compare/chain-grades.json`): who made it, its size, the checkpoint,
   and what Thorp must match it at (a tenth its size, with each fit's forecast there); its chaining
   result (the chaining lift, the tests performed, each test's lift and share, the logic deck's gain
@@ -185,6 +190,20 @@ holds the ways in, always:
   (amber: the reading isn't valid yet), with the counts behind it on hover.
   The server never sends NaN: a failed reading (NaN or infinity) goes out as null, since one NaN
   makes a whole JSON response unreadable to the browser.
+  **The art** (`thorp/dash/art/generate_art.py`, the Atlas generators' Eduardo Risso style, made with
+  fal; saved to `web/public/art/<key>.png`): a ship across the top of each class card (keel to summit,
+  each a vessel a size up from the last) and a face on each playing card (previous-word, Nevermore,
+  mover, comparator, bridge) wherever the card appears: the star chart, the methodology and the
+  competitor pages. An image not made yet removes itself, so a card without art draws no frame.
+  **The deck** (`lib/deck.js`): on a competitor's or a Thorp version's page the five cards are a
+  player's hand on a table: the cards it has lit are in its hand, face up and fanned (each with a
+  corner rank and suit, P♣ previous-word, N♠ Nevermore, M♦ mover, C♥ comparator, B♠ bridge, and its
+  art), lifting on hover; the ones it hasn't are still in the deck, set aside face down with how
+  close each came (a bar on the back), or greyed where unreadable or not read. Suits are printed in ink, never
+  red: colour on a card means something (green lit, amber not trusted). A card the judge doesn't
+  trust (`valid` false) keeps its place, in the hand or the deck, but carries an amber dashed edge,
+  sepia art and a "not trusted" stamp across it, so it can't pass for a sound card. The readings, the mark
+  and the judge's verdict sit in a table beneath, and the bridge's curve over layers below that.
 - **Shelves** (`#/shelves`): every list of books (`thorp.shelves.payload`, `/api/shelves`). It takes
   seconds to compute, so the server keeps it warm (computed at start, served from memory and
   recomputed in the background every five minutes); until the first is ready the page says it is

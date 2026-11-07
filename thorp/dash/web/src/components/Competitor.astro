@@ -1,5 +1,6 @@
 ---
-// One outside model (#/leaderboard/competitor/<model>): a 2-4B competitor or a reference ladder model, as read on Thorp's
+// One outside model (#/leaderboard/competitor/<model>), or a Thorp version (#/leaderboard/thorp/<ship_key>, its ship's
+// sailings averaged, leaderboard.thorp_entry): a 2-4B competitor or a reference ladder model, as read on Thorp's
 // tests (data/compare/chain-grades.json, /api/competitor). Its chaining result and the logic deck, its cards (the stars
 // that do the trick, read by Thorp's cards evaluator), and every rung of the four chains: those are Thorp's internal
 // measures, shown here because this page describes the competitor, not Thorp. UI.md, "Leaderboard".
@@ -19,8 +20,8 @@
   </section>
 
   <section class="panel">
-    <h2>Its cards <span class="note">the stars that do the trick, read inside the model by Thorp's cards evaluator: lit at the card's mark by one head, or shared by two; "unreadable" where its attention can't be read through MLX-LM. Every model, outside or Thorp, is read by the same reader with its own tokeniser (previous-word and Nevermore on Goldsmith's essays, cards.copying_cards)</span></h2>
-    <div class="cards cpcards" id="cpcards"></div>
+    <h2>Its hand <span class="note">the stars that do the trick, as playing cards: a card lit inside the model (at its mark by one head, or shared by two) is in its hand; one it hasn't lit is still in the deck, set aside face down with how close it came; "unreadable" where its attention can't be read through MLX-LM. Every model, outside or Thorp, is read by the same reader with its own tokeniser (previous-word and Nevermore on Goldsmith's essays, cards.copying_cards)</span></h2>
+    <div id="cpcards"></div>
   </section>
 
   <section class="panel">

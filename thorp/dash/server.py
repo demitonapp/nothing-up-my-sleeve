@@ -1276,30 +1276,12 @@ def api_bridge() -> dict:
     return {"threshold": getattr(st, "threshold", None), "runs": out}
 
 
-def api_competitor(model: str) -> dict:
-    """One outside model (a 2-4B competitor or a reference ladder model), as read on Thorp's tests
-    (data/compare/chain-grades.json): the four chaining tests, the logic deck (variants, hops,
-    relations), its cards (thorp's evaluator "cards": mover, comparator, bridge; previous-word and
-    Nevermore not read for outside models yet), every rung of the four chains, and what Thorp must
-    match it at (a tenth its size, with the forecast there from smoking_qwen)."""
+def _entry_body(v: dict) -> dict:
+    """An entry in chain-grades.json's shape (an outside model's, or a Thorp ship's from
+    leaderboard.thorp_entry): every rung of the four chains with its class title, the logic deck
+    (without its per-item readings), and the cards."""
     from thorp import fleet
 
-    p = Path(__file__).resolve().parents[2] / "data" / "compare" / "chain-grades.json"
-    try:
-        models = json.loads(p.read_text()).get("models", {})
-    except (OSError, ValueError):
-        models = {}
-    comp = getattr(fleet, "COMPETITORS", {})
-    if model not in models and model not in comp:
-        raise LookupError(f"no model {model}")
-    v = models.get(model, {})
-    label, params = comp.get(model, (None, None))
-    try:
-        from thorp import smoking_qwen
-
-        params = params or getattr(smoking_qwen, "REFERENCE_PARAMS", {}).get(model)
-    except ImportError:
-        pass
     names = {k: t.name for k, t in fleet.TRICKS.items()}
     rungs = [r.title for r in getattr(fleet, "RUNGS", ())]
     chains = []
@@ -1323,6 +1305,89 @@ def api_competitor(model: str) -> dict:
     items = logic.pop("items", None)
     if items is not None:
         logic["items_n"] = len(items)
+    return {"chains": chains, "logic": logic or None, "cards": v.get("cards")}
+
+
+def api_thorp(ship: str) -> dict:
+    """A Thorp ship as the leaderboard names it (Thorp <class> v<n>), in the competitor page's shape
+    (leaderboard.thorp_entry: the mean of its sailings' latest readings), with its version's history
+    from data/thorp-versions.json (a version rises only when a new ship beats the last by more than
+    the noise)."""
+    from thorp import leaderboard
+
+    v = leaderboard.thorp_entry(ship)
+    if not v:
+        raise LookupError(f"no ship {ship}")
+    meta = v.get("_ship", {})
+    preset = meta.get("preset")
+    try:
+        reg = json.loads(
+            (Path(__file__).resolve().parents[2] / "data" / "thorp-versions.json").read_text()
+        )
+    except (OSError, ValueError):
+        reg = {}
+    history = reg.get(preset, [])
+    mine = next((h for h in history if h.get("ship_key") == ship), None)
+    best = next(
+        (
+            b["best"]
+            for b in leaderboard.payload().get("board", [])
+            if b.get("best") and b["best"].get("ship_key") == ship
+        ),
+        None,
+    )
+    rung = next((r for r in _rows_ladder() if r["preset"] == preset), {})
+    return {
+        "model": ship,
+        "thorp": True,
+        "label": (best or {}).get("name")
+        or (f"Thorp {preset} v{mine['v']}" if mine else f"Thorp {preset}"),
+        "version": (mine or {}).get("v"),
+        "crowned": (mine or {}).get("crowned"),
+        "history": history,
+        "current": bool(best),
+        "ship": meta,
+        "params": rung.get("total"),
+        "competitor": False,
+        "ladder": False,
+        "scored": True,
+        "card_verdicts": _card_verdicts(),
+        **_entry_body(v),
+    }
+
+
+def _rows_ladder() -> list[dict]:
+    try:
+        return api_ladder().get("rungs", [])
+    except Exception:  # noqa: BLE001
+        return []
+
+
+def api_competitor(model: str) -> dict:
+    """One outside model (a 2-4B competitor or a reference ladder model), as read on Thorp's tests
+    (data/compare/chain-grades.json): the four chaining tests, the logic deck (variants, hops,
+    relations), its cards (thorp's evaluator "cards": mover, comparator, bridge; previous-word and
+    Nevermore not read for outside models yet), every rung of the four chains, and what Thorp must
+    match it at (a tenth its size, with the forecast there from smoking_qwen)."""
+    from thorp import fleet
+
+    p = Path(__file__).resolve().parents[2] / "data" / "compare" / "chain-grades.json"
+    try:
+        models = json.loads(p.read_text()).get("models", {})
+    except (OSError, ValueError):
+        models = {}
+    comp = getattr(fleet, "COMPETITORS", {})
+    if model not in models and model not in comp:
+        raise LookupError(f"no model {model}")
+    v = models.get(model, {})
+    label, params = comp.get(model, (None, None))
+    body = _entry_body(v)
+    try:
+        from thorp import smoking_qwen
+
+        params = params or getattr(smoking_qwen, "REFERENCE_PARAMS", {}).get(model)
+    except ImportError:
+        pass
     tenth = None
     try:
         sq = api_smoking_qwen()
@@ -1336,9 +1401,7 @@ def api_competitor(model: str) -> dict:
         "competitor": model in comp,
         "ladder": model in getattr(fleet, "REFERENCE_LADDER", ()),
         "scored": bool(v),
-        "chains": chains,
-        "logic": logic or None,
-        "cards": v.get("cards"),
+        **body,
         "card_verdicts": _card_verdicts(),
         "tenth": tenth,
     }
@@ -1855,6 +1918,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/shelf_books": lambda: api_shelf_books(q["path"]),
                 "/api/leaderboard": api_leaderboard,
                 "/api/competitor": lambda: api_competitor(q["model"]),
+                "/api/thorp": lambda: api_thorp(q["ship"]),
                 "/api/bridge": api_bridge,
                 "/api/leaderboard/internal": api_leaderboard_internal,
                 "/api/smoking_qwen": api_smoking_qwen,

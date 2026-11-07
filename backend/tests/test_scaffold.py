@@ -107,3 +107,62 @@ def test_a_scaffolded_voyage_records_its_phases(library, spec, tmp_thorp):
     first = rec.query("select value from metrics where run_id=? and name='scaffold/loss' order by step limit 5", [rid])
     last = rec.query("select value from metrics where run_id=? and name='scaffold/loss' and step < (select max(step) from metrics where run_id=?) * 0.2 order by step desc limit 5", [rid, rid])  # fmt: skip
     assert np.mean([r["value"] for r in last]) < np.mean([r["value"] for r in first])  # the metre phase pulls
+
+
+# ---- the full deck (2026-11-08): the other eight metre cards, the floor, the riddles
+
+
+def test_the_other_metre_rules():
+    x = mx.array([[7, 3, 9, 3, 5]])
+    t, h = (np.array(a)[0] for a in train.metre_target(x, "words_back"))
+    assert t[2].tolist() == [1, 0, 0, 0, 0] and not h[1]
+    t, h = (np.array(a)[0] for a in train.metre_target(x, "duplicate_word"))
+    assert t[3].tolist() == [0, 1, 0, 0, 0] and not h[2]  # the second 3 looks back at the first
+    t, _ = (np.array(a)[0] for a in train.metre_target(x, "sink"))
+    assert all(t[i, 0] == 1 for i in range(1, 5))
+    flags = {"delimiter": mx.array([i in (3, 5) for i in range(10)]), "rare_word": mx.array(np.arange(10, dtype=np.float32))}
+    t, h = (np.array(a)[0] for a in train.metre_target(x, "delimiter", flags))
+    assert t[4].tolist() == [0, 0.5, 0, 0.5, 0] and not h[1]  # the two earlier 3s, nothing yet at the first
+    t, _ = (np.array(a)[0] for a in train.metre_target(x, "rare_word", flags))
+    assert np.allclose(t[2], [7 / 10, 3 / 10, 0, 0, 0])  # weighted by rarity
+    with pytest.raises(ValueError):
+        train.metre_target(x, "delimiter")  # no class without its table
+
+
+def test_the_floor():
+    sc = {**SC, "floor": 0.2}
+    assert train.scaffold_weight(0, 1000, sc) == 1.0
+    assert train.scaffold_weight(150, 1000, sc) == pytest.approx(0.6)
+    assert train.scaffold_weight(900, 1000, sc) == pytest.approx(0.2)
+
+
+def test_riddles_are_checked():
+    train.check_scaffold({"riddles": {"bridge": {"layer": 1}}}, 2, 2)
+    with pytest.raises(ValueError):
+        train.check_scaffold({"riddles": {"mover": {"layer": 1}}}, 2, 2)
+    with pytest.raises(ValueError):
+        train.check_scaffold({"riddles": {"comparator": {"layer": 1, "head": 5}}}, 2, 2)
+
+
+def test_a_full_deck_voyage_runs_and_records_the_riddles(library, spec, tmp_thorp, monkeypatch):
+    from thorp import logic_tutor
+    from thorp.ledger import Ledger
+
+    # the invented words are drawn against the real corpus's lexicon, which the synthetic library lacks
+    monkeypatch.setattr(logic_tutor, "invented_words", lambda n, seed=1, exclude=None: [f"{chr(97 + i % 26)}{chr(97 + i // 26 % 26)}ol" for i in range(n)])
+
+    spec["optim"]["scaffold"] = {
+        "weight": 1.0, "hold": 0.2, "fade": 0.5, "floor": 0.2, "sample": {"windows": 2, "length": 64},
+        "heads": [{"layer": 0, "head": 0, "card": "sink"}, {"layer": 0, "head": 1, "card": "delimiter"},
+                  {"layer": 1, "head": 0, "card": "words_back"}, {"layer": 1, "head": 1, "card": "rare_word"}],
+        "riddles": {"comparator": {"layer": 1, "head": 1, "items": 4, "pool": 32},
+                    "bridge": {"layer": 1, "items": 4, "pool": 32}},
+    }  # fmt: skip
+    spec["model"]["positions"], spec["model"]["context"] = "rope", 256  # the bridge's items, in a 512-piece vocabulary
+    prep = train.prepare(spec, resolver=library["resolver"], log=lambda *a: None)
+    rec = Ledger(tmp_thorp / "deck.sqlite")
+    rid = train.train(spec, prep, rec, stop_after=60, log=lambda *a: None)["run_id"]
+    names = {r["name"] for r in rec.query("select distinct name from metrics where run_id=?", [rid])}
+    assert {"scaffold/loss", "scaffold/riddle/comparator", "scaffold/riddle/bridge"} <= names
+    w = rec.query("select value from metrics where run_id=? and name='scaffold/weight' order by step desc limit 1", [rid])
+    assert w[0]["value"] == pytest.approx(0.2, abs=0.05) or w[0]["value"] > 0.2  # at or above the floor

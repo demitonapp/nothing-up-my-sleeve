@@ -555,39 +555,83 @@ def copy_weighted(ce, x, y, cw: dict, markers: mx.array | None = None):
 #       fade: 0.25
 #       heads: [{layer: 0, head: 0, card: previous_word}, {layer: 1, head: 0, card: induction}]
 
-METRE_PATTERNS = ("previous_word", "induction")
+METRE_PATTERNS = (
+    "previous_word", "induction", "duplicate_word", "sink", "delimiter", "words_back",
+    "number_spotter", "order_word", "premise_marker", "rare_word",
+)  # fmt: skip
+RIDDLES = ("comparator", "bridge")  # the riddle cards the scaffold can pull on composed items (thorp/riddles.py)
+KEYED = ("delimiter", "number_spotter", "order_word", "premise_marker")  # a class of pieces, read off the vocabulary
 
 
-def metre_target(x, card: str):
-    """((batch, time, time) target attention, each row summing to 1 or 0; (batch, time) rows that have one).
-    previous_word: the piece before (t - 1). induction: the pieces that followed an earlier copy of this piece
-    (key j where x[j - 1] == x[t] and j <= t), shared evenly among them."""
+def metre_flags(tok, recipe: list[str]) -> dict:
+    """The per-piece tables the keyed metre cards' rules read: a bool per vocabulary id for the delimiter and the
+    three word classes (as stars.py and pips.py read them), and for the rare word each piece's rarity on the shelf
+    (-log frequency, less the commonest piece's, so the commonest weighs nothing)."""
+    from thorp.evaluators import pips, stars
+
+    out = {"delimiter": mx.array(stars.delimiters(tok))}
+    for k in ("number_spotter", "order_word", "premise_marker"):
+        out[k] = mx.array(pips.flags(tok, k))
+    r = stars.rarity(tok, recipe)
+    if r is not None:
+        out["rare_word"] = mx.array((r - r.min()).astype("float32"))
+    return out
+
+
+def metre_target(x, card: str, flags: dict | None = None):
+    """((batch, time, time) target attention, each row summing to 1 or 0; (batch, time) rows that have one): each
+    metre card's pattern, a rule over the token ids (thorp/viable/s5_policy/deck.py).
+
+    previous_word: the piece before (t - 1). words_back: two pieces back (t - 2). induction: the pieces that
+    followed an earlier copy of this piece (key j where x[j - 1] == x[t] and j <= t). duplicate_word: the earlier
+    copies of this piece. sink: the first piece. delimiter, number_spotter, order_word, premise_marker: the earlier
+    pieces of the card's class (flags). rare_word: every earlier piece, weighted by its rarity. Shared evenly (or
+    by weight) among the keys a row has."""
     B, T = x.shape
+    before = mx.tril(mx.ones((T, T), dtype=mx.bool_), k=-1)[None]  # keys j < t
     if card == "previous_word":
         hit = mx.broadcast_to(mx.eye(T, k=-1, dtype=mx.bool_)[None], (B, T, T))
+    elif card == "words_back":
+        hit = mx.broadcast_to(mx.eye(T, k=-2, dtype=mx.bool_)[None], (B, T, T))
     elif card == "induction":
         eq = x[:, :, None] == x[:, None, :]  # (t, p): the same piece
         shifted = mx.concatenate([mx.zeros((B, T, 1), dtype=mx.bool_), eq[:, :, :-1]], axis=2)  # (t, p + 1)
         hit = shifted & mx.tril(mx.ones((T, T), dtype=mx.bool_), k=0)[None]
+    elif card == "duplicate_word":
+        hit = (x[:, :, None] == x[:, None, :]) & before
+    elif card == "sink":
+        first = (mx.arange(T)[None, :] == 0) & (mx.arange(T)[:, None] >= 1)
+        hit = mx.broadcast_to(first[None], (B, T, T))
+    elif card in KEYED:
+        if not flags or card not in flags:
+            raise ValueError(f"the {card} rule needs its class of pieces (metre_flags)")
+        k = flags[card][x]  # (batch, time): the piece is of the class
+        hit = k[:, None, :] & before
+    elif card == "rare_word":
+        if not flags or "rare_word" not in flags:
+            raise ValueError("the rare word's rule needs the shelf's rarities (metre_flags)")
+        hit = flags["rare_word"][x][:, None, :] * before.astype(mx.float32)
     else:
         raise ValueError(f"no metre pattern for {card!r} (have {', '.join(METRE_PATTERNS)})")
     hit = hit.astype(mx.float32)
     n = hit.sum(axis=-1)
-    return hit / mx.maximum(n, 1.0)[..., None], n > 0
+    return hit / mx.maximum(n, 1e-6)[..., None], n > 0
 
 
 def scaffold_weight(step: int, total: int, sc: dict) -> float:
-    """The scaffold's weight at this step: full to hold x total, then linearly to zero at fade x total."""
+    """The scaffold's weight at this step: full to hold x total, then linearly down to its floor (0 unless set) at
+    fade x total, and the floor after."""
     w = float(sc.get("weight", 1.0))
     fade = sc.get("fade")
     if fade is None:
         return w
+    floor = float(sc.get("floor", 0.0))
     hold, end = float(sc.get("hold", 0.0)) * total, float(fade) * total
     if step < hold:
         return w
     if step >= end:
-        return 0.0
-    return w * (end - step) / max(end - hold, 1.0)
+        return floor
+    return floor + (w - floor) * (end - step) / max(end - hold, 1.0)
 
 
 def scaffold_phase(step: int, total: int, sc: dict) -> str:
@@ -603,13 +647,13 @@ def scaffold_picks(sc: dict) -> dict[int, list[int]]:
     return picks
 
 
-def scaffold_loss(pats: dict, x, sc: dict, targets: dict | None = None):
+def scaffold_loss(pats: dict, x, sc: dict, targets: dict | None = None, flags: dict | None = None):
     """The mean, over the scaffolded heads, of the cross-entropy from the card's pattern to the head's attention
     (over the queries that have a target). Its floor is the target's own entropy (0 for previous-word)."""
     out = []
     for h in sc["heads"]:
         card = h["card"]
-        tgt, has = targets[card] if targets and card in targets else metre_target(x, card)
+        tgt, has = targets[card] if targets and card in targets else metre_target(x, card, flags)
         p = pats[(int(h["layer"]), int(h["head"]))]
         ce = -(tgt * mx.log(p + 1e-9)).sum(axis=-1)
         hf = has.astype(mx.float32)
@@ -623,8 +667,13 @@ def check_scaffold(sc: dict, layers: int, heads: int) -> None:
             raise ValueError(f"scaffold card {h.get('card')!r}: only metre cards with a rule ({', '.join(METRE_PATTERNS)})")
         if not (0 <= int(h["layer"]) < layers and 0 <= int(h["head"]) < heads):
             raise ValueError(f"scaffold head {h} is not in a {layers} x {heads} model")
-    if not sc.get("heads"):
+    if not sc.get("heads") and not sc.get("riddles"):
         raise ValueError("scaffold names no heads")
+    for key, r in (sc.get("riddles") or {}).items():
+        if key not in RIDDLES:
+            raise ValueError(f"scaffold riddle {key!r}: the riddles are {', '.join(RIDDLES)}")
+        if not 0 <= int(r["layer"]) < layers or ("head" in r and not 0 <= int(r["head"]) < heads):
+            raise ValueError(f"scaffold riddle {key} {r} is not in a {layers} x {heads} model")
 
 
 def run_evaluators(spec, rid, step, model, prep, rec: Ledger, log) -> dict:
@@ -844,23 +893,73 @@ def train(
     )  # learning from a teacher run's predictions (2026-11-07): {run, alpha, temperature}
     teacher = load_teacher(teach, spec, tok.vocab_size, log) if teach else None
 
-    sc = o.get("scaffold")  # the metre scaffold (2026-11-07): {weight, hold, fade, heads}
-    picks = None
+    sc = o.get("scaffold")  # the metre scaffold (2026-11-07): {weight, hold, fade, floor, heads, sample, riddles}
+    picks, flags, sample, riddle_cfg, pools = None, None, None, {}, {}
     if sc:
         check_scaffold(sc, model.cfg.layers, model.cfg.heads)
-        picks = scaffold_picks(sc)
-        where = ", ".join(f"{h['card']} on layer {h['layer']} head {h['head']}" for h in sc["heads"])
-        until = f"faded out by {sc['fade']}" if sc.get("fade") is not None else "never released"
-        log(f"metre scaffold: {where}; weight {sc.get('weight', 1.0)} to {sc.get('hold', 0)} of the voyage, {until}")
+        picks = scaffold_picks(sc) if sc.get("heads") else None
+        if any(h["card"] in KEYED or h["card"] == "rare_word" for h in sc.get("heads") or []):
+            flags = metre_flags(tok, list(prep.recipe))
+        sample = sc.get("sample")  # {windows, length}: the metre pull read on part of the batch (the full deck)
+        riddle_cfg = sc.get("riddles") or {}
+        if riddle_cfg:
+            from thorp import riddles
 
-    def loss_fn(mdl, x, y, sw):
+            makers = {"comparator": riddles.comparator_items, "bridge": riddles.bridge_items}
+            pools = {k: makers[k](tok, int(r.get("pool", 2048)), seed=int(r.get("seed", 1))) for k, r in riddle_cfg.items()}
+            for k, pool in pools.items():
+                if pool["tokens"].shape[1] > m["context"]:
+                    raise ValueError(f"the {k} riddle's items run to {pool['tokens'].shape[1]} pieces, past the context ({m['context']})")
+        where = ", ".join(f"{h['card']} on layer {h['layer']} head {h['head']}" for h in sc.get("heads") or [])
+        until = f"faded out by {sc['fade']}" if sc.get("fade") is not None else "never released"
+        if sc.get("floor"):
+            until += f" to a floor of {sc['floor']}"
+        log(f"metre scaffold: {where}; weight {sc.get('weight', 1.0)} to {sc.get('hold', 0)} of the voyage, {until}"
+            + (f"; read on {sample['windows']} windows of {sample['length']}" if sample else "")
+            + "".join(f"; riddle {k} on layer {r['layer']}" + (f" head {r['head']}" if "head" in r else " (logit lens)")
+                      + f", {len(pools[k]['q'])} composed items" for k, r in riddle_cfg.items()))  # fmt: skip
+
+    def riddle_losses(mdl, rb):
+        """The riddles' pulls on this step's composed items: the comparator's head onto the year to exceed; the
+        bridge's logit lens preferring the middle term to the distractor."""
+        out = []
+        for key in ("comparator", "bridge"):
+            r = riddle_cfg.get(key)
+            if r is None:
+                out.append(mx.array(0.0))
+                continue
+            w = float(r.get("weight", 1.0))
+            if key == "comparator":
+                t, q, m = rb["comparator"]
+                li, hi = int(r["layer"]), int(r["head"])
+                _, pats = mdl.forward_attending(t, {li: [hi]})
+                p = pats[(li, hi)]
+                row = mx.take_along_axis(p, mx.broadcast_to(q[:, None, None], (p.shape[0], 1, p.shape[2])), axis=1)[:, 0, :]
+                out.append(w * (-(m * mx.log(row + 1e-9)).sum(axis=-1)).mean())
+            else:
+                t, q, bb, dd = rb["bridge"]
+                h = mdl.hidden(t)[int(r["layer"])]
+                hq = mx.take_along_axis(h, mx.broadcast_to(q[:, None, None], (h.shape[0], 1, h.shape[2])), axis=1)[:, 0, :]
+                lg = mdl.tok.as_linear(mdl.ln_f(hq)).astype(mx.float32)
+                lp = lg - mx.logsumexp(lg, axis=-1, keepdims=True)
+                diff = mx.take_along_axis(lp, bb[:, None], axis=1)[:, 0] - mx.take_along_axis(lp, dd[:, None], axis=1)[:, 0]
+                out.append(w * mx.logaddexp(mx.array(0.0), -diff).mean())
+        return out
+
+    def loss_fn(mdl, x, y, sw, rb):
         # (batch, time) -> the mean per window, so the loss can be attributed to the window's book;
         # every window is the same length, so the mean of the window means is the batch mean.
-        if picks:
+        if picks and not sample:
             logits, pats = mdl.forward_attending(x, picks)
-            sl = scaffold_loss(pats, x, sc)
+            sl = scaffold_loss(pats, x, sc, flags=flags)
+        elif picks:  # the pull read on part of the batch: a second, smaller forward pass
+            logits = mdl(x)
+            xs = x[: int(sample["windows"]), : int(sample["length"])]
+            _, pats = mdl.forward_attending(xs, picks)
+            sl = scaffold_loss(pats, xs, sc, flags=flags)
         else:
             logits, sl = mdl(x), mx.array(0.0)
+        parts = [sl] + (riddle_losses(mdl, rb) if riddle_cfg else [mx.array(0.0), mx.array(0.0)])
         ce = nn.losses.cross_entropy(logits.astype(mx.float32), y, reduction="none")
         per_window = ce.mean(axis=1)
         if teacher is not None:
@@ -881,13 +980,30 @@ def train(
             # 1 + alpha, the rest 1, normalised by the total weight so the tack's size is comparable.
             # The per-window losses (and so the logged loss) stay unweighted.
             base = copy_weighted(ce, x, y, cw, markers)
-        # the metre scaffold rides on top, at this step's weight (zero in the content phase)
-        return base + sw * sl, per_window, sl
+        # the metre scaffold (and the riddles) ride on top, at this step's weight (zero in the content phase)
+        pull = parts[0] + parts[1] + parts[2] if riddle_cfg else parts[0]
+        return base + sw * pull, per_window, mx.stack(parts)
 
     value_and_grad = nn.value_and_grad(model, loss_fn)
     step_fn = mx.compile(
-        lambda x, y, sw: value_and_grad(model, x, y, sw), inputs=model.state, outputs=model.state
+        lambda x, y, sw, rb: value_and_grad(model, x, y, sw, rb), inputs=model.state, outputs=model.state
     )
+    no_riddles = {"comparator": (mx.zeros((1, 2), dtype=mx.int32),) * 3, "bridge": (mx.zeros((1, 2), dtype=mx.int32),) * 4}
+
+    def riddle_batch(step: int) -> dict:
+        if not riddle_cfg:
+            return no_riddles
+        from thorp import riddles
+
+        out = dict(no_riddles)
+        for key, r in riddle_cfg.items():
+            d = riddles.draw(pools[key], step, int(r.get("items", 16)))
+            if key == "comparator":
+                out[key] = (mx.array(d["tokens"]), mx.array(d["q"]), mx.array(d["target"]))
+            else:
+                out[key] = (mx.array(d["tokens"]), mx.array(d["q"]), mx.array(d["b"]), mx.array(d["d"]))
+        return out
+
     groups = model.param_groups()
     # the sieves: the weights as they stood at the last record, so the move per group is measured
     prev_flat, prev_step = dict(tree_flatten(master)), start
@@ -907,7 +1023,9 @@ def train(
         opt.learning_rate = lr
         tokens = mx.array(batch.tokens)
         sw = scaffold_weight(step, total, sc) if sc else 0.0
-        (loss, per_window, sl), grads = step_fn(tokens[:, :-1], tokens[:, 1:], mx.array(sw, dtype=mx.float32))
+        (loss, per_window, sl), grads = step_fn(
+            tokens[:, :-1], tokens[:, 1:], mx.array(sw, dtype=mx.float32), riddle_batch(step)
+        )
         grads = tree_map(lambda g: g.astype(mx.float32), grads)
         grads, gnorm = optim.clip_grad_norm(grads, o["grad_clip"])
         if inherit and seed.get("mode") == "slow":  # the inherited weights learn at lr_scale
@@ -935,7 +1053,11 @@ def train(
         }
         if sc:  # the scaffold's weight, how far the heads are from its pattern, and the phase (0 metre, 1 fade, 2 content)
             vals["scaffold/weight"] = sw
-            vals["scaffold/loss"] = sl.item()
+            parts = sl.tolist()
+            vals["scaffold/loss"] = parts[0]
+            for key, v in zip(("comparator", "bridge"), parts[1:], strict=True):
+                if key in riddle_cfg:
+                    vals[f"scaffold/riddle/{key}"] = v
             vals["scaffold/phase"] = float(("metre", "fade", "content").index(scaffold_phase(step - 1, total, sc)))
         if step % METRICS_EVERY == 0 or step == 1:
             flat = dict(tree_flatten(grads))

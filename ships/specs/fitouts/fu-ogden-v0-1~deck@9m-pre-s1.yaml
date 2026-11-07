@@ -1,0 +1,121 @@
+# ships/specs/fitouts: the full deck on the 9m (Justin, 2026-11-08 06:00): the 9m with metre's spec with every metre card
+# pinned by rule and the two riddles pulled on composed items (thorp/train.py optim.scaffold; thorp/riddles.py).
+name: fu-ogden-v0-1~deck@9m-pre-s1
+ship: 'Fitout: Ogden v0.1 @ 9m ~ deck, every metre and riddle card scaffolded'
+experiment: 'Fitout ogden-v0-1: one fixed Ogden corpus for every class; what cards and stars form at each size?'
+question: 'The full deck (Justin, 2026-11-08 06:00: ''can we get all metre and riddles for 9m''): the ten metre
+  cards pinned by rule and the two riddles pulled on composed items, laid out low to high as the deck''s evolutions
+  ask; full weight to 10%, down to a floor of 0.2 by 60%. Are all twelve played at the end, and what does it cost
+  the language?'
+fitout:
+  key: ogden-v0-1
+  variation: deck
+data:
+  recipe: lists/ogden-v0.1.csv
+  passes: 4
+  order: shuffled
+  refuse:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+  - lists/hole-cards-unseen.csv
+  clean: unwrap-v2
+tokeniser:
+  kind: spm-bpe
+  vocab: 2048
+  byte_fallback: true
+  train_on: lists/ogden-v0.1.csv
+model:
+  family: gpt
+  preset: 9m
+  context: 1024
+  positions: rope
+optim:
+  name: adamw
+  lr: 0.001
+  betas:
+  - 0.9
+  - 0.95
+  weight_decay: 0.1
+  warmup_steps: 200
+  schedule: cosine
+  min_lr_ratio: 0.1
+  batch_tokens: 32768
+  grad_clip: 1.0
+  precision: bf16
+  scaffold:
+    weight: 1.0
+    hold: 0.1
+    fade: 0.6
+    floor: 0.2
+    sample:
+      windows: 8
+      length: 512
+    heads:
+    - layer: 0
+      head: 0
+      card: sink
+    - layer: 0
+      head: 1
+      card: delimiter
+    - layer: 0
+      head: 2
+      card: number_spotter
+    - layer: 0
+      head: 3
+      card: order_word
+    - layer: 1
+      head: 0
+      card: previous_word
+    - layer: 1
+      head: 1
+      card: duplicate_word
+    - layer: 1
+      head: 2
+      card: rare_word
+    - layer: 1
+      head: 3
+      card: premise_marker
+    - layer: 2
+      head: 0
+      card: words_back
+    - layer: 3
+      head: 0
+      card: induction
+    - layer: 3
+      head: 1
+      card: induction
+    riddles:
+      comparator:
+        layer: 3
+        head: 2
+        items: 16
+        pool: 2048
+      bridge:
+        layer: 4
+        items: 16
+        pool: 2048
+eval:
+  sets:
+  - lists/hole-cards-unseen.csv
+  every_steps: 640
+  evaluators:
+  - ce_bpb
+  - discovery
+  - logic
+  - stars
+  - nevermore
+  - cards
+  - shapes
+  - pips
+  light:
+    every_steps: 64
+    evaluators:
+    - stars
+    - nevermore
+    - cards
+    - logic
+    - shapes
+    - pips
+checkpoint:
+  every_steps: 640
+seed: 1

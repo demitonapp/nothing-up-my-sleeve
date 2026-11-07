@@ -1495,6 +1495,8 @@ def expedition_of_label(name: str | None, label: str | None) -> str | None:
         return "first_light"
     if (label or "").startswith("Fitout: Trigram engine"):
         return "induction"
+    if (label or "").startswith("Logic tutor"):
+        return "logic_tutor"
     if (label or "").startswith("Fitout: Ogden"):
         return "ogden"
     if (label or "").startswith(
@@ -1593,6 +1595,8 @@ def fleet_of(ship: str | None) -> Fleet | None:
         return EXPEDITIONS["induction"].fleet
     if ship.startswith("Cards:"):
         return EXPEDITIONS["card_census"].fleet
+    if ship.startswith("Logic tutor"):
+        return EXPEDITIONS["logic_tutor"].fleet
     if ship.startswith("Two facts"):
         return EXPEDITIONS["two_facts"].fleet
     if ship.startswith("Best keel"):
@@ -2242,6 +2246,66 @@ EXPEDITIONS: dict[str, Expedition] = {
             results="data/runs/fitouts/",
             status="planned",
             stars=("nevermore", "previous_word", "mover", "comparator"),
+        ),
+        Expedition(
+            key="logic_tutor",
+            name="The logic tutor",
+            goal="Can chaining two facts be taught to an Ogden speller rather than read into it, and does a bigger "
+            "model's writing teach it better than a program's? (Justin, 19:58: 'Pre-register it'.) From each Ogden "
+            "v0.1 9m seed's last checkpoint, a 16M-token stage: the same skeletons of invented facts (order, cause, "
+            "membership, proportion) written in strict Basic English by Qwen 3.8 27B (tutor) or in fixed frames "
+            "(template), each half and half with Ogden replay, against replay alone. The trick is taught; the stars "
+            "and cards are read, never handed over.",
+            ship="Logic tutor",
+            fleet="Star Fleet",
+            preset=next(r["preset"] for r in LADDER if r.get("name") == "The speller"),
+            outcomes=(
+                Outcome("tricks/logic_test/gain", "higher", "the chaining gain on the logic deck, performed at 0.1"),
+                Outcome("tricks/logic_test/score", "higher", "the share of logic items right, performed at two-thirds"),
+                Outcome(
+                    "tricks/logic_test/gain_counterfactual",
+                    "higher",
+                    "transfer: the counterfactual relation, never taught",
+                ),
+                Outcome("tricks/logic_test/lift_three_hop", "higher", "transfer: three-fact chains, never taught"),
+                Outcome("stars/mover/max_score", "higher", "the mover, lit at 0.2"),
+                Outcome("nevermore/natural_max_score", "higher", "the Nevermore, lit at 0.3"),
+                Outcome(
+                    "eval/hole-cards-unseen/bpb_mean",
+                    "lower",
+                    "the guard: the Forgotten Tomes no worse than replay by more than 0.02 bits per byte",
+                ),
+            ),
+            levers=(
+                Lever(
+                    "arm",
+                    choices=("tutor", "template", "replay"),
+                    about="who wrote the taught half of the stage: a bigger model, a program, or nothing (Ogden replay)",
+                ),
+                Lever("seed", choices=("1", "2"), about="each arm continues from that seed's Ogden 9m"),
+            ),
+            stop=StopRule(
+                6,
+                "Three arms, two seeds, one 16M-token stage each. Verdicts across both seeds (DECISIONS.md, 'The "
+                "logic tutor, pre-registered'): taught (a taught arm performs chaining by the deck's rule and both "
+                "seeds beat both replay seeds); the teacher worth having (both tutor seeds beat both template seeds); "
+                "nothing lost (the Forgotten Tomes within 0.02 bits per byte of replay).",
+            ),
+            runner="thorp/fitouts.py",
+            results="data/runs/fitouts/",
+            status="planned",
+            stars=("nevermore", "mover", "comparator"),
+            next_steps=(
+                "Write the skeleton generator: two facts and a checked conclusion over fresh invented words, four "
+                "relations, counterfactual and three-fact chains held out",
+                "Write the two writers (the tutor through Qwen 3.8 27B, strict Basic English with triples to check; "
+                "the template in fresh frames) and the audits: Ogden words only, no six-word overlap with the logic "
+                "deck or the chains' pairs, the 50m rungs' content words kept out",
+                "Measure the teacher's generation rate on 1,000 passages, and read 100 by hand (95% must keep the logic)",
+                "Justin's decision: an S5 policy for taught text (marked, off the period leaderboard, never scored "
+                "against its teacher)",
+                "Write the six specs, seeded from fu-ogden-v0-1@9m-pre-s1 and -s2, once both are home",
+            ),
         ),
     )
 }

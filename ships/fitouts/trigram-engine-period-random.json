@@ -1,0 +1,56 @@
+{
+ "key": "trigram-engine-period-random",
+ "name": "Trigram engine (period, random books)",
+ "aim": "The control for the trigram engine: the same shelves, amounts and passes, books chosen at random instead of by repetition",
+ "positions": "rope",
+ "tack": {
+  "alpha": 3,
+  "kind": "induction"
+ },
+ "stages": [
+  {
+   "phase": "pretraining",
+   "name": "repetition engine",
+   "shelf": "lists/keel-nursery.csv",
+   "tokens": 6000000,
+   "select": "random",
+   "passes": 4,
+   "lr": null,
+   "tack": null,
+   "purpose": "nursery rhymes and primers at the Pareto frontier of repetition and variety"
+  },
+  {
+   "phase": "pretraining",
+   "name": "repetition engine II",
+   "shelf": "lists/cause-shelf.csv",
+   "tokens": 6000000,
+   "select": "random",
+   "passes": 4,
+   "lr": null,
+   "tack": null,
+   "purpose": "recipes and how-to, highest repetition first"
+  },
+  {
+   "phase": "pretraining",
+   "name": "causal skeleton",
+   "shelf": "lists/reasoning-shelf.csv",
+   "tokens": 8000000,
+   "select": "random",
+   "passes": 3,
+   "lr": null,
+   "tack": null,
+   "purpose": "logic, geometry and procedure at the frontier"
+  },
+  {
+   "phase": "pretraining",
+   "name": "narrative",
+   "shelf": "lists/stars-fiction.csv",
+   "tokens": 20000000,
+   "select": "random",
+   "passes": 2,
+   "lr": null,
+   "tack": null,
+   "purpose": "the most repetitive fiction, a small dose"
+  }
+ ]
+}

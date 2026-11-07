@@ -1,0 +1,21 @@
+{
+ "key": "ogden-v0-1",
+ "name": "Ogden v0.1",
+ "aim": "One fixed corpus for every class, as the Pile was for Pythia: the 592 store books whose ordinary words keep closest to Ogden's Basic English (Ogden-ness 68% or more, lists/ogden-v0.1-scores.csv; The Adventures of Pinocchio left out, a credited name dead in 1972), on clean text, read four times, so 300k, 1m and 9m differ only in size and the cards and stars that form can be set side by side.",
+ "positions": "rope",
+ "tack": null,
+ "opt_in": "",
+ "stages": [
+  {
+   "phase": "pretraining",
+   "name": "ogden",
+   "shelf": "lists/ogden-v0.1.csv",
+   "tokens": null,
+   "select": "all",
+   "passes": 4,
+   "lr": null,
+   "tack": null,
+   "purpose": "the whole corpus, four passes: the baseline"
+  }
+ ]
+}

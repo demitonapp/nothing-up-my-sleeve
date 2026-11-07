@@ -6,6 +6,8 @@
       "runtimeExecutable": "uv",
       "runtimeArgs": [
         "run",
+        "--project",
+        "backend",
         "thorp",
         "dash"
       ],
@@ -16,7 +18,7 @@
       "runtimeExecutable": "pnpm",
       "runtimeArgs": [
         "--dir",
-        "thorp/dash/web",
+        "frontend",
         "dev"
       ],
       "port": 4321
@@ -26,6 +28,8 @@
       "runtimeExecutable": "uv",
       "runtimeArgs": [
         "run",
+        "--project",
+        "backend",
         "thorp",
         "dash",
         "--port",

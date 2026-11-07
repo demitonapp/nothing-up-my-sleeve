@@ -9,7 +9,8 @@
 
 # Ogden v0.1 re-sails with the shapes taxonomy at every reading (Justin, 20:20: "call the ships back and send them out with that included")
 # Ogden v0.1 at 21m, to the top of the queue (Justin, 21:45)
-fitouts/fu-ogden-v0-1@21m-pre-s1
+# Score the four new cards (pips) on every checkpoint of the voyages that sailed before them: the 21m first (Justin, 22:20: "yes, score them"), then the Ogden keels
+cmd: for v in 'fu-ogden-v0-1@21m-pre-s1' 'fu-ogden-v0-1@300k-pre-s1' 'fu-ogden-v0-1@300k-pre-s2' 'fu-ogden-v0-1~l3@300k-l3-pre-s1' 'fu-ogden-v0-1~l3@300k-l3-pre-s2' 'fu-ogden-v0-1~l3-copy@300k-l3-pre-s1'; do uv run --project backend python backend/scripts/score_checkpoints.py "$v" pips; done >> data/runs/score-pips.out 2>&1
 fitouts/fu-ogden-v0-1~l3-copy@300k-l3-pre-s2
 fitouts/fu-ogden-v0-1@1m-pre-s1
 fitouts/fu-ogden-v0-1@1m-pre-s2

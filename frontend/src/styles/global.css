@@ -900,3 +900,17 @@ button[aria-busy="true"] { cursor: progress; opacity: .7; }
 /* the Library's fitouts as one DataTable: the aim wraps in a readable measure */
 .fittable td.fitaim { min-width: 260px; max-width: 420px; }
 .fittable tr.sel td { background: var(--raise); }
+/* the $100 bet (#/bet, UI.md "The $100 bet"): Justin's words, then lists that read as prose */
+.betsaid { margin: 0 0 12px; padding: 0 0 0 12px; border-left: 2px solid var(--accent); font-size: var(--fs-lg); max-width: 90ch; }
+.betsaid .who { display: block; margin-top: 4px; color: var(--muted); font-size: var(--fs-sm); }
+.betlist { margin: 0; padding-left: 18px; display: grid; gap: 8px; }
+.betlist li { max-width: 92ch; }
+.betlist span { color: var(--muted); }
+.betlist .s { color: var(--muted); font-size: var(--fs-sm); margin-top: 2px; }
+.betq { margin: 0; }
+.betq dt { color: var(--muted); font-size: var(--fs-sm); margin-top: 10px; }
+.betq dt:first-child { margin-top: 0; }
+.betq dd { margin: 2px 0 0; max-width: 80ch; }
+.betq ul { margin: 2px 0 0; padding-left: 18px; }
+#betladder td { vertical-align: top; }
+#betladder td .s, #betchain td .s { color: var(--muted); font-size: var(--fs-sm); white-space: normal; }

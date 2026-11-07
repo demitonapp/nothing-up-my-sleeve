@@ -31,6 +31,10 @@ import math
 from thorp.models.registry import LADDER as REGISTRY_LADDER
 from thorp.models.registry import PRESETS
 
+# Classes are named here as the registry names them ("The keel" is "keel"); a preset's own name lives only in
+# thorp/models/registry.py, so each class is turned into its preset through the registry's ladder.
+PRESET_OF = {r["name"].lower().removeprefix("the "): r["preset"] for r in REGISTRY_LADDER}
+
 BUDGET = 100.0  # dollars
 VOCAB = 2048  # the shared Ogden tokeniser (fitout ogden-v0-1)
 CONTEXT = 1024
@@ -42,10 +46,10 @@ BATCH_TOKENS = 32_768  # every Ogden class, so step k is the same tokens read in
 # a market median of $4.20): an hourly rate band, and achieved bf16 TFLOPS by class (a 350m fills
 # about 40% of the 989 peak; smaller models less). Estimates, not measurements.
 H100_RATE = (2.22, 3.00, 4.20)
-H100_TFLOPS = {"50m": (190.0, 250.0, 310.0), "100m": (220.0, 300.0, 380.0), "350m": (300.0, 400.0, 500.0)}
+H100_TFLOPS = {"paragraph": (190.0, 250.0, 310.0), "bettor": (220.0, 300.0, 380.0), "summit": (300.0, 400.0, 500.0)}
 # This Mac (Mac mini, Apple M6, 32 GB): achieved bf16 TFLOPS where no voyage of the class has sailed.
 # The ledger measures 1.3 (300k), 1.9 (1m) and 2.3 to 2.5 (9m), rising with size; these continue it.
-MAC_TFLOPS_EST = {"21m": 3.5, "50m": 4.5, "100m": 5.5, "350m": 6.6}
+MAC_TFLOPS_EST = {"stylist": 3.5, "paragraph": 4.5, "bettor": 5.5, "summit": 6.6}
 
 # Plan for the H100 sitting (hours that are not a training run)
 SETUP_HOURS = 0.5  # start the pod, sync code and shards
@@ -54,7 +58,7 @@ PROBE_TOKENS = 3 * 600 * BATCH_TOKENS  # learning-rate probe: three rates, 600 s
 
 LADDER: list[dict] = [
     dict(
-        preset="300k",
+        cls="keel",
         goal="The best two-word guesser",
         test="Its top guess of the next keyed word on the Forgotten Tomes beats Ogden's own keyed table "
         "with one word of context, on both seeds.",
@@ -62,7 +66,7 @@ LADDER: list[dict] = [
         shelf="ogden",
     ),
     dict(
-        preset="1m",
+        cls="pilot",
         goal="The best three-word guesser",
         test="The same, against the table with two words of context.",
         carries="Copying what came before: a pattern that came round once comes round again "
@@ -70,7 +74,7 @@ LADDER: list[dict] = [
         shelf="ogden",
     ),
     dict(
-        preset="9m",
+        cls="speller",
         goal="The best four-word guesser",
         test="The same, against the table with three words of context.",
         carries="Everyday knowledge: a string sounds only certain notes; salt in a flame gives one "
@@ -78,7 +82,7 @@ LADDER: list[dict] = [
         shelf="ogden",
     ),
     dict(
-        preset="21m",
+        cls="stylist",
         goal="The best model in the world at chaining two facts",
         test="Leads every outside model of its size on the four chaining tests and the logic deck "
         "(chaining lift above the 0.03 noise).",
@@ -87,7 +91,7 @@ LADDER: list[dict] = [
         shelf="ogden",
     ),
     dict(
-        preset="50m",
+        cls="paragraph",
         goal="The first eureka",
         test="Bets on an idea before the world found it: the eternal return (cutoff 1872; found by "
         "Blanqui 1872, Nietzsche 1881, Poincare 1890), under the discovery tests' pass rule.",
@@ -96,7 +100,7 @@ LADDER: list[dict] = [
         shelf="English before 1872",
     ),
     dict(
-        preset="100m",
+        cls="bettor",
         goal="The classical discoveries",
         test="The Origin test, the energy test and Mendeleev's gaps, each with its precursor ablation.",
         carries="Betting with what the books know: the spectroscopists' bright lines and Balmer's "
@@ -104,7 +108,7 @@ LADDER: list[dict] = [
         shelf="English before each test's cutoff",
     ),
     dict(
-        preset="350m",
+        cls="summit",
         goal="The quantum bet, for $100",
         test="The discrete atom, cutoff 1910: two seeds and the precursor ablation on a rented H100.",
         carries="",
@@ -149,19 +153,19 @@ QUANTUM = dict(
     "the preference falls by more than the seed range. Matched pairs of premise and frame, scored in "
     "bits per byte, as every discovery test.",
     chain=[
-        dict(preset="300k", name="Strings and notes", about="The words that go together: string and note, "
+        dict(cls="keel", name="Strings and notes", about="The words that go together: string and note, "
              "prism and colour, flame and light."),
-        dict(preset="1m", name="The overtone series", about="A series that came round continues: a half, a "
+        dict(cls="pilot", name="The overtone series", about="A series that came round continues: a half, a "
              "third, a quarter, then a fifth."),
-        dict(preset="9m", name="The harmonics test", about="A string sounds only certain notes; salt in a flame "
+        dict(cls="speller", name="The harmonics test", about="A string sounds only certain notes; salt in a flame "
              "gives one yellow line."),
-        dict(preset="21m", name="The ring test", about="Two facts chained: a wave must close on itself round a "
+        dict(cls="stylist", name="The ring test", about="Two facts chained: a wave must close on itself round a "
              "ring, the ring has one length, so only certain waves fit."),
-        dict(preset="50m", name="The eternal return", about="The first eureka, and the same move: only so many "
+        dict(cls="paragraph", name="The eternal return", about="The first eureka, and the same move: only so many "
              "states explain what is seen."),
-        dict(preset="100m", name="The spectroscopists", about="What the precursors wrote: the bright lines, "
+        dict(cls="bettor", name="The spectroscopists", about="What the precursors wrote: the bright lines, "
              "Balmer's and Rydberg's formulas, Planck's quanta, Thomson's atom."),
-        dict(preset="350m", name="The discrete atom", about="The bet."),
+        dict(cls="summit", name="The discrete atom", about="The bet."),
     ],
     status="draft: no pairs written yet",
 )
@@ -252,12 +256,17 @@ def _measured_mac(preset: str) -> float | None:
         con = connect(readonly=True)
     except Exception:  # noqa: BLE001 - no ledger: estimates only
         return None
-    for vocab_clause in ("and json_extract(r.spec_json, '$.tokeniser.vocab') = ?", ""):
+    # the runs first (a small table), then their metrics by run id, so the metrics index is used
+    for vocab_clause in ("and json_extract(spec_json, '$.tokeniser.vocab') = ?", ""):
         args = [preset] + ([VOCAB] if vocab_clause else [])
+        ids = [r[0] for r in con.execute(
+            "select run_id from runs where status = 'finished' and json_extract(spec_json, '$.model.preset') = ? "
+            + vocab_clause, args).fetchall()]
+        if not ids:
+            continue
         row = con.execute(
-            "select avg(m.value) from metrics m join runs r using(run_id) where m.name = 'tokens_per_s' "
-            "and r.status = 'finished' and json_extract(r.spec_json, '$.model.preset') = ? " + vocab_clause,
-            args,
+            f"select avg(value) from metrics where run_id in ({','.join('?' * len(ids))}) and name = 'tokens_per_s'",
+            ids,
         ).fetchone()
         if row and row[0]:
             return float(row[0])
@@ -284,8 +293,9 @@ def _ogden_sailed() -> dict[str, dict]:
     return out
 
 
-def rung_costs(preset: str, shelf: str) -> dict:
-    """Tokens a rung reads, and how long that takes on this Mac and what it costs on an H100."""
+def rung_costs(cls: str, shelf: str) -> dict:
+    """Tokens a class reads, and how long that takes on this Mac and what it costs on an H100."""
+    preset = PRESET_OF[cls]
     n = params(preset)
     tokens = OGDEN_TOKENS if shelf == "ogden" else TOKENS_PER_PARAM * n
     ft = flops_per_token(preset)
@@ -293,22 +303,23 @@ def rung_costs(preset: str, shelf: str) -> dict:
     if measured:
         mac_tps, mac_kind = measured, "measured"
     else:
-        mac_tps, mac_kind = MAC_TFLOPS_EST.get(preset, 3.0) * 1e12 / ft, "estimated"
+        mac_tps, mac_kind = MAC_TFLOPS_EST.get(cls, 3.0) * 1e12 / ft, "estimated"
     out = dict(params=n, tokens=tokens, flops_per_token=ft, mac_tokens_per_s=mac_tps, mac_kind=mac_kind,
                mac_hours=tokens / mac_tps / 3600)
-    if preset in H100_TFLOPS:
-        tf = H100_TFLOPS[preset][1]
+    if cls in H100_TFLOPS:
+        tf = H100_TFLOPS[cls][1]
         h = tokens * ft / (tf * 1e12) / 3600
         out.update(h100_tokens_per_s=tf * 1e12 / ft, h100_hours=h, h100_cost=h * H100_RATE[1])
     return out
 
 
 def budget() -> dict:
-    """The $100 on one H100: a 350m at twenty tokens a parameter, two seeds and an ablation, as a band."""
-    n = params("350m")
+    """The $100 on one H100: the summit at twenty tokens a parameter, two seeds and an ablation, as a band."""
+    summit = PRESET_OF["summit"]
+    n = params(summit)
     tokens = TOKENS_PER_PARAM * n
-    ft = flops_per_token("350m")
-    lo_tf, mid_tf, hi_tf = H100_TFLOPS["350m"]
+    ft = flops_per_token(summit)
+    lo_tf, mid_tf, hi_tf = H100_TFLOPS["summit"]
     run_h = {"fast": tokens * ft / (hi_tf * 1e12) / 3600, "mid": tokens * ft / (mid_tf * 1e12) / 3600,
              "slow": tokens * ft / (lo_tf * 1e12) / 3600}
     probe_h = PROBE_TOKENS * ft / (mid_tf * 1e12) / 3600
@@ -332,7 +343,7 @@ def budget() -> dict:
     runs_for_budget = {k: max(0, math.floor((BUDGET - overhead_h * r) / run_cost[k]))
                        for k, r in zip(("low", "mid", "high"), H100_RATE)}
     return dict(budget=BUDGET, params=n, tokens=tokens, flops_per_token=ft, rate=H100_RATE,
-                tflops=H100_TFLOPS["350m"], run_hours=run_h, run_cost=run_cost, items=items,
+                tflops=H100_TFLOPS["summit"], run_hours=run_h, run_cost=run_cost, items=items,
                 total_hours=total_h, total=total, runs_for_budget=runs_for_budget,
                 fits=total["mid"] <= BUDGET)
 
@@ -343,15 +354,17 @@ def payload() -> dict:
     sailed = _ogden_sailed()
     ladder = []
     for r in LADDER:
-        row = dict(r, cls=names.get(r["preset"], r["preset"]), **rung_costs(r["preset"], r["shelf"]))
+        preset = PRESET_OF[r["cls"]]
+        row = dict(r, preset=preset, name=names.get(preset, preset), **rung_costs(r["cls"], r["shelf"]))
         if r["shelf"] == "ogden":
-            row["ogden"] = sailed.get(r["preset"], {"finished": 0, "running": 0})
+            row["ogden"] = sailed.get(preset, {"finished": 0, "running": 0})
         ladder.append(row)
+    quantum = dict(QUANTUM, chain=[dict(c, preset=PRESET_OF[c["cls"]]) for c in QUANTUM["chain"]])
     gates = []
     for g in GATES:
         g = dict(g, state="open")
         if g["key"] == "guessers":
-            done = {p: sailed.get(p, {}).get("finished", 0) for p in ("300k", "1m", "9m")}
+            done = {PRESET_OF[c]: sailed.get(PRESET_OF[c], {}).get("finished", 0) for c in ("keel", "pilot", "speller")}
             g["progress"] = "Ogden voyages finished: " + ", ".join(f"{p} {n} of 2" for p, n in done.items())
         gates.append(g)
     return dict(
@@ -362,7 +375,7 @@ def payload() -> dict:
         said_at="2026-11-07 20:10",
         theory=THEORY,
         ladder=ladder,
-        quantum=QUANTUM,
+        quantum=quantum,
         budget=budget(),
         gates=gates,
         gates_passed=sum(g["state"] == "passed" for g in gates),

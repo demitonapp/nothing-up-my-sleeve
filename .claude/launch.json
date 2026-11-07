@@ -36,6 +36,20 @@
         "8797"
       ],
       "port": 8797
+    },
+    {
+      "name": "thorp-dash-bet",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": [
+        "run",
+        "--project",
+        "backend",
+        "thorp",
+        "dash",
+        "--port",
+        "8807"
+      ],
+      "port": 8807
     }
   ]
 }

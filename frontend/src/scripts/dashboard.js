@@ -42,7 +42,7 @@ const MTABS = ['fleet', 'goals', 'overview', 'training', 'scoring', 'waypoints',
 const STABS = ['betting', 'books', 'languages', 'sieves', 'attention', 'traits'];
 const STAB_EL = { betting: 'betting', books: 'books', languages: 'languages', sieves: 'sieves', attention: 'attention', traits: 'traits-section' };
 const OLD_SHIP = { betting: 'betting', books: 'books', languages: 'languages', sieves: 'sieves', attention: 'attention', 'traits-section': 'traits' };
-const SECTION_NAV = { sizes: 'classes', rung: 'classes', ship: 'classes', 'runs-section': 'classes', voyages: 'expeditions', voyage: 'expeditions', table: 'expeditions', discoveries: 'discoveries', sievesguide: 'sieves', leaderboard: 'leaderboard', competitor: 'leaderboard', lab: 'leaderboard', governance: 'governance', shelves: 'library' };
+const SECTION_NAV = { sizes: 'classes', rung: 'classes', ship: 'classes', 'runs-section': 'classes', voyages: 'expeditions', voyage: 'expeditions', table: 'expeditions', discoveries: 'discoveries', sievesguide: 'sieves', leaderboard: 'leaderboard', competitor: 'leaderboard', lab: 'leaderboard', governance: 'governance', bet: 'bet', shelves: 'library' };
 let discView = 'index', discTrick = null, discChain = null, discSub = 'two-facts';
 // an expedition page's tabs (UI.md, "Expeditions"): the same five for every expedition; one that doesn't apply is hidden
 const ETABS = ['overview', 'at-sea', 'findings', 'fleet', 'inside'];
@@ -81,6 +81,7 @@ function route(h) {
     if (a === 'leaderboard' && b === 'lab' && c) return { page: 'lab', lab: decodeURIComponent(c) };
     if (a === 'leaderboard') return { page: 'leaderboard' };
     if (a === 'governance') return { page: 'governance', gview: GVIEWS.includes(b) ? b : 'systems' };
+    if (a === 'bet') return { page: 'bet' };
     if (a === 'shelves' || a === 'library') return { page: 'shelves', shelf: b ? decodeURIComponent(b) : null };
     return { page: 'sizes' };
   }
@@ -174,6 +175,7 @@ function showTab(h, push = true) {
   }
   if (page === 'sievesguide') { sieveRun = rt.run; hash = '/sieves' + (sieveRun ? '/' + encodeURIComponent(sieveRun) : ''); }
   if (page === 'leaderboard') hash = '/leaderboard';
+  if (page === 'bet') hash = '/bet';
   if (page === 'governance') {  // three tabs: the five systems, S3 control built out, acquisition one level down
     govView = rt.gview || 'systems';
     hash = '/governance' + (govView === 'systems' ? '' : '/' + govView);
@@ -199,6 +201,7 @@ function showTab(h, push = true) {
   if (page === 'sievesguide') loadSieves();
   if (page === 'leaderboard') loadLeaderboard();
   if (page === 'governance') loadGovernance();
+  if (page === 'bet') loadBet();
   if (page === 'competitor') loadCompetitor();
   if (page === 'lab') loadLab();
   if (page === 'shelves') loadShelves();
@@ -2270,6 +2273,7 @@ async function refresh() {
   if (page === 'sievesguide') loadSieves();
   if (page === 'leaderboard') loadLeaderboard();
   if (page === 'governance') loadGovernance();
+  if (page === 'bet') loadBet();
   if (page === 'competitor') loadCompetitor();
   if (page === 'lab') loadLab();
   if (page === 'shelves') loadShelves();
@@ -4081,4 +4085,63 @@ async function loadLab() {
     t.tHead.innerHTML = head;
     t.tBodies[0].innerHTML = rows.length ? rows.map(row).join('') : `<tr><td colspan="10" class="s">not enough readings yet</td></tr>`;
   }
+}
+
+// ==================================================================================== the $100 bet
+// (#/bet; thorp/bet.py, /api/bet; UI.md "The $100 bet"): Justin's bet that a ladder of model sizes, each rung proved
+// on this Mac, makes a 350m trained for $100 on a rented H100 bet the right way on quantum physics. Read-only:
+// the bet and its numbers, the theory, the ladder, the discrete-atom test and its chain, where the $100 goes, the
+// gates before it is spent and the risks.
+let betKey = null;
+const betUsd = (v, d = 0) => v == null ? '–' : '$' + Number(v).toFixed(d);
+const betDur = h => h == null ? '–' : h < 1 ? Math.max(1, Math.round(h * 60)) + ' min' : h < 48 ? (h < 10 ? h.toFixed(1) : Math.round(h)) + ' h' : (h / 24).toFixed(h / 24 < 10 ? 1 : 0) + ' days';
+const betParams = n => n >= 1e6 ? (n / 1e6).toFixed(n < 1e7 ? 1 : 0) + 'M' : (n / 1e3).toFixed(0) + 'k';
+async function loadBet() {
+  const el = document.getElementById('betclaim'); if (!el) return;
+  let d; try { d = await get('/api/bet'); } catch (e) { d = null; }
+  if (!d || !d.budget) { el.innerHTML = `<div class="${emptyCls()}">The bet's numbers come from /api/bet, which this server does not have yet: restart <span class="mono">thorp dash</span> to load them.</div>`; return; }
+  const key = JSON.stringify(d); if (key === betKey) return; betKey = key;
+  const b = d.budget, rate = b.rate || [], runs = b.runs_for_budget || {};
+  const last = (d.ladder || [])[(d.ladder || []).length - 1] || {};
+  el.innerHTML = `<blockquote class="betsaid">“${esc(d.said)}”<span class="who">Justin, ${esc(String(d.said_at || '').replace('2026-11-07 ', '7 November, '))}</span></blockquote>
+    <div class="strip">${stat('budget', betUsd(b.budget), 'one H100, rented by the hour')}
+    ${stat('one 350m run', `${betDur(b.run_hours.mid)} · ${betUsd(b.run_cost.mid)}`, `${(b.tokens / 1e9).toFixed(1)}B tokens; ${betUsd(b.run_cost.low)} to ${betUsd(b.run_cost.high)} across the band`)}
+    ${stat('the plan', betUsd(b.total.mid), `${b.total_hours.toFixed(0)} H100-hours: two seeds and the ablation`)}
+    ${stat('runs $100 buys', String(runs.mid ?? '–'), `${runs.high ?? '–'} to ${runs.low ?? '–'} across the band`)}
+    ${stat('gates passed', `${d.gates_passed} of ${(d.gates || []).length}`, 'before the $100 is spent')}</div>
+    <p class="note mt">${esc(d.claim)} The band runs from $${Number(rate[0]).toFixed(2)} an hour at the fastest speed to $${Number(rate[2]).toFixed(2)} at the slowest; the middle is $${Number(rate[1]).toFixed(2)} at ${b.tflops[1]} TFLOPS achieved, an estimate from published training runs.</p>`;
+  document.getElementById('bettheory').innerHTML = (d.theory || []).map(t => `<li><b>${esc(t.lead)}</b> <span>${esc(t.text)}</span></li>`).join('');
+  // the ladder: each class's goal, what it reads, its time on this Mac and its cost rented
+  const lt = document.getElementById('betladder');
+  lt.tHead.innerHTML = '<tr><th>class</th><th>parameters</th><th>goal</th><th>reads</th><th title="training steps only, on the Mac mini M6">this Mac</th><th title="one H100 at the middle rate">rented H100</th><th>state</th></tr>';
+  lt.tBodies[0].innerHTML = (d.ladder || []).map(r => {
+    const reads = r.shelf === 'ogden' ? `Ogden v0.1, four passes<div class="s">${big(r.tokens)} tokens</div>` : `${esc(r.shelf)}<div class="s">${big(r.tokens)} tokens, twenty a parameter</div>`;
+    const h100 = r.h100_hours != null ? `${betDur(r.h100_hours)} · ${betUsd(r.h100_cost, r.h100_cost < 10 ? 2 : 0)}` : '<span class="s">not needed</span>';
+    const og = r.ogden, isBet = r.preset === last.preset;
+    const state = og ? (og.running ? `<span class="${pillCls('blue')}">at sea</span> ` : '') + `<span class="${pillCls(og.finished >= 2 ? 'good' : '')}">${og.finished} of 2 sailed</span>`
+      : `<span class="${pillCls(isBet ? 'accent' : '')}">${isBet ? 'the bet' : 'to come'}</span>`;
+    return `<tr><td><b>${esc(r.preset)}</b><div class="s">${esc(r.name)}</div></td><td>${betParams(r.params)}</td><td><b>${esc(r.goal)}</b><div class="s">${esc(r.test)}</div></td>
+      <td>${reads}</td><td>${betDur(r.mac_hours)}<div class="s">${esc(r.mac_kind)}</div></td><td>${h100}</td><td>${state}</td></tr>`;
+  }).join('');
+  document.getElementById('betladdernote').textContent = `Parameters on Ogden's 2,048-piece tokeniser with rotary positions. Times on this Mac (${d.mac}) are measured from the ledger where the class has sailed and estimated otherwise; the H100's are estimates. 300k to 21m read Ogden for the shapes of the world; from the 50m up each class reads English printed before its test's cutoff, so its bet is made before the world made it.`;
+  // the quantum bet, and its chain from the keel
+  const q = d.quantum || {};
+  document.getElementById('betquantum').innerHTML = `<dl class="betq">
+    <dt>The idea, cutoff ${esc(q.cutoff)}</dt><dd>${esc(q.idea)}</dd>
+    <dt>Found independently by</dt><dd>${(q.found_by || []).map(f => `<div><b>${esc(f.who)}</b> (${f.year}): ${esc(f.what)}</div>`).join('')}</dd>
+    <dt>The rivals</dt><dd><ul>${(q.rivals || []).map(x => `<li>${esc(x)}</li>`).join('')}</ul></dd>
+    <dt>On the shelf before ${esc(q.cutoff)}</dt><dd><ul>${(q.precursors || []).map(x => `<li>${esc(x)}</li>`).join('')}</ul></dd>
+    <dt>The ablation</dt><dd>${esc(q.ablation)}</dd>
+    <dt>The pass rule</dt><dd>${esc(q.pass_rule)}</dd></dl>
+    <p class="mt"><span class="${pillCls('accent')}">${esc(q.status || 'draft')}</span></p>`;
+  document.querySelector('#betchain tbody').innerHTML = (q.chain || []).map(c => `<tr><td><b>${esc(c.preset)}</b></td><td>${esc(c.name)}</td><td>${esc(c.about)}</td></tr>`).join('');
+  // where the $100 goes
+  const bt = document.getElementById('betbudget');
+  bt.tHead.innerHTML = `<tr><th>step</th><th>H100-hours</th><th>at $${Number(rate[1]).toFixed(2)} an hour</th></tr>`;
+  bt.tBodies[0].innerHTML = (b.items || []).map(it => `<tr><td>${it.run ? '<b>' : ''}${esc(it.step)}${it.run ? '</b>' : ''}</td><td>${it.hours.toFixed(1)}</td><td>${betUsd(it.cost, it.cost < 10 ? 2 : 0)}</td></tr>`).join('')
+    + `<tr><td colspan="3"><b>${b.total_hours.toFixed(1)} H100-hours, ${betUsd(b.total.mid)}</b> of the $${b.budget}: ${b.fits ? `${betUsd(b.budget - b.total.mid)} to spare` : 'over budget'}</td></tr>`;
+  document.getElementById('betbudgetnote').textContent = `Each run is the 350m (${betParams(b.params)} parameters) reading ${(b.tokens / 1e9).toFixed(2)}B tokens, about ${(b.flops_per_token / 1e9).toFixed(2)} GFLOP a token. Across the band the plan costs ${betUsd(b.total.low)} to ${betUsd(b.total.high)}; at the dear end $100 buys ${runs.high} run${runs.high === 1 ? '' : 's'} and the rest wait. The PyTorch port and the 1910 shelf are not in the $100: they are work, not H100-hours.`;
+  // the gates and the risks
+  document.getElementById('betgates').innerHTML = (d.gates || []).map(g => `<li><span class="${pillCls(g.state === 'passed' ? 'good' : 'accent')}">${esc(g.state)}</span> <b>${esc(g.name)}</b> <span>${esc(g.test)}</span>${g.progress ? `<div class="s">${esc(g.progress)}</div>` : ''}</li>`).join('');
+  document.getElementById('betrisks').innerHTML = (d.risks || []).map(r => `<li><b>${esc(r.lead)}</b> <span>${esc(r.text)}</span></li>`).join('');
 }

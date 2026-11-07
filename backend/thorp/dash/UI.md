@@ -289,7 +289,17 @@ holds the ways in, always:
   other labs' models on the same test (standing: lift less their median, over their spread, in σ),
   each with its lift, the field median, how many it beats, share right and ✓. The other labs link
   beside the title.
-- **Governance** (`#/governance`, after Leaderboard; `thorp/vsm.py`, `/api/governance`): Thorp's rules
+- **$100** (`#/bet`, after Leaderboard; `thorp/bet.py`, `/api/bet`): Justin's bet that a ladder of model
+  sizes makes a 350m trained for $100 on a rented H100 bet the right way on quantum physics. Read-only,
+  top to bottom: **the bet** (Justin's words, then a stat strip: the budget, one 350m run's hours and
+  cost, the plan's cost, the runs $100 buys, the gates passed); **the theory**; **the ladder** (each
+  class's goal and how it is judged, what it reads, its time on this Mac, measured from the ledger
+  where it has sailed, and its cost rented, with its Ogden sailings as Badges); **the quantum bet** (the
+  discrete atom: the idea, who found it, the rivals, the precursors, the ablation, the pass rule) beside
+  **its chain**, one rung per class; **where the $100 goes** (the H100 sitting, step by step); **the
+  gates** before the $100 is spent, each an open or passed Badge, beside **the risks**. A server
+  without `/api/bet` shows an Empty state saying to restart `thorp dash`.
+- **Governance** (`#/governance`, after $100; `thorp/vsm.py`, `/api/governance`): Thorp's rules
   as Beer's Viable System Model, five Card bands from S5 at the top to S1, each with its name, purpose,
   its code as Badge chips and its live numbers from `vsm.audit()`. S5 policy: each policy's
   statement, when Justin adopted it, and an enforced or advisory Badge. S4 intelligence: the

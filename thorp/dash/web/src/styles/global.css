@@ -731,3 +731,22 @@ main a.pc2-more:hover { color: #000; }
 .govlints { margin: 0; padding-left: 18px; }
 .govexc { color: var(--text); }
 .fboptin { margin-top: 6px; }
+
+/* the Stars tab's class grid (cells shaded toward the mark, green where lit) */
+#starclassgrid td.cen { text-align: center; font-variant-numeric: tabular-nums; font-size: var(--fs-sm);
+  background: linear-gradient(to right, rgba(227,179,65,.18) 0 var(--near, 0%), transparent var(--near, 0%)); }
+#starclassgrid td.cen.lit { background: rgba(63,185,80,.22); color: var(--good); font-weight: 600; }
+#starclassgrid td.cen.q { color: var(--muted); }
+
+/* the queue at a glance, and where a voyage's reading came from */
+.ovtop { display: flex; gap: 24px; flex-wrap: wrap; align-items: flex-start; margin-bottom: 10px; }
+.ovtop > div:first-child { flex: 1 1 320px; }
+.ovqueue { flex: 1 1 360px; }
+.ovsea { font-size: var(--fs-sm); margin-bottom: 4px; }
+.ovbar { display: flex; height: 14px; border-radius: 4px; overflow: hidden; background: var(--raise); border: 1px solid var(--line); }
+.ovbar span { min-width: 3px; }
+.ovq { font-size: var(--fs-sm); margin: 6px 0; }
+.ovq b { font-size: 1.15em; }
+.ovsw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; vertical-align: middle; }
+.wherebadge { margin-left: 4px; }
+#overviewpanel .bad { color: var(--bad); }

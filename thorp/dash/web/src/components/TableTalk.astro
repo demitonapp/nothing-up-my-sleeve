@@ -1,16 +1,16 @@
 ---
 import { btnCls, cardCls, crumbCls, fieldCls, rangeCls, selectCls } from '../lib/ui';
-// The table (#/voyages/<key>/table): talk with a ship. Type a line and the sailing chosen answers it
+// The table (#/expeditions/<key>/table): talk with a ship. Type a line and the sailing chosen answers it
 // as "A:" after your "Q:" (thorp.table.reply, through server.py's POST /api/table/reply), at the
 // temperature set; every exchange is kept in that sailing's transcript (thorp.table.transcript), and
 // beside the talk are the ship's star and trick readings at its last checkpoint. Any finished ship
 // can sit at the table, not only Table Talk's, so the table is open before Table Talk sails.
 ---
 <div class="section" id="table">
-  <h1><a class={crumbCls('back')} id="tableback" href="#/voyages/table_talk">← voyage</a> The table <span class="q">talk with a ship: your line as Q:, its answer as A:, every exchange kept</span></h1>
+  <h1><a class={crumbCls('back')} id="tableback" href="#/expeditions/table_talk">← expedition</a> The table <span class="q">talk with a ship: your line as Q:, its answer as A:, every exchange kept</span></h1>
   <section class={cardCls(false, 'panel')}>
     <div class="handtools">
-      <span class="note">ship</span><select class={selectCls('')} id="tablerun" title="the sailing at the table"></select>
+      <span class="note">ship</span><select class={selectCls('')} id="tablerun" title="the voyage at the table"></select>
       <span class="note">temperature</span><input class={rangeCls('')} type="range" id="tabletemp" min="0" max="1.5" step="0.05" value="0.8"><b id="tabletempv">0.80</b>
       <span class="note">longest answer</span><select class={selectCls('')} id="tablemax"><option>50</option><option>100</option><option selected>200</option><option>400</option></select>
       <span class="note">seed</span><input class={fieldCls('')} id="tableseed" placeholder="any" size="6" title="the same seed and temperature give the same answer">

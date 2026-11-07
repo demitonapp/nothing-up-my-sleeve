@@ -13,10 +13,14 @@ import Traits from './Traits.astro';
 ---
 <div class="section" id="ship">
   <h1><a class={crumbCls('back')} href="#/classes">← classes</a> <a class={crumbCls('crumb')} id="shipclass"></a> <span id="shipname"></span> <span id="shiptags"></span> <span class="q" id="shipfitout"></span></h1>
-  <div class="sailings"><span class="k">sailings</span><span id="sailings"></span><span class="sub" id="title"></span></div>
+  <div class="sailings"><span class="k">voyages</span><span id="sailings"></span><span class="sub" id="title"></span></div>
   <section class={cardCls(false, 'panel')} id="stagepanel" hidden>
-    <h2>Stages <span class="note">this sailing read its shelves in stages, in order, under one learning-rate schedule; each step chart below shows them as bands</span></h2>
-    <div class="scroll"><table id="stagetable" data-nosort><thead><tr><th>#</th><th>stage</th><th>shelf</th><th>passes</th><th>steps</th><th>tokens</th></tr></thead><tbody></tbody></table></div>
+    <h2>Stages <span class="note">this voyage read its libraries in stages, in order, under one learning-rate schedule; each step chart below shows them as bands</span></h2>
+    <div class="scroll"><table id="stagetable" data-nosort><thead><tr><th>#</th><th>stage</th><th>library</th><th>passes</th><th>steps</th><th>tokens</th></tr></thead><tbody></tbody></table></div>
+  </section>
+  <section class={cardCls(false, 'panel')} id="aboardpanel" hidden>
+    <h2>Library aboard <span class="note">the libraries this voyage carried (thorp.library.aboard): each one's stage, where it came from (the prose stores, the trigram stores, drawn from the stores, or outside the stores), its books and its hash; the decks it refused; its opt-in, if it read outside the stores</span></h2>
+    <div id="aboard"></div>
   </section>
   <nav class={tabsCls('line', 'subnav')} data-orientation="horizontal" data-variant="line" id="shipnav">
     <a class={tabCls('')} data-state="inactive" data-stab="betting">Betting</a><a class={tabCls('')} data-state="inactive" data-stab="books">Books</a><a class={tabCls('')} data-state="inactive" data-stab="languages">Languages</a><a class={tabCls('')} data-state="inactive" data-stab="sieves">Sieves</a><a class={tabCls('')} data-state="inactive" data-stab="attention">Attention</a><a class={tabCls('')} data-state="inactive" data-stab="traits">Traits</a>

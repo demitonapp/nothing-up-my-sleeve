@@ -56,7 +56,7 @@ function arrow(cx, cy, write, turn) {
 // 'push' 'move' 'heading' 'stars' 'kink'; opts.kinks: {layer_i: kink}; opts.title: the sailing's name
 export function drawJourney(el, m, step, defs, opts = {}) {
   const L = layersOf(m);
-  if (!L) { el.innerHTML = `<div class="${emptyCls()}">${esc(opts.title || 'this sailing')}: no layers on the ledger yet</div>`; return; }
+  if (!L) { el.innerHTML = `<div class="${emptyCls()}">${esc(opts.title || 'this voyage')}: no layers on the ledger yet</div>`; return; }
   const mods = opts.modules || new Set(), S = k => m[k];
   const hasSound = Object.keys(m).some(k => k.startsWith('soundings/'));
   const depthY = k => TOP + (L + 1 - k) * ROW;  // depth k = after k layers; 0 is the embeddings
@@ -99,8 +99,8 @@ export function drawJourney(el, m, step, defs, opts = {}) {
     }
     // the stars lit in this layer by the step shown, and the layer's push kink
     const notes = [];
-    if (here) notes.push(`⇄ ${tp.star ? tp.star.replace(/_/g, ' ') + ' ' : ''}heads ${(tp.heads || []).join(', ')} transplanted from ${tp.from_run || 'another run'}${tp.ln ? ', with their layer norms' : ''}${tp.restored_from_log ? ' (restored from the log)' : ''}`);
-    if (whole && !here) notes.push(`⇄ the whole layer transplanted from ${tp.from_run || 'another run'}`);
+    if (here) notes.push(`⇄ ${tp.star ? tp.star.replace(/_/g, ' ') + ' ' : ''}heads ${(tp.heads || []).join(', ')} transplanted from ${tp.from_run || 'another voyage'}${tp.ln ? ', with their layer norms' : ''}${tp.restored_from_log ? ' (restored from the log)' : ''}`);
+    if (whole && !here) notes.push(`⇄ the whole layer transplanted from ${tp.from_run || 'another voyage'}`);
     if (mods.has('stars')) for (const st of defs.stars || []) {
       for (const [metric, layer, how] of [[st.metric, st.layer, 'one head'], [st.shared_metric, st.shared_layer, 'shared']]) {
         const sr = metric && S(metric); if (!sr) continue;
@@ -114,6 +114,6 @@ export function drawJourney(el, m, step, defs, opts = {}) {
   }
   svg += '</svg>';
   el.innerHTML = `<div class="j-title">${esc(opts.title || '')}${out != null ? ` · guess ${f2(out)} bits per byte` : ''}</div>`
-    + (hasSound ? '' : `<div class="note j-none">no soundings on this sailing: they start with the next ship to sail, so its guesses and arrows are empty; the modules still read its sieves</div>`)
+    + (hasSound ? '' : `<div class="note j-none">no soundings on this voyage: they start with the next ship to sail, so its guesses and arrows are empty; the modules still read its sieves</div>`)
     + svg;
 }

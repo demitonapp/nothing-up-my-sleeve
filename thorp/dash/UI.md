@@ -35,6 +35,20 @@ Numbers sit in `tabular-nums` everywhere (set on `body`).
 - Spacing comes from the grid gaps (16px). One-off margins use `.mt` (8px), not `style=""`.
   Inline styles are only for values computed at run time (a chart height, the reader's page width).
 
+## The words (2026-11-07 16:30, `fleet.TERMS`)
+
+An **expedition** is a line of experiments with one goal, its levers and its stop rule (was a voyage:
+`#/expeditions`, `#/voyages` still answered). A **voyage** is one ship's run, one spec trained once
+(was a run, or a sailing). A **library** is a book list Thorp reads from, scores on or refuses (was a
+shelf: `#/library`, `#/shelves` still answered); the ship's two stores are the canonical libraries.
+Storage keeps `run_id` and the runs table, and the code its old names; the page says the new ones.
+The Expeditions page opens on **the queue at a glance** (`/api/expeditions/overview`): the voyage at
+sea, a bar of the voyages still to sail coloured by expedition with about how many hours, the queue's
+lints, and per expedition its voyages at sea, queued, its next at #n, finished and failed. A ship's
+page shows its voyage's **library aboard** (`/api/voyage/<run_id>/library`: each library's stage,
+where it came from, books and hash; its opt-in and refusals), and each voyage chip carries where its
+reading came from (`/api/voyages/where`).
+
 ## Navigation
 
 The site is organised the way the project is: classes of ship (model sizes), the ships of each
@@ -60,8 +74,10 @@ holds the ways in, always:
   pairs with an example from each chaining test, lift, the rule, grading, the chaining lift, the
   forecast and backtest, the pre-registered rule), **Quantum mechanics** (`#/discoveries/quantum`, the route of seven waypoints, then the
   discovery chains table)
-  and **Registry of tricks** (`#/discoveries/registry`, every trick, with the star chart and traits
-  a link away). A trick, a chain, the stars and the traits keep their own addresses beneath. A trick is what a model can do, judged
+  and **Registry of tricks** (`#/discoveries/registry`, every trick, with traits a link away) and
+  **Stars** (`#/discoveries/stars`: a grid of every star Thorp measures by class of ship, each cell
+  the class's best reading against the mark, green with the first lit step where a sailing lit it,
+  and the card judge's verdict; then the star cards, the bridge layer by layer and the star chart). A trick, a chain, the stars and the traits keep their own addresses beneath. A trick is what a model can do, judged
   from outside by its bets; the catalogue is `thorp/dash/tricks.py` (`KNOWN_TRICKS`, 40 tricks).
   The tricks are grouped into the seven **waypoints** on the route to quantum physics (`WAYPOINTS`:
   reading, knowing, counting, reasoning, mathematics, physics, discovery), shown first as the route

@@ -1,25 +1,30 @@
 ---
-import { cardCls, checkCls, crumbCls, rangeCls, selectCls } from '../lib/ui';
-// Voyages: the campaigns several ships take part in to find something (thorp/fleet.py VOYAGES).
-// #/voyages lists them; #/voyages/<key> is one voyage, from one template.
+import { cardCls, checkCls, crumbCls, emptyCls, rangeCls, selectCls } from '../lib/ui';
+// Expeditions (was Voyages until 2026-11-07 16:30): the campaigns several ships take part in to find something
+// (thorp/fleet.py EXPEDITIONS). #/expeditions lists them, the queue at a glance on top; #/expeditions/<key> is one
+// expedition, from one template. #/voyages is still answered.
 ---
 <div class="section" id="voyages">
-  <h1>Voyages <span class="q">campaigns of ships sent to find something: their goals, how they are steered, and what they found</span></h1>
+  <h1>Expeditions <span class="q">campaigns of ships sent to find something: their goals, how they are steered, and what they found</span></h1>
+  <section class={cardCls(false, 'panel')} id="overviewpanel">
+    <h2>The queue at a glance <span class="note">the voyage at sea, the voyages still to sail and about how many hours that is (each class's mean time), and for every expedition its voyages at sea, queued, finished and failed, and where its next one stands in the queue</span></h2>
+    <div id="expoverview"><div class={emptyCls()}>reading the queue…</div></div>
+  </section>
   <div class="cards" id="voyagecards"></div>
 </div>
 
 <div class="section" id="voyage">
-  <h1><a class={crumbCls('back')} href="#/voyages">← voyages</a> <span id="voyagetitle"></span> <span id="voyagestatus"></span> <span class="q" id="voyagegoal"></span></h1>
+  <h1><a class={crumbCls('back')} href="#/expeditions">← expeditions</a> <span id="voyagetitle"></span> <span id="voyagestatus"></span> <span class="q" id="voyagegoal"></span></h1>
   <section class={cardCls(false, 'panel')}><div class="rungover" id="voyageover"></div></section>
   <section class={cardCls(false, 'panel')} data-voyage="table_talk" hidden>
     <h2>The table <span class="note">talk with Table Talk's ships, or any finished ship: type a line and read its answer</span></h2>
-    <p><a href="#/voyages/table_talk/table">Sit at the table →</a></p>
+    <p><a href="#/expeditions/table_talk/table">Sit at the table →</a></p>
   </section>
   <section class={cardCls(false, 'panel')} id="voyagelearned"><h2>What it found</h2><p id="voyagelearnedtext"></p>
     <div id="voyagenextwrap" hidden><h2 class="mt">Suggested next steps</h2><ol id="voyagenext" class="nextsteps"></ol></div></section>
   <!-- this voyage's own panels: data-voyage names the voyage they belong to -->
   <section class={cardCls(false, 'panel')} data-voyage="induction" hidden>
-    <h2>The Nevermore over training <span class="note">the trigram engine (frontier books, green) against its random twin (the same shelves and amounts, books chosen at random, grey), two seeds each (seed 1 solid, seed 2 dashed): the Nevermore's natural score at every reading, the mark 0.3 dotted, and the step each run first lights it. Success: a 300k lights it on two seeds; repetition did it if the engine lights it and its twin does not (DECISIONS.md, "Discovering the induction head, pre-registered")</span></h2>
+    <h2>The Nevermore over training <span class="note">the trigram engine (frontier books, green) against its random twin (the same libraries and amounts, books chosen at random, grey), two seeds each (seed 1 solid, seed 2 dashed): the Nevermore's natural score at every reading, the mark 0.3 dotted, and the step each voyage first lights it. Success: a 300k lights it on two seeds; repetition did it if the engine lights it and its twin does not (DECISIONS.md, "Discovering the induction head, pre-registered")</span></h2>
     <div class="indverdict" id="indverdict"></div>
     <div class="chart tall" id="indnevermore"></div>
     <div class="row">
@@ -32,30 +37,30 @@ import { cardCls, checkCls, crumbCls, rangeCls, selectCls } from '../lib/ui';
     <div id="knockouts"></div>
   </section>
   <section class={cardCls(false, 'panel')} data-voyage="card_census" hidden>
-    <h2>The census <span class="note">which of the four necessary cards (previous-word, Nevermore, mover, comparator: the ones every model that chains plays) each class can draw, and its cause-and-effect score, run as ablations of the class's own fitout so every variation compares with it. A row per variation (the fitout first), each cell its latest stage's reading (one head or a layer's best two together), green ✓ at the card's mark; cause with its change from the fitout's own. Open a row for its three stages</span></h2>
+    <h2>The census <span class="note">which of the four necessary cards (previous-word, Nevermore, mover, comparator: the ones every model that chains plays) each class can draw, and its cause-and-effect score, voyage as ablations of the class's own fitout so every variation compares with it. A row per variation (the fitout first), each cell its latest stage's reading (one head or a layer's best two together), green ✓ at the card's mark; cause with its change from the fitout's own. Open a row for its three stages</span></h2>
     <div id="censusgrid"></div>
   </section>
   <section class={cardCls(false, 'panel')} data-voyage="two_facts" hidden>
-    <h2>The climb over training <span class="note">each run's climb toward chaining two facts at every discovery reading (0 to 5: the rungs performed from the bottom of each chain, plus the next rung's share of its mark, the mean of the four chains), one line per run, coloured by class; the dotted levels are the reference ladder; the <a href="#/leaderboard">leaderboard</a> holds each class's best</span></h2>
+    <h2>The climb over training <span class="note">each voyage's climb toward chaining two facts at every discovery reading (0 to 5: the rungs performed from the bottom of each chain, plus the next rung's share of its mark, the mean of the four chains), one line per voyage, coloured by class; the dotted levels are the reference ladder; the <a href="#/leaderboard">leaderboard</a> holds each class's best</span></h2>
     <div class="handtools"><select class={selectCls('')} id="voyageclimbwhat"><option value="climb">the climb</option><option value="chaining_lift">the chaining lift</option><option value="logic_gain">the chaining gain (logic deck)</option></select></div>
     <div class="chart tall" id="voyageclimb"></div>
   </section>
   <section class={cardCls(false, 'panel')} data-voyage="book_value" hidden>
-    <h2>The fit: what each kind of book is worth <span class="note">the Forgotten Tomes score a pure shelf of each kind would give, with 90% intervals, lower is better; <b id="fitr2"></b></span></h2>
+    <h2>The fit: what each kind of book is worth <span class="note">the Forgotten Tomes score a pure library of each kind would give, with 90% intervals, lower is better; <b id="fitr2"></b></span></h2>
     <div class="row"><div class="scroll"><table id="fittable"><thead><tr><th>term</th><th>estimate</th><th>90% low</th><th>90% high</th></tr></thead><tbody></tbody></table></div>
       <div class="chart" id="fitchart"></div></div>
   </section>
-  <section class={cardCls(false, 'panel')}><h2>The ships <span class="note">each ship this voyage fitted out, its sailings, its mean Forgotten Tomes score, and for each star how many sailings lit it and the soonest step; open one to see it sail</span></h2>
+  <section class={cardCls(false, 'panel')}><h2>The ships <span class="note">each ship this expedition fitted out, its voyages, its mean Forgotten Tomes score, and for each star how many voyages lit it and the soonest step; open one to see it sail</span></h2>
     <div class="scroll"><table id="voyageruns" class="clickable"><thead></thead><tbody></tbody></table></div></section>
   <div class="row">
-    <section class={cardCls(false, 'panel')}><h2>The Forgotten Tomes score, run by run <span class="note">one dot per run in the order they sailed, coloured by the voyage's main lever; lower is better</span></h2><div class="chart" id="voyageft"></div></section>
-    <section class={cardCls(false, 'panel')}><h2>First light <span class="note">each star's score against step: per run, the best single head (solid) and the best layer's two strongest heads together (dashed); the dotted line is the threshold, and the moment a line crosses it is first light, lit or lit shared</span></h2>
+    <section class={cardCls(false, 'panel')}><h2>The Forgotten Tomes score, voyage by voyage <span class="note">one dot per voyage in the order they sailed, coloured by the expedition's main lever; lower is better</span></h2><div class="chart" id="voyageft"></div></section>
+    <section class={cardCls(false, 'panel')}><h2>First light <span class="note">each star's score against step: per voyage, the best single head (solid) and the best layer's two strongest heads together (dashed); the dotted line is the threshold, and the moment a line crosses it is first light, lit or lit shared</span></h2>
       <div class="handtools"><select class={selectCls('')} id="voyagestar" title="the star shown"></select></div><div class="chart" id="voyagestars"></div></section>
   </div>
   <section class={cardCls(false, 'panel')} id="journeypanel">
-    <h2>The journey through the layers <span class="note">one sailing read as the data's journey up its stack, bottom to top: the guess the model would make at each depth (bits per byte, and how much each layer lowered it), and out of each half of each layer an arrow sized by how hard it writes into the stream and tilted by which way, up along it, level across it (something new), down against it. Switch on the modules to read each layer's sieves, stars and kink at the step chosen; put a second sailing beside it to compare</span></h2>
+    <h2>The journey through the layers <span class="note">one voyage read as the data's journey up its stack, bottom to top: the guess the model would make at each depth (bits per byte, and how much each layer lowered it), and out of each half of each layer an arrow sized by how hard it writes into the stream and tilted by which way, up along it, level across it (something new), down against it. Switch on the modules to read each layer's sieves, stars and kink at the step chosen; put a second voyage beside it to compare</span></h2>
     <div class="handtools">
-      <select class={selectCls('')} id="journeyA" title="the sailing"></select><span class="note">beside</span><select class={selectCls('')} id="journeyB" title="a second sailing to compare"><option value="">none</option></select>
+      <select class={selectCls('')} id="journeyA" title="the voyage"></select><span class="note">beside</span><select class={selectCls('')} id="journeyB" title="a second voyage to compare"><option value="">none</option></select>
       <input class={rangeCls('')} type="range" id="journeystep" min="0" max="0" value="0"><span id="journeylabel" class="note"></span>
     </div>
     <div class="jstages" id="journeystages" hidden></div>
@@ -67,7 +72,7 @@ import { cardCls, checkCls, crumbCls, rangeCls, selectCls } from '../lib/ui';
     <div class="journeys"><div id="journeyviewA"></div><div id="journeyviewB"></div></div>
   </section>
   <div class="row">
-    <section class={cardCls(false, 'panel')}><h2>What it measures <span class="note">the outcomes the voyage is judged by</span></h2><div class="scroll"><table id="voyageoutcomes"><thead><tr><th>outcome</th><th>metric</th><th>better is</th></tr></thead><tbody></tbody></table></div></section>
-    <section class={cardCls(false, 'panel')}><h2>The levers <span class="note">what the voyage may change between runs, and within what limits</span></h2><div class="scroll"><table id="voyagelevers"><thead><tr><th>lever</th><th>range or choices</th><th>about</th></tr></thead><tbody></tbody></table></div></section>
+    <section class={cardCls(false, 'panel')}><h2>What it measures <span class="note">the outcomes the expedition is judged by</span></h2><div class="scroll"><table id="voyageoutcomes"><thead><tr><th>outcome</th><th>metric</th><th>better is</th></tr></thead><tbody></tbody></table></div></section>
+    <section class={cardCls(false, 'panel')}><h2>The levers <span class="note">what the expedition may change between voyages, and within what limits</span></h2><div class="scroll"><table id="voyagelevers"><thead><tr><th>lever</th><th>range or choices</th><th>about</th></tr></thead><tbody></tbody></table></div></section>
   </div>
 </div>

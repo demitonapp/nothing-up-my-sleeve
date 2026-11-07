@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 import sqlite3
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -611,11 +612,12 @@ def api_essay(name: str) -> dict:
 def _voyage_of() -> dict[str, str]:
     """run name -> voyage key, for every run a voyage claims (thorp/voyages.py runs_of)."""
     try:
-        from thorp import fleet, voyages
+        from thorp import expeditions as voyages
+        from thorp import fleet
     except ImportError:
         return {}
     out = {}
-    for v in fleet.VOYAGES.values():
+    for v in fleet.EXPEDITIONS.values():
         for r in voyages.runs_of(v):
             out[r["name"]] = v.key
     return out
@@ -694,7 +696,7 @@ def _fleet_of(ship: str | None) -> str | None:
 
 def api_voyages() -> list[dict]:
     """Every voyage: goal, outcomes, levers, stop rule, status, lessons and its runs (voyages.py)."""
-    from thorp import voyages
+    from thorp import expeditions as voyages
 
     return voyages.payload()
 
@@ -704,9 +706,10 @@ def api_voyage_series(key: str) -> dict:
     which a line crosses its threshold: first light. A run that received heads from another
     (a `transplant` artifact: the Magician's Apprentice) carries the record, and the donor run is
     added (role "donor") so its curve sits beside the receivers'."""
-    from thorp import fleet, voyages
+    from thorp import expeditions as voyages
+    from thorp import fleet
 
-    v = fleet.VOYAGES[key]
+    v = fleet.EXPEDITIONS[key]
     runs = [{**r, "role": None} for r in voyages.runs_of(v)]
     con = _con()
 
@@ -1142,7 +1145,7 @@ def _warm(name: str, fn, ttl: float = 300.0):
 def api_shelves() -> dict:
     """Every shelf (thorp.shelves.payload): the training lists, the decks, the probes and drafts, each
     with its books, size, families and the runs that use it. Served warm (see _warm)."""
-    from thorp import shelves
+    from thorp import library as shelves
 
     value, busy, error = _warm("shelves", shelves.payload)
     fits, fbusy, ferror = (
@@ -1206,7 +1209,8 @@ def api_fitouts(preset: str = "") -> dict:
     """A class's fitouts (thorp.shelves.fitouts, kept warm), each run with the four necessary cards'
     latest readings (one head and shared, lit at the card's mark), so a class page can show the
     fitout's progress stage by stage (fo-<key>-pre-s*, -post1-s*, -post2-s*)."""
-    from thorp import fleet, shelves
+    from thorp import fleet
+    from thorp import library as shelves
 
     fits, busy, error = (
         _warm("fitouts", shelves.fitouts) if hasattr(shelves, "fitouts") else ([], False, None)
@@ -1324,7 +1328,7 @@ def _knockout_files() -> list[Path]:
 
 
 def api_knockout(model: str = "") -> dict:
-    """The knockout (fleet.VOYAGES["knockout"], thorp/knockout.py; DECISIONS.md "The knockout,
+    """The knockout (fleet.EXPEDITIONS["knockout"], thorp/knockout.py; DECISIONS.md "The knockout,
     pre-registered"): in a model that chains, each card's 8 strongest heads silenced and the logic
     deck and the chaining tests read again, beside three random draws of 8 heads. One model's
     result (data/compare/knockout-<model, / as __>.json), or every result when no model is named."""
@@ -1373,7 +1377,8 @@ def api_fitout_builder() -> dict:
 def api_shelf_trigrams(path: str) -> dict:
     """A shelf's books by trigram repetition (thorp.trigrams.book_stats over the shelf's book ids, as
     the warm shelves payload carries them): each book's repeat rate and variety, and the frontier."""
-    from thorp import shelves, trigrams
+    from thorp import library as shelves
+    from thorp import trigrams
 
     value, busy, _ = _warm("shelves", shelves.payload)
     if value is None:
@@ -1453,6 +1458,54 @@ def api_governance() -> dict:
         "systems": [dataclasses.asdict(s) for s in vsm.SYSTEMS.values()],
         "audit": vsm.audit(),
     }
+
+
+# ---- the words since 2026-11-07 16:30 (fleet.TERMS): an expedition is a line of experiments (was a voyage), a voyage
+# is one ship's run (was a run), a library is a book list (was a shelf). Storage keeps run_id and the runs table.
+
+
+def api_expeditions_overview() -> dict:
+    """The queue at a glance (thorp.expeditions.overview): the voyage at sea, the queue's voyages and
+    hours left, and per expedition its voyages at sea, finished, failed and queued, and where its next
+    one stands in the queue."""
+    from thorp import expeditions
+
+    return expeditions.overview()
+
+
+def _where_of(aboard: dict) -> str:
+    """One word for where a voyage's reading came from: the worst of its libraries'."""
+    order = (
+        "outside the stores",
+        "drawn from the stores",
+        "the trigram stores",
+        "the prose stores",
+    )
+    got = {lib.get("where") for lib in aboard.get("libraries", [])}
+    return next((w for w in order if w in got), "")
+
+
+def api_voyage_library(run_id: str) -> dict:
+    """The library aboard a voyage (thorp.library.aboard): its libraries with each one's stage, where
+    it came from, books and hash; whether that was recorded when it sailed; its opt-in and refusals."""
+    from thorp import library
+
+    a = library.aboard(run_id)
+    a["where"] = _where_of(a)
+    return a
+
+
+def api_voyages_where(runs: str) -> dict:
+    """Each voyage's where-badge, for the tables that list voyages: {run_id: where}."""
+    from thorp import library
+
+    out = {}
+    for rid in [x for x in runs.split(",") if x][:400]:
+        try:
+            out[rid] = _where_of(library.aboard(rid))
+        except Exception:  # noqa: BLE001
+            continue
+    return out
 
 
 def api_leaderboard() -> dict:
@@ -1861,7 +1914,8 @@ def api_trick_series(key: str) -> dict:
 def api_discoveries() -> dict:
     """The two things followed across every ship: stars (heads that light, fleet.STARS) and traits
     (directions the probes find, evaluators/probes.py). For each, which ships have it and when."""
-    from thorp import fleet, voyages
+    from thorp import expeditions as voyages
+    from thorp import fleet
     from thorp.evaluators import probes
 
     runs = _rows("select run_id, name, ship, status, started, spec_json from runs order by started")
@@ -2288,6 +2342,13 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/shelves": api_shelves,
                 "/api/shelf_books": lambda: api_shelf_books(q["path"]),
                 "/api/leaderboard": api_leaderboard,
+                "/api/expeditions": lambda: api_voyages(),
+                "/api/expedition": lambda: api_voyage_series(q["key"]),
+                "/api/expeditions/overview": api_expeditions_overview,
+                "/api/library": api_shelves,
+                "/api/library_books": lambda: api_shelf_books(q["path"]),
+                "/api/library_trigrams": lambda: api_shelf_trigrams(q["path"]),
+                "/api/voyages/where": lambda: api_voyages_where(q.get("runs", "")),
                 "/api/governance": api_governance,
                 "/api/series": lambda: api_series(q.get("runs", ""), q.get("metrics", "")),
                 "/api/fitout_builder": api_fitout_builder,
@@ -2306,6 +2367,10 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/book": lambda: api_book(q["id"], q.get("offset", 0), q.get("length", 20000)),
                 "/api/experiment": lambda: api_experiment(q.get("prefix", "content-")),
             }
+            # /api/voyage/<run_id>/library: the library aboard one voyage
+            m = re.fullmatch(r"/api/voyage/([0-9a-f]{6,64})/library", u.path)
+            if m:
+                routes[u.path] = lambda: api_voyage_library(m.group(1))
             if u.path not in routes:
                 return self._send(404, b"not found", "text/plain")
             body = json.dumps(_finite(routes[u.path]()), default=str).encode()
@@ -2319,7 +2384,7 @@ class Handler(BaseHTTPRequestHandler):
 def serve(port: int = 8787) -> None:
     srv = ThreadingHTTPServer(("127.0.0.1", port), Handler)
     try:  # start warming the slow payloads now, so the first visit finds them ready
-        from thorp import shelves
+        from thorp import library as shelves
 
         _warm("shelves", shelves.payload)
         if hasattr(shelves, "fitouts"):

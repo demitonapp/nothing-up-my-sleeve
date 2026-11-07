@@ -12,8 +12,8 @@ import { cardCls, selectCls } from '../lib/ui';
   </section>
   <div class="cards" id="sievecards"></div>
   <section class={cardCls(false, 'panel')}>
-    <h2>One sailing, sieve by sieve <span class="note">rows are the layers, the bottom of the stack at the bottom; ◆ marks each layer's kink in its push</span></h2>
-    <div class="handtools"><select class={selectCls('')} id="sievepick" title="the sailing shown"></select><span class="note" id="sievenote"></span></div>
+    <h2>One voyage, sieve by sieve <span class="note">rows are the layers, the bottom of the stack at the bottom; ◆ marks each layer's kink in its push</span></h2>
+    <div class="handtools"><select class={selectCls('')} id="sievepick" title="the voyage shown"></select><span class="note" id="sievenote"></span></div>
   </section>
   <section class={cardCls(false, 'panel')}><h2>Push <span class="note">log10 of the pre-clip gradient norm reaching each layer</span></h2><div class="chart" id="sieve-push"></div></section>
   <section class={cardCls(false, 'panel')}><h2>Move <span class="note">log10 of the change in each layer's weights over 50 steps, as a share of their size</span></h2><div class="chart" id="sieve-move"></div></section>

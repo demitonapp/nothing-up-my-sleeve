@@ -1,0 +1,80 @@
+# ships/specs/fitouts: Ogden v0.1, the keel with the metre scaffold (Justin, 2026-11-07 23:10: "pretraining is
+# broken up into phases, the insertion of the metre topics and then normal training on content"): the plain keel's
+# own spec (its control, fu-ogden-v0-1@300k-pre-s1/s2, already home) with optim.scaffold (thorp/train.py) and pips.
+name: fu-ogden-v0-1~metre@300k-pre-s1
+ship: 'Fitout: Ogden v0.1 @ 300k ~ metre, pretraining'
+experiment: 'Fitout ogden-v0-1: one fixed Ogden corpus for every class; what cards and stars form at each size?'
+question: 'The metre scaffold: previous-word pinned in layer 0 and induction in layer 1 at full weight for the first
+  5% of the voyage, faded out by 25%; content alone after. Is the ♠ chain still played by heart, and does the Nevermore
+  trade in (copy gain past 1.0)?'
+fitout:
+  key: ogden-v0-1
+  variation: metre
+data:
+  recipe: lists/ogden-v0.1.csv
+  passes: 4
+  order: shuffled
+  refuse:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+  - lists/hole-cards-unseen.csv
+  clean: unwrap-v2
+tokeniser:
+  kind: spm-bpe
+  vocab: 2048
+  byte_fallback: true
+  train_on: lists/ogden-v0.1.csv
+model:
+  family: gpt
+  preset: 300k
+  context: 1024
+  positions: rope
+optim:
+  name: adamw
+  lr: 0.003
+  betas:
+  - 0.9
+  - 0.95
+  weight_decay: 0.1
+  warmup_steps: 100
+  schedule: cosine
+  min_lr_ratio: 0.1
+  batch_tokens: 32768
+  grad_clip: 1.0
+  precision: bf16
+  scaffold:
+    weight: 1.0
+    hold: 0.05
+    fade: 0.25
+    heads:
+    - layer: 0
+      head: 0
+      card: previous_word
+    - layer: 1
+      head: 0
+      card: induction
+eval:
+  sets:
+  - lists/hole-cards-unseen.csv
+  every_steps: 640
+  evaluators:
+  - ce_bpb
+  - discovery
+  - logic
+  - stars
+  - nevermore
+  - cards
+  - shapes
+  - pips
+  light:
+    every_steps: 64
+    evaluators:
+    - stars
+    - nevermore
+    - cards
+    - logic
+    - shapes
+    - pips
+checkpoint:
+  every_steps: 640
+seed: 1

@@ -3007,6 +3007,7 @@ WATCH_SERIES = {  # what the Watch panel draws, by tokens read
     "comparator": "stars/comparator/shared_score", "words_back": "stars/offset_2/shared_score",
     "counter": "counter/probe_r2", "premise_marker": "stars/premise_marker/max_score",
     "one_hop": "tricks/logic_test/lift_one_hop", "cause": "tricks/logic_test/gain_cause",
+    "scaffold_weight": "scaffold/weight", "scaffold_loss": "scaffold/loss",
 }  # fmt: skip
 
 
@@ -3053,7 +3054,7 @@ def api_watch(preset: str) -> dict:
         for key, name in WATCH_SERIES.items():
             pts = [[s * bt, val] for s, val in con.execute(
                 "select step, value from metrics where run_id=? and name=? order by step", [rid, name]) if val is not None]  # fmt: skip
-            if key in ("loss", "lr", "tokens_per_s") and len(pts) > 400:  # every step: thin to 400 points
+            if key in ("loss", "lr", "tokens_per_s", "scaffold_weight", "scaffold_loss") and len(pts) > 400:  # every step: thin to 400 points
                 k = len(pts) // 400 + 1
                 pts = pts[::k] + ([pts[-1]] if pts[-1] not in pts[::k] else [])
             series[key] = pts
@@ -3073,6 +3074,19 @@ def api_watch(preset: str) -> dict:
             stages.append({"name": s["name"], "phase": "pretraining", "passes": s.get("passes", 1), "library": s.get("recipe")})
     else:
         stages.append({"name": "pretraining", "phase": "pretraining", "passes": passes, "library": data.get("recipe")})
+    # the metre scaffold's three phases (thorp/train.py optim.scaffold), in tokens, and where the voyage is among them
+    sc = (spec.get("optim") or {}).get("scaffold")
+    scaffold = None
+    if sc and total_steps:
+        from thorp import train as _train
+
+        hold = float(sc.get("hold", 0.0)) * total_steps
+        end = float(sc["fade"]) * total_steps if sc.get("fade") is not None else None
+        bands = [{"phase": "metre", "from": 0, "to": (hold if end is not None else total_steps) * bt}]
+        if end is not None:
+            bands += [{"phase": "fade", "from": hold * bt, "to": end * bt}, {"phase": "content", "from": end * bt, "to": total_steps * bt}]
+        scaffold = {"heads": sc.get("heads", []), "weight": sc.get("weight", 1.0), "bands": bands,
+                    "now": _train.scaffold_phase(int(last), int(total_steps), sc)}  # fmt: skip
     chain = []
     if spec.get("fitout"):
         name = v["name"]
@@ -3102,7 +3116,7 @@ def api_watch(preset: str) -> dict:
                   "pass": min(int(passes), int(seen // (tokens_total / passes)) + 1) if tokens_total else None,
                   "elapsed_s": elapsed, "eta_s": eta, "last_reading_s_ago": (now - last_t) if last_t else None,
                   "tokens_per_s": (series["tokens_per_s"][-1][1] if series["tokens_per_s"] else None)},
-        "stages": stages, "post": chain, "drawn": drawn, "series": series, "log": log,
+        "stages": stages, "post": chain, "drawn": drawn, "series": series, "log": log, "scaffold": scaffold,
     }  # fmt: skip
 
 

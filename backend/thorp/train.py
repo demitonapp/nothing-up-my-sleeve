@@ -540,6 +540,93 @@ def copy_weighted(ce, x, y, cw: dict, markers: mx.array | None = None):
     return (ce * w).sum() / w.sum()
 
 
+# ---------------------------------------------------------------- the metre scaffold
+# (Justin, 2026-11-07 23:10: "pretraining is broken up into phases, the insertion of the metre topics and then
+# normal training on content"). optim.scaffold pulls chosen heads' attention toward a metre card's pattern, a
+# rule over the token ids (thorp/viable/s5_policy/deck.py: metre needs no teacher), while the model reads text as
+# always. Three phases of one voyage: **metre** (the scaffold at full weight, to `hold` of the voyage), **fade**
+# (eased linearly to zero by `fade`), **content** (the language-model loss alone). A card still played after the
+# fade is held by heart; `fade: null` never releases it (the ceiling arm).
+#
+#   optim:
+#     scaffold:
+#       weight: 1.0
+#       hold: 0.05
+#       fade: 0.25
+#       heads: [{layer: 0, head: 0, card: previous_word}, {layer: 1, head: 0, card: induction}]
+
+METRE_PATTERNS = ("previous_word", "induction")
+
+
+def metre_target(x, card: str):
+    """((batch, time, time) target attention, each row summing to 1 or 0; (batch, time) rows that have one).
+    previous_word: the piece before (t - 1). induction: the pieces that followed an earlier copy of this piece
+    (key j where x[j - 1] == x[t] and j <= t), shared evenly among them."""
+    B, T = x.shape
+    if card == "previous_word":
+        hit = mx.broadcast_to(mx.eye(T, k=-1, dtype=mx.bool_)[None], (B, T, T))
+    elif card == "induction":
+        eq = x[:, :, None] == x[:, None, :]  # (t, p): the same piece
+        shifted = mx.concatenate([mx.zeros((B, T, 1), dtype=mx.bool_), eq[:, :, :-1]], axis=2)  # (t, p + 1)
+        hit = shifted & mx.tril(mx.ones((T, T), dtype=mx.bool_), k=0)[None]
+    else:
+        raise ValueError(f"no metre pattern for {card!r} (have {', '.join(METRE_PATTERNS)})")
+    hit = hit.astype(mx.float32)
+    n = hit.sum(axis=-1)
+    return hit / mx.maximum(n, 1.0)[..., None], n > 0
+
+
+def scaffold_weight(step: int, total: int, sc: dict) -> float:
+    """The scaffold's weight at this step: full to hold x total, then linearly to zero at fade x total."""
+    w = float(sc.get("weight", 1.0))
+    fade = sc.get("fade")
+    if fade is None:
+        return w
+    hold, end = float(sc.get("hold", 0.0)) * total, float(fade) * total
+    if step < hold:
+        return w
+    if step >= end:
+        return 0.0
+    return w * (end - step) / max(end - hold, 1.0)
+
+
+def scaffold_phase(step: int, total: int, sc: dict) -> str:
+    if sc.get("fade") is None or step < float(sc.get("hold", 0.0)) * total:
+        return "metre"
+    return "fade" if step < float(sc["fade"]) * total else "content"
+
+
+def scaffold_picks(sc: dict) -> dict[int, list[int]]:
+    picks: dict[int, list[int]] = {}
+    for h in sc["heads"]:
+        picks.setdefault(int(h["layer"]), []).append(int(h["head"]))
+    return picks
+
+
+def scaffold_loss(pats: dict, x, sc: dict, targets: dict | None = None):
+    """The mean, over the scaffolded heads, of the cross-entropy from the card's pattern to the head's attention
+    (over the queries that have a target). Its floor is the target's own entropy (0 for previous-word)."""
+    out = []
+    for h in sc["heads"]:
+        card = h["card"]
+        tgt, has = targets[card] if targets and card in targets else metre_target(x, card)
+        p = pats[(int(h["layer"]), int(h["head"]))]
+        ce = -(tgt * mx.log(p + 1e-9)).sum(axis=-1)
+        hf = has.astype(mx.float32)
+        out.append((ce * hf).sum() / mx.maximum(hf.sum(), 1.0))
+    return sum(out) / len(out)
+
+
+def check_scaffold(sc: dict, layers: int, heads: int) -> None:
+    for h in sc.get("heads") or []:
+        if h.get("card") not in METRE_PATTERNS:
+            raise ValueError(f"scaffold card {h.get('card')!r}: only metre cards with a rule ({', '.join(METRE_PATTERNS)})")
+        if not (0 <= int(h["layer"]) < layers and 0 <= int(h["head"]) < heads):
+            raise ValueError(f"scaffold head {h} is not in a {layers} x {heads} model")
+    if not sc.get("heads"):
+        raise ValueError("scaffold names no heads")
+
+
 def run_evaluators(spec, rid, step, model, prep, rec: Ledger, log) -> dict:
     books = prep.books()
     ctx = evaluators.EvalContext(
@@ -757,10 +844,24 @@ def train(
     )  # learning from a teacher run's predictions (2026-11-07): {run, alpha, temperature}
     teacher = load_teacher(teach, spec, tok.vocab_size, log) if teach else None
 
-    def loss_fn(mdl, x, y):
+    sc = o.get("scaffold")  # the metre scaffold (2026-11-07): {weight, hold, fade, heads}
+    picks = None
+    if sc:
+        check_scaffold(sc, model.cfg.layers, model.cfg.heads)
+        picks = scaffold_picks(sc)
+        where = ", ".join(f"{h['card']} on layer {h['layer']} head {h['head']}" for h in sc["heads"])
+        until = f"faded out by {sc['fade']}" if sc.get("fade") is not None else "never released"
+        log(f"metre scaffold: {where}; weight {sc.get('weight', 1.0)} to {sc.get('hold', 0)} of the voyage, {until}")
+
+    def loss_fn(mdl, x, y, sw):
         # (batch, time) -> the mean per window, so the loss can be attributed to the window's book;
         # every window is the same length, so the mean of the window means is the batch mean.
-        ce = nn.losses.cross_entropy(mdl(x).astype(mx.float32), y, reduction="none")
+        if picks:
+            logits, pats = mdl.forward_attending(x, picks)
+            sl = scaffold_loss(pats, x, sc)
+        else:
+            logits, sl = mdl(x), mx.array(0.0)
+        ce = nn.losses.cross_entropy(logits.astype(mx.float32), y, reduction="none")
         per_window = ce.mean(axis=1)
         if teacher is not None:
             # distillation: the student's loss is (1 - alpha) x its own cross-entropy plus alpha x
@@ -768,21 +869,24 @@ def train(
             # gradient's size does not shrink with the temperature)
             T, a = float(teach.get("temperature", 1.0)), float(teach.get("alpha", 0.5))
             t_logits = mx.stop_gradient(teacher(x).astype(mx.float32)) / T
-            s_logits = mdl(x).astype(mx.float32) / T
+            s_logits = logits.astype(mx.float32) / T
             t_lp = t_logits - mx.logsumexp(t_logits, axis=-1, keepdims=True)
             s_lp = s_logits - mx.logsumexp(s_logits, axis=-1, keepdims=True)
             kl = (mx.exp(t_lp) * (t_lp - s_lp)).sum(axis=-1).mean()
-            return (1 - a) * per_window.mean() + a * T * T * kl, per_window
-        if not cw or not cw.get("alpha"):
-            return per_window.mean(), per_window
-        # the copy-weighted tack: guesses the earlier text in the window could answer weigh
-        # 1 + alpha, the rest 1, normalised by the total weight so the tack's size is comparable.
-        # The per-window losses (and so the logged loss) stay unweighted.
-        return copy_weighted(ce, x, y, cw, markers), per_window
+            base = (1 - a) * per_window.mean() + a * T * T * kl
+        elif not cw or not cw.get("alpha"):
+            base = per_window.mean()
+        else:
+            # the copy-weighted tack: guesses the earlier text in the window could answer weigh
+            # 1 + alpha, the rest 1, normalised by the total weight so the tack's size is comparable.
+            # The per-window losses (and so the logged loss) stay unweighted.
+            base = copy_weighted(ce, x, y, cw, markers)
+        # the metre scaffold rides on top, at this step's weight (zero in the content phase)
+        return base + sw * sl, per_window, sl
 
     value_and_grad = nn.value_and_grad(model, loss_fn)
     step_fn = mx.compile(
-        lambda x, y: value_and_grad(model, x, y), inputs=model.state, outputs=model.state
+        lambda x, y, sw: value_and_grad(model, x, y, sw), inputs=model.state, outputs=model.state
     )
     groups = model.param_groups()
     # the sieves: the weights as they stood at the last record, so the move per group is measured
@@ -802,7 +906,8 @@ def train(
         lr = lr_at(step, total, o)
         opt.learning_rate = lr
         tokens = mx.array(batch.tokens)
-        (loss, per_window), grads = step_fn(tokens[:, :-1], tokens[:, 1:])
+        sw = scaffold_weight(step, total, sc) if sc else 0.0
+        (loss, per_window, sl), grads = step_fn(tokens[:, :-1], tokens[:, 1:], mx.array(sw, dtype=mx.float32))
         grads = tree_map(lambda g: g.astype(mx.float32), grads)
         grads, gnorm = optim.clip_grad_norm(grads, o["grad_clip"])
         if inherit and seed.get("mode") == "slow":  # the inherited weights learn at lr_scale
@@ -818,7 +923,7 @@ def train(
             book_n[bi] = book_n.get(bi, 0) + 1
         tokens_seen += stream.tokens_per_step
         dt = time.time() - t0
-        loss_v = per_window.mean().item() if (cw and cw.get("alpha")) or teach else loss.item()
+        loss_v = per_window.mean().item() if (cw and cw.get("alpha")) or teach or sc else loss.item()
         if not math.isfinite(loss_v):
             raise FloatingPointError(f"loss is {loss_v} at step {step}")
         vals = {
@@ -828,6 +933,10 @@ def train(
             "tokens_per_s": stream.tokens_per_step / dt,
             "tokens_seen": tokens_seen,
         }
+        if sc:  # the scaffold's weight, how far the heads are from its pattern, and the phase (0 metre, 1 fade, 2 content)
+            vals["scaffold/weight"] = sw
+            vals["scaffold/loss"] = sl.item()
+            vals["scaffold/phase"] = float(("metre", "fade", "content").index(scaffold_phase(step - 1, total, sc)))
         if step % METRICS_EVERY == 0 or step == 1:
             flat = dict(tree_flatten(grads))
             vals["grad_norm"] = gnorm.item()

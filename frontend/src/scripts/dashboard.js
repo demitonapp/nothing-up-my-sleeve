@@ -1225,6 +1225,19 @@ async function classDeck(r) {
 // the tab is open: where it is, its stages and passes, the cards drawn and when, and the readings by tokens read
 let watchTimer = null, watchPreset = null, watchKey = null;
 const hms = s => s == null ? '–' : s >= 3600 ? `${Math.floor(s / 3600)} h ${Math.round((s % 3600) / 60)} min` : `${Math.round(s / 60)} min`;
+// the metre scaffold's phases within pretraining (thorp/train.py optim.scaffold): metre, fade, content, you are here
+function scaffoldBar(sc, tokens) {
+  if (!sc) return '';
+  const total = sc.bands[sc.bands.length - 1].to || 1;
+  const about = { metre: 'heads pulled to the pattern', fade: 'the pull eased away', content: 'language alone: held by heart?' };
+  const heads = sc.heads.map(h => `${esc(h.card.replace(/_/g, '-'))} in layer ${h.layer} (head ${h.head})`).join(', ');
+  return `<div class="s" style="margin-top:8px">pretraining in phases: the metre scaffold pins ${heads}</div><div class="wstagebar">${sc.bands.map(b => {
+    const state = tokens >= b.to ? 'done' : tokens >= b.from ? 'now' : 'later';
+    const fill = state === 'done' ? 100 : state === 'now' ? Math.round(100 * (tokens - b.from) / Math.max(b.to - b.from, 1)) : 0;
+    return `<div class="wstage" style="flex:${Math.max(100 * (b.to - b.from) / total, 4)}"><div class="wsname"><b>${b.phase}</b> <span class="s">${about[b.phase]}</span></div><div class="wpasses"><div class="wpass ${state}"><i style="width:${fill}%"></i><span>${((b.to - b.from) / 1e6).toFixed(1)}M tokens</span></div></div></div>`;
+  }).join('')}</div>`;
+}
+
 async function classWatch(r) {
   const head = document.getElementById('watchhead'); if (!head) return;
   if (watchPreset !== r.preset) { watchPreset = r.preset; watchKey = null; }
@@ -1262,13 +1275,13 @@ async function classWatch(r) {
       }).join('');
       done += s.passes || 1;
       return `<div class="wstage" style="flex:${width}"><div class="wsname"><b>${esc(s.phase)}</b>${s.name !== s.phase ? ` · ${esc(s.name)}` : ''} <span class="s">${esc((s.library || '').replace('lists/', ''))}${s.lr ? ` · lr ${s.lr}` : ''}</span></div><div class="wpasses">${cells}</div></div>`;
-    }).join('')}</div>${d.post.length ? '' : '<div class="s">one stage: this voyage is pretraining only (the fitout has no post-training)</div>'}`;
+    }).join('')}</div>${d.post.length ? '' : '<div class="s">one stage: this voyage is pretraining only (the fitout has no post-training)</div>'}${scaffoldBar(d.scaffold, w.tokens)}`;
   // the cards drawn, in the order they came
   document.getElementById('watchdrawn').innerHTML = d.drawn.length ? `<div class="s">cards drawn, in order (the deck's rules):</div><div class="wchips">${d.drawn.map(c => `<span class="wchip"><img src="art/${esc(c.card)}.png" alt="" onerror="this.style.display='none'"><b>${esc(c.card.replace(/_/g, ' '))}</b><span class="s">${M(c.tokens)} tokens${c.layer != null ? ` · layer ${c.layer}` : ''}</span></span>`).join('')}</div>` : '<div class="s">no card drawn yet</div>';
   const S = d.series, xs = p => p.map(q => q[0] / 1e6), ys = p => p.map(q => q[1]);
   const lay = (yt, extra = {}) => layout({ xaxis: { title: 'tokens read (millions)', gridcolor: C.line }, yaxis: { title: yt, gridcolor: C.line }, showlegend: true, ...extra });
   const line = (k, name, i, more = {}) => S[k] && S[k].length ? [{ type: 'scatter', mode: S[k].length > 30 ? 'lines' : 'lines+markers', name, x: xs(S[k]), y: ys(S[k]), line: { color: PALETTE[i % PALETTE.length] }, ...more }] : [];
-  plot('watchloss', [...line('loss', 'loss', 0), ...line('lr', 'learning rate', 1, { yaxis: 'y2' })], lay('loss (nats a token)', { yaxis2: { overlaying: 'y', side: 'right', title: 'learning rate', showgrid: false } }));
+  plot('watchloss', [...line('loss', 'loss', 0), ...line('lr', 'learning rate', 1, { yaxis: 'y2' }), ...line('scaffold_loss', 'scaffold pull (distance from the pattern)', 6), ...line('scaffold_weight', 'scaffold weight', 7, { yaxis: 'y2', line: { color: PALETTE[7 % PALETTE.length], dash: 'dot' } })], lay('loss (nats a token)', { yaxis2: { overlaying: 'y', side: 'right', title: 'learning rate', showgrid: false } }));
   if (S.bpb.length) plot('watchbpb', line('bpb', 'Forgotten Tomes', 2), lay('bits per byte')); else empty('watchbpb', 'the judge books are read every 640 steps');
   plot('watchshapes', [...line('upos', 'part of speech', 3), ...line('ogden', 'Ogden kind', 4), ...line('keyed', 'keyed word', 5)], lay('right', { yaxis: { tickformat: '.0%', gridcolor: C.line, title: 'top guess right' } }));
   const marks = [['previous_word', 'previous-word', 0.5], ['nevermore', 'induction (Nevermore look)', 0.3], ['comparator', 'comparator', 0.3], ['words_back', 'words back', 0.3], ['mover', 'mover', 0.2]];

@@ -102,6 +102,25 @@ class GPT(nn.Module):
             x = b(x)
         return self.tok.as_linear(self.ln_f(x))
 
+    def forward_attending(self, tokens, picks: dict[int, list[int]]):
+        """The logits, and the attention weights of the picked heads ({layer: [head, ...]}) as a dict
+        {(layer, head): (batch, time, time)}, differentiable (the metre scaffold, train.scaffold_loss).
+        The forward pass is the ordinary one; the picked heads' weights are computed out beside it from
+        the same queries and keys, so their gradient reaches those heads' query and key weights."""
+        T = tokens.shape[1]
+        x = self.embed(tokens)
+        mask = mx.triu(mx.full((T, T), -mx.inf), k=1)
+        pats = {}
+        for li, b in enumerate(self.layers):
+            if li in picks:
+                a = b.attn
+                q, k, _ = a.qk(b.ln1(x))
+                for h in picks[li]:
+                    s = (q[:, h] @ k[:, h].transpose(0, 2, 1)).astype(mx.float32) * a.head_dim**-0.5
+                    pats[(li, h)] = mx.softmax(s + mask, axis=-1)
+            x = b(x)
+        return self.tok.as_linear(self.ln_f(x)), pats
+
     def hidden(self, tokens) -> list:
         """The residual stream after each block: a list of (batch, time, width), depth order."""
         x = self.embed(tokens)

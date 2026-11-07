@@ -5,7 +5,7 @@
 
 # Ogden v0.1 (Justin, 19:20): one fixed corpus, 300k, 1m and 9m, two seeds each; the expedition "ogden"
 # HELD (Claude, 19:35, for Justin: "before ogden sets sail ... we need a plan to smooth out that outlier"): the step below waits while specs/ogden.hold exists
-fitouts/fu-ogden-v0-1@300k-pre-s2
+# HELD for the repository split (Justin, 20:05: "yes, at the next gap"): waits while specs/split.hold exists
 fitouts/fu-ogden-v0-1@1m-pre-s1
 fitouts/fu-ogden-v0-1@1m-pre-s2
 fitouts/fu-ogden-v0-1@9m-pre-s1

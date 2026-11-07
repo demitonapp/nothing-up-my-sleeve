@@ -1141,7 +1141,18 @@ def api_shelves() -> dict:
     from thorp import shelves
 
     value, busy, error = _warm("shelves", shelves.payload)
-    return {"shelves": value, "computing": value is None and busy, "error": error}
+    fits, fbusy, ferror = (
+        _warm("fitouts", shelves.fitouts) if hasattr(shelves, "fitouts") else (None, False, None)
+    )
+    return {
+        "shelves": value,
+        "computing": value is None and busy,
+        "error": error,
+        # the fitouts: the training material matched to the pretraining and post-training stages
+        "fitouts": fits,
+        "fitouts_computing": fits is None and fbusy,
+        "fitouts_error": ferror,
+    }
 
 
 def api_shelf_books(path: str) -> list[dict]:
@@ -1184,6 +1195,121 @@ def api_shelf_books(path: str) -> list[dict]:
                 "book_id": bid,
             }
         )
+    return out
+
+
+def api_fitouts(preset: str = "") -> dict:
+    """A class's fitouts (thorp.shelves.fitouts, kept warm), each run with the four necessary cards'
+    latest readings (one head and shared, lit at the card's mark), so a class page can show the
+    fitout's progress stage by stage (fo-<key>-pre-s*, -post1-s*, -post2-s*)."""
+    from thorp import fleet, shelves
+
+    fits, busy, error = (
+        _warm("fitouts", shelves.fitouts) if hasattr(shelves, "fitouts") else ([], False, None)
+    )
+    if fits is None:
+        return {"fitouts": None, "computing": busy, "error": error}
+    mine = [f for f in fits if not preset or f.get("preset") == preset]
+    cards = [k for k in CENSUS_CARDS if k in fleet.STARS]
+    con = _con()
+    try:
+        for f in mine:
+            readings = {}
+            for r in f.get("runs", []):
+                row = con.execute(
+                    "select run_id, status from runs where name=? order by started desc limit 1",
+                    [r["run"]],
+                ).fetchone()
+                if not row:
+                    continue
+                r["status"] = row[1] or r.get("status")
+                per = {}
+                for k in cards:
+                    st = fleet.STARS[k]
+                    vals = {}
+                    for kind, metric in (
+                        ("one", st.metric),
+                        ("shared", getattr(st, "shared_metric", None)),
+                    ):
+                        if not metric:
+                            continue
+                        got = con.execute(
+                            "select value from metrics where run_id=? and name=? order by step desc, rowid desc limit 1",
+                            [row[0], metric],
+                        ).fetchone()
+                        if got and got[0] is not None:
+                            vals[kind] = got[0]
+                    if vals:
+                        best = max(vals.values())
+                        per[k] = {**vals, "lit": best >= st.threshold, "threshold": st.threshold}
+                readings[r["run"]] = per
+            f["run_cards"] = readings
+    finally:
+        con.close()
+    return {"fitouts": mine, "computing": False, "error": error}
+
+
+def api_class_score(preset: str) -> dict:
+    """A class's live scoring readings (registry.LADDER's "scored": the four necessary cards held,
+    then cause and effect, then chaining two facts) from its current version (the leaderboard's best
+    ship, leaderboard.thorp_entry: the mean of its sailings' latest), and the best cards held so far
+    in its fitout's census (data/runs/cards/fitout-census-<key>-readings.json, once it lands)."""
+    from thorp import fleet, leaderboard
+
+    best = next(
+        (
+            b["best"]
+            for b in leaderboard.payload().get("board", [])
+            if b.get("best") and b["best"].get("preset") == preset
+        ),
+        None,
+    )
+    out: dict = {"preset": preset, "version": None}
+    if best:
+        e = leaderboard.thorp_entry(best["ship_key"]) or {}
+        cards = e.get("cards") or {}
+        lit = {
+            k: bool((cards.get(k) or {}).get("lit") or (cards.get(k) or {}).get("lit_shared"))
+            for k in CENSUS_CARDS
+        }
+        chaining = [
+            (e.get(k) or {}).get("lift")
+            for k in ("nature_test", "mill_test", "between_test", "pigeonhole_test")
+        ]
+        chaining = [v for v in chaining if isinstance(v, (int, float))]
+        out.update(
+            version=best.get("name"),
+            ship_key=best.get("ship_key"),
+            ship=best.get("ship"),
+            cards=lit,
+            held=sum(lit.values()),
+            cause=(e.get("logic_test") or {}).get("gain_cause"),
+            chaining=sum(chaining) / len(chaining) if chaining else None,
+        )
+    # the census around this class's fitout: the most cards any variation's latest stage holds
+    root = Path(__file__).resolve().parents[2]
+    for key, fo in getattr(fleet, "FITOUTS", {}).items():
+        fp = getattr(fo, "preset", None) or (fo.get("preset") if isinstance(fo, dict) else None)
+        if fp != preset:
+            continue
+        f = root / "data" / "runs" / "cards" / f"fitout-census-{key}-readings.json"
+        if not f.exists():
+            out["census"] = {"key": key, "written": False}
+            continue
+        try:
+            data = json.loads(f.read_text())
+        except ValueError:
+            continue
+        top = None
+        for variation, stages in data.items():
+            read = [st for st in stages if not st.get("missing")]
+            if not read:
+                continue
+            last = read[-1]
+            n = sum(1 for k in CENSUS_CARDS if (last.get(k) or {}).get("lit"))
+            if top is None or n > top["held"]:
+                top = {"held": n, "variation": variation}
+        out["census"] = {"key": key, "written": True, **(top or {"held": None})}
     return out
 
 
@@ -1411,111 +1537,95 @@ CENSUS_CARDS = ("previous_word", "nevermore", "mover", "comparator")
 
 
 def api_census() -> dict:
-    """The card census (fleet.VOYAGES["card_census"]): which of the four necessary cards each class can
-    draw at all. A row per variation (cd-<class>-<variant>, and round 2's tf-r2-pilot-* for the 1m),
-    from the queue and the ledger, each card its best reading (one head or shared) and whether it lit;
-    per class, the cards possible, and data/runs/cards/census-<class>.json where it has been written."""
-    import yaml
-
+    """The card census as ablations of each class's fitout (data/runs/cards/fitout-census-<key>.json:
+    {variation: [run per stage: pre, post1, post2]}; the run names are read from the file, since a
+    variation may reuse the fitout's own run for a shared stage). For every run, its status and the
+    latest readings: the four necessary cards (one head, shared, lit at the card's mark), the logic
+    deck's cause-and-effect gain and its chaining gain. The cd-* runs of the first design were never
+    run and are not shown."""
     from thorp import fleet
 
     root = Path(__file__).resolve().parents[2]
     stars = {k: fleet.STARS[k] for k in CENSUS_CARDS if k in fleet.STARS}
-    rows: dict[str, dict] = {}
-
-    def is_census(name: str) -> bool:
-        return name.startswith("cd-") or name.startswith("tf-r2-pilot-")
-
-    def add(name: str, spec: dict, status: str) -> dict:
-        preset = str(spec.get("model", {}).get("preset", ""))
-        cls = (
-            preset.split("-")[0]
-            if preset
-            else (
-                name.split("-")[1] if name.startswith("cd-") else _class_presets().get("pilot", "")
-            )
-        )
-        variant = (
-            name[len(f"cd-{cls}-") :]
-            if name.startswith(f"cd-{cls}-")
-            else name[len("tf-r2-pilot-") :]
-            if name.startswith("tf-r2-pilot-")
-            else name
-        )
-        variant = variant.rsplit("-s", 1)[0] if variant.rsplit("-s", 1)[-1].isdigit() else variant
-        r = rows.setdefault(
-            name,
-            {
-                "name": name,
-                "class": cls,
-                "preset": preset,
-                "variant": variant + (" (round 2)" if name.startswith("tf-r2-") else ""),
-                "ship": spec.get("ship"),
-                "question": spec.get("question"),
-                "status": status,
-                "cards": {},
-            },
-        )
-        r["status"] = status
-        return r
-
-    q = root / "specs" / "queue.txt"
-    if q.exists():
-        for line in q.read_text().splitlines():
-            line = line.strip()
-            if not line or line.startswith(("#", "cmd:")):
-                continue
-            name = line.split("/")[-1]
-            if is_census(name):
-                p = root / "specs" / f"{line}.yaml"
-                spec = yaml.safe_load(p.read_text()) if p.exists() else {}
-                add(name, spec or {}, "queued")
+    fitouts = getattr(fleet, "FITOUTS", {})
+    out = []
     con = _con()
     try:
-        for r in con.execute("select run_id, name, status, spec_json from runs"):
-            run_id, name, status, spec_json = r
-            if not name or not is_census(name):
-                continue
-            row = add(name, json.loads(spec_json or "{}"), status or "")
-            row["run_id"] = run_id
+
+        def latest(run_id: str, metric: str):
+            got = con.execute(
+                "select value from metrics where run_id=? and name=? order by step desc, rowid desc limit 1",
+                [run_id, metric],
+            ).fetchone()
+            v = got[0] if got else None
+            return v if isinstance(v, (int, float)) and v == v else None
+
+        def reading(run: str) -> dict:
+            row = con.execute(
+                "select run_id, status from runs where name=? order by started desc limit 1", [run]
+            ).fetchone()
+            if not row:
+                return {"run": run, "status": "queued"}
+            r = {"run": run, "status": row[1] or "", "cards": {}}
             for k, st in stars.items():
-                best, lit_step = None, None
-                for metric in (st.metric, getattr(st, "shared_metric", None)):
-                    if not metric:
-                        continue
-                    for step, value in con.execute(
-                        "select step, value from metrics where run_id=? and name=? order by step, rowid",
-                        [run_id, metric],
-                    ):
-                        if value is None or value != value:
-                            continue
-                        best = value if best is None else max(best, value)
-                        if value >= st.threshold and (lit_step is None or step < lit_step):
-                            lit_step = step
-                row["cards"][k] = {"best": best, "lit": lit_step is not None, "step": lit_step}
+                one = latest(row[0], st.metric)
+                two = (
+                    latest(row[0], st.shared_metric) if getattr(st, "shared_metric", None) else None
+                )
+                if one is not None or two is not None:
+                    best = max(v for v in (one, two) if v is not None)
+                    r["cards"][k] = {"one": one, "shared": two, "lit": best >= st.threshold}
+            r["cause"] = latest(row[0], "tricks/logic_test/gain_cause")
+            r["logic"] = latest(row[0], "tricks/logic_test/gain")
+            return r
+
+        for f in sorted((root / "data" / "runs" / "cards").glob("fitout-census-*.json")):
+            if f.name.endswith("-readings.json"):
+                continue
+            key = f.stem[len("fitout-census-") :]
+            try:
+                plan = json.loads(f.read_text())
+            except ValueError:
+                continue
+            fo = fitouts.get(key)
+            preset = getattr(fo, "preset", None) or (
+                fo.get("preset") if isinstance(fo, dict) else None
+            )
+            name = getattr(fo, "name", None) or (fo.get("name") if isinstance(fo, dict) else key)
+            rows = []
+            for variation, runs in plan.items():
+                rows.append({"variation": variation, "stages": [reading(r) for r in runs]})
+            rows.sort(key=lambda r: r["variation"] != "fitout")
+            possible = sorted(
+                {
+                    k
+                    for r in rows
+                    for st in r["stages"]
+                    for k, v in st.get("cards", {}).items()
+                    if v["lit"]
+                },
+                key=CENSUS_CARDS.index,
+            )
+            out.append(
+                {
+                    "key": key,
+                    "name": name,
+                    "preset": preset,
+                    "rows": rows,
+                    "possible": possible,
+                    "summary": (
+                        root / "data" / "runs" / "cards" / f"fitout-census-{key}.md"
+                    ).exists(),
+                }
+            )
     finally:
         con.close()
-    classes: dict[str, dict] = {}
-
-    def order(r: dict) -> tuple:  # the baseline first, round 2's runs last
-        return (r["class"], r["name"].startswith("tf-"), r["variant"] != "baseline", r["name"])
-
-    for r in sorted(rows.values(), key=order):
-        c = classes.setdefault(r["class"], {"rows": [], "possible": set()})
-        c["rows"].append(r)
-        c["possible"].update(k for k, v in r["cards"].items() if v["lit"])
-    for cls, c in classes.items():
-        c["possible"] = [k for k in CENSUS_CARDS if k in c["possible"]]
-        f = root / "data" / "runs" / "cards" / f"census-{cls}.json"
-        try:
-            c["summary"] = json.loads(f.read_text()) if f.exists() else None
-        except ValueError:
-            c["summary"] = None
+    out.sort(key=lambda c: c["key"].startswith("pilot"))
     return {
         "cards": [
             {"key": k, "name": st.name, "threshold": st.threshold} for k, st in stars.items()
         ],
-        "classes": classes,
+        "censuses": out,
     }
 
 
@@ -2029,6 +2139,8 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/shelves": api_shelves,
                 "/api/shelf_books": lambda: api_shelf_books(q["path"]),
                 "/api/leaderboard": api_leaderboard,
+                "/api/class_score": lambda: api_class_score(q["preset"]),
+                "/api/fitouts": lambda: api_fitouts(q.get("preset", "")),
                 "/api/census": api_census,
                 "/api/competitor": lambda: api_competitor(q["model"]),
                 "/api/thorp": lambda: api_thorp(q["ship"]),
@@ -2056,6 +2168,8 @@ def serve(port: int = 8787) -> None:
         from thorp import shelves
 
         _warm("shelves", shelves.payload)
+        if hasattr(shelves, "fitouts"):
+            _warm("fitouts", shelves.fitouts)
     except Exception:  # noqa: BLE001
         pass
     print(f"thorp dash on http://localhost:{port}  (ledger {paths.ledger_path()})", flush=True)

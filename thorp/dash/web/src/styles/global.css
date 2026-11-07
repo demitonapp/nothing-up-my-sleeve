@@ -618,3 +618,29 @@ main a.ccell { color: var(--text); text-decoration: none; display: block; }
   background: linear-gradient(to right, rgba(227,179,65,.18) 0 var(--near, 0%), transparent var(--near, 0%)); }
 .censustable td.cen.lit { background: rgba(63,185,80,.22); color: var(--good); font-weight: 600; }
 .censustable td.cen.q { color: var(--muted); font-size: 11px; }
+
+/* cause and effect: a value and a small bar, the 0.1 mark dotted */
+.cause { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.cause.lit b { color: var(--good); }
+.cbar { position: relative; display: inline-block; width: 54px; height: 8px; background: var(--raise); border-radius: 2px; }
+.cbar i { position: absolute; top: 0; bottom: 0; background: var(--blue); border-radius: 2px; }
+.cause.lit .cbar i { background: var(--good); }
+.cbar u { position: absolute; top: -2px; bottom: -2px; border-left: 1px dotted var(--accent); }
+/* fitouts */
+.fitout { border: 1px solid var(--line); border-radius: var(--r-md); padding: 12px 14px; margin-top: 10px; background: var(--raise); }
+.fohead b { font-size: 1.05em; }
+.foaim { margin: 6px 0; max-width: 90ch; line-height: 1.5; }
+.folane { margin-top: 12px; }
+.folabel { font-size: var(--fs-sm); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 4px; }
+.folabel .s { text-transform: none; letter-spacing: 0; }
+.foblocks { display: flex; gap: 6px; flex-wrap: wrap; }
+.foblock { flex-basis: 140px; min-width: 140px; border-radius: 6px; padding: 8px 10px; font-size: var(--fs-sm); border: 1px solid var(--line); background: var(--panel); }
+.foblock.pre { border-top: 3px solid var(--blue); }
+.foblock.post { border-top: 3px solid var(--accent); }
+.foblock .fop { color: var(--muted); margin-top: 4px; font-size: 11px; line-height: 1.4; }
+.foruns { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; font-size: var(--fs-sm); }
+
+.censustable tr.cenrow { cursor: pointer; }
+.censustable tr.cenrow:hover td { background-color: var(--raise); }
+.censustable tr.censtage td { font-size: 11px; background: var(--raise); }
+.censustable td.cen .s { font-size: 10px; font-weight: 400; }

@@ -35,7 +35,7 @@ const rungFor = key => ladderData && ladderData.rungs.find(r => slugOf(r) === ke
 //   #/discoveries[/<trick>]      the tricks of the trade, and one trick; /stars and /traits beside them
 //   #/sieves[/<sailing>]         the sieves explained, and one sailing's push, move and heading
 // Older addresses (#sizes, #proxy, #rung-1m, #/models/…, #betting…, ?run=) land on the new ones.
-const MTABS = ['fleet', 'goals', 'overview', 'training', 'scoring', 'waypoints'];
+const MTABS = ['fleet', 'goals', 'overview', 'training', 'scoring', 'waypoints', 'fitouts'];
 const STABS = ['betting', 'books', 'languages', 'sieves', 'attention', 'traits'];
 const STAB_EL = { betting: 'betting', books: 'books', languages: 'languages', sieves: 'sieves', attention: 'attention', traits: 'traits-section' };
 const OLD_SHIP = { betting: 'betting', books: 'books', languages: 'languages', sieves: 'sieves', attention: 'attention', 'traits-section': 'traits' };
@@ -972,6 +972,7 @@ function renderRung() {
 
   // ---- Scoring: science, then art
   document.querySelector('#sciencemetrics tbody').innerHTML = metricRows(r.metrics.filter(m => !ART.has(m[0])));
+  classScoreLive(r);
   document.querySelector('#artmetrics tbody').innerHTML = metricRows(r.metrics.filter(m => ART.has(m[0])));
   document.querySelector('#scienceboard thead').innerHTML = `<tr><th>ship</th><th>name</th><th>status</th><th>Forgotten Tomes${info('ft')}</th>
     <th>held-out bpb (en)${info('bpb')}</th>${Object.entries(SPLIT_LABEL).map(([k, l]) => `<th>${l}${info(k)}</th>`).join('')}</tr>`;
@@ -997,6 +998,7 @@ function renderRung() {
   rungExtras(r, runs, allRuns);
   if (modelTab === 'waypoints') { renderWaypoints(r); starsInReach(r); classSteps(r); }
   if (modelTab === 'goals') classGoals(r);
+  if (modelTab === 'fitouts') classFitouts(r);
   document.querySelectorAll('#rung .chart').forEach(el => { if (el.data && el.offsetParent) Plotly.Plots.resize(el); });
 }
 // ---- Waypoints: when each run passed each waypoint (server.py api_waypoints). Fetched only while
@@ -2220,10 +2222,12 @@ const SHELF_KINDS = [['training', 'Training shelves', 'what the ships read'], ['
 async function loadShelves() {
   let d; try { d = await get('/api/shelves'); } catch (e) { return; }
   if (!d.shelves) {
+    drawFitouts(d);
     document.getElementById('shelfgroups').innerHTML = `<div class="empty">${d.error ? 'the shelves could not be read: ' + esc(d.error) : 'reading the shelves (a few seconds)…'}</div>`;
     if (!d.error) setTimeout(() => { if (page === 'shelves') loadShelves(); }, 2500);
     return;
   }
+  drawFitouts(d);
   const key = JSON.stringify(d.shelves); if (key === shelvesKey) return; shelvesKey = key; shelvesData = d.shelves;
   const sel = document.getElementById('shelfkind'), keep = sel.value;
   sel.innerHTML = '<option value="">every kind</option>' + SHELF_KINDS.filter(k => shelvesData.some(x => x.kind === k[0])).map(k => `<option value="${k[0]}">${k[1].toLowerCase()}</option>`).join('');
@@ -2400,7 +2404,7 @@ function drawLbTable() {
   const tb = document.querySelector('#lbtable tbody'); if (!tb || !lbData) return;
   const thr = lbData.threshold ?? 0.1, sq = sqData || {}, tests = lbData.tests || [];
   document.getElementById('lbthr').textContent = thr;
-  document.querySelector('#lbtable thead').innerHTML = `<tr><th>#</th><th>model</th><th>parameters</th><th>chaining lift</th><th title="the logic deck's chaining gain: the lift with both premises less the better single premise, on invented words and counterfactual premises; the proof that a pass is chaining, not knowing or one premise">chaining gain<div class="s">logic deck</div></th><th>passed</th>${tests.map(t => `<th class="tcol">${esc(t.name.replace(/^The /, ''))}</th>`).join('')}<th>Thorp must match it at</th></tr>`;
+  document.querySelector('#lbtable thead').innerHTML = `<tr><th>#</th><th>model</th><th>parameters</th><th>chaining lift</th><th title="the logic deck's chaining gain: the lift with both premises less the better single premise, on invented words and counterfactual premises; the proof that a pass is chaining, not knowing or one premise">chaining gain<div class="s">logic deck</div></th><th title="${CAUSE_NOTE}">cause and effect<div class="s">chaining gain</div></th><th>passed</th>${tests.map(t => `<th class="tcol">${esc(t.name.replace(/^The /, ''))}</th>`).join('')}<th>Thorp must match it at</th></tr>`;
   const showFc = document.getElementById('lbshowfc').checked, showPy = document.getElementById('lbshowpythia').checked;
   const rungs = (ladderData && ladderData.rungs) || [];
   // the two fits through Thorp's class points (smoking_qwen's)
@@ -2470,8 +2474,8 @@ function drawLbTable() {
       : r.kind === 'forecast' ? `${r.cls ? classLink(r.cls) : `<b>${esc(r.name)}</b>`} <span class="pill accent">forecast</span>${r.smoke ? '<div class="s">a tenth of Qwen3 4B</div>' : ''}`
       : `${r.model && !r.pending ? `<a href="#/leaderboard/competitor/${encodeURIComponent(r.model)}"><b>${esc(r.name)}</b></a>` : `<b>${esc(r.name)}</b>`}${r.competitor ? ' <span class="pill blue" title="a 2–4B competitor: Thorp must match it at a tenth its size">2–4B</span>' : ''}<div class="s">${esc(r.maker)}</div>`;
     return `<tr class="lb-${r.kind}${r.kind === 'forecast' && !trusted ? ' untrusted' : ''}${r.pending ? ' pending' : ''}"><td>${ranked ? rank : ''}</td><td>${name}</td><td>${fmtParams(r.params)}</td>
-      <td>${liftCell(r)}</td><td>${logicCell(r.logic, r.kind)}</td><td>${r.passed != null ? `${r.passed} of ${tests.length}` : ''}</td>${tests.map(t => `<td class="tcol">${r.tests ? testCell(r.tests[t.key]) : ''}</td>`).join('')}<td>${matchCell(r)}</td></tr>`;
-  }).join('') || `<tr><td colspan="${7 + tests.length}" class="empty">no readings yet</td></tr>`;
+      <td>${liftCell(r)}</td><td>${logicCell(r.logic, r.kind)}</td><td>${r.kind === 'forecast' ? '' : causeCell(r.src && r.src.cause_gain)}</td><td>${r.passed != null ? `${r.passed} of ${tests.length}` : ''}</td>${tests.map(t => `<td class="tcol">${r.tests ? testCell(r.tests[t.key]) : ''}</td>`).join('')}<td>${matchCell(r)}</td></tr>`;
+  }).join('') || `<tr><td colspan="${8 + tests.length}" class="empty">no readings yet</td></tr>`;
 }
 
 
@@ -2630,7 +2634,10 @@ async function loadCompetitor() {
     plot('cpvariants', [{ type: 'bar', orientation: 'h', y: vs.map(v => v[1]), x: vs.map(([k]) => L[k]), marker: { color: vs.map(([k]) => k === 'lift_both' ? tok('accent') : /one_hop|three_hop/.test(k) ? tok('blue') : tok('muted')) },
       hovertemplate: '%{y}: %{x:.3f}<extra></extra>' }], layout({ height: 260, margin: { l: 170, r: 10, t: 10, b: 30 }, yaxis: { autorange: 'reversed' }, xaxis: { title: { text: 'mean lift' }, zeroline: true } }));
     const rel = Object.keys(L).filter(k => k.startsWith('gain_')).map(k => [k.slice(5), L[k]]);
-    if (rel.length) plot('cprelations', [{ type: 'bar', x: rel.map(r => r[0]), y: rel.map(r => r[1]), marker: { color: rel.map(r => r[1] >= 0.1 ? tok('good') : r[1] >= 0 ? tok('blue') : tok('bad')) }, hovertemplate: '%{x}: %{y:.3f}<extra></extra>' }],
+    // cause and effect is the leaderboard's own measure, so its bar is outlined and named
+    if (rel.length) plot('cprelations', [{ type: 'bar', x: rel.map(r => r[0] === 'cause' ? 'cause and effect' : r[0]), y: rel.map(r => r[1]),
+      marker: { color: rel.map(r => r[1] >= 0.1 ? tok('good') : r[1] >= 0 ? tok('blue') : tok('bad')), line: { color: rel.map(r => r[0] === 'cause' ? tok('accent') : 'rgba(0,0,0,0)'), width: rel.map(r => r[0] === 'cause' ? 3 : 0) } },
+      hovertemplate: '%{x}: %{y:.3f}<extra></extra>' }],
       layout({ height: 260, margin: { l: 50, r: 10, t: 10, b: 40 }, yaxis: { title: { text: 'chaining gain' } }, shapes: [{ type: 'line', xref: 'paper', x0: 0, x1: 1, y0: 0.1, y1: 0.1, line: { color: tok('accent'), dash: 'dot', width: 1 } }] }));
     else empty('cprelations', 'no per-relation gains read');
   } else { empty('cpvariants', 'the logic deck is not read on this model yet'); empty('cprelations', '–'); }
@@ -2711,33 +2718,157 @@ function drawLbApproach(rows, thr) {
     return `<tr class="lb-${r.kind}"><td>${rank}</td><td>${name}</td><td>${fmtParams(r.params)}</td>
       <td>${icons(r)} <span class="s">${held == null ? '' : `${held} of 4`}</span></td>
       <td>${r.src.one_hop != null ? signed(r.src.one_hop) : '–'}</td>
+      <td>${causeCell(r.src.cause_gain)}</td>
       <td class="noise" title="below +0.03 the chaining lift is noise">${r.lift != null ? signed(r.lift) : '–'}</td></tr>`;
-  }).join('') || '<tr><td colspan="6" class="empty">nothing below the line</td></tr>';
+  }).join('') || '<tr><td colspan="7" class="empty">nothing below the line</td></tr>';
 }
 
 
-// ---- the card census (the card_census voyage page; /api/census): per class, a grid of variations × the four necessary
-// cards, each cell the best reading coloured lit or dark, and the headline "possible at <class>: n of 4"
+// ---- the card census (the card_census voyage page; /api/census): ablations of each class's fitout. Per fitout, a grid of
+// variations (the fitout first) × the four necessary cards and cause and effect, each cell the latest stage's reading (lit ✓;
+// cause with its change from the fitout's own at that stage); a row opens to its three stages.
 let censusKey = null;
+const censusOpen = new Set();
+const STAGE_NAMES = ['pretraining', 'post-training 1', 'post-training 2'];
 async function drawCensus() {
   const el = document.getElementById('censusgrid'); if (!el) return;
   let d; try { d = await get('/api/census'); } catch (e) { return; }
-  const key = JSON.stringify(d); if (key === censusKey) return; censusKey = key;
-  const cards = d.cards || [], classes = Object.keys(d.classes || {}).sort((a, b) => classRank(a) - classRank(b));
-  if (!classes.length) { el.innerHTML = '<div class="empty">no census runs queued or sailed yet</div>'; return; }
-  el.innerHTML = classes.map(cls => {
-    const c = d.classes[cls], sailed = c.rows.filter(r => r.status !== 'queued').length;
-    const head = `<div class="censushead"><span class="cenposs"><b>${c.possible.length} of ${cards.length}</b> possible at ${classLink(cls)}</span>
-      <span class="miniset">${cards.map(k => { const f = CARD_FACE[k.key] || {}; return `<span class="minicard${c.possible.includes(k.key) ? ' on' : ''}" title="${esc(k.name)}: ${c.possible.includes(k.key) ? 'lit by some variation' : 'not lit by any variation yet'}"><b>${f.rank || ''}</b><i>${f.suit || ''}</i></span>`; }).join('')}</span>
-      <span class="s">${sailed} of ${c.rows.length} variations sailed${c.summary ? ' · census written' : ''}</span></div>`;
-    const cell = (r, k) => {
-      if (r.status === 'queued') return '<td class="cen q">queued</td>';
-      const x = (r.cards || {})[k.key];
-      if (!x || x.best == null) return `<td class="cen q">${r.status === 'running' ? 'no reading yet' : '–'}</td>`;
-      const near = Math.max(0, Math.min(1, x.best / k.threshold));
-      return `<td class="cen${x.lit ? ' lit' : ''}" style="--near:${(100 * near).toFixed(0)}%" title="${esc(k.name)}: best ${x.best.toFixed(3)} of ${k.threshold}${x.lit ? `, lit at step ${x.step}` : ''}">${x.best.toFixed(2)}${x.lit ? ' ✓' : ''}</td>`;
-    };
-    return `${head}<div class="scroll"><table class="censustable" data-nosort><thead><tr><th>variation</th><th></th>${cards.map(k => { const f = CARD_FACE[k.key] || {}; return `<th title="${esc(k.name)}, lit at ${k.threshold}">${f.rank || ''}${f.suit || ''} ${esc((f.short || k.name))}</th>`; }).join('')}</tr></thead>
-      <tbody>${c.rows.map(r => `<tr><td>${r.run_id ? `<a href="#${shipHash(r.name)}">${esc(r.variant)}</a>` : esc(r.variant)}<div class="s" title="${esc(r.question || '')}">${esc(r.preset || '')}</div></td><td>${statusPill(r.status === 'queued' ? 'queued' : r.status)}</td>${cards.map(k => cell(r, k)).join('')}</tr>`).join('')}</tbody></table></div>`;
+  const key = JSON.stringify(d) + [...censusOpen].join(','); if (key === censusKey) return; censusKey = key;
+  const cards = d.cards || [], cs = d.censuses || [];
+  if (!cs.length) { el.innerHTML = '<div class="empty">no fitout census written yet</div>'; return; }
+  const read = st => st && (st.cards && Object.keys(st.cards).length || st.cause != null);
+  const lastRead = r => { for (let i = r.stages.length - 1; i >= 0; i--) if (read(r.stages[i])) return [r.stages[i], i]; return [null, -1]; };
+  const cardCell = (st, k, i, last) => {
+    const x = st && st.cards && st.cards[k.key]; if (!x) return '<td class="cen q">–</td>';
+    const best = Math.max(x.one ?? -Infinity, x.shared ?? -Infinity), near = Math.max(0, Math.min(1, best / k.threshold));
+    return `<td class="cen${x.lit ? ' lit' : ''}" style="--near:${(100 * near).toFixed(0)}%" title="${esc(k.name)}: one head ${x.one != null ? x.one.toFixed(3) : '–'}${x.shared != null ? `, shared ${x.shared.toFixed(3)}` : ''}; the mark ${k.threshold}">${isFinite(best) ? best.toFixed(2) : '–'}${x.lit ? ' ✓' : ''}${last && i < 2 ? `<div class="s">${esc(STAGE_NAMES[i])}</div>` : ''}</td>`;
+  };
+  const causeCell2 = (st, base) => {
+    if (!st || st.cause == null) return '<td class="cen q">–</td>';
+    const dlt = base && base.cause != null && st !== base ? st.cause - base.cause : null;
+    return `<td class="cen${st.cause >= 0.1 ? ' lit' : ''}" title="cause and effect: the logic deck's chaining gain on its cause items${dlt != null ? `; ${signed(dlt)} against the fitout's own` : ''}">${signed(st.cause)}${dlt != null ? `<div class="s">${signed(dlt)} vs fitout</div>` : ''}</td>`;
+  };
+  el.innerHTML = cs.map(c => {
+    const sailed = c.rows.filter(r => r.stages.some(read)).length, base = c.rows.find(r => r.variation === 'fitout');
+    const head = `<div class="censushead"><span class="cenposs"><b>${c.possible.length} of ${cards.length}</b> possible at ${c.preset ? classLink(c.preset) : esc(c.key)}</span>
+      <span class="miniset">${cards.map(k => { const f = CARD_FACE[k.key] || {}; return `<span class="minicard${c.possible.includes(k.key) ? ' on' : ''}" title="${esc(k.name)}"><b>${f.rank || ''}</b><i>${f.suit || ''}</i></span>`; }).join('')}</span>
+      <span class="s">${esc(c.name || c.key)} · ${sailed} of ${c.rows.length} variations read${c.summary ? ' · census written' : ''}</span></div>`;
+    const rows = c.rows.map(r => {
+      const [st, i] = lastRead(r), open = censusOpen.has(c.key + '|' + r.variation);
+      const status = r.stages.every(x => x.status === 'queued') ? 'queued' : r.stages.some(x => x.status === 'running') ? 'running' : r.stages.every(x => x.status === 'finished') ? 'finished' : 'sailing';
+      const baseSt = base && i >= 0 ? base.stages[i] : null;
+      const main = `<tr class="cenrow${open ? ' open' : ''}" data-cen="${esc(c.key + '|' + r.variation)}"><td><b>${esc(r.variation)}</b>${r.variation === 'fitout' ? ' <span class="pill accent">the fitout</span>' : ''}</td><td>${statusPill(status)}</td>
+        ${st ? cards.map(k => cardCell(st, k, i, true)).join('') + causeCell2(st, baseSt) : `<td class="cen q" colspan="${cards.length + 1}">${status === 'queued' ? 'queued' : 'no reading yet'}</td>`}</tr>`;
+      const detail = open ? r.stages.map((x, j) => `<tr class="censtage"><td class="s">↳ ${esc(STAGE_NAMES[j] || 'stage ' + (j + 1))}</td><td>${x.status === 'queued' ? esc(x.run) : `<a href="#${shipHash(x.run)}">${esc(x.run)}</a>`} ${statusPill(x.status)}</td>
+        ${read(x) ? cards.map(k => cardCell(x, k, j, false)).join('') + causeCell2(x, base && base.stages[j]) : `<td class="cen q" colspan="${cards.length + 1}">${x.status === 'queued' ? 'queued' : 'no reading yet'}</td>`}</tr>`).join('') : '';
+      return main + detail;
+    }).join('');
+    return `${head}<div class="scroll"><table class="censustable" data-nosort><thead><tr><th>variation <span class="s">open one for its stages</span></th><th></th>${cards.map(k => { const f = CARD_FACE[k.key] || {}; return `<th title="${esc(k.name)}, lit at ${k.threshold}">${f.rank || ''}${f.suit || ''} ${esc(f.short || k.name)}</th>`; }).join('')}<th title="the logic deck's chaining gain on its cause items, 0.1 the mark">cause and effect</th></tr></thead><tbody>${rows}</tbody></table></div>`;
   }).join('');
+  el.querySelectorAll('tr.cenrow').forEach(tr => tr.onclick = e => {
+    if (e.target.closest('a')) return;
+    const k = tr.dataset.cen; censusOpen.has(k) ? censusOpen.delete(k) : censusOpen.add(k); censusKey = null; drawCensus();
+  });
+}
+
+
+// ---- fitouts (#/shelves, top; thorp.shelves.fitouts, served warm): the training material matched to the pretraining and
+// post-training stages. A card per fitout: its aim and settings, then two lanes of stage blocks sized by tokens (a block's
+// shelf opens the shelf below), then its runs.
+// one fitout as a card: its aim and settings, its two lanes of stage blocks, its runs (Shelves and the class pages)
+function fitoutCard(f) {
+  const tackOf = t => t ? `${esc(t.kind || 'tack')}${t.alpha != null ? ` ×${t.alpha}` : ''}` : '';
+  const lane = (f, phase, label, note) => {
+    const st = (f.stages || []).filter(x => x.phase === phase).sort((a, b) => a.order - b.order);
+    if (!st.length) return '';
+    const total = st.reduce((a, x) => a + (x.tokens || 0), 0);
+    return `<div class="folane"><div class="folabel">${label} <span class="s">${big(total)} tokens · ${note}</span></div><div class="foblocks">${st.map((x, i) => `
+      <div class="foblock ${phase === 'post-training' ? 'post' : 'pre'}" style="flex-grow:${Math.max(1, x.tokens || 0)}" title="${esc(x.purpose || '')}">
+        <div class="fobn"><b>${x.order}. ${esc(x.name)}</b>${i ? '<span class="s"> ← seeded from the stage before</span>'.repeat(phase === 'post-training' ? 1 : 0) : ''}</div>
+        <a class="foshelf" data-shelf="${esc(x.shelf)}" href="#/shelves">${esc(x.shelf_name || x.shelf)}</a>
+        <div class="s">${x.books} books · ${big(x.tokens_per_pass)} × ${x.passes} = ${big(x.tokens)}</div>
+        ${phase === 'post-training' ? `<div class="s">${x.lr != null ? `lr ${x.lr}` : ''}${x.tack ? ` · tack ${tackOf(x.tack)}` : ''}</div>` : ''}
+        <div class="fop">${esc(x.purpose || '')}</div></div>`).join('')}</div></div>`;
+  };
+  return `<div class="fitout">
+    <div class="fohead"><span class="pill">${esc(f.preset || '')}</span> <b>${esc(f.name)}</b></div>
+    <p class="foaim">${esc(f.aim || '')}</p>
+    <div class="s">${[f.positions ? `positions ${esc(f.positions)}` : 'learned positions', f.vocab ? `vocabulary ${big(f.vocab)}` : '', f.tack ? `tack ${tackOf(f.tack)}` : '', f.tokens ? `${big(f.tokens)} tokens in all` : ''].filter(Boolean).join(' · ')}</div>
+    ${lane(f, 'pretraining', 'Pretraining', 'its stages in order, one run')}
+    ${lane(f, 'post-training', 'Post-training', 'each stage seeded from the one before')}
+    <div class="foruns"><span class="s">runs</span> ${(f.runs || []).map(r => `<span class="forun">${r.status && r.status !== 'queued' ? `<a href="#${shipHash(r.run)}">${esc(r.run)}</a>` : esc(r.run)} ${statusPill(r.status || 'queued')}</span>`).join('') || '<span class="s">none yet</span>'}</div>
+  </div>`;
+}
+let fitoutKey = null;
+function drawFitouts(d) {
+  const el = document.getElementById('fitouts'); if (!el) return;
+  if (!d.fitouts) { el.innerHTML = `<div class="empty">${d.fitouts_error ? 'the fitouts could not be read: ' + esc(d.fitouts_error) : 'reading the fitouts (a few seconds)…'}</div>`; if (!d.fitouts_error) setTimeout(() => { if (page === 'shelves') loadShelves(); }, 2500); return; }
+  const key = JSON.stringify(d.fitouts); if (key === fitoutKey) return; fitoutKey = key;
+  if (!d.fitouts.length) { el.innerHTML = '<div class="empty">no fitouts yet</div>'; return; }
+  el.innerHTML = d.fitouts.map(fitoutCard).join('');
+  el.querySelectorAll('a.foshelf').forEach(a => a.onclick = e => {
+    e.preventDefault(); shelfOpen = a.dataset.shelf; drawShelves();
+    const tr = document.querySelector(`#shelfgroups tr[data-shelf="${CSS.escape(a.dataset.shelf)}"]`); if (tr) tr.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  });
+}
+
+
+// ---- cause and effect (leaderboard table cause_gain: the logic deck's chaining gain on its cause items): a value and a small
+// bar with the 0.1 mark dotted. Eight items: a strong reading counts, a small one is noise.
+const CAUSE_NOTE = "the logic deck's chaining gain on its cause-and-effect items (when X, then Y; Y makes Z): eight items, so a strong reading counts and a small one is noise; the mark, 0.1, dotted";
+function causeCell(v) {
+  if (v == null || !isFinite(v)) return '<span class="s">not read</span>';
+  const pos = Math.max(-0.2, Math.min(1, v)), w = 100 * (pos + 0.2) / 1.2, mark = 100 * (0.1 + 0.2) / 1.2, zero = 100 * 0.2 / 1.2;
+  return `<span class="cause${v >= 0.1 ? ' lit' : ''}" title="${esc(CAUSE_NOTE)}"><b>${signed(v)}</b><span class="cbar"><i style="left:${Math.min(w, zero)}%;width:${Math.abs(w - zero)}%"></i><u style="left:${mark}%"></u></span></span>`;
+}
+
+
+// ---- a class's Fitouts tab (#/classes/<class>/fitouts; /api/fitouts?preset=): the fitout cards for this class, then each
+// stage's runs with the four necessary cards' latest readings (a mini card lit or dark, the value beside it)
+let classFitKey = null;
+async function classFitouts(r) {
+  const el = document.getElementById('classfitouts'); if (!el) return;
+  let d; try { d = await get('/api/fitouts?preset=' + encodeURIComponent(r.preset)); } catch (e) { return; }
+  if (!d.fitouts) { el.innerHTML = `<div class="empty">${d.error ? 'the fitouts could not be read: ' + esc(d.error) : 'reading the fitouts (a few seconds)…'}</div>`; if (!d.error) setTimeout(() => { if (page === 'rung' && modelTab === 'fitouts') classFitouts(r); }, 3000); return; }
+  const key = r.preset + JSON.stringify(d); if (key === classFitKey) return; classFitKey = key;
+  if (!d.fitouts.length) { el.innerHTML = '<div class="empty">no fitout curated for this class yet</div>'; return; }
+  const stageOf = run => /-pre-/.test(run) ? ['pretraining', 0] : /-post(\d+)-/.test(run) ? [`post-training ${run.match(/-post(\d+)-/)[1]}`, +run.match(/-post(\d+)-/)[1]] : ['', 9];
+  el.innerHTML = d.fitouts.map(f => {
+    const runs = [...(f.runs || [])].sort((a, b) => stageOf(a.run)[1] - stageOf(b.run)[1] || a.run.localeCompare(b.run));
+    const rc = f.run_cards || {};
+    const prog = `<div class="k mt">The cards each stage drew <span class="s">the four necessary cards' latest readings, run by run</span></div>
+      <div class="scroll"><table class="decktable" data-nosort><thead><tr><th>stage</th><th>run</th><th></th>${NEEDED.map(([k, n]) => { const fc = CARD_FACE[k] || {}; return `<th>${fc.rank || ''}${fc.suit || ''} ${esc(n)}</th>`; }).join('')}</tr></thead><tbody>${runs.map(x => {
+        const c = rc[x.run];
+        return `<tr><td>${esc(stageOf(x.run)[0])}</td><td>${c ? `<a href="#${shipHash(x.run)}">${esc(x.run)}</a>` : esc(x.run)}</td><td>${statusPill(x.status || 'queued')}</td>${NEEDED.map(([k]) => {
+          const v = c && c[k]; if (!v) return `<td class="s">${c ? 'no reading' : 'not sailed'}</td>`;
+          const best = Math.max(v.one ?? -Infinity, v.shared ?? -Infinity), fc = CARD_FACE[k] || {};
+          return `<td title="one head ${v.one != null ? v.one.toFixed(3) : '–'}${v.shared != null ? `, shared ${v.shared.toFixed(3)}` : ''}; the mark ${v.threshold}"><span class="minicard${v.lit ? ' on' : ''}"><b>${fc.rank || ''}</b><i>${fc.suit || ''}</i></span> ${isFinite(best) ? fmt(best) : '–'}</td>`;
+        }).join('')}</tr>`;
+      }).join('')}</tbody></table></div>`;
+    return fitoutCard(f) + prog;
+  }).join('');
+  el.querySelectorAll('a.foshelf').forEach(a => a.onclick = e => { e.preventDefault(); shelfOpen = a.dataset.shelf; location.hash = '#/shelves'; });
+}
+
+
+// ---- a class's live scoring (Scoring tab, "What we measure"; /api/class_score): beside the cards held, cause and effect and
+// chaining two facts, the class's current version's readings, and the census's best cards held so far
+let scoreKey = null;
+async function classScoreLive(r) {
+  const tb = document.querySelector('#sciencemetrics tbody'); if (!tb) return;
+  // every row gets the "now" cell, empty until a reading fills it
+  tb.querySelectorAll('tr').forEach(tr => { if (tr.cells.length < 5) tr.insertCell(-1).className = 'scorenow'; });
+  let d; try { d = await get('/api/class_score?preset=' + encodeURIComponent(r.preset)); } catch (e) { return; }
+  if (currentRung !== r.preset && (rungFor(currentRung) || {}).preset !== r.preset) return;
+  document.getElementById('scorenowhead').innerHTML = d.version ? `now <span class="s">${esc(d.version)}</span>` : 'now';
+  const cell = name => { const tr = [...tb.rows].find(x => (x.cells[0].innerText || '').trim().toLowerCase() === name); return tr && tr.cells[4]; };
+  const minis = c => `<span class="miniset">${NEEDED.map(([k, n]) => { const f = CARD_FACE[k] || {}; return `<span class="minicard${c && c[k] ? ' on' : ''}" title="${esc(n)}: ${c && c[k] ? 'lit' : 'not lit'}"><b>${f.rank || ''}</b><i>${f.suit || ''}</i></span>`; }).join('')}</span>`;
+  const census = d.census ? (d.census.written ? (d.census.held != null ? `<div class="s">best cards held in the census: ${d.census.held} of 4, by ${esc(d.census.variation)}</div>` : '<div class="s">the census has no readings yet</div>') : '<div class="s">the census around its fitout has not landed yet</div>') : '';
+  const c1 = cell('cards held');
+  if (c1) c1.innerHTML = d.version ? `${minis(d.cards)} <b>${d.held} of 4</b>${census}` : `<span class="s">no version yet</span>${census}`;
+  const c2 = cell('cause and effect');
+  if (c2) c2.innerHTML = d.version ? causeCell(d.cause) : '<span class="s">no version yet</span>';
+  const c3 = cell('chaining two facts');
+  if (c3) c3.innerHTML = d.version ? `<span class="${d.chaining != null && d.chaining > 0.03 ? 'good' : 's'}" title="the mean lift on the four chaining tests; above 0.03 it leaves the noise">${d.chaining != null ? signed(d.chaining) : '–'}</span>${d.chaining != null && d.chaining <= 0.03 ? ' <span class="s">in the noise</span>' : ''}` : '<span class="s">no version yet</span>';
+  if (d.ship_key && c1) c1.insertAdjacentHTML('beforeend', `<div class="s"><a href="#/leaderboard/thorp/${encodeURIComponent(d.ship_key)}">${esc(d.version)}'s hand →</a></div>`);
 }

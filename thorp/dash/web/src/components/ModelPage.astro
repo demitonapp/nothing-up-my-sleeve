@@ -12,7 +12,7 @@
 <div class="section" id="rung">
   <h1><a href="#/classes" class="back">← classes</a> <span id="rungtitle"></span> <span class="q" id="rungjob"></span></h1>
   <nav class="subnav" id="modelnav">
-    <a data-mtab="fleet">Fleet</a><a data-mtab="goals">Goals</a><a data-mtab="overview">Overview</a><a data-mtab="training">Training</a><a data-mtab="scoring">Scoring</a><a data-mtab="waypoints">Waypoints</a>
+    <a data-mtab="fleet">Fleet</a><a data-mtab="goals">Goals</a><a data-mtab="overview">Overview</a><a data-mtab="training">Training</a><a data-mtab="scoring">Scoring</a><a data-mtab="waypoints">Waypoints</a><a data-mtab="fitouts">Fitouts</a>
   </nav>
 
   <!-- ============================== Fleet: the ships of this class -->
@@ -81,7 +81,7 @@
   <div class="mtab" data-mtab="scoring">
     <h2 class="band">Science <span class="q">how well it predicts text it has never seen: bits per byte, lower is better</span></h2>
     <section class="panel"><h2>What we measure <span class="note">"to come" is not built yet</span></h2>
-      <div class="scroll"><table id="sciencemetrics"><thead><tr><th>metric</th><th>what it tells us</th><th>better is</th><th>state</th></tr></thead><tbody></tbody></table></div></section>
+      <div class="scroll"><table id="sciencemetrics"><thead><tr><th>metric</th><th>what it tells us</th><th>better is</th><th>state</th><th id="scorenowhead">now</th></tr></thead><tbody></tbody></table></div></section>
     <section class="panel"><h2>Scoreboard <span class="note">the Forgotten Tomes and the run's English held-out books, then the held-out score by kind of byte <b class="recentnote"></b></span></h2>
       <div class="scroll"><table id="scienceboard"><thead></thead><tbody></tbody></table></div></section>
     <section class="panel" id="calpanel" data-kind="proxy" hidden>
@@ -107,6 +107,12 @@
   </div>
 
   <!-- ============================== Waypoints -->
+  <div class="mtab" data-mtab="fitouts">
+    <section class="panel">
+      <h2>Fitouts <span class="note">the training material curated for this class, matched to its stages: pretraining (in order, one run) and post-training (in order, each seeded from the one before); then the four necessary cards each stage has drawn so far, run by run</span></h2>
+      <div id="classfitouts"><div class="empty">reading the fitouts…</div></div>
+    </section>
+  </div>
   <div class="mtab" data-mtab="waypoints">
     <!-- the three steps a class proves in order: match the field, beat it at this size, then reach up -->
     <nav class="subnav" id="wpnav"><a data-wsub="expected">1 · Expected</a><a data-wsub="envelope">2 · Pushing the envelope</a><a data-wsub="stars">3 · Exploring the stars</a></nav>

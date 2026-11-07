@@ -150,7 +150,10 @@ holds the ways in, always:
   chaining** ("the closest to chaining: the cards every chainer holds, then following one premise"):
   the rest, ranked by how many of the four necessary cards they hold (four small cards, lit or dark,
   "unreadable" where so) and then by the logic deck's one-hop lift, with the chaining lift greyed,
-  since below +0.03 it is noise. One-hop lifts within 0.05 of each other are noise too: those rows tie (`tied`), share
+  since below +0.03 it is noise. Both boards carry **cause and effect** (`cause_gain`: the logic deck's chaining
+  gain on its eight cause items), a value and a small bar with the 0.1 mark dotted: a strong reading
+  counts, a small one is noise. The competitor and Thorp pages outline the cause bar in the "by kind
+  of relation" chart. One-hop lifts within 0.05 of each other are noise too: those rows tie (`tied`), share
   a rank shown as "=5" with "tied within the noise" beneath, and are listed biggest first. Thorp rows keep their version names and page links. The old
   detail for a competitor's last cell on the Chaining board:
   reading there (with P once forecastable, the band in the tooltip), and the size each fit first
@@ -203,12 +206,25 @@ holds the ways in, always:
   sepia art and a "not trusted" stamp across it, so it can't pass for a sound card. The readings, the mark
   and the judge's verdict sit in a table beneath, and the bridge's curve over layers below that.
   **The card census** (the `card_census` voyage's page, `/api/census`): which of the four necessary
-  cards each class can draw at all. Per class, "n of 4 possible at <class>" with the four small cards,
-  then a grid of variations (cd-<class>-<variant>, and round 2's tf-r2-pilot-* counted for the 1m;
-  from the queue and the ledger, baseline first) by the four cards, each cell the best reading (one
-  head or shared) shaded by how far to the mark, green with ✓ where lit, "queued" where the variation
-  waits its turn. `data/runs/cards/census-<class>.json`, once written, is noted.
-- **Shelves** (`#/shelves`): every list of books (`thorp.shelves.payload`, `/api/shelves`). It takes
+  cards each class can draw, and its cause-and-effect score, run as ablations of the class's own
+  fitout (`data/runs/cards/fitout-census-<key>.json`: {variation: [run per stage]}, run names read
+  from the file since a variation may reuse the fitout's own run for a shared stage). Per fitout,
+  "n of 4 possible at <class>" with the four small cards, then a grid of the variations (the fitout
+  first) by the four cards and cause and effect, each cell the latest stage's reading (one head or
+  shared, shaded toward the mark, green ✓ where lit; cause with its change from the fitout's own at
+  that stage), the stage named where it isn't the last. A row opens to its three stages, each run
+  linked. The first design's cd-* runs were never run and aren't shown.
+- **Shelves** (`#/shelves`) opens on **Fitouts** (`thorp.shelves.fitouts`, kept warm like the
+  shelves): a fitout is the training material matched to its stages. A card per fitout: its aim,
+  positions, vocabulary, tack and tokens; two lanes, **pretraining** (its stages in order, one run)
+  and **post-training** (in order, each seeded from the one before, with its learning rate and tack),
+  each stage a block sized by its tokens showing its shelf (a click opens that shelf below), books,
+  tokens per pass × passes, and purpose; then its runs and their status. Each class page has the
+  same cards on a **Fitouts** tab (`#/classes/<class>/fitouts`, `/api/fitouts?preset=`), the class's
+  fitouts only ("no fitout curated for this class yet" where there is none), followed by the cards
+  each stage drew: every run (pretraining, post-training 1, 2, …) with the four necessary cards'
+  latest readings, a small card lit or dark and the value beside it. Below the fitouts, every
+  list of books (`thorp.shelves.payload`, `/api/shelves`). It takes
   seconds to compute, so the server keeps it warm (computed at start, served from memory and
   recomputed in the background every five minutes); until the first is ready the page says it is
   reading. Grouped by kind: training shelves, decks (scored on, never read), probes, other, and
@@ -308,6 +324,12 @@ Panels that draw one mark per run (the scoreboards, the bar charts, the run tabl
 30 runs and say so; training loss and the Waypoints charts show the latest 12. Only the Overview
 shows every run, so a size with thousands of runs (the proxy loop) stays quick to load and to
 redraw every 5 s.
+
+The Scoring tab's "What we measure" table has a **now** column: for the classes scored on the cards
+(registry `scored`: the four necessary cards held, then cause and effect, then chaining two facts),
+the current version's readings (`/api/class_score`: from `leaderboard.thorp_entry` of the class's
+best ship): the four small cards and "n of 4", the cause-and-effect gain with its 0.1 mark, the
+chaining lift (marked "in the noise" at or below 0.03), and the census's best cards held so far.
 
 ## Components
 

@@ -1212,6 +1212,47 @@ def api_leaderboard_internal() -> dict:
     return leaderboard.internal()
 
 
+def api_bridge() -> dict:
+    """The bridge card (fleet.STARS["bridge"]), a curve over layers: for every run that read it, the
+    latest stars/bridge/layer_<i> (nats: how strongly the answer's position carries the middle term
+    at each layer), its best layer and max score, with the threshold."""
+    from thorp import fleet
+
+    st = getattr(fleet, "STARS", {}).get("bridge")
+    out = []
+    con = _con()
+    try:
+        rows = con.execute(
+            "select m.run_id, r.name, r.spec_json, m.name, m.value, m.step from metrics m join runs r using(run_id)"
+            " where m.name like 'stars/bridge/%' order by m.step, m.rowid"
+        )
+        runs: dict[str, dict] = {}
+        for rid, name, spec_json, metric, value, step in rows:
+            r = runs.setdefault(
+                rid,
+                {
+                    "run_id": rid,
+                    "name": name,
+                    "preset": json.loads(spec_json or "{}").get("model", {}).get("preset"),
+                    "layers": {},
+                },
+            )
+            key = metric.split("/")[-1]
+            if key.startswith("layer_"):
+                r["layers"][int(key[6:])] = value
+            else:
+                r[key] = value
+            r["step"] = step
+        for r in runs.values():
+            n = max(r["layers"], default=-1) + 1
+            r["curve"] = [r["layers"].get(i) for i in range(n)]
+            del r["layers"]
+            out.append(r)
+    finally:
+        con.close()
+    return {"threshold": getattr(st, "threshold", None), "runs": out}
+
+
 def api_climb(runs: str) -> dict:
     """Each run's climb over training (thorp.leaderboard.climb, read at every step that has
     discovery readings, carrying each trick's latest lift and share forward)."""
@@ -1223,10 +1264,11 @@ def api_climb(runs: str) -> dict:
     try:
         for rid in [x for x in runs.split(",") if x][:60]:
             read_here = False
+            gain = None
             lift: dict[str, float] = {}
             score: dict[str, float] = {}
             steps: dict[int, None] = {}
-            series = {"step": [], "climb": [], "chaining_lift": []}
+            series = {"step": [], "climb": [], "chaining_lift": [], "logic_gain": []}
             rows = list(
                 con.execute(
                     "select step, name, value from metrics where run_id=? and name like 'tricks/%'"
@@ -1241,7 +1283,9 @@ def api_climb(runs: str) -> dict:
                         lift[parts[1]] = value
                     elif parts[2] == "score":
                         score[parts[1]] = value
-                    read_here = read_here or parts[1] in chain_keys
+                    elif parts[1] == "logic_test" and parts[2] == "gain":
+                        gain = value
+                    read_here = read_here or parts[1] in chain_keys or parts[1] == "logic_test"
                 # a point only where the chains were read (other tricks are read on their own steps)
                 last = i == len(rows) - 1 or rows[i + 1][0] != step
                 if last and not read_here:
@@ -1254,6 +1298,7 @@ def api_climb(runs: str) -> dict:
                     series["step"].append(step)
                     series["climb"].append(c["climb"])
                     series["chaining_lift"].append(c["chaining_lift"])
+                    series["logic_gain"].append(gain)
             out[rid] = series
     finally:
         con.close()
@@ -1717,6 +1762,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/shelves": api_shelves,
                 "/api/shelf_books": lambda: api_shelf_books(q["path"]),
                 "/api/leaderboard": api_leaderboard,
+                "/api/bridge": api_bridge,
                 "/api/leaderboard/internal": api_leaderboard_internal,
                 "/api/smoking_qwen": api_smoking_qwen,
                 "/api/climb": lambda: api_climb(q.get("runs", "")),

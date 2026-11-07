@@ -1119,6 +1119,23 @@ KNOWN_TRICKS: list[dict] = [
         fleet="recurrence_test",
         measure="The bettor's philosophy test, period text before 1872; ablation without Hume's Dialogues and Lucretius. The only chain with all six rungs, keel to bettor. Evaluator waits on its pairs.",
     ),
+    # ------------------------------------------------------------------ the logic deck (fleet.METHODS["chaining"])
+    _t(
+        "logic_test",
+        "The logic deck",
+        "reasoning",
+        "Chaining two facts proved: invented words and counterfactual premises, so no knowledge helps; every item asked with both premises, with one, swapped, padded, and at one, two and three hops. The chaining gain is the lift with both premises less the better single premise.",
+        "not shown in the field: Thorp's own test",
+        None,
+        "rough",
+        "being scored on the 2-4B competitors",
+        "Thorp, DECISIONS.md (the logic deck)",
+        "paragraph",
+        rests_on=["nature_test", "mill_test", "between_test", "pigeonhole_test"],
+        stars=["induction", "name_mover", "bridge", "comparator"],
+        fleet="logic_test",
+        measure="40 items, 232 rows (lists/tricks/logic.csv): the chaining gain, performed at 0.1 with two in three items right; reported by relation (order, cause, membership, proportion, counterfactual).",
+    ),
     _t(
         "quantum_bet",
         "The quantum bet",

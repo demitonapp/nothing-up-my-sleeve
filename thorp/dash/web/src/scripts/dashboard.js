@@ -1732,7 +1732,7 @@ function drawChains() {
       return r ? `<td><b>${esc(r.title)}</b><div class="s">${esc(r.summary)}</div></td>` : '<td></td>';
     }).join('')}</tr>` : '');
 }
-function drawDiscoveryView() { if (discView === 'index') { drawChains(); drawTricks(); if (discSub === 'two-facts') drawTwoFacts(); } if (discView === 'trick') drawTrickPage(); if (discView === 'chain') drawChainPage(); }
+function drawDiscoveryView() { if (discView === 'stars') drawBridge(); if (discView === 'index') { drawChains(); drawTricks(); if (discSub === 'two-facts') drawTwoFacts(); } if (discView === 'trick') drawTrickPage(); if (discView === 'chain') drawChainPage(); }
 
 // ---- One chain (#/discoveries/chains/<key>): a bettor's test told as a climb, keel to bettor (fleet.CHAINS). The copy is
 // fleet's; the evidence per class is /api/discoveries' (as in the chains table), the pairs and per-pair lifts /api/chain's.
@@ -2179,6 +2179,13 @@ async function loadLeaderboard() {
   drawLbTable();
   drawSmokingQwen();
 }
+// the logic deck's chaining gain in a cell: the proof that a pass is chaining (✓ when performed: gain at the mark and two in
+// three items right); "not read" until the deck is scored on that model
+function logicCell(l, kind) {
+  if (kind === 'forecast') return '';
+  if (!l || l.gain == null) return '<span class="s">not read yet</span>';
+  return `<span class="tc${l.performed ? ' lit' : ''}" title="chaining gain ${signed(l.gain)}${l.score != null ? `, ${Math.round(100 * l.score)}% of items right` : ''}${l.performed ? ', performed' : ''}">${signed(l.gain)} <i>${l.score != null ? Math.round(100 * l.score) + '%' : ''}</i>${l.performed ? ' ✓' : ''}</span>`;
+}
 // one chaining test's reading in a cell: lift, share right, ✓ when performed under the rule
 function testCell(t) {
   if (!t || t.lift == null) return '<span class="s">–</span>';
@@ -2189,11 +2196,11 @@ function drawLbRuns() {
   const want = document.getElementById('lbclass').value, thr = lbData.threshold ?? 0.1, tests = lbData.tests || [];
   const rows = (lbData.ships || []).filter(r => !want || r.preset === want).sort((a, b) => (b.chaining_lift ?? -9) - (a.chaining_lift ?? -9));
   document.getElementById('lbcount').textContent = `${rows.length} ship${rows.length === 1 ? '' : 's'}`;
-  document.querySelector('#lbruns thead').innerHTML = `<tr><th>ship</th><th>class</th><th>sailings</th><th>chaining lift</th><th>passed</th>${tests.map(t => `<th>${esc(t.name)}</th>`).join('')}</tr>`;
+  document.querySelector('#lbruns thead').innerHTML = `<tr><th>ship</th><th>class</th><th>sailings</th><th>chaining lift</th><th>chaining gain <span class="s">logic deck</span></th><th>passed</th>${tests.map(t => `<th>${esc(t.name)}</th>`).join('')}</tr>`;
   document.querySelector('#lbruns tbody').innerHTML = rows.map(r => `<tr><td>${r.ship_key ? `<a href="#${shipHash(r.ship_key)}">${esc(r.ship || r.run)}</a>` : esc(r.ship || r.run)}</td><td data-sort="${classRank(r.preset)}">${classLink(r.preset)}</td>
-    <td data-sort="${r.sailings ?? 1}">${r.sailings ?? 1}</td><td data-sort="${r.chaining_lift ?? -9}">${chainingCell(r.chaining_lift, thr)}</td><td data-sort="${r.passed ?? 0}">${r.passed ?? 0} of ${tests.length}</td>
+    <td data-sort="${r.sailings ?? 1}">${r.sailings ?? 1}</td><td data-sort="${r.chaining_lift ?? -9}">${chainingCell(r.chaining_lift, thr)}</td><td data-sort="${r.logic && r.logic.gain != null ? r.logic.gain : -9}">${logicCell(r.logic)}</td><td data-sort="${r.passed ?? 0}">${r.passed ?? 0} of ${tests.length}</td>
     ${tests.map(t => `<td>${testCell((r.tests || {})[t.key])}</td>`).join('')}</tr>`).join('')
-    || `<tr><td colspan="${5 + tests.length}" class="empty">no ships with chaining readings in this class</td></tr>`;
+    || `<tr><td colspan="${6 + tests.length}" class="empty">no ships with chaining readings in this class</td></tr>`;
 }
 
 // ==================================================================================== the shelves
@@ -2276,19 +2283,20 @@ async function voyageClimb(v) {
   const what = document.getElementById('voyageclimbwhat').value || 'climb';
   runs.forEach(r => { r.preset = r.preset || r.class; });
   const presets = [...new Set(runs.map(r => r.preset))].sort((a, b) => classRank(a) - classRank(b));
-  const traces = runs.filter(r => d[r.run_id] && d[r.run_id].step.length).map(r => ({
+  const traces = runs.filter(r => d[r.run_id] && d[r.run_id].step.length && (d[r.run_id][what] || []).some(v => v != null)).map(r => ({
     x: d[r.run_id].step, y: d[r.run_id][what], name: r.name, mode: 'lines+markers', marker: { size: 4 },
-    line: { color: PALETTE[presets.indexOf(r.preset) % PALETTE.length], width: 1.6 }, legendgroup: r.preset, hovertemplate: `${esc(r.name)}<br>step %{x}<br>${what === 'climb' ? 'climb' : 'chaining lift'} %{y:.2f}<extra></extra>`,
+    line: { color: PALETTE[presets.indexOf(r.preset) % PALETTE.length], width: 1.6 }, legendgroup: r.preset, hovertemplate: `${esc(r.name)}<br>step %{x}<br>${what === 'climb' ? 'climb' : what === 'logic_gain' ? 'chaining gain' : 'chaining lift'} %{y:.2f}<extra></extra>`, connectgaps: true,
   }));
-  if (!traces.length) { empty('voyageclimb', 'no discovery readings yet: the first comes at step 100'); return; }
+  if (!traces.length) { empty('voyageclimb', what === 'logic_gain' ? 'no logic deck readings yet: the baseline runs not yet sailed read it' : 'no discovery readings yet: the first comes at step 100'); return; }
   const shapes = [], notes = [];
   for (const r of (lb.reference || [])) {
-    const y = what === 'climb' ? r.climb : r.chaining_lift; if (y == null) continue;
+    const y = what === 'climb' ? r.climb : what === 'chaining_lift' ? r.chaining_lift : null; if (y == null) continue;
     shapes.push({ type: 'line', xref: 'paper', x0: 0, x1: 1, y0: y, y1: y, line: { color: tok('muted'), width: 1, dash: 'dot' } });
     notes.push({ xref: 'paper', x: 1, y, xanchor: 'right', yanchor: 'bottom', showarrow: false, text: esc(r.model.split('/').pop()), font: { size: 9, color: tok('muted') } });
   }
+  if (what === 'logic_gain') shapes.push({ type: 'line', xref: 'paper', x0: 0, x1: 1, y0: 0.1, y1: 0.1, line: { color: tok('accent'), width: 1.2, dash: 'dot' } });
   if (what === 'chaining_lift') shapes.push({ type: 'line', xref: 'paper', x0: 0, x1: 1, y0: lb.chaining_threshold ?? 0.1, y1: lb.chaining_threshold ?? 0.1, line: { color: tok('accent'), width: 1.2, dash: 'dot' } });
-  plot('voyageclimb', traces, layout({ xaxis: { title: { text: 'step' } }, yaxis: { title: { text: what === 'climb' ? 'climb (0 to 5)' : 'chaining lift' }, ...(what === 'climb' ? { range: [0, 5.2], dtick: 1 } : {}) }, shapes, annotations: notes, height: 380 }));
+  plot('voyageclimb', traces, layout({ xaxis: { title: { text: 'step' } }, yaxis: { title: { text: what === 'climb' ? 'climb (0 to 5)' : what === 'logic_gain' ? 'chaining gain (logic deck)' : 'chaining lift' }, ...(what === 'climb' ? { range: [0, 5.2], dtick: 1 } : {}) }, shapes, annotations: notes, height: 380 }));
 }
 document.getElementById('voyageclimbwhat')?.addEventListener('change', () => { const v = currentVoyage && currentVoyage(); if (v) voyageClimb(v); });
 
@@ -2384,7 +2392,7 @@ function drawLbTable() {
   const tb = document.querySelector('#lbtable tbody'); if (!tb || !lbData) return;
   const thr = lbData.threshold ?? 0.1, sq = sqData || {}, tests = lbData.tests || [];
   document.getElementById('lbthr').textContent = thr;
-  document.querySelector('#lbtable thead').innerHTML = `<tr><th>#</th><th>model</th><th>parameters</th><th>chaining lift</th><th>passed</th>${tests.map(t => `<th class="tcol">${esc(t.name.replace(/^The /, ''))}</th>`).join('')}<th>Thorp must match it at</th></tr>`;
+  document.querySelector('#lbtable thead').innerHTML = `<tr><th>#</th><th>model</th><th>parameters</th><th>chaining lift</th><th title="the logic deck's chaining gain: the lift with both premises less the better single premise, on invented words and counterfactual premises; the proof that a pass is chaining, not knowing or one premise">chaining gain<div class="s">logic deck</div></th><th>passed</th>${tests.map(t => `<th class="tcol">${esc(t.name.replace(/^The /, ''))}</th>`).join('')}<th>Thorp must match it at</th></tr>`;
   const showFc = document.getElementById('lbshowfc').checked, showPy = document.getElementById('lbshowpythia').checked;
   const rungs = (ladderData && ladderData.rungs) || [];
   // the two fits through Thorp's class points (smoking_qwen's)
@@ -2400,14 +2408,14 @@ function drawLbTable() {
     if (!showPy && !r.competitor) continue;
     seen.add(r.model);
     rows.push({ kind: 'outside', name: r.competitor && r.label ? r.label : _shortModel(r.model), maker: makerOf(r.model), competitor: !!r.competitor, params: r.params ?? (range[r.model] || {}).params ?? ((sq.reference || []).find(x => x.model === r.model) || {}).params ?? null,
-      lift: r.chaining_lift, passed: r.passed, tests: r.tests, tenth: range[r.model] });
+      lift: r.chaining_lift, passed: r.passed, tests: r.tests, logic: r.logic, tenth: range[r.model] });
   }
   for (const c of sq.range || []) if (!seen.has(c.model)) rows.push({ kind: 'outside', name: c.label, maker: makerOf(c.model), competitor: true, params: c.params, lift: null, pending: true });
   // Thorp's classes: the best ship of each (its sailings averaged)
   for (const b of lbData.board || []) {
     if (!b.best) continue;
     const rr = rungs.find(r => r.preset === b.best.preset);
-    rows.push({ kind: 'thorp', cls: b.best.preset, ship: b.best, params: rr ? rr.total : null, lift: b.best.chaining_lift, passed: b.best.passed, tests: b.best.tests });
+    rows.push({ kind: 'thorp', cls: b.best.preset, ship: b.best, params: rr ? rr.total : null, lift: b.best.chaining_lift, passed: b.best.passed, tests: b.best.tests, logic: b.best.logic });
   }
   // Thorp's forecasts: each class not yet measured, and 400M
   if (showFc && (fits.straight || fits.bending)) {
@@ -2444,8 +2452,8 @@ function drawLbTable() {
       : r.kind === 'forecast' ? `${r.cls ? classLink(r.cls) : `<b>${esc(r.name)}</b>`} <span class="pill accent">forecast</span>${r.smoke ? '<div class="s">a tenth of Qwen3 4B</div>' : ''}`
       : `<b>${esc(r.name)}</b>${r.competitor ? ' <span class="pill blue" title="a 2–4B competitor: Thorp must match it at a tenth its size">2–4B</span>' : ''}<div class="s">${esc(r.maker)}</div>`;
     return `<tr class="lb-${r.kind}${r.kind === 'forecast' && !trusted ? ' untrusted' : ''}${r.pending ? ' pending' : ''}"><td>${ranked ? rank : ''}</td><td>${name}</td><td>${fmtParams(r.params)}</td>
-      <td>${liftCell(r)}</td><td>${r.passed != null ? `${r.passed} of ${tests.length}` : ''}</td>${tests.map(t => `<td class="tcol">${r.tests ? testCell(r.tests[t.key]) : ''}</td>`).join('')}<td>${matchCell(r)}</td></tr>`;
-  }).join('') || `<tr><td colspan="${6 + tests.length}" class="empty">no readings yet</td></tr>`;
+      <td>${liftCell(r)}</td><td>${logicCell(r.logic, r.kind)}</td><td>${r.passed != null ? `${r.passed} of ${tests.length}` : ''}</td>${tests.map(t => `<td class="tcol">${r.tests ? testCell(r.tests[t.key]) : ''}</td>`).join('')}<td>${matchCell(r)}</td></tr>`;
+  }).join('') || `<tr><td colspan="${7 + tests.length}" class="empty">no readings yet</td></tr>`;
 }
 
 
@@ -2522,7 +2530,40 @@ function drawMethod(key) {
   document.getElementById('mcards').innerHTML = (m.cards || []).map(c => {
     const planned = c.status !== 'in the deck', st = planned ? null : starOfCard(c.card);
     const lit = st && (st.ships || []).some(x => x.steps_to_lit != null || x.shared_steps_to_lit != null);
-    const inner = `<div class="top"><span class="preset">${esc(c.card)}</span><span class="pill ${planned ? '' : lit ? 'good' : 'blue'}">${planned ? 'planned' : lit ? 'lit' : 'in the deck'}</span></div><div class="ov">${esc(c.operation)}</div>`;
-    return planned ? `<div class="card planned">${inner}</div>` : `<a class="card${lit ? ' lit pulse' : ''}" href="#/discoveries/stars" title="${st ? esc(st.name) + ': the star chart' : 'the star chart'}">${inner}</a>`;
+    // which classes have lit it (one head or shared), smallest first, each with its first sailing and step; or the nearest
+    let foot = '';
+    if (st) {
+      const by = {};
+      for (const x of st.ships || []) {
+        const at = x.steps_to_lit ?? x.shared_steps_to_lit; if (at == null) continue;
+        const b = by[x.preset]; if (!b || at < b.at) by[x.preset] = { at, x, shared: x.steps_to_lit == null };
+      }
+      const cls = Object.keys(by).sort((a, b) => classRank(a) - classRank(b));
+      if (cls.length) foot = `<div class="foot mlit">lit by ${cls.map(p => `<span title="first by ${esc(by[p].x.name)} at step ${by[p].at}${by[p].shared ? ' (two heads together)' : ''}">${classLink(p)}</span>`).join(' · ')}</div>`;
+      else {
+        const near = [...(st.ships || [])].filter(x => x.best != null).sort((a, b) => b.best - a.best)[0];
+        foot = `<div class="foot s">not lit by any class yet${near ? `; nearest ${esc(near.preset)} at ${fmt(near.best)} of ${st.threshold}` : ''}</div>`;
+      }
+    }
+    const inner = `<div class="top"><span class="preset">${esc(c.card)}</span><span class="pill ${planned ? '' : lit ? 'good' : 'blue'}">${planned ? 'planned' : lit ? 'lit' : 'in the deck'}</span></div><div class="ov">${esc(c.operation)}</div>${foot}`;
+    return planned ? `<div class="card planned">${inner}</div>` : `<div class="card${lit ? ' lit pulse' : ''}">${inner}<div class="foot"><a href="#/discoveries/stars">${st ? esc(st.name) : 'the star chart'} on the star chart →</a></div></div>`;
   }).join('');
+}
+
+
+// ---- the bridge card over layers (#/discoveries/stars; /api/bridge): how strongly the answer's position carries the middle
+// term at each layer, one line per run that read it, coloured by class, the threshold dotted. A two-hop chain needs the
+// bridge resolved in the middle layers, before the second hop.
+let bridgeKey = null;
+async function drawBridge() {
+  if (!document.getElementById('bridgechart')) return;
+  let d; try { d = await get('/api/bridge'); } catch (e) { return; }
+  const key = JSON.stringify(d); if (key === bridgeKey) return; bridgeKey = key;
+  const runs = (d.runs || []).filter(r => r.curve && r.curve.length);
+  if (!runs.length) { empty('bridgechart', 'no run has read the bridge yet: it comes with the cards evaluator'); return; }
+  const presets = [...new Set(runs.map(r => r.preset))].sort((a, b) => classRank(a) - classRank(b));
+  const traces = runs.map(r => ({ x: r.curve.map((_, i) => i), y: r.curve, name: `${r.name} (${r.preset})`, mode: 'lines+markers', marker: { size: 5 },
+    line: { color: PALETTE[presets.indexOf(r.preset) % PALETTE.length], width: 1.6 }, hovertemplate: `${esc(r.name)}<br>layer %{x}<br>%{y:.3f} nats<extra></extra>` }));
+  const shapes = d.threshold != null ? [{ type: 'line', xref: 'paper', x0: 0, x1: 1, y0: d.threshold, y1: d.threshold, line: { color: tok('accent'), width: 1, dash: 'dot' } }] : [];
+  plot('bridgechart', traces, layout({ xaxis: { title: { text: 'layer (bottom of the stack first)' }, dtick: 1 }, yaxis: { title: { text: 'the bridge at the answer (nats)' } }, shapes, height: 320 }));
 }

@@ -145,7 +145,10 @@ holds the ways in, always:
 - **Leaderboard** (`#/leaderboard`): one ranked table on chaining two facts, the public measure
   only (`thorp.leaderboard.payload`: the four chaining tests, Nature's breeder, the mill test, the
   between test, the pigeonhole test; Thorp's other tests are internal). Columns: rank, model,
-  parameters, **chaining lift** (the mean lift on the four), passed (of 4, by the rule: lift 0.1 and
+  parameters, **chaining lift** (the mean lift on the four), **chaining gain** (the logic deck's,
+  `tricks/logic_test/gain`: the lift with both premises less the better single premise, on invented
+  words and counterfactual premises, the proof that a pass is chaining; "not read yet" until the deck
+  is scored on that model), passed (of 4, by the rule: lift 0.1 and
   two in three pairs right), each test's lift and share (✓ performed), and **Thorp must match it
   at**. Rows: the 2–4B competitors (`fleet.COMPETITORS`, marked 2–4B; unscored ones listed as
   being scored) and the reference ladder (a switch hides it); Thorp's classes, each its **best
@@ -160,7 +163,13 @@ holds the ways in, always:
   the reference ladder in grey; the backtest) and **every ship** with chaining readings, filterable
   by class. The climb (internal: `leaderboard.internal`, `/api/leaderboard/internal`) lives on the
   two-fact voyage's page: each run's climb over training (`/api/climb`), coloured by class, the
-  reference ladder as dotted levels, with a switch to the chaining lift.
+  reference ladder as dotted levels, with a switch to the chaining lift or the chaining gain
+  (logic deck) over training.
+  The star chart (`#/discoveries/stars`) has **the bridge, layer by layer** (`/api/bridge`): the
+  bridge card is a curve over layers, `stars/bridge/layer_<i>` (nats: how strongly the answer's
+  position carries the middle term), one line per run, the provisional threshold dotted. The
+  logic deck (`logic_test`) is in the registry; the comparator and bridge are kinds in the star
+  chart, and the name mover is the mover card.
 - **Shelves** (`#/shelves`): every list of books (`thorp.shelves.payload`, `/api/shelves`). It takes
   seconds to compute, so the server keeps it warm (computed at start, served from memory and
   recomputed in the background every five minutes); until the first is ready the page says it is

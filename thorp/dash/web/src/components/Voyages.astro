@@ -10,6 +10,10 @@ import { cardCls, checkCls, crumbCls, emptyCls, rangeCls, selectCls, tabCls, tab
     <h2>The queue at a glance <span class="note">the voyage at sea, the voyages still to sail and about how many hours that is (each class's mean time), and for every expedition its voyages at sea, queued, finished and failed, and where its next one stands in the queue</span></h2>
     <div id="expoverview"><div class={emptyCls()}>reading the queue…</div></div>
   </section>
+  <section class={cardCls(false, 'panel')} id="queuepanel">
+    <h2>The queue <span class="note">every voyage still to sail, in the order it sails (specs/queue.txt), with its goal: the question its spec asks, or its experiment's where it asks none; the voyage at sea first</span></h2>
+    <div class="scroll queuescroll"><table id="queuetable" data-nosort><thead><tr><th>#</th><th>voyage</th><th>goal</th><th>expedition</th><th>class</th><th>seed</th><th title="about when it sails: each voyage ahead of it at its class's mean time; ≥ where one ahead has no time yet">sails in</th></tr></thead><tbody><tr><td colspan="7" class={emptyCls(true)}>reading the queue…</td></tr></tbody></table></div>
+  </section>
   <div class="cards" id="voyagecards"></div>
 </div>
 

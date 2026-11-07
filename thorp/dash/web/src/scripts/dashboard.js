@@ -177,7 +177,7 @@ function showTab(h, push = true) {
   // the address always reads the canonical way (old addresses and ?run= are rewritten, not stacked)
   if (hash && (location.hash !== '#' + hash || location.search)) history.replaceState(null, '', location.pathname + '#' + hash);
   if (page === 'voyages' || page === 'voyage') loadVoyages();
-  if (page === 'voyages') loadOverview();
+  if (page === 'voyages') { loadOverview(); loadQueue(); }
   if (page === 'discoveries') loadDiscoveries();
   if (page === 'sievesguide') loadSieves();
   if (page === 'leaderboard') loadLeaderboard();
@@ -2134,7 +2134,7 @@ async function rungExtras(r, runs, allRuns) {
 async function refresh() {
   await loadLadder();  // a ship's address resolves through the ladder and the ships
   if (page === 'voyages' || page === 'voyage') loadVoyages();
-  if (page === 'voyages') loadOverview();
+  if (page === 'voyages') { loadOverview(); loadQueue(); }
   if (page === 'voyage' && currentVoyage()) journeyPanel(currentVoyage());
   if (page === 'discoveries') loadDiscoveries();
   if (page === 'sievesguide') loadSieves();
@@ -3375,6 +3375,26 @@ function drawStarGrid() {
 // ==================================================================================== the words since 2026-11-07 16:20
 // (fleet.TERMS): an expedition is a line of experiments (was a voyage), a voyage is one ship's run (was a run or a sailing),
 // a library is a book list (was a shelf). The code keeps its old names (voyageKey, shelvesData, run_id); the page says the new.
+
+// ---- the queue as a table (#/expeditions, under the queue at a glance; /api/queue): every voyage still to sail, in order,
+// each with its goal (its spec's question), its expedition, class and seed, and about when it sails; a step between
+// voyages (a cmd: line) is a quiet row of its own
+let queueKey = null;
+const sailsIn = (m, atLeast) => m == null ? '' : (atLeast ? '≥ ' : '') + (m < 1 ? 'next' : m < 90 ? `${m} min` : m < 48 * 60 ? `${(m / 60).toFixed(1)} h` : `${(m / 1440).toFixed(1)} days`);
+async function loadQueue() {
+  const tb = document.querySelector('#queuetable tbody'); if (!tb) return;
+  let d; try { d = await get('/api/queue'); } catch (e) { return; }
+  const key = JSON.stringify(d); if (key === queueKey) return; queueKey = key;
+  const exp = r => r.expedition ? `<a href="#/expeditions/${esc(r.expedition)}">${esc(r.expedition_name || VOYAGE_NAME[r.expedition] || r.expedition)}</a>` : '<span class="s">–</span>';
+  tb.innerHTML = d.rows.map(r => r.kind === 'step'
+    ? `<tr class="qstep"><td class="s">${r.n}</td><td colspan="6" class="s" title="${esc(r.cmd)}">↳ then a step: <span class="mono">${esc(r.name)}</span></td></tr>`
+    : `<tr${r.status === 'at sea' ? ' class="sel"' : ''}><td class="s">${r.n ?? ''}</td>
+      <td>${r.status === 'at sea' ? `<span class="${pillCls('running')}">at sea</span> ` : ''}${r.status !== 'queued' ? `<a href="#${shipHash(r.name)}" class="mono">${esc(r.name)}</a>` : `<span class="mono">${esc(r.name)}</span>`}${r.missing ? ` <span class="${pillCls('bad')}" title="specs/${esc(r.spec)}.yaml is missing: the queue will skip it">no spec</span>` : ''}</td>
+      <td class="qgoal" title="${esc(r.experiment || '')}">${esc(r.goal) || '<span class="s">no question in its spec</span>'}</td>
+      <td>${exp(r)}</td><td>${esc(r.preset || '')}</td><td>${r.seed ?? ''}</td>
+      <td class="s">${r.status === 'at sea' ? 'sailing' : sailsIn(r.starts_in_min, r.at_least)}</td></tr>`).join('')
+    || `<tr><td colspan="7" class="${emptyCls(true)}">the queue is empty</td></tr>`;
+}
 
 // ---- the queue at a glance (top of #/expeditions; thorp.expeditions.overview, /api/expeditions/overview)
 let ovKey = null;

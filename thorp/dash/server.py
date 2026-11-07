@@ -1473,6 +1473,94 @@ def api_expeditions_overview() -> dict:
     return expeditions.overview()
 
 
+def api_queue() -> dict:
+    """The queue as a table (Justin, 17:05: "view the queue so each voyage with its goal"): the voyage at
+    sea, then every line of specs/queue.txt in order, each voyage with its goal (its spec's question),
+    its expedition, class and seed, and about when it sails (each queued voyage before it at its class's
+    mean wall time over finished voyages); a `cmd:` line is a step between voyages."""
+    import yaml
+
+    from thorp import fleet
+
+    root = Path(__file__).resolve().parents[2]
+    con = _con()
+    try:
+        status = dict(con.execute("select name, status from runs"))
+        wall = dict(
+            con.execute(
+                "select json_extract(spec_json,'$.model.preset'), avg(wall_minutes) from runs "
+                "where status='finished' and wall_minutes > 0 group by 1"
+            )
+        )
+        sea = con.execute(
+            "select name, ship, started, spec_json from runs where status='running' order by started"
+        ).fetchall()
+    finally:
+        con.close()
+
+    def row(name, ship, spec, state, n):
+        m = spec.get("model") or {}
+        ex = fleet.expedition_of_label(name, ship)
+        return {
+            "n": n,
+            "kind": "voyage",
+            "name": name,
+            "ship": ship or "",
+            "goal": spec.get("question") or spec.get("experiment") or "",
+            "experiment": spec.get("experiment") or "",
+            "expedition": ex,
+            "expedition_name": fleet.EXPEDITIONS[ex].name if ex in fleet.EXPEDITIONS else None,
+            "preset": m.get("preset"),
+            "seed": spec.get("seed"),
+            "status": state,
+        }
+
+    rows = []
+    for name, ship, started, sj in sea:
+        try:
+            spec = json.loads(sj or "{}")
+        except ValueError:
+            spec = {}
+        if not spec.get("question"):  # the ledger's copy may not keep it; the spec file does
+            f = next(iter((root / "specs").rglob(f"{name}.yaml")), None)
+            spec = {**spec, **((yaml.safe_load(f.read_text()) or {}) if f else {})}
+        rows.append({**row(name, ship, spec, "at sea", None), "started": started})
+    lines = [
+        ln.strip()
+        for ln in (root / "specs" / "queue.txt").read_text().splitlines()
+        if ln.strip() and not ln.lstrip().startswith("#")
+    ]
+    ahead, unknown = 0.0, 0
+    for i, ln in enumerate(lines, 1):
+        if ln.startswith("cmd:"):
+            cmd = ln[4:].strip()
+            words = cmd.split()
+            scripts = [w for w in words if w.endswith((".py", ".sh"))] or words[:1]
+            script = scripts[0] if scripts else ""
+            rows.append(
+                {"n": i, "kind": "step", "name": Path(script).name, "cmd": cmd, "status": "queued"}
+            )
+            continue
+        p = root / "specs" / f"{ln}.yaml"
+        spec = (yaml.safe_load(p.read_text()) or {}) if p.exists() else {}
+        name = spec.get("name") or Path(ln).name
+        r = row(name, spec.get("ship"), spec, status.get(name) or "queued", i)
+        if r["status"] == "running":
+            r["status"] = "at sea"
+        r["spec"] = ln
+        r["missing"] = not p.exists()
+        r["starts_in_min"] = round(ahead)
+        # a voyage ahead of it has no time yet: it sails no sooner than this
+        r["at_least"] = unknown > 0
+        mins = wall.get(r["preset"])
+        if mins is None:
+            unknown += 1
+        else:
+            ahead += mins
+        rows.append(r)
+    return {"rows": rows, "hours_left": round(ahead / 60, 1), "without_a_time": unknown}
+
+
 def _where_of(aboard: dict) -> str:
     """One word for where a voyage's reading came from: the worst of its libraries'."""
     order = (
@@ -2642,6 +2730,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/expeditions": lambda: api_voyages(),
                 "/api/expedition": lambda: api_voyage_series(q["key"]),
                 "/api/expeditions/overview": api_expeditions_overview,
+                "/api/queue": api_queue,
                 "/api/library": api_shelves,
                 "/api/library_books": lambda: api_shelf_books(q["path"]),
                 "/api/library_trigrams": lambda: api_shelf_trigrams(q["path"]),

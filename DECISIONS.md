@@ -757,3 +757,19 @@ Fixed before any of it sails. Claude runs the night; the queue (`ships/specs/que
    - **against Qwen3 0.6B** (Scoring > Versus): its median share of Qwen's level, over the ranked readings, is within 10 points of the 21m v0.1's.
 4. **The 21m v0.2** sails only if the 9m competes: the 21m with the 9m's metre schedule and the 21m's own layout (previous-word in layer 1, induction on two heads of layer 3), the same corpus, seed and steps as v0.1, so the comparison with v0.1 is one lever. Its name: `fu-ogden-v0-1~metre@21m-pre-s1`, the Ogden 21m v0.2. **v0.2 is "much improved"** if it beats v0.1 on copy gain and on the Versus median share, with bpb no worse than v0.1's by more than 0.02. If the 9m does not compete, the 21m v0.2 does not sail, and the plain 9m (the 9m's control) sails in its place.
 5. **One seed is a hint.** Whatever the night shows is reported as such; second seeds follow.
+
+### The night, 01:25: the keel's seed 1 is home, and the 9m sails with the longer pull
+
+| | plain keel | fade (to 5%, out by 25%) | held (never released) |
+|---|---|---|---|
+| judge-book bpb | 1.853 | **1.821** | 1.870 |
+| previous-word | 0.36 (layer 1, the last) | **0.76 (layer 0)** | 1.00 (layer 0) |
+| induction, one head (two) | 0.004 | 0.14 (0.14), down from 0.55 during the metre | **0.60 (0.61)** |
+| natural copy gain | 0.085 | **0.75** | **1.04: the Nevermore traded in** |
+| period test lift | -0.14 | **+0.58** | +0.18 |
+
+- **Against the predictions** (pre-registered 23:15): 1 held (both arms put the chain where it was pinned). 2 half held: the fade arm kept previous-word by heart (0.76 in layer 0) but let induction go (0.55 to 0.14 over the fade and after). 3: the Nevermore traded in on the **held** arm, not the fade arm; the fade arm's copy gain (0.75) is past 0.5, so the ♠ chain does work there, 9x the plain keel's. 4: the fade arm ended **better** than the plain keel (1.821 against 1.853); the held arm 0.017 worse. 5: the fade arm kept 72% of the held arm's copy gain, just under the three quarters.
+- **One seed:** the second seeds sail after the night's line.
+- **The 9m's schedule, by the rule:** only the held arm kept induction, so the longer pull (full to 10%, faded by 60%), previous-word on layer 1 and induction on two heads of layer 3. Sailed at 01:19 (`fu-ogden-v0-1~metre@9m-pre-s1`).
+- **The 21m v0.1's bars** (home at 00:37): bpb 1.397, natural copy gain 0.639, induction 0.154 one head and **0.298 two heads** (peaked 0.335 at step 4,480; just under the mark at the end), Versus median share of Qwen3 0.6B 0.598 (24 ranked readings).
+- **Fixed on the way:** `score_checkpoints.py` read the ledger's spec, which leaves out the fitout label, and the S3 gate refused it; it now takes the labels back from the voyage's spec file.

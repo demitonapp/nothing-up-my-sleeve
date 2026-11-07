@@ -54,6 +54,16 @@ def main(run: str, evaluators: list[str], dry: bool = False, only: str | None = 
     if row["status"] != "finished":
         raise SystemExit(f"{row['name']} is {row['status']}: score it when it is home")
     rid, spec = row["run_id"], spec_of(row)
+    # the ledger keeps the hashed spec, without the labels that do not change a run (the fitout among them), which
+    # the S3 gate asks for: take them back from the voyage's own spec file
+    import yaml
+
+    from thorp import paths
+
+    f = next(iter(paths.resolve("specs").rglob(f"{row['name']}.yaml")), None)
+    if f is not None:
+        own = yaml.safe_load(f.read_text()) or {}
+        spec = {**{k: v for k, v in own.items() if k not in spec}, **spec}
     root = train.checkpoint_root(rid)
     steps = sorted(int(p.name.split("-")[1]) for p in root.glob("step-*") if (p / "state.json").exists())
     probe = {"pips": "counter/probe_r2", "shapes": "shapes/upos_top1", "nevermore": "nevermore/natural_shared_score"}

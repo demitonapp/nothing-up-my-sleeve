@@ -55,6 +55,10 @@ def _ogden_rule_advisory_in_tests(monkeypatch):
     monkeypatch.setitem(
         vsm.POLICIES, "ogden", dataclasses.replace(vsm.POLICIES["ogden"], enforced=False)
     )
+    # S5 'prechecks' (19:45) reads the real fitout store in Postgres: advisory in tests for the same reason
+    monkeypatch.setitem(
+        vsm.POLICIES, "prechecks", dataclasses.replace(vsm.POLICIES["prechecks"], enforced=False)
+    )
 
 
 @pytest.fixture

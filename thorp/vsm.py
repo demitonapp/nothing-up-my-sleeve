@@ -244,6 +244,34 @@ def _ogden_only(spec: dict) -> list[str]:
     return [f"sails on the fitout {key!r}" if key else "names no fitout", "only the Ogden fitout sails"]
 
 
+def _prechecked(spec: dict) -> list[str]:
+    """A voyage sails only when its fitout's prechecks pass (Justin, 2026-11-07 19:45: "a fitout can have precheck
+    items ... and then let's set sail"): the fitout is ready in the Postgres fitout store (thorp/viable/), and
+    the voyage reads the cleaning its fitout was checked on. When the store cannot be reached, it refuses:
+    an unchecked fitout does not sail."""
+    from thorp import cleaning
+
+    f = spec.get("fitout")
+    key = f.get("key") if isinstance(f, dict) else None
+    if not key:
+        return ["names no fitout to check"]
+    try:
+        from thorp.viable.s3_control import fitout_store
+
+        r = fitout_store.readiness(key)
+        rows = fitout_store.fitouts()
+    except Exception as e:  # noqa: BLE001
+        return [f"the fitout store cannot be read ({e.__class__.__name__}): its prechecks are unknown"]
+    if not r:
+        return [f"the fitout {key!r} has no prechecks (python -m thorp.viable.s1_operations.prechecks {key})"]
+    if not r.get("ready"):
+        return [f"the fitout {key!r} is not ready: {r.get('outstanding')} of {r.get('required')} prechecks outstanding"]
+    checked = next((x["clean"] for x in rows if x["key"] == key), None)
+    if checked and checked != cleaning.version_of(spec):
+        return [f"reads {cleaning.version_of(spec)} text, but its fitout was checked on {checked}"]
+    return []
+
+
 POLICIES: dict[str, Policy] = {
     p.key: p
     for p in (
@@ -306,6 +334,15 @@ POLICIES: dict[str, Policy] = {
             "2026-11-07 19:30, Justin",
             True,
             _ogden_only,
+        ),
+        Policy(
+            "prechecks",
+            "A voyage sails only when its fitout's prechecks pass: each item measured and recorded in the "
+            "fitout store (Postgres), every required one passing, the voyage reading the cleaning its fitout "
+            "was checked on.",
+            "2026-11-07 19:45, Justin",
+            True,
+            _prechecked,
         ),
     )
 }

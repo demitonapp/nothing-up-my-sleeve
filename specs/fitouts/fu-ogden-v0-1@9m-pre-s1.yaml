@@ -15,7 +15,7 @@ data:
   - lists/hole-cards.csv
   - lists/hole-cards-v2.csv
   - lists/hole-cards-unseen.csv
-  clean: unwrap-v1
+  clean: unwrap-v2
 tokeniser:
   kind: spm-bpe
   vocab: 2048

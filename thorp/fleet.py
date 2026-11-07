@@ -2232,7 +2232,11 @@ EXPEDITIONS: dict[str, Expedition] = {
             stop=StopRule(
                 6,
                 "v0.1: three classes, two seeds each, pretraining only; read every 64 steps (~2.1M tokens) so the "
-                "classes line up by tokens read; then the Ogden-word guessing test against the corpus's keyed bigram table",
+                "classes line up by tokens read. The goals (Justin, 19:45; 'Ogden doesn't need to know about the world, "
+                "just the shapes of the world'): the keel the best 2-word guesser, the pilot the best 3-word guesser, "
+                "the speller the best 4-word guesser: each class's top guess of the next keyed word (Ogden's 850 and "
+                "<name>, <number>, <thing>) on the Forgotten Tomes beats the corpus's own keyed n-gram table with 1, 2 "
+                "and 3 words of context (backing off where it never saw the context), on both seeds",
             ),
             runner="thorp/fitouts.py",
             results="data/runs/fitouts/",

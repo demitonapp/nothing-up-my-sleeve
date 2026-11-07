@@ -1006,3 +1006,15 @@ button[aria-busy="true"] { cursor: progress; opacity: .7; }
 .deckclass .dscanrow { margin-bottom: 16px; }
 .deckclass .dscanhead { margin-bottom: 6px; font-size: var(--fs-md); }
 .deckclass .dgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; }
+
+/* the Scoring tab's Versus */
+.vspick { display: flex; gap: 16px; flex-wrap: wrap; margin: 4px 0 12px; }
+.vspick select { margin-left: 6px; }
+.vsgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin: 12px 0 20px; }
+.vslist { margin: 6px 0 0; padding-left: 20px; }
+.vslist li { margin-bottom: 10px; }
+.vsnums { margin: 2px 0; }
+.vsme { font-weight: 600; }
+.vsshare { font-variant-numeric: tabular-nums; padding: 0 6px; border-radius: 4px; }
+.vsshare.ahead { color: var(--good, #2e7d32); font-weight: 600; }
+.vsshare.far { color: var(--bad, #c62828); }

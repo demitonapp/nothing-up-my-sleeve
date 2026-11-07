@@ -102,7 +102,7 @@ import { btnCls, cardCls, crumbCls, emptyCls, fieldCls, rangeCls, selectCls, tab
 
   <!-- ============================== Scoring -->
   <div class="mtab" data-mtab="scoring">
-    <nav class={tabsCls('line', 'subnav')} data-orientation="horizontal" data-variant="line" id="scnav"><a class={tabCls('')} data-state="inactive" data-ssub="ask">Ask</a><a class={tabCls('')} data-state="inactive" data-ssub="language">Language</a><a class={tabCls('')} data-state="inactive" data-ssub="shapes">Shapes</a><a class={tabCls('')} data-state="inactive" data-ssub="number">Number</a><a class={tabCls('')} data-state="inactive" data-ssub="physics">Physics</a><a class={tabCls('')} data-state="inactive" data-ssub="life">Life</a><a class={tabCls('')} data-state="inactive" data-ssub="return">Return</a><a class={tabCls('')} data-state="inactive" data-ssub="logic">Logic</a></nav>
+    <nav class={tabsCls('line', 'subnav')} data-orientation="horizontal" data-variant="line" id="scnav"><a class={tabCls('')} data-state="inactive" data-ssub="ask">Ask</a><a class={tabCls('')} data-state="inactive" data-ssub="language">Language</a><a class={tabCls('')} data-state="inactive" data-ssub="shapes">Shapes</a><a class={tabCls('')} data-state="inactive" data-ssub="number">Number</a><a class={tabCls('')} data-state="inactive" data-ssub="physics">Physics</a><a class={tabCls('')} data-state="inactive" data-ssub="life">Life</a><a class={tabCls('')} data-state="inactive" data-ssub="return">Return</a><a class={tabCls('')} data-state="inactive" data-ssub="logic">Logic</a><a class={tabCls('')} data-state="inactive" data-ssub="versus">Versus</a></nav>
     <div class="ssub" data-ssub="ask">
     <section class={cardCls(false, 'panel')} id="askpanel">
       <h2>Ask the best version <span class="note">type a line and read what it guesses comes next: its ten likeliest next words (or two words, or the raw pieces it actually predicts), no sampling; or let it answer; the rudimentary questions below each carry the answer we would hope for, and "run all" shows where that answer ranks among its guesses</span></h2>
@@ -170,6 +170,11 @@ import { btnCls, cardCls, crumbCls, emptyCls, fieldCls, rangeCls, selectCls, tab
     <div class="ssub" data-ssub="return">
       <section class={cardCls(false, 'panel')}><h2 id="subj-return-title">Return <span class="note" id="subj-return-about"></span></h2>
         <div id="subj-return" class="subject"><div class={emptyCls()}>reading the tests…</div></div></section>
+    </div>
+    <div class="ssub" data-ssub="versus">
+      <section class={cardCls(false, 'panel')}><h2>Versus <span class="note">this class's voyage against a reference model on every reading both have: the trick tests, the logic deck, the cards and copying, and the judge books' bits per byte; each put as a share of the reference's level so they rank together</span></h2>
+        <div id="vspick" class="vspick"></div>
+        <div id="vsbody"><div class={emptyCls()}>reading…</div></div></section>
     </div>
     <div class="ssub" data-ssub="logic">
       <section class={cardCls(false, 'panel')}><h2 id="subj-logic-title">Logic <span class="note" id="subj-logic-about"></span></h2>

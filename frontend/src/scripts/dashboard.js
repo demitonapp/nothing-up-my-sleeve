@@ -93,7 +93,7 @@ function route(h) {
 }
 const WSUBS = ['expected', 'envelope', 'stars'];
 let wpSub = 'expected';
-const SSUBS = ['ask', 'language', 'shapes', 'number', 'physics', 'life', 'return', 'logic'];
+const SSUBS = ['ask', 'language', 'shapes', 'number', 'physics', 'life', 'return', 'logic', 'versus'];
 let scSub = 'ask';
 const modelHash = (r, mt = 'fleet', sub = null) => `/classes/${slugOf(r)}${mt === 'fleet' ? '' : '/' + mt}${mt === 'waypoints' && sub && sub !== 'expected' ? '/' + sub : ''}${mt === 'scoring' && sub && sub !== 'ask' ? '/' + sub : ''}`;
 const shipHash = (key, sailing = null, st = 'betting') => `/ships/${key}${sailing ? '/' + encodeURIComponent(sailing) : ''}${st === 'betting' ? '' : '/' + st}`;
@@ -1165,6 +1165,37 @@ async function classSubject(r, key) {
   else document.getElementById(`subjchart-${key}`).innerHTML = `<div class="${emptyCls()}">no voyage of this class has read its own step on this track yet</div>`;
 }
 
+// ---- the Scoring tab's Versus (/api/class_vs): the class's voyage against a reference model (Qwen3 0.6B by
+// default), the five readings where it is closest (or ahead) and the five where it is furthest, then every reading
+let vsRef = null, vsVoyage = null, vsPreset = null;
+async function classVersus(r) {
+  const body = document.getElementById('vsbody'); if (!body) return;
+  if (vsPreset !== r.preset) { vsPreset = r.preset; vsVoyage = null; body.innerHTML = `<div class="${emptyCls()}">reading…</div>`; document.getElementById('vspick').innerHTML = ''; }
+  const asked = r.preset;
+  try { vsRef = vsRef || localStorage.getItem('thorp.vs.ref'); } catch (e) { /* storage blocked */ }
+  const q = `preset=${encodeURIComponent(r.preset)}${vsRef ? `&ref=${encodeURIComponent(vsRef)}` : ''}${vsVoyage ? `&voyage=${encodeURIComponent(vsVoyage)}` : ''}`;
+  let d; try { d = await get(`/api/class_vs?${q}`); } catch (e) { body.innerHTML = `<div class="${emptyCls()}">the comparison could not be read (a dashboard server started before it existed has to be restarted)</div>`; return; }
+  if (asked !== vsPreset) return;  // the class changed while it was read
+  const short = n => (n || '').replace('fu-ogden-v0-1', 'Ogden').replace('-pre', '');
+  const refName = n => (n || '').split('/').pop();
+  document.getElementById('vspick').innerHTML = `<label class="s">voyage <select id="vsvoyage">${d.voyages.map(v => `<option value="${esc(v)}"${v === d.voyage ? ' selected' : ''}>${esc(short(v))}</option>`).join('')}</select></label>
+    <label class="s">against <select id="vsref">${d.refs.map(x => `<option value="${esc(x)}"${x === d.ref ? ' selected' : ''}>${esc(refName(x))}</option>`).join('')}</select></label>`;
+  document.getElementById('vsvoyage').onchange = e => { vsVoyage = e.target.value; classVersus(r); };
+  document.getElementById('vsref').onchange = e => { vsRef = e.target.value; try { localStorage.setItem('thorp.vs.ref', vsRef); } catch (x) { /* storage blocked */ } classVersus(r); };
+  if (!d.voyage) { body.innerHTML = `<div class="${emptyCls()}">no voyage of this class has read the trick tests yet</div>`; return; }
+  const by = Object.fromEntries(d.rows.map(x => [x.key, x]));
+  const val = (x, v) => v == null ? '–' : x.unit === 'pairs of 24' ? `${v}/24` : v.toFixed(x.unit === 'bits a byte' ? 3 : 2);
+  const pct = s => s == null ? '–' : `${Math.round(100 * s)}%`;
+  const tag = x => x.noise ? ' <span class="s" title="within the test\'s noise: two pairs of 24, or 0.05 nats">≈ noise</span>' : '';
+  const card = (keys, title, sub) => `<div class="vscol"><h3>${title} <span class="s">${sub}</span></h3><ol class="vslist">${keys.map(k => { const x = by[k];
+      return `<li><b>${esc(x.name)}</b>${tag(x)}<div class="vsnums"><span class="vsme">${val(x, x.mine)}</span> <span class="s">against</span> <span>${val(x, x.ref)}</span> <span class="vsshare ${x.share >= 1 ? 'ahead' : x.share < 0.25 ? 'far' : ''}">${pct(x.share)} of ${esc(refName(d.ref))}</span></div><div class="s">${esc(x.about.slice(0, 120))}${x.about.length > 120 ? '…' : ''}${x.note ? ` · ${esc(x.note)}` : ''}</div></li>`; }).join('')}</ol></div>`;
+  const groups = ['language', 'card', 'logic deck', 'trick test'];
+  const rows = [...d.rows].sort((a, b) => groups.indexOf(a.group) - groups.indexOf(b.group) || ((b.share ?? -9) - (a.share ?? -9)));
+  body.innerHTML = `<p class="s"><span class="mono">${esc(short(d.voyage))}</span> ${d.status === 'running' ? `at sea, step ${(d.step || 0).toLocaleString()} of ${d.total_steps ? Math.round(d.total_steps).toLocaleString() : '–'}` : 'home'}, against ${esc(refName(d.ref))}. The share is how much of the reference's level this voyage reaches: for a trick test, pairs right above chance (12 of 24) over the reference's; for a lift or a card, ours over theirs; for bits per byte, theirs over ours. Above 100% is ahead. A trick test has 24 pairs, so two pairs either way is noise.</p>
+    <div class="vsgrid">${card(d.closer, 'Closest', 'or ahead')}${card(d.further, 'Furthest away', '')}</div>
+    <h3>Every reading</h3><div class="scroll"><table class="subjtable"><thead><tr><th>reading</th><th>kind</th><th>whose step</th><th>${esc(short(d.voyage))}</th><th>${esc(refName(d.ref))}</th><th>share</th></tr></thead><tbody>${rows.map(x => `<tr><td><b>${esc(x.name)}</b>${tag(x)}${x.note ? `<div class="s">${esc(x.note)}</div>` : ''}</td><td class="s">${esc(x.group)}</td><td class="s">${esc(x.whose || '')}</td><td>${val(x, x.mine)}</td><td>${val(x, x.ref)}</td><td><span class="vsshare ${x.share >= 1 ? 'ahead' : x.share != null && x.share < 0.25 ? 'far' : ''}">${pct(x.share)}</span></td></tr>`).join('')}</tbody></table></div>`;
+}
+
 // ---- the Scoring tab's Shapes (/api/class_shapes): the parts-of-speech readings over tokens, and what kind of
 // word the latest reading expects against what the judge books hold
 async function classShapes(r) {
@@ -1428,7 +1459,7 @@ function renderRung() {
   if (modelTab === 'waypoints') { renderWaypoints(r); starsInReach(r); classSteps(r); }
   if (modelTab === 'goals') classGoals(r);
   if (modelTab === 'fitouts') classFitouts(r);
-  if (modelTab === 'scoring') { askPanel(r); if (scSub === 'shapes') classShapes(r); else if (!['ask', 'language'].includes(scSub)) classSubject(r, scSub); }
+  if (modelTab === 'scoring') { askPanel(r); if (scSub === 'shapes') classShapes(r); else if (scSub === 'versus') classVersus(r); else if (!['ask', 'language'].includes(scSub)) classSubject(r, scSub); }
   if (modelTab === 'bet') classWager(r);
   if (modelTab === 'training') classWatch(r);
   document.querySelectorAll('#rung .chart').forEach(el => { if (el.data && el.offsetParent) Plotly.Plots.resize(el); });

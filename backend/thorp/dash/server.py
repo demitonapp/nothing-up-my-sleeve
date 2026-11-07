@@ -2874,6 +2874,130 @@ def api_class_subjects(preset: str) -> dict:
     return {"preset": preset, "class": slug, "voyages": [v["name"] for v in voyages], "subjects": out}
 
 
+VS_REFERENCE = "Qwen/Qwen3-0.6B"
+VS_CARDS = (  # (key, name, our metric (and a fallback), the reference's card field, about)
+    ("previous_word", "Previous-word (two heads of a layer)", ("stars/previous_word/shared_score", "stars/previous_word/max_score"), ("previous_word", "shared"), "attends to the word before"),
+    ("induction", "Induction (two heads of a layer)", ("nevermore/natural_shared_score", "nevermore/natural_max_score"), ("nevermore", "shared"), "attends to what followed this word last time"),
+    ("copy_gain", "Copying: the Nevermore's copy gain", ("nevermore/natural_copy_gain",), ("nevermore", "copy_gain"), "how much easier a repeated passage is the second time, nats a token"),
+    ("comparator", "The comparator (two heads)", ("stars/comparator/shared_score", "stars/comparator/max_score"), ("comparator", "shared"), "attends to the year to beat rather than a decoy"),
+    ("mover", "The mover (two heads)", ("stars/mover/shared_score", "stars/mover/max_score"), ("mover", "shared"), "carries the premise's answer to the conclusion"),
+)  # fmt: skip
+VS_LOGIC = (
+    ("lift_one_hop", "Logic: one-hop lift", "one fact carried to a question (nats over the floor)"),
+    ("lift_both", "Logic: both premises given", "lift with both premises in front of the question"),
+    ("gain", "Logic: chaining gain", "both premises over the better one alone: putting two facts together"),
+    ("lift_first", "Logic: the first premise alone", "lift from the first premise"),
+    ("lift_second", "Logic: the second premise alone", "lift from the second premise"),
+)  # fmt: skip
+VS_LIFT_FLOOR = 0.1  # a logic lift is ranked only when the reference's reaches it: below, a ratio is noise over noise
+VS_PAIRS = 24  # the matched pairs in a trick test: one pair is 1/24 of the score
+
+
+def _vs_references() -> dict[str, dict]:
+    """The reference models on file: chain-grades.json (trick tests, the logic deck, cards) with the judge-book
+    bits per byte from data/compare/<model>__hole-cards-unseen.json where it was scored."""
+    cg = paths.data_dir() / "compare" / "chain-grades.json"
+    models = json.loads(cg.read_text())["models"] if cg.exists() else {}
+    bpb = {}
+    for f in (paths.data_dir() / "compare").glob("*__hole-cards-unseen.json"):
+        d = json.loads(f.read_text())
+        bpb[d["model"].split("/")[-1].removesuffix("-bf16").removesuffix("-4bit").lower()] = d.get("bpb_mean")
+    out = {}
+    for name, m in models.items():
+        if "/" not in name:  # Thorp's own voyages graded alongside
+            continue
+        short = name.split("/")[-1].removesuffix("-bf16").removesuffix("-4bit").lower()
+        out[name] = {**m, "bpb": bpb.get(short)}
+    return out
+
+
+def api_class_vs(preset: str, ref: str | None = None, voyage: str | None = None) -> dict:
+    """The class's voyage against a reference model (Justin, 23:50: "the top 5 ways we're further away and the top
+    5 ways we're closer"), on every reading both have: the 20 trick tests (pairs right of 24; chance 12), the logic
+    deck's lifts, the cards (attention readings, two heads of a layer together) and copy gain, and judge-book bits
+    per byte. Each reading is put as a share of the reference's level, so they can be ranked together: for a trick
+    test, pairs right above chance over the reference's (not ranked when the reference is within two pairs of
+    chance); for a lift or a card, ours over theirs; for bits per byte, theirs over ours. A difference of two pairs
+    or less in a trick test is within its noise."""
+    from thorp import fleet
+
+    refs = _vs_references()
+    ref = ref if ref in refs else (VS_REFERENCE if VS_REFERENCE in refs else next(iter(refs), None))
+    voyages = [v for v in _class_voyages(preset, 20)]
+    con = _con()
+    try:
+        def last(rid, name):
+            r = con.execute("select value, step from metrics where run_id=? and name=? order by step desc limit 1", [rid, name]).fetchone()  # fmt: skip
+            return (r[0], r[1]) if r else (None, None)
+
+        readable = [v for v in voyages if last(v["run_id"], "tricks/refrain_test/score")[0] is not None]
+        v = next((x for x in readable if x["name"] == voyage), None) or next(
+            (x for x in readable if x["status"] == "running"), None) or (readable[0] if readable else None)  # fmt: skip
+        if v is None or ref is None:
+            return {"preset": preset, "ref": ref, "refs": list(refs), "voyage": None, "voyages": [x["name"] for x in readable], "rows": []}
+        rid = v["run_id"]
+        R = refs[ref]
+        rows = []
+
+        def add(key, group, name, about, mine, theirs, share, unit, step, note=None, noise=False, whose=None):
+            rows.append({"key": key, "group": group, "name": name, "about": about, "mine": mine, "ref": theirs,
+                         "share": share, "unit": unit, "step": step, "note": note, "noise": noise, "whose": whose})  # fmt: skip
+
+        for k, t in R.items():
+            if not k.endswith("_test") or k == "logic_test" or not isinstance(t, dict):
+                continue
+            tr = fleet.TRICKS.get(k)
+            sc, step = last(rid, f"tricks/{k}/score")
+            lf, _ = last(rid, f"tricks/{k}/lift")
+            if sc is None:
+                continue
+            mp, rp = round(sc * VS_PAIRS), round(t["score"] * VS_PAIRS)
+            above = rp - VS_PAIRS / 2
+            share = (mp - VS_PAIRS / 2) / above if above > 2 else None
+            add(k, "trick test", tr.name if tr else k, (tr.about[:180] if tr else ""), mp, rp, share, "pairs of 24", step,
+                note=f"lift {lf:+.2f} against {t['lift']:+.2f}" if lf is not None else None, noise=abs(mp - rp) <= 2,
+                whose=tr.goal_class if tr else None)  # fmt: skip
+        lt = R.get("logic_test") or {}
+        for k, name, about in VS_LOGIC:
+            mine, step = last(rid, f"tricks/logic_test/{k}")
+            theirs = lt.get(k)
+            if mine is None or theirs is None:
+                continue
+            ranked = theirs >= VS_LIFT_FLOOR
+            add(f"logic/{k}", "logic deck", name, about, mine, theirs, mine / theirs if ranked else None, "nats", step,
+                noise=abs(mine - theirs) < 0.05, note=None if ranked else f"the reference reads under {VS_LIFT_FLOOR}: not ranked")  # fmt: skip
+        cards = R.get("cards") or {}
+        for k, name, metrics, (card, field), about in VS_CARDS:
+            theirs = (cards.get(card) or {}).get(field)
+            mine, step, used = None, None, None
+            for m in metrics:
+                mine, step = last(rid, m)
+                if mine is not None:
+                    used = m
+                    break
+            if mine is None or theirs is None:
+                continue
+            note = "one head: the two-head reading is not on the ledger for this voyage yet" if used != metrics[0] else None
+            add(f"card/{k}", "card", name, about, mine, theirs, mine / theirs if theirs > 0 else None,
+                "nats a token" if k == "copy_gain" else "attention", step, note=note)  # fmt: skip
+        mine, step = last(rid, "eval/hole-cards-unseen/bpb_mean")
+        if mine is not None and R.get("bpb"):
+            add("bpb", "language", "Judge-book bits per byte (lower is better)", "the 16 Forgotten Tomes, every byte",
+                mine, R["bpb"], R["bpb"] / mine, "bits a byte", step,
+                note="the reference was scored before the hard-wrap cleaning; ours reads the cleaned text")  # fmt: skip
+        tot = last(rid, "plan/total_steps")[0]
+    finally:
+        con.close()
+    ranked = [r for r in rows if r["share"] is not None]
+    ranked.sort(key=lambda r: r["share"])
+    return {
+        "preset": preset, "ref": ref, "refs": list(refs), "voyage": v["name"], "status": v["status"],
+        "step": max((r["step"] or 0) for r in rows) if rows else None, "total_steps": tot,
+        "voyages": [x["name"] for x in readable], "rows": rows,
+        "closer": [r["key"] for r in ranked[::-1][:5]], "further": [r["key"] for r in ranked[:5]],
+    }  # fmt: skip
+
+
 def api_class_shapes(preset: str) -> dict:
     """The shapes readings (the parts-of-speech taxonomy) for the class's voyages that carry them: each
     accuracy as a series over tokens read, and the latest share of probability on each kind of word."""
@@ -3382,6 +3506,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/ask_questions": lambda: api_ask_questions(q["preset"]),
                 "/api/class_subjects": lambda: api_class_subjects(q["preset"]),
                 "/api/class_shapes": lambda: api_class_shapes(q["preset"]),
+                "/api/class_vs": lambda: api_class_vs(q["preset"], q.get("ref"), q.get("voyage")),
                 "/api/table/guesses": lambda: api_table_guesses(
                     q["run"], q.get("text", ""), q.get("k", 10), q.get("mode", "1")
                 ),

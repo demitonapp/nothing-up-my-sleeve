@@ -38,8 +38,11 @@ const MTABS = ['fleet', 'goals', 'overview', 'training', 'scoring', 'waypoints']
 const STABS = ['betting', 'books', 'languages', 'sieves', 'attention', 'traits'];
 const STAB_EL = { betting: 'betting', books: 'books', languages: 'languages', sieves: 'sieves', attention: 'attention', traits: 'traits-section' };
 const OLD_SHIP = { betting: 'betting', books: 'books', languages: 'languages', sieves: 'sieves', attention: 'attention', 'traits-section': 'traits' };
-const SECTION_NAV = { sizes: 'classes', rung: 'classes', ship: 'classes', 'runs-section': 'classes', voyages: 'voyages', voyage: 'voyages', table: 'voyages', discoveries: 'discoveries', sievesguide: 'sieves' };
+const SECTION_NAV = { sizes: 'classes', rung: 'classes', ship: 'classes', 'runs-section': 'classes', voyages: 'voyages', voyage: 'voyages', table: 'voyages', discoveries: 'discoveries', sievesguide: 'sieves', leaderboard: 'leaderboard', shelves: 'shelves' };
 let discView = 'index', discTrick = null, discChain = null;
+// the leaderboard and the shelves (their code is at the end; declared here, as the first route may reach them)
+let lbData = null, lbKey = null, shelvesData = null, shelfOpen = null, shelvesKey = null;
+const shelfBooks = new Map();
 let page = 'sizes', modelTab = 'fleet', shipKey = null, sailingKey = null, shipTab = 'betting', voyageKey = null, runsList = null, shipsData = null;
 function route(h) {
   if (h.startsWith('/')) {
@@ -58,6 +61,8 @@ function route(h) {
     if (a === 'discoveries' && b === 'chains' && c) return { page: 'discoveries', dview: 'chain', chain: c };
     if (a === 'discoveries') return { page: 'discoveries', dview: !b ? 'index' : (b === 'stars' || b === 'traits') ? b : 'trick', trick: b && b !== 'stars' && b !== 'traits' ? b : null };
     if (a === 'sieves') return { page: 'sievesguide', run: b ? decodeURIComponent(b) : null };
+    if (a === 'leaderboard') return { page: 'leaderboard' };
+    if (a === 'shelves') return { page: 'shelves', shelf: b ? decodeURIComponent(b) : null };
     return { page: 'sizes' };
   }
   if (h.startsWith('rung-')) return { page: 'rung', rung: h.slice(5), mtab: 'fleet' };
@@ -134,6 +139,8 @@ function showTab(h, push = true) {
     if (discData) drawDiscoveryView();
   }
   if (page === 'sievesguide') { sieveRun = rt.run; hash = '/sieves' + (sieveRun ? '/' + encodeURIComponent(sieveRun) : ''); }
+  if (page === 'leaderboard') hash = '/leaderboard';
+  if (page === 'shelves') { shelfOpen = rt.shelf || shelfOpen; hash = '/shelves'; }
   document.querySelectorAll('main > .section').forEach(s => s.classList.toggle('active', s.id === page));
   document.querySelectorAll('#mainnav a').forEach(a => a.classList.toggle('active', a.dataset.nav === SECTION_NAV[page]));
   document.querySelectorAll('#rung .mtab').forEach(t => t.classList.toggle('active', t.dataset.mtab === modelTab));
@@ -147,6 +154,8 @@ function showTab(h, push = true) {
   if (page === 'voyages' || page === 'voyage') loadVoyages();
   if (page === 'discoveries') loadDiscoveries();
   if (page === 'sievesguide') loadSieves();
+  if (page === 'leaderboard') loadLeaderboard();
+  if (page === 'shelves') loadShelves();
   if (page === 'ship' && (selected !== wasShip || !runsList)) refresh();
   // charts drawn while hidden have no width; size the ones now showing
   document.querySelectorAll(`#${page} .chart`).forEach(el => { if (el.data && el.offsetParent) Plotly.Plots.resize(el); });
@@ -1196,6 +1205,7 @@ function renderVoyage() {
     <td>${l.fixed ? 'fixed' : l.choices && l.choices.length ? esc(l.choices.join(', ')) : `${l.low ?? '–'} to ${l.high ?? '–'}`}</td><td>${esc(l.about || '')}</td></tr>`).join('');
   // the journey picks its default sailings from the transplant records, so it waits for them
   voyageStars(v).then(() => journeyPanel(v));
+  voyageClimb(v);
 }
 // ---- the journey through the layers (lib/journey.js): one or two sailings of the voyage, read up
 // their stack at one step; the slider follows the latest reading unless moved
@@ -2077,6 +2087,8 @@ async function refresh() {
   if (page === 'voyage' && currentVoyage()) journeyPanel(currentVoyage());
   if (page === 'discoveries') loadDiscoveries();
   if (page === 'sievesguide') loadSieves();
+  if (page === 'leaderboard') loadLeaderboard();
+  if (page === 'shelves') loadShelves();
   try {
     const runs = await get('/api/runs');
     const first = !runsList;
@@ -2124,3 +2136,219 @@ async function refresh() {
 }
 refresh();
 setInterval(refresh, 5000);
+
+
+// ==================================================================================== the leaderboard
+// (#/leaderboard; thorp.leaderboard.payload, UI.md "Leaderboard"): the best of each class on the climb to chaining two
+// facts, the reference ladder on the same bars, and every run. A climb bar runs 0 to 5, ticked at each rung; the four-chain
+// strip has a row per chain, five cells (keel to 50m), lit cells filled and the next cell filled by its share of the mark.
+const CHAIN_LABEL = { origin_test: 'the Origin', energy_test: 'energy', mendeleev_gaps: "Mendeleev's gaps", recurrence_test: 'the eternal return' };
+const RUNG_CLASS = ['keel', 'pilot', 'speller', 'stylist', '50m'];
+function climbBar(c, max = 5) {
+  if (c == null) return '<span class="s">–</span>';
+  const pct = Math.max(0, Math.min(100, 100 * c / max));
+  return `<div class="climb" title="climb ${fmt(c, 2)} of ${max}"><div class="cfill" style="width:${pct}%"></div>${Array.from({ length: max - 1 }, (_, i) => `<i style="left:${100 * (i + 1) / max}%"></i>`).join('')}<b>${fmt(c, 2)}</b></div>`;
+}
+function chainingCell(v, thr) {
+  if (v == null) return '<span class="s">not read</span>';
+  return `<span class="${v >= thr ? 'good' : Math.abs(v) <= 0.03 ? 's' : ''}" title="${v >= thr ? 'at the mark' : Math.abs(v) <= 0.03 ? 'within the noise (about 0.03 of zero)' : 'below the mark'}">${signed(v)}</span>`;
+}
+function chainStrip(chains) {
+  if (!chains) return '';
+  return `<div class="cstrip">${Object.entries(chains).map(([k, c]) => `<div class="csr" title="${esc(CHAIN_LABEL[k] || k)}: ${c.rungs} rung${c.rungs === 1 ? '' : 's'} performed${c.next ? `, next ${esc(c.next.replace(/_test$/, ''))} at ${Math.round(100 * c.partial)}% of its mark` : ', all five'}"><span>${esc(CHAIN_LABEL[k] || k)}</span>${RUNG_CLASS.map((r, i) => `<em class="${i < c.rungs ? 'on' : ''}">${i === c.rungs && c.partial ? `<u style="width:${Math.round(100 * c.partial)}%"></u>` : ''}</em>`).join('')}</div>`).join('')}</div>`;
+}
+const runLink = x => x.run ? `<a href="#${shipHash(x.run)}">${esc(x.run)}</a>` : '–';
+async function loadLeaderboard() {
+  let d; try { d = await get('/api/leaderboard'); } catch (e) { return; }
+  const key = JSON.stringify(d) + !!ladderData; if (key === lbKey) return; lbKey = key; lbData = d;
+  const thr = d.chaining_threshold ?? 0.1;
+  document.getElementById('lbthr').textContent = thr;
+  document.querySelector('#lbboard tbody').innerHTML = d.board.map(b => {
+    const preset = ((ladderData && ladderData.rungs) || []).find(r => classOf(r.preset) && (classOf(r.preset).name || '').toLowerCase().replace(/^the\s+/, '') === b.class);
+    const cl = preset ? classLink(preset.preset) : esc(b.class);
+    return `<tr${b.stalled ? ' class="stalled"' : ''}><td>${cl}<div class="s">${esc(b.title)}</div></td>
+      <td>${b.best ? `${runLink(b.best)}<div class="s">${esc(b.best.ship || '')}</div>` : '<span class="s">no run read yet</span>'}</td>
+      <td>${b.best ? climbBar(b.best.climb) : ''}${b.stalled ? ' <span class="pill accent" title="this class climbs no higher than the class beneath">stalled</span>' : ''}</td>
+      <td>${b.best ? chainingCell(b.best.chaining_lift, thr) : ''}${b.chaining_rising && b.best && b.best.chaining_lift > 0.03 ? '<div class="good s" title="a higher chaining lift than the class beneath, clear of the noise">chaining rising</div>' : ''}</td>
+      <td>${b.best ? chainStrip(b.best.chains) : ''}</td></tr>`;
+  }).join('');
+  const perch = d.reference.reduce((a, r) => (!a || r.climb > a.climb || (r.climb === a.climb && (r.chaining_lift ?? -9) > (a.chaining_lift ?? -9)) ? r : a), null);
+  document.querySelector('#lbref tbody').innerHTML = d.reference.length ? d.reference.map(r => `<tr${r === perch ? ' class="perch"' : ''}><td><b>${esc(r.model.split('/').pop())}</b>${r === perch ? ' <span class="pill good">the perch</span>' : ''}</td>
+    <td>${climbBar(r.climb)}</td><td>${chainingCell(r.chaining_lift, thr)}</td><td>${chainStrip(r.chains)}</td></tr>`).join('')
+    : '<tr><td colspan="4" class="empty">no reference readings yet (data/compare/chain-grades.json)</td></tr>';
+  const sel = document.getElementById('lbclass'), presets = [...new Set(d.runs.map(r => r.preset).filter(Boolean))].sort((a, b) => classRank(a) - classRank(b));
+  const keep = sel.value;
+  sel.innerHTML = '<option value="">every class</option>' + presets.map(p => `<option value="${esc(p)}">${esc(p)}${classOf(p) ? ' · ' + esc(classOf(p).name) : ''}</option>`).join('');
+  sel.value = presets.includes(keep) ? keep : '';
+  sel.onchange = drawLbRuns;
+  drawLbRuns();
+  drawSmokingQwen();
+}
+function drawLbRuns() {
+  if (!lbData) return;
+  const want = document.getElementById('lbclass').value, thr = lbData.chaining_threshold ?? 0.1;
+  const rows = lbData.runs.filter(r => !want || r.preset === want);
+  document.getElementById('lbcount').textContent = `${rows.length} run${rows.length === 1 ? '' : 's'}`;
+  document.querySelector('#lbruns tbody').innerHTML = rows.map(r => `<tr><td>${runLink(r)}</td><td>${esc(r.ship || '')}</td><td data-sort="${classRank(r.preset)}">${classLink(r.preset)}</td><td>${statusPill(r.status)}</td>
+    <td data-sort="${r.climb}">${climbBar(r.climb)}</td><td data-sort="${r.chaining_lift ?? -9}">${chainingCell(r.chaining_lift, thr)}</td><td>${chainStrip(r.chains)}</td></tr>`).join('')
+    || '<tr><td colspan="7" class="empty">no runs with chain readings in this class</td></tr>';
+}
+
+// ==================================================================================== the shelves
+// (#/shelves; thorp.shelves.payload served warm, UI.md "Shelves"): grouped by kind, training first, then the decks, the
+// probes and the rest, drafts folded away. A row opens to its uses (each run and its role) and its books, which open in
+// the reader.
+const SHELF_KINDS = [['training', 'Training shelves', 'what the ships read'], ['deck', 'Decks', 'the books the ships are scored on, never read'],
+  ['probe', 'Probes', 'small lists the instruments read'], ['other', 'Other', 'lists kept for a purpose of their own'], ['draft', 'Drafts', 'lists being drawn up, not yet used']];
+async function loadShelves() {
+  let d; try { d = await get('/api/shelves'); } catch (e) { return; }
+  if (!d.shelves) {
+    document.getElementById('shelfgroups').innerHTML = `<div class="empty">${d.error ? 'the shelves could not be read: ' + esc(d.error) : 'reading the shelves (a few seconds)…'}</div>`;
+    if (!d.error) setTimeout(() => { if (page === 'shelves') loadShelves(); }, 2500);
+    return;
+  }
+  const key = JSON.stringify(d.shelves); if (key === shelvesKey) return; shelvesKey = key; shelvesData = d.shelves;
+  const sel = document.getElementById('shelfkind'), keep = sel.value;
+  sel.innerHTML = '<option value="">every kind</option>' + SHELF_KINDS.filter(k => shelvesData.some(x => x.kind === k[0])).map(k => `<option value="${k[0]}">${k[1].toLowerCase()}</option>`).join('');
+  sel.value = keep; sel.onchange = drawShelves;
+  document.getElementById('shelfsearch').oninput = drawShelves;
+  drawShelves();
+}
+const FAMILY_TOK = ['blue', 'accent', 'good', 'bad', 'c5', 'c6', 'c7', 'c8', 'c9', 'c10'];
+const familyColour = (() => { const seen = {}; return f => seen[f] || (seen[f] = `var(--${FAMILY_TOK[Object.keys(seen).length % FAMILY_TOK.length]})`); })();
+function familyBar(fam) {
+  const n = Object.values(fam || {}).reduce((a, b) => a + b, 0); if (!n) return '<span class="s">–</span>';
+  return `<div class="fbar" title="${esc(Object.entries(fam).map(([f, k]) => `${f} ${k}`).join(' · '))}">${Object.entries(fam).map(([f, k]) => `<span style="width:${100 * k / n}%;background:${familyColour(f)}"></span>`).join('')}</div>`;
+}
+function drawShelves() {
+  if (!shelvesData) return;
+  const want = document.getElementById('shelfkind').value, q = document.getElementById('shelfsearch').value.trim().toLowerCase();
+  const rows = shelvesData.filter(x => (!want || x.kind === want) && (!q || (x.name + ' ' + x.path + ' ' + x.about).toLowerCase().includes(q)));
+  document.getElementById('shelfcount').textContent = `${rows.length} shel${rows.length === 1 ? 'f' : 'ves'}`;
+  const known = SHELF_KINDS.map(k => k[0]);
+  const groups = [...SHELF_KINDS, ...[...new Set(rows.map(x => x.kind))].filter(k => !known.includes(k)).map(k => [k, k, ''])];
+  document.getElementById('shelfgroups').innerHTML = groups.map(([k, title, note]) => {
+    const g = rows.filter(x => x.kind === k); if (!g.length) return '';
+    const body = `<div class="scroll"><table class="shelftable clickable" data-kind="${k}"><thead><tr><th>shelf</th><th>books</th><th>~tokens</th><th>families</th><th>read by</th></tr></thead><tbody>${g.map(x => `
+      <tr data-shelf="${esc(x.path)}"${x.path === shelfOpen ? ' class="open"' : ''}><td><b>${esc(x.name)}</b> <span class="mono s">${esc(x.path)}</span>${x.about ? `<div class="s">${esc(x.about)}</div>` : ''}</td>
+        <td data-sort="${x.books}">${x.books}${x.books < x.rows ? ` <span class="s">of ${x.rows}</span>` : ''}</td>
+        <td data-sort="${x.tokens_est}">${big(x.tokens_est)}</td><td>${familyBar(x.families)}</td>
+        <td data-sort="${x.runs + x.queued}">${[x.runs ? `read by ${x.runs} run${x.runs === 1 ? '' : 's'}` : '', x.queued ? `<span class="accent">${x.queued} queued</span>` : ''].filter(Boolean).join(' · ') || '<span class="s">no run yet</span>'}</td></tr>
+      ${x.path === shelfOpen ? `<tr class="shelfdetail"><td colspan="5" id="shelfdetail"></td></tr>` : ''}`).join('')}</tbody></table></div>`;
+    const head = `${esc(title)} <span class="note">${g.length} · ${esc(note)}</span>`;
+    return k === 'draft' && !q && want !== 'draft'
+      ? `<section class="panel"><details${g.some(x => x.path === shelfOpen) ? ' open' : ''}><summary><h2>${head}</h2></summary>${body}</details></section>`
+      : `<section class="panel"><h2>${head}</h2>${body}</section>`;
+  }).join('') || '<div class="empty">no shelf matches</div>';
+  document.querySelectorAll('#shelfgroups tr[data-shelf]').forEach(tr => tr.onclick = e => {
+    if (e.target.closest('a')) return;
+    shelfOpen = shelfOpen === tr.dataset.shelf ? null : tr.dataset.shelf; drawShelves();
+  });
+  if (shelfOpen) drawShelfDetail();
+}
+async function drawShelfDetail() {
+  const el = document.getElementById('shelfdetail'), x = shelvesData.find(s => s.path === shelfOpen); if (!el || !x) return;
+  const roleOrder = r => ['reads', 'reads first', 'tokeniser', 'scored on', 'refuses'].indexOf(r);
+  const uses = [...x.uses].sort((a, b) => (a.status === 'queued') - (b.status === 'queued') || roleOrder(a.role) - roleOrder(b.role) || a.run.localeCompare(b.run));
+  const usesHtml = uses.length ? `<div class="shelfuses">${uses.map(u => `<span class="use${u.status === 'queued' ? ' queued' : ''}">${u.status === 'queued' ? esc(u.run) : `<a href="#${shipHash(u.run)}">${esc(u.run)}</a>`} <i>${esc(u.role)}</i>${u.status === 'queued' ? ' <i>queued</i>' : ''}</span>`).join('')}</div>` : '<div class="s">no run reads it yet</div>';
+  el.innerHTML = `<div class="k">used by</div>${usesHtml}<div class="k mt">the books</div><div id="shelfbooks" class="s">reading the list…</div>`;
+  let books = shelfBooks.get(x.path);
+  if (!books) { try { books = await get('/api/shelf_books?path=' + encodeURIComponent(x.path)); shelfBooks.set(x.path, books); } catch (e) { books = null; } }
+  const bel = document.getElementById('shelfbooks'); if (!bel || shelfOpen !== x.path) return;
+  if (!books) { bel.textContent = 'the list could not be read'; return; }
+  bel.className = 'shelfbooks';
+  bel.innerHTML = books.map(b => b.book_id
+    ? `<button class="bookbtn" data-book="${esc(b.book_id)}" title="open in the reader">${esc(b.title)}<span>${esc(b.author)}${b.family ? ' · ' + esc(b.family) : ''}</span></button>`
+    : `<span class="bookbtn off" title="not fetched yet">${esc(b.title)}<span>${esc(b.author)} · not fetched</span></span>`).join('');
+  bel.querySelectorAll('[data-book]').forEach(b => b.onclick = () => openBook(b.dataset.book));
+}
+
+// ==================================================================================== the two-fact problem's climb
+// (the two_facts voyage page): each run's climb over training, coloured by class, from its discovery readings
+// (/api/climb), with the reference ladder as dotted levels for scale; a select switches to the chaining lift.
+async function voyageClimb(v) {
+  const el = document.getElementById('voyageclimb'); if (!el || v.key !== 'two_facts') return;
+  const runs = v.runs.filter(r => r.run_id);
+  if (!runs.length) { empty('voyageclimb', 'no runs yet: the baseline (keel, pilot, speller and stylist, two seeds each) is at the top of the queue'); return; }
+  let d, lb; try { [d, lb] = await Promise.all([get('/api/climb?runs=' + runs.map(r => r.run_id).join(',')), lbData ? lbData : get('/api/leaderboard')]); } catch (e) { return; }
+  const what = document.getElementById('voyageclimbwhat').value || 'climb';
+  runs.forEach(r => { r.preset = r.preset || r.class; });
+  const presets = [...new Set(runs.map(r => r.preset))].sort((a, b) => classRank(a) - classRank(b));
+  const traces = runs.filter(r => d[r.run_id] && d[r.run_id].step.length).map(r => ({
+    x: d[r.run_id].step, y: d[r.run_id][what], name: r.name, mode: 'lines+markers', marker: { size: 4 },
+    line: { color: PALETTE[presets.indexOf(r.preset) % PALETTE.length], width: 1.6 }, legendgroup: r.preset, hovertemplate: `${esc(r.name)}<br>step %{x}<br>${what === 'climb' ? 'climb' : 'chaining lift'} %{y:.2f}<extra></extra>`,
+  }));
+  if (!traces.length) { empty('voyageclimb', 'no discovery readings yet: the first comes at step 100'); return; }
+  const shapes = [], notes = [];
+  for (const r of (lb.reference || [])) {
+    const y = what === 'climb' ? r.climb : r.chaining_lift; if (y == null) continue;
+    shapes.push({ type: 'line', xref: 'paper', x0: 0, x1: 1, y0: y, y1: y, line: { color: tok('muted'), width: 1, dash: 'dot' } });
+    notes.push({ xref: 'paper', x: 1, y, xanchor: 'right', yanchor: 'bottom', showarrow: false, text: esc(r.model.split('/').pop()), font: { size: 9, color: tok('muted') } });
+  }
+  if (what === 'chaining_lift') shapes.push({ type: 'line', xref: 'paper', x0: 0, x1: 1, y0: lb.chaining_threshold ?? 0.1, y1: lb.chaining_threshold ?? 0.1, line: { color: tok('accent'), width: 1.2, dash: 'dot' } });
+  plot('voyageclimb', traces, layout({ xaxis: { title: { text: 'step' } }, yaxis: { title: { text: what === 'climb' ? 'climb (0 to 5)' : 'chaining lift' }, ...(what === 'climb' ? { range: [0, 5.2], dtick: 1 } : {}) }, shapes, annotations: notes, height: 380 }));
+}
+document.getElementById('voyageclimbwhat')?.addEventListener('change', () => { const v = currentVoyage && currentVoyage(); if (v) voyageClimb(v); });
+
+
+// ---- Smoking Qwen (top of the Leaderboard; thorp.smoking_qwen.payload, UI.md "Leaderboard"): chaining lift against size on
+// Thorp's classes, fitted (linear and bending, in log10 parameters, as smoking_qwen fits them) and carried to 400M, with the
+// bootstrap's 5-95% band there, Qwen3 4B's mark, the threshold, and the reference ladder in grey.
+let sqKey = null;
+function polyfit(xs, ys, deg) {  // least squares through (xs, ys), coefficients highest power first (numpy.polyfit's order)
+  const n = deg + 1, A = Array.from({ length: n }, () => Array(n + 1).fill(0));
+  xs.forEach((x, i) => { for (let r = 0; r < n; r++) { for (let c = 0; c < n; c++) A[r][c] += x ** (2 * deg - r - c); A[r][n] += ys[i] * x ** (deg - r); } });
+  for (let i = 0; i < n; i++) { let m = i; for (let r = i + 1; r < n; r++) if (Math.abs(A[r][i]) > Math.abs(A[m][i])) m = r; [A[i], A[m]] = [A[m], A[i]];
+    for (let r = 0; r < n; r++) if (r !== i) { const f = A[r][i] / A[i][i]; for (let c = i; c <= n; c++) A[r][c] -= f * A[i][c]; } }
+  return A.map((row, i) => row[n] / row[i]);
+}
+const polyval = (co, x) => co.reduce((a, c) => a * x + c, 0);
+async function drawSmokingQwen() {
+  if (!document.getElementById('sqchart')) return;
+  let d; try { d = await get('/api/smoking_qwen'); } catch (e) { return; }
+  const key = JSON.stringify(d); if (key === sqKey) return; sqKey = key;
+  const T = d.target || {}, th = d.thorp || {}, pts = th.points || [], need = 3;
+  const pct = v => v == null ? '–' : `${Math.round(100 * v)}%`;
+  const above = (d.classes_above_noise || []).length;
+  document.getElementById('sqhead').innerHTML = d.forecastable
+    ? `<div class="sqp"><b class="${(th.linear || {}).p_at_or_above_target >= 0.9 ? 'good' : ''}">${pct((th.linear || {}).p_at_or_above_target)}</b><span>on the straight line (conservative)</span></div>
+       <div class="sqp"><b class="${(th.bending || {}).p_at_or_above_target >= 0.9 ? 'accent' : ''}">${pct((th.bending || {}).p_at_or_above_target)}</b><span>on the bending curve (probable)</span></div>`
+    : `<div class="sqp"><b class="s">not yet forecastable</b><span>${above} of ${need} classes above the noise (a chaining lift over ${d.noise ?? 0.03}); a curve through noise extrapolates nothing, so the curves below are drawn but no probability is claimed</span></div>`;
+  const claimed = d.forecastable && (th.linear || {}).p_at_or_above_target >= 0.9, probable = d.forecastable && !claimed && (th.bending || {}).p_at_or_above_target >= 0.9;
+  document.getElementById('sqhead').innerHTML += `<div class="sqp"><b>${claimed ? '<span class="pill good">claimed</span>' : probable ? '<span class="pill accent">probable</span>' : '<span class="pill">not claimed</span>'}</b><span>target: ${esc(_shortModel(T.model))} at ${signed(T.chaining_lift)}, a Thorp of ${d.smoke_at >= 1e9 ? (d.smoke_at / 1e9).toFixed(1) + 'B' : Math.round(d.smoke_at / 1e6) + 'M'} parameters</span></div>`;
+  document.getElementById('sqrule').textContent = 'Claimed when forecastable (three classes above the noise) and P ≥ 0.9 on the straight line; "probable" when only the bending curve reaches 0.9.';
+  const fmtBand = f => f ? `${signed(f.predicted)} <span class="s">(${signed(f.band[0])} to ${signed(f.band[1])})</span>` : '–';
+  document.getElementById('sqbacktest').innerHTML = (d.backtest || []).map(b => `<div class="sqbt"><div><b>${esc(b.test)}</b> · actual ${signed(b.actual)}</div>
+    ${['linear', 'bending'].filter(k => b[k]).map(k => `<div class="sqbk ${b[k].inside_band ? 'good' : 'bad'}">${k === 'linear' ? 'straight' : 'bending'}: ${fmtBand(b[k])} · ${b[k].inside_band ? 'inside the band' : b[k].predicted < b.actual ? 'missed (too low)' : 'missed (too high)'}</div>`).join('')}</div>`).join('') || '<div class="s">no backtest yet</div>';
+  // the chart
+  const lx = Math.log10, traces = [];
+  const xs = pts.map(p => lx(p.params)), ys = pts.map(p => p.chaining_lift);
+  const grid = Array.from({ length: 61 }, (_, i) => 5 + i * (lx(d.smoke_at) - 5) / 60);
+  for (const [kind, deg, col, dash] of [['linear', 1, tok('blue'), 'solid'], ['bending', 2, tok('accent'), 'dash']]) {
+    const f = th[kind]; if (!f || pts.length < deg + 1) continue;
+    const co = polyfit(xs, ys, deg);
+    traces.push({ x: grid.map(g => 10 ** g), y: grid.map(g => polyval(co, g)), mode: 'lines', name: kind === 'linear' ? 'straight line' : 'bending curve', line: { color: col, width: 1.6, dash }, hoverinfo: 'skip' });
+    traces.push({ x: [d.smoke_at], y: [f.predicted], mode: 'markers', name: `${kind === 'linear' ? 'straight' : 'bending'} at 400M`, showlegend: false, marker: { color: col, size: 9, symbol: 'diamond' },
+      error_y: { type: 'data', symmetric: false, array: [f.band[1] - f.predicted], arrayminus: [f.predicted - f.band[0]], color: col, thickness: 1.4, width: 6 },
+      hovertemplate: `${kind === 'linear' ? 'straight' : 'bending'} at 400M: %{y:.3f}<br>5-95%: ${signed(f.band[0])} to ${signed(f.band[1])}<extra></extra>` });
+  }
+  traces.push({ x: pts.map(p => p.params), y: ys, mode: 'markers+text', name: 'Thorp (best of each class)', text: pts.map(p => p.name), textposition: 'top center', textfont: { size: 10, color: tok('text') },
+    marker: { color: tok('good'), size: 10 }, customdata: pts.map(p => p.run || ''), hovertemplate: '%{text} · %{customdata}<br>%{x:.3s} parameters<br>chaining lift %{y:.3f}<extra></extra>' });
+  const ref = d.reference || [];
+  if (ref.length) traces.push({ x: ref.map(r => r.params), y: ref.map(r => r.chaining_lift), mode: 'markers', name: 'reference ladder (hover for each)', text: ref.map(r => r.short),
+    marker: { color: tok('muted'), size: 7, symbol: 'circle-open' }, hovertemplate: '%{text}<br>%{x:.3s} parameters<br>chaining lift %{y:.3f}<extra></extra>' });
+  const shapes = [
+    { type: 'line', xref: 'x', yref: 'paper', x0: d.smoke_at, x1: d.smoke_at, y0: 0, y1: 1, line: { color: tok('muted'), width: 1, dash: 'dash' } },
+    { type: 'rect', xref: 'paper', yref: 'y', x0: 0, x1: 1, y0: -(d.noise ?? 0.03), y1: d.noise ?? 0.03, fillcolor: 'rgba(139,148,158,0.10)', line: { width: 0 }, layer: 'below' },
+    { type: 'line', xref: 'paper', yref: 'y', x0: 0, x1: 1, y0: d.threshold ?? 0.1, y1: d.threshold ?? 0.1, line: { color: tok('accent'), width: 1, dash: 'dot' } },
+  ];
+  if (T.chaining_lift != null) shapes.push({ type: 'line', xref: 'paper', yref: 'y', x0: 0, x1: 1, y0: T.chaining_lift, y1: T.chaining_lift, line: { color: tok('bad'), width: 1.2 } });
+  const notes = [
+    { xref: 'x', yref: 'paper', x: Math.log10(d.smoke_at), y: 1, yanchor: 'bottom', showarrow: false, text: '400M', font: { size: 10, color: tok('muted') } },
+    { xref: 'paper', yref: 'y', x: 0, y: d.threshold ?? 0.1, xanchor: 'left', yanchor: 'bottom', showarrow: false, text: 'performed (0.1)', font: { size: 9, color: tok('accent') } },
+    { xref: 'paper', yref: 'y', x: 0, y: d.noise ?? 0.03, xanchor: 'left', yanchor: 'bottom', showarrow: false, text: 'noise', font: { size: 9, color: tok('muted') } },
+  ];
+  if (T.chaining_lift != null) notes.push({ xref: 'paper', yref: 'y', x: 0, y: T.chaining_lift, xanchor: 'left', yanchor: 'bottom', showarrow: false, text: `${esc(_shortModel(T.model))} ${signed(T.chaining_lift)}`, font: { size: 10, color: tok('bad') } });
+  plot('sqchart', traces, layout({ xaxis: { type: 'log', title: { text: 'parameters' }, range: [5, 10] }, yaxis: { title: { text: 'chaining lift' }, zeroline: false }, shapes, annotations: notes, height: 400, legend: { orientation: 'h', y: -0.2 } }));
+}
+const _shortModel = m => (m || '').split('/').pop().replace(/-(\d+)bit$/, ' $1-bit').replace('Qwen3-', 'Qwen3 ');

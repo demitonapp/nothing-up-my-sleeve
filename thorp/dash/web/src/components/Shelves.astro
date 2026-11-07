@@ -1,0 +1,11 @@
+---
+// Shelves (#/shelves): every list of books Thorp reads, keeps or drafts (thorp.shelves.payload,
+// /api/shelves, served warm): the training shelves first, then the decks it is scored on, the probes,
+// the rest, and the drafts folded away. A row opens to the runs that use it and its books, each one
+// opening in the reader. UI.md, "Shelves".
+---
+<div class="section" id="shelves">
+  <h1>Shelves <span class="q">every list of books Thorp reads from, is scored on or is drafting: how many books are fetched, about how many tokens they hold, their language families, and the runs that read them</span></h1>
+  <div class="handtools"><span class="note">show</span><select id="shelfkind"><option value="">every kind</option></select><input id="shelfsearch" type="search" placeholder="find a shelf" /><span class="note" id="shelfcount"></span></div>
+  <div id="shelfgroups"><div class="empty">reading the shelves…</div></div>
+</div>

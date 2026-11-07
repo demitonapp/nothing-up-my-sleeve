@@ -1,6 +1,6 @@
 ---
 /**
- * The Thorp dashboard: one page, hash-routed (#/classes, #/classes/proxy, #/ships/…, #/voyages, #/discoveries), like the Atlas shell in
+ * The Thorp dashboard: one page, hash-routed (#/classes, #/classes/proxy, #/ships/…, #/voyages, #/discoveries, #/leaderboard, #/shelves, #/sieves), like the Atlas shell in
  * the monorepo. Every panel is filled in the browser from server.py's JSON API and refreshed every
  * 5 s; the build is static and `thorp dash` serves it. The standards are in ../../UI.md.
  */
@@ -12,6 +12,8 @@ import Ship from '../components/Ship.astro';
 import Voyages from '../components/Voyages.astro';
 import Discoveries from '../components/Discoveries.astro';
 import SievesGuide from '../components/SievesGuide.astro';
+import Shelves from '../components/Shelves.astro';
+import Leaderboard from '../components/Leaderboard.astro';
 import TableTalk from '../components/TableTalk.astro';
 import Runs from '../components/Runs.astro';
 import Reader from '../components/Reader.astro';
@@ -33,6 +35,8 @@ import Reader from '../components/Reader.astro';
       <Runs />
       <Voyages />
       <Discoveries />
+      <Leaderboard />
+      <Shelves />
       <SievesGuide />
       <TableTalk />
     </main>

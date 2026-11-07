@@ -404,3 +404,57 @@ main a.ccell { color: var(--text); text-decoration: none; display: block; }
 #chainover .ginv summary { cursor: pointer; color: var(--blue); }
 #chainsteps .pframe { color: var(--text); font-weight: 600; }
 #chainsteps .pfsep { color: var(--line); }
+
+/* the leaderboard: a climb bar (0 to 5, ticked at each rung) and the four-chain strip */
+.climb { position: relative; width: 180px; height: 16px; border-radius: 3px; background: var(--raise); border: 1px solid var(--line); display: inline-block; vertical-align: middle; }
+.climb .cfill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--blue); opacity: 0.55; border-radius: 2px; }
+.climb i { position: absolute; top: 0; bottom: 0; border-left: 1px solid var(--track); }
+.climb b { position: absolute; right: -44px; top: -1px; font-weight: 500; font-variant-numeric: tabular-nums; font-size: var(--fs-sm); }
+#lbboard td, #lbref td, #lbruns td { vertical-align: middle; }
+#lbboard td:nth-child(3), #lbref td:nth-child(2), #lbruns td:nth-child(5) { min-width: 240px; }
+#lbboard tr.stalled .climb .cfill { background: var(--accent); }
+#lbref tr.perch .climb .cfill { background: var(--good); }
+#leaderboard .good { color: var(--good); }
+#leaderboard .accent, #shelves .accent { color: var(--accent); }
+.cstrip { display: grid; gap: 2px; font-size: 11px; color: var(--muted); }
+.cstrip .csr { display: grid; grid-template-columns: 104px repeat(5, 16px); gap: 2px; align-items: center; }
+.cstrip .csr span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cstrip em { position: relative; height: 9px; background: var(--raise); border: 1px solid var(--line); border-radius: 2px; overflow: hidden; }
+.cstrip em.on { background: var(--good); border-color: var(--good); }
+.cstrip em u { position: absolute; left: 0; top: 0; bottom: 0; background: var(--good); opacity: 0.45; }
+
+/* the shelves */
+#shelves .handtools input[type=search] { background: var(--raise); border: 1px solid var(--line); color: var(--text); border-radius: 4px; padding: 3px 8px; }
+.shelftable td { vertical-align: top; }
+.shelftable tr.open > td { background: var(--raise); }
+.shelftable tr.shelfdetail > td { background: var(--raise); padding: 10px 14px 14px; }
+.fbar { display: flex; width: 120px; height: 9px; border-radius: 2px; overflow: hidden; background: var(--raise); margin-top: 4px; }
+.fbar span { height: 100%; }
+.shelfuses { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: var(--fs-sm); }
+.shelfuses .use i { font-style: normal; color: var(--muted); }
+.shelfuses .use.queued { color: var(--accent); }
+.shelfbooks { display: flex; flex-wrap: wrap; gap: 6px; max-height: 320px; overflow-y: auto; }
+.bookbtn { background: var(--panel); border: 1px solid var(--line); color: var(--text); border-radius: 4px; padding: 4px 8px; font-size: var(--fs-sm); text-align: left; cursor: pointer; max-width: 260px; }
+.bookbtn span { display: block; color: var(--muted); font-size: 11px; }
+.bookbtn:hover { border-color: var(--blue); }
+.bookbtn.off { cursor: default; opacity: 0.55; }
+#shelfgroups details > summary { cursor: pointer; list-style: none; }
+#shelfgroups details > summary h2 { display: inline; }
+@media (max-width: 700px) { .climb { width: 120px; } }
+
+/* Smoking Qwen */
+.sqhead { display: flex; flex-wrap: wrap; gap: 10px 28px; margin-bottom: 8px; }
+.sqp { display: flex; flex-direction: column; max-width: 420px; }
+.sqp b { font-size: 26px; font-weight: 600; line-height: 1.2; }
+.sqp b.s { font-size: 20px; color: var(--muted); }
+.sqp span { font-size: var(--fs-sm); color: var(--muted); }
+.sqp .good, .sqbk.good { color: var(--good); }
+.sqp .accent { color: var(--accent); }
+.sqbk.bad { color: var(--bad); }
+.sqrow { gap: 18px; align-items: flex-start; flex-wrap: wrap; }
+.sqrow > .chart { flex: 2; min-width: 300px; }
+.sqside { flex: 1; min-width: 240px; }
+.sqside .k { font-size: var(--fs-sm); color: var(--muted); margin-bottom: 4px; }
+.sqbt { margin-bottom: 8px; font-size: var(--fs-sm); }
+.sqbk { padding-left: 10px; }
+#sqrule { font-size: var(--fs-sm); color: var(--muted); margin: 0; }

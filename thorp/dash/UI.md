@@ -132,6 +132,39 @@ holds the ways in, always:
   Beside the talk are the ship's star and trick readings at the checkpoint answering, measured
   ones first. Each answer says why it stopped (the next turn, the length, the end of text), its
   tokens and seconds. Ships not trained on the Q:/A: form don't converse yet, and the page says so.
+- **Leaderboard** (`#/leaderboard`): the best in class on the climb to chaining two facts
+  (`thorp.leaderboard.payload`, `/api/leaderboard`). The rule is the headline: every class must
+  climb closer to chaining two facts than the class beneath; the 50m attempts it. A row per class,
+  keel to bettor, with its best run, its **climb** (0 to 5: on each of the four chains the rungs
+  performed from the bottom without a gap, plus the next rung's lift as a share of its mark; the
+  mean of the four) as a bar ticked at each rung, its **chaining lift** (the mean lift on the four
+  50m rungs, the north star, marked at the threshold; within about 0.03 of zero is noise), "stalled"
+  in amber when the class climbs no higher than the class beneath, and a four-chain strip (a row per
+  chain, a cell per rung keel to 50m, lit cells filled, the next one filled by its share of the
+  mark). Below, the reference ladder on the same bars (the largest is the perch), then every run
+  with chain readings, by climb, filterable by class. The two-fact voyage's page draws each run's
+  climb over training (`/api/climb`: `leaderboard.climb` read at every step the chains were read,
+  each trick's latest reading carried forward), coloured by class, the reference ladder as dotted
+  levels, with a switch to the chaining lift.
+  At the top, **Smoking Qwen** (`thorp.smoking_qwen.payload`, `/api/smoking_qwen`, kept two
+  minutes): P(a 400M Thorp chains two facts as well as Qwen3 4B), on the straight line
+  (conservative) and the bending curve (probable), or "not yet forecastable: N of 3 classes above
+  the noise"; claimed, probable or not claimed by the pre-registered rule (forecastable and P ≥ 0.9
+  on the straight line; probable on the bending curve only). The chart: chaining lift against
+  parameters (log, 100k to 10B), Thorp's class points with both fits (refitted in the page the way
+  `smoking_qwen` fits them: polynomials in log10 parameters) carried to 400M, each with its
+  bootstrap 5–95% band there, a dashed line at 400M, Qwen3 4B's lift in red, the threshold dotted,
+  the noise shaded, and the reference ladder as grey open points. Beside it the backtest: the same
+  method where the answer is known, each fit inside its band or missed (too low, too high).
+- **Shelves** (`#/shelves`): every list of books (`thorp.shelves.payload`, `/api/shelves`). It takes
+  seconds to compute, so the server keeps it warm (computed at start, served from memory and
+  recomputed in the background every five minutes); until the first is ready the page says it is
+  reading. Grouped by kind: training shelves, decks (scored on, never read), probes, other, and
+  drafts folded away. A row per shelf: name, path and about; books fetched (of the rows when some
+  aren't); about how many tokens; its language families as a small bar; read by how many runs and
+  how many queued. A row opens to its uses (each run and its role: reads, reads first, a stage,
+  tokeniser, scored on, refuses; queued ones in amber) and its books (`/api/shelf_books`), each
+  opening in the reader; a book not fetched yet is shown faded.
 - **Sieves** (`#/sieves[/<sailing>]`): how the ship answers the wind, layer by layer. An intro in
   the voyage vocabulary, a card per sieve with its write-up from `fleet.SIEVES` (push, move,
   heading: rendered as written there, never rewritten on the page), then for a picked sailing

@@ -1055,6 +1055,174 @@ def api_chain(key: str) -> dict:
     }
 
 
+# ---- slow payloads, kept warm: the shelves take seconds to compute (they read every list and the
+# catalogue), so the last result is served while a fresh one is computed in the background
+_WARM: dict[str, dict] = {}
+_WARM_LOCK = __import__("threading").Lock()
+
+
+def _warm(name: str, fn, ttl: float = 300.0):
+    import threading
+    import time
+
+    with _WARM_LOCK:
+        e = _WARM.setdefault(name, {"at": 0.0, "value": None, "busy": False, "error": None})
+        stale = time.time() - e["at"] > ttl
+        if stale and not e["busy"]:
+            e["busy"] = True
+
+            def run():
+                try:
+                    v, err = fn(), None
+                except Exception as ex:  # noqa: BLE001
+                    v, err = None, str(ex)
+                with _WARM_LOCK:
+                    if v is not None:
+                        e["value"], e["at"] = v, time.time()
+                    e["busy"], e["error"] = False, err
+
+            threading.Thread(target=run, daemon=True).start()
+        return e["value"], e["busy"], e["error"]
+
+
+def api_shelves() -> dict:
+    """Every shelf (thorp.shelves.payload): the training lists, the decks, the probes and drafts, each
+    with its books, size, families and the runs that use it. Served warm (see _warm)."""
+    from thorp import shelves
+
+    value, busy, error = _warm("shelves", shelves.payload)
+    return {"shelves": value, "computing": value is None and busy, "error": error}
+
+
+def api_shelf_books(path: str) -> list[dict]:
+    """A shelf's rows (title, author, language, family) with the fetched book each resolves to,
+    where it can be told without fetching, so the reader can open it."""
+    import csv
+
+    from thorp import manifest
+
+    p = Path(__file__).resolve().parents[2] / path
+    if not path.startswith("lists/") or ".." in path or not p.exists():
+        raise LookupError(f"no shelf {path}")
+    with open(p, newline="") as f:
+        rows = list(csv.DictReader(f))
+    from thorp.sources import base
+
+    by_title: dict[tuple[str, str], str] = {}
+    for b in manifest.all_books():
+        by_title.setdefault(((b.title or "").lower(), (b.author or "").lower()), b.id)
+    sources = base._sources()
+    out = []
+    for r in rows:
+        # a row names its text (key:ident, as thorp.shelves reads it), or is matched by title
+        ref, bid = r.get("text") or "", None
+        if ":" in ref:
+            key, ident = ref.split(":", 1)
+            bid = (
+                ident if key == "local" else sources[key].prefix + ident if key in sources else None
+            )
+        if bid and manifest.get(bid) is None:
+            bid = None
+        if bid is None:
+            bid = by_title.get(((r.get("title") or "").lower(), (r.get("author") or "").lower()))
+        out.append(
+            {
+                "title": r.get("title", ""),
+                "author": r.get("author", ""),
+                "language": r.get("language", ""),
+                "family": r.get("family", ""),
+                "book_id": bid,
+            }
+        )
+    return out
+
+
+def api_leaderboard() -> dict:
+    """The best of each class on the climb to chaining two facts (thorp.leaderboard.payload)."""
+    from thorp import leaderboard
+
+    return leaderboard.payload()
+
+
+_SMOKE: dict = {"at": 0.0, "value": None}
+
+
+def api_smoking_qwen() -> dict:
+    """Smoking Qwen (thorp.smoking_qwen.payload): the forecast that a 400M Thorp chains two facts as
+    well as Qwen3 4B, with the reference ladder's points (size, chaining lift) for the chart. The
+    payload bootstraps, so it is kept for two minutes."""
+    import time
+
+    from thorp import leaderboard, smoking_qwen
+
+    if _SMOKE["value"] is not None and time.time() - _SMOKE["at"] < 120:
+        return _SMOKE["value"]
+    d = smoking_qwen.payload()
+    sizes = getattr(smoking_qwen, "REFERENCE_PARAMS", {})
+    d["reference"] = [
+        {
+            "model": r["model"],
+            "short": _short_model(r["model"]),
+            "params": sizes.get(r["model"]),
+            "chaining_lift": r.get("chaining_lift"),
+        }
+        for r in leaderboard.payload().get("reference", [])
+        if sizes.get(r["model"])
+    ]
+    d["threshold"] = leaderboard.payload().get("chaining_threshold", 0.1)
+    d["noise"] = getattr(smoking_qwen, "NOISE", 0.03)
+    _SMOKE.update(at=time.time(), value=d)
+    return d
+
+
+def api_climb(runs: str) -> dict:
+    """Each run's climb over training (thorp.leaderboard.climb, read at every step that has
+    discovery readings, carrying each trick's latest lift and share forward)."""
+    from thorp import fleet, leaderboard
+
+    out = {}
+    chain_keys = {k for c in fleet.chains() for k in c}
+    con = _con()
+    try:
+        for rid in [x for x in runs.split(",") if x][:60]:
+            read_here = False
+            lift: dict[str, float] = {}
+            score: dict[str, float] = {}
+            steps: dict[int, None] = {}
+            series = {"step": [], "climb": [], "chaining_lift": []}
+            rows = list(
+                con.execute(
+                    "select step, name, value from metrics where run_id=? and name like 'tricks/%'"
+                    " order by step, rowid",
+                    [rid],
+                )
+            )
+            for i, (step, name, value) in enumerate(rows):
+                parts = name.split("/")
+                if len(parts) == 3 and parts[1] in fleet.TRICKS:
+                    if parts[2] == "lift":
+                        lift[parts[1]] = value
+                    elif parts[2] == "score":
+                        score[parts[1]] = value
+                    read_here = read_here or parts[1] in chain_keys
+                # a point only where the chains were read (other tricks are read on their own steps)
+                last = i == len(rows) - 1 or rows[i + 1][0] != step
+                if last and not read_here:
+                    continue
+                if last:
+                    read_here = False
+                if last and step not in steps:
+                    steps[step] = None
+                    c = leaderboard.climb(lift, score)
+                    series["step"].append(step)
+                    series["climb"].append(c["climb"])
+                    series["chaining_lift"].append(c["chaining_lift"])
+            out[rid] = series
+    finally:
+        con.close()
+    return out
+
+
 def api_trick_series(key: str) -> dict:
     """One measured trick's score at every reading of every sailing, for its chart."""
     from thorp import fleet
@@ -1508,6 +1676,11 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/stages": lambda: api_stages(q.get("runs", "")),
                 "/api/trick": lambda: api_trick_series(q["key"]),
                 "/api/chain": lambda: api_chain(q["key"]),
+                "/api/shelves": api_shelves,
+                "/api/shelf_books": lambda: api_shelf_books(q["path"]),
+                "/api/leaderboard": api_leaderboard,
+                "/api/smoking_qwen": api_smoking_qwen,
+                "/api/climb": lambda: api_climb(q.get("runs", "")),
                 "/api/shelf": lambda: api_shelf(q["run"]),
                 "/api/book": lambda: api_book(q["id"], q.get("offset", 0), q.get("length", 20000)),
                 "/api/experiment": lambda: api_experiment(q.get("prefix", "content-")),
@@ -1524,6 +1697,12 @@ class Handler(BaseHTTPRequestHandler):
 
 def serve(port: int = 8787) -> None:
     srv = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+    try:  # start warming the slow payloads now, so the first visit finds them ready
+        from thorp import shelves
+
+        _warm("shelves", shelves.payload)
+    except Exception:  # noqa: BLE001
+        pass
     print(f"thorp dash on http://localhost:{port}  (ledger {paths.ledger_path()})", flush=True)
     try:
         srv.serve_forever()

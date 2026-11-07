@@ -214,6 +214,13 @@ holds the ways in, always:
   shared, shaded toward the mark, green ✓ where lit; cause with its change from the fitout's own at
   that stage), the stage named where it isn't the last. A row opens to its three stages, each run
   linked. The first design's cd-* runs were never run and aren't shown.
+  **The knockout** (the `knockout` voyage's page, and a section on each competitor page that has
+  one; `/api/knockout`, `data/compare/knockout-<model>.json`; DECISIONS.md "The knockout,
+  pre-registered"): in a model that chains, each card's 8 strongest heads silenced, beside three
+  random draws of 8 heads. A badge per card (NECESSARY or not shown), a bar per card for the gain lost
+  when silenced (cause; the comparator, order) beside the random draws' drops on that same measure in
+  grey, and each card's own rule dotted over its group (0.1, and twice its largest random drop), and a table with each card's drops, verdict and its heads
+  (layer:head); the competitor's deck table notes each card's knocked-out heads.
 - **Shelves** (`#/shelves`) opens on **Fitouts** (`thorp.shelves.fitouts`, kept warm like the
   shelves): a fitout is the training material matched to its stages. A card per fitout: its aim,
   positions, vocabulary, tack and tokens; two lanes, **pretraining** (its stages in order, one run)

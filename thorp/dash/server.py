@@ -1313,6 +1313,34 @@ def api_class_score(preset: str) -> dict:
     return out
 
 
+def _knockout_files() -> list[Path]:
+    return sorted(
+        (Path(__file__).resolve().parents[2] / "data" / "compare").glob("knockout-*.json")
+    )
+
+
+def api_knockout(model: str = "") -> dict:
+    """The knockout (fleet.VOYAGES["knockout"], thorp/knockout.py; DECISIONS.md "The knockout,
+    pre-registered"): in a model that chains, each card's 8 strongest heads silenced and the logic
+    deck and the chaining tests read again, beside three random draws of 8 heads. One model's
+    result (data/compare/knockout-<model, / as __>.json), or every result when no model is named."""
+    from thorp import fleet
+
+    competitors = getattr(fleet, "COMPETITORS", {})
+    out = []
+    for f in _knockout_files():
+        try:
+            d = json.loads(f.read_text())
+        except ValueError:
+            continue
+        d.setdefault("model", f.stem[len("knockout-") :].replace("__", "/"))
+        if model and d["model"] != model:
+            continue
+        d["label"] = (competitors.get(d["model"]) or (None,))[0] or _short_model(d["model"])
+        out.append(d)
+    return {"results": out}
+
+
 def api_leaderboard() -> dict:
     """The best of each class on the climb to chaining two facts (thorp.leaderboard.payload)."""
     from thorp import leaderboard
@@ -2139,6 +2167,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/shelves": api_shelves,
                 "/api/shelf_books": lambda: api_shelf_books(q["path"]),
                 "/api/leaderboard": api_leaderboard,
+                "/api/knockout": lambda: api_knockout(q.get("model", "")),
                 "/api/class_score": lambda: api_class_score(q["preset"]),
                 "/api/fitouts": lambda: api_fitouts(q.get("preset", "")),
                 "/api/census": api_census,

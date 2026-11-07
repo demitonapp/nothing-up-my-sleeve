@@ -644,3 +644,17 @@ main a.ccell { color: var(--text); text-decoration: none; display: block; }
 .censustable tr.cenrow:hover td { background-color: var(--raise); }
 .censustable tr.censtage td { font-size: 11px; background: var(--raise); }
 .censustable td.cen .s { font-size: 10px; font-weight: 400; }
+
+/* the knockout */
+.kobadges { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.kobadge { font-size: var(--fs-sm); border: 1px solid var(--line); border-radius: 4px; padding: 3px 8px; }
+.kobadge b { font-family: Georgia, serif; }
+.kobadge i { font-style: normal; color: var(--muted); margin-left: 4px; font-size: 11px; letter-spacing: .05em; }
+.kobadge.need { border-color: var(--good); }
+.kobadge.need i { color: var(--good); font-weight: 600; }
+.koro { gap: 16px; flex-wrap: wrap; align-items: flex-start; }
+.koro > .chart { flex: 1; min-width: 300px; }
+.koro > .scroll { flex: 1.2; min-width: 320px; }
+.kotable td { font-size: var(--fs-sm); vertical-align: top; }
+.kohd { font-size: 11px; color: var(--muted); }
+.komodel h3 { margin: 12px 0 6px; }

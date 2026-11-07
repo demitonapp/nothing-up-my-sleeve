@@ -1220,6 +1220,7 @@ function renderVoyage() {
   voyageStars(v).then(() => journeyPanel(v));
   voyageClimb(v);
   if (v.key === 'card_census') drawCensus();
+  if (v.key === 'knockout') drawKnockouts();
 }
 // ---- the journey through the layers (lib/journey.js): one or two sailings of the voyage, read up
 // their stack at one step; the slider follows the latest reading unless moved
@@ -2664,6 +2665,14 @@ async function loadCompetitor() {
   document.getElementById('cpcards').innerHTML = deckHand(hand, { empty: !C ? 'its cards are being read' : 'no card lit yet' })
     + `<div class="scroll"><table class="decktable" data-nosort><thead><tr><th>card</th><th></th><th>its reading</th><th>the mark</th><th>the judge</th></tr></thead><tbody>${hand.map(rowOf).join('')}</tbody></table></div>`
     + (C && C.bridge && C.bridge.curve && C.bridge.curve.length ? '<div class="k mt">the bridge over layers <span class="s">nats at the answer\'s position; the mark dotted</span></div><div class="chart cpbridge" id="cpbridge"></div>' : '');
+  if (!cpThorp) competitorKnockout(d.model).then(k => {
+    if (!k) return;
+    // the silenced heads on each card's row: "its 8 heads, layer:head", and the knockout's verdict
+    document.querySelectorAll('#cpcards .decktable tbody tr').forEach((tr, i) => {
+      const key = DECK[i] && DECK[i][0], heads = (k.card_heads || {})[key], v = (k.verdict || {})[key];
+      if (heads && heads.length) tr.cells[2].insertAdjacentHTML('beforeend', `<div class="s kohd">knocked out: ${heads.map(h => `${h[0]}:${h[1]}`).join(' ')}${v ? ` · ${v.necessary ? '<b class="good">necessary</b>' : 'not shown necessary'}` : ''}</div>`);
+    });
+  });
   const B = C && C.bridge;
   if (B && B.curve && B.curve.length) {
     const thr = thrOf('bridge');
@@ -2871,4 +2880,75 @@ async function classScoreLive(r) {
   const c3 = cell('chaining two facts');
   if (c3) c3.innerHTML = d.version ? `<span class="${d.chaining != null && d.chaining > 0.03 ? 'good' : 's'}" title="the mean lift on the four chaining tests; above 0.03 it leaves the noise">${d.chaining != null ? signed(d.chaining) : '–'}</span>${d.chaining != null && d.chaining <= 0.03 ? ' <span class="s">in the noise</span>' : ''}` : '<span class="s">no version yet</span>';
   if (d.ship_key && c1) c1.insertAdjacentHTML('beforeend', `<div class="s"><a href="#/leaderboard/thorp/${encodeURIComponent(d.ship_key)}">${esc(d.version)}'s hand →</a></div>`);
+}
+
+
+// ---- the knockout (fleet.VOYAGES["knockout"]; /api/knockout; DECISIONS.md "The knockout, pre-registered"): in a model that
+// chains, each card's 8 strongest heads silenced and the logic deck read again, beside three random draws of 8 heads. A bar
+// per card (the gain lost when silenced: cause, or order for the comparator), the random draws' bars, the rule line (a drop
+// of 0.1 and more than twice the largest random drop) and a verdict per card: NECESSARY or not shown.
+const KO_CARDS = [['previous_word', 'Previous-word'], ['nevermore', 'Nevermore'], ['mover', 'Mover'], ['comparator', 'Comparator']];
+function knockoutBlock(k, id) {
+  const base = k.baseline || {}, v = k.verdict || {}, controls = k.controls || [];
+  const drop = (cond, measure) => cond && base[measure] != null && cond[measure] != null ? base[measure] - cond[measure] : null;
+  const ctrlCause = controls.map(c => drop(c, 'cause_gain'));
+  const largest = Math.max(0, ...ctrlCause.filter(x => x != null));
+  const line = Math.max(0.1, 2 * largest);
+  const badges = KO_CARDS.map(([key, name]) => {
+    const x = v[key], f = CARD_FACE[key] || {};
+    if (!x) return `<span class="kobadge"><b>${f.rank || ''}${f.suit || ''}</b> ${esc(name)} <i>not knocked out</i></span>`;
+    return `<span class="kobadge ${x.necessary ? 'need' : ''}" title="${esc(x.measure || 'cause_gain')} dropped ${x.drop != null ? x.drop.toFixed(3) : '–'}; the largest random drop ${x.largest_random_drop != null ? x.largest_random_drop.toFixed(3) : '–'}; chaining lift dropped ${x.chaining_lift_drop != null ? x.chaining_lift_drop.toFixed(3) : '–'}"><b>${f.rank || ''}${f.suit || ''}</b> ${esc(name)} <i>${x.necessary ? 'NECESSARY' : 'not shown'}</i></span>`;
+  }).join('');
+  const rows = KO_CARDS.filter(([key]) => v[key] || k[key]).map(([key, name]) => {
+    const x = v[key] || {}, heads = (k.card_heads || {})[key] || [];
+    return `<tr><td><b>${esc(name)}</b></td><td class="s">${esc((x.measure || (key === 'comparator' ? 'order_gain' : 'cause_gain')).replace('_', ' '))}</td>
+      <td>${x.drop != null ? signed(x.drop) : '–'}</td><td>${x.largest_random_drop != null ? signed(x.largest_random_drop) : '–'}</td><td>${x.chaining_lift_drop != null ? signed(x.chaining_lift_drop) : '–'}</td>
+      <td>${x.necessary ? '<span class="pill good">necessary</span>' : '<span class="pill">not shown</span>'}</td>
+      <td class="mono kohd">${heads.map(h => `${h[0]}:${h[1]}`).join(' ')}</td></tr>`;
+  }).join('');
+  return `<div class="kobadges">${badges}</div>
+    <div class="row koro"><div class="chart" id="${id}"></div>
+    <div class="scroll"><table class="kotable" data-nosort><thead><tr><th>card</th><th>measure</th><th>lost</th><th>largest random</th><th>chaining lift lost</th><th>verdict</th><th>its ${k.k || 8} heads <span class="s">layer:head</span></th></tr></thead><tbody>${rows}</tbody></table>
+    <p class="s">baseline: cause gain ${base.cause_gain != null ? signed(base.cause_gain) : '–'} · order gain ${base.order_gain != null ? signed(base.order_gain) : '–'} · logic gain ${base.logic_gain != null ? signed(base.logic_gain) : '–'} · chaining lift ${base.chaining_lift != null ? signed(base.chaining_lift) : '–'}${k.layers ? ` · ${k.layers} layers × ${k.heads} heads` : ''}</p></div></div>`;
+}
+function knockoutChart(k, id) {
+  // grouped per card: the card's own drop and the three random draws' drops, all on that card's own measure (the comparator,
+  // order gain; the rest, cause gain), with the card's rule line at max(0.1, 2 × its largest random drop)
+  const base = k.baseline || {}, v = k.verdict || {}, controls = k.controls || [];
+  const cards = KO_CARDS.filter(([key]) => v[key]);
+  const measureOf = key => v[key].measure || (key === 'comparator' ? 'order_gain' : 'cause_gain');
+  const lost = (cond, m) => cond && base[m] != null && cond[m] != null ? base[m] - cond[m] : null;
+  const names = cards.map(([, n]) => n);
+  const traces = [{ type: 'bar', name: 'its 8 heads silenced', x: names, y: cards.map(([key]) => v[key].drop),
+    marker: { color: cards.map(([key]) => v[key].necessary ? tok('good') : tok('blue')) },
+    text: cards.map(([key, n]) => `${n}: ${measureOf(key).replace('_', ' ')} lost ${v[key].drop != null ? v[key].drop.toFixed(3) : '–'}`), textposition: 'none', hovertemplate: '%{text}<extra></extra>' }];
+  controls.forEach((c, i) => traces.push({ type: 'bar', name: `random ${i + 1}`, x: names, y: cards.map(([key]) => lost(c, measureOf(key))), marker: { color: tok('muted'), opacity: 0.5 + 0.15 * i },
+    text: cards.map(([key]) => `random draw ${i + 1}: ${measureOf(key).replace('_', ' ')} lost ${lost(c, measureOf(key)) != null ? lost(c, measureOf(key)).toFixed(3) : '–'}`), textposition: 'none', hovertemplate: '%{text}<extra></extra>', showlegend: i === 0, legendgroup: 'random' }));
+  const shapes = [], notes = [];
+  cards.forEach(([key], i) => {
+    const largest = v[key].largest_random_drop ?? Math.max(0, ...controls.map(c => lost(c, measureOf(key)) ?? 0));
+    const line = Math.max(0.1, 2 * largest);
+    shapes.push({ type: 'line', xref: 'x', yref: 'y', x0: i - 0.45, x1: i + 0.45, y0: line, y1: line, line: { color: tok('accent'), dash: 'dot', width: 1.6 } });
+    notes.push({ xref: 'x', yref: 'y', x: i, y: line, yanchor: 'bottom', showarrow: false, text: `${line.toFixed(2)}${measureOf(key) === 'order_gain' ? ' (order)' : ''}`, font: { size: 9, color: tok('accent') } });
+  });
+  plot(id, traces, layout({ barmode: 'group', height: 300, margin: { l: 50, r: 10, t: 10, b: 40 }, yaxis: { title: { text: 'gain lost when silenced' } },
+    legend: { orientation: 'h', y: -0.18 }, shapes, annotations: notes }));
+}
+let koKey = null;
+async function drawKnockouts() {
+  const el = document.getElementById('knockouts'); if (!el) return;
+  let d; try { d = await get('/api/knockout'); } catch (e) { return; }
+  const key = JSON.stringify(d); if (key === koKey) return; koKey = key;
+  const rs = d.results || [];
+  if (!rs.length) { el.innerHTML = '<div class="empty">no knockout has finished yet: the first, Qwen3 4B, takes about an hour</div>'; return; }
+  el.innerHTML = rs.map((k, i) => `<div class="komodel"><h3><a href="#/leaderboard/competitor/${encodeURIComponent(k.model)}">${esc(k.label || k.model)}</a></h3>${knockoutBlock(k, 'kochart' + i)}</div>`).join('');
+  rs.forEach((k, i) => knockoutChart(k, 'kochart' + i));
+}
+async function competitorKnockout(model) {
+  const sec = document.getElementById('cpknockout'), el = document.getElementById('cpknock'); if (!sec || !el) return null;
+  let d; try { d = await get('/api/knockout?model=' + encodeURIComponent(model)); } catch (e) { d = null; }
+  const k = d && (d.results || [])[0];
+  sec.hidden = !k; if (!k) return null;
+  el.innerHTML = knockoutBlock(k, 'cpkochart'); knockoutChart(k, 'cpkochart');
+  return k;
 }

@@ -8,12 +8,8 @@
 # HELD for the repository split (Justin, 20:05: "yes, at the next gap"): waits while specs/split.hold exists
 
 # Ogden v0.1 re-sails with the shapes taxonomy at every reading (Justin, 20:20: "call the ships back and send them out with that included")
-cmd: while [ -e ships/specs/ogden.hold ]; do sleep 30; done
-fitouts/fu-ogden-v0-1@300k-pre-s1
-fitouts/fu-ogden-v0-1@300k-pre-s2
-fitouts/fu-ogden-v0-1~l3@300k-l3-pre-s1
-fitouts/fu-ogden-v0-1~l3@300k-l3-pre-s2
-fitouts/fu-ogden-v0-1~l3-copy@300k-l3-pre-s1
+# Ogden v0.1 at 21m, to the top of the queue (Justin, 21:45)
+fitouts/fu-ogden-v0-1@21m-pre-s1
 fitouts/fu-ogden-v0-1~l3-copy@300k-l3-pre-s2
 fitouts/fu-ogden-v0-1@1m-pre-s1
 fitouts/fu-ogden-v0-1@1m-pre-s2

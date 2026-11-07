@@ -159,3 +159,8 @@
 2026-11-07T20:11:15 fitouts/fu-ogden-v0-1@300k-pre-s2 0
 2026-11-07T20:17:45 cmd: while [ -e specs/split.hold ]; do sleep 20; done 0
 2026-11-07T20:19:32 fitouts/fu-ogden-v0-1@1m-pre-s1 130
+2026-11-07T20:39:16 cmd: while [ -e ships/specs/ogden.hold ]; do sleep 30; done 0
+2026-11-07T20:53:11 fitouts/fu-ogden-v0-1@300k-pre-s1 0
+2026-11-07T21:07:09 fitouts/fu-ogden-v0-1@300k-pre-s2 0
+2026-11-07T21:25:19 fitouts/fu-ogden-v0-1~l3@300k-l3-pre-s1 0
+2026-11-07T21:44:13 fitouts/fu-ogden-v0-1~l3@300k-l3-pre-s2 0

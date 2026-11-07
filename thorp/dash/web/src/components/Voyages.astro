@@ -1,20 +1,34 @@
 ---
-import { cardCls, checkCls, crumbCls, emptyCls, rangeCls, selectCls, tabCls, tabsCls } from '../lib/ui';
+import { cardCls, checkCls, crumbCls, emptyCls, rangeCls, selectCls, tabCls, tabsCls, toggleCls } from '../lib/ui';
 // Expeditions (was Voyages until 2026-11-07 16:30): the campaigns several ships take part in to find something
 // (thorp/fleet.py EXPEDITIONS). #/expeditions lists them, the queue at a glance on top; #/expeditions/<key> is one
 // expedition, from one template. #/voyages is still answered.
 ---
 <div class="section" id="voyages">
   <h1>Expeditions <span class="q">campaigns of ships sent to find something: their goals, how they are steered, and what they found</span></h1>
+  <nav class={tabsCls('line', 'subnav')} data-orientation="horizontal" data-variant="line" id="vnav">
+    <a class={tabCls('')} data-state="inactive" data-vtab="expeditions" href="#/expeditions">Expeditions</a><a class={tabCls('')} data-state="inactive" data-vtab="queue" href="#/expeditions/queue">Queue</a>
+  </nav>
+  <div class="vtab" data-vtab="expeditions">
+    <div class="cards" id="voyagecards"></div>
+  </div>
+  <div class="vtab" data-vtab="queue">
+    <div class="qswitch" role="tablist" aria-label="how to see the queue">
+      <a role="tab" class={toggleCls()} data-state="off" data-qview="glance" href="#/expeditions/queue">At a glance</a><a role="tab" class={toggleCls()} data-state="off" data-qview="every" href="#/expeditions/queue/every">Every voyage</a>
+    </div>
+    <div class="qview" data-qview="glance">
   <section class={cardCls(false, 'panel')} id="overviewpanel">
     <h2>The queue at a glance <span class="note">the voyage at sea, the voyages still to sail and about how many hours that is (each class's mean time), and for every expedition its voyages at sea, queued, finished and failed, and where its next one stands in the queue</span></h2>
     <div id="expoverview"><div class={emptyCls()}>reading the queue…</div></div>
   </section>
+    </div>
+    <div class="qview" data-qview="every">
   <section class={cardCls(false, 'panel')} id="queuepanel">
-    <h2>The queue <span class="note">every voyage still to sail, in the order it sails (specs/queue.txt), with its goal: the question its spec asks, or its experiment's where it asks none; the voyage at sea first</span></h2>
-    <div class="scroll queuescroll"><table id="queuetable" data-nosort><thead><tr><th>#</th><th>voyage</th><th>goal</th><th>expedition</th><th>class</th><th>seed</th><th title="about when it sails: each voyage ahead of it at its class's mean time; ≥ where one ahead has no time yet">sails in</th></tr></thead><tbody><tr><td colspan="7" class={emptyCls(true)}>reading the queue…</td></tr></tbody></table></div>
+    <h2>The queue <span class="note">every voyage still to sail, in the order it sails (specs/queue.txt), with its goal: the question its spec asks, or its experiment's where it asks none, and the fitout it was compiled from (its census variation and stage); the voyage at sea first</span></h2>
+    <div class="scroll queuescroll"><table id="queuetable" data-nosort><thead><tr><th>#</th><th>voyage</th><th>goal</th><th title="the fitout the voyage was compiled from (scripts/make_fitout.py, the Fitouts tab): its census variation, if one, and its stage">fitout</th><th>expedition</th><th>class</th><th>seed</th><th title="about when it sails: each voyage ahead of it at its class's mean time; ≥ where one ahead has no time yet">sails in</th></tr></thead><tbody><tr><td colspan="8" class={emptyCls(true)}>reading the queue…</td></tr></tbody></table></div>
   </section>
-  <div class="cards" id="voyagecards"></div>
+    </div>
+  </div>
 </div>
 
 <div class="section" id="voyage">

@@ -5,12 +5,15 @@ way of operating").
 Stafford Beer's Viable System Model, mapped onto Thorp, each system with its members in the codebase:
 
 - **S1, operations**: the expeditions (fleet.EXPEDITIONS) and the voyages (runs) they sail; each is an operation with its own
-  goal, levers and stop rule.
+  goal, levers and stop rule. And acquisition, the books the voyages read: a viable system of its own, one
+  level down (Beer's recursion), with its own S1 to S5 (thorp/acquisition.py: intakes, the intake lock, the
+  intake gate and its audit, the sources, the rules).
 - **S2, coordination**: what keeps the operations from colliding: one GPU and one standing queue
   (scripts/queue.sh), run ids, log folders, seeding order, the ledger; and the two Claude sessions (this one
   and the dashboard's) that share the files. `lint_queue()` finds collisions before they cost a run.
-- **S3, control**: the gate every run passes (`gate(spec)`, called from train.prepare): the enforced
-  policies applied to the spec; and the bargain, a written opt-in (`data.opt_in`) that a policy admits.
+- **S3, control**: the gate every run passes (`gate(spec)`, called from train.prepare and the fitout
+  builder): the enforced policies applied to the spec; and the bargain, a written opt-in (`data.opt_in`)
+  that a policy admits. Every decision the gate makes is kept (`gate_log()`, data/gate-log.jsonl).
   **S3\*, audit**: `audit()`, over the queue and the ledger, sporadic and independent of the gate
   (the night watches and steering tasks call it too).
 - **S4, intelligence**: the outside world and the future: the competitors and the reference ladder
@@ -49,8 +52,8 @@ SYSTEMS: dict[str, System] = {
         System(
             "S1",
             "Operations",
-            "the expeditions and the voyages they sail",
-            ("thorp/fleet.py EXPEDITIONS", "specs/", "data/runs/", "thorp/train.py"),
+            "the expeditions and the voyages they sail; and acquisition, the books they read (a viable system of its own)",
+            ("thorp/fleet.py EXPEDITIONS", "specs/", "data/runs/", "thorp/train.py", "thorp/acquisition.py"),
         ),
         System(
             "S2",
@@ -201,6 +204,46 @@ def _pre_registered(spec: dict) -> list[str]:
     return []
 
 
+def _cleaned(spec: dict) -> list[str]:
+    """A new voyage reads text cleaned by the current version (thorp/cleaning.py CURRENT), its held-out
+    decks cleaned the same way (they share its tokeniser, so this holds by construction)."""
+    from thorp import cleaning
+
+    try:
+        v = cleaning.version_of(spec)
+    except ValueError as e:
+        return [str(e)]
+    if v != cleaning.CURRENT:
+        return [f"reads {v} text, not {cleaning.CURRENT} (data.clean)"]
+    return []
+
+
+def _named_fitout(spec: dict) -> list[str]:
+    """Every voyage names the fitout it is a variation of (`fitout: {key, variation}` in its spec), and
+    that fitout exists (fleet.FITOUTS or data/fitouts/). Named in the spec, never inferred at the gate."""
+    from thorp import fleet
+
+    f = spec.get("fitout")
+    key = f.get("key") if isinstance(f, dict) else None
+    if not key:
+        return ["names no fitout (fitout: {key, variation}; fleet.with_fitout writes one)"]
+    if fleet.named_fitout(key) is None:
+        return [f"names the fitout {key!r}, which does not exist"]
+    return []
+
+
+OGDEN = "ogden"  # the Ogden fitout and its versions (ogden, ogden-v0-1, ...): thorp/ogden.py, fleet EXPEDITIONS["ogden"]
+
+
+def _ogden_only(spec: dict) -> list[str]:
+    """Only the Ogden fitout sails (Justin, 2026-11-07 19:30): a voyage's named fitout is Ogden or a version of it."""
+    f = spec.get("fitout")
+    key = (f.get("key") if isinstance(f, dict) else None) or ""
+    if key == OGDEN or key.startswith(OGDEN + "-"):
+        return []
+    return [f"sails on the fitout {key!r}" if key else "names no fitout", "only the Ogden fitout sails"]
+
+
 POLICIES: dict[str, Policy] = {
     p.key: p
     for p in (
@@ -236,6 +279,33 @@ POLICIES: dict[str, Policy] = {
             "2026-11-07, Justin",
             False,
             _pre_registered,
+        ),
+        Policy(
+            "clean",
+            "Thorp reads text cleaned by a named version, the current one (unwrap-v2: Gutenberg's hard "
+            "wraps joined back into paragraphs, verse kept line for line), and is scored on held-out "
+            "books cleaned the same way; a voyage on other text opts out in words.",
+            "2026-11-07 18:45, Justin",
+            True,
+            _cleaned,
+            opt_in=True,
+        ),
+        Policy(
+            "fitout",
+            "No voyage sails without a named fitout: every spec names the fitout it is a variation of, "
+            "and that fitout exists.",
+            "2026-11-07 18:10, Justin",
+            True,
+            _named_fitout,
+        ),
+        Policy(
+            "ogden",
+            "Only the Ogden fitout sails: every new voyage is a variation of Ogden (or a later version of "
+            'it); everything else was taken off the queue ("everything going forward only runs the ogden '
+            'fitout").',
+            "2026-11-07 19:30, Justin",
+            True,
+            _ogden_only,
         ),
     )
 }
@@ -274,12 +344,13 @@ def excepted(key: str, spec: dict) -> str:
     return e.get("reason", "") if hit else ""
 
 
-def gate(spec: dict, known_run: bool = False) -> list[str]:
+def gate(spec: dict, known_run: bool = False, *, where: str = "voyage") -> list[str]:
     """S3: every enforced policy applied to a new run; refuse on a violation (unless the policy admits a
-    written opt-in and the spec has one). Returns the advisory findings, for the log."""
+    written opt-in and the spec has one). Returns the advisory findings, for the log. Every decision is
+    kept in the gate's log (`gate_log()`), with where it was asked (a voyage sailing, the fitout builder)."""
     if known_run:
         return []
-    notes = []
+    notes, decisions = [], []
     opt_in = (spec.get("data", {}).get("opt_in") or "").strip()
     for key, pol in POLICIES.items():
         found = pol.check(spec)
@@ -287,14 +358,55 @@ def gate(spec: dict, known_run: bool = False) -> list[str]:
             continue
         if why := excepted(key, spec):
             notes.append(f"policy '{key}' does not govern this run: {why}")
+            decisions.append({"policy": key, "how": "excepted", "why": why})
             continue
         if enforced(key) and not (pol.opt_in and opt_in):
+            decisions.append({"policy": key, "how": "refused", "why": "; ".join(found)})
+            _record_gate(spec, where, "refused", decisions)
             raise GateRefused(f"S3 gate, policy '{key}' ({pol.statement}): {'; '.join(found)}")
-        notes.append(
-            f"policy '{key}'"
-            + (f" opted out: {opt_in}" if pol.opt_in and opt_in else f": {'; '.join(found)}")
+        bargain = pol.opt_in and bool(opt_in)
+        notes.append(f"policy '{key}'" + (f" opted out: {opt_in}" if bargain else f": {'; '.join(found)}"))
+        decisions.append(
+            {"policy": key, "how": "bargain" if bargain else "advisory", "why": opt_in if bargain else "; ".join(found)}
         )
+    _record_gate(spec, where, "passed", decisions)
     return notes
+
+
+def _gate_log_path():
+    return paths.data_dir() / "gate-log.jsonl"
+
+
+def _record_gate(spec: dict, where: str, verdict: str, decisions: list[dict]) -> None:
+    """S3's record: one line per decision of the gate (never costs a voyage if it cannot be written)."""
+    try:
+        p = _gate_log_path()
+        p.parent.mkdir(parents=True, exist_ok=True)
+        line = {
+            "at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+            "name": spec.get("name"),
+            "ship": spec.get("ship"),
+            "where": where,
+            "verdict": verdict,
+            "decisions": decisions,
+        }
+        with p.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(line, ensure_ascii=False) + "\n")
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def gate_log(limit: int = 60) -> list[dict]:
+    """The gate's latest decisions, newest first."""
+    p = _gate_log_path()
+    if not p.exists():
+        return []
+    rows = []
+    with p.open(encoding="utf-8") as f:
+        for ln in f:
+            with contextlib.suppress(ValueError):
+                rows.append(json.loads(ln))
+    return rows[-limit:][::-1]
 
 
 # S2's helm: one GPU, so one voyage at sea at a time (Justin, 16:35: "surely only one can be running at
@@ -422,6 +534,56 @@ def _label_of(name: str) -> str | None:
     return r[0]["ship"] if r else None
 
 
+def _clean_of(name: str, queued: dict) -> str | None:
+    """The cleaning version a voyage read (or will read): from the queue, else the ledger's spec."""
+    from thorp import cleaning
+    from thorp.ledger import Ledger
+
+    if name in queued:
+        return cleaning.version_of(queued[name])
+    r = Ledger().query(
+        "select spec_json from runs where name=? order by started desc limit 1", [name]
+    )
+    if not r:
+        return None
+    return cleaning.version_of(json.loads(r[0]["spec_json"] or "{}"))
+
+
+def clean_audit(per_library: int = 6) -> dict:
+    """S3*: does the current cleaning still do its job on the canonical libraries? For a few books of
+    each store, the line breaks before and after (words per break, the share inside a paragraph), and
+    whether cleaning is deterministic. Independent of the gate: it reads the books, not the specs."""
+    from thorp import cleaning
+    from thorp.sources import load_text
+    from thorp.sources.gutenberg import resolve_list
+
+    out = {"version": cleaning.CURRENT, "libraries": {}}
+    for lib in ("lists/stores/prose.csv", "lists/stores/trigram.csv"):
+        ids = [f"pg{r.chosen}" for r in resolve_list(lib) if r.chosen][:per_library]
+        raw_w = raw_b = cl_b = raw_in = cl_in = 0
+        stable = True
+        for b in ids:
+            try:
+                r = load_text(b)
+            except Exception:  # noqa: BLE001  (a missing text is the sources' finding, not this one)
+                continue
+            c = cleaning.clean(r, cleaning.CURRENT)
+            stable &= cleaning.clean(r, cleaning.CURRENT) == c
+            a, k = cleaning.breaks(r), cleaning.breaks(c)
+            raw_w += a["words"]
+            raw_b += a["breaks"]
+            cl_b += k["breaks"]
+            raw_in += a["breaks"] * a["inside_share"]
+            cl_in += k["breaks"] * k["inside_share"]
+        out["libraries"][lib] = {
+            "books": len(ids),
+            "words_per_break": [round(raw_w / max(1, raw_b), 1), round(raw_w / max(1, cl_b), 1)],
+            "inside_paragraph_share": [round(raw_in / max(1, raw_b), 3), round(cl_in / max(1, cl_b), 3)],
+            "deterministic": stable,
+        }
+    return out
+
+
 def lint_queue() -> list[str]:
     """S2: what would collide or fail in the standing queue before it costs a run."""
     import yaml
@@ -435,6 +597,7 @@ def lint_queue() -> list[str]:
     from thorp.ledger import Ledger
 
     found, seen, order = [], {}, {}
+    specs_by_name = {}
     sailing = {
         r["name"]
         for r in Ledger().query("select name from runs where status in ('running','finished')")
@@ -455,12 +618,21 @@ def lint_queue() -> list[str]:
         if not folder.exists():
             found.append(f"{ln}: its log folder {folder} does not exist")
         spec = yaml.safe_load(p.read_text())
+        specs_by_name[spec.get("name")] = spec
+        for why in _named_fitout(spec):  # S5 'fitout': the gate would refuse it when it reached the helm
+            found.append(f"{ln}: {why}; the S3 gate will refuse it")
         rid = train.run_id(spec)
         if rid in seen:
             found.append(f"{ln}: the same run as {seen[rid]} (one run id)")
         seen[rid] = ln
         order[spec.get("name")] = i
         src = (spec.get("seeded_from") or {}).get("run")
+        if src:  # S5 'clean': a model carries its tokeniser, so a seed must have read the same text
+            from thorp import cleaning
+
+            mine, theirs = cleaning.version_of(spec), _clean_of(src, specs_by_name)
+            if theirs is not None and theirs != mine:
+                found.append(f"{ln}: reads {mine} text but is seeded from {src}, which read {theirs}")
         if src and src in order:
             continue
         if (
@@ -495,11 +667,13 @@ def audit() -> dict:
     ]
     violations: dict[str, list[str]] = {}
     excused: dict[str, list[str]] = {}
+    bargains: dict[str, list[dict]] = {}  # the voyages that opted out of a policy in words, and why
     for ln in queued:
         p = paths.resolve(f"specs/{ln}.yaml")
         if not p.exists():
             continue
         spec = yaml.safe_load(p.read_text())
+        opt_in = (spec.get("data", {}).get("opt_in") or "").strip()
         for key, pol in POLICIES.items():
             if (
                 key == "period"
@@ -508,26 +682,56 @@ def audit() -> dict:
             v = pol.check(spec)
             if v and excepted(key, spec):
                 excused.setdefault(key, []).append(ln)
-            elif v and not (pol.opt_in and (spec.get("data", {}).get("opt_in") or "").strip()):
+            elif v and pol.opt_in and opt_in:
+                bargains.setdefault(key, []).append({"voyage": ln, "why": opt_in})
+            elif v:
                 violations.setdefault(key, []).append(ln)
     failed = rec.query("select count(*) n from runs where status not in ('finished','running')")[0][
         "n"
     ]
+    log = gate_log(400)
+    try:  # acquisition, the books the voyages read: a viable system one level down (thorp/acquisition.py)
+        from thorp import acquisition
+
+        acq = acquisition.summary()
+    except Exception as e:  # noqa: BLE001
+        acq = {"error": str(e)}
     return {
-        "S1": {"expeditions": expedition_states(), "queued": len(queued)},
+        "S1": {"expeditions": expedition_states(), "queued": len(queued), "acquisition": acq},
         "S2": {"helm": helm(), "queue_lints": lint_queue()},
         "S3": {
             "policies": {
                 k: {
                     "enforced": enforced(k),
+                    "opt_in": POLICIES[k].opt_in,
                     "queued_runs_breaking_it": len(violations.get(k, [])),
                     "queued_runs_excepted": len(excused.get(k, [])),
+                    "queued_runs_bargained": len(bargains.get(k, [])),
                     "exception": (_exceptions().get(k) or {}).get("reason", ""),
+                    "refused_lately": sum(
+                        1
+                        for g in log
+                        for d in g.get("decisions", [])
+                        if d.get("policy") == k and d.get("how") == "refused"
+                    ),
                 }
                 for k in POLICIES
             },
             "runs_not_finished": failed,
+            "gate_log": log[:60],
+            "bargains": {k: v[:40] for k, v in bargains.items()},
+            "exceptions": {
+                k: {
+                    "reason": e.get("reason", ""),
+                    "adopted": e.get("adopted", ""),
+                    "runs": len(e.get("runs") or []),
+                    "patterns": e.get("patterns") or [],
+                }
+                for k, e in _exceptions().items()
+                if isinstance(e, dict)
+            },
         },
+        "S3*": {"cleaning": clean_audit()},
         "S4": {
             "competitors": list(fleet.COMPETITORS),
             "reference_ladder": list(fleet.REFERENCE_LADDER),

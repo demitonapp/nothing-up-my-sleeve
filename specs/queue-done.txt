@@ -110,3 +110,47 @@
 2026-11-07T16:23:19 fitouts/fo-keel-cards-cause~no-copy-pre-s1 0
 2026-11-07T16:25:51 fitouts/fo-keel-cards-cause~no-copy-post1-s1 0
 2026-11-07T16:27:48 fitouts/fo-keel-cards-cause~no-copy-post2-s1 0
+2026-11-07T16:37:39 fitouts/fo-keel-cards-cause~no-nursery-pre-s1 0
+2026-11-07T16:40:14 fitouts/fo-keel-cards-cause~no-nursery-post1-s1 0
+2026-11-07T16:42:12 fitouts/fo-keel-cards-cause~no-nursery-post2-s1 0
+2026-11-07T16:51:55 fitouts/fo-keel-cards-cause~no-verse-pre-s1 0
+2026-11-07T16:54:34 fitouts/fo-keel-cards-cause~no-verse-post1-s1 0
+2026-11-07T16:56:35 fitouts/fo-keel-cards-cause~no-verse-post2-s1 0
+2026-11-07T17:04:37 fitouts/fo-keel-cards-cause~no-cause-pre-pre-s1 0
+2026-11-07T17:07:17 fitouts/fo-keel-cards-cause~no-cause-pre-post1-s1 0
+2026-11-07T17:09:11 fitouts/fo-keel-cards-cause~no-cause-pre-post2-s1 0
+2026-11-07T17:11:03 fitouts/fo-keel-cards-cause~no-reasoning-post-post1-s1 0
+2026-11-07T17:25:10 fitouts/fo-keel-cards-cause~fiction-only-pre-pre-s1 0
+2026-11-07T17:27:38 fitouts/fo-keel-cards-cause~fiction-only-pre-post1-s1 0
+2026-11-07T17:29:29 fitouts/fo-keel-cards-cause~fiction-only-pre-post2-s1 0
+2026-11-07T18:02:34 fitouts/fo-keel-cards-cause~heads-pre-s1 0
+2026-11-07T18:06:13 fitouts/fo-keel-cards-cause~heads-post1-s1 0
+2026-11-07T18:08:59 fitouts/fo-keel-cards-cause~heads-post2-s1 0
+# 2026-11-07 18:12-18:14 (Claude): a git stash swapped the ledger and queue.txt for the committed copies; the queue re-sailed these stale lines against the wrong ledger. Not results: the ledger was rebuilt from before the swap.
+# gap: 2026-11-07T18:12:10 fitouts/fo-keel-cards-cause~deeper-pre-s1 1
+# gap: 2026-11-07T18:12:18 fitouts/fo-keel-cards-cause~no-nursery-post1-s1 1
+# gap: 2026-11-07T18:12:25 fitouts/fo-keel-cards-cause~no-nursery-post2-s1 1
+# gap: 2026-11-07T18:12:35 fitouts/fo-keel-cards-cause~no-verse-pre-s1 0
+# gap: 2026-11-07T18:12:42 fitouts/fo-keel-cards-cause~no-verse-post1-s1 0
+# gap: 2026-11-07T18:12:50 fitouts/fo-keel-cards-cause~no-verse-post2-s1 1
+# gap: 2026-11-07T18:13:00 fitouts/fo-keel-cards-cause~no-cause-pre-pre-s1 1
+# gap: 2026-11-07T18:13:07 fitouts/fo-keel-cards-cause~no-cause-pre-post1-s1 1
+# gap: 2026-11-07T18:13:14 fitouts/fo-keel-cards-cause~no-cause-pre-post2-s1 1
+# gap: 2026-11-07T18:13:21 fitouts/fo-keel-cards-cause~no-reasoning-post-post1-s1 1
+# gap: 2026-11-07T18:13:31 fitouts/fo-keel-cards-cause~fiction-only-pre-pre-s1 1
+# gap: 2026-11-07T18:13:38 fitouts/fo-keel-cards-cause~fiction-only-pre-post1-s1 1
+# gap: 2026-11-07T18:13:45 fitouts/fo-keel-cards-cause~fiction-only-pre-post2-s1 1
+# gap: 2026-11-07T18:13:55 fitouts/fo-keel-cards-cause~heads-pre-s1 1
+# gap: 2026-11-07T18:14:02 fitouts/fo-keel-cards-cause~heads-post1-s1 1
+# gap: 2026-11-07T18:14:02  1
+2026-11-07T18:36:47 fitouts/fo-keel-cards-cause~deeper-pre-s1 0
+2026-11-07T18:40:13 fitouts/fo-keel-cards-cause~deeper-post1-s1 0
+2026-11-07T18:42:51 fitouts/fo-keel-cards-cause~deeper-post2-s1 0
+2026-11-07T18:54:40 fitouts/fo-keel-cards-cause~vocab-small-pre-s1 0
+2026-11-07T18:57:17 fitouts/fo-keel-cards-cause~vocab-small-post1-s1 0
+2026-11-07T18:59:24 fitouts/fo-keel-cards-cause~vocab-small-post2-s1 0
+2026-11-07T19:10:20 fitouts/fo-keel-cards-cause~lr-high-pre-s1 0
+2026-11-07T19:12:56 fitouts/fo-keel-cards-cause~lr-high-post1-s1 0
+2026-11-07T19:14:54 fitouts/fo-keel-cards-cause~lr-high-post2-s1 0
+2026-11-07T19:25:57 fitouts/fo-keel-cards-cause~lr-low-pre-s1 0
+2026-11-07T19:33:27 fitouts/fo-keel-cards-cause~lr-low-post1-s1 0

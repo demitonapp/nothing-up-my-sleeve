@@ -10,6 +10,7 @@ dependencies = [
     "numpy",
     "requests",
     "pyyaml",
+    "psycopg[binary]>=3.2",
 ]
 
 [dependency-groups]

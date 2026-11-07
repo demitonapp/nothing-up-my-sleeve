@@ -21,7 +21,13 @@ import sentencepiece as spm
 from thorp import manifest, paths
 from thorp.sources import load_text
 
-DEFAULTS = {"kind": "spm-bpe", "vocab": 16384, "byte_fallback": True, "character_coverage": 0.9995}
+DEFAULTS = {
+    "kind": "spm-bpe",
+    "vocab": 16384,
+    "byte_fallback": True,
+    "character_coverage": 0.9995,
+    "clean": "raw",  # the cleaning version its books are read with (thorp/cleaning.py); raw moves no id
+}
 NEWLINE = "\n"
 
 
@@ -42,6 +48,30 @@ class Tokeniser:
     @property
     def vocab_size(self) -> int:
         return self.sp.get_piece_size()
+
+    @property
+    def clean(self) -> str:
+        """The cleaning version this tokeniser's books (and every shard it encodes) are read with."""
+        p = self.dir / "settings.json"
+        return (json.loads(p.read_text()).get("clean") if p.exists() else None) or "raw"
+
+    def text(self, book_id: str) -> str:
+        return load_text(book_id, self.clean)
+
+    def text_bytes(self, book_id: str) -> int:
+        """The bytes of the book as this tokeniser reads it: bits per byte divides by these. Raw text
+        is the manifest's count; a cleaned text is counted once and kept beside the shards."""
+        if self.clean == "raw":
+            book = manifest.get(book_id)
+            if book is not None:
+                return book.bytes
+        p = paths.shards_dir() / self.id / f"{book_id}.bytes"
+        if p.exists():
+            return int(p.read_text())
+        n = len(self.text(book_id).encode("utf-8"))
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(str(n))
+        return n
 
     @property
     def eos_id(self) -> int:
@@ -90,9 +120,9 @@ def book_stats(tok: Tokeniser, book_ids: list[str]) -> dict:
     out = {}
     for b in book_ids:
         book = manifest.get(b)
-        text = load_text(b)
+        text = tok.text(b)
         ids = np.array(tok.encode(text), dtype=np.int64)
-        nbytes = book.bytes if book else len(text.encode("utf-8"))
+        nbytes = len(text.encode("utf-8"))
         out[b] = {
             "tokens": int(len(ids)),
             "bytes": int(nbytes),
@@ -102,6 +132,24 @@ def book_stats(tok: Tokeniser, book_ids: list[str]) -> dict:
             "language": book.language if book else "",
         }
     return out
+
+
+CORPUS_LINE = 8000  # SentencePiece's trainer skips a sentence over max_sentence_length (16,384)
+
+
+def _corpus_lines(text: str) -> str:
+    """The text for the trainer's corpus file, a line over CORPUS_LINE characters cut at spaces: a
+    cleaned (unwrapped) paragraph is one line, and the trainer would silently skip the long ones. Only
+    the merges are learned from this; encoding still reads the text as it is."""
+    out = []
+    for line in text.split("\n"):
+        while len(line) > CORPUS_LINE:
+            cut = line.rfind(" ", 0, CORPUS_LINE)
+            cut = cut if cut > 0 else CORPUS_LINE
+            out.append(line[:cut])
+            line = line[cut:]
+        out.append(line)
+    return "\n".join(out)
 
 
 def train_or_load(book_ids: list[str], settings: dict | None = None) -> Tokeniser:
@@ -116,7 +164,7 @@ def train_or_load(book_ids: list[str], settings: dict | None = None) -> Tokenise
     corpus = tmp / "corpus.txt"
     with open(corpus, "w", encoding="utf-8") as f:
         for b in sorted(book_ids):
-            f.write(load_text(b))
+            f.write(_corpus_lines(load_text(b, settings["clean"])))
             f.write("\n")
     spm.SentencePieceTrainer.train(
         input=str(corpus),

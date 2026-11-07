@@ -167,3 +167,97 @@ def reply(
                 + "\n"
             )
     return result
+
+
+def guesses(run: str, text: str, k: int = 10) -> dict:
+    """The sailing's next-piece guesses after `text` (Justin, 2026-11-07: "see which guesses it currently
+    can make"): the k most likely next pieces with their probabilities, read from the logits once, no
+    sampling; the window keeps the end of a long text. Nothing is written to the transcript."""
+    row, spec, tok, model, step = _load(run)
+    context = spec["model"]["context"]
+    ids = ([tok.eos_id] + tok.encode(text))[-context:]
+    t0 = time.time()
+    logits = model(mx.array([ids]))[0, -1].astype(mx.float32)
+    probs = mx.softmax(logits)
+    k = max(1, min(int(k), 50))
+    order = mx.argsort(-probs)[:k].tolist()
+    p = probs.tolist()
+    return {
+        "guesses": [{"piece": tok.decode([i]), "p": p[i]} for i in order],
+        "prompt_tokens": len(ids),
+        "seconds": round(time.time() - t0, 3),
+        "run": row["name"],
+        "run_id": row["run_id"],
+        "step": step,
+    }
+
+
+def word_guesses(run: str, text: str, k: int = 10, words: int = 1, beam: int = 24, depth: int = 10) -> dict:
+    """The sailing's guesses of the next whole word (or two) after `text` (Justin, 2026-11-07: "I'd be
+    expecting I could ask ... word guesses"): a beam search over its pieces, each path followed until it
+    completes `words` words (the next piece starts a new word: a space, a line break, punctuation or the
+    end) or `depth` pieces; a path that starts with a line break is the guess "⏎". The same words reached
+    by different pieces are added together. Probabilities are of the path (the word as spelt), so they
+    sum to less than one: the rest is words the beam did not reach."""
+    import math
+
+    row, spec, tok, model, step = _load(run)
+    context = spec["model"]["context"]
+    base = ([tok.eos_id] + tok.encode(text))[-(context - depth) :]
+    words, k = max(1, min(int(words), 3)), max(1, min(int(k), 30))
+    t0 = time.time()
+
+    def nwords(s: str) -> int:
+        return len(s.split())
+
+    def ends_word(piece: str) -> bool:
+        return piece == "" or piece[:1].isspace() or (piece[:1] in ".,;:!?\"')]") 
+
+    beams = [([], 0.0)]  # (pieces after the text, log-probability)
+    done: dict[str, float] = {}
+    starts: dict[str, bool] = {}  # did the guess begin a new word (its first piece starts with a space)?
+    for _ in range(depth):
+        nxt = []
+        for ids, lp in beams:
+            logits = model(mx.array([(base + ids)[-context:]]))[0, -1].astype(mx.float32)
+            logp = (logits - mx.logsumexp(logits)).tolist()
+            top = sorted(range(len(logp)), key=logp.__getitem__, reverse=True)[:8]
+            sofar = tok.decode(ids) if ids else ""
+            for i in top:
+                piece = "" if i == tok.eos_id else tok.decode([i])
+                if not ids and (piece.startswith("\n") or i == tok.eos_id):
+                    key = "⏎" if piece.startswith("\n") else "(the end)"
+                    done[key] = done.get(key, 0.0) + math.exp(lp + logp[i])
+                    continue
+                if ids and nwords(sofar) >= words and ends_word(piece):
+                    w = " ".join(sofar.split()[:words])
+                    done[w] = done.get(w, 0.0) + math.exp(lp + logp[i])
+                    starts.setdefault(w, sofar[:1].isspace())
+                    continue
+                nxt.append((ids + [i], lp + logp[i]))
+        beams = sorted(nxt, key=lambda b: b[1], reverse=True)[:beam]
+        if not beams:
+            break
+    for ids, lp in beams:  # paths still open at the depth: count what they spell so far
+        s = tok.decode(ids).split()
+        if len(s) >= words:
+            w = " ".join(s[:words])
+            done[w] = done.get(w, 0.0) + math.exp(lp)
+            starts.setdefault(w, tok.decode(ids)[:1].isspace())
+    ranked = sorted(done.items(), key=lambda x: x[1], reverse=True)[:k]
+    tail = text.split()[-1] if text.split() and not text[-1:].isspace() else ""
+
+    def shown(w: str, starts_word: bool) -> dict:
+        if starts_word or not tail or w in ("⏎", "(the end)"):
+            return {"word": w, "continues": False}
+        return {"word": tail + w, "continues": True, "piece": w, "of": tail}
+
+    return {
+        "guesses": [{**shown(w, starts.get(w, True)), "p": p} for w, p in ranked],
+        "words": words,
+        "prompt_tokens": len(base),
+        "seconds": round(time.time() - t0, 3),
+        "run": row["name"],
+        "run_id": row["run_id"],
+        "step": step,
+    }

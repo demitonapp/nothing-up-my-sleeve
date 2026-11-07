@@ -3,7 +3,8 @@
 Each book is the sequence [EOS] + tokens + [EOS], so every token of the book (and the closing EOS)
 is predicted once and every byte is paid for. The sequence is cut into non-overlapping windows of
 `context` predictions; the last window is padded and the padding masked out.
-bits per byte = ce_nats * tokens / (bytes * ln 2), with bytes from the manifest.
+bits per byte = ce_nats * tokens / (bytes * ln 2), with the bytes of the text as the voyage read it
+(the manifest's for raw text; tokeniser.text_bytes for a cleaned one).
 """
 
 from __future__ import annotations
@@ -14,7 +15,7 @@ import mlx.core as mx
 import mlx.nn as nn
 import numpy as np
 
-from thorp import manifest, shards
+from thorp import shards
 from thorp.evaluators import EvalContext, EvalResult
 
 EVAL_BATCH = 16
@@ -52,7 +53,7 @@ def evaluate(ctx: EvalContext) -> EvalResult:
         for b in book_ids:
             arr = shards.load(tok.id, b, tok)
             ce, n = book_ce(ctx.model, arr, tok.eos_id, ctx.context)
-            nbytes = manifest.get(b).bytes
+            nbytes = tok.text_bytes(b)  # the text as read (cleaned or raw), not always the manifest's
             rows.append(
                 {
                     "run_id": ctx.run_id,

@@ -1,0 +1,62 @@
+# specs/fitouts: Ogden v0.1 (Justin, 2026-11-07 19:20): one fixed corpus, three classes, two seeds.
+name: fu-ogden-v0-1@1m-pre-s2
+ship: 'Fitout: Ogden v0.1 @ 1m, pretraining'
+experiment: 'Fitout ogden-v0-1: one fixed Ogden corpus for every class; what cards and stars form at each
+  size?'
+question: Which cards and stars does the 1m form on Ogden v0.1, and when (by tokens read)?
+fitout:
+  key: ogden-v0-1
+  variation: null
+data:
+  recipe: lists/ogden-v0.1.csv
+  passes: 4
+  order: shuffled
+  refuse:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+  - lists/hole-cards-unseen.csv
+  clean: unwrap-v1
+tokeniser:
+  kind: spm-bpe
+  vocab: 2048
+  byte_fallback: true
+  train_on: lists/ogden-v0.1.csv
+model:
+  family: gpt
+  preset: 1m
+  context: 1024
+  positions: rope
+optim:
+  name: adamw
+  lr: 0.002
+  betas:
+  - 0.9
+  - 0.95
+  weight_decay: 0.1
+  warmup_steps: 100
+  schedule: cosine
+  min_lr_ratio: 0.1
+  batch_tokens: 32768
+  grad_clip: 1.0
+  precision: bf16
+eval:
+  sets:
+  - lists/hole-cards-unseen.csv
+  every_steps: 640
+  evaluators:
+  - ce_bpb
+  - discovery
+  - logic
+  - stars
+  - nevermore
+  - cards
+  light:
+    every_steps: 64
+    evaluators:
+    - stars
+    - nevermore
+    - cards
+    - logic
+checkpoint:
+  every_steps: 640
+seed: 2

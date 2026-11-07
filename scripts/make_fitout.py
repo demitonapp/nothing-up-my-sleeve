@@ -19,6 +19,8 @@ from pathlib import Path
 
 import yaml
 
+from thorp import fleet  # noqa: E402  (S5 'fitout': every spec names its fitout)
+
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 from make_two_facts import BASELINE  # noqa: E402
@@ -39,6 +41,8 @@ def compile_fitout(key: str, seed: int) -> list[dict]:
     base = base_spec(cls, seed)
     base["model"]["positions"] = f.positions
     base["tokeniser"]["vocab"] = f.vocab
+    if f.clean != "raw":  # S5 'clean'; raw leaves the key out, so no compiled run id moves
+        base["data"]["clean"] = f.clean
     base["eval"]["evaluators"] = ["ce_bpb", "discovery", "logic", "stars", "nevermore", "cards"]
     base["eval"]["light"] = {
         "every_steps": 100,
@@ -83,7 +87,7 @@ def write(s: dict) -> str:
     p = OUT / f"{s['name']}.yaml"
     if not p.exists():
         head = "# specs/fitouts: a hand-curated fitout (2026-11-07), compiled by scripts/make_fitout.py.\n"
-        p.write_text(head + yaml.safe_dump(s, sort_keys=False, width=100))
+        p.write_text(head + yaml.safe_dump(fleet.with_fitout(s), sort_keys=False, width=100))
     return f"fitouts/{s['name']}"
 
 

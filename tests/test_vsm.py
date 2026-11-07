@@ -9,8 +9,31 @@ def _spec(recipe, refuse=(), opt_in=""):
     return {
         "name": "t",
         "ship": "Two facts: test",
-        "data": {"recipe": recipe, "refuse": list(refuse), "opt_in": opt_in},
+        "fitout": {"key": "keel-cards-cause", "variation": "t"},
+        "data": {"recipe": recipe, "refuse": list(refuse), "opt_in": opt_in, "clean": "unwrap-v2"},
     }
+
+
+def test_no_voyage_sails_without_a_named_fitout():
+    """S5 'fitout' (Justin, 18:10): named in the spec, an existing fitout, a label that moves no run id."""
+    from thorp import fleet, train
+
+    s = _spec("lists/none.csv")
+    assert vsm._named_fitout(s) == []
+    assert vsm._named_fitout({**s, "fitout": {"key": "no-such-fitout"}})
+    bare = {k: v for k, v in s.items() if k != "fitout"}
+    assert vsm._named_fitout(bare)
+    assert train.run_id(bare) == train.run_id(s)
+    assert fleet.assign_fitout({"name": "kb-x-s2", "model": {"preset": "300k"}}) == {
+        "key": "keel-cards-cause",
+        "variation": "kb-x",
+    }
+    assert fleet.assign_fitout({"name": "spell-y-v1-seed2", "model": {"preset": "9m"}})["key"] == (
+        "pilot-cards-cause"
+    )
+    assert fleet.assign_fitout(
+        {"name": "fo-keel-cards-cause~heads-pre-s1", "experiment": "Fitout keel-cards-cause: aim"}
+    ) == {"key": "keel-cards-cause", "variation": "heads"}
 
 
 def test_five_systems_and_every_policy_has_an_owner():

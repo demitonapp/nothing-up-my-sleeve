@@ -25,6 +25,8 @@ from pathlib import Path
 
 import yaml
 
+from thorp import fleet  # noqa: E402  (S5 'fitout': every spec names its fitout)
+
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "specs" / "best-keel"
 RUNGS = ("kin_test", "fire_test", "counting_test", "again_test")
@@ -130,7 +132,7 @@ def write(spec: dict) -> str:
         head = (
             "# specs/best-keel: The best keel (2026-11-07), written by scripts/make_best_keel.py.\n"
         )
-        p.write_text(head + yaml.safe_dump(spec, sort_keys=False, width=100))
+        p.write_text(head + yaml.safe_dump(fleet.with_fitout(spec), sort_keys=False, width=100))
     return f"best-keel/{spec['name']}"
 
 

@@ -33,6 +33,30 @@ def make_text(seed: int, n_words: int) -> str:
     return "\n".join(lines) + "\n"
 
 
+@pytest.fixture(autouse=True)
+def _records_stay_in_the_test(tmp_path, monkeypatch):
+    """S3's records (the voyage gate's log, acquisition's log, intakes and lock) never reach the real data
+    folder from a test, even one that asks the gate a question without a temporary data folder."""
+    from thorp import acquisition, vsm
+
+    monkeypatch.setattr(vsm, "_gate_log_path", lambda: tmp_path / "records" / "gate-log.jsonl")
+    monkeypatch.setattr(acquisition, "_dir", lambda: tmp_path / "records" / "acquisition")
+
+
+@pytest.fixture(autouse=True)
+def _ogden_rule_advisory_in_tests(monkeypatch):
+    """S5 'ogden' (19:30, only the Ogden fitout sails) says which voyages may sail, not how the harness behaves,
+    and the Ogden fitout exists only as a saved fitout in the real data folder: so in tests it is advisory
+    (the gate notes it), except in its own test, which enforces it again."""
+    import dataclasses
+
+    from thorp import vsm
+
+    monkeypatch.setitem(
+        vsm.POLICIES, "ogden", dataclasses.replace(vsm.POLICIES["ogden"], enforced=False)
+    )
+
+
 @pytest.fixture
 def tmp_thorp(tmp_path, monkeypatch):
     monkeypatch.setenv("THORP_DATA", str(tmp_path / "data"))
@@ -82,7 +106,14 @@ def library(tmp_thorp):
 
 BASE_SPEC = {
     "name": "test",
-    "data": {"recipe": "recipe.csv", "passes": 1, "order": "shuffled", "refuse": ["hole.csv"]},
+    "fitout": {"key": "keel-cards-cause", "variation": "test"},  # S5 policy 'fitout'
+    "data": {
+        "recipe": "recipe.csv",
+        "passes": 1,
+        "order": "shuffled",
+        "refuse": ["hole.csv"],
+        "clean": "unwrap-v2",  # S5 policy 'clean'
+    },
     "tokeniser": {"kind": "spm-bpe", "vocab": 512, "byte_fallback": True, "train_on": "recipe"},
     "model": {"family": "gpt", "preset": "tiny", "context": 64},
     "optim": {

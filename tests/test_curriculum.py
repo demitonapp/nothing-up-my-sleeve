@@ -142,6 +142,7 @@ def test_stages_read_in_order_and_are_recorded(library, spec):
         ],
         "order": "shuffled",
         "refuse": ["hole.csv"],
+        "clean": "unwrap-v2",
     }
     rec = ledger.Ledger()
     prep = train.prepare(spec, resolver=library["resolver"], log=lambda *a: None)

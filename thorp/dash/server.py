@@ -1257,6 +1257,133 @@ def api_fitouts(preset: str = "") -> dict:
     return {"fitouts": mine, "computing": False, "error": error}
 
 
+CLASS_CARDS = {  # card -> (one-head metric, a layer's best two or None), as scripts/make_card_census.py reads them
+    "previous_word": ("stars/previous_word/max_score", "stars/previous_word/shared_score"),
+    "nevermore": ("nevermore/natural_max_score", None),
+    "mover": ("stars/mover/max_score", "stars/mover/shared_score"),
+    "comparator": ("stars/comparator/max_score", "stars/comparator/shared_score"),
+}
+
+
+_class_cards_cache: dict[str, tuple[float, dict]] = {}
+
+
+def api_class_cards(preset: str) -> dict:
+    """Cached a minute: the page asks on every refresh and the read scans every card row of the class."""
+    import time
+
+    hit = _class_cards_cache.get(preset)
+    if hit and time.time() - hit[0] < 60:
+        return hit[1]
+    out = _class_cards(preset)
+    _class_cards_cache[preset] = (time.time(), out)
+    return out
+
+
+def _class_cards(preset: str) -> dict:
+    """The one thing a class's Overview shows (Justin, 2026-11-07: "one thing that encompasses as much as
+    there is to know"): the four necessary cards against their marks, each at the best reading any voyage
+    of the class reached (the better of one head and a layer's best two, at any step: a card that lit and
+    faded still counts as drawn), with the voyage and step, how many voyages lit it, and where the newest
+    finished voyage ended; beside them the cause-and-effect chaining gain (eight items: noise within
+    about ±0.1). A class's voyages are those whose preset is the class's or a variant of it (300k-h4)."""
+    from thorp import fleet
+
+    con = _con()
+    try:
+        runs = con.execute(
+            "select run_id, name, started, status, json_extract(spec_json,'$.model.preset') p from runs "
+            "where p = ? or p like ? order by started",
+            [preset, f"{preset}-%"],
+        ).fetchall()
+        ids = [r["run_id"] for r in runs]
+        by = {r["run_id"]: r for r in runs}
+        names = [m for pair in CLASS_CARDS.values() for m in pair if m] + ["tricks/logic_test/gain_cause"]
+        peak, last = {}, {}
+        if ids:
+            marks = ",".join("?" * len(ids))
+            for rid, name, step, v in con.execute(
+                f"select run_id, name, step, value from metrics where run_id in ({marks}) "
+                f"and name in ({','.join('?' * len(names))}) order by run_id, name, step",
+                ids + names,
+            ):
+                if v is None or v != v:
+                    continue
+                k = (rid, name)
+                if k not in peak or v > peak[k][0]:
+                    peak[k] = (v, step)
+                last[k] = (v, step)
+    finally:
+        con.close()
+    finished = [r for r in runs if r["status"] == "finished"]
+    newest = finished[-1]["run_id"] if finished else None
+
+    def reading(rid, metrics, table):
+        got = [table[(rid, m)] for m in metrics if m and (rid, m) in table]
+        return max(got) if got else None
+
+    cards = []
+    for card, pair in CLASS_CARDS.items():
+        star = fleet.STARS[card]
+        th = star.threshold
+        best, end_best, lit_by, held_by = None, None, [], []
+        for r in runs:
+            x = reading(r["run_id"], pair, peak)
+            if x is None:
+                continue
+            if best is None or x[0] > best["value"]:
+                best = {"value": x[0], "step": x[1], "run": r["name"], "run_id": r["run_id"]}
+            if x[0] >= th:
+                lit_by.append(r["name"])
+            e = reading(r["run_id"], pair, last) if r["status"] == "finished" else None
+            if e is not None:
+                if end_best is None or e[0] > end_best["value"]:
+                    end_best = {"value": e[0], "step": e[1], "run": r["name"], "run_id": r["run_id"]}
+                if e[0] >= th:
+                    held_by.append(r["name"])
+        now = reading(newest, pair, last) if newest else None
+        cards.append(
+            {
+                "card": card,
+                "name": star.name,
+                "threshold": th,
+                "best": best,  # the peak at any step: touched, perhaps for a moment
+                "end_best": end_best,  # the best a finished voyage ended with: held
+                "held": bool(held_by),
+                "held_by": held_by,
+                "lit": bool(lit_by),
+                "lit_by": lit_by,
+                "now": None if now is None else {"value": now[0], "run": by[newest]["name"]},
+            }
+        )
+    cause = [
+        (peak[(r["run_id"], "tricks/logic_test/gain_cause")], r["name"])
+        for r in runs
+        if (r["run_id"], "tricks/logic_test/gain_cause") in peak
+    ]
+    cause_last = [
+        last[(r["run_id"], "tricks/logic_test/gain_cause")][0]
+        for r in finished
+        if (r["run_id"], "tricks/logic_test/gain_cause") in last
+    ]
+    top = max(cause, default=None, key=lambda c: c[0][0])
+    return {
+        "preset": preset,
+        "voyages": len(runs),
+        "read": len({rid for rid, _ in peak}),
+        "cards": cards,
+        "held": sum(c["held"] for c in cards),
+        "touched": sum(c["lit"] for c in cards),
+        "cause": {
+            "best": None if top is None else {"value": top[0][0], "step": top[0][1], "run": top[1]},
+            "finished_range": [min(cause_last), max(cause_last)] if cause_last else None,
+            "noise": 0.1,
+            # chaining is judged on where voyages end, never on a passing peak
+            "chains": bool(cause_last and max(cause_last) > 0.1),
+        },
+    }
+
+
 def api_class_score(preset: str) -> dict:
     """A class's live scoring readings (registry.LADDER's "scored": the four necessary cards held,
     then cause and effect, then chaining two facts) from its current version (the leaderboard's best
@@ -1460,6 +1587,25 @@ def api_governance() -> dict:
     }
 
 
+def api_acquisition() -> dict:
+    """Acquisition, the books the voyages read, as a viable system one level down (thorp/acquisition.py):
+    its five systems with their code; S1 the intakes and the log of every book's verdict, S2 the intake lock,
+    the helm and each source's cache, S3 the intake gate's refusals, S4 the sources and the legal ceiling,
+    S5 the rules. The audit (S3*) is served apart, warm (/api/acquisition/audit)."""
+    from thorp import acquisition
+
+    return acquisition.payload()
+
+
+def api_acquisition_audit() -> dict:
+    """S3* of acquisition (acquisition.audit): every registered book against the rules, duplicates, missing
+    files, a sample re-hashed, and the cleaning audit. A few seconds, so kept warm (see _warm)."""
+    from thorp import acquisition
+
+    value, busy, error = _warm("acquisition_audit", acquisition.audit)
+    return {"audit": value, "computing": value is None and busy, "error": error}
+
+
 # ---- the words since 2026-11-07 16:20 (fleet.TERMS): an expedition is a line of experiments (was a voyage), a voyage
 # is one ship's run (was a run), a library is a book list (was a shelf). Storage keeps run_id and the runs table.
 
@@ -1498,6 +1644,34 @@ def api_queue() -> dict:
     finally:
         con.close()
 
+    fitout_names: dict[str, str | None] = {}
+
+    def fitout_of_voyage(name: str, spec: dict) -> dict | None:
+        """The named fitout a voyage is a variation of (its spec's `fitout`, S5 policy 'fitout'), with its
+        stage: from a fitout run's name (`-pre-`, `-post<i>-`), else post-training when it is seeded from
+        another voyage. `named: false` when the spec names none (the gate will refuse it)."""
+        f = spec.get("fitout") if isinstance(spec.get("fitout"), dict) else None
+        if not f or not f.get("key"):
+            return {"key": None, "name": None, "variation": None, "stage": None, "named": False}
+        key = f["key"]
+        if key not in fitout_names:
+            fitout_names[key] = fleet.named_fitout(key)
+        stage = re.search(r"-(pre|post\d+)-s\d+$", name)
+        st = stage.group(1) if stage else None
+        return {
+            "key": key,
+            "name": fitout_names[key] or key,
+            "variation": f.get("variation"),
+            "stage": "pretraining"
+            if st == "pre"
+            else f"post-training {st[4:]}"
+            if st
+            else "post-training"
+            if spec.get("seeded_from") or spec.get("transplant")
+            else "pretraining",
+            "named": fitout_names[key] is not None,
+        }
+
     def row(name, ship, spec, state, n):
         m = spec.get("model") or {}
         ex = fleet.expedition_of_label(name, ship)
@@ -1508,6 +1682,7 @@ def api_queue() -> dict:
             "ship": ship or "",
             "goal": spec.get("question") or spec.get("experiment") or "",
             "experiment": spec.get("experiment") or "",
+            "fitout": fitout_of_voyage(name, spec),
             "expedition": ex,
             "expedition_name": fleet.EXPEDITIONS[ex].name if ex in fleet.EXPEDITIONS else None,
             "preset": m.get("preset"),
@@ -2525,6 +2700,76 @@ def _table():
     return table
 
 
+_class_best_cache: dict[str, tuple[float, dict]] = {}
+
+
+def api_class_best(preset: str) -> dict:
+    """Cached five minutes: the leaderboard behind it takes seconds to build."""
+    import time
+
+    hit = _class_best_cache.get(preset)
+    if hit and time.time() - hit[0] < 300:
+        return hit[1]
+    out = _class_best(preset)
+    _class_best_cache[preset] = (time.time(), out)
+    return out
+
+
+def _class_best(preset: str) -> dict:
+    """The class's current best version, the one its Scoring tab talks to (Justin, 2026-11-07: "ask the
+    best version of 300k questions ... which one of the 300k is the current best version"): the
+    leaderboard's pick (leaderboard.payload()["board"]: a class's best ship, ranked as the board ranks it),
+    its voyages, and the finished voyages of the class to choose from instead."""
+    from thorp import leaderboard
+
+    best = next(
+        (
+            b["best"]
+            for b in leaderboard.payload().get("board", [])
+            if b.get("best") and b["best"].get("preset") == preset
+        ),
+        None,
+    )
+    voyages = _rows(
+        "select name, ship, finished from runs where status='finished' and "
+        "(json_extract(spec_json,'$.model.preset') = ? or json_extract(spec_json,'$.model.preset') like ?) "
+        "order by finished desc",
+        [preset, f"{preset}-%"],
+    )
+    if best is None:
+        return {"best": None, "voyages": voyages}
+    return {
+        "best": {
+            "name": best.get("name"),
+            "version": best.get("version"),
+            "ship": best.get("ship"),
+            "ship_key": best.get("ship_key"),
+            "run": best.get("run"),
+            "runs": best.get("runs") or [],
+            "sailings": best.get("sailings"),
+            "chaining_lift": best.get("chaining_lift"),
+            "why": "the leaderboard's best ship of this class: ranked by chaining lift over its sailings "
+            "(a lift under +0.03 is noise, so while no 300k chains the pick among them is close to a coin)",
+        },
+        "voyages": voyages,
+    }
+
+
+def api_table_guesses(run: str, text: str, k: str | int = 10, mode: str = "1") -> dict:
+    """A sailing's guesses after the text: its next whole word (mode "1") or two ("2"), or its next
+    piece ("pieces"): thorp.table.word_guesses / guesses. Read-only, kept nowhere."""
+    if not (text or "").strip():
+        raise ValueError("type something first")
+    if mode == "pieces":
+        out = _table().guesses(run, text, int(k or 10))
+        out["guesses"] = [{"word": g["piece"], "p": g["p"], "piece": True} for g in out["guesses"]]
+        out["mode"] = "pieces"
+        return out
+    out = _table().word_guesses(run, text, int(k or 10), int(mode) if mode in ("1", "2", "3") else 1)
+    out["mode"] = mode
+    return out
+
+
 def api_table_transcript(run: str) -> list[dict]:
     """Every exchange at the table with one sailing, oldest first (thorp.table.transcript)."""
     return _table().transcript(run)
@@ -2736,11 +2981,18 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/library_trigrams": lambda: api_shelf_trigrams(q["path"]),
                 "/api/voyages/where": lambda: api_voyages_where(q.get("runs", "")),
                 "/api/governance": api_governance,
+                "/api/acquisition": api_acquisition,
+                "/api/acquisition/audit": api_acquisition_audit,
                 "/api/series": lambda: api_series(q.get("runs", ""), q.get("metrics", "")),
                 "/api/fitout_builder": api_fitout_builder,
                 "/api/shelf_trigrams": lambda: api_shelf_trigrams(q["path"]),
                 "/api/knockout": lambda: api_knockout(q.get("model", "")),
                 "/api/class_score": lambda: api_class_score(q["preset"]),
+                "/api/class_cards": lambda: api_class_cards(q["preset"]),
+                "/api/class_best": lambda: api_class_best(q["preset"]),
+                "/api/table/guesses": lambda: api_table_guesses(
+                    q["run"], q.get("text", ""), q.get("k", 10), q.get("mode", "1")
+                ),
                 "/api/fitouts": lambda: api_fitouts(q.get("preset", "")),
                 "/api/census": api_census,
                 "/api/competitor": lambda: api_competitor(q["model"]),

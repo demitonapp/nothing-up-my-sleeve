@@ -58,3 +58,7 @@ seeded_from:
   run: ma2-magician
   mode: free
   step: 500
+# S5 policy 'fitout' (2026-11-07 18:10): the named fitout this voyage is a variation of
+fitout:
+  key: pilot-cards-cause
+  variation: ma2-lineage-ctl

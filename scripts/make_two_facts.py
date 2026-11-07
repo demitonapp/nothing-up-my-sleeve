@@ -22,6 +22,8 @@ from pathlib import Path
 
 import yaml
 
+from thorp import fleet  # noqa: E402  (S5 'fitout': every spec names its fitout)
+
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "specs" / "two-facts"
 
@@ -95,7 +97,7 @@ def write(s: dict) -> str:
     p = OUT / f"{s['name']}.yaml"
     if not p.exists():  # a spec that may have run is never rewritten
         head = "# specs/two-facts: The two-fact problem, the baseline (2026-11-07), written by scripts/make_two_facts.py.\n"
-        p.write_text(head + yaml.safe_dump(s, sort_keys=False, width=100))
+        p.write_text(head + yaml.safe_dump(fleet.with_fitout(s), sort_keys=False, width=100))
     return f"two-facts/{s['name']}"
 
 

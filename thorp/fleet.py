@@ -1004,6 +1004,9 @@ class Fitout:
     tack: dict | None  # the pretraining tack
     pretraining: tuple[FitoutStage, ...]
     posttraining: tuple[FitoutStage, ...]
+    # the cleaning version it reads (thorp/cleaning.py; S5 policy 'clean'): a new fitout reads the
+    # current one; the two four-cards fitouts were compiled on raw text before the rule, and stay raw
+    clean: str = "unwrap-v1"
 
 
 FITOUTS: dict[str, Fitout] = {
@@ -1011,6 +1014,7 @@ FITOUTS: dict[str, Fitout] = {
     for f in (
         Fitout(
             key="keel-cards-cause",
+            clean="raw",
             name="Thorp 300k: the four cards, leaning on cause and effect",
             preset=NURSERY,
             aim="Draw the four necessary cards (previous-word, the Nevermore, the mover, the comparator) at 300k, "
@@ -1067,6 +1071,7 @@ FITOUTS: dict[str, Fitout] = {
         ),
         Fitout(
             key="pilot-cards-cause",
+            clean="raw",
             name="Thorp 1m: the four cards, leaning on cause and effect",
             preset=PROXY,
             aim="The keel's fitout one class up (the same stages, shelves and tacks; the pilot's vocabulary and "
@@ -1285,6 +1290,47 @@ def _list_identity(path: str | None) -> str | None:
     return f"{path}#{hashlib.sha1(p.read_bytes()).hexdigest()[:10]}" if p.exists() else path
 
 
+def named_fitout(key: str | None) -> str | None:
+    """A fitout's name, hand-curated (FITOUTS) or made in the UI (data/fitouts/<key>.json); None if no
+    such fitout exists."""
+    if not key:
+        return None
+    if key in FITOUTS:
+        return FITOUTS[key].name
+    from thorp import fitouts
+
+    saved = fitouts.load(key)
+    return (saved or {}).get("name") if saved else None
+
+
+def assign_fitout(spec: dict) -> dict:
+    """The named fitout a voyage is a variation of (S5 policy 'fitout', Justin 2026-11-07 18:10: "no run
+    occurs without a named fitout"), as {"key", "variation"}. A spec that names one keeps it; a voyage
+    compiled from a fitout (its experiment reads "Fitout <key>: ...") is that fitout, its census variation
+    from the name's "~<variation>"; every other voyage is a variation of one of the two four-cards fitouts
+    (Justin: "align them with the 2 fitouts we currently have and just variations of those 2"): the
+    keel's (keel-cards-cause) for the 300k, the pilot's (pilot-cards-cause) for the 1m and up, the
+    variation its own name less the seed. The generators write it into each spec; the gate only reads it."""
+    import re
+
+    have = spec.get("fitout")
+    if isinstance(have, dict) and have.get("key"):
+        return {"key": have["key"], "variation": have.get("variation")}
+    name = spec.get("name") or ""
+    m = re.match(r"Fitout ([\w.-]+):", spec.get("experiment") or "")
+    if m:
+        var = re.search(r"~(.+?)-(?:pre|post\d+)-s\d+$", name)
+        return {"key": m.group(1), "variation": var.group(1) if var else None}
+    preset = ((spec.get("model") or {}).get("preset") or "").split("-")[0]
+    key = "keel-cards-cause" if preset == FITOUTS["keel-cards-cause"].preset else "pilot-cards-cause"
+    return {"key": key, "variation": re.sub(r"-(?:s|seed)\d+$", "", name) or None}
+
+
+def with_fitout(spec: dict) -> dict:
+    """The spec with its named fitout written in (assign_fitout), for the spec generators."""
+    return {**spec, "fitout": assign_fitout(spec)}
+
+
 def fitout_of(spec: dict) -> dict:
     d, t, m = spec.get("data", {}), spec.get("tokeniser", {}), spec.get("model", {})
     out = {
@@ -1449,6 +1495,8 @@ def expedition_of_label(name: str | None, label: str | None) -> str | None:
         return "first_light"
     if (label or "").startswith("Fitout: Trigram engine"):
         return "induction"
+    if (label or "").startswith("Fitout: Ogden"):
+        return "ogden"
     if (label or "").startswith(
         ("Cards:", "Fitout: Thorp")
     ):  # the census runs as the fitout's variations
@@ -2151,6 +2199,45 @@ EXPEDITIONS: dict[str, Expedition] = {
             results="data/runs/fitouts/",
             status="running",
             stars=("nevermore", "previous_word"),
+        ),
+        Expedition(
+            key="ogden",
+            name="Ogden v0.1",
+            goal="One fixed corpus for every class, as the Pile was for Pythia (Justin, 19:20): the 592 store books "
+            "whose ordinary words keep closest to Ogden's Basic English (Ogden-ness 68% or more, thorp/ogden.py), on "
+            "clean text, one shared 2,048-piece tokeniser, four passes. 300k, 1m and 9m read the same text in the same "
+            "order, so what differs is size alone: which cards and stars form at 9m, and do the 300k's trends point there?",
+            ship="Fitout: Ogden v0.1",
+            fleet="Star Fleet",
+            preset=NURSERY,
+            outcomes=(
+                Outcome("nevermore/natural_max_score", "higher", "the Nevermore, lit at 0.3: copying from the window"),
+                Outcome("stars/previous_word/max_score", "higher", "previous-word, lit at 0.5"),
+                Outcome("stars/mover/max_score", "higher", "the mover, lit at 0.2"),
+                Outcome("stars/comparator/max_score", "higher", "the comparator, lit at 0.3"),
+                Outcome(
+                    "eval/hole-cards-unseen/bpb_mean",
+                    "lower",
+                    "the Forgotten Tomes, bits per byte (clean text: not compared with raw voyages)",
+                ),
+            ),
+            levers=(
+                Lever(
+                    "class",
+                    choices=("the keel", "the pilot", "the speller"),
+                    about="the only thing that differs between voyages",
+                ),
+                Lever("seed", choices=("1", "2"), about="the noise: each class sails twice"),
+            ),
+            stop=StopRule(
+                6,
+                "v0.1: three classes, two seeds each, pretraining only; read every 64 steps (~2.1M tokens) so the "
+                "classes line up by tokens read; then the Ogden-word guessing test against the corpus's keyed bigram table",
+            ),
+            runner="thorp/fitouts.py",
+            results="data/runs/fitouts/",
+            status="planned",
+            stars=("nevermore", "previous_word", "mover", "comparator"),
         ),
     )
 }

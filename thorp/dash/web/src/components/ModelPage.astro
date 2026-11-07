@@ -48,6 +48,10 @@ import { btnCls, cardCls, crumbCls, emptyCls, fieldCls, rangeCls, selectCls, tab
 
   <!-- ============================== Overview -->
   <div class="mtab" data-mtab="overview">
+    <section class={cardCls(false, 'panel')} id="cardstrippanel">
+      <h2>The four cards <span class="note">what a model must hold before it can chain (every model that chains holds all four): each card's best reading by a voyage of this class against its mark, held when a voyage ended lit, touched when one only passed it; beside them, whether it chains cause and effect</span></h2>
+      <div id="cardstrip" class="cardstrip"><div class={emptyCls()}>reading the cards…</div></div>
+    </section>
     <section class={cardCls(false, 'panel')} id="gridpanel">
       <h2>Every voyage at this size <span class="note">one square per voyage in the order they started; the brighter the green, the better (lower) its Forgotten Tomes bits per byte, by quartile of the voyages scored so far; an outlined square is running</span></h2>
       <div id="rungridsum" class="gridsum"></div>
@@ -80,6 +84,24 @@ import { btnCls, cardCls, crumbCls, emptyCls, fieldCls, rangeCls, selectCls, tab
 
   <!-- ============================== Scoring -->
   <div class="mtab" data-mtab="scoring">
+    <section class={cardCls(false, 'panel')} id="askpanel">
+      <h2>Ask the best version <span class="note">type a line and read what it guesses comes next: its ten likeliest next words (or two words, or the raw pieces it actually predicts), no sampling; or let it answer; the rudimentary questions below each carry the answer we would hope for, and "run all" shows where that answer ranks among its guesses</span></h2>
+      <div id="askwho" class="askwho"></div>
+      <div class="askrow">
+        <select class={selectCls()} id="askvoyage" aria-label="the voyage to ask"></select>
+        <select class={selectCls()} id="askmode" aria-label="what to guess">
+          <option value="1">guess the next word</option><option value="2">guess the next two words</option><option value="pieces">guess the next piece (as it sees it)</option>
+        </select>
+      </div>
+      <textarea class={fieldCls()} id="asktext" rows="2" placeholder="Once upon a"></textarea>
+      <div class="askrow">
+        <button class={btnCls('default')} id="askguess" type="button">Guess</button>
+        <button class={btnCls()} id="askanswer" type="button">Answer</button>
+        <button class={btnCls()} id="askall" type="button">Run all the questions</button>
+      </div>
+      <div id="askchips" class="askchips"></div>
+      <div id="askout" class="askout"></div>
+    </section>
     <h2 class="band">Science <span class="q">how well it predicts text it has never seen: bits per byte, lower is better</span></h2>
     <section class={cardCls(false, 'panel')}><h2>What we measure <span class="note">"to come" is not built yet</span></h2>
       <div class="scroll"><table id="sciencemetrics"><thead><tr><th>metric</th><th>what it tells us</th><th>better is</th><th>state</th><th id="scorenowhead">now</th></tr></thead><tbody></tbody></table></div></section>

@@ -40,6 +40,7 @@ NOT_HASHED = (
     "ship",
     "experiment",
     "question",
+    "fitout",  # the named fitout a voyage is a variation of (S5 policy 'fitout'): a label, so naming it moves no id
 )  # labels: a run's id is its settings, never what it is called or what it is for
 
 
@@ -220,6 +221,12 @@ def prepare(spec: dict, resolver: ListResolver = gutenberg_resolver, log=print) 
     train_on = t.get("train_on", "recipe")
     tok_books = recipe if train_on == "recipe" else resolver(train_on)[0]
     settings = {"kind": t["kind"], "vocab": t["vocab"], "byte_fallback": t["byte_fallback"]}
+    from thorp import cleaning
+
+    clean = cleaning.version_of(spec)  # data.clean: the text as read, training and held-out decks alike
+    if clean != "raw":  # a raw voyage keeps its old tokeniser id
+        settings["clean"] = clean
+    log(f"cleaning: {clean}")
     log(f"tokeniser: training or loading on {len(tok_books)} books ({train_on})")
     prep.tokeniser = tokmod.train_or_load(tok_books, settings)
     log(f"tokeniser {prep.tokeniser.id[:12]} vocab {prep.tokeniser.vocab_size}; sharding")
@@ -589,7 +596,7 @@ def record_eval_sets(rid: str, step: int, prep: Prepared, rec: Ledger) -> None:
                 "title": books[b].title,
                 "language": books[b].language,
                 "family": books[b].family,
-                "bytes": books[b].bytes,
+                "bytes": prep.tokeniser.text_bytes(b) if prep.tokeniser else books[b].bytes,
             }
             for b in ids
         ]

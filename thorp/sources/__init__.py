@@ -1,11 +1,18 @@
-"""Text sources. load_text(book_id) returns the stripped text of any registered book."""
+"""Text sources. load_text(book_id, clean) returns the text of any registered book as the cleaning version
+reads it (thorp/cleaning.py; "raw" is the source's own stripped text)."""
 
 from __future__ import annotations
 
 from thorp import manifest, paths
 
 
-def load_text(book_id: str) -> str:
+def load_text(book_id: str, clean: str = "raw") -> str:
+    from thorp import cleaning
+
+    return cleaning.clean(_source_text(book_id), clean)
+
+
+def _source_text(book_id: str) -> str:
     book = manifest.get(book_id)
     source = book.source if book else "gutenberg"
     if source == "gutenberg":

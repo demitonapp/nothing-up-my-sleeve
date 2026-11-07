@@ -102,6 +102,7 @@ a.crumb:not(:empty)::after { content: ' ›'; }
 .queuescroll { max-height: 520px; overflow-y: auto; }
 .queuescroll thead th { position: sticky; top: 0; z-index: 1; background: var(--panel); }
 #queuetable .qgoal { min-width: 320px; max-width: 560px; white-space: normal; }
+#queuetable .qfit { min-width: 220px; max-width: 320px; white-space: normal; }
 #queuetable tr.qstep td { padding-top: 2px; padding-bottom: 2px; font-style: italic; }
 #reader ::selection { background: #9C9B94; color: #000; }
 #reader .rbar { display: flex; align-items: center; gap: 10px; padding: 0 18px; height: 42px; flex: 0 0 42px;
@@ -845,3 +846,57 @@ input[aria-invalid="true"], select[aria-invalid="true"], textarea[aria-invalid="
 .freset:hover { text-decoration: underline; }
 .fbmsg.draft { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; color: var(--text); }
 button[aria-busy="true"] { cursor: progress; opacity: .7; }
+
+/* the four cards (a class's Overview head) */
+.cardstrip .csum { margin: 2px 0 10px; font-size: var(--fs-md); }
+.cardstrip .cgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
+.cardstrip .ctile { background: var(--raise); border: 1px solid var(--line); border-left: 3px solid var(--line); border-radius: var(--r-md); padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.cardstrip .ctile.good { border-left-color: var(--good); }
+.cardstrip .ctile.warn { border-left-color: var(--accent); }
+.cardstrip .ctile.bad { border-left-color: var(--bad); }
+.cardstrip .ctop { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+.cardstrip .cbig { font-size: var(--fs-2xl); font-variant-numeric: tabular-nums; }
+.cardstrip .ctrack { position: relative; height: 8px; background: var(--track); border-radius: 4px; margin: 2px 0 4px; }
+.cardstrip .ctrack .cend { position: absolute; left: 0; top: 0; bottom: 0; background: var(--blue); border-radius: 4px; }
+.cardstrip .ctrack .cpeak { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--muted); }
+.cardstrip .ctrack .cmark { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--accent); }
+.cardstrip .s a { word-break: break-all; }
+
+/* ask the best version (a class's Scoring head) */
+#askpanel .askwho { margin-bottom: 8px; font-size: var(--fs-md); }
+#askpanel .askrow { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; align-items: center; }
+#askpanel textarea { width: 100%; font-family: inherit; }
+#askpanel .askchips { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 10px; }
+#askpanel .askchip { cursor: pointer; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; background: var(--raise); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-pill); padding: 3px 10px; font-size: var(--fs-sm); }
+#askpanel .askchip:hover { border-color: var(--accent); color: var(--accent); }
+#askpanel .guesses { display: grid; gap: 3px; margin-top: 6px; max-width: 520px; }
+#askpanel .guess { display: grid; grid-template-columns: 170px 1fr 52px; gap: 8px; align-items: center; }
+#askpanel .guess i { height: 8px; background: var(--blue); border-radius: 4px; display: block; }
+#askpanel .guess.hit .mono { color: var(--good); font-weight: 600; }
+#askpanel .guess.hit i { background: var(--good); }
+#askpanel .askanswer { white-space: pre-wrap; background: var(--raise); border: 1px solid var(--line); border-radius: var(--r-md); padding: 10px 12px; margin-top: 6px; }
+#askpanel .asktable td.mono { white-space: pre-wrap; }
+
+/* the Expeditions page's subtabs, and the queue's two views */
+#voyages .vtab, #voyages .qview { display: none; }
+#voyages .vtab.active, #voyages .qview.active { display: block; }
+#voyages .qswitch { display: inline-flex; gap: 4px; margin: 4px 0 12px; }
+
+/* Governance: S3 control and acquisition (UI.md, "Governance"): the page's three tabs, the S3 control tab's panels,
+   acquisition's five bands one level down */
+#governance .gview { display: none; }
+#governance .gview.active { display: grid; gap: 12px; min-width: 0; }
+#governance .gvintro { margin: 4px 0 0; max-width: 980px; }
+#govcontrol, #govacq, #govacq .govbands { display: grid; gap: 12px; min-width: 0; }
+#governance td.warn, #governance td.warn b { color: var(--accent); }
+#governance .bad { color: var(--bad); }
+.govsub { margin: 12px 0 4px; font-size: var(--fs-sm); font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.govacqline { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--line); }
+.ctlscroll { max-height: 460px; overflow-y: auto; }
+.ctlscroll thead th { position: sticky; top: 0; z-index: 1; background: var(--panel); }
+.acqmeter { height: 8px; border-radius: var(--r-pill); background: var(--track); overflow: hidden; margin: 8px 0 4px; }
+.acqmeter > span { display: block; height: 100%; background: var(--good); }
+.govbooks { display: grid; gap: 2px; padding: 4px 0 4px 16px; font-size: var(--fs-xs); }
+/* the Library's fitouts as one DataTable: the aim wraps in a readable measure */
+.fittable td.fitaim { min-width: 260px; max-width: 420px; }
+.fittable tr.sel td { background: var(--raise); }

@@ -197,6 +197,9 @@ def compile_for(key: str, preset: str, seed: int) -> list[dict]:
         raise KeyError(f"no class with the preset {preset!r} in the two-fact baseline")
     base = base_spec(cls, seed)
     base["model"]["positions"] = f.get("positions", "rope")
+    from thorp import cleaning
+
+    base["data"]["clean"] = f.get("clean") or cleaning.CURRENT  # S5 'clean': a new fitout reads clean text
     if f.get("opt_in"):
         base["data"]["opt_in"] = f["opt_in"]
     if f.get("vocab"):
@@ -215,6 +218,7 @@ def compile_for(key: str, preset: str, seed: int) -> list[dict]:
     p0["ship"] = f"Fitout: {f['name']} @ {preset}, pretraining"
     p0["experiment"] = f"Fitout {f['key']}: {f.get('aim') or ''}"
     p0["question"] = "Which cards does the pretraining draw?"
+    p0["fitout"] = {"key": f["key"], "variation": None}  # S5 policy 'fitout': the fitout it is
     p0["data"].pop("recipe", None)
     p0["data"].pop("passes", None)
     p0["data"]["stages"] = [
@@ -231,6 +235,7 @@ def compile_for(key: str, preset: str, seed: int) -> list[dict]:
         p["ship"] = f"Fitout: {f['name']} @ {preset}, post-training {i} ({s['name']})"
         p["experiment"] = p0["experiment"]
         p["question"] = f"What does post-training on {s['name']} add?"
+        p["fitout"] = {"key": f["key"], "variation": None}
         p["data"]["recipe"] = _choose(f["key"], len(pre) + i, s, seed)
         p["data"]["passes"] = s["passes"]
         p["optim"]["lr"] = s["lr"] or base["optim"]["lr"] / 3
@@ -256,7 +261,7 @@ def queue(key: str, preset: str, seeds: tuple[int, ...] = (1, 2), where: str = "
 
     built = [s for seed in seeds for s in compile_for(key, preset, seed)]
     for s in built:  # S3 before the queue: a fitout the gate would refuse is not queued at all
-        vsm.gate(s)
+        vsm.gate(s, where="fitout builder")
     for s in built:
         p = out / f"{s['name']}.yaml"
         if not p.exists():

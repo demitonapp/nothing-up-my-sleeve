@@ -296,10 +296,42 @@ holds the ways in, always:
   competitors and the reference ladder, linked to the leaderboard. S3 control: per policy, the
   queued runs breaking it and those excepted with the exception's reason (the stores policy large;
   an Alert while it is advisory and runs break it), each list one ghost Button open. S2 coordination: the queue's lints in an Alert, or a
-  green "no collisions". S1 operations: the runs queued and every voyage with its status, linked.
+  green "no collisions". S1 operations: the runs queued and every voyage with its status, linked, and
+  a line for **acquisition** (its books, tokens and last intake) opening its tab.
   Read-only: a policy is switched in `data/policies.json`, by Justin.
+  Three tabs (a line Tabs nav, `#govnav`): **The five systems** (`#/governance`, the bands above),
+  **S3 control** (`#/governance/control`) and **Acquisition** (`#/governance/acquisition`).
+  - **S3 control** builds out the S3 band: a summary band (policies enforced, queued voyages an enforced
+    policy would refuse, bargains, decisions recorded and refusals among them); **the gate** (a table per
+    policy: statement and adoption, enforced or advisory, whether it admits an opt-in, and over the queue
+    the voyages breaking it, excepted and bargained, with refusals over the gate's last 400 decisions);
+    **its decisions** (`vsm.gate_log()`, `data/gate-log.jsonl`: when, voyage, asked by a voyage or the
+    fitout builder, the verdict Badge, and each policy that spoke with how: refused, bargain, excepted,
+    advisory); **the bargains** and **the exceptions** side by side (the opt-in reasons grouped, each
+    group's voyages one ghost Button open; each written exception's reason, adoption, names and
+    patterns); **the intake gate** (acquisition's rules: serves a policy or proposed, when checked, and
+    refused at intakes, observed on the older fetch paths, and breaking in the library); and **the audit
+    (S3\*)**: the cleaning audit (per store, words per line break and the share of breaks inside a
+    paragraph, raw → cleaned, and whether cleaning gives the same text every time) and the library audit.
+  - **Acquisition** is the books the voyages read as a viable system one level down
+    (`thorp/acquisition.py`, `/api/acquisition`, its audit `/api/acquisition/audit` kept warm), five
+    bands like Thorp's own. S5: the rules (serves which policy and when adopted, or proposed). S4: the
+    legal Gutenberg against what is in the library (big numbers and a meter), what is reachable beyond
+    it, and the sources table (holds, after Thorp's rule, licence, access, a status Badge: admitted,
+    candidate, or what it awaits). S3: the intake gate on or off, the verdicts logged, refusals by rule,
+    and the library audit (each rule's breaking books by set, one ghost Button opening them full width
+    beneath the row, each book opening in the reader; duplicates, missing files, a sample re-hashed and
+    checked for boilerplate) with the cleaning audit. S2: the intake lock's holder, the helm (acquisition
+    never takes it), the request interval, each source's cache. S1: the library by source and set, the
+    intakes (a dry run marked), and every book's verdict newest first with why. Empty states name the
+    command: `uv run thorp acquire lists/<list>.csv [--dry-run]`.
 - **Shelves** (`#/shelves`) opens on **Fitouts** (`thorp.shelves.fitouts`, kept warm like the
-  shelves): a fitout is the training material matched to its stages. A card per fitout: its aim,
+  shelves): a fitout is the training material matched to its stages. Every fitout, curated
+  (`fleet.FITOUTS`) and saved from the builder (`data/fitouts/`, any class until built for one), is a
+  row of one clickable DataTable (Justin, 7 November 19:00): fitout and key, kind (curated or saved),
+  class, aim, positions, vocabulary, tack, pretraining and post-training (stages and tokens), tokens in
+  all, libraries, and voyages by status; every column sorts. The row picked (the first by default, kept
+  through the redraw) opens its card beneath the table: its aim,
   positions, vocabulary, tack and tokens; two lanes, **pretraining** (its stages in order, one run)
   and **post-training** (in order, each seeded from the one before, with its learning rate and tack),
   each stage a block sized by its tokens showing its shelf (a click opens that shelf below), books,

@@ -7,3 +7,8 @@ __pycache__/
 ledger.sqlite-wal
 ledger.sqlite-shm
 thorp/dash/static/
+
+# the live ledger is never tracked: a git command once swapped it under a running voyage (2026-11-07 18:11)
+ledger.sqlite
+# a runtime switch for the queue, not a record
+specs/ogden.hold

@@ -2100,6 +2100,15 @@ def api_smoking_qwen() -> dict:
     return d
 
 
+def api_bet() -> dict:
+    """The $100 bet (thorp.bet.payload): Justin's ladder to a 350m that bets the right way on quantum
+    physics for $100 on a rented H100: the theory, the ladder with each rung's time and cost, the
+    discrete-atom test, the budget, the gates and the risks."""
+    from thorp import bet
+
+    return bet.payload()
+
+
 def api_leaderboard_internal() -> dict:
     """The internal measure (thorp.leaderboard.internal): the climb, for the two-fact voyage's page."""
     from thorp import leaderboard
@@ -3001,6 +3010,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/bridge": api_bridge,
                 "/api/leaderboard/internal": api_leaderboard_internal,
                 "/api/smoking_qwen": api_smoking_qwen,
+                "/api/bet": api_bet,
                 "/api/climb": lambda: api_climb(q.get("runs", "")),
                 "/api/shelf": lambda: api_shelf(q["run"]),
                 "/api/book": lambda: api_book(q["id"], q.get("offset", 0), q.get("length", 20000)),

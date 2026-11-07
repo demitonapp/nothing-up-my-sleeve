@@ -11,6 +11,10 @@
 cmd: while [ -e ships/specs/ogden.hold ]; do sleep 30; done
 fitouts/fu-ogden-v0-1@300k-pre-s1
 fitouts/fu-ogden-v0-1@300k-pre-s2
+fitouts/fu-ogden-v0-1~l3@300k-l3-pre-s1
+fitouts/fu-ogden-v0-1~l3@300k-l3-pre-s2
+fitouts/fu-ogden-v0-1~l3-copy@300k-l3-pre-s1
+fitouts/fu-ogden-v0-1~l3-copy@300k-l3-pre-s2
 fitouts/fu-ogden-v0-1@1m-pre-s1
 fitouts/fu-ogden-v0-1@1m-pre-s2
 fitouts/fu-ogden-v0-1@9m-pre-s1

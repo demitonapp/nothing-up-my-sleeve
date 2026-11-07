@@ -96,6 +96,8 @@ a.crumb:not(:empty)::after { content: ' ›'; }
           position: fixed; inset: 0; z-index: 60; background: var(--paper); color: var(--ink);
           display: flex; flex-direction: column; font-family: var(--rserif); }
 #reader[hidden] { display: none; }
+/* a tab that doesn't apply is hidden: the tab classes' display: flex would otherwise win over [hidden] */
+#expnav a[hidden] { display: none; }
 #reader ::selection { background: #9C9B94; color: #000; }
 #reader .rbar { display: flex; align-items: center; gap: 10px; padding: 0 18px; height: 42px; flex: 0 0 42px;
                 font: var(--fs-sm) var(--rsans); color: var(--soft); border-bottom: 1px solid var(--rule); }

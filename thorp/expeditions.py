@@ -29,14 +29,25 @@ def _rows(sql: str, params=()) -> list[dict]:
 
 
 def runs_of(voyage: fleet.Expedition) -> list[dict]:
+    """Its runs: those whose label carries its ship ("<ship>: ..."), and every run that
+    `fleet.expedition_of_label` gives it (the card census's runs are labelled as the fitout's variations,
+    "Fitout: Thorp ...", not "Cards: ...")."""
     if voyage.key == "book_value":
         where, args = "name like 'loop-%'", []
     else:
         where, args = "ship like ?", [voyage.ship + ":%"]  # its run label, not its display name
-    return _rows(
-        f"select run_id, name, ship, status, tokens_seen, spec_json from runs where {where} order by started",
-        args,
-    )
+    cols = "run_id, name, ship, status, tokens_seen, spec_json, started"
+    rows = _rows(f"select {cols} from runs where {where} order by started", args)
+    seen = {r["run_id"] for r in rows}
+    rows += [
+        r
+        for r in _rows(f"select {cols} from runs order by started")
+        if r["run_id"] not in seen and fleet.expedition_of_label(r["name"], r["ship"]) == voyage.key
+    ]
+    rows.sort(key=lambda r: r["started"] or "")
+    for r in rows:
+        r.pop("started")
+    return rows
 
 
 def star_timeline(run_id: str, star: fleet.Star, tokens_per_step: int) -> dict:

@@ -134,20 +134,27 @@ holds the ways in, always:
   tokens and seconds. Ships not trained on the Q:/A: form don't converse yet, and the page says so.
 - **Leaderboard** (`#/leaderboard`): one ranked table on chaining two facts, the **chaining lift**
   (the mean lift on the four 50m rungs; performed at the threshold, within about 0.03 of zero is
-  noise). Rows: the outside models (`leaderboard.reference`: Qwen, Phi, Llama and Pythia as they are
-  scored into `data/compare/chain-grades.json`, sized from `smoking_qwen.REFERENCE_PARAMS`), Thorp's
+  noise). Rows: the outside models (`leaderboard.reference`, scored into
+  `data/compare/chain-grades.json`, sized from `smoking_qwen.REFERENCE_PARAMS`): the **2–4B
+  competitors** (`fleet.COMPETITORS`: Qwen3 4B, Phi-2, Phi-4-mini, Llama 3.2 3B, Gemma 2 2B and 3 4B,
+  SmolLM3 3B; marked 2–4B, by their labels; listed unranked as "being scored" until read; they
+  never grade the chains) and the reference ladder (Pythia, the smaller Qwens; a switch hides it),
+  Thorp's
   classes (each class's best run, shaded), and Thorp's **forecasts** (italic, unranked): the two
   fits through Thorp's class points (polynomials in log10 parameters, refitted in the page as
   `smoking_qwen` fits them), read at each class not yet measured and at 400M, bending (probable)
   first and straight (conservative) beneath, the bootstrap band in the tooltip; faded while fewer
   than three classes are above the noise. Each outside model has **Thorp matches it at**: the size
   where each fit first reaches its lift, and how many times smaller or larger than it that is.
+  A competitor also has **a tenth its size** (`smoking_qwen.payload()["range"]`): each fit's reading
+  at a tenth of its parameters and, once forecastable, P that it reaches the competitor's lift.
   Each row also has its climb bar and four-chain strip. Switches hide the forecasts or Pythia.
-  Folded beneath: **Smoking Qwen** (P(a 400M Thorp chains two facts as well as Qwen3 4B) on each
-  fit, or "not yet forecastable: N of 3 classes above the noise"; claimed, probable or not by the
+  Folded beneath: **Smoking the 2–4B range** (the least P over the competitors that a Thorp a tenth
+  each one's size chains two facts as well as it, `p_range_linear` and `p_range_bending`, on each
+  fit, with the hardest competitor named; or "not yet forecastable: N of 3 classes above the noise"; claimed, probable or not by the
   pre-registered rule; the chart of chaining lift against parameters with both fits and their
-  bands at 400M, Qwen3 4B's lift, the threshold, the noise and the reference ladder; the
-  backtest), **the climb, class by class** (each class's best run by its climb, 0 to 5, ticked at
+  bands at 400M, Qwen3 4B's lift, the threshold, the noise, the competitors as red diamonds and the
+  reference ladder in grey; the backtest), **the climb, class by class** (each class's best run by its climb, 0 to 5, ticked at
   each rung, stalled in amber when no higher than the class beneath, and the reference ladder on
   the same bars), and **every run** with chain readings, filterable by class. The two-fact
   voyage's page draws each run's climb over training (`/api/climb`: `leaderboard.climb` read at

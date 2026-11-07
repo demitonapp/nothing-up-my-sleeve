@@ -1162,9 +1162,12 @@ def api_smoking_qwen() -> dict:
     d["reference"] = [
         {
             "model": r["model"],
-            "short": _short_model(r["model"]),
+            "short": r.get("label")
+            if r.get("competitor") and r.get("label")
+            else _short_model(r["model"]),
             "params": sizes.get(r["model"]),
             "chaining_lift": r.get("chaining_lift"),
+            "competitor": bool(r.get("competitor")),
         }
         for r in leaderboard.payload().get("reference", [])
         if sizes.get(r["model"])

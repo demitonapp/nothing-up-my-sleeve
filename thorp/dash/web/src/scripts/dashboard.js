@@ -2312,13 +2312,15 @@ async function drawSmokingQwen() {
   const T = d.target || {}, th = d.thorp || {}, pts = th.points || [], need = 3;
   const pct = v => v == null ? '–' : `${Math.round(100 * v)}%`;
   const above = (d.classes_above_noise || []).length;
+  const rng = d.range || [], scored = rng.filter(c => c.scored);
+  const pLin = d.p_range_linear ?? (th.linear || {}).p_at_or_above_target, pBend = d.p_range_bending ?? (th.bending || {}).p_at_or_above_target;
   document.getElementById('sqhead').innerHTML = d.forecastable
-    ? `<div class="sqp"><b class="${(th.linear || {}).p_at_or_above_target >= 0.9 ? 'good' : ''}">${pct((th.linear || {}).p_at_or_above_target)}</b><span>on the straight line (conservative)</span></div>
-       <div class="sqp"><b class="${(th.bending || {}).p_at_or_above_target >= 0.9 ? 'accent' : ''}">${pct((th.bending || {}).p_at_or_above_target)}</b><span>on the bending curve (probable)</span></div>`
+    ? `<div class="sqp"><b class="${pLin >= 0.9 ? 'good' : ''}">${pct(pLin)}</b><span>on the straight line (conservative), the least over the range</span></div>
+       <div class="sqp"><b class="${pBend >= 0.9 ? 'accent' : ''}">${pct(pBend)}</b><span>on the bending curve (probable), the least over the range</span></div>`
     : `<div class="sqp"><b class="s">not yet forecastable</b><span>${above} of ${need} classes above the noise (a chaining lift over ${d.noise ?? 0.03}); a curve through noise extrapolates nothing, so the curves below are drawn but no probability is claimed</span></div>`;
-  const claimed = d.forecastable && (th.linear || {}).p_at_or_above_target >= 0.9, probable = d.forecastable && !claimed && (th.bending || {}).p_at_or_above_target >= 0.9;
-  document.getElementById('sqhead').innerHTML += `<div class="sqp"><b>${claimed ? '<span class="pill good">claimed</span>' : probable ? '<span class="pill accent">probable</span>' : '<span class="pill">not claimed</span>'}</b><span>target: ${esc(_shortModel(T.model))} at ${signed(T.chaining_lift)}, a Thorp of ${d.smoke_at >= 1e9 ? (d.smoke_at / 1e9).toFixed(1) + 'B' : Math.round(d.smoke_at / 1e6) + 'M'} parameters</span></div>`;
-  document.getElementById('sqrule').textContent = 'Claimed when forecastable (three classes above the noise) and P ≥ 0.9 on the straight line; "probable" when only the bending curve reaches 0.9.';
+  const claimed = d.forecastable && pLin >= 0.9, probable = d.forecastable && !claimed && pBend >= 0.9;
+  document.getElementById('sqhead').innerHTML += `<div class="sqp"><b>${claimed ? '<span class="pill good">claimed</span>' : probable ? '<span class="pill accent">probable</span>' : '<span class="pill">not claimed</span>'}</b><span>${rng.length ? `${scored.length} of ${rng.length} competitors scored${d.hardest ? `; the hardest, ${esc(d.hardest)}` : ''}, each to be matched at a tenth its size` : `target: ${esc(_shortModel(T.model))} at ${signed(T.chaining_lift)}, a Thorp of ${fmtParams(d.smoke_at)}`}</span></div>`;
+  document.getElementById('sqrule').textContent = 'Claimed when forecastable (three classes above the noise) and P ≥ 0.9 on the straight line for every competitor in the range; "probable" when only the bending curve reaches 0.9.';
   const fmtBand = f => f ? `${signed(f.predicted)} <span class="s">(${signed(f.band[0])} to ${signed(f.band[1])})</span>` : '–';
   document.getElementById('sqbacktest').innerHTML = (d.backtest || []).map(b => `<div class="sqbt"><div><b>${esc(b.test)}</b> · actual ${signed(b.actual)}</div>
     ${['linear', 'bending'].filter(k => b[k]).map(k => `<div class="sqbk ${b[k].inside_band ? 'good' : 'bad'}">${k === 'linear' ? 'straight' : 'bending'}: ${fmtBand(b[k])} · ${b[k].inside_band ? 'inside the band' : b[k].predicted < b.actual ? 'missed (too low)' : 'missed (too high)'}</div>`).join('')}</div>`).join('') || '<div class="s">no backtest yet</div>';
@@ -2336,7 +2338,10 @@ async function drawSmokingQwen() {
   }
   traces.push({ x: pts.map(p => p.params), y: ys, mode: 'markers+text', name: 'Thorp (best of each class)', text: pts.map(p => p.name), textposition: 'top center', textfont: { size: 10, color: tok('text') },
     marker: { color: tok('good'), size: 10 }, customdata: pts.map(p => p.run || ''), hovertemplate: '%{text} · %{customdata}<br>%{x:.3s} parameters<br>chaining lift %{y:.3f}<extra></extra>' });
-  const ref = d.reference || [];
+  const comp = (d.reference || []).filter(r => r.competitor && r.chaining_lift != null);
+  if (comp.length) traces.push({ x: comp.map(r => r.params), y: comp.map(r => r.chaining_lift), mode: 'markers+text', name: 'the 2–4B competitors', text: comp.map(r => r.short), textposition: 'middle left', textfont: { size: 9, color: tok('bad') },
+    marker: { color: tok('bad'), size: 9, symbol: 'diamond-open' }, hovertemplate: '%{text}<br>%{x:.3s} parameters<br>chaining lift %{y:.3f}<extra></extra>' });
+  const ref = (d.reference || []).filter(r => !r.competitor);
   if (ref.length) traces.push({ x: ref.map(r => r.params), y: ref.map(r => r.chaining_lift), mode: 'markers', name: 'reference ladder (hover for each)', text: ref.map(r => r.short),
     marker: { color: tok('muted'), size: 7, symbol: 'circle-open' }, hovertemplate: '%{text}<br>%{x:.3s} parameters<br>chaining lift %{y:.3f}<extra></extra>' });
   const shapes = [
@@ -2390,13 +2395,18 @@ function drawLbTable() {
     : `<span class="accent">forecasts not yet trusted</span>: ${(sq.classes_above_noise || []).length} of 3 classes above the noise`;
   const rows = [];
   // outside models
+  const range = Object.fromEntries((sq.range || []).map(c => [c.model, c]));
+  const seen = new Set();
   for (const r of lbData.reference || []) {
-    if (!showPy && /pythia/i.test(r.model)) continue;
+    if (!showPy && !r.competitor) continue;
+    seen.add(r.model);
     const y = r.chaining_lift;
     const at = k => fits[k] && y != null ? fitReachAt(fits[k], y, top) : undefined;
-    rows.push({ kind: 'outside', name: _shortModel(r.model), maker: makerOf(r.model), params: size[r.model] ?? null, lift: y, climb: r.climb, chains: r.chains,
-      match: y == null ? null : { straight: at('straight'), bending: at('bending') } });
+    rows.push({ kind: 'outside', name: r.competitor && r.label ? r.label : _shortModel(r.model), maker: makerOf(r.model), competitor: !!r.competitor, params: size[r.model] ?? (range[r.model] || {}).params ?? null,
+      lift: y, climb: r.climb, chains: r.chains, tenth: range[r.model], match: y == null ? null : { straight: at('straight'), bending: at('bending') } });
   }
+  // competitors not scored yet: listed, unranked, so the range is whole
+  for (const c of sq.range || []) if (!seen.has(c.model)) rows.push({ kind: 'outside', name: c.label, maker: makerOf(c.model), competitor: true, params: c.params, lift: null, pending: true });
   // Thorp's classes: each class's best run
   for (const b of lbData.board || []) {
     if (!b.best) continue;
@@ -2414,14 +2424,21 @@ function drawLbTable() {
       rows.push({ kind: 'forecast', name: a.label, cls: a.cls, maker: 'Thorp (forecast)', params: a.params, lift: be ?? st, straight: st, bending: be, band, smoke: a.smoke });
     }
   }
-  rows.sort((a, b) => (b.lift ?? -9) - (a.lift ?? -9));
+  rows.sort((a, b) => (b.lift ?? -9) - (a.lift ?? -9) || (b.params ?? 0) - (a.params ?? 0));
   const liftCell = r => {
     if (r.kind === 'forecast') {
       const bb = r.band && r.band.bending, sb = r.band && r.band.linear;
       const tip = `bending (probable) ${signed(r.bending)}${bb ? `, 5–95% ${signed(bb.band[0])} to ${signed(bb.band[1])}` : ''}; straight (conservative) ${signed(r.straight)}${sb ? `, 5–95% ${signed(sb.band[0])} to ${signed(sb.band[1])}` : ''}`;
       return `<span title="${esc(tip)}"><b>${signed(r.bending)}</b> <span class="s">bending</span><div class="s">${signed(r.straight)} straight</div></span>`;
     }
+    if (r.pending) return '<span class="s">being scored</span>';
     return chainingCell(r.lift, thr);
+  };
+  const tenthCell = r => {
+    const c = r.tenth; if (!c || !c.scored) return '';
+    const p = k => c[k] && c[k].p_at_or_above_target != null ? ` · <b>P ${Math.round(100 * c[k].p_at_or_above_target)}%</b>` : '';
+    const tip = k => c[k] ? `5–95% ${signed(c[k].band[0])} to ${signed(c[k].band[1])}` : '';
+    return `<div class="s">${fmtParams(c.smoke_at)}</div>${['bending', 'linear'].filter(k => c[k]).map(k => `<div title="${esc(tip(k))}"><span class="s">${k === 'linear' ? 'straight' : k}</span> ${signed(c[k].predicted)}${p(k)}</div>`).join('')}`;
   };
   const matchCell = r => {
     if (r.kind !== 'outside' || !r.match) return '';
@@ -2431,11 +2448,11 @@ function drawLbTable() {
   };
   let rank = 0;
   tb.innerHTML = rows.map(r => {
-    if (r.kind !== 'forecast') rank++;
+    if (r.kind !== 'forecast' && !r.pending) rank++;
     const name = r.kind === 'thorp' ? `${classLink(r.cls)}<div class="s">best run ${runLink(r.run)}</div>`
       : r.kind === 'forecast' ? `${r.cls ? classLink(r.cls) : `<b>${esc(r.name)}</b>`} <span class="pill accent">forecast</span>${r.smoke ? '<div class="s">a tenth of Qwen3 4B</div>' : ''}`
-      : `<b>${esc(r.name)}</b><div class="s">${esc(r.maker)}</div>`;
-    return `<tr class="lb-${r.kind}${r.kind === 'forecast' && !trusted ? ' untrusted' : ''}"><td>${r.kind === 'forecast' ? '' : rank}</td><td>${name}</td><td data-sort="${r.params ?? ''}">${fmtParams(r.params)}</td>
-      <td>${liftCell(r)}</td><td>${matchCell(r)}</td><td>${r.climb != null ? climbBar(r.climb) : ''}</td><td>${r.chains ? chainStrip(r.chains) : ''}</td></tr>`;
-  }).join('') || '<tr><td colspan="7" class="empty">no readings yet</td></tr>';
+      : `<b>${esc(r.name)}</b>${r.competitor ? ' <span class="pill blue" title="a 2–4B competitor: Thorp must match it at a tenth its size">2–4B</span>' : ''}<div class="s">${esc(r.maker)}</div>`;
+    return `<tr class="lb-${r.kind}${r.kind === 'forecast' && !trusted ? ' untrusted' : ''}${r.pending ? ' pending' : ''}"><td>${r.kind === 'forecast' || r.pending ? '' : rank}</td><td>${name}</td><td data-sort="${r.params ?? ''}">${fmtParams(r.params)}</td>
+      <td>${liftCell(r)}</td><td>${matchCell(r)}</td><td>${tenthCell(r)}</td><td>${r.climb != null ? climbBar(r.climb) : ''}</td><td>${r.chains ? chainStrip(r.chains) : ''}</td></tr>`;
+  }).join('') || '<tr><td colspan="8" class="empty">no readings yet</td></tr>';
 }

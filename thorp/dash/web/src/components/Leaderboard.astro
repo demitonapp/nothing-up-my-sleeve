@@ -10,15 +10,15 @@
   <section class="panel">
     <div class="handtools">
       <label><input type="checkbox" id="lbshowfc" checked> Thorp's forecasts</label>
-      <label><input type="checkbox" id="lbshowpythia" checked> Pythia</label>
+      <label><input type="checkbox" id="lbshowpythia" checked> the reference ladder (Pythia, smaller Qwen)</label>
       <span class="note" id="lbfcnote"></span>
     </div>
-    <div class="scroll"><table id="lbtable" data-nosort><thead><tr><th>#</th><th>model</th><th>parameters</th><th>chaining lift</th><th>Thorp matches it at</th><th>climb</th><th>the four chains</th></tr></thead><tbody></tbody></table></div>
-    <p class="note mt">Measured rows are read on the same pairs; a Thorp class is its best run. Forecast rows (italic) are Thorp's own classes fitted against size, straight (conservative) and bending (probable), as Smoking Qwen fits them; while fewer than three classes are above the noise (0.03) they are curves through noise, shown but not trusted. "Thorp matches it at" is the size where each fit reaches that model's lift. Performed at <b id="lbthr"></b>.</p>
+    <div class="scroll"><table id="lbtable" data-nosort><thead><tr><th>#</th><th>model</th><th>parameters</th><th>chaining lift</th><th>Thorp matches it at</th><th>a tenth its size</th><th>climb</th><th>the four chains</th></tr></thead><tbody></tbody></table></div>
+    <p class="note mt">Measured rows are read on the same pairs; a Thorp class is its best run. The 2–4B models (Qwen, Phi, Llama, Gemma, SmolLM, base checkpoints where one exists) are the competitors: Thorp must chain two facts as well as each at a tenth its size, and they never grade the chains (the reference ladder does). Forecast rows (italic) are Thorp's own classes fitted against size, straight (conservative) and bending (probable), as Smoking Qwen fits them; while fewer than three classes are above the noise (0.03) they are curves through noise, shown but not trusted. "Thorp matches it at" is the size where each fit reaches that model's lift; "a tenth its size" is each fit's reading there, with the probability it reaches that model's lift once forecastable. Performed at <b id="lbthr"></b>.</p>
   </section>
 
   <details class="panel lbfold" id="lbfoldsmoke">
-    <summary><h2>Smoking Qwen <span class="note">P(a 400M Thorp chains two facts as well as Qwen3 4B): the fits, the backtest and the rule</span></h2></summary>
+    <summary><h2>Smoking the 2–4B range <span class="note">P(a Thorp a tenth the size of each 2–4B model chains two facts as well as it), the least of them over the range: the fits, the backtest and the rule</span></h2></summary>
     <div id="smokingqwen">
       <div class="sqhead" id="sqhead"></div>
       <div class="row sqrow">

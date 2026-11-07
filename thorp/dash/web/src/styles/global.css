@@ -461,7 +461,9 @@ main a.ccell { color: var(--text); text-decoration: none; display: block; }
 
 /* the leaderboard table */
 #lbtable td { vertical-align: middle; }
-#lbtable td:nth-child(6) { min-width: 240px; }
+#lbtable td:nth-child(7) { min-width: 240px; }
+#lbtable td:nth-child(6) { font-size: var(--fs-sm); white-space: nowrap; }
+#lbtable tr.pending td { opacity: 0.6; }
 #lbtable tr.lb-outside td:first-child, #lbtable tr.lb-thorp td:first-child { font-weight: 600; color: var(--muted); }
 #lbtable tr.lb-thorp { background: rgba(63,185,80,0.06); }
 #lbtable tr.lb-forecast td { font-style: italic; }

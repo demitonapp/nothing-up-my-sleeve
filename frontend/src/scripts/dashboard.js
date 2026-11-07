@@ -1001,11 +1001,16 @@ async function askPanel(r) {
   const mode = () => (document.getElementById('askmode') || {}).value || '1';
   const guessesFor = text => get(`/api/table/guesses?run=${encodeURIComponent(run())}&k=10&mode=${mode()}&text=${encodeURIComponent(text)}`);
   const busy = (on) => ['askguess', 'askanswer', 'askall'].forEach(id => { document.getElementById(id).disabled = on; });
-  const guessTable = (g, hope) => {
+  const guessTable = (g0, hope) => {
+    // the next word is a new word: a guess that carries on the prompt's last word ("end" + "s" = "ends") is shown
+    // apart, as a note, and never ranked against the new words (Justin, 22:42: "is that arrow end→ends concerning")
+    const carried = g0.mode !== 'pieces' ? g0.guesses.filter(x => x.continues) : [];
+    const g = { ...g0, guesses: g0.mode !== 'pieces' ? g0.guesses.filter(x => !x.continues) : g0.guesses };
     const rank = hope ? hopeRank(g.guesses, hope) : null;
-    return `<div class="s">${esc(g.run)} at step ${g.step} · ${g.seconds}s${hope ? ` · hoped for “${esc(hope)}”: ${rank ? `<b>guess ${rank}</b>` : '<b>not in its ten</b>'}` : ''}</div>
+    const note = carried.length ? `<div class="s carried">it may not take “${esc(carried[0].of)}” as finished: ${carried.slice(0, 3).map(x => `“${esc(x.word)}” ${(100 * x.p).toFixed(1)}%`).join(', ')} (it carries your last word on: a prompt that stops on a word cannot say the word is finished)</div>` : '';
+    return `<div class="s">${esc(g.run)} at step ${g.step} · ${g.seconds}s${hope ? ` · hoped for “${esc(hope)}”: ${rank ? `<b>guess ${rank}</b>` : '<b>not in its ten</b>'}` : ''}</div>${note}
       <div class="guesses">${g.guesses.map((x, i) => `<div class="guess${hope && rank === i + 1 ? ' hit' : ''}"><span class="mono" title="${x.continues ? `carries on “${esc(x.of)}” with “${esc(x.piece)}”` : ''}">${x.continues ? `<span class="s">${esc(x.of)}→</span>${esc(x.word)}` : esc(x.piece === true ? showPiece(x.word) : x.word)}</span><i style="width:${Math.max(2, Math.round(100 * x.p))}%"></i><span class="s">${(100 * x.p).toFixed(1)}%</span></div>`).join('')}</div>
-      ${g.mode !== 'pieces' ? '<div class="s">the likeliest whole words it reaches (a word carried on from your last word shows it with →); the rest of the probability is words it rarely spells</div>' : ''}`;
+      ${g.mode !== 'pieces' ? '<div class="s">the likeliest new words it reaches; the rest of the probability is words it rarely spells</div>' : ''}`;
   };
   const guess = async (text, hope) => {
     if (!text.trim()) { out.innerHTML = `<div class="${emptyCls()}">type something first</div>`; return; }
@@ -1038,7 +1043,7 @@ async function askPanel(r) {
           <td>${x.err ? '<span class="s">failed</span>' : x.rank ? `<b>${x.rank}</b>` : '<span class="s">not in ten</span>'}</td><td class="mono">${x.g ? x.g.guesses.slice(0, 3).map(g => `${esc(g.piece === true ? showPiece(g.word) : g.word)} <span class="s">${(100 * g.p).toFixed(0)}%</span>`).join(' · ') : ''}</td></tr>`).join('')}</tbody></table></div>`;
     };
     for (const q of askQuestions) {
-      try { const g = await guessesFor(q.text); rows.push({ q, g, rank: hopeRank(g.guesses, q.hope) }); } catch (e) { rows.push({ q, err: true }); }
+      try { const g0 = await guessesFor(q.text); const g = { ...g0, guesses: g0.mode !== 'pieces' ? g0.guesses.filter(x => !x.continues) : g0.guesses }; rows.push({ q, g, rank: hopeRank(g.guesses, q.hope) }); } catch (e) { rows.push({ q, err: true }); }
       draw();
     }
     busy(false);

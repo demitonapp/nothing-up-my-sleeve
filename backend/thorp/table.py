@@ -232,7 +232,7 @@ def word_guesses(run: str, text: str, k: int = 10, words: int = 1, beam: int = 2
                 if ids and nwords(sofar) >= words and ends_word(piece):
                     w = " ".join(sofar.split()[:words])
                     done[w] = done.get(w, 0.0) + math.exp(lp + logp[i])
-                    starts.setdefault(w, sofar[:1].isspace())
+                    starts.setdefault(w, not sofar[:1].isalnum())  # a space or a mark starts anew; a letter carries on
                     continue
                 nxt.append((ids + [i], lp + logp[i]))
         beams = sorted(nxt, key=lambda b: b[1], reverse=True)[:beam]
@@ -243,7 +243,7 @@ def word_guesses(run: str, text: str, k: int = 10, words: int = 1, beam: int = 2
         if len(s) >= words:
             w = " ".join(s[:words])
             done[w] = done.get(w, 0.0) + math.exp(lp)
-            starts.setdefault(w, tok.decode(ids)[:1].isspace())
+            starts.setdefault(w, not tok.decode(ids)[:1].isalnum())
     ranked = sorted(done.items(), key=lambda x: x[1], reverse=True)[:k]
     tail = text.split()[-1] if text.split() and not text[-1:].isspace() else ""
 

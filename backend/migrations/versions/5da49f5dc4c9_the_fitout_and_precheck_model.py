@@ -5,19 +5,19 @@ Revises:
 Create Date: 2026-11-07 19:40:24.719888
 
 """
-from typing import Sequence, Union
+from collections.abc import Sequence
 
+import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.dialects import postgresql
 
 from thorp.viable.s3_control.models import VIEWS
-import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision: str = '5da49f5dc4c9'
-down_revision: Union[str, Sequence[str], None] = None
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | Sequence[str] | None = None
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:

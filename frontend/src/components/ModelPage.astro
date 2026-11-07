@@ -13,7 +13,7 @@ import { btnCls, cardCls, crumbCls, emptyCls, fieldCls, rangeCls, selectCls, tab
 <div class="section" id="rung">
   <h1><a class={crumbCls('back')} href="#/classes">← classes</a> <span id="rungtitle"></span> <span class="q" id="rungjob"></span></h1>
   <nav class={tabsCls('line', 'subnav')} data-orientation="horizontal" data-variant="line" id="modelnav">
-    <a class={tabCls('')} data-state="inactive" data-mtab="fleet">Fleet</a><a class={tabCls('')} data-state="inactive" data-mtab="goals">Goals</a><a class={tabCls('')} data-state="inactive" data-mtab="overview">Overview</a><a class={tabCls('')} data-state="inactive" data-mtab="training">Training</a><a class={tabCls('')} data-state="inactive" data-mtab="scoring">Scoring</a><a class={tabCls('')} data-state="inactive" data-mtab="waypoints">Waypoints</a><a class={tabCls('')} data-state="inactive" data-mtab="fitouts">Fitouts</a>
+    <a class={tabCls('')} data-state="inactive" data-mtab="fleet">Fleet</a><a class={tabCls('')} data-state="inactive" data-mtab="goals">Goals</a><a class={tabCls('')} data-state="inactive" data-mtab="overview">Overview</a><a class={tabCls('')} data-state="inactive" data-mtab="training">Training</a><a class={tabCls('')} data-state="inactive" data-mtab="scoring">Scoring</a><a class={tabCls('')} data-state="inactive" data-mtab="waypoints">Waypoints</a><a class={tabCls('')} data-state="inactive" data-mtab="fitouts">Fitouts</a><a class={tabCls('')} data-state="inactive" data-mtab="bet">Bet</a>
   </nav>
 
   <!-- ============================== Fleet: the ships of this class -->
@@ -130,6 +130,22 @@ import { btnCls, cardCls, crumbCls, emptyCls, fieldCls, rangeCls, selectCls, tab
   </div>
 
   <!-- ============================== Waypoints -->
+  <!-- ============================== Bet: the Navigator's Wager (thorp/viable/s4_intelligence/wager.py) -->
+  <div class="mtab" data-mtab="bet">
+    <section class={cardCls(false, 'panel')} id="wagerpanel">
+      <h2>The Navigator's Wager <span class="note">pull one lever on a voyage and bet where the 16 cards fall: for each card, does the pull make it appear, vanish, come earlier or later, or stay the same (and, for a bonus, in which layer)? The House bets that nothing moves. Five chips a round; the readings reveal it; ties go to the House. What a round reveals is the lever's lesson</span></h2>
+      <div class="wagerdeal">
+        <label>Control voyage <select class={selectCls()} id="wagercontrol"></select></label>
+        <label>Lever <select class={selectCls()} id="wagerlever"></select></label>
+        <button class={btnCls('default')} id="wagerdealbtn" type="button">Deal the round</button>
+        <span class="s" id="wagerleverabout"></span>
+      </div>
+      <div id="wagerrounds" class="wagerrounds"></div>
+      <div id="wagerhead" class="wagerhead"></div>
+      <div id="wagertable" class="wagertable"></div>
+    </section>
+  </div>
+
   <div class="mtab" data-mtab="fitouts">
     <section class={cardCls(false, 'panel')}>
       <h2>Fitouts <span class="note">the training material curated for this class, matched to its stages: pretraining (in order, one voyage) and post-training (in order, each seeded from the one before); then the four necessary cards each stage has drawn so far, voyage by voyage</span></h2>

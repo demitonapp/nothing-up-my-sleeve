@@ -2779,6 +2779,38 @@ def api_table_guesses(run: str, text: str, k: str | int = 10, mode: str = "1") -
     return out
 
 
+def api_wager(preset: str) -> dict:
+    """The Bet tab (the Navigator's Wager, thorp/viable/s4_intelligence/wager.py): the 16-card deck, the levers,
+    and every round on this class with both voyages' falls, the House's calls, the Navigator's bets, the
+    outcomes and the score."""
+    from thorp.viable.s4_intelligence import wager
+
+    return wager.payload(preset)
+
+
+def api_wager_deal(body: dict) -> dict:
+    from thorp.viable.s4_intelligence import wager
+
+    return wager.deal(str(body["preset"]), str(body["control"]), str(body["lever"]))
+
+
+def api_wager_bet(body: dict) -> dict:
+    from thorp.viable.s4_intelligence import wager
+
+    layer = body.get("layer")
+    return wager.place(
+        str(body["round"]), str(body["card"]), body.get("move") or None, None if layer in (None, "") else int(layer)
+    )
+
+
+def api_wager_queue(body: dict) -> dict:
+    """Queue a round's pull voyage: written, gated (S3) and put at the end of the standing queue. It changes
+    what the Mac trains next, so the page asks before it sends."""
+    from thorp.viable.s4_intelligence import wager
+
+    return wager.queue(str(body["round"]))
+
+
 def api_table_transcript(run: str) -> list[dict]:
     """Every exchange at the table with one sailing, oldest first (thorp.table.transcript)."""
     return _table().transcript(run)
@@ -2916,6 +2948,9 @@ class Handler(BaseHTTPRequestHandler):
             "/api/table/reply": api_table_reply,
             "/api/fitouts/save": api_fitout_save,
             "/api/fitouts/queue": api_fitout_queue,
+            "/api/wager/deal": api_wager_deal,
+            "/api/wager/bet": api_wager_bet,
+            "/api/wager/queue": api_wager_queue,
         }
         if u.path not in posts:
             return self._send(404, b"not found", "text/plain")
@@ -2999,6 +3034,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/class_score": lambda: api_class_score(q["preset"]),
                 "/api/class_cards": lambda: api_class_cards(q["preset"]),
                 "/api/class_best": lambda: api_class_best(q["preset"]),
+                "/api/wager": lambda: api_wager(q["preset"]),
                 "/api/table/guesses": lambda: api_table_guesses(
                     q["run"], q.get("text", ""), q.get("k", 10), q.get("mode", "1")
                 ),

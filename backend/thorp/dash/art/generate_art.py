@@ -3,7 +3,7 @@
 
 Eduardo Risso style, matching the monorepo's Atlas generators (packages/ui/apps/atlas/scripts/
 generate-*-art.py): noir, heavy black ink, stark chiaroscuro, a single light source, no text. Made with
-fal (fal-ai/flux/dev). Saved to thorp/dash/web/public/art/<key>.png, which the build copies into the
+fal (fal-ai/flux/dev). Saved to frontend/public/art/<key>.png (since the split), which the build copies into the
 dashboard; a class card or playing card shows its image when the file exists and draws none otherwise.
 
 The fal key is read from FAL_KEY in the monorepo's packages/api/.env.local (gitignored), the same
@@ -32,7 +32,7 @@ except ImportError:
     SSL_CONTEXT = ssl.create_default_context()
 
 HERE = Path(__file__).resolve().parent
-OUT_DIR = HERE.parent / "web" / "public" / "art"
+OUT_DIR = HERE.parents[3] / "frontend" / "public" / "art"  # the repository's frontend/
 ENV_LOCAL = Path.home() / "Source" / "monorepo" / "packages" / "api" / ".env.local"
 
 MODEL = "fal-ai/flux/dev"
@@ -77,6 +77,29 @@ CARDS: dict[str, str] = {
     "a single shaft of light from above falling across it",
     "bridge": "a narrow rope bridge across a deep chasm in fog, a lone figure halfway across holding a "
     "lantern, the two cliff edges barely visible, the bridge the only way from one side to the other",
+    # the rest of the 16-card deck (Justin, 2026-11-07 21:20; thorp/viable/s5_policy/deck.py)
+    "duplicate_word": "two identical calling cards lying side by side on a dark wooden table under a single "
+    "hanging lamp, one slightly overlapping the other, a gloved finger touching the second",
+    "induction": "a hand turning back the pages of an old book by candlelight to a passage marked with a ribbon, "
+    "a fingertip resting on the line just after the mark",
+    "sink": "an old iron mooring bollard on a dark stone quay at night, many ropes from unseen ships all "
+    "tied to it, the ropes vanishing into fog, a single lamp above",
+    "delimiter": "a long breakwater of tall dark stone posts dividing calm harbour water from a rough open sea, "
+    "moonlight catching the top of each post in a row",
+    "words_back": "a sailor at a ship's stern at night looking back at two small lanterns bobbing in the dark "
+    "wake behind the ship, one near, one further",
+    "counter": "a ship's log line being paid out over the stern, the knots running through a gloved hand, a "
+    "sand glass beside it on the rail, lit by a ship's lantern",
+    "number_spotter": "a magnifying glass held over a ledger column of handwritten figures on a desk at night, "
+    "one lamp, the lens sharpening a single line",
+    "order_word": "a wooden signpost at a foggy crossroads at night with two arrows pointing opposite ways, a "
+    "lone traveller with a lantern deciding which way",
+    "scales": "a row of brass weights on a dark chart table arranged in order from the smallest to the largest, "
+    "a single shaft of light falling along the row",
+    "rare_word": "a single gold coin lying among dark wet pebbles on a beach at night, catching the moonlight, "
+    "everything else in shadow",
+    "premise_marker": "a hand setting a small lit marker buoy at the mouth of a dark channel between rocks, "
+    "the first light showing where the way begins",
 }
 
 SIZES = {**{k: "landscape_16_9" for k in CLASSES}, **{k: "portrait_4_3" for k in CARDS}}

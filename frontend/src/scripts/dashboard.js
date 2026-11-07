@@ -38,7 +38,7 @@ const rungFor = key => ladderData && ladderData.rungs.find(r => slugOf(r) === ke
 //   #/discoveries[/<trick>]      the tricks of the trade, and one trick; /stars and /traits beside them
 //   #/sieves[/<sailing>]         the sieves explained, and one sailing's push, move and heading
 // Older addresses (#sizes, #proxy, #rung-1m, #/models/…, #betting…, ?run=) land on the new ones.
-const MTABS = ['fleet', 'goals', 'overview', 'training', 'scoring', 'waypoints', 'fitouts'];
+const MTABS = ['fleet', 'goals', 'overview', 'training', 'scoring', 'waypoints', 'fitouts', 'bet'];
 const STABS = ['betting', 'books', 'languages', 'sieves', 'attention', 'traits'];
 const STAB_EL = { betting: 'betting', books: 'books', languages: 'languages', sieves: 'sieves', attention: 'attention', traits: 'traits-section' };
 const OLD_SHIP = { betting: 'betting', books: 'books', languages: 'languages', sieves: 'sieves', attention: 'attention', 'traits-section': 'traits' };
@@ -1031,6 +1031,90 @@ async function askPanel(r) {
     busy(false);
   };
 }
+// ---- The Navigator's Wager (the Bet tab; /api/wager, POST /api/wager/{deal,bet,queue}): pull one lever on a
+// voyage, bet where the deck's 16 cards fall, queue the experiment, and read the outcome as the readings arrive.
+let wagerData = null, wagerRound = null, wagerWired = false, wagerPreset = null;
+const MOVE_LABEL = { appears: 'appears', vanishes: 'vanishes', earlier: 'earlier', later: 'later', same: 'same' };
+const fmtTok = t => t == null ? '' : t >= 1e6 ? `${Math.round(t / 1e6)}M` : `${Math.round(t / 1e3)}k`;
+const fallText = f => !f ? '<span class="s">not sailed</span>' : !f.charted ? '<span class="s">uncharted</span>'
+  : f.played ? `played at ${fmtTok(f.tokens)} tokens${f.layer != null ? `, layer ${f.layer}` : ''}` : '<span class="s">not played</span>';
+async function postJSON(url, body) {
+  const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const d = await res.json().catch(() => ({})); if (!res.ok || d.error) throw new Error(d.error || res.statusText); return d;
+}
+async function classWager(r, keep = true) {
+  const el = document.getElementById('wagertable'); if (!el) return;
+  if (wagerPreset !== r.preset) { wagerPreset = r.preset; wagerRound = null; }
+  let d; try { d = await get(`/api/wager?preset=${encodeURIComponent(r.preset)}`); } catch (e) { el.innerHTML = `<div class="${emptyCls()}">the wager could not be read: ${esc(String(e.message || e))}</div>`; return; }
+  wagerData = d;
+  const csel = document.getElementById('wagercontrol'), lsel = document.getElementById('wagerlever');
+  if (csel.options.length !== d.controls.length) csel.innerHTML = d.controls.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+  if (lsel.options.length !== d.levers.length) lsel.innerHTML = d.levers.map(l => `<option value="${esc(l.key)}">${esc(l.name)}</option>`).join('');
+  const about = () => { const l = d.levers.find(x => x.key === lsel.value); document.getElementById('wagerleverabout').textContent = l ? l.about : ''; };
+  about();
+  if (!wagerRound || !d.rounds.find(x => x.key === wagerRound)) {
+    let saved = null; try { saved = localStorage.getItem('thorp.wager.' + r.preset); } catch (e) { /* storage blocked */ }
+    wagerRound = (d.rounds.find(x => x.key === saved) || d.rounds.find(x => x.open) || d.rounds[0] || {}).key || null;
+  }
+  document.getElementById('wagerrounds').innerHTML = d.rounds.length ? d.rounds.map(x => {
+    const s = x.settled ? `${x.winner === 'navigator' ? 'you won' : 'the House won'} ${x.score.navigator}–${x.score.house}`
+      : x.pull_voyage.status === 'at sea' ? 'at sea' : x.in_queue ? 'queued' : x.open ? 'open: bet, then queue' : x.pull_voyage.status;
+    return `<button type="button" class="wround${x.key === wagerRound ? ' on' : ''}" data-round="${esc(x.key)}"><b>${esc(x.lever)}</b><span class="s">${esc(x.pull.replace('fu-ogden-v0-1', 'Ogden'))}</span><span class="wstate">${esc(s)}</span></button>`;
+  }).join('') : `<div class="${emptyCls()}">no rounds yet: deal one above</div>`;
+  const R = d.rounds.find(x => x.key === wagerRound);
+  const head = document.getElementById('wagerhead');
+  if (!R) { head.innerHTML = ''; el.innerHTML = ''; } else {
+    const chips = R.cards.filter(c => c.bet && !c.bet.practice).length;
+    const canQueue = R.pull_voyage.status === 'queued' && !R.in_queue;
+    head.innerHTML = `<div class="whead"><div><b>${esc(R.lever)}</b> · ${esc(R.about || '')}</div>
+      <div class="s">control <span class="mono">${esc(R.control)}</span> (${esc(R.control_voyage.status)}) → pull <span class="mono">${esc(R.pull)}</span> (${esc(R.in_queue ? 'in the queue' : R.pull_voyage.status)})</div>
+      <div class="wscore"><span>chips ${chips} of ${d.chips}</span>${R.settled ? `<span>you <b>${R.score.navigator}</b> · the House <b>${R.score.house}</b> · <b>${R.winner === 'navigator' ? 'you win' : 'the House wins'}</b></span>` : '<span class="s">the outcome shows when both voyages are home</span>'}
+      ${canQueue ? `<button class="${btnCls('default')}" type="button" id="wagerqueue">Queue the experiment</button>` : ''}</div></div>`;
+    const layers = 6;
+    const byKey = Object.fromEntries(d.deck.map(c => [c.key, c]));
+    el.innerHTML = d.constellations.map(k => `<div class="wrow"><div class="wsuit"><span class="suit">${esc(k.suit)}</span><b>${esc(k.name)}</b><span class="s">${esc(k.about)}</span></div>
+      ${R.cards.filter(c => byKey[c.card].constellation === k.key).map(c => {
+        const card = byKey[c.card], bet = c.bet || {}, h = c.house;
+        const ctrlFall = c.control, pullFall = c.pull;
+        const disabled = !card.charted ? ' disabled' : '';
+        return `<div class="wcard${card.charted ? '' : ' uncharted'}${c.outcome && bet.move ? (c.points > 0 ? ' won' : ' lost') : ''}" data-card="${esc(c.card)}">
+          <div class="wart"><img src="art/${esc(c.card)}.png" alt="" loading="lazy" onerror="this.style.display='none'"><span class="wstage">${esc(card.stage)}</span><span class="wcost">${card.cost}</span></div>
+          <div class="wname">${esc(card.name)}</div>
+          <div class="s wability">${esc(card.ability)}</div>
+          ${card.on.length ? `<div class="s">evolves from: ${card.on.map(o => esc(byKey[o].name)).join(' + ')}</div>` : ''}
+          <div class="wfall"><span class="s">control:</span> ${fallText(ctrlFall)}</div>
+          ${R.settled || R.pull_voyage.status === 'at sea' ? `<div class="wfall"><span class="s">pull:</span> ${fallText(pullFall)}</div>` : ''}
+          <div class="wbet"><select class="${selectCls()} wmove"${disabled}><option value="">no chip</option>${d.moves.map(m => `<option value="${m}"${bet.move === m ? ' selected' : ''}>${MOVE_LABEL[m]}</option>`).join('')}</select>
+            <select class="${selectCls()} wlayer"${disabled}><option value="">any layer</option>${Array.from({ length: layers }, (_, i) => `<option value="${i}"${bet.layer === i ? ' selected' : ''}>layer ${i}</option>`).join('')}</select></div>
+          <div class="s">${h ? `the House: ${esc(h.move)}${h.layer != null ? `, layer ${h.layer}` : ''}` : 'the House: no chip'}${bet.practice ? ' · <b>practice</b> (placed after sailing)' : ''}</div>
+          ${c.outcome ? `<div class="woutcome">moved: <b>${esc(c.outcome)}</b>${c.points != null ? ` · you ${c.points > 0 ? '+' : ''}${c.points}` : ''}${c.house_points != null ? ` · the House ${c.house_points > 0 ? '+' : ''}${c.house_points}` : ''}</div>` : ''}
+        </div>`;
+      }).join('')}</div>`).join('');
+  }
+  if (wagerWired) return; wagerWired = true;
+  lsel.onchange = () => { const l = wagerData.levers.find(x => x.key === lsel.value); document.getElementById('wagerleverabout').textContent = l ? l.about : ''; };
+  const rr = () => rungFor(currentRung);
+  document.getElementById('wagerdealbtn').onclick = async () => {
+    try { const x = await postJSON('/api/wager/deal', { preset: wagerPreset, control: csel.value, lever: lsel.value }); wagerRound = x.key; try { localStorage.setItem('thorp.wager.' + wagerPreset, x.key); } catch (e) { /* storage blocked */ } classWager(rr()); }
+    catch (e) { document.getElementById('wagerhead').innerHTML = `<div class="${emptyCls()}">${esc(String(e.message || e))}</div>`; }
+  };
+  document.getElementById('wagerrounds').onclick = e => { const b = e.target.closest('.wround'); if (!b) return; wagerRound = b.dataset.round; try { localStorage.setItem('thorp.wager.' + wagerPreset, wagerRound); } catch (err) { /* storage blocked */ } classWager(rr()); };
+  document.getElementById('wagertable').onchange = async e => {
+    const tile = e.target.closest('.wcard'); if (!tile) return;
+    const mv = tile.querySelector('.wmove').value, ly = tile.querySelector('.wlayer').value;
+    try { await postJSON('/api/wager/bet', { round: wagerRound, card: tile.dataset.card, move: mv || null, layer: ly === '' ? null : +ly }); }
+    catch (err) { alert(String(err.message || err)); }
+    classWager(rr());
+  };
+  document.getElementById('wagerhead').onclick = async e => {
+    if (e.target.id !== 'wagerqueue') return;
+    const R = wagerData.rounds.find(x => x.key === wagerRound); if (!R) return;
+    if (!(await confirmDialog(`Queue ${R.pull}? It goes at the end of the standing queue and changes what the Mac trains next.`))) return;
+    try { const x = await postJSON('/api/wager/queue', { round: wagerRound }); alert(`${x.queued} is queued, position ${x.position}.`); }
+    catch (err) { alert(String(err.message || err)); }
+    classWager(rr());
+  };
+}
 const RECENT = 30;
 // ---- RunGrid: every run at one size as a square, like a GitHub contribution graph. Bands of 7 rows
 // x 53 columns (a "year" of 371 runs) stack downwards, so a new run only ever adds a square at the
@@ -1170,6 +1254,7 @@ function renderRung() {
   if (modelTab === 'goals') classGoals(r);
   if (modelTab === 'fitouts') classFitouts(r);
   if (modelTab === 'scoring') askPanel(r);
+  if (modelTab === 'bet') classWager(r);
   document.querySelectorAll('#rung .chart').forEach(el => { if (el.data && el.offsetParent) Plotly.Plots.resize(el); });
 }
 // ---- Waypoints: when each run passed each waypoint (server.py api_waypoints). Fetched only while

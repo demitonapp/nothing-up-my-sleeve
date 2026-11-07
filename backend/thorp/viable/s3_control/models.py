@@ -156,3 +156,40 @@ VIEWS = {
         left join fitout.current_results r on r.fitout_key = fp.fitout_key and r.item_key = fp.item_key
         group by f.key""",
 }
+
+
+# ---- the Navigator's Wager (S4 intelligence's game; thorp/viable/s4_intelligence/wager.py), schema `game`
+GAME_SCHEMA = "game"
+
+
+class WagerRound(Base):
+    """A round: one lever pulled on a control voyage. Dealt by the Navigator on the Bet tab (or one of Ogden
+    v0.1's own pairs); `pull_spec` is the voyage the lever makes, queued when the Navigator says so."""
+
+    __tablename__ = "rounds"
+    __table_args__ = {"schema": GAME_SCHEMA}
+
+    key: Mapped[str] = mapped_column(Text, primary_key=True)  # the pull voyage's name
+    preset: Mapped[str] = mapped_column(Text)  # the class page it was dealt on
+    lever: Mapped[str] = mapped_column(Text)
+    control: Mapped[str] = mapped_column(Text)  # the control voyage's name
+    pull: Mapped[str] = mapped_column(Text)  # the pull voyage's name
+    pull_spec: Mapped[dict] = mapped_column(JSONB)
+    status: Mapped[str] = mapped_column(Text, default="dealt", server_default="dealt")  # dealt, queued
+    dealt_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    queued_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class WagerBet(Base):
+    """A chip: the Navigator's call of how the pull moves one card (and, for a bonus, the layer it falls in)."""
+
+    __tablename__ = "bets"
+    __table_args__ = {"schema": GAME_SCHEMA}
+
+    round_key: Mapped[str] = mapped_column(Text, primary_key=True)
+    card: Mapped[str] = mapped_column(Text, primary_key=True)
+    move: Mapped[str] = mapped_column(Text)
+    layer: Mapped[int | None] = mapped_column(Integer)
+    player: Mapped[str] = mapped_column(Text, default="Justin", server_default="Justin")
+    placed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    practice: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")  # placed after the pull sailed

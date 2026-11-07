@@ -107,7 +107,24 @@ def fetch_ref(ref: str, family: str = "", set_name: str = "recipe") -> manifest.
     path = paths.texts_dir(key) / f"{book_id}.txt"
     if known is not None and path.exists():
         return known
-    f = src.fetch(ident)
+    return register_fetched(key, ident, src.fetch(ident), family, set_name)
+
+
+def register_fetched(
+    key: str,
+    ident: str,
+    f: Fetched,
+    family: str = "",
+    set_name: str = "recipe",
+    observe: bool = True,
+) -> manifest.Book:
+    """Write a fetched book's text to its source's cache and register it in the manifest. A book new to the
+    library is observed by acquisition's S1 (thorp/acquisition.py: logged with the verdict its gate would
+    give, never refused) unless an intake, which has already passed it through the gate, registers it."""
+    src = _sources()[key]
+    book_id = f"{src.prefix}{ident}"
+    new = manifest.get(book_id) is None
+    path = paths.texts_dir(key) / f"{book_id}.txt"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(f.text, encoding="utf-8")
     data = f.text.encode("utf-8")
@@ -126,6 +143,13 @@ def fetch_ref(ref: str, family: str = "", set_name: str = "recipe") -> manifest.
         set=set_name,
     )
     manifest.upsert(book)
+    if new and observe:
+        try:
+            from thorp import acquisition
+
+            acquisition.observe(book, "fetch_ref")
+        except Exception:  # noqa: BLE001  (the record must never cost a fetch)
+            pass
     return book
 
 

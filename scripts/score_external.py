@@ -13,6 +13,10 @@ nats / (UTF-8 bytes x ln 2), so the number is comparable with Thorp's whatever t
 
 Writes data/compare/<model>__<list>.json (per book: nats, tokens, bytes, bits per byte; the means;
 the settings) and prints a table.
+
+A model mlx-lm cannot load (Maincode/Maincoder-1B) is built from its weights by scripts/mlx_ports.py. The
+scoring takes S2's helm (thorp/vsm.py at_sea, kind "score"): it waits in port while a voyage is at sea,
+and the next voyage waits for it.
 """
 
 from __future__ import annotations
@@ -64,7 +68,18 @@ def main() -> None:
     ap.add_argument("--batch", type=int, default=4)
     a = ap.parse_args()
 
-    model, tok = load(a.model)
+    from thorp import vsm
+
+    # S2: one GPU, so one job at sea; this waits in port for the voyage at sea, and the next voyage for it
+    with vsm.at_sea(f"score {a.model} on {Path(a.list).stem}", kind="score"):
+        score(a)
+
+
+def score(a) -> None:
+    import mlx_ports  # scripts/mlx_ports.py: models mlx-lm cannot load (Maincoder), from their weights alone
+
+    port = mlx_ports.port_for(a.model)
+    model, tok = port() if port else load(a.model)
     start = tok.eos_token_id if tok.bos_token_id is None else tok.bos_token_id
     books = [f"pg{r.chosen}" for r in resolve_list(ROOT / a.list) if r.chosen]
     rows, t0 = [], time.time()

@@ -1,9 +1,22 @@
-"""thorp fetch LIST · thorp run SPEC · thorp eval RUN · thorp dash · thorp ledger SQL · thorp id SPEC"""
+"""thorp fetch LIST · thorp acquire LIST · thorp run SPEC · thorp eval RUN · thorp dash · thorp ledger SQL · thorp id SPEC"""
 
 from __future__ import annotations
 
 import argparse
 import sys
+
+
+def cmd_acquire(a) -> int:
+    """S1 of acquisition (thorp/acquisition.py): an intake, every row through the intake gate first."""
+    from thorp import acquisition
+
+    rec = acquisition.intake(a.list, set_name=a.set, limit=a.limit, dry_run=a.dry_run)
+    by = ", ".join(f"{k} {n}" for k, n in rec["refused_by_rule"].items())
+    print(
+        f"record: data/acquisition/intakes/{rec['id']}.json"
+        + (f"; refused by rule: {by}" if by else "")
+    )
+    return 0
 
 
 def cmd_fetch(a) -> int:
@@ -88,6 +101,15 @@ def main(argv: list[str] | None = None) -> int:
     s = sub.add_parser("fetch", help="resolve, fetch, strip and register a book list")
     s.add_argument("list")
     s.set_defaults(fn=cmd_fetch)
+    s = sub.add_parser(
+        "acquire",
+        help="an intake: a book list through the intake gate, fetched, registered, checked",
+    )
+    s.add_argument("list")
+    s.add_argument("--set", help="the manifest set (default: from the list's name)")
+    s.add_argument("--limit", type=int, help="take in at most this many rows")
+    s.add_argument("--dry-run", action="store_true", help="the gate's verdicts, nothing fetched")
+    s.set_defaults(fn=cmd_acquire)
     s = sub.add_parser("run", help="train (or resume, or report) the run a spec describes")
     s.add_argument("spec")
     s.set_defaults(fn=cmd_run)

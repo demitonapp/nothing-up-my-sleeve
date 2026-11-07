@@ -1,10 +1,26 @@
 ---
-// Governance (#/governance): Thorp's rules as Beer's Viable System Model (thorp/vsm.py, /api/governance). Five bands, S5
-// policy at the top down to S1 operations, each with its purpose, its code and its live numbers from the audit. Read-only:
+// Governance (#/governance): Thorp's rules as Beer's Viable System Model (thorp/vsm.py, /api/governance). Three tabs:
+// the five systems (five bands, S5 policy at the top down to S1 operations, each with its purpose, its code and its live
+// numbers from the audit); S3 control built out (#/governance/control: the gate, its decisions, the bargains, the
+// exceptions, the intake gate and the audit S3*); and acquisition (#/governance/acquisition, thorp/acquisition.py,
+// /api/acquisition): the books the voyages read, a viable system one level down with its own five bands. Read-only:
 // switching a policy is Justin's S5 decision, made in data/policies.json. UI.md, "Governance".
-import { emptyCls } from '../lib/ui';
+import { emptyCls, tabCls, tabsCls } from '../lib/ui';
 ---
 <div class="section" id="governance">
-  <h1>Governance <span class="q">Thorp's rules as Beer's Viable System Model: S5 policy (the identity, Justin's rules), S4 intelligence (the outside world), S3 control (the gate every voyage passes, and the audit), S2 coordination (one GPU, one queue), S1 operations (the expeditions). Read-only: a policy is switched on or off by Justin in data/policies.json</span></h1>
-  <div id="govbands"><div class={emptyCls()}>reading the audit…</div></div>
+  <h1>Governance <span class="q">Thorp's rules as Beer's Viable System Model: S5 policy (the identity, Justin's rules), S4 intelligence (the outside world), S3 control (the gate every voyage passes, and the audit), S2 coordination (one GPU, one queue), S1 operations (the expeditions, and acquisition: the books they read). Read-only: a policy is switched on or off by Justin in data/policies.json</span></h1>
+  <nav class={tabsCls('line', 'subnav')} data-orientation="horizontal" data-variant="line" id="govnav">
+    <a class={tabCls('')} data-state="inactive" data-gview="systems" href="#/governance">The five systems</a><a class={tabCls('')} data-state="inactive" data-gview="control" href="#/governance/control">S3 control</a><a class={tabCls('')} data-state="inactive" data-gview="acquisition" href="#/governance/acquisition">Acquisition</a>
+  </nav>
+  <div class="gview" data-gview="systems">
+    <div id="govbands"><div class={emptyCls()}>reading the audit…</div></div>
+  </div>
+  <div class="gview" data-gview="control">
+    <p class="s gvintro">S3 is control: what lets the operations run on their own without breaking Thorp's identity. For voyages it is the gate every new voyage passes before it reads a page (<span class="mono">vsm.gate</span>, from <span class="mono">train.prepare</span> and the fitout builder); for books it is the intake gate (<span class="mono">acquisition.admit</span>). The audit (S3*) looks again, independently of both.</p>
+    <div id="govcontrol"><div class={emptyCls()}>reading the gate…</div></div>
+  </div>
+  <div class="gview" data-gview="acquisition">
+    <p class="s gvintro">Acquisition is how books enter Thorp's library: fetched, registered and checked that they clean. Beer's model is recursive, so it is a viable system of its own inside Thorp's S1, with its own five systems (<span class="mono">thorp/acquisition.py</span>). Cleaning happens when a book is read (<span class="mono">thorp/cleaning.py</span>), so the source's own text stays the record.</p>
+    <div id="govacq"><div class={emptyCls()}>reading acquisition…</div></div>
+  </div>
 </div>

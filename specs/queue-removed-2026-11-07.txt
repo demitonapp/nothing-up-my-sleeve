@@ -1,0 +1,197 @@
+# Every line of specs/queue.txt as it stood at 19:30 on 2026-11-07, when Justin ruled that only Ogden fitout voyages
+# sail (DECISIONS.md, "Only Ogden sails"). Nothing here is queued; copy a line back to specs/queue.txt to sail it.
+
+# The standing queue (scripts/queue.sh): one spec name per line, run top to bottom. Edit freely.
+# The Magician's Apprentice (Justin, 08:05): the magician (the keel pathfinder), the apprentice on shuffled words, then handover against control
+# First Light (Justin, 07:05): the quickest path to the previous-word and duplicate-word stars; the book-value voyage is done
+# The two-fact problem, the baseline (Justin, 10:55): the most important voyage; top of the queue. One reading (English-original fiction x4), four classes, two seeds
+# The two-fact problem, the baseline (Justin, 10:55; re-queued 11:33 after its log folder was missing): top of the queue
+# The two-fact problem, round 2 on the pilot (Justin, 12:20): rotary positions, the reasoning shelf as a late stage, the conclusion-weighted tack, and all three; two seeds each; then the pick, which writes the speller's round 2 after its baseline
+# The fitout 'Thorp 300k: the four cards, leaning on cause and effect' (Justin, 13:15): pretraining (nursery, verse, fiction, cause), then post-training on the reasoning shelf and on cause again, two seeds
+# The card census around the fitout (Justin, 13:20): each variation one change from it, one seed, every stage; then the census
+# The 300k card census around its fitout, re-queued 13:45 (its log folder was missing at 13:27): next, ahead of round 2
+# Fitout trigram-engine-period @ 300k, built in the fitout builder
+# Fitout trigram-engine-period-random @ 300k, built in the fitout builder
+# The fitout's post-training runs, re-queued 15:55 (seeding a rotary run failed on an empty 'rope' branch; fixed)
+# The card census on the 1m, around its fitout (Justin, 13:20): the fitout on two seeds, then each variation one change from it; then the census
+# The copy-weighted tack (Justin, 07:45; rule pre-registered in DECISIONS.md): baseline settings, alpha 1 and 3
+# First Light round 2 (combinations) is appended here by the steering task (thorp-first-light)
+# 1m first (Justin, 00:50): the proxy calibration with trait probes, the small Qwens and Thorp on the Forgotten Tomes, Little Argo's traits
+# Seedling (Justin, 08:20): the seedling pathfinder, then the 1m grown from it, frozen / slowed / free, two seeds each
+# The Magician's Apprentice II (Justin, 09:20): the five next steps, at the pilot; before Table Talk
+# The best keel (Justin, 10:10): the end of the current queue. Round 1: one lever at a time, two seeds; round 2 is written and queued by the cmd line
+# Retry (night watch 06:00): the traits eval of proxy-hundred-v1 exited 1 at 05:24 because thorp eval takes a run id, not a name
+# Qwen 3.8 27B on the Forgotten Tomes: dropped (Justin, 09:35): no comparison against Qwen at this stage; the 9m tracks the 100m's discovery tests instead
+# The 9m sweep, seed 1 (spell-vocab4k-v1 is running as this is written)
+# The data levers: distinct text against total reading (DECISIONS.md, 22:30)
+# The 9m sweep, seed 2
+# The speller curriculum
+# The content experiment
+# The traits ships
+fitouts/fo-keel-cards-cause~lr-low-post2-s1
+fitouts/fo-keel-cards-cause~longer-pre-s1
+fitouts/fo-keel-cards-cause~longer-post1-s1
+fitouts/fo-keel-cards-cause~longer-post2-s1
+fitouts/fo-keel-cards-cause~cause-heavy-pre-s1
+fitouts/fo-keel-cards-cause~cause-heavy-post1-s1
+fitouts/fo-keel-cards-cause~cause-heavy-post2-s1
+# The four-cards fitout on clean text (unwrap-v1), two seeds: the new baseline (Justin, 18:50)
+fitouts/fo-keel-cards-cause~clean-pre-s1
+fitouts/fo-keel-cards-cause~clean-post1-s1
+fitouts/fo-keel-cards-cause~clean-post2-s1
+fitouts/fo-keel-cards-cause~clean-pre-s2
+fitouts/fo-keel-cards-cause~clean-post1-s2
+fitouts/fo-keel-cards-cause~clean-post2-s2
+# Ogden v0.1 (Justin, 19:20): one fixed corpus, 300k, 1m and 9m, two seeds each; the expedition "ogden"
+fitouts/fu-ogden-v0-1@300k-pre-s1
+fitouts/fu-ogden-v0-1@300k-pre-s2
+fitouts/fu-ogden-v0-1@1m-pre-s1
+fitouts/fu-ogden-v0-1@1m-pre-s2
+fitouts/fu-ogden-v0-1@9m-pre-s1
+fitouts/fu-ogden-v0-1@9m-pre-s2
+cmd: uv run python scripts/make_card_census.py --fitout keel-cards-cause > data/runs/cards/fitout-census-keel-cards-cause.out 2>&1
+two-facts/tf-r2-pilot-rope-s2
+two-facts/tf-r2-pilot-reason-s1
+two-facts/tf-r2-pilot-reason-s2
+two-facts/tf-r2-pilot-conclude-s1
+two-facts/tf-r2-pilot-conclude-s2
+two-facts/tf-r2-pilot-all-s1
+two-facts/tf-r2-pilot-all-s2
+fitouts/fo-pilot-cards-cause-pre-s1
+fitouts/fo-pilot-cards-cause-post1-s1
+fitouts/fo-pilot-cards-cause-post2-s1
+fitouts/fo-pilot-cards-cause-pre-s2
+fitouts/fo-pilot-cards-cause-post1-s2
+fitouts/fo-pilot-cards-cause-post2-s2
+fitouts/fo-pilot-cards-cause~no-rope-pre-s1
+fitouts/fo-pilot-cards-cause~no-rope-post1-s1
+fitouts/fo-pilot-cards-cause~no-rope-post2-s1
+fitouts/fo-pilot-cards-cause~no-copy-pre-s1
+fitouts/fo-pilot-cards-cause~no-copy-post1-s1
+fitouts/fo-pilot-cards-cause~no-copy-post2-s1
+fitouts/fo-pilot-cards-cause~no-nursery-pre-s1
+fitouts/fo-pilot-cards-cause~no-nursery-post1-s1
+fitouts/fo-pilot-cards-cause~no-nursery-post2-s1
+fitouts/fo-pilot-cards-cause~no-verse-pre-s1
+fitouts/fo-pilot-cards-cause~no-verse-post1-s1
+fitouts/fo-pilot-cards-cause~no-verse-post2-s1
+fitouts/fo-pilot-cards-cause~no-cause-pre-pre-s1
+fitouts/fo-pilot-cards-cause~no-cause-pre-post1-s1
+fitouts/fo-pilot-cards-cause~no-cause-pre-post2-s1
+fitouts/fo-pilot-cards-cause~no-reasoning-post-post1-s1
+fitouts/fo-pilot-cards-cause~fiction-only-pre-pre-s1
+fitouts/fo-pilot-cards-cause~fiction-only-pre-post1-s1
+fitouts/fo-pilot-cards-cause~fiction-only-pre-post2-s1
+fitouts/fo-pilot-cards-cause~heads-pre-s1
+fitouts/fo-pilot-cards-cause~heads-post1-s1
+fitouts/fo-pilot-cards-cause~heads-post2-s1
+fitouts/fo-pilot-cards-cause~deeper-pre-s1
+fitouts/fo-pilot-cards-cause~deeper-post1-s1
+fitouts/fo-pilot-cards-cause~deeper-post2-s1
+fitouts/fo-pilot-cards-cause~vocab-small-pre-s1
+fitouts/fo-pilot-cards-cause~vocab-small-post1-s1
+fitouts/fo-pilot-cards-cause~vocab-small-post2-s1
+fitouts/fo-pilot-cards-cause~lr-high-pre-s1
+fitouts/fo-pilot-cards-cause~lr-high-post1-s1
+fitouts/fo-pilot-cards-cause~lr-high-post2-s1
+fitouts/fo-pilot-cards-cause~lr-low-pre-s1
+fitouts/fo-pilot-cards-cause~lr-low-post1-s1
+fitouts/fo-pilot-cards-cause~lr-low-post2-s1
+fitouts/fo-pilot-cards-cause~longer-pre-s1
+fitouts/fo-pilot-cards-cause~longer-post1-s1
+fitouts/fo-pilot-cards-cause~longer-post2-s1
+fitouts/fo-pilot-cards-cause~cause-heavy-pre-s1
+fitouts/fo-pilot-cards-cause~cause-heavy-post1-s1
+fitouts/fo-pilot-cards-cause~cause-heavy-post2-s1
+cmd: uv run python scripts/make_card_census.py --fitout pilot-cards-cause > data/runs/cards/fitout-census-pilot-cards-cause.out 2>&1
+cmd: uv run python scripts/make_two_facts.py --pick > data/runs/two-facts/round2-pick.out 2>&1
+two-facts/tf-base-speller-s1
+two-facts/tf-base-speller-s2
+two-facts/tf-base-stylist-s1
+two-facts/tf-base-stylist-s2
+first-light/fl-pool-s2
+first-light/fl-copy1-s1
+first-light/fl-copy3-s1
+first-light/fl-copy1-s2
+first-light/fl-copy3-s2
+seedling/sl-grown-freeze-s1
+seedling/sl-grown-slow-s1
+seedling/sl-grown-free-s1
+seedling/sl-grown-freeze-s2
+seedling/sl-grown-slow-s2
+seedling/sl-grown-free-s2
+apprentice2/ma2-magician
+apprentice2/ma2-apprentice
+apprentice2/ma2-deck-s1
+apprentice2/ma2-nevermore-s1
+apprentice2/ma2-lineage-s1
+apprentice2/ma2-lineage-ctl-s1
+apprentice2/ma2-teach-s1
+apprentice2/ma2-control-s1
+apprentice2/ma2-deck-s2
+apprentice2/ma2-nevermore-s2
+apprentice2/ma2-lineage-s2
+apprentice2/ma2-lineage-ctl-s2
+apprentice2/ma2-teach-s2
+apprentice2/ma2-control-s2
+best-keel/kb-baseline-s1
+best-keel/kb-vocab-1024-s1
+best-keel/kb-vocab-4096-s1
+best-keel/kb-lr-1e-3-s1
+best-keel/kb-lr-1e-2-s1
+best-keel/kb-context-256-s1
+best-keel/kb-passes-1-s1
+best-keel/kb-passes-4-s1
+best-keel/kb-shelf-verse-s1
+best-keel/kb-shelf-pool-s1
+best-keel/kb-shelf-nursery-s1
+best-keel/kb-shelf-nursery-then-fiction-s1
+best-keel/kb-baseline-s2
+best-keel/kb-vocab-1024-s2
+best-keel/kb-vocab-4096-s2
+best-keel/kb-lr-1e-3-s2
+best-keel/kb-lr-1e-2-s2
+best-keel/kb-context-256-s2
+best-keel/kb-passes-1-s2
+best-keel/kb-passes-4-s2
+best-keel/kb-shelf-verse-s2
+best-keel/kb-shelf-pool-s2
+best-keel/kb-shelf-nursery-s2
+best-keel/kb-shelf-nursery-then-fiction-s2
+cmd: uv run python scripts/make_best_keel.py --round 2 > data/runs/best-keel-round2.out 2>&1
+cmd: uv run thorp eval 6f6765d464972740179c4a5a67e3f8d4005fba50 --sets lists/hole-cards-v2.csv --evaluators probes > data/runs/traits-proxy-hundred-v1.out 2>&1
+spell-vocab8k-v1
+spell-ctx256-v1
+lever-u800-p1
+lever-u200-p4
+lever-u100-p8
+lever-u400-p1
+lever-u400-p4
+spell-vocab4k-v1-seed2
+spell-vocab8k-v1-seed2
+spell-ctx256-v1-seed2
+spell-mixed-v1
+spell-first-v1
+spell-mantra-v1
+spell-mixed-v1-seed2
+spell-first-v1-seed2
+spell-mantra-v1-seed2
+content-random-v1
+content-greek-v1
+content-islamic-v1
+content-renaissance-v1
+content-about-v1
+content-random-v1-seed2
+content-greek-v1-seed2
+content-islamic-v1-seed2
+content-renaissance-v1-seed2
+content-about-v1-seed2
+content-random-v1-seed3
+content-greek-v1-seed3
+content-islamic-v1-seed3
+content-renaissance-v1-seed3
+content-about-v1-seed3
+hundred-traits-v1
+hundred-traits-v1-seed2
+pool-400-traits-v1
+pool-400-traits-v1-seed2

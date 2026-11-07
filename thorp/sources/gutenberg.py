@@ -284,9 +284,13 @@ def text(gid: int) -> str:
     return strip(raw)
 
 
-def fetch_and_register(res: Resolution, set_name: str) -> manifest.Book:
+def fetch_and_register(res: Resolution, set_name: str, observe: bool = True) -> manifest.Book:
+    """Fetch, strip and register one resolved row. A book new to the library is observed by acquisition's
+    S1 (thorp/acquisition.py: logged with the verdict its gate would give, never refused), unless an intake,
+    which has already passed it through the gate, registers it (observe=False)."""
     assert res.chosen is not None
     gid = res.chosen
+    new = manifest.get(book_id(gid)) is None
     fetch(gid)
     t = text(gid)
     b = t.encode("utf-8")
@@ -305,6 +309,13 @@ def fetch_and_register(res: Resolution, set_name: str) -> manifest.Book:
         set=set_name,
     )
     manifest.upsert(book)
+    if new and observe:
+        try:
+            from thorp import acquisition
+
+            acquisition.observe(book, "thorp fetch")
+        except Exception:  # noqa: BLE001  (the record must never cost a fetch)
+            pass
     return book
 
 

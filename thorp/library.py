@@ -317,8 +317,11 @@ if __name__ == "__main__":
 
 
 def fitouts() -> list[dict]:
-    """Every hand-curated fitout (fleet.FITOUTS) with its stages beside the shelves they read (books,
-    tokens) and the runs it has compiled to: for the Shelves tab (Justin, 13:15)."""
+    """Every fitout, the hand-curated ones (fleet.FITOUTS) and those saved from the builder (data/fitouts/,
+    no class until built for one), each with its stages beside the shelves they read (books, tokens) and the
+    runs it has compiled to: for the Library's fitout table (Justin, 13:15; saved ones added 19:05, "a table
+    of fitouts ... with columns for its attributes")."""
+    from thorp import fitouts as built
     from thorp import fleet
     from thorp.ledger import connect
 
@@ -373,6 +376,47 @@ def fitouts() -> list[dict]:
                 "stages": stages,
                 "tokens": sum(x["tokens"] for x in stages),
                 "runs": [{"run": n, "status": ran.get(n, "queued")} for n in runs],
+                "kind": "curated",
+            }
+        )
+    for f in built.saved():  # the builder's: a stage may read only part of its shelf (its tokens), chosen by `select`
+        stages, order = [], {"pretraining": 0, "post-training": 0}
+        for s in f.get("stages") or []:
+            sh = shelves.get(s.get("shelf"), {})
+            per = min(s["tokens"], sh.get("tokens_est") or s["tokens"]) if s.get("tokens") else sh.get("tokens_est")
+            order[s["phase"]] = order.get(s["phase"], 0) + 1
+            stages.append(
+                {
+                    "phase": s["phase"],
+                    "order": order[s["phase"]],
+                    "name": s.get("name"),
+                    "shelf": s.get("shelf"),
+                    "shelf_name": sh.get("name", s.get("shelf")),
+                    "books": sh.get("books"),
+                    "tokens_per_pass": per,
+                    "passes": s.get("passes", 1),
+                    "tokens": (per or 0) * s.get("passes", 1),
+                    "purpose": s.get("purpose", ""),
+                    "lr": s.get("lr"),
+                    "tack": s.get("tack"),
+                    "select": s.get("select", "all"),
+                }
+            )
+        runs = sorted({n for n in list(ran) + list(queued) if n.startswith(f"fo-{f['key']}-")})
+        out.append(
+            {
+                "key": f["key"],
+                "name": f.get("name"),
+                "preset": None,
+                "aim": f.get("aim", ""),
+                "positions": f.get("positions"),
+                "vocab": f.get("vocab"),
+                "tack": f.get("tack"),
+                "stages": stages,
+                "tokens": sum(x["tokens"] for x in stages),
+                "runs": [{"run": n, "status": ran.get(n, "queued")} for n in runs],
+                "kind": "saved",
+                "opt_in": f.get("opt_in", ""),
             }
         )
     return out

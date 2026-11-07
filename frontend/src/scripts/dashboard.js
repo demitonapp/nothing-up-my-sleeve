@@ -1184,7 +1184,7 @@ async function classVersus(r) {
   document.getElementById('vsref').onchange = e => { vsRef = e.target.value; try { localStorage.setItem('thorp.vs.ref', vsRef); } catch (x) { /* storage blocked */ } classVersus(r); };
   if (!d.voyage) { body.innerHTML = `<div class="${emptyCls()}">no voyage of this class has read the trick tests yet</div>`; return; }
   const by = Object.fromEntries(d.rows.map(x => [x.key, x]));
-  const val = (x, v) => v == null ? '–' : x.unit === 'pairs of 24' ? `${v}/24` : v.toFixed(x.unit === 'bits a byte' ? 3 : 2);
+  const val = (x, v) => v == null ? '–' : x.unit === 'pairs of 24' ? `${v}/24` : x.unit === 'cards' ? `${v} of 16` : v.toFixed(x.unit === 'bits a byte' ? 3 : 2);
   const pct = s => s == null ? '–' : `${Math.round(100 * s)}%`;
   const tag = x => x.noise ? ' <span class="s" title="within the test\'s noise: two pairs of 24, or 0.05 nats">≈ noise</span>' : '';
   const card = (keys, title, sub) => `<div class="vscol"><h3>${title} <span class="s">${sub}</span></h3><ol class="vslist">${keys.map(k => { const x = by[k];

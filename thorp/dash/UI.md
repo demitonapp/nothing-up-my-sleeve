@@ -142,19 +142,17 @@ holds the ways in, always:
   Beside the talk are the ship's star and trick readings at the checkpoint answering, measured
   ones first. Each answer says why it stopped (the next turn, the length, the end of text), its
   tokens and seconds. Ships not trained on the Q:/A: form don't converse yet, and the page says so.
-- **Leaderboard** (`#/leaderboard`): one ranked table on chaining two facts, the public measure
-  only (`thorp.leaderboard.payload`: the four chaining tests, Nature's breeder, the mill test, the
-  between test, the pigeonhole test; Thorp's other tests are internal). Columns: rank, model,
-  parameters, **chaining lift** (the mean lift on the four), **chaining gain** (the logic deck's,
-  `tricks/logic_test/gain`: the lift with both premises less the better single premise, on invented
-  words and counterfactual premises, the proof that a pass is chaining; "not read yet" until the deck
-  is scored on that model), passed (of 4, by the rule: lift 0.1 and
-  two in three pairs right), each test's lift and share (✓ performed), and **Thorp must match it
-  at**. Rows: the 2–4B competitors (`fleet.COMPETITORS`, marked 2–4B; unscored ones listed as
-  being scored) and the reference ladder (a switch hides it); Thorp's classes, each its **best
-  ship** with its sailings averaged; and Thorp's **forecasts** (italic, unranked; the two fits
-  through Thorp's class points read at each class not yet measured and at 400M, faded while fewer
-  than three classes are above the noise). A competitor's last cell: a tenth its size, each fit's
+- **Leaderboard** (`#/leaderboard`): two boards on chaining two facts, from one table
+  (`leaderboard.payload()["table"]`, outside models and Thorp versions together), split by the
+  noise. **Chaining**: the rows whose chaining lift clears +0.03, ranked by it, with the chaining
+  gain (logic deck), passed of 4, each test's lift and share, and what Thorp must match each
+  competitor at; Thorp's forecasts join only when they clear the noise too. **Approaching
+  chaining** ("the closest to chaining: the cards every chainer holds, then following one premise"):
+  the rest, ranked by how many of the four necessary cards they hold (four small cards, lit or dark,
+  "unreadable" where so) and then by the logic deck's one-hop lift, with the chaining lift greyed,
+  since below +0.03 it is noise. One-hop lifts within 0.05 of each other are noise too: those rows tie (`tied`), share
+  a rank shown as "=5" with "tied within the noise" beneath, and are listed biggest first. Thorp rows keep their version names and page links. The old
+  detail for a competitor's last cell on the Chaining board:
   reading there (with P once forecastable, the band in the tooltip), and the size each fit first
   reaches it at. The test columns drop first on narrow screens. Folded beneath: **Smoking the 2–4B
   range** (the least P over the competitors on each fit, or "not yet forecastable: N of 3 classes

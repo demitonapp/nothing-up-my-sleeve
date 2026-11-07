@@ -7,8 +7,9 @@
 // away beneath. UI.md, "Leaderboard".
 ---
 <div class="section" id="leaderboard">
-  <h1>Leaderboard <span class="q">chaining two facts: every model ranked by its chaining lift, the mean lift on the four 50m rungs (a premise and a frame chained into a conclusion no sentence states). the method is under <a href="#/discoveries">Discoveries, chaining two facts</a></span></h1>
+  <h1>Leaderboard <span class="q">two boards on chaining two facts: the models that chain, ranked by how well; and those not chaining yet, ranked by how close they are. The method is under <a href="#/discoveries">Discoveries, chaining two facts</a></span></h1>
   <section class="panel">
+    <h2>Chaining <span class="note">the models whose chaining lift clears the noise (+0.03), ranked by it: the mean lift on the four chaining tests</span></h2>
     <div class="handtools">
       <label><input type="checkbox" id="lbshowfc" checked> Thorp's forecasts</label>
       <label><input type="checkbox" id="lbshowpythia" checked> the reference ladder (Pythia, smaller Qwen)</label>
@@ -16,6 +17,11 @@
     </div>
     <div class="scroll"><table id="lbtable" data-nosort><thead></thead><tbody></tbody></table></div>
     <p class="note mt">The leaderboard is the four chaining tests only (Nature's breeder, the mill test, the between test, the pigeonhole test; 96 pairs), each cell its lift and share of pairs right, ✓ when performed (lift 0.1 and two in three right); Thorp's other tests are internal. The chaining gain is the logic deck's: invented words and counterfactual premises, each item asked with both premises and with one; the lift with both less the better single premise, the proof that a pass is chaining, not knowing or one premise. A Thorp class is its best ship, its sailings averaged. The 2–4B models (Qwen, Phi, Llama, Gemma, SmolLM, base checkpoints where one exists) are the competitors: Thorp must chain two facts as well as each at a tenth its size, and they never grade the chains (the reference ladder does). Forecast rows (italic) are Thorp's own classes fitted against size, straight (conservative) and bending (probable), as Smoking Qwen fits them; while fewer than three classes are above the noise (0.03) they are curves through noise, shown but not trusted. "Thorp matches it at" is the size where each fit reaches that model's lift; "a tenth its size" is each fit's reading there, with the probability it reaches that model's lift once forecastable. Performed at <b id="lbthr"></b>.</p>
+  </section>
+  <section class="panel">
+    <h2>Approaching chaining <span class="note">the closest to chaining: the cards every chainer holds, then following one premise. Models not chaining yet, ranked by how many of the four necessary cards they hold, then by the logic deck's one-hop lift</span></h2>
+    <div class="scroll"><table id="lbapproach" data-nosort><thead><tr><th>#</th><th>model</th><th>parameters</th><th>the necessary cards <span class="s">P♣ N♠ M♦ C♥</span></th><th title="the logic deck's lift on one-hop items: following one premise">one-hop lift</th><th title="below +0.03 it is noise">chaining lift <span class="s">noise</span></th></tr></thead><tbody></tbody></table></div>
+    <p class="note mt">Below the line nothing is ranked by chaining lift: below +0.03 it is noise. The four cards are the ones every model that chains plays (the card judge's necessary cards); one hop is following a single premise, the step before chaining two. One-hop lifts within 0.05 of each other are noise, so those rows tie and share a rank (=5), listed biggest first.</p>
   </section>
 
   <details class="panel lbfold" id="lbfoldsmoke">

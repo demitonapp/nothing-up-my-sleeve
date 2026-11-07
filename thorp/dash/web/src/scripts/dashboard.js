@@ -2410,30 +2410,40 @@ function drawLbTable() {
   document.getElementById('lbfcnote').innerHTML = !pts.length ? '' : trusted ? 'forecasts trusted: three classes above the noise'
     : `<span class="accent">forecasts not yet trusted</span>: ${(sq.classes_above_noise || []).length} of 3 classes above the noise`;
   const range = Object.fromEntries((sq.range || []).map(c => [c.model, c]));
-  const rows = [], seen = new Set();
-  for (const r of lbData.reference || []) {
-    if (!showPy && !r.competitor) continue;
-    seen.add(r.model);
-    rows.push({ kind: 'outside', model: r.model, name: r.competitor && r.label ? r.label : _shortModel(r.model), maker: makerOf(r.model), competitor: !!r.competitor, params: r.params ?? (range[r.model] || {}).params ?? ((sq.reference || []).find(x => x.model === r.model) || {}).params ?? null,
-      lift: r.chaining_lift, passed: r.passed, tests: r.tests, logic: r.logic, tenth: range[r.model] });
-  }
+  // one table (leaderboard.payload table), outside models and Thorp versions together, split by the noise: the CHAINING
+  // board holds the rows whose chaining lift clears it, ranked by chaining lift; the rest approach chaining (drawn below)
+  const tests_of = r => r.kind === 'thorp' ? ((lbData.ships || []).find(x => x.ship_key === r.ship_key) || (lbData.board || []).map(b => b.best).find(b => b && b.ship_key === r.ship_key) || {}).tests
+    : ((lbData.reference || []).find(x => x.model === r.model) || {}).tests;
+  const asRow = r => {
+    if (r.kind === 'thorp') {
+      const best = (lbData.board || []).map(b => b.best).find(b => b && b.ship_key === r.ship_key) || {};
+      const preset = best.preset || (r.ship_key || '').split(':')[0], rr = rungs.find(x => x.preset === preset);
+      return { kind: 'thorp', cls: preset, ship: { ...best, name: r.name, ship: r.ship || best.ship, ship_key: r.ship_key, sailings: r.sailings ?? best.sailings }, params: r.params ?? (rr ? rr.total : null),
+        lift: r.chaining_lift, passed: r.passed, tests: tests_of(r), logic: r.logic, src: r };
+    }
+    return { kind: 'outside', model: r.model, name: r.name, maker: makerOf(r.model), competitor: r.kind === 'competitor', params: r.params ?? (range[r.model] || {}).params ?? null,
+      lift: r.chaining_lift, passed: r.passed, tests: tests_of(r), logic: r.logic, tenth: range[r.model], src: r };
+  };
+  const table = lbData.table || [];
+  const rows = table.filter(r => r.group === 'chaining' && (showPy || r.kind !== 'ladder')).sort((a, b) => a.rank - b.rank).map(asRow);
+  const seen = new Set(table.map(r => r.model).filter(Boolean));
   for (const c of sq.range || []) if (!seen.has(c.model)) rows.push({ kind: 'outside', name: c.label, maker: makerOf(c.model), competitor: true, params: c.params, lift: null, pending: true });
-  // Thorp's classes: the best ship of each (its sailings averaged)
-  for (const b of lbData.board || []) {
-    if (!b.best) continue;
-    const rr = rungs.find(r => r.preset === b.best.preset);
-    rows.push({ kind: 'thorp', cls: b.best.preset, ship: b.best, params: rr ? rr.total : null, lift: b.best.chaining_lift, passed: b.best.passed, tests: b.best.tests, logic: b.best.logic });
-  }
+  drawLbApproach(table.filter(r => r.group === 'approaching').sort((a, b) => a.rank - b.rank).map(r => ({ ...asRow(r), src: r })), thr);
   // Thorp's forecasts: each class not yet measured, and 400M
+  let fcNoise = 0;
   if (showFc && (fits.straight || fits.bending)) {
-    const measured = new Set(rows.filter(r => r.kind === 'thorp').map(r => r.cls));
+    const measured = new Set(table.filter(r => r.kind === 'thorp').map(r => (r.ship_key || '').split(':')[0]));
     const at = rungs.filter(r => !measured.has(r.preset) && r.total).map(r => ({ cls: r.preset, params: r.total }));
     if (sq.smoke_at && !at.some(a => Math.abs(a.params - sq.smoke_at) / sq.smoke_at < 0.1)) at.push({ label: `Thorp ${fmtParams(sq.smoke_at)}`, params: sq.smoke_at, smoke: true });
     for (const a of at) {
       const x = Math.log10(a.params), st = fits.straight ? polyval(fits.straight, x) : null, be = fits.bending ? polyval(fits.bending, x) : null;
-      rows.push({ kind: 'forecast', name: a.label, cls: a.cls, params: a.params, lift: be ?? st, straight: st, bending: be, smoke: a.smoke });
+      // the Chaining board holds only what clears the noise: a forecast still in it is counted, not drawn
+      if ((be ?? st) > (lbData.noise ?? 0.03)) rows.push({ kind: 'forecast', name: a.label, cls: a.cls, params: a.params, lift: be ?? st, straight: st, bending: be, smoke: a.smoke });
+      else fcNoise++;
     }
   }
+  if (fcNoise) document.getElementById('lbfcnote').innerHTML += ` · ${fcNoise} forecast${fcNoise === 1 ? '' : 's'} still in the noise, so not on this board`;
+  // the ranked rows keep their rank; a forecast sits where its lift would, unranked
   rows.sort((a, b) => (b.lift ?? -9) - (a.lift ?? -9) || (b.params ?? 0) - (a.params ?? 0));
   const liftCell = r => r.pending ? '<span class="s">being scored</span>'
     : r.kind === 'forecast' ? `<span title="bending (probable) ${signed(r.bending)}; straight (conservative) ${signed(r.straight)}"><b>${signed(r.bending)}</b> <span class="s">bending</span><div class="s">${signed(r.straight)} straight</div></span>`
@@ -2679,3 +2689,27 @@ function artImg(key, cls = 'cardart') {
   return key ? `<img class="${cls}" src="art/${encodeURIComponent(key)}.png" alt="" loading="lazy" onerror="this.remove()">` : '';
 }
 const cardArt = key => ART_CARDS.has(key) ? artImg(key, 'cardart face') : '';
+
+
+// ---- the APPROACHING CHAINING board (leaderboard.payload table, group "approaching"): models whose chaining lift is still in
+// the noise, ranked by the cards every chainer holds (previous-word, Nevermore, mover, comparator) and then by following one
+// premise (the logic deck's one-hop lift). Their chaining lift is shown greyed: below +0.03 it is noise.
+const NEEDED = [['previous_word', 'Previous-word'], ['nevermore', 'Nevermore'], ['mover', 'Mover'], ['comparator', 'Comparator']];
+function drawLbApproach(rows, thr) {
+  const tb = document.querySelector('#lbapproach tbody'); if (!tb) return;
+  const icons = r => {
+    const c = r.src.cards;
+    if (!c) return `<span class="miniset"><span class="s">unreadable</span></span>`;
+    return `<span class="miniset">${NEEDED.map(([k, n]) => { const f = CARD_FACE[k] || {}; return `<span class="minicard${c[k] ? ' on' : ''}" title="${esc(n)}: ${c[k] ? 'lit' : 'not lit'}"><b>${f.rank || ''}</b><i>${f.suit || ''}</i></span>`; }).join('')}</span>`;
+  };
+  tb.innerHTML = rows.map(r => {
+    const name = r.kind === 'thorp' ? `<a href="#/leaderboard/thorp/${encodeURIComponent(r.ship.ship_key)}"><b>${esc(r.ship.name)}</b></a><div class="s">${r.ship.ship_key ? `<a href="#${shipHash(r.ship.ship_key)}">${esc(r.ship.ship || '')}</a>` : esc(r.ship.ship || '')}${r.ship.sailings ? ` · ${r.ship.sailings} sailing${r.ship.sailings === 1 ? '' : 's'}` : ''}</div>`
+      : `<a href="#/leaderboard/competitor/${encodeURIComponent(r.model)}"><b>${esc(r.name)}</b></a>${r.competitor ? ' <span class="pill blue">2–4B</span>' : ''}<div class="s">${esc(r.maker)}</div>`;
+    const held = r.src.cards_held;
+    const rank = r.src.tied ? `<span title="tied within the noise: one-hop lifts within 0.05 of each other">=${r.src.rank}</span><div class="s tiehint">tied within the noise</div>` : r.src.rank;
+    return `<tr class="lb-${r.kind}"><td>${rank}</td><td>${name}</td><td>${fmtParams(r.params)}</td>
+      <td>${icons(r)} <span class="s">${held == null ? '' : `${held} of 4`}</span></td>
+      <td>${r.src.one_hop != null ? signed(r.src.one_hop) : '–'}</td>
+      <td class="noise" title="below +0.03 the chaining lift is noise">${r.lift != null ? signed(r.lift) : '–'}</td></tr>`;
+  }).join('') || '<tr><td colspan="6" class="empty">nothing below the line</td></tr>';
+}

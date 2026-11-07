@@ -1,35 +1,47 @@
 ---
-// Leaderboard (#/leaderboard): the best of each class on the climb to chaining two facts
-// (thorp.leaderboard.payload, /api/leaderboard). Climb: per chain, the rungs performed from the bottom
-// plus the next rung's share of its mark, averaged over the four chains (0 to 5). Chaining lift: the
-// mean lift on the four 50m rungs, the north star. UI.md, "Leaderboard".
+// Leaderboard (#/leaderboard): one ranked table on chaining two facts (the chaining lift: the mean lift on
+// the four 50m rungs). Outside models (Qwen, Phi, Llama, Pythia: leaderboard.reference) beside Thorp's
+// classes (each class's best run) and Thorp's forecasts (smoking_qwen's two fits, carried to the classes
+// not yet sailed and to 400M), each outside model with the size Thorp is forecast to match it at.
+// The detail (Smoking Qwen, the climb by class, every run) folds away beneath. UI.md, "Leaderboard".
 ---
 <div class="section" id="leaderboard">
-  <h1>Leaderboard <span class="q">the best in class on the climb to chaining two facts. Every class must climb closer to chaining two facts than the class beneath; the 50m attempts it</span></h1>
-  <section class="panel" id="smokingqwen">
-    <h2>Smoking Qwen <span class="note">P(a 400M Thorp chains two facts as well as Qwen3 4B): Thorp's classes, chaining lift against size, fitted and carried an order of magnitude below Qwen3 4B; the Mac cannot train 400M, so the proof is a forecast (thorp/smoking_qwen.py; DECISIONS.md, "Smoking Qwen, pre-registered")</span></h2>
-    <div class="sqhead" id="sqhead"></div>
-    <div class="row sqrow">
-      <div class="chart tall" id="sqchart"></div>
-      <div class="sqside">
-        <div class="k">Does the method work? <span class="s">the same fit where the answer is known</span></div>
-        <div id="sqbacktest"></div>
-        <div class="k mt">The rule <span class="s">pre-registered</span></div>
-        <p class="s" id="sqrule"></p>
+  <h1>Leaderboard <span class="q">chaining two facts: every model ranked by its chaining lift, the mean lift on the four 50m rungs (a premise and a frame chained into a conclusion no sentence states). Every class must climb closer than the class beneath; the 50m attempts it</span></h1>
+  <section class="panel">
+    <div class="handtools">
+      <label><input type="checkbox" id="lbshowfc" checked> Thorp's forecasts</label>
+      <label><input type="checkbox" id="lbshowpythia" checked> Pythia</label>
+      <span class="note" id="lbfcnote"></span>
+    </div>
+    <div class="scroll"><table id="lbtable" data-nosort><thead><tr><th>#</th><th>model</th><th>parameters</th><th>chaining lift</th><th>Thorp matches it at</th><th>climb</th><th>the four chains</th></tr></thead><tbody></tbody></table></div>
+    <p class="note mt">Measured rows are read on the same pairs; a Thorp class is its best run. Forecast rows (italic) are Thorp's own classes fitted against size, straight (conservative) and bending (probable), as Smoking Qwen fits them; while fewer than three classes are above the noise (0.03) they are curves through noise, shown but not trusted. "Thorp matches it at" is the size where each fit reaches that model's lift. Performed at <b id="lbthr"></b>.</p>
+  </section>
+
+  <details class="panel lbfold" id="lbfoldsmoke">
+    <summary><h2>Smoking Qwen <span class="note">P(a 400M Thorp chains two facts as well as Qwen3 4B): the fits, the backtest and the rule</span></h2></summary>
+    <div id="smokingqwen">
+      <div class="sqhead" id="sqhead"></div>
+      <div class="row sqrow">
+        <div class="chart tall" id="sqchart"></div>
+        <div class="sqside">
+          <div class="k">Does the method work? <span class="s">the same fit where the answer is known</span></div>
+          <div id="sqbacktest"></div>
+          <div class="k mt">The rule <span class="s">pre-registered (DECISIONS.md, "Smoking Qwen, pre-registered")</span></div>
+          <p class="s" id="sqrule"></p>
+        </div>
       </div>
     </div>
-  </section>
-  <section class="panel">
-    <h2>Best in class <span class="note">each class's best run by its climb (0 to 5: on each of the four chains, the rungs performed from the bottom without a gap, plus the next rung's lift as a share of its mark; the mean of the four), ticked at each rung; beside it the chaining lift, the mean lift on the four 50m rungs (two facts chained), performed at <b id="lbthr"></b>; stalled when a class climbs no higher than the class beneath</span></h2>
+  </details>
+
+  <details class="panel lbfold">
+    <summary><h2>The climb, class by class <span class="note">each class's best run by its climb (0 to 5: on each chain the rungs performed from the bottom, plus the next rung's share of its mark; the mean of the four), stalled when a class climbs no higher than the class beneath; the reference ladder on the same bars</span></h2></summary>
     <div class="scroll"><table id="lbboard" data-nosort><thead><tr><th>class</th><th>best run</th><th>climb</th><th>chaining lift</th><th>the four chains</th></tr></thead><tbody></tbody></table></div>
-  </section>
-  <section class="panel">
-    <h2>The reference ladder <span class="note">outside models read on the same pairs, on the same bars, for scale; the largest is the perch</span></h2>
-    <div class="scroll"><table id="lbref" data-nosort><thead><tr><th>model</th><th>climb</th><th>chaining lift</th><th>the four chains</th></tr></thead><tbody></tbody></table></div>
-  </section>
-  <section class="panel">
-    <h2>Every run <span class="note">every run with chain readings (its latest), by climb</span></h2>
+    <div class="scroll mt"><table id="lbref" data-nosort><thead><tr><th>model</th><th>climb</th><th>chaining lift</th><th>the four chains</th></tr></thead><tbody></tbody></table></div>
+  </details>
+
+  <details class="panel lbfold">
+    <summary><h2>Every run <span class="note">every run with chain readings (its latest), by climb</span></h2></summary>
     <div class="handtools"><span class="note">class</span><select id="lbclass"><option value="">every class</option></select><span class="note" id="lbcount"></span></div>
     <div class="scroll"><table id="lbruns"><thead><tr><th>run</th><th>ship</th><th>class</th><th>status</th><th>climb</th><th>chaining lift</th><th>the four chains</th></tr></thead><tbody></tbody></table></div>
-  </section>
+  </details>
 </div>

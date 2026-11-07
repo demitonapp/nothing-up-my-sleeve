@@ -458,3 +458,19 @@ main a.ccell { color: var(--text); text-decoration: none; display: block; }
 .sqbt { margin-bottom: 8px; font-size: var(--fs-sm); }
 .sqbk { padding-left: 10px; }
 #sqrule { font-size: var(--fs-sm); color: var(--muted); margin: 0; }
+
+/* the leaderboard table */
+#lbtable td { vertical-align: middle; }
+#lbtable td:nth-child(6) { min-width: 240px; }
+#lbtable tr.lb-outside td:first-child, #lbtable tr.lb-thorp td:first-child { font-weight: 600; color: var(--muted); }
+#lbtable tr.lb-thorp { background: rgba(63,185,80,0.06); }
+#lbtable tr.lb-forecast td { font-style: italic; }
+#lbtable tr.lb-forecast.untrusted td { opacity: 0.65; }
+#lbtable td:nth-child(5) { font-size: var(--fs-sm); white-space: nowrap; }
+#leaderboard details.lbfold > summary { cursor: pointer; list-style: none; }
+#leaderboard details.lbfold > summary h2 { display: inline; }
+#leaderboard details.lbfold > summary::before { content: '▸ '; color: var(--muted); }
+#leaderboard details.lbfold[open] > summary::before { content: '▾ '; }
+#leaderboard .handtools label { font-size: var(--fs-sm); color: var(--muted); }
+#lbtable td:nth-child(2) { min-width: 190px; }
+#lbtable td:nth-child(4) { min-width: 120px; white-space: nowrap; }

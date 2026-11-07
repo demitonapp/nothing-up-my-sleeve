@@ -132,30 +132,27 @@ holds the ways in, always:
   Beside the talk are the ship's star and trick readings at the checkpoint answering, measured
   ones first. Each answer says why it stopped (the next turn, the length, the end of text), its
   tokens and seconds. Ships not trained on the Q:/A: form don't converse yet, and the page says so.
-- **Leaderboard** (`#/leaderboard`): the best in class on the climb to chaining two facts
-  (`thorp.leaderboard.payload`, `/api/leaderboard`). The rule is the headline: every class must
-  climb closer to chaining two facts than the class beneath; the 50m attempts it. A row per class,
-  keel to bettor, with its best run, its **climb** (0 to 5: on each of the four chains the rungs
-  performed from the bottom without a gap, plus the next rung's lift as a share of its mark; the
-  mean of the four) as a bar ticked at each rung, its **chaining lift** (the mean lift on the four
-  50m rungs, the north star, marked at the threshold; within about 0.03 of zero is noise), "stalled"
-  in amber when the class climbs no higher than the class beneath, and a four-chain strip (a row per
-  chain, a cell per rung keel to 50m, lit cells filled, the next one filled by its share of the
-  mark). Below, the reference ladder on the same bars (the largest is the perch), then every run
-  with chain readings, by climb, filterable by class. The two-fact voyage's page draws each run's
-  climb over training (`/api/climb`: `leaderboard.climb` read at every step the chains were read,
-  each trick's latest reading carried forward), coloured by class, the reference ladder as dotted
-  levels, with a switch to the chaining lift.
-  At the top, **Smoking Qwen** (`thorp.smoking_qwen.payload`, `/api/smoking_qwen`, kept two
-  minutes): P(a 400M Thorp chains two facts as well as Qwen3 4B), on the straight line
-  (conservative) and the bending curve (probable), or "not yet forecastable: N of 3 classes above
-  the noise"; claimed, probable or not claimed by the pre-registered rule (forecastable and P ≥ 0.9
-  on the straight line; probable on the bending curve only). The chart: chaining lift against
-  parameters (log, 100k to 10B), Thorp's class points with both fits (refitted in the page the way
-  `smoking_qwen` fits them: polynomials in log10 parameters) carried to 400M, each with its
-  bootstrap 5–95% band there, a dashed line at 400M, Qwen3 4B's lift in red, the threshold dotted,
-  the noise shaded, and the reference ladder as grey open points. Beside it the backtest: the same
-  method where the answer is known, each fit inside its band or missed (too low, too high).
+- **Leaderboard** (`#/leaderboard`): one ranked table on chaining two facts, the **chaining lift**
+  (the mean lift on the four 50m rungs; performed at the threshold, within about 0.03 of zero is
+  noise). Rows: the outside models (`leaderboard.reference`: Qwen, Phi, Llama and Pythia as they are
+  scored into `data/compare/chain-grades.json`, sized from `smoking_qwen.REFERENCE_PARAMS`), Thorp's
+  classes (each class's best run, shaded), and Thorp's **forecasts** (italic, unranked): the two
+  fits through Thorp's class points (polynomials in log10 parameters, refitted in the page as
+  `smoking_qwen` fits them), read at each class not yet measured and at 400M, bending (probable)
+  first and straight (conservative) beneath, the bootstrap band in the tooltip; faded while fewer
+  than three classes are above the noise. Each outside model has **Thorp matches it at**: the size
+  where each fit first reaches its lift, and how many times smaller or larger than it that is.
+  Each row also has its climb bar and four-chain strip. Switches hide the forecasts or Pythia.
+  Folded beneath: **Smoking Qwen** (P(a 400M Thorp chains two facts as well as Qwen3 4B) on each
+  fit, or "not yet forecastable: N of 3 classes above the noise"; claimed, probable or not by the
+  pre-registered rule; the chart of chaining lift against parameters with both fits and their
+  bands at 400M, Qwen3 4B's lift, the threshold, the noise and the reference ladder; the
+  backtest), **the climb, class by class** (each class's best run by its climb, 0 to 5, ticked at
+  each rung, stalled in amber when no higher than the class beneath, and the reference ladder on
+  the same bars), and **every run** with chain readings, filterable by class. The two-fact
+  voyage's page draws each run's climb over training (`/api/climb`: `leaderboard.climb` read at
+  every step the chains were read, each trick's latest reading carried forward), coloured by
+  class, the reference ladder as dotted levels, with a switch to the chaining lift.
 - **Shelves** (`#/shelves`): every list of books (`thorp.shelves.payload`, `/api/shelves`). It takes
   seconds to compute, so the server keeps it warm (computed at start, served from memory and
   recomputed in the background every five minutes); until the first is ready the page says it is

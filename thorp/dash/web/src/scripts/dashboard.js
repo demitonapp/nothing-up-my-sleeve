@@ -2182,6 +2182,7 @@ async function loadLeaderboard() {
   sel.value = presets.includes(keep) ? keep : '';
   sel.onchange = drawLbRuns;
   drawLbRuns();
+  drawLbTable();
   drawSmokingQwen();
 }
 function drawLbRuns() {
@@ -2294,7 +2295,7 @@ document.getElementById('voyageclimbwhat')?.addEventListener('change', () => { c
 // ---- Smoking Qwen (top of the Leaderboard; thorp.smoking_qwen.payload, UI.md "Leaderboard"): chaining lift against size on
 // Thorp's classes, fitted (linear and bending, in log10 parameters, as smoking_qwen fits them) and carried to 400M, with the
 // bootstrap's 5-95% band there, Qwen3 4B's mark, the threshold, and the reference ladder in grey.
-let sqKey = null;
+let sqKey = null, sqData = null;
 function polyfit(xs, ys, deg) {  // least squares through (xs, ys), coefficients highest power first (numpy.polyfit's order)
   const n = deg + 1, A = Array.from({ length: n }, () => Array(n + 1).fill(0));
   xs.forEach((x, i) => { for (let r = 0; r < n; r++) { for (let c = 0; c < n; c++) A[r][c] += x ** (2 * deg - r - c); A[r][n] += ys[i] * x ** (deg - r); } });
@@ -2306,6 +2307,7 @@ const polyval = (co, x) => co.reduce((a, c) => a * x + c, 0);
 async function drawSmokingQwen() {
   if (!document.getElementById('sqchart')) return;
   let d; try { d = await get('/api/smoking_qwen'); } catch (e) { return; }
+  sqData = d; drawLbTable();
   const key = JSON.stringify(d); if (key === sqKey) return; sqKey = key;
   const T = d.target || {}, th = d.thorp || {}, pts = th.points || [], need = 3;
   const pct = v => v == null ? '–' : `${Math.round(100 * v)}%`;
@@ -2352,3 +2354,88 @@ async function drawSmokingQwen() {
   plot('sqchart', traces, layout({ xaxis: { type: 'log', title: { text: 'parameters' }, range: [5, 10] }, yaxis: { title: { text: 'chaining lift' }, zeroline: false }, shapes, annotations: notes, height: 400, legend: { orientation: 'h', y: -0.2 } }));
 }
 const _shortModel = m => (m || '').split('/').pop().replace(/-(\d+)bit$/, ' $1-bit').replace('Qwen3-', 'Qwen3 ');
+
+
+// ---- the leaderboard table: one ranking on the chaining lift. Outside models (leaderboard.reference, sized from
+// smoking_qwen's REFERENCE_PARAMS), Thorp's classes (each class's best run), and Thorp's forecasts: the two fits through
+// Thorp's class points (polynomials in log10 parameters, as smoking_qwen fits them) read at each class not yet measured
+// and at 400M. For each outside model, the size where each fit reaches its lift.
+const MAKER = [[/qwen/i, 'Qwen', 'Alibaba'], [/llama/i, 'Llama', 'Meta'], [/phi/i, 'Phi', 'Microsoft'], [/pythia/i, 'Pythia', 'EleutherAI'], [/gemma/i, 'Gemma', 'Google'], [/smollm/i, 'SmolLM', 'Hugging Face']];
+const makerOf = m => (MAKER.find(([re]) => re.test(m)) || [null, '', ''])[2];
+const fmtParams = n => n == null ? '–' : n >= 1e12 ? `${(n / 1e12).toFixed(n >= 1e13 ? 0 : 1)}T` : n >= 1e9 ? `${(n / 1e9).toFixed(n >= 1e10 ? 0 : 1)}B` : n >= 1e6 ? `${Math.round(n / 1e6)}M` : `${Math.round(n / 1e3)}k`;
+// where a fit (coefficients in log10 parameters) first reaches y above the largest measured size; null if never by 10^14
+function fitReachAt(co, y, from) {
+  if (!co) return null;
+  for (let x = from; x <= 14; x += 0.005) if (polyval(co, x) >= y) return 10 ** x;
+  return null;
+}
+document.getElementById('lbshowfc').onchange = () => drawLbTable();
+document.getElementById('lbshowpythia').onchange = () => drawLbTable();
+document.querySelectorAll('#leaderboard details.lbfold').forEach(d => d.addEventListener('toggle', () => {
+  if (d.open) d.querySelectorAll('.js-plotly-plot').forEach(el => Plotly.Plots.resize(el));
+}));
+function drawLbTable() {
+  const tb = document.querySelector('#lbtable tbody'); if (!tb || !lbData) return;
+  const thr = lbData.chaining_threshold ?? 0.1, sq = sqData || {}, noise = sq.noise ?? 0.03;
+  document.getElementById('lbthr').textContent = thr;
+  const showFc = document.getElementById('lbshowfc').checked, showPy = document.getElementById('lbshowpythia').checked;
+  const size = Object.fromEntries((sq.reference || []).map(r => [r.model, r.params]));
+  const rungs = (ladderData && ladderData.rungs) || [];
+  // the two fits through Thorp's class points
+  const pts = ((sq.thorp || {}).points || []).filter(p => p.params && p.chaining_lift != null);
+  const xs = pts.map(p => Math.log10(p.params)), ys = pts.map(p => p.chaining_lift), top = xs.length ? Math.max(...xs) : 6;
+  const fits = { straight: pts.length >= 2 ? polyfit(xs, ys, 1) : null, bending: pts.length >= 3 ? polyfit(xs, ys, 2) : null };
+  const trusted = !!sq.forecastable;
+  document.getElementById('lbfcnote').innerHTML = !pts.length ? '' : trusted ? 'forecasts trusted: three classes above the noise'
+    : `<span class="accent">forecasts not yet trusted</span>: ${(sq.classes_above_noise || []).length} of 3 classes above the noise`;
+  const rows = [];
+  // outside models
+  for (const r of lbData.reference || []) {
+    if (!showPy && /pythia/i.test(r.model)) continue;
+    const y = r.chaining_lift;
+    const at = k => fits[k] && y != null ? fitReachAt(fits[k], y, top) : undefined;
+    rows.push({ kind: 'outside', name: _shortModel(r.model), maker: makerOf(r.model), params: size[r.model] ?? null, lift: y, climb: r.climb, chains: r.chains,
+      match: y == null ? null : { straight: at('straight'), bending: at('bending') } });
+  }
+  // Thorp's classes: each class's best run
+  for (const b of lbData.board || []) {
+    if (!b.best) continue;
+    const rr = rungs.find(r => r.preset === b.best.preset);
+    rows.push({ kind: 'thorp', name: `Thorp ${b.best.preset}`, cls: b.best.preset, maker: 'Thorp', params: rr ? rr.total : null, lift: b.best.chaining_lift, climb: b.best.climb, chains: b.best.chains, run: b.best });
+  }
+  // Thorp's forecasts: each class not yet measured, and 400M (Smoking Qwen's size)
+  if (showFc && (fits.straight || fits.bending)) {
+    const measured = new Set(rows.filter(r => r.kind === 'thorp').map(r => r.cls));
+    const at = rungs.filter(r => !measured.has(r.preset) && r.total).map(r => ({ label: `Thorp ${r.preset}`, cls: r.preset, params: r.total }));
+    if (sq.smoke_at && !at.some(a => Math.abs(a.params - sq.smoke_at) / sq.smoke_at < 0.1)) at.push({ label: `Thorp ${fmtParams(sq.smoke_at)}`, params: sq.smoke_at, smoke: true });
+    for (const a of at) {
+      const x = Math.log10(a.params), st = fits.straight ? polyval(fits.straight, x) : null, be = fits.bending ? polyval(fits.bending, x) : null;
+      const band = a.smoke ? sq.thorp : null;
+      rows.push({ kind: 'forecast', name: a.label, cls: a.cls, maker: 'Thorp (forecast)', params: a.params, lift: be ?? st, straight: st, bending: be, band, smoke: a.smoke });
+    }
+  }
+  rows.sort((a, b) => (b.lift ?? -9) - (a.lift ?? -9));
+  const liftCell = r => {
+    if (r.kind === 'forecast') {
+      const bb = r.band && r.band.bending, sb = r.band && r.band.linear;
+      const tip = `bending (probable) ${signed(r.bending)}${bb ? `, 5–95% ${signed(bb.band[0])} to ${signed(bb.band[1])}` : ''}; straight (conservative) ${signed(r.straight)}${sb ? `, 5–95% ${signed(sb.band[0])} to ${signed(sb.band[1])}` : ''}`;
+      return `<span title="${esc(tip)}"><b>${signed(r.bending)}</b> <span class="s">bending</span><div class="s">${signed(r.straight)} straight</div></span>`;
+    }
+    return chainingCell(r.lift, thr);
+  };
+  const matchCell = r => {
+    if (r.kind !== 'outside' || !r.match) return '';
+    if (!fits.straight && !fits.bending) return '<span class="s">no fit yet</span>';
+    const one = (k, v) => fits[k] ? `<div><span class="s">${k}</span> ${v === undefined ? '–' : v == null ? '<span class="s">never, on this fit</span>' : `<b>${fmtParams(v)}</b>${r.params ? ` <span class="s">(${v < r.params ? `${(r.params / v).toFixed(v < r.params / 10 ? 0 : 1)}× smaller` : `${(v / r.params).toFixed(1)}× larger`})</span>` : ''}`}</div>` : '';
+    return one('bending', r.match.bending) + one('straight', r.match.straight);
+  };
+  let rank = 0;
+  tb.innerHTML = rows.map(r => {
+    if (r.kind !== 'forecast') rank++;
+    const name = r.kind === 'thorp' ? `${classLink(r.cls)}<div class="s">best run ${runLink(r.run)}</div>`
+      : r.kind === 'forecast' ? `${r.cls ? classLink(r.cls) : `<b>${esc(r.name)}</b>`} <span class="pill accent">forecast</span>${r.smoke ? '<div class="s">a tenth of Qwen3 4B</div>' : ''}`
+      : `<b>${esc(r.name)}</b><div class="s">${esc(r.maker)}</div>`;
+    return `<tr class="lb-${r.kind}${r.kind === 'forecast' && !trusted ? ' untrusted' : ''}"><td>${r.kind === 'forecast' ? '' : rank}</td><td>${name}</td><td data-sort="${r.params ?? ''}">${fmtParams(r.params)}</td>
+      <td>${liftCell(r)}</td><td>${matchCell(r)}</td><td>${r.climb != null ? climbBar(r.climb) : ''}</td><td>${r.chains ? chainStrip(r.chains) : ''}</td></tr>`;
+  }).join('') || '<tr><td colspan="7" class="empty">no readings yet</td></tr>';
+}

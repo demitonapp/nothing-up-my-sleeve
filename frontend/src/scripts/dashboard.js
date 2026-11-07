@@ -1087,13 +1087,14 @@ async function classWager(r, keep = true) {
       ${canQueue ? `<button class="${btnCls('default')}" type="button" id="wagerqueue">Queue the experiment</button>` : ''}</div></div>`;
     const layers = 6;
     const byKey = Object.fromEntries(d.deck.map(c => [c.key, c]));
+    const scanAbout = Object.fromEntries((d.scansions || []).map(s => [s.key, `${s.name}: ${s.about}`]));
     el.innerHTML = d.constellations.map(k => `<div class="wrow"><div class="wsuit"><span class="suit">${esc(k.suit)}</span><b>${esc(k.name)}</b><span class="s">${esc(k.about)}</span></div>
       ${R.cards.filter(c => byKey[c.card].constellation === k.key).map(c => {
         const card = byKey[c.card], bet = c.bet || {}, h = c.house;
         const ctrlFall = c.control, pullFall = c.pull;
         const disabled = !card.charted ? ' disabled' : '';
         return `<div class="wcard${card.charted ? '' : ' uncharted'}${c.outcome && bet.move ? (c.points > 0 ? ' won' : ' lost') : ''}" data-card="${esc(c.card)}">
-          <div class="wart"><img src="art/${esc(c.card)}.png" alt="" loading="lazy" onerror="this.style.display='none'"><span class="wstage">${esc(card.stage)}</span><span class="wcost">${card.cost}</span></div>
+          <div class="wart"><img src="art/${esc(c.card)}.png" alt="" loading="lazy" onerror="this.style.display='none'"><span class="wstage">${esc(card.stage)}</span><span class="wcost">${card.cost}</span>${card.scansion ? `<span class="wscan" title="${esc(scanAbout[card.scansion] || '')}">${esc(card.scansion)}</span>` : ''}</div>
           <div class="wname">${esc(card.name)}</div>
           <div class="s wability">${esc(card.ability)}</div>
           ${card.on.length ? `<div class="s">evolves from: ${card.on.map(o => esc(byKey[o].name)).join(' + ')}</div>` : ''}
@@ -1188,11 +1189,12 @@ async function classDeck(r) {
   const key = JSON.stringify(d); if (key === classDeckKey && el.dataset.preset === r.preset) return; classDeckKey = key; el.dataset.preset = r.preset;
   const tok = t => t == null ? '' : t >= 1e6 ? `${Math.round(t / 1e6)}M` : `${Math.round(t / 1e3)}k`;
   const byKey = Object.fromEntries(d.cards.map(c => [c.key, c]));
+  const scanAbout = Object.fromEntries((d.scansions || []).map(s => [s.key, `${s.name}: ${s.about}`]));
   const tile = c => {
     const pct = c.voyages_read ? Math.round(100 * c.played / c.voyages_read) : 0;
     const barTo = c.best != null && c.mark ? Math.min(100, Math.round(100 * c.best / (c.mark * 2))) : 0;
     return `<div class="dcard r-${esc(c.rarity)}">
-      <div class="dart"><img src="art/${esc(c.key)}.png" alt="" loading="lazy" onerror="this.style.display='none'"><span class="dstage">${esc(c.stage)}</span><span class="dcost" title="layers that must stand in order">${c.cost}</span><span class="drarity">${esc(c.rarity)}</span></div>
+      <div class="dart"><img src="art/${esc(c.key)}.png" alt="" loading="lazy" onerror="this.style.display='none'"><span class="dstage">${esc(c.stage)}</span><span class="dcost" title="layers that must stand in order">${c.cost}</span><span class="drarity">${esc(c.rarity)}</span>${c.scansion ? `<span class="dscan" title="${esc(scanAbout[c.scansion] || '')}">${esc(c.scansion)}</span>` : ''}</div>
       <div class="dname">${esc(c.name)}</div>
       ${!c.charted ? '<div class="s">uncharted: Thorp has no reading for it yet</div>' : `
       <div class="dstat"><b>${c.played}</b> of ${c.voyages_read} voyages played it${c.voyages_read ? ` (${pct}%)` : ''}</div>
@@ -1204,6 +1206,61 @@ async function classDeck(r) {
   };
   el.innerHTML = `<div class="s dsum">${d.voyages} voyage${d.voyages === 1 ? '' : 's'} of the ${esc(d.class)} class on the ledger, ${d.read} with card readings${d.read ? '' : ': the deck fills in as its first voyage reads'}</div>` +
     d.constellations.map(k => `<div class="drow"><div class="dsuit"><span class="suit">${esc(k.suit)}</span><b>${esc(k.name)}</b><span class="s">${esc(k.about)}</span></div>${d.cards.filter(c => c.constellation === k.key).map(tile).join('')}</div>`).join('');
+}
+// ---- Watch it train (the Training tab's head; /api/watch): the class's voyage at sea, read every 30 seconds while
+// the tab is open: where it is, its stages and passes, the cards drawn and when, and the readings by tokens read
+let watchTimer = null, watchPreset = null, watchKey = null;
+const hms = s => s == null ? '–' : s >= 3600 ? `${Math.floor(s / 3600)} h ${Math.round((s % 3600) / 60)} min` : `${Math.round(s / 60)} min`;
+async function classWatch(r) {
+  const head = document.getElementById('watchhead'); if (!head) return;
+  if (watchPreset !== r.preset) { watchPreset = r.preset; watchKey = null; }
+  clearTimeout(watchTimer);
+  let d; try { d = await get(`/api/watch?preset=${encodeURIComponent(r.preset)}`); } catch (e) { head.innerHTML = `<div class="${emptyCls()}">the voyage could not be read (a dashboard server started before the Watch panel has to be restarted)</div>`; return; }
+  const again = () => { if (page === 'rung' && modelTab === 'training' && currentRung && rungFor(currentRung) && rungFor(currentRung).preset === r.preset) classWatch(r); };
+  if (d.voyage && d.voyage.status === 'at sea') watchTimer = setTimeout(again, 30000);
+  const key = JSON.stringify([d.where, d.drawn.length, d.log.slice(-1)]); if (key === watchKey) return; watchKey = key;
+  if (!d.voyage) { head.innerHTML = `<div class="${emptyCls()}">no voyage of this class on the ledger yet</div>`; return; }
+  const v = d.voyage, w = d.where, M = x => x == null ? '–' : `${(x / 1e6).toFixed(x < 1e8 ? 1 : 0)}M`;
+  const pct = w.total_steps ? Math.min(100, 100 * w.step / w.total_steps) : 0;
+  head.innerHTML = `<div class="wtop"><span class="${pillCls(v.status === 'at sea' ? 'running' : 'good')}">${esc(v.status)}</span> <b class="mono">${esc(v.name)}</b>
+      <span class="s">${esc((v.model || {}).preset || '')} · ${esc((v.model || {}).positions || '')} · lr ${v.lr ?? '–'}${v.fitout ? ` · fitout ${esc(v.fitout.key)}${v.fitout.variation ? ' ~ ' + esc(v.fitout.variation) : ''}` : ''}</span></div>
+    <div class="wnums"><div><b>${w.step.toLocaleString()}</b><span class="s"> of ${w.total_steps ? Math.round(w.total_steps).toLocaleString() : '–'} steps</span></div>
+      <div><b>${M(w.tokens)}</b><span class="s"> of ${M(w.tokens_total)} tokens</span></div>
+      <div><b>pass ${w.pass ?? '–'}</b><span class="s"> of ${w.passes}</span></div>
+      <div><b>${w.tokens_per_s ? Math.round(w.tokens_per_s).toLocaleString() : '–'}</b><span class="s"> tokens a second</span></div>
+      <div><b>${hms(w.elapsed_s)}</b><span class="s"> sailing</span></div>
+      <div><b>${v.status === 'at sea' ? hms(w.eta_s) : 'home'}</b><span class="s">${v.status === 'at sea' ? ' to go (readings included)' : ''}</span></div></div>
+    <div class="wprog"><i style="width:${pct}%"></i></div>
+    <div class="s">${w.last_reading_s_ago != null && v.status === 'at sea' ? `last reading ${Math.round(w.last_reading_s_ago)} s ago · the panel reads again every 30 s` : ''}</div>`;
+  // the stage plan: each stage as a band, its passes marked; you are here
+  const all = [...d.stages, ...d.post];
+  const passes = all.reduce((a, s) => a + (s.passes || 1), 0) || 1;
+  let done = 0;
+  const herePass = (w.pass || 1) - 1 + ((w.tokens_total ? (w.tokens % (w.tokens_total / w.passes)) / (w.tokens_total / w.passes) : 0));
+  document.getElementById('watchstages').innerHTML = `<div class="wstagebar">${all.map((s, si) => {
+      const width = 100 * (s.passes || 1) / passes;
+      const isThis = si < d.stages.length;
+      const cells = Array.from({ length: s.passes || 1 }, (_, k) => {
+        const n = si < d.stages.length ? k : -1;
+        const state = !isThis ? 'later' : (k < Math.floor(herePass) ? 'done' : k === Math.floor(herePass) ? 'now' : 'later');
+        const fill = state === 'now' ? Math.round(100 * (herePass - Math.floor(herePass))) : state === 'done' ? 100 : 0;
+        return `<div class="wpass ${state}" title="${esc(s.name)}, pass ${k + 1} of ${s.passes}"><i style="width:${fill}%"></i><span>pass ${k + 1}</span></div>`;
+      }).join('');
+      done += s.passes || 1;
+      return `<div class="wstage" style="flex:${width}"><div class="wsname"><b>${esc(s.phase)}</b>${s.name !== s.phase ? ` · ${esc(s.name)}` : ''} <span class="s">${esc((s.library || '').replace('lists/', ''))}${s.lr ? ` · lr ${s.lr}` : ''}</span></div><div class="wpasses">${cells}</div></div>`;
+    }).join('')}</div>${d.post.length ? '' : '<div class="s">one stage: this voyage is pretraining only (the fitout has no post-training)</div>'}`;
+  // the cards drawn, in the order they came
+  document.getElementById('watchdrawn').innerHTML = d.drawn.length ? `<div class="s">cards drawn, in order (the deck's rules):</div><div class="wchips">${d.drawn.map(c => `<span class="wchip"><img src="art/${esc(c.card)}.png" alt="" onerror="this.style.display='none'"><b>${esc(c.card.replace(/_/g, ' '))}</b><span class="s">${M(c.tokens)} tokens${c.layer != null ? ` · layer ${c.layer}` : ''}</span></span>`).join('')}</div>` : '<div class="s">no card drawn yet</div>';
+  const S = d.series, xs = p => p.map(q => q[0] / 1e6), ys = p => p.map(q => q[1]);
+  const lay = (yt, extra = {}) => layout({ xaxis: { title: 'tokens read (millions)', gridcolor: C.line }, yaxis: { title: yt, gridcolor: C.line }, showlegend: true, ...extra });
+  const line = (k, name, i, more = {}) => S[k] && S[k].length ? [{ type: 'scatter', mode: S[k].length > 30 ? 'lines' : 'lines+markers', name, x: xs(S[k]), y: ys(S[k]), line: { color: PALETTE[i % PALETTE.length] }, ...more }] : [];
+  plot('watchloss', [...line('loss', 'loss', 0), ...line('lr', 'learning rate', 1, { yaxis: 'y2' })], lay('loss (nats a token)', { yaxis2: { overlaying: 'y', side: 'right', title: 'learning rate', showgrid: false } }));
+  if (S.bpb.length) plot('watchbpb', line('bpb', 'Forgotten Tomes', 2), lay('bits per byte')); else empty('watchbpb', 'the judge books are read every 640 steps');
+  plot('watchshapes', [...line('upos', 'part of speech', 3), ...line('ogden', 'Ogden kind', 4), ...line('keyed', 'keyed word', 5)], lay('right', { yaxis: { tickformat: '.0%', gridcolor: C.line, title: 'top guess right' } }));
+  const marks = [['previous_word', 'previous-word', 0.5], ['nevermore', 'induction (Nevermore look)', 0.3], ['comparator', 'comparator', 0.3], ['words_back', 'words back', 0.3], ['mover', 'mover', 0.2]];
+  plot('watchcards', marks.flatMap(([k, n], i) => line(k, n, i)), lay('reading', { shapes: [...new Set(marks.map(m => m[2]))].map(y => ({ type: 'line', xref: 'paper', x0: 0, x1: 1, y0: y, y1: y, line: { color: C.accent, dash: 'dot', width: 1 } })) }));
+  plot('watchchain', [...line('copy_gain', 'copy gain (nats)', 0), ...line('one_hop', 'one-hop lift', 1), ...line('cause', 'cause gain', 2)], lay('', { shapes: [{ type: 'line', xref: 'paper', x0: 0, x1: 1, y0: 0, y1: 0, line: { color: C.line } }] }));
+  document.getElementById('watchlog').textContent = d.log.join('\n');
 }
 const RECENT = 30;
 // ---- RunGrid: every run at one size as a square, like a GitHub contribution graph. Bands of 7 rows
@@ -1346,6 +1403,7 @@ function renderRung() {
   if (modelTab === 'fitouts') classFitouts(r);
   if (modelTab === 'scoring') { askPanel(r); if (scSub === 'shapes') classShapes(r); else if (!['ask', 'language'].includes(scSub)) classSubject(r, scSub); }
   if (modelTab === 'bet') classWager(r);
+  if (modelTab === 'training') classWatch(r);
   document.querySelectorAll('#rung .chart').forEach(el => { if (el.data && el.offsetParent) Plotly.Plots.resize(el); });
 }
 // ---- Waypoints: when each run passed each waypoint (server.py api_waypoints). Fetched only while

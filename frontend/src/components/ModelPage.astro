@@ -69,6 +69,20 @@ import { btnCls, cardCls, crumbCls, emptyCls, fieldCls, rangeCls, selectCls, tab
 
   <!-- ============================== Training -->
   <div class="mtab" data-mtab="training">
+    <section class={cardCls(false, 'panel')} id="watchpanel">
+      <h2>Watch it train <span class="note">this class's voyage at sea (else its latest home), read every 30 seconds: where it is in its stages and passes, the cards it has drawn and when, and the readings that matter, by tokens read</span></h2>
+      <div id="watchhead" class="watchhead"><div class={emptyCls()}>looking for a voyage…</div></div>
+      <div id="watchstages" class="watchstages"></div>
+      <div id="watchdrawn" class="watchdrawn"></div>
+      <div class="watchgrid">
+        <div><h3>Loss and learning rate</h3><div class="chart" id="watchloss"></div></div>
+        <div><h3>Judge books, bits per byte <span class="s">lower is better</span></h3><div class="chart" id="watchbpb"></div></div>
+        <div><h3>Shapes <span class="s">top guess right</span></h3><div class="chart" id="watchshapes"></div></div>
+        <div><h3>The cards <span class="s">each against its mark</span></h3><div class="chart" id="watchcards"></div></div>
+        <div><h3>Copying and chaining <span class="s">copy gain (nats), one-hop lift, cause gain</span></h3><div class="chart" id="watchchain"></div></div>
+        <div><h3>The log</h3><pre id="watchlog" class="watchlog"></pre></div>
+      </div>
+    </section>
     <section class={cardCls(false, 'panel')}><div class="rungover" id="rungover"></div></section>
     <section class={cardCls(false, 'panel')}>
       <h2>The voyages <span class="note">each voyage's library, passes and settings, and how far it got <b class="recentnote"></b></span></h2>

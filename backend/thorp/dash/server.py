@@ -2980,6 +2980,7 @@ def api_class_deck(preset: str) -> dict:
         out.append({
             "key": c.key, "name": c.name, "constellation": c.constellation, "stage": c.stage, "cost": c.cost,
             "ability": c.ability_text, "on": list(c.on), "charted": deck.charted(c), "rarity": rarity,
+            "scansion": c.scansion,
             "mark": c.look[1] if c.look else (c.ability[1] if c.ability else None),
             "voyages_read": len(read), "played": len(played), "ogden_read": len(ogden_read), "ogden_played": len(ogden_played),
             "first_tokens_median": statistics.median(toks) if toks else None,
@@ -2990,10 +2991,119 @@ def api_class_deck(preset: str) -> dict:
     res = {
         "preset": preset, "class": _slug(preset), "voyages": len(voyages), "read": len(read),
         "constellations": [{"key": k, "suit": s, "name": n, "about": a} for k, s, n, a in deck.CONSTELLATIONS],
+        "scansions": [{"key": k, "name": n, "about": a} for k, n, a in deck.SCANSIONS],
         "cards": out,
     }
     _class_deck_cache[preset] = (time.time(), res)
     return res
+
+
+WATCH_SERIES = {  # what the Watch panel draws, by tokens read
+    "loss": "loss", "lr": "lr", "tokens_per_s": "tokens_per_s",
+    "bpb": "eval/hole-cards-unseen/bpb_mean",
+    "upos": "shapes/upos_top1", "ogden": "shapes/ogden_top1", "keyed": "shapes/keyed_top1",
+    "previous_word": "stars/previous_word/shared_score", "nevermore": "nevermore/natural_max_score",
+    "copy_gain": "nevermore/natural_copy_gain", "mover": "stars/mover/max_score",
+    "comparator": "stars/comparator/shared_score", "words_back": "stars/offset_2/shared_score",
+    "counter": "counter/probe_r2", "premise_marker": "stars/premise_marker/max_score",
+    "one_hop": "tricks/logic_test/lift_one_hop", "cause": "tricks/logic_test/gain_cause",
+}  # fmt: skip
+
+
+def api_watch(preset: str) -> dict:
+    """Watch a class train (Justin, 22:25: "so I can watch thorp 21m training to see what's happening ... show the
+    stages"): the class's voyage at sea (else its latest home), where it is (step, tokens, pass, stage, speed, time
+    left), its fitout's stage plan with the voyage's place on it, the cards it has drawn and when (the deck's
+    rules), the series that matter by tokens read, and the log's last lines."""
+    import time
+    from datetime import datetime
+
+    from thorp.viable.s4_intelligence import wager
+
+    cls = preset.split("-")[0]
+    rows = _rows(
+        """select run_id, name, status, started, finished, spec_json from runs
+           where json_extract(spec_json,'$.model.preset') like ? order by (status='running') desc, started desc limit 1""",
+        [f"{cls}%"],
+    )
+    if not rows:
+        return {"preset": preset, "voyage": None}
+    v = rows[0]
+    rid = v["run_id"]
+    spec = json.loads(v["spec_json"] or "{}")
+    f = paths.resolve("specs").rglob(f"{v['name']}.yaml")
+    f = next(iter(f), None)
+    if f is not None:
+        import yaml
+
+        spec = {**spec, **(yaml.safe_load(f.read_text()) or {})}
+    bt = (spec.get("optim") or {}).get("batch_tokens") or 32768
+    con = _con()
+    try:
+        def one(name):
+            r = con.execute("select value from metrics where run_id=? and name=? order by step desc limit 1", [rid, name]).fetchone()
+            return r[0] if r else None
+
+        total_steps = one("plan/total_steps")
+        tokens_total = one("plan/tokens_total")
+        passes = one("plan/passes") or (spec.get("data") or {}).get("passes") or 1
+        last = con.execute("select max(step) from metrics where run_id=? and name='loss'", [rid]).fetchone()[0] or 0
+        seen = one("tokens_seen") or last * bt
+        series = {}
+        for key, name in WATCH_SERIES.items():
+            pts = [[s * bt, val] for s, val in con.execute(
+                "select step, value from metrics where run_id=? and name=? order by step", [rid, name]) if val is not None]  # fmt: skip
+            if key in ("loss", "lr", "tokens_per_s") and len(pts) > 400:  # every step: thin to 400 points
+                k = len(pts) // 400 + 1
+                pts = pts[::k] + ([pts[-1]] if pts[-1] not in pts[::k] else [])
+            series[key] = pts
+        last_t = con.execute("select max(ts) from metrics where run_id=? and name='loss'", [rid]).fetchone()[0]
+    finally:
+        con.close()
+    started = datetime.fromisoformat(v["started"]).timestamp() if v["started"] else None
+    now = time.time()
+    elapsed = (now if v["status"] == "running" else (datetime.fromisoformat(v["finished"]).timestamp() if v["finished"] else now)) - (started or now)
+    rate = last / elapsed if elapsed > 0 and last else None  # steps a second, readings included
+    eta = (total_steps - last) / rate if rate and total_steps and v["status"] == "running" else None
+    # the stage plan: the voyage's own stages (pretraining) and, for a fitout, the post-training voyages seeded after it
+    data = spec.get("data") or {}
+    stages = []
+    if data.get("stages"):
+        for s in data["stages"]:
+            stages.append({"name": s["name"], "phase": "pretraining", "passes": s.get("passes", 1), "library": s.get("recipe")})
+    else:
+        stages.append({"name": "pretraining", "phase": "pretraining", "passes": passes, "library": data.get("recipe")})
+    chain = []
+    if spec.get("fitout"):
+        name = v["name"]
+        for p2 in sorted(paths.resolve("specs/fitouts").glob("*.yaml")):
+            import yaml
+
+            s2 = yaml.safe_load(p2.read_text()) or {}
+            if (s2.get("seeded_from") or {}).get("run") == name:
+                chain.append({"name": s2["name"], "phase": "post-training", "passes": (s2.get("data") or {}).get("passes", 1),
+                              "library": (s2.get("data") or {}).get("recipe"), "lr": (s2.get("optim") or {}).get("lr")})  # fmt: skip
+    cards = wager.falls(rid, bt)
+    drawn = sorted(
+        [{"card": k, "tokens": x["tokens"], "step": x["step"], "layer": x["layer"]} for k, x in cards.items() if x["played"]],
+        key=lambda x: x["tokens"],
+    )
+    log = []
+    lp = paths.runs_dir() / f"{rid}.log"
+    if lp.exists():
+        for line in lp.read_text(errors="replace").splitlines()[-12:]:
+            log.append(line if len(line) < 220 else line[:217] + "...")
+    return {
+        "preset": preset, "class": _slug(preset),
+        "voyage": {"name": v["name"], "run_id": rid, "status": "at sea" if v["status"] == "running" else v["status"],
+                   "started": v["started"], "finished": v["finished"], "fitout": spec.get("fitout"),
+                   "model": spec.get("model"), "lr": (spec.get("optim") or {}).get("lr")},
+        "where": {"step": last, "total_steps": total_steps, "tokens": seen, "tokens_total": tokens_total, "passes": passes,
+                  "pass": min(int(passes), int(seen // (tokens_total / passes)) + 1) if tokens_total else None,
+                  "elapsed_s": elapsed, "eta_s": eta, "last_reading_s_ago": (now - last_t) if last_t else None,
+                  "tokens_per_s": (series["tokens_per_s"][-1][1] if series["tokens_per_s"] else None)},
+        "stages": stages, "post": chain, "drawn": drawn, "series": series, "log": log,
+    }  # fmt: skip
 
 
 def api_wager(preset: str) -> dict:
@@ -3252,6 +3362,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/class_cards": lambda: api_class_cards(q["preset"]),
                 "/api/class_best": lambda: api_class_best(q["preset"]),
                 "/api/wager": lambda: api_wager(q["preset"]),
+                "/api/watch": lambda: api_watch(q["preset"]),
                 "/api/class_deck": lambda: api_class_deck(q["preset"]),
                 "/api/ask_questions": lambda: api_ask_questions(q["preset"]),
                 "/api/class_subjects": lambda: api_class_subjects(q["preset"]),

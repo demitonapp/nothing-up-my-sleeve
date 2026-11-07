@@ -112,10 +112,19 @@ def falls(run_id: str, batch_tokens: int) -> dict[str, dict]:
                     continue
             ok = True
             mine = layer(card, step)
+            if card.on_any:  # above any one of its Basics (the sink or the delimiter): the first played, below it
+                held = [b for b in card.on if out[b]["played"] and out[b]["step"] <= step]
+                lows = [layer(deck.BY_KEY[b], step) for b in held]
+                ok = bool(held) and (mine is None or any(lv is None or lv < mine for lv in lows))
+                if ok:
+                    out[card.key] = {"played": True, "step": step, "tokens": step * batch_tokens, "layer": mine, "charted": True}
+                    break
+                continue
             for below in card.on:
                 b = out[below]
-                if not deck.charted(deck.BY_KEY[below]):
-                    continue  # an uncharted Basic cannot be checked: the card stands on its own reading
+                bc = deck.BY_KEY[below]
+                if not deck.charted(bc) or not any(m in s for m in (bc.look[0] if bc.look else ())):
+                    continue  # a Basic uncharted, or never read on this voyage, cannot be checked: the card stands on its own
                 if not b["played"] or b["step"] > step:
                     ok = False
                     break
@@ -285,10 +294,11 @@ def payload(preset: str, bets_for=None) -> dict:
                 "key": c.key, "name": c.name, "constellation": c.constellation, "stage": c.stage, "cost": c.cost,
                 "look": ({"metrics": list(c.look[0]), "mark": c.look[1]} if c.look else None),
                 "ability": c.ability_text, "ability_reading": ({"metric": c.ability[0], "mark": c.ability[1]} if c.ability else None),
-                "fragility": c.fragility, "on": list(c.on), "charted": deck.charted(c),
+                "fragility": c.fragility, "on": list(c.on), "charted": deck.charted(c), "scansion": c.scansion,
             }
             for c in deck.CARDS
         ],  # fmt: skip
+        "scansions": [{"key": k, "name": n, "about": a} for k, n, a in deck.SCANSIONS],
         "moves": list(MOVES),
         "chips": CHIPS,
         "levers": [{"key": k, "name": v[0], "about": v[1]} for k, v in LEVERS.items()],

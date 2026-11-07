@@ -56,9 +56,21 @@ records soundings); an address naming a hidden tab opens Overview. The **observa
 (`/api/observation?expedition=`) reads each of its voyages at sea live from its log
 (`data/runs/<run_id>.log`) and the ledger: how far it has come and how long it has left, its loss as
 a sparkline, tokens a second and memory, the four necessary cards as they stand, the logic deck's gain
-and cause, and its **telegrams**, short dispatches in capitals with STOP between thoughts on a paper
-strip, newest first: casting off (the ship, the S3 gate, what it was seeded from), every tenth of the
-way, each star's first light, and the latest readings. With none of its voyages at sea, the deck says
+and cause, and its **star chart** (`finds`, `latest` and `sky` from `_finds` and `_sky`): every star
+by level with a line to each it rests on, the tricks beside them dashed to the stars expected to do
+them, and the four chains rung by rung; each star lights gold at its first light and each trick blue
+at its first performance (`fleet.performed`), numbered in the order found, the newest pulsing. Not
+found yet: dim, brighter the nearer its latest reading is to the mark; found and since fallen below
+it: dimmed; not built: a dashed ring. **Play** lights the finds one at a time in order; the slider and
+the chips beneath go to any point, **live** to where the voyage is now. The section opens on **the
+Nevermore card** (for now; a toggle gives **every star**): a flow, at one reading of the voyage, from
+every head (by layer; `heads` from `_heads`, the layer x head matrices the stars, nevermore and cards
+evaluators keep each eval) through the sieves, what each head does (a Nevermore head at its mark, a
+previous-word head at its mark, nearly one at half the mark, another star's head, no job yet), to the
+link: a previous-word head with a Nevermore head in a later layer forms the card; otherwise no
+Nevermore above it, no previous-word head below, or still forming. A line says whether the card has
+formed and names the nearest heads; a table beneath gives every head's two scores as bars against
+the marks. Play runs the readings in order; the slider and live as on the chart. With none of its voyages at sea, the deck says
 where its next one stands in the queue, and which voyage is at sea instead.
 The Expeditions page opens on **the queue at a glance** (`/api/expeditions/overview`): the voyage at
 sea, a bar of the voyages still to sail coloured by expedition with about how many hours, the queue's
@@ -207,7 +219,7 @@ holds the ways in, always:
   <ship_key>`, `/api/thorp`, from `leaderboard.thorp_entry`: the mean of its sailings' latest
   readings) on the competitor page's template: the class, the ship, its runs, the version and its
   history, then the same chaining result, cards and rungs. Each outside model's name opens **its page** (`#/leaderboard/competitor/<model>`,
-  `/api/competitor`, from `data/compare/chain-grades.json`): who made it, its size, the checkpoint,
+  `/api/competitor`, from `data/compare/chain-grades.json`): who made it (a link to its lab), its size, the checkpoint,
   and what Thorp must match it at (a tenth its size, with each fit's forecast there); its chaining
   result (the chaining lift, the tests performed, each test's lift and share, the logic deck's gain
   and share, the deck asked each way, one to three hops, one premise, swapped, padded, and the gain
@@ -269,6 +281,14 @@ holds the ways in, always:
   each (seed 1 solid, seed 2 dashed), the 0.3 mark dotted and a star where each run first lights it;
   then previous-word (0.5) and the copy gain (0.5). Above, the verdict by the pre-registered rule: lit
   on two seeds or not, and "repetition did it" when the engine lights it and its twin does not.
+- **A lab** (`#/leaderboard/lab/<key>`, `/api/lab`, `thorp/labs.py`): the maker of a family of
+  outside models (EleutherAI makes Pythia; `labs.LABS`, matched by family name, since checkpoints are
+  re-hosted under `mlx-community/`), opened from the maker under each outside model's name on the
+  leaderboard and from its page's "made by". Its models, then **its best** and **its worst**: the five
+  (model, test) readings on the rungs of the four chains that stand highest and lowest against the
+  other labs' models on the same test (standing: lift less their median, over their spread, in σ),
+  each with its lift, the field median, how many it beats, share right and ✓. The other labs link
+  beside the title.
 - **Governance** (`#/governance`, after Leaderboard; `thorp/vsm.py`, `/api/governance`): Thorp's rules
   as Beer's Viable System Model, five Card bands from S5 at the top to S1, each with its name, purpose,
   its code as Badge chips and its live numbers from `vsm.audit()`. S5 policy: each policy's

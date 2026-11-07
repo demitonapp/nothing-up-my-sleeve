@@ -42,7 +42,7 @@ const MTABS = ['fleet', 'goals', 'overview', 'training', 'scoring', 'waypoints',
 const STABS = ['betting', 'books', 'languages', 'sieves', 'attention', 'traits'];
 const STAB_EL = { betting: 'betting', books: 'books', languages: 'languages', sieves: 'sieves', attention: 'attention', traits: 'traits-section' };
 const OLD_SHIP = { betting: 'betting', books: 'books', languages: 'languages', sieves: 'sieves', attention: 'attention', 'traits-section': 'traits' };
-const SECTION_NAV = { sizes: 'classes', rung: 'classes', ship: 'classes', 'runs-section': 'classes', voyages: 'expeditions', voyage: 'expeditions', table: 'expeditions', discoveries: 'discoveries', sievesguide: 'sieves', leaderboard: 'leaderboard', competitor: 'leaderboard', governance: 'governance', shelves: 'library' };
+const SECTION_NAV = { sizes: 'classes', rung: 'classes', ship: 'classes', 'runs-section': 'classes', voyages: 'expeditions', voyage: 'expeditions', table: 'expeditions', discoveries: 'discoveries', sievesguide: 'sieves', leaderboard: 'leaderboard', competitor: 'leaderboard', lab: 'leaderboard', governance: 'governance', shelves: 'library' };
 let discView = 'index', discTrick = null, discChain = null, discSub = 'two-facts';
 // an expedition page's tabs (UI.md, "Expeditions"): the same five for every expedition; one that doesn't apply is hidden
 const ETABS = ['overview', 'at-sea', 'findings', 'fleet', 'inside'];
@@ -50,7 +50,7 @@ let expTab = 'overview';
 // the Discoveries subtabs: the trick in focus (chaining two facts), the road to quantum mechanics, the registry of every trick
 const DSUBS = ['two-facts', 'quantum', 'registry', 'stars'];
 // the leaderboard and the shelves (their code is at the end; declared here, as the first route may reach them)
-let cpModel = null, cpThorp = null, cpKey = null, cpStarsAsked = false, lbData = null, lbKey = null, shelvesData = null, shelfOpen = null, shelvesKey = null;
+let labKey = null, labDataKey = null, cpModel = null, cpThorp = null, cpKey = null, cpStarsAsked = false, lbData = null, lbKey = null, shelvesData = null, shelfOpen = null, shelvesKey = null;
 const shelfBooks = new Map();
 let page = 'sizes', modelTab = 'fleet', shipKey = null, sailingKey = null, shipTab = 'betting', voyageKey = null, runsList = null, shipsData = null;
 function route(h) {
@@ -73,6 +73,7 @@ function route(h) {
     if (a === 'sieves') return { page: 'sievesguide', run: b ? decodeURIComponent(b) : null };
     if (a === 'leaderboard' && b === 'thorp' && c) return { page: 'competitor', thorp: decodeURIComponent(c) };
     if (a === 'leaderboard' && b === 'competitor' && c) return { page: 'competitor', model: decodeURIComponent(h.slice(1).split('/').slice(2).join('/')) };
+    if (a === 'leaderboard' && b === 'lab' && c) return { page: 'lab', lab: decodeURIComponent(c) };
     if (a === 'leaderboard') return { page: 'leaderboard' };
     if (a === 'governance') return { page: 'governance' };
     if (a === 'shelves' || a === 'library') return { page: 'shelves', shelf: b ? decodeURIComponent(b) : null };
@@ -163,6 +164,7 @@ function showTab(h, push = true) {
   if (page === 'leaderboard') hash = '/leaderboard';
   if (page === 'governance') hash = '/governance';
   if (page === 'competitor') { cpThorp = rt.thorp || null; cpModel = rt.thorp || rt.model; hash = cpThorp ? '/leaderboard/thorp/' + encodeURIComponent(cpThorp) : '/leaderboard/competitor/' + encodeURIComponent(cpModel); }
+  if (page === 'lab') { labKey = rt.lab; hash = '/leaderboard/lab/' + encodeURIComponent(labKey); }
   if (page === 'shelves') { shelfOpen = rt.shelf || shelfOpen; hash = '/library'; }
   document.querySelectorAll('main > .section').forEach(s => s.classList.toggle('active', s.id === page));
   document.querySelectorAll('#mainnav a').forEach(a => setTab(a, a.dataset.nav === SECTION_NAV[page]));
@@ -181,6 +183,7 @@ function showTab(h, push = true) {
   if (page === 'leaderboard') loadLeaderboard();
   if (page === 'governance') loadGovernance();
   if (page === 'competitor') loadCompetitor();
+  if (page === 'lab') loadLab();
   if (page === 'shelves') loadShelves();
   if (page === 'ship' && (selected !== wasShip || !runsList)) refresh();
   // charts drawn while hidden have no width; size the ones now showing
@@ -2138,6 +2141,7 @@ async function refresh() {
   if (page === 'leaderboard') loadLeaderboard();
   if (page === 'governance') loadGovernance();
   if (page === 'competitor') loadCompetitor();
+  if (page === 'lab') loadLab();
   if (page === 'shelves') loadShelves();
   try {
     const runs = await get('/api/runs');
@@ -2421,8 +2425,10 @@ const _shortModel = m => (m || '').split('/').pop().replace(/-(\d+)bit$/, ' $1-b
 // smoking_qwen's REFERENCE_PARAMS), Thorp's classes (each class's best run), and Thorp's forecasts: the two fits through
 // Thorp's class points (polynomials in log10 parameters, as smoking_qwen fits them) read at each class not yet measured
 // and at 400M. For each outside model, the size where each fit reaches its lift.
-const MAKER = [[/qwen/i, 'Qwen', 'Alibaba'], [/llama/i, 'Llama', 'Meta'], [/phi/i, 'Phi', 'Microsoft'], [/pythia/i, 'Pythia', 'EleutherAI'], [/gemma/i, 'Gemma', 'Google'], [/smollm/i, 'SmolLM', 'Hugging Face']];
+// the labs, as thorp/labs.py LABS: a model's family, its maker, and the lab page's key (#/leaderboard/lab/<key>)
+const MAKER = [[/qwen/i, 'Qwen', 'Alibaba', 'alibaba'], [/llama/i, 'Llama', 'Meta', 'meta'], [/phi/i, 'Phi', 'Microsoft', 'microsoft'], [/pythia/i, 'Pythia', 'EleutherAI', 'eleutherai'], [/gemma/i, 'Gemma', 'Google', 'google'], [/smollm/i, 'SmolLM', 'Hugging Face', 'huggingface']];
 const makerOf = m => (MAKER.find(([re]) => re.test(m)) || [null, '', ''])[2];
+const makerLink = m => { const x = MAKER.find(([re]) => re.test(m || '')); return x ? `<a href="#/leaderboard/lab/${x[3]}" title="${esc(x[2])}: its models' best and worst">${esc(x[2])}</a>` : ''; };
 const fmtParams = n => n == null ? '–' : n >= 1e12 ? `${(n / 1e12).toFixed(n >= 1e13 ? 0 : 1)}T` : n >= 1e9 ? `${(n / 1e9).toFixed(n >= 1e10 ? 0 : 1)}B` : n >= 1e6 ? `${Math.round(n / 1e6)}M` : `${Math.round(n / 1e3)}k`;
 // where a fit (coefficients in log10 parameters) first reaches y above the largest measured size; null if never by 10^14
 function fitReachAt(co, y, from) {
@@ -2507,7 +2513,7 @@ function drawLbTable() {
     const ranked = r.kind !== 'forecast' && !r.pending; if (ranked) rank++;
     const name = r.kind === 'thorp' ? `<a href="#/leaderboard/thorp/${encodeURIComponent(r.ship.ship_key)}"><b>${esc(r.ship.name || `Thorp ${r.cls}`)}</b></a><div class="s">${r.ship.ship_key ? `<a href="#${shipHash(r.ship.ship_key)}">${esc(r.ship.ship)}</a>` : esc(r.ship.ship || '')} · ${r.ship.sailings ?? 1} sailing${(r.ship.sailings ?? 1) === 1 ? '' : 's'}</div>`
       : r.kind === 'forecast' ? `${r.cls ? classLink(r.cls) : `<b>${esc(r.name)}</b>`} <span class="${pillCls('accent')}">forecast</span>${r.smoke ? '<div class="s">a tenth of Qwen3 4B</div>' : ''}`
-      : `${r.model && !r.pending ? `<a href="#/leaderboard/competitor/${encodeURIComponent(r.model)}"><b>${esc(r.name)}</b></a>` : `<b>${esc(r.name)}</b>`}${r.competitor ? ` <span class="${pillCls('blue')}" title="a 2–4B competitor: Thorp must match it at a tenth its size">2–4B</span>` : ''}<div class="s">${esc(r.maker)}</div>`;
+      : `${r.model && !r.pending ? `<a href="#/leaderboard/competitor/${encodeURIComponent(r.model)}"><b>${esc(r.name)}</b></a>` : `<b>${esc(r.name)}</b>`}${r.competitor ? ` <span class="${pillCls('blue')}" title="a 2–4B competitor: Thorp must match it at a tenth its size">2–4B</span>` : ''}<div class="s">${makerLink(r.model || r.name)}</div>`;
     return `<tr class="lb-${r.kind}${r.kind === 'forecast' && !trusted ? ' untrusted' : ''}${r.pending ? ' pending' : ''}"><td>${ranked ? rank : ''}</td><td>${name}</td><td>${fmtParams(r.params)}</td>
       <td>${liftCell(r)}</td><td>${logicCell(r.logic, r.kind)}</td><td>${r.kind === 'forecast' ? '' : causeCell(r.src && r.src.cause_gain)}</td><td>${r.passed != null ? `${r.passed} of ${tests.length}` : ''}</td>${tests.map(t => `<td class="tcol">${r.tests ? testCell(r.tests[t.key]) : ''}</td>`).join('')}<td>${matchCell(r)}</td></tr>`;
   }).join('') || `<tr><td colspan="${8 + tests.length}" class="${emptyCls(true)}">no readings yet</td></tr>`;
@@ -2662,7 +2668,7 @@ async function loadCompetitor() {
       ['version', `${d.version ? `<b>v${d.version}</b>, crowned ${esc(crowned(d.crowned))}` : 'not crowned'}${(d.history || []).length ? `<div class="s">${d.history.map(h => `v${h.v} ${esc(h.ship)} (${signed(h.chaining_lift)}, ${esc(crowned(h.crowned))})`).join(' → ')}</div>` : ''}<div class="s">a new version is crowned only when a ship beats the last by more than the noise (0.03)</div>`],
     ].map(([k, v]) => `<div><div class="k">${k}</div><div>${v}</div></div>`).join('');
   } else document.getElementById('cpover').innerHTML = [
-    ['made by', esc(makerOf(d.model) || '–')], ['parameters', fmtParams(d.params)], ['checkpoint', `<span class="mono">${esc(d.model)}</span>`],
+    ['made by', makerLink(d.model) || '–'], ['parameters', fmtParams(d.params)], ['checkpoint', `<span class="mono">${esc(d.model)}</span>`],
     ['Thorp must match it at', d.competitor && d.params ? `<b>${fmtParams(t && t.smoke_at || d.params / 10)}</b> <span class="s">a tenth its size</span>${t && t.scored ? ['bending', 'linear'].filter(k => t[k]).map(k => `<div class="s">${k === 'linear' ? 'straight' : k} forecast there ${signed(t[k].predicted)}${t[k].p_at_or_above_target != null ? ` · P ${Math.round(100 * t[k].p_at_or_above_target)}%` : ''}</div>`).join('') : ''}` : '<span class="s">not a competitor: a reference model that grades the chains</span>'],
   ].map(([k, v]) => `<div><div class="k">${k}</div><div>${v}</div></div>`).join('');
   // the chaining result
@@ -2766,7 +2772,7 @@ function drawLbApproach(rows, thr) {
   };
   tb.innerHTML = rows.map(r => {
     const name = r.kind === 'thorp' ? `<a href="#/leaderboard/thorp/${encodeURIComponent(r.ship.ship_key)}"><b>${esc(r.ship.name)}</b></a><div class="s">${r.ship.ship_key ? `<a href="#${shipHash(r.ship.ship_key)}">${esc(r.ship.ship || '')}</a>` : esc(r.ship.ship || '')}${r.ship.sailings ? ` · ${r.ship.sailings} sailing${r.ship.sailings === 1 ? '' : 's'}` : ''}</div>`
-      : `<a href="#/leaderboard/competitor/${encodeURIComponent(r.model)}"><b>${esc(r.name)}</b></a>${r.competitor ? ` <span class="${pillCls('blue')}">2–4B</span>` : ''}<div class="s">${esc(r.maker)}</div>`;
+      : `<a href="#/leaderboard/competitor/${encodeURIComponent(r.model)}"><b>${esc(r.name)}</b></a>${r.competitor ? ` <span class="${pillCls('blue')}">2–4B</span>` : ''}<div class="s">${makerLink(r.model || r.name)}</div>`;
     const held = r.src.cards_held;
     const rank = r.src.tied ? `<span title="tied within the noise: one-hop lifts within 0.05 of each other">=${r.src.rank}</span><div class="s tiehint">tied within the noise</div>` : r.src.rank;
     return `<tr class="lb-${r.kind}"><td>${rank}</td><td>${name}</td><td>${fmtParams(r.params)}</td>
@@ -3440,7 +3446,7 @@ const expPill = v => expState[v.key] ? statePill(expState[v.key], v.status) : st
 
 // ---- the observation deck (each expedition's page, "On the water"; /api/observation): its voyages at sea, read live from
 // their logs. Per voyage: how far it has come and how long it has left, its loss (a sparkline), speed and memory, the four
-// necessary cards as they stand, and its telegrams, newest first. With none at sea: where its next voyage stands.
+// necessary cards as they stand, and its star chart (skyChart). With none at sea: where its next voyage stands.
 let deckKey = null;
 async function drawDeck(v) {
   const el = document.getElementById('obsdeck'); if (!el) return;
@@ -3471,15 +3477,233 @@ async function drawDeck(v) {
       </div>
       <div class="obscards"><span class="k">the four cards</span> ${Object.entries(r.cards || {}).map(([k, c]) => cardChip(k, c)).join('')}
         ${r.logic_gain != null ? `<span class="obscard" title="the logic deck's chaining gain"><b>gain</b> ${signed(r.logic_gain)}</span>` : ''}${r.cause_gain != null ? `<span class="obscard" title="cause and effect"><b>cause</b> ${signed(r.cause_gain)}</span>` : ''}</div>
-      <div class="telegrams"><div class="k">telegrams <span class="s">from the ship, newest first</span></div>
-        ${(r.telegrams || []).map(t => `<div class="telegram ${t.kind}"><span class="tgtime">${esc(t.time || (t.step != null ? 'step ' + t.step : ''))}</span><span class="tgtext">${esc(t.text)}</span></div>`).join('') || '<div class="s">no word from the ship yet</div>'}</div>
+      <div class="sky" data-run="${esc(r.run_id)}">${skyChart(r)}</div>
     </div>`;
   };
-  if (d.at_sea && d.at_sea.length) { el.innerHTML = d.at_sea.map(ship).join(''); return; }
+  if (d.at_sea && d.at_sea.length) {
+    // a chart being played keeps the stage until it ends; the next refresh brings the deck up to date
+    if (Object.values(skyState).some(x => x.timer) || Object.values(nvState).some(x => x.timer)) { deckKey = null; return; }
+    skyRuns = Object.fromEntries(d.at_sea.map(r => [r.run_id, r]));
+    el.innerHTML = d.at_sea.map(ship).join(''); return;
+  }
   const where = d.next_in_queue ? `its next voyage is <b>#${d.next_in_queue}</b> in the queue (${d.queued} of its voyages queued)` : d.state === 'home' ? 'it is home: every voyage has come back' : d.state === 'awaiting orders' ? 'it is awaiting orders: nothing of it at sea or queued' : 'nothing of it is queued';
   const other = (d.elsewhere || [])[0];
   el.innerHTML = `<div class="${emptyCls()}">no voyage of this expedition is at sea: ${where}.${other ? ` At sea now: <a href="#${shipHash(other.name)}">${esc(other.name)}</a>${other.expedition ? `, of <a href="#/expeditions/${esc(other.expedition)}">${esc(VOYAGE_NAME[other.expedition] || other.expedition)}</a>` : ''}.` : ''}</div>`;
 }
+
+
+// ---- the star chart (on the observation deck, one per voyage at sea): every star (by level, a line to each it rests on)
+// and every trick (the four chains rung by rung, and those beside them, dashed to the stars expected to do them), from
+// /api/observation's sky. Each find lights as it was made: a star's first light, a trick's first performance, numbered in
+// order. Play runs them in that order, one at a time; the slider goes to any point; "live" is where the voyage is now.
+// Not found yet: dim, brighter the nearer its latest reading is to the mark (live only). Not built: a faint ring.
+let skyRuns = {};
+const skyState = {};  // run_id -> { k: finds shown (null: live, all of them), timer }
+function skyLayout(sky) {
+  const pos = {}, W0 = 40, COL = 130, ROW = 50, TOP = 46;
+  const stars = sky.stars.slice().sort((a, b) => a.level - b.level || b.rests_on.length - a.rests_on.length);  // a star on a line first, so it keeps the row of the star it rests on
+  const used = {};  // column -> ys taken
+  for (const st of stars) {
+    const x = W0 + COL * st.level, col = used[st.level] = used[st.level] || [];
+    let y = st.rests_on.length && pos['star:' + st.rests_on[0]] ? pos['star:' + st.rests_on[0]].y : null;
+    if (y == null || col.includes(y)) { y = TOP; while (col.includes(y)) y += ROW; }
+    col.push(y); pos['star:' + st.key] = { x, y, side: 'r' };
+  }
+  const besideX = W0 + COL * 4 + 20; let lastY = -Infinity;
+  const beside = sky.tricks.map(t => { const ys = t.performed_by.map(k => pos['star:' + k]).filter(Boolean).map(p => p.y); return { t, y: ys.length ? ys.reduce((a, b) => a + b, 0) / ys.length : 9999 }; }).sort((a, b) => a.y - b.y);
+  for (const b of beside) { let y = b.y === 9999 ? lastY + ROW : b.y; if (y < lastY + 44) y = lastY + 44; if (!isFinite(y)) y = TOP; lastY = y; pos['trick:' + b.t.key] = { x: besideX, y, side: 'r' }; }
+  const chainX = besideX + 150, STEP = 84;
+  sky.chains.forEach((c, i) => c.forEach((t, j) => { pos['trick:' + t.key] = { x: chainX + STEP * j, y: TOP + 18 + 100 * i, side: j % 2 ? 'a' : 'b' }; }));
+  const ymax = Math.max(...Object.values(pos).map(p => p.y));
+  return { pos, w: chainX + STEP * 5 + 70, h: ymax + 40 };
+}
+function skyAll(r) {
+  const sky = r.sky; if (!sky) return '';
+  const finds = r.finds || [], st = skyState[r.run_id] = skyState[r.run_id] || { k: null, timer: null };
+  const k = st.k == null ? finds.length : Math.min(st.k, finds.length), shown = finds.slice(0, k), live = st.k == null;
+  const at = Object.fromEntries(shown.map(f => [f.kind + ':' + f.key, f])), newest = shown[shown.length - 1];
+  const { pos, w, h } = skyLayout(sky), latest = r.latest || {};
+  const items = [...sky.stars.map(x => ({ ...x, id: 'star:' + x.key, kind: 'star' })), ...sky.tricks.map(x => ({ ...x, id: 'trick:' + x.key, kind: 'trick' })), ...sky.chains.flat().map(x => ({ ...x, id: 'trick:' + x.key, kind: 'trick' }))];
+  const line = (a, b, cls) => { const p = pos[a], q = pos[b]; return p && q ? `<line class="skyline ${cls}${at[a] && at[b] ? ' on' : ''}" x1="${p.x}" y1="${p.y}" x2="${q.x}" y2="${q.y}"/>` : ''; };
+  const lines = [
+    ...sky.stars.flatMap(x => x.rests_on.map(o => line('star:' + x.key, 'star:' + o, ''))),
+    ...sky.tricks.flatMap(x => x.performed_by.map(o => line('trick:' + x.key, 'star:' + o, 'dash'))),
+    ...sky.chains.flatMap(c => c.slice(1).map((t, j) => line('trick:' + c[j].key, 'trick:' + t.key, ''))),
+  ].join('');
+  const dot = it => {
+    const p = pos[it.id]; if (!p) return '';
+    const f = at[it.id], near = live && !f && latest[it.id] != null && it.threshold ? Math.max(0, Math.min(1, latest[it.id] / it.threshold)) : 0;
+    const faded = live && f && latest[it.id] != null && latest[it.id] < it.threshold;
+    const cls = ['skyobj', it.kind, f ? 'found' : '', it.built === false ? 'unbuilt' : '', f && f === newest ? 'newest' : '', faded ? 'faded' : ''].filter(Boolean).join(' ');
+    const r0 = it.kind === 'star' ? 6 : 5, lx = p.side === 'r' ? p.x + 11 : p.x, ly = p.side === 'r' ? p.y + 4 : p.side === 'a' ? p.y - 13 : p.y + 20;
+    const tip = `${it.name}: ${f ? `${it.kind === 'star' ? 'lit' : 'performed'} at step ${f.step} (${signed(f.value)}, the mark ${it.threshold}${f.how ? ', ' + f.how : ''})${faded ? `; since faded to ${signed(latest[it.id])}` : ''}` : it.built === false ? 'not built yet: no test reads it' : `not found${latest[it.id] != null ? `; latest ${signed(latest[it.id])} of ${it.threshold}` : ''}`}`;
+    const shape = it.kind === 'star'
+      ? `<path d="${starPath(p.x, p.y, f ? r0 + 2 : r0)}"/>`
+      : `<rect x="${p.x - r0}" y="${p.y - r0}" width="${2 * r0}" height="${2 * r0}" transform="rotate(45 ${p.x} ${p.y})"/>`;
+    return `<g class="${cls}" style="--near:${(0.25 + 0.6 * near).toFixed(2)}" data-id="${esc(it.id)}"><title>${esc(tip)}</title>${f === newest ? `<circle class="pulse" cx="${p.x}" cy="${p.y}" r="10"/>` : ''}${shape}
+      <text x="${lx}" y="${ly}" text-anchor="${p.side === 'r' ? 'start' : 'middle'}">${f ? `<tspan class="ord">${f.order}</tspan> ` : ''}${esc(it.name)}</text></g>`;
+  };
+  const heads = `<text class="skyhead" x="${pos[Object.keys(pos).find(x => x.startsWith('star:'))].x - 6}" y="16">THE STARS <tspan>heads inside, by level</tspan></text>
+    ${sky.tricks.length ? `<text class="skyhead" x="${pos['trick:' + sky.tricks[0].key].x - 6}" y="16">TRICKS</text>` : ''}
+    ${sky.chains.length ? `<text class="skyhead" x="${pos['trick:' + sky.chains[0][0].key].x - 6}" y="16">THE FOUR CHAINS <tspan>rung by rung, to the discovery</tspan></text>` : ''}`;
+  const svg = `<svg class="skysvg" viewBox="0 0 ${w} ${h}" width="${w}" role="img" aria-label="star chart: ${shown.length} of ${items.filter(i => i.built !== false).length} found">${heads}${lines}${items.map(dot).join('')}</svg>`;
+  const cap = newest ? `<b>${newest.order}.</b> step ${newest.step}: <b>${esc(newest.name)}</b> ${newest.kind === 'star' ? 'lit' : 'performed'} <span class="s">(${signed(newest.value)}, the mark ${newest.threshold}${newest.how ? ', ' + newest.how : ''})</span>` : '<span class="s">nothing found yet</span>';
+  return `<div class="skytop"><span class="s">each star and trick lights where this voyage found it, numbered in order</span>
+      <span class="skyctl"><button class="${btnCls('outline')}" data-sky="play" ${finds.length ? '' : 'disabled'}>${st.timer ? '❚❚ pause' : '▶ play'}</button>
+      <input type="range" class="skyrange" min="0" max="${finds.length}" value="${k}" aria-label="finds shown" ${finds.length ? '' : 'disabled'}>
+      <button class="${btnCls(live ? 'default' : 'outline', live ? 'text-primary-foreground hover:text-primary-foreground' : '')}" data-sky="live" aria-pressed="${live}">live</button>
+      <span class="s">${k} of ${finds.length} found${r.step != null ? ` · at step ${r.step}` : ''}</span></span></div>
+    <div class="skycap">${cap}</div>
+    <div class="scroll skywrap">${svg}</div>
+    <div class="skyorder">${finds.map(f => `<button class="skychip${f.order <= k ? ' on' : ''}" data-k="${f.order}" title="step ${f.step}">${f.order}. ${f.kind === 'star' ? '★' : '◆'} ${esc(f.name)} <span class="s">${f.step}</span></button>`).join('') || '<span class="s">no star lit and no trick performed yet</span>'}</div>`;
+}
+// the section: the Nevermore card traced through the sieves (for now, the default), or every star
+const skyView = {};  // run_id -> 'nevermore' | 'all'
+function skyChart(r) {
+  const v = skyView[r.run_id] || 'nevermore';
+  return `<div class="skytop"><span class="k">the star chart</span>
+      <span class="skytabs" role="tablist">${[['nevermore', 'the Nevermore card'], ['all', 'every star']].map(([k, l]) => `<button role="tab" aria-selected="${v === k}" class="${toggleCls()}" data-state="${v === k ? 'on' : 'off'}" data-skyview="${k}">${l}</button>`).join('')}</span></div>
+    ${v === 'nevermore' ? nevermoreFlow(r) : skyAll(r)}`;
+}
+
+// ---- the Nevermore card, traced (Justin, 17:00: "all the heads ... through sieves and then what's left that then gets
+// linked to form the nevermore"): a flow, at one step of the voyage, from every head (by layer) through the sieves (what
+// each head does: a Nevermore head at its mark, a previous-word head at its mark, nearly one of those at half the mark,
+// another star's head, or no job yet) to the link: a previous-word head with a Nevermore head in a later layer above it
+// forms the card (the Nevermore reads what the previous-word head wrote). Play runs the voyage's readings in order.
+const nvState = {};  // run_id -> { i: index into heads.steps (null: live, the latest), timer }
+const NV_JOBS = [
+  ['nm', 'Nevermore head', 'at its mark: attends from a repeat to what followed it last time'],
+  ['pw', 'previous-word head', 'at its mark: attends to the word just before'],
+  ['nm_near', 'nearly a Nevermore', 'half its mark or more'],
+  ['pw_near', 'nearly previous-word', 'half its mark or more'],
+  ['other', "another star's head", 'lit as another star (two back, a sink, the delimiter...)'],
+  ['none', 'no job yet', 'below half of every mark'],
+];
+const NV_ENDS = [
+  ['linked', 'linked: the Nevermore card', 'a previous-word head with a Nevermore head in a later layer'],
+  ['pw_alone', 'no Nevermore above it', 'a previous-word head with no Nevermore head in a later layer'],
+  ['nm_alone', 'no previous-word head below', 'a Nevermore head with no previous-word head in an earlier layer: copying some other way'],
+  ['forming', 'still forming', 'nearly there: half the mark or more, not yet at it'],
+];
+function nvClassify(snap, marks) {
+  const m = snap.m, pw = m.previous_word, nm = m.nevermore, heads = [];
+  const others = Object.keys(m).filter(k => k !== 'previous_word' && k !== 'nevermore' && marks[k] != null);
+  pw.forEach((row, l) => row.forEach((_, h) => {
+    const p = pw[l][h], n = (nm[l] || [])[h] ?? 0;
+    const lit = others.filter(k => m[k][l] && m[k][l][h] >= marks[k]).sort((a, b) => m[b][l][h] / marks[b] - m[a][l][h] / marks[a]);
+    const job = n >= marks.nevermore ? 'nm' : p >= marks.previous_word ? 'pw' : n >= marks.nevermore / 2 ? 'nm_near' : p >= marks.previous_word / 2 ? 'pw_near' : lit.length ? 'other' : 'none';
+    heads.push({ l, h, pw: p, nm: n, job, other: lit[0] || null, otherVal: lit[0] ? m[lit[0]][l][h] : null });
+  }));
+  for (const x of heads) {
+    x.end = x.job === 'pw' ? (heads.some(y => y.job === 'nm' && y.l > x.l) ? 'linked' : 'pw_alone')
+      : x.job === 'nm' ? (heads.some(y => y.job === 'pw' && y.l < x.l) ? 'linked' : 'nm_alone')
+      : x.job === 'nm_near' || x.job === 'pw_near' ? 'forming' : null;
+  }
+  return heads;
+}
+function nevermoreFlow(r) {
+  const H = r.heads || { steps: [] }, steps = H.steps || [], marks = H.marks || {}, names = H.names || {};
+  if (!steps.length) return '<div class="s">no head readings yet: the stars and the Nevermore are read at each eval</div>';
+  const st = nvState[r.run_id] = nvState[r.run_id] || { i: null, timer: null };
+  const i = st.i == null ? steps.length - 1 : Math.min(st.i, steps.length - 1), snap = steps[i], live = st.i == null;
+  const heads = nvClassify(snap, marks), layers = [...new Set(heads.map(x => x.l))].sort((a, b) => a - b);
+  // the flow: three columns of nodes, each link one head wide
+  const W = 860, PAD = 14, NW = 12, GAP = 14, Hh = Math.max(200, 26 * heads.length + 40), U = (Hh - 30 - GAP * 5) / heads.length;
+  const colX = [140, 420, 680];
+  const cols = [
+    layers.map(l => ({ id: 'L' + l, label: `layer ${l}`, sub: `${heads.filter(x => x.l === l).length} heads`, n: heads.filter(x => x.l === l).length, cls: 'layer' })),
+    NV_JOBS.map(([k, label, about]) => ({ id: k, label, about, n: heads.filter(x => x.job === k).length, cls: 'job-' + k })).filter(x => x.n),
+    NV_ENDS.map(([k, label, about]) => ({ id: k, label, about, n: heads.filter(x => x.end === k).length, cls: 'end-' + k })).filter(x => x.n),
+  ];
+  const at = {};
+  cols.forEach((col, c) => { let y = 24; col.forEach(nd => { nd.x = colX[c]; nd.y = y; nd.h = Math.max(4, nd.n * U); nd.out = 0; nd.in = 0; at[nd.id] = nd; y += nd.h + GAP; }); });
+  const links = [];
+  const pairs = (a, b) => { const g = {}; heads.forEach(x => { const s = a(x), t = b(x); if (s != null && t != null) { const k = s + '>' + t; (g[k] = g[k] || []).push(x); } }); return Object.entries(g).map(([k, hs]) => { const [s, t] = k.split('>'); return { s, t, hs }; }); };
+  const order = id => [...cols[1], ...cols[2]].findIndex(n => n.id === id);
+  for (const lk of [...pairs(x => 'L' + x.l, x => x.job).sort((a, b) => order(a.t) - order(b.t)), ...pairs(x => x.job, x => x.end).sort((a, b) => order(a.t) - order(b.t))]) {
+    const a = at[lk.s], b = at[lk.t], w = lk.hs.length * U;
+    const y0 = a.y + a.out + w / 2, y1 = b.y + b.in + w / 2; a.out += w; b.in += w;
+    const x0 = a.x + NW, x1 = b.x, mx = (x0 + x1) / 2;
+    const tip = `${lk.hs.length} head${lk.hs.length === 1 ? '' : 's'}: ${lk.hs.map(x => `layer ${x.l} head ${x.h} (previous word ${x.pw.toFixed(2)}, Nevermore ${x.nm.toFixed(2)})`).join('; ')}`;
+    links.push(`<path class="nvlink to-${esc(lk.t)}" d="M${x0},${y0}C${mx},${y0} ${mx},${y1} ${x1},${y1}" stroke-width="${Math.max(1, w - 1).toFixed(1)}"><title>${esc(tip)}</title></path>`);
+  }
+  const nodes = cols.flatMap((col, c) => col.map(nd => `<g class="nvnode ${nd.cls}"><title>${esc(nd.label + (nd.about ? ': ' + nd.about : ''))}</title><rect x="${nd.x}" y="${nd.y}" width="${NW}" height="${nd.h}" rx="2"/>
+    <text x="${c === 0 ? nd.x - 6 : nd.x + NW + 6}" y="${nd.y + nd.h / 2 + 4}" text-anchor="${c === 0 ? 'end' : 'start'}">${esc(nd.label)} <tspan class="n">${nd.n}</tspan></text></g>`)).join('');
+  const heads3 = ['every head', 'the sieves: what each head does', 'the link'].map((t, c) => `<text class="skyhead" x="${c === 0 ? colX[0] + NW : colX[c]}" y="12" text-anchor="${c === 0 ? 'end' : 'start'}">${t.toUpperCase()}</text>`).join('');
+  const formed = heads.some(x => x.end === 'linked');
+  const best = heads.slice().sort((a, b) => b.pw / marks.previous_word - a.pw / marks.previous_word)[0], bestN = heads.slice().sort((a, b) => b.nm - a.nm)[0];
+  const verdict = formed ? `<span class="${pillCls('good')}">formed</span> the Nevermore card is in its hand at step ${snap.step}`
+    : `<span class="${pillCls('')}">not formed</span> at step ${snap.step}: the best previous-word head is layer ${best.l} head ${best.h} at <b>${best.pw.toFixed(2)}</b> of ${marks.previous_word}; the best Nevermore head layer ${bestN.l} head ${bestN.h} at <b>${bestN.nm.toFixed(2)}</b> of ${marks.nevermore}`;
+  const bar = (v, mk) => `<span class="nvbar" title="${v.toFixed(3)} of ${mk}"><span style="width:${Math.max(0, Math.min(100, 100 * v / mk)).toFixed(0)}%"></span><i style="left:50%"></i></span> ${v.toFixed(2)}`;
+  const jobName = Object.fromEntries([...NV_JOBS, ...NV_ENDS].map(([k, l]) => [k, l]));
+  const table = `<table class="nvheads" data-nosort><thead><tr><th>head</th><th>previous word <span class="s">mark ${marks.previous_word}</span></th><th>Nevermore <span class="s">mark ${marks.nevermore}</span></th><th>the sieve</th><th>the link</th></tr></thead><tbody>${heads.map(x => `<tr><td>layer ${x.l} · head ${x.h}</td><td>${bar(x.pw, marks.previous_word)}</td><td>${bar(x.nm, marks.nevermore)}</td><td><span class="nvdot job-${x.job}"></span>${esc(jobName[x.job])}${x.other ? ` <span class="s">(${esc(names[x.other] || x.other)} ${x.otherVal.toFixed(2)})</span>` : ''}</td><td class="s">${x.end ? esc(jobName[x.end]) : '–'}</td></tr>`).join('')}</tbody></table>`;
+  return `<div class="skyctl"><button class="${btnCls('outline')}" data-nv="play">${st.timer ? '❚❚ pause' : '▶ play'}</button>
+      <input type="range" class="nvrange" min="0" max="${steps.length - 1}" value="${i}" aria-label="step">
+      <button class="${btnCls(live ? 'default' : 'outline', live ? 'text-primary-foreground hover:text-primary-foreground' : '')}" data-nv="live" aria-pressed="${live}">live</button>
+      <span class="s">step <b>${snap.step}</b> · reading ${i + 1} of ${steps.length}</span></div>
+    <div class="skycap">${verdict}</div>
+    <div class="scroll skywrap"><svg class="nvsvg" viewBox="0 0 ${W} ${Hh}" role="img" aria-label="every head through the sieves to the Nevermore card at step ${snap.step}">${heads3}${links.join('')}${nodes}</svg></div>
+    <div class="scroll">${table}</div>
+    <p class="s">A head passes a sieve at its star's mark; half the mark is "nearly". The Nevermore is read on real passages (a repeat, then what followed it last time); the previous-word head on the same passages. The card forms when a previous-word head has a Nevermore head in a later layer to read what it wrote. Read every ${steps.length > 1 ? steps[1].step - steps[0].step : '–'} steps.</p>`;
+}
+function nvRedraw(rid) { const el = document.querySelector(`.sky[data-run="${CSS.escape(rid)}"]`); if (el && skyRuns[rid]) el.innerHTML = skyChart(skyRuns[rid]); }
+function nvStop(rid) { const st = nvState[rid]; if (st && st.timer) { clearInterval(st.timer); st.timer = null; } }
+document.addEventListener('click', e => {
+  const box = e.target.closest('.sky[data-run]'); if (!box) return;
+  const rid = box.dataset.run, r = skyRuns[rid]; if (!r) return;
+  const tab = e.target.closest('[data-skyview]');
+  if (tab) { skyView[rid] = tab.dataset.skyview; nvStop(rid); skyStop(rid); nvRedraw(rid); return; }
+  const b = e.target.closest('[data-nv]'); if (!b) return;
+  const st = nvState[rid] = nvState[rid] || { i: null, timer: null }, n = ((r.heads || {}).steps || []).length;
+  if (b.dataset.nv === 'live') { nvStop(rid); st.i = null; }
+  else if (b.dataset.nv === 'play') {
+    if (st.timer) nvStop(rid);
+    else {
+      st.i = st.i == null || st.i >= n - 1 ? 0 : st.i;
+      st.timer = setInterval(() => { st.i++; if (st.i >= n - 1) { nvStop(rid); st.i = null; } nvRedraw(rid); }, 700);
+    }
+  }
+  nvRedraw(rid);
+});
+document.addEventListener('input', e => {
+  if (!e.target.classList.contains('nvrange')) return;
+  const rid = e.target.closest('.sky[data-run]').dataset.run, r = skyRuns[rid]; if (!r) return;
+  const st = nvState[rid] = nvState[rid] || { i: null, timer: null }; nvStop(rid);
+  const v = +e.target.value; st.i = v >= ((r.heads || {}).steps || []).length - 1 ? null : v;
+  nvRedraw(rid);
+  const rg = document.querySelector(`.sky[data-run="${CSS.escape(rid)}"] .nvrange`); if (rg) rg.focus();
+});
+function starPath(cx, cy, R) {
+  const r = R * 0.45; let d = '';
+  for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, q = i % 2 ? r : R; d += `${i ? 'L' : 'M'}${(cx + q * Math.cos(a)).toFixed(1)},${(cy + q * Math.sin(a)).toFixed(1)}`; }
+  return d + 'Z';
+}
+function skyRedraw(rid) { const el = document.querySelector(`.sky[data-run="${CSS.escape(rid)}"]`); if (el && skyRuns[rid]) el.innerHTML = skyChart(skyRuns[rid]); }
+function skyStop(rid) { const st = skyState[rid]; if (st && st.timer) { clearInterval(st.timer); st.timer = null; } }
+document.addEventListener('click', e => {
+  const box = e.target.closest('.sky[data-run]'); if (!box) return;
+  const rid = box.dataset.run, st = skyState[rid], r = skyRuns[rid]; if (!st || !r) return;
+  const b = e.target.closest('[data-sky], .skychip'); if (!b) return;
+  const n = (r.finds || []).length;
+  if (b.dataset.sky === 'live') { skyStop(rid); st.k = null; }
+  else if (b.dataset.k) { skyStop(rid); st.k = +b.dataset.k; }
+  else if (b.dataset.sky === 'play') {
+    if (st.timer) skyStop(rid);
+    else {
+      st.k = st.k == null || st.k >= n ? 0 : st.k;
+      st.timer = setInterval(() => { st.k++; if (st.k >= n) { skyStop(rid); st.k = null; } skyRedraw(rid); }, 900);
+    }
+  }
+  skyRedraw(rid);
+});
+document.addEventListener('input', e => {
+  if (!e.target.classList.contains('skyrange')) return;
+  const rid = e.target.closest('.sky[data-run]').dataset.run, st = skyState[rid], r = skyRuns[rid]; if (!st || !r) return;
+  skyStop(rid); const v = +e.target.value; st.k = v >= (r.finds || []).length ? null : v;
+  skyRedraw(rid);
+  const rg = document.querySelector(`.sky[data-run="${CSS.escape(rid)}"] .skyrange`); if (rg) rg.focus();
+});
 
 
 // ---- the expedition page's tabs. Overview, Findings: always. At sea: while any of it is at sea, queued, paused or awaiting
@@ -3531,3 +3755,26 @@ async function drawExpReadings(v) {
     || `<tr><td colspan="${outs.length + 2}" class="${emptyCls(true)}">none of its voyages has a reading on these measures yet</td></tr>`;
 }
 
+// ==================================================================================== one lab
+// (#/leaderboard/lab/<key>; /api/lab, thorp.labs, UI.md "Leaderboard"): the maker of a family of outside models, its
+// models, and its five best and five worst readings, each against the other labs' models on the same test.
+async function loadLab() {
+  if (!labKey) return;
+  let d; try { d = await get('/api/lab?lab=' + encodeURIComponent(labKey)); } catch (e) { d = null; }
+  if (!d || d.error || !d.key) { document.getElementById('labtitle').textContent = `no lab called ${labKey}`; return; }
+  const key = JSON.stringify(d); if (key === labDataKey) return; labDataKey = key;
+  document.getElementById('labtitle').textContent = d.name;
+  document.getElementById('labnav').innerHTML = d.labs.filter(x => x.key !== d.key).map(x => `<a href="#/leaderboard/lab/${x.key}">${esc(x.name)}</a>`).join(' · ');
+  document.getElementById('labover').innerHTML = [
+    ['lab', `<b>${esc(d.name)}</b>${d.url ? `<div class="s"><a href="${esc(d.url)}" target="_blank" rel="noopener">${esc(d.url.replace(/^https?:\/\//, ''))}</a></div>` : ''}`],
+    ['its models', d.models.map(m => `<a href="#/leaderboard/competitor/${encodeURIComponent(m.model)}">${esc(m.label)}</a> <span class="s">${fmtParams(m.params ?? null)}</span>${m.competitor ? ` <span class="${pillCls('blue')}">2–4B</span>` : ''}${m.ladder ? ` <span class="${pillCls('')}">ladder</span>` : ''}`).join('<br>') || '–'],
+    ['readings', `<b>${d.readings}</b><div class="s">every rung of the four chains, for each of its models</div>`],
+  ].map(([k, v]) => `<div><div class="k">${k}</div><div>${v}</div></div>`).join('');
+  const head = '<tr><th>#</th><th>model</th><th>test</th><th>rung</th><th>lift</th><th title="the median lift of the other labs\' models on this test">field median</th><th title="the other labs\' models it lifts higher than">beats</th><th title="lift less the field median, over the field\'s spread">standing</th><th>share right</th><th></th></tr>';
+  const row = (r, i) => `<tr><td>${i + 1}</td><td><a href="#/leaderboard/competitor/${encodeURIComponent(r.model)}"><b>${esc(r.label)}</b></a></td><td>${esc(r.name)}<div class="s">${esc(r.chain)}</div></td><td class="s">${esc(r.rung || '')}</td><td class="num">${signed(r.lift)}</td><td class="num s">${signed(r.field_median)}</td><td class="num s">${r.beats} of ${r.field_n}</td><td class="num"><span class="${pillCls(r.standing >= 0 ? 'good' : 'bad')}">${r.standing >= 0 ? '+' : ''}${r.standing.toFixed(2)}σ</span></td><td class="num">${r.score == null ? '–' : Math.round(100 * r.score) + '%'}</td><td>${r.performed ? '✓' : ''}</td></tr>`;
+  for (const [id, rows] of [['labbest', d.best], ['labworst', d.worst]]) {
+    const t = document.getElementById(id);
+    t.tHead.innerHTML = head;
+    t.tBodies[0].innerHTML = rows.length ? rows.map(row).join('') : `<tr><td colspan="10" class="s">not enough readings yet</td></tr>`;
+  }
+}

@@ -1509,7 +1509,7 @@ def api_voyages_where(runs: str) -> dict:
 
 
 # ---- the observation deck (each expedition's page): its voyages at sea, read live from their logs (data/runs/<id>.log) and
-# the ledger, with the ship's telegrams: short dispatches from the log, newest first.
+# the ledger, with its finds: each star's first light and each trick's first performance, in order (the star chart).
 
 LOG_LINE = re.compile(r"^\[(\d\d:\d\d:\d\d)\] (.*)$")
 STEP_LINE = re.compile(
@@ -1543,13 +1543,158 @@ def _log_tail(run_id: str, nbytes: int = 400_000) -> list[tuple[str, str]]:
     return uniq
 
 
-def _telegram(text: str) -> str:
-    """A log line as a telegram: capitals, no lower-case flourishes, STOP between thoughts."""
-    t = re.sub(r"\s+", " ", text).strip().rstrip(".")
-    return (
-        " STOP ".join(x.strip().upper() for x in re.split(r"[;:]\s+|\.\s+", t) if x.strip())
-        + " STOP"
-    )
+def _sky() -> dict:
+    """The star chart's sky: every star (by level, with what it rests on) and every trick (the chains
+    of discovery tests rung by rung, and the tricks beside them with the stars expected to do them);
+    one not built yet (no evaluator) can never be found, and is drawn faint."""
+    from thorp import fleet
+
+    chains = fleet.chains()
+    in_chain = {k for c in chains for k in c}
+    return {
+        "stars": [
+            {
+                "key": s.key,
+                "name": s.name,
+                "level": s.level,
+                "rests_on": list(s.rests_on),
+                "threshold": s.threshold,
+                "built": bool(s.evaluator),
+                "about": s.about,
+            }
+            for s in fleet.STARS.values()
+        ],
+        "tricks": [
+            {
+                "key": t.key,
+                "name": t.name,
+                "threshold": t.threshold,
+                "performed_by": list(t.performed_by),
+                "built": bool(t.evaluator),
+                "about": t.about,
+            }
+            for t in fleet.TRICKS.values()
+            if t.key not in in_chain and (t.evaluator or t.performed_by)
+        ],
+        "chains": [
+            [
+                {
+                    "key": k,
+                    "name": fleet.TRICKS[k].name,
+                    "threshold": fleet.TRICKS[k].threshold,
+                    "built": bool(fleet.TRICKS[k].evaluator),
+                }
+                for k in c
+            ]
+            for c in chains
+        ],
+    }
+
+
+def _heads(con, rid: str) -> dict:
+    """Every head's score on every star, at each step the voyage read them (the layer x head matrices
+    the stars, nevermore and cards evaluators keep as artifacts, every eval): for tracing a card
+    through the sieves to the heads that form it. The Nevermore is read on the natural passages
+    (its star's metric, nevermore/natural_max_score)."""
+    from thorp import fleet
+
+    steps: dict[int, dict] = {}
+    for step, kind, text in con.execute(
+        "select step, kind, text from artifacts where run_id=? and kind in ('stars','nevermore','cards')"
+        " and step is not null order by step",
+        [rid],
+    ):
+        try:
+            rec = json.loads(text or "{}")
+        except ValueError:
+            continue
+        m = steps.setdefault(step, {})
+        if kind == "nevermore":
+            if rec.get("natural_scores") is not None:
+                m["nevermore"] = rec["natural_scores"]
+            continue
+        for k, v in rec.items():
+            if k in fleet.STARS and isinstance(v, list) and v and isinstance(v[0], list):
+                m[k] = v
+    return {
+        "marks": {k: s.threshold for k, s in fleet.STARS.items()},
+        "names": {k: s.name for k, s in fleet.STARS.items()},
+        "steps": [
+            {"step": k, "m": v}
+            for k, v in sorted(steps.items())
+            if "previous_word" in v and "nevermore" in v
+        ],
+    }
+
+
+def _finds(con, rid: str) -> dict:
+    """A voyage's finds, in the order it made them: each star's first light (its strongest head, or
+    two heads together, at its mark) and each trick's first performance (fleet.performed: its metric at
+    the threshold and, for a matched-pairs test, two in three pairs right), from the ledger. Each with
+    the step it came at and the reading then; the latest reading too, for those not found yet."""
+    from thorp import fleet
+
+    names = set()
+    for st in fleet.STARS.values():
+        names |= {st.metric, st.shared_metric} - {""}
+    for t in fleet.TRICKS.values():
+        if t.evaluator:
+            names |= {t.metric, t.metric.rsplit("/", 1)[0] + "/score"}
+    rows = con.execute(
+        f"select step, name, value from metrics where run_id=? and name in ({','.join('?' * len(names))})"
+        " and value is not null order by step, rowid",
+        [rid, *names],
+    ).fetchall()
+    seen: dict[str, float] = {}  # the readings so far, the latest of each
+    found: dict[str, dict] = {}
+    latest: dict[str, float] = {}
+
+    def check(step: int) -> None:
+        for st in fleet.STARS.values():
+            one, two = seen.get(st.metric), seen.get(st.shared_metric) if st.shared_metric else None
+            best = max([v for v in (one, two) if v is not None], default=None)
+            if best is None:
+                continue
+            latest["star:" + st.key] = best
+            if ("star:" + st.key) not in found and best >= st.threshold:
+                found["star:" + st.key] = {
+                    "kind": "star",
+                    "key": st.key,
+                    "name": st.name,
+                    "step": step,
+                    "value": best,
+                    "threshold": st.threshold,
+                    "how": "one head" if one is not None and one >= st.threshold else "two heads",
+                }
+        for t in fleet.TRICKS.values():
+            v = seen.get(t.metric)
+            if not t.evaluator or v is None:
+                continue
+            latest["trick:" + t.key] = v
+            if ("trick:" + t.key) not in found and fleet.performed(t.key, seen):
+                found["trick:" + t.key] = {
+                    "kind": "trick",
+                    "key": t.key,
+                    "name": t.name,
+                    "step": step,
+                    "value": v,
+                    "threshold": t.threshold,
+                }
+
+    at = None
+    for step, name, value in rows:
+        if value != value:  # NaN
+            continue
+        if at is not None and step != at:
+            check(at)
+        at = step
+        seen[name] = value
+    if at is not None:
+        check(at)
+    out = sorted(found.values(), key=lambda f: (f["step"], f["kind"] != "star", f["name"]))
+    for i, f in enumerate(out):
+        f["order"] = i + 1
+    return {"finds": out, "latest": latest}
 
 
 def _deck(run: dict) -> dict:
@@ -1608,97 +1753,10 @@ def _deck(run: dict) -> dict:
         gain, _ = latest("tricks/logic_test/gain")
         cause, _ = latest("tricks/logic_test/gain_cause")
         hole, _ = latest("eval/hole-cards-unseen/bpb_mean_en")
-        # first light: each star's first reading at its mark, from the ledger
-        lights = []
-        for st in fleet.STARS.values():
-            for metric, how in (
-                (st.metric, "one head"),
-                (getattr(st, "shared_metric", None), "two heads"),
-            ):
-                if not metric:
-                    continue
-                r = con.execute(
-                    "select min(step) from metrics where run_id=? and name=? and value>=?",
-                    [rid, metric, st.threshold],
-                ).fetchone()
-                if r and r[0] is not None:
-                    lights.append(
-                        {
-                            "step": r[0],
-                            "text": f"{st.name} lit at step {r[0]} ({how})",
-                            "kind": "lit",
-                        }
-                    )
-                    break
+        fx = _finds(con, rid)
+        heads = _heads(con, rid)
     finally:
         con.close()
-    # the telegrams: departure, the milestones (every tenth of the way), each light, and the latest readings
-    tele = []
-    for t, x in log[:12]:
-        if x.startswith(
-            (
-                "ship ",
-                "S3 gate",
-                "seeded from",
-                "conclusion-weighted",
-                "induction-weighted",
-                "stage",
-            )
-        ):
-            tele.append({"time": t, "kind": "depart", "text": _telegram(x)})
-    marks = set()
-    for t, m in steps:
-        s_, tot = int(m.group(1)), int(m.group(2))
-        tenth = s_ * 10 // max(1, tot)
-        if tenth not in marks and s_ > 0:
-            marks.add(tenth)
-            tele.append(
-                {
-                    "time": t,
-                    "step": s_,
-                    "kind": "progress",
-                    "text": _telegram(
-                        f"step {s_} of {tot}; loss {float(m.group(3)):.2f}; {int(m.group(5)):,} tokens a second"
-                    ),
-                }
-            )
-    for x in lights:
-        tele.append({"time": "", "step": x["step"], "kind": "lit", "text": _telegram(x["text"])})
-    evals = [(t, x) for t, x in log if x.startswith("eval @")]
-    if evals:
-        t, x = evals[-1]
-        at = re.match(r"eval @ (\d+)", x)
-        bits = []
-        for k in DECK_CARDS:
-            c = cards.get(k)
-            if c and c["one"] is not None:
-                bits.append(
-                    f"{fleet.STARS[k].name} {max(v for v in (c['one'], c['shared']) if v is not None):.2f} of {c['threshold']}"
-                )
-        if gain is not None:
-            bits.append(f"chaining gain {gain:+.2f}")
-        tele.append(
-            {
-                "time": t,
-                "step": int(at.group(1)) if at else None,
-                "kind": "reading",
-                "text": _telegram(
-                    f"readings at step {at.group(1) if at else '?'}; " + "; ".join(bits)
-                ),
-            }
-        )
-    other = [(t, x) for t, x in log[12:] if not x.startswith(("step ", "eval @"))]
-    for t, x in other[-6:]:
-        tele.append({"time": t, "kind": "note", "text": _telegram(x)})
-    tele.sort(
-        key=lambda d: (
-            d.get("step")
-            if d.get("step") is not None
-            else (-1 if d["kind"] == "depart" else 10**9),
-            d.get("time") or "",
-        ),
-        reverse=True,
-    )
     return {
         **run,
         "step": step,
@@ -1711,7 +1769,10 @@ def _deck(run: dict) -> dict:
         "logic_gain": gain,
         "cause_gain": cause,
         "hole_cards_bpb": hole,
-        "telegrams": tele[:24],
+        "finds": fx["finds"],
+        "latest": fx["latest"],
+        "heads": heads,
+        "sky": _sky(),
         "log_lines": len(log),
     }
 
@@ -1953,6 +2014,14 @@ def api_competitor(model: str) -> dict:
         "card_verdicts": _card_verdicts(),
         "tenth": tenth,
     }
+
+
+def api_lab(key: str) -> dict:
+    """One lab (thorp.labs): its models on Thorp's tests, and its five best and five worst readings,
+    each set against the other labs' models on the same test."""
+    from thorp import labs
+
+    return labs.payload(key)
 
 
 CENSUS_CARDS = ("previous_word", "nevermore", "mover", "comparator")
@@ -2587,6 +2656,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/census": api_census,
                 "/api/competitor": lambda: api_competitor(q["model"]),
                 "/api/thorp": lambda: api_thorp(q["ship"]),
+                "/api/lab": lambda: api_lab(q["lab"]),
                 "/api/bridge": api_bridge,
                 "/api/leaderboard/internal": api_leaderboard_internal,
                 "/api/smoking_qwen": api_smoking_qwen,

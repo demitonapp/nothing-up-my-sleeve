@@ -754,7 +754,7 @@ main a.pc2-more:hover { color: #000; }
 #overviewpanel .bad { color: var(--bad); }
 .pill.awaiting { font-weight: 600; }
 
-/* the observation deck: a voyage at sea, and its telegrams */
+/* the observation deck: a voyage at sea, and its star chart */
 .obsship { display: grid; gap: 10px; }
 .obshead .s { margin-top: 2px; }
 .obsrow { display: flex; gap: 20px; flex-wrap: wrap; align-items: center; }
@@ -769,15 +769,61 @@ main a.pc2-more:hover { color: #000; }
 .obscards { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; font-size: var(--fs-sm); }
 .obscard { display: inline-flex; align-items: center; gap: 4px; font-variant-numeric: tabular-nums; }
 .obscard.lit { color: var(--good); }
-.telegrams { display: grid; gap: 4px; max-height: 340px; overflow-y: auto; padding: 8px 10px; border-radius: 6px;
-  background: #e9e1c8; color: #1c1a14; font-family: "Courier New", ui-monospace, monospace; font-size: 12px; letter-spacing: .03em; }
-.telegrams .k { color: #6b6250; font-family: inherit; text-transform: uppercase; letter-spacing: .12em; }
-.telegrams .k .s { color: #8a8170; text-transform: none; letter-spacing: 0; }
-.telegram { display: grid; grid-template-columns: 70px 1fr; gap: 10px; padding: 3px 0; border-bottom: 1px dashed rgba(28,26,20,.18); }
-.telegram .tgtime { color: #6b6250; }
-.telegram.lit .tgtext { font-weight: 700; color: #1d5a24; }
-.telegram.reading .tgtext { color: #2a3b5c; }
-.telegram.depart .tgtext { color: #5a4a1d; }
+/* the star chart: each find lit in the order it was made (dashboard.js skyChart) */
+.sky { display: grid; gap: 8px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--r-md);
+  background: radial-gradient(ellipse at 30% 0%, #18233a 0%, #0b0f17 70%); }
+.skytop { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; }
+.skyctl { display: inline-flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.skyrange { width: 180px; accent-color: var(--accent); }
+.skycap { font-size: var(--fs-sm); min-height: 18px; }
+.skywrap { overflow-x: auto; }
+.skysvg { display: block; width: 100%; min-width: 860px; height: auto; }
+.skyhead { fill: var(--muted); font-size: 10px; letter-spacing: .14em; }
+.skyhead tspan { letter-spacing: 0; font-style: italic; }
+.skyline { stroke: var(--track); stroke-width: 1; opacity: .5; }
+.skyline.dash { stroke-dasharray: 3 3; }
+.skyline.on { stroke: var(--accent); opacity: .8; stroke-width: 1.4; }
+.skyobj path, .skyobj rect { fill: var(--muted); opacity: var(--near); transition: opacity .3s, fill .3s; }
+.skyobj text { fill: var(--muted); font-size: 10px; opacity: .75; }
+.skyobj.found path { fill: var(--accent); opacity: 1; filter: drop-shadow(0 0 4px var(--accent)); }
+.skyobj.found rect { fill: var(--blue); opacity: 1; filter: drop-shadow(0 0 4px var(--blue)); }
+.skyobj.found text { fill: var(--text); opacity: 1; }
+.skyobj.faded path, .skyobj.faded rect { opacity: .55; filter: none; }
+.skyobj.unbuilt path, .skyobj.unbuilt rect { fill: none; stroke: var(--track); stroke-dasharray: 2 2; opacity: .8; }
+.skyobj.unbuilt text { opacity: .45; font-style: italic; }
+.skyobj .ord { fill: var(--accent); font-weight: 700; }
+.skyobj.newest text { font-weight: 600; }
+.skyobj .pulse { fill: none; stroke: var(--accent); stroke-width: 1.5; animation: skypulse 1.4s ease-out infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes skypulse { from { transform: scale(.5); opacity: 1; } to { transform: scale(2.2); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .skyobj .pulse { animation: none; } }
+.skyorder { display: flex; flex-wrap: wrap; gap: 4px 6px; }
+.skychip { font-size: var(--fs-xs); padding: 2px 8px; border: 1px solid var(--line); border-radius: var(--r-pill); background: transparent; color: var(--muted); cursor: pointer; }
+.skychip.on { color: var(--text); border-color: var(--accent); }
+.skychip .s { font-size: 10px; }
+.skytabs { display: inline-flex; gap: 4px; }
+/* the Nevermore card traced: every head through the sieves to the link */
+.nvsvg { display: block; width: 100%; min-width: 760px; height: auto; }
+.nvlink { fill: none; stroke: var(--track); opacity: .55; }
+.nvlink:hover { opacity: .9; }
+.nvlink.to-nm, .nvlink.to-nm_alone { stroke: var(--blue); }
+.nvlink.to-pw, .nvlink.to-pw_alone { stroke: var(--accent); }
+.nvlink.to-nm_near, .nvlink.to-pw_near, .nvlink.to-forming { stroke: var(--accent); opacity: .3; }
+.nvlink.to-linked { stroke: var(--good); opacity: .8; }
+.nvnode rect { fill: var(--muted); }
+.nvnode text { fill: var(--text); font-size: 11px; }
+.nvnode text .n { fill: var(--muted); }
+.nvnode.job-nm rect, .nvnode.end-nm_alone rect { fill: var(--blue); }
+.nvnode.job-pw rect, .nvnode.end-pw_alone rect { fill: var(--accent); }
+.nvnode.job-nm_near rect, .nvnode.job-pw_near rect, .nvnode.end-forming rect { fill: var(--accent); opacity: .5; }
+.nvnode.job-none rect, .nvnode.job-other rect { fill: var(--track); }
+.nvnode.end-linked rect { fill: var(--good); }
+.nvheads { font-size: var(--fs-sm); }
+.nvbar { display: inline-block; position: relative; width: 70px; height: 6px; background: var(--raise); border: 1px solid var(--line); border-radius: 3px; vertical-align: middle; }
+.nvbar span { display: block; height: 100%; background: var(--accent); border-radius: 2px; }
+.nvbar i { position: absolute; top: -2px; bottom: -2px; width: 1px; background: var(--muted); }
+.nvdot { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 6px; background: var(--track); }
+.nvdot.job-nm { background: var(--blue); } .nvdot.job-pw { background: var(--accent); }
+.nvdot.job-nm_near, .nvdot.job-pw_near { background: var(--accent); opacity: .5; }
 #voyage > h2.band { margin-top: 18px; }
 
 /* an expedition page's tabs */

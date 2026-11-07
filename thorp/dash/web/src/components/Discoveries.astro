@@ -131,7 +131,7 @@ import { btnCls, cardCls, checkCls, crumbCls, selectCls, tabCls, tabsCls } from 
       </section>
       <section class={cardCls(false, 'panel')}>
         <h2>The star chart <span class="note">every kind of attention head described so far. Those Thorp measures carry their state from the ledger; the rest are charted but not yet measured, each with how Thorp could measure it. "Rests on" is the dependency its source reports; a blank means none reported. "Expected from" is the smallest class predicted to reach it (the floor is depth: one hop per layer), set beside the smallest class where a voyage has lit it</span></h2>
-        <div class="handtools"><span class="note">family</span><select class={selectCls('')} id="headfamily"><option value="">all</option></select><span class="note" id="headcount"></span></div>
+        <div class="handtools" data-filters><label class="note" for="headfamily">family</label><select class={selectCls('')} id="headfamily" data-remember><option value="">all</option></select><span class="note" id="headcount"></span></div>
         <div class="scroll"><table id="headtable"><thead><tr><th>kind of head</th><th>family</th><th>what it does</th><th>rests on</th><th>expected from</th><th>first lit in</th><th>in Thorp</th><th>first described</th><th>seen in</th></tr></thead><tbody></tbody></table></div>
       </section>
     </div>
@@ -139,7 +139,7 @@ import { btnCls, cardCls, checkCls, crumbCls, selectCls, tabCls, tabsCls } from 
     <div class="dsub" data-dsub="registry">
     <section class={cardCls(false, 'panel')}>
       <h2>The tricks <span class="note">a trick is what a model can do, judged from outside by its bets; open one for the stars that do it and Thorp's progress, class by class. "The field shows it at" is the size band (one order of magnitude, in parameters) where the trick is documented in standard models, not a proven smallest size; hover a band for the detail. "Thorp's goal class" is the class of ship expected to reach it, about an order of magnitude smaller than the field where the depth it needs allows; ◆ marks a gate, performed before a ship moves on to the next waypoint</span></h2>
-      <div class="handtools"><span class="note">waypoint</span><select class={selectCls('')} id="trickfamily"><option value="">all</option></select><span class="note">the field shows it at</span><select class={selectCls('')} id="trickband"><option value="">any size</option></select><span class="note" id="trickcount"></span></div>
+      <div class="handtools" data-filters><label class="note" for="trickfamily">waypoint</label><select class={selectCls('')} id="trickfamily" data-remember><option value="">all</option></select><label class="note" for="trickband">the field shows it at</label><select class={selectCls('')} id="trickband" data-remember><option value="">any size</option></select><span class="note" id="trickcount"></span></div>
       <div class="scroll"><table id="tricktable" class="clickable"><thead><tr><th>waypoint</th><th>trick</th><th>what it does</th><th>the field shows it at</th><th>how sure</th><th>stars needed</th><th>Thorp so far</th><th>Thorp's goal class</th></tr></thead><tbody></tbody></table></div>
       <p class="note mt">Also: <a href="#/discoveries/stars">every kind of head (the star chart)</a> · <a href="#/discoveries/traits">traits</a></p>
     </section>

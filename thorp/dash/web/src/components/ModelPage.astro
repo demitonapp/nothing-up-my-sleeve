@@ -41,7 +41,7 @@ import { btnCls, cardCls, crumbCls, emptyCls, fieldCls, rangeCls, selectCls, tab
     </section>
     <section class={cardCls(false, 'panel')}>
       <h2>What the field expects of this size <span class="note">the minimum, not the limit: the tricks the field would expect a ship this size to reach, and how its voyages are doing on each; every trick above them is worth taking too. Sort by any column, filter by step</span></h2>
-      <div class="handtools"><span class="note">step to quantum physics</span><select class={selectCls('')} id="goalfilter" title="filter the goals by waypoint"><option value="">all seven</option></select></div>
+      <div class="handtools" data-filters><label class="note" for="goalfilter">step to quantum physics</label><select class={selectCls('')} id="goalfilter" data-remember title="filter the goals by waypoint"><option value="">all seven</option></select></div>
       <div class="scroll"><table id="goaltable" class="clickable"><thead><tr><th>trick</th><th>waypoint</th><th>gate</th><th>rests on</th><th>the field shows it at</th><th>on this class</th></tr></thead><tbody></tbody></table></div>
     </section>
   </div>
@@ -118,7 +118,7 @@ import { btnCls, cardCls, crumbCls, emptyCls, fieldCls, rangeCls, selectCls, tab
     <!-- the three steps a class proves in order: match the field, beat it at this size, then reach up -->
     <nav class={tabsCls('line', 'subnav')} data-orientation="horizontal" data-variant="line" id="wpnav"><a class={tabCls('')} data-state="inactive" data-wsub="expected">1 · Expected</a><a class={tabCls('')} data-state="inactive" data-wsub="envelope">2 · Pushing the envelope</a><a class={tabCls('')} data-state="inactive" data-wsub="stars">3 · Exploring the stars</a></nav>
     <section class={cardCls(false, 'panel')}><div class="wpsteps" id="wpsteps"></div>
-      <div class="handtools mt"><span class="note">step to quantum physics</span><select class={selectCls('')} id="wpfilter" title="filter the tricks by waypoint"><option value="">all seven</option></select></div></section>
+      <div class="handtools mt" data-filters><label class="note" for="wpfilter">step to quantum physics</label><select class={selectCls('')} id="wpfilter" data-remember title="filter the tricks by waypoint"><option value="">all seven</option></select></div></section>
     <div class="wsub" data-wsub="expected">
       <section class={cardCls(false, 'panel')}><h2>Expected <span class="note">what the field already shows at this size or smaller: the tricks to prove first, so the ship is known to match the field before it tries to beat it</span></h2>
         <div class="scroll"><table id="wp-expected" class="clickable"><thead></thead><tbody></tbody></table></div></section>

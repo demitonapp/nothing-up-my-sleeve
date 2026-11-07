@@ -43,7 +43,7 @@ import { cardCls, checkCls, selectCls } from '../lib/ui';
 
   <details class={cardCls(false, 'panel lbfold')}>
     <summary><h2>Every ship <span class="note">every ship with chaining readings, its voyages averaged, by chaining lift</span></h2></summary>
-    <div class="handtools"><span class="note">class</span><select class={selectCls('')} id="lbclass"><option value="">every class</option></select><span class="note" id="lbcount"></span></div>
+    <div class="handtools" data-filters><label class="note" for="lbclass">class</label><select class={selectCls('')} id="lbclass" data-remember><option value="">every class</option></select><span class="note" id="lbcount"></span></div>
     <div class="scroll"><table id="lbruns"><thead></thead><tbody></tbody></table></div>
   </details>
 </div>

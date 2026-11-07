@@ -10,10 +10,10 @@ import { btnCls, cardCls, crumbCls, fieldCls, rangeCls, selectCls } from '../lib
   <h1><a class={crumbCls('back')} id="tableback" href="#/expeditions/table_talk">← expedition</a> The table <span class="q">talk with a ship: your line as Q:, its answer as A:, every exchange kept</span></h1>
   <section class={cardCls(false, 'panel')}>
     <div class="handtools">
-      <span class="note">ship</span><select class={selectCls('')} id="tablerun" title="the voyage at the table"></select>
-      <span class="note">temperature</span><input class={rangeCls('')} type="range" id="tabletemp" min="0" max="1.5" step="0.05" value="0.8"><b id="tabletempv">0.80</b>
-      <span class="note">longest answer</span><select class={selectCls('')} id="tablemax"><option>50</option><option>100</option><option selected>200</option><option>400</option></select>
-      <span class="note">seed</span><input class={fieldCls('')} id="tableseed" placeholder="any" size="6" title="the same seed and temperature give the same answer">
+      <label class="note" for="tablerun">ship</label><select class={selectCls('')} id="tablerun" title="the voyage at the table"></select>
+      <label class="note" for="tabletemp">temperature</label><input class={rangeCls('')} type="range" id="tabletemp" min="0" max="1.5" step="0.05" value="0.8"><b id="tabletempv">0.80</b>
+      <label class="note" for="tablemax">longest answer</label><select class={selectCls('')} id="tablemax"><option>50</option><option>100</option><option selected>200</option><option>400</option></select>
+      <label class="note" for="tableseed">seed</label><input class={fieldCls('')} id="tableseed" placeholder="any" size="6" title="the same seed and temperature give the same answer">
     </div>
     <p class="note" id="tablehint">Low temperature: the ship's surest words. High: braver, stranger. The ship reads the last exchanges as the conversation so far. Ships not trained on the Q:/A: form don't converse yet: they carry on as if reading a book (a contents page, a poem). Table Talk's conversation stage is what teaches them to answer.</p>
   </section>

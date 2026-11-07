@@ -9,6 +9,7 @@ import { openBook, openEssay } from '../lib/reader.js';
 import { renderHand, miniHand } from '../lib/cards.js';
 import { drawJourney, soundingSteps } from '../lib/journey.js';
 import { deckHand, CARD_FACE } from '../lib/deck.js';
+import { fieldError, clearErrors, busy, filterBars, store } from '../lib/forms.js';
 import { stagesFor, common as commonStages, band as bandStages, stageAt } from '../lib/stages.js';
 
 // metric keys: `<prefix>/layer_3`, `<prefix>/layer_3/attn`, `<prefix>/tok`, `<prefix>/pos`
@@ -43,6 +44,9 @@ const STAB_EL = { betting: 'betting', books: 'books', languages: 'languages', si
 const OLD_SHIP = { betting: 'betting', books: 'books', languages: 'languages', sieves: 'sieves', attention: 'attention', 'traits-section': 'traits' };
 const SECTION_NAV = { sizes: 'classes', rung: 'classes', ship: 'classes', 'runs-section': 'classes', voyages: 'expeditions', voyage: 'expeditions', table: 'expeditions', discoveries: 'discoveries', sievesguide: 'sieves', leaderboard: 'leaderboard', competitor: 'leaderboard', governance: 'governance', shelves: 'library' };
 let discView = 'index', discTrick = null, discChain = null, discSub = 'two-facts';
+// an expedition page's tabs (UI.md, "Expeditions"): the same five for every expedition; one that doesn't apply is hidden
+const ETABS = ['overview', 'at-sea', 'findings', 'fleet', 'inside'];
+let expTab = 'overview';
 // the Discoveries subtabs: the trick in focus (chaining two facts), the road to quantum mechanics, the registry of every trick
 const DSUBS = ['two-facts', 'quantum', 'registry', 'stars'];
 // the leaderboard and the shelves (their code is at the end; declared here, as the first route may reach them)
@@ -61,7 +65,7 @@ function route(h) {
     }
     if (a === 'ships') return { page: 'runs-section' };
     if ((a === 'voyages' || a === 'expeditions') && b && c === 'table') return { page: 'table', voyage: b };
-    if ((a === 'voyages' || a === 'expeditions') && b) return { page: 'voyage', voyage: b };
+    if ((a === 'voyages' || a === 'expeditions') && b) return { page: 'voyage', voyage: b, etab: ETABS.includes(c) ? c : 'overview' };
     if (a === 'voyages' || a === 'expeditions') return { page: 'voyages' };
     if (a === 'discoveries' && b === 'chains' && c) return { page: 'discoveries', dview: 'chain', chain: c };
     if (a === 'discoveries' && (!b || DSUBS.includes(b))) return { page: 'discoveries', dview: 'index', dsub: b || 'two-facts' };
@@ -136,7 +140,12 @@ function showTab(h, push = true) {
       shipHeader(ship, run);
     }
   }
-  if (page === 'voyage') { voyageKey = rt.voyage; hash = '/expeditions/' + voyageKey; }
+  if (page === 'voyage') {
+    voyageKey = rt.voyage; expTab = rt.etab || 'overview';
+    document.querySelectorAll('#expnav a').forEach(a => { a.href = '#/expeditions/' + voyageKey + (a.dataset.etab === 'overview' ? '' : '/' + a.dataset.etab); });
+    showExpTab();  // may fall back to Overview, so the address is written after it
+    hash = '/expeditions/' + voyageKey + (expTab === 'overview' ? '' : '/' + expTab);
+  }
   if (page === 'table') { tableVoyage = rt.voyage; hash = '/expeditions/' + tableVoyage + '/table'; loadTable(); }
   if (page === 'sizes') hash = '/classes';
   if (page === 'runs-section') hash = '/ships';
@@ -203,6 +212,7 @@ function shipHeader(ship, run) {
   drawAboard(run);
 }
 window.addEventListener('hashchange', () => showTab(location.hash.slice(1), false));
+filterBars();
 // once the whole script has run (showTab reaches state declared further down); an old ?run= address opens that ship
 queueMicrotask(() => {
   const h = location.hash.slice(1);
@@ -1163,7 +1173,7 @@ async function loadVoyages() {
     const valid = v.runs.filter(r => !r.set_aside).length;
     const headline = v.learned || starHeadline(v) || 'nothing found yet';
     return `<a class="${cardCls(true, 'card')}" href="#/expeditions/${esc(v.key)}">
-      <div class="top"><span class="preset">${esc(v.name)}</span>${statusPill(v.status)}</div>
+      <div class="top"><span class="preset">${esc(v.name)}</span>${expPill(v)}</div>
       <div class="goal">${esc(v.goal)}</div>
       <div class="ov">${esc(headline)}</div>
       <div class="foot"><span>${esc(v.fleet || '')} · ${esc(v.preset || '')}</span><span>${valid} of ${v.stop.max_runs} voyages</span></div>
@@ -1175,8 +1185,9 @@ function renderVoyage() {
   const v = voyagesData && voyagesData.find(x => x.key === voyageKey);
   if (!v) { document.getElementById('voyagetitle').textContent = voyagesData ? `no expedition called ${voyageKey}` : 'loading…'; return; }
   document.querySelectorAll('#voyage [data-voyage]').forEach(el => { el.hidden = el.dataset.voyage !== v.key; });
+  gateExpTabs(v);
   document.getElementById('voyagetitle').textContent = v.name;
-  document.getElementById('voyagestatus').innerHTML = statusPill(v.status);
+  document.getElementById('voyagestatus').innerHTML = expPill(v);
   document.getElementById('voyagegoal').textContent = v.goal;
   const valid = v.runs.filter(r => !r.set_aside);
   document.getElementById('voyageover').innerHTML = [
@@ -1186,8 +1197,9 @@ function renderVoyage() {
     ['stop rule', esc(v.stop.about || '')], ['status', esc(v.status)],
   ].map(([k, val]) => `<div><div class="k">${k}</div><div>${val}</div></div>`).join('');
   const learned = v.learned || starHeadline(v);
-  document.getElementById('voyagelearned').hidden = !learned;
-  document.getElementById('voyagelearnedtext').textContent = learned;
+  // standard: every expedition shows the panel; one with nothing written up says so
+  document.getElementById('voyagelearned').hidden = false;
+  document.getElementById('voyagelearnedtext').innerHTML = learned ? esc(learned) : '<span class="s">nothing written up yet: what it found is written when it comes home</span>';
   const next = v.next_steps || [];
   document.getElementById('voyagenextwrap').hidden = !next.length;
   document.getElementById('voyagenext').innerHTML = next.map(x => `<li>${esc(x)}</li>`).join('');
@@ -1216,6 +1228,9 @@ function renderVoyage() {
     : `<tr><td colspan="${4 + starKeys.length}" class="${emptyCls(true)}">no ships have sailed on this expedition yet</td></tr>`;
   // the Forgotten Tomes score run by run, one colour per value of the setting that varies most
   const scored = v.runs.map((r, i) => ({ r, i: i + 1 })).filter(p => p.r.ft_en != null && !p.r.set_aside);
+  // the Forgotten Tomes score shows only where the expedition has one; first light only for the stars it is bound for
+  document.getElementById('ftpanel').hidden = !scored.length;
+  document.getElementById('lightpanel').hidden = !(v.stars && v.stars.length);
   if (!scored.length) empty('voyageft', 'no voyage on this expedition has a Forgotten Tomes score yet');
   else {
     const fields = ['passes', 'vocab', 'lr', 'recipe'];
@@ -1232,6 +1247,8 @@ function renderVoyage() {
   // the journey picks its default sailings from the transplant records, so it waits for them
   voyageStars(v).then(() => journeyPanel(v));
   voyageClimb(v);
+  drawDeck(v);
+  drawExpReadings(v);
   if (v.key === 'card_census') drawCensus();
   if (v.key === 'knockout') drawKnockouts();
   if (v.key === 'induction') drawInduction(v);
@@ -1306,7 +1323,7 @@ async function voyageStars(v) {
   const keys = Object.keys(d.stars), lit = k => d.runs.some(r => r.series[k] && r.series[k].step.length);
   if (sel.dataset.voyage !== v.key) {
     const own = (d.voyage_stars || []).filter(k => d.stars[k]);
-    sel.innerHTML = [...own, ...keys.filter(k => !own.includes(k))].map(k => `<option value="${k}">${esc(d.stars[k].name)}</option>`).join('');
+    sel.innerHTML = (own.length ? own : keys).map(k => `<option value="${k}">${esc(d.stars[k].name)}</option>`).join('');
     sel.value = own.find(lit) || own[0] || keys.find(lit) || keys[0]; sel.dataset.voyage = v.key;
   }
   const k = sel.value, star = d.stars[k], key = JSON.stringify(d.runs.map(r => r.series[k])) + k;
@@ -2999,7 +3016,12 @@ async function initBuilder(shelves) {
   fbShelves = shelves.filter(x => x.kind === 'training' || x.kind === 'other' || x.kind === 'draft').filter(x => x.books > 0);
   if (!fbMeta) { try { fbMeta = await get('/api/fitout_builder'); } catch (e) { return; } }
   drawPalette(); drawLibrary();
-  if (!fbInit) { fbInit = true; drawBuilder(); wireLanes(); }
+  if (!fbInit) {
+    fbInit = true; drawBuilder(); wireLanes(); fbDraftOffer();
+    document.getElementById('fbform').addEventListener('submit', e => { e.preventDefault(); fbSave(); });
+    // a field put right loses its mark as it is typed in
+    document.getElementById('fbform').addEventListener('input', e => { const t = e.target.closest('[aria-invalid="true"]'); if (t) clearErrors(t.parentElement || t); });
+  }
 }
 function triScatter(path) {
   const t = fbTri.get(path);
@@ -3038,10 +3060,31 @@ function drawPalette() {
     }).catch(() => fbTri.delete(x.path));
   }
 }
-function fbMark() { fb.dirty = true; drawTotals(); drawActions(); }
+function fbMark() { fb.dirty = true; drawTotals(); drawActions(); fbDraftSave(); }
+// an unsaved fitout is kept in this browser (per viewer), offered back when the builder opens again
+const FB_DRAFT = 'thorp.fitout.draft';
+let fbDraftTimer = null;
+function fbDraftSave() {
+  clearTimeout(fbDraftTimer);
+  fbDraftTimer = setTimeout(() => {
+    if (!fb.dirty || (!fb.stages.length && !fb.name)) return;
+    store.set(FB_DRAFT, JSON.stringify({ at: new Date().toISOString(), key: fb.key, f: { name: fb.name, aim: fb.aim, opt_in: fb.opt_in, positions: fb.positions, tack: fb.tack, stages: fb.stages } }));
+  }, 400);
+}
+function fbDraftClear() { clearTimeout(fbDraftTimer); store.set(FB_DRAFT, null); }
+function fbDraftOffer() {
+  let d = null; try { d = JSON.parse(store.get(FB_DRAFT) || 'null'); } catch (e) { d = null; }
+  if (!d || !d.f) return;
+  const when = new Date(d.at), n = (d.f.stages || []).length;
+  fbMsg(`<span>An unsaved fitout from ${when.toTimeString().slice(0, 5)}: <b>${esc(d.f.name || 'unnamed')}</b>, ${n} stage${n === 1 ? '' : 's'}.</span>
+    <button type="button" class="${btnCls()}" id="fbdraftyes">Restore it</button> <button type="button" class="${btnCls('ghost')}" id="fbdraftno">Discard</button>`, 'draft');
+  document.getElementById('fbdraftyes').onclick = () => { fbLoad(d.f, null); fb.key = d.key || null; fb.dirty = true; drawActions(); fbMsg('restored the unsaved fitout: save it to keep it'); };
+  document.getElementById('fbdraftno').onclick = () => { fbDraftClear(); fbMsg(''); };
+}
+window.addEventListener('beforeunload', e => { if (fb.dirty && fb.stages.length) { e.preventDefault(); e.returnValue = ''; } });
 function drawSettings() {
   const el = document.getElementById('fbsettings');
-  el.innerHTML = `<div class="fbrow"><label>name <input class="${fieldCls('')}" id="fbname" value="${esc(fb.name)}" placeholder="a name for this fitout"></label>
+  el.innerHTML = `<div class="fbrow"><label>name <input class="${fieldCls('')}" id="fbname" value="${esc(fb.name)}" placeholder="a name for this fitout" required maxlength="80"></label>
     <label>positions <select class="${selectCls('')}" id="fbpos"><option value="rope"${fb.positions === 'rope' ? ' selected' : ''}>rope</option><option value="learned"${fb.positions === 'learned' ? ' selected' : ''}>learned</option></select></label>
     <label>tack <select class="${selectCls('')}" id="fbtack"><option value="">none</option><option value="induction"${fb.tack && fb.tack.kind === 'induction' ? ' selected' : ''}>induction</option><option value="conclusion"${fb.tack && fb.tack.kind === 'conclusion' ? ' selected' : ''}>conclusion</option></select></label>
     <label>× <input class="${fieldCls('')}" id="fbalpha" type="number" min="0" step="0.5" value="${fb.tack ? fb.tack.alpha ?? 3 : 3}" style="width:56px"${fb.tack ? '' : ' disabled'}></label></div>
@@ -3059,11 +3102,11 @@ function stageBlock(st, i) {
   const max = Math.max(1, sh.tokens_est || st.tokens || 1), tok = st.tokens ?? max, post = st.phase === 'post-training';
   const weight = Math.max(1, tok * (st.passes || 1));
   return `<div class="fbblock ${post ? 'post' : 'pre'}" draggable="true" data-i="${i}" style="flex-grow:${weight}">
-    <div class="fbbh"><input class="${fieldCls('fbin')}" data-f="name" value="${esc(st.name)}"><button class="${btnCls('ghost', 'fbx')}" data-x="${i}" title="remove this stage">×</button></div>
+    <div class="fbbh"><input class="${fieldCls('fbin')}" data-f="name" value="${esc(st.name)}"><button type="button" class="${btnCls('ghost', 'fbx')}" data-x="${i}" title="remove this stage" aria-label="remove this stage">×</button></div>
     <div class="s">${esc(sh.name)} · ${sh.books} books</div>
     <label class="s">tokens <b data-tokv="${i}">${big(tok)}</b>${st.tokens == null ? ' (the whole library)' : ` of ${big(max)}`}<input class="${rangeCls('fbin')}" type="range" data-f="tokens" min="${Math.min(max, 100000)}" max="${max}" step="${Math.max(1, Math.round(max / 200))}" value="${tok}"></label>
     <div class="fbrow2"><label class="s">books <select class="${selectCls('fbin')}" data-f="select">${(fbMeta.select || Object.keys(FB_SELECT)).map(k => `<option value="${k}"${st.select === k ? ' selected' : ''}>${esc(FB_SELECT[k] || k)}</option>`).join('')}</select></label>
-      <label class="s">passes <input class="${fieldCls('fbin')}" data-f="passes" type="number" min="1" max="20" value="${st.passes || 1}" style="width:48px"></label></div>
+      <label class="s">passes <input class="${fieldCls('fbin')}" data-f="passes" type="number" min="1" max="20" required value="${st.passes || 1}" style="width:48px"></label></div>
     ${post ? `<div class="fbrow2"><label class="s">lr <input class="${fieldCls('fbin')}" data-f="lr" type="number" step="0.0001" min="0" value="${st.lr ?? ''}" placeholder="the voyage's" style="width:80px"></label>
       <label class="s">tack <select class="${selectCls('fbin')}" data-f="tack"><option value="">the fitout's</option><option value="induction"${st.tack && st.tack.kind === 'induction' ? ' selected' : ''}>induction</option><option value="conclusion"${st.tack && st.tack.kind === 'conclusion' ? ' selected' : ''}>conclusion</option></select></label></div>` : ''}
     <input class="${fieldCls('fbin fbpurpose')}" data-f="purpose" value="${esc(st.purpose || '')}" placeholder="what this stage is for">
@@ -3128,41 +3171,66 @@ function drawTotals() {
 function drawActions() {
   const el = document.getElementById('fbactions'); if (!el || !fbMeta) return;
   const canQueue = fb.key && !fb.dirty;
-  el.innerHTML = `<button class="${btnCls()}" id="fbsave">${fb.key && !fb.dirty ? 'Saved' : 'Save'}</button>
+  el.innerHTML = `<button type="submit" class="${btnCls()}" id="fbsave">${fb.key && !fb.dirty ? 'Saved' : 'Save'}</button>
     <span class="fbsep">then</span>
     <label>build for <select class="${selectCls('')}" id="fbclass">${(fbMeta.classes || []).map(c => `<option value="${esc(c.preset)}">${esc(c.preset)} · ${esc(c.name)}</option>`).join('')}</select></label>
-    <label>seeds <input class="${fieldCls('')}" id="fbseeds" value="1, 2" style="width:60px"></label>
+    <label>seeds <input class="${fieldCls('')}" id="fbseeds" value="1, 2" style="width:60px" pattern="\\s*\\d+(\\s*,\\s*\\d+)*\\s*" title="seeds, as whole numbers separated by commas"></label>
     <label>put it <select class="${selectCls('')}" id="fbwhere"><option value="end">at the end of the queue</option><option value="top">at the top (next to sail)</option></select></label>
-    <button class="${btnCls()}" id="fbqueue"${canQueue ? '' : ' disabled'} title="${canQueue ? 'compile it for that class and put its voyages in the queue' : 'save it first'}">Queue</button>
-    <button id="fbnew" class="${btnCls('ghost')}">New</button>`;
-  el.querySelector('#fbsave').onclick = fbSave;
+    <button type="button" class="${btnCls()}" id="fbqueue"${canQueue ? '' : ' disabled'} title="${canQueue ? 'compile it for that class and put its voyages in the queue' : 'save it first'}">Queue</button>
+    <button type="button" id="fbnew" class="${btnCls('ghost')}">New</button>`;
+  // Save is the form's submit (Enter in any field saves), so the form's own checks run first
   el.querySelector('#fbqueue').onclick = fbQueue;
-  el.querySelector('#fbnew').onclick = async () => { if (fb.dirty && fb.stages.length && !await confirmDialog('The unsaved changes here are lost.', { title: 'Start a new fitout?', ok: 'Start new' })) return; fbLoad({ name: '', aim: '', positions: 'rope', tack: { alpha: 3, kind: 'induction' }, stages: [] }, null); };
+  el.querySelector('#fbnew').onclick = async () => { if (fb.dirty && fb.stages.length && !await confirmDialog('The unsaved changes here are lost.', { title: 'Start a new fitout?', ok: 'Start new' })) return; fbDraftClear(); fbLoad({ name: '', aim: '', positions: 'rope', tack: { alpha: 3, kind: 'induction' }, stages: [] }, null); fb.dirty = false; drawActions(); };
 }
 function fbMsg(html, kind = '') { const el = document.getElementById('fbmsg'); if (el) { el.className = 'fbmsg ' + kind; el.innerHTML = html; } }
 async function fbPost(url, body) {
   const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || r.statusText); return j;
 }
+// a server refusal, put where it belongs: "stage N: …" on that stage's block (N counts the stages as sent), the pretraining
+// rule on its lane, the stores rule on the opt-in; anything else in the message line
+function fbServerError(message) {
+  const m = message.match(/stage (\d+):\s*(.*)/i);
+  if (m) { const blk = document.querySelector(`.fbblock[data-i="${+m[1] - 1}"]`); if (blk) { fieldError(blk, m[2]); return true; } }
+  if (/pretraining stage/i.test(message)) { fieldError(document.querySelector('.fbdrop[data-phase="pretraining"]'), message); return true; }
+  if (/stores/i.test(message) && !document.getElementById('fboptinwrap').hidden) { fieldError(document.getElementById('fboptin'), message); return true; }
+  return false;
+}
+// the checks the page can make before anything is sent; true when it may go
+function fbCheck(form, { queueing = false } = {}) {
+  clearErrors(form);
+  let ok = form.checkValidity();
+  if (!ok) form.reportValidity();
+  if (!fb.stages.some(st => st.phase === 'pretraining')) { fieldError(document.querySelector('.fbdrop[data-phase="pretraining"]'), 'drop at least one library here: a fitout needs a pretraining stage'); ok = false; }
+  const outside = fb.stages.filter(st => !String(st.shelf).startsWith('lists/stores/'));
+  if (queueing && outside.length && !(fb.opt_in || '').trim()) { fieldError(document.getElementById('fboptin'), `the stores rule (S3) needs a reason in words: ${outside.length} stage${outside.length === 1 ? ' reads' : 's read'} outside the ship's stores`); ok = false; }
+  return ok;
+}
 async function fbSave() {
+  const form = document.getElementById('fbform');
+  if (!fbCheck(form)) { fbMsg('not saved: fix the marked fields', 'bad'); return; }
   const body = { key: fb.key || undefined, name: fb.name, aim: fb.aim, positions: fb.positions, tack: fb.tack, stages: fb.stages, opt_in: fb.opt_in || undefined };
+  const done = busy(document.getElementById('fbsave'), 'Saving…');
   try {
     const r = await fbPost('/api/fitouts/save', { fitout: body });
-    fb.key = r.key; fb.dirty = false; fbMeta = null; fbMeta = await get('/api/fitout_builder');
-    fbMsg(`saved as <b>${esc(r.key)}</b> (data/fitouts/${esc(r.key)}.json)`, 'good'); drawActions(); drawLibrary();
-  } catch (e) { fbMsg(`not saved: ${esc(e.message)}`, 'bad'); }
+    fb.key = r.key; fb.dirty = false; fbDraftClear(); fbMeta = null; fbMeta = await get('/api/fitout_builder');
+    done('Saved'); fbMsg(`saved as <b>${esc(r.key)}</b> (data/fitouts/${esc(r.key)}.json)`, 'good'); drawActions(); drawLibrary();
+  } catch (e) { done(); fbMsg(fbServerError(e.message) ? 'not saved: see the marked field' : `not saved: ${esc(e.message)}`, 'bad'); }
 }
 async function fbQueue() {
   if (!fb.key || fb.dirty) return;
   const preset = document.getElementById('fbclass').value, where = document.getElementById('fbwhere').value;
   const seeds = document.getElementById('fbseeds').value.split(/[^0-9]+/).filter(Boolean).map(Number);
   const runs = seeds.length * (1 + fb.stages.filter(st => st.phase === 'post-training').length);
-  if (!seeds.length) { fbMsg('give at least one seed', 'bad'); return; }
-  if (!await confirmDialog(`Queue "${fb.name || fb.key}" for the ${preset}: ${runs} run${runs === 1 ? '' : 's'} (${seeds.length} seed${seeds.length === 1 ? '' : 's'}) ${where === 'top' ? 'at the TOP of the queue, next to sail' : 'at the end of the queue'}?\n\nThis changes what the Mac trains next.`)) return;
+  if (!seeds.length) { fieldError(document.getElementById('fbseeds'), 'give at least one seed'); return; }
+  if (!fbCheck(document.getElementById('fbform'), { queueing: true })) { fbMsg('not queued: fix the marked fields', 'bad'); return; }
+  if (!await confirmDialog(`Queue "${fb.name || fb.key}" for the ${preset}: ${runs} voyage${runs === 1 ? '' : 's'} (${seeds.length} seed${seeds.length === 1 ? '' : 's'}) ${where === 'top' ? 'at the TOP of the queue, next to sail' : 'at the end of the queue'}?\n\nThis changes what the Mac trains next.`)) return;
+  const done = busy(document.getElementById('fbqueue'), 'Queueing…');
   try {
     const r = await fbPost('/api/fitouts/queue', { key: fb.key, preset, seeds, where });
-    fbMsg(`queued ${r.lines.length} run${r.lines.length === 1 ? '' : 's'} ${where === 'top' ? 'at the top' : 'at the end'}: ${r.lines.map(l => `<span class="mono">${esc(l)}</span>`).join(', ')}`, 'good');
-  } catch (e) { fbMsg(`not queued, the gate (S3) refused it: ${esc(e.message)}`, 'bad'); }
+    done();
+    fbMsg(`queued ${r.lines.length} voyage${r.lines.length === 1 ? '' : 's'} ${where === 'top' ? 'at the top' : 'at the end'}: ${r.lines.map(l => `<span class="mono">${esc(l)}</span>`).join(', ')}`, 'good');
+  } catch (e) { done(); fbMsg(fbServerError(e.message) ? 'not queued: the gate (S3) refused it, see the marked field' : `not queued, the gate (S3) refused it: ${esc(e.message)}`, 'bad'); }
 }
 function fbLoad(f, key) {
   fb.name = f.name || ''; fb.aim = f.aim || ''; fb.opt_in = f.opt_in || ''; fb.positions = f.positions || 'rope'; fb.tack = f.tack ? { ...f.tack } : null;
@@ -3259,12 +3327,14 @@ async function loadGovernance() {
     ${order.filter(k => (breaking[k] || []).length).map(k => { const open = govOpen.has(k), lines = breaking[k];
       return `<div class="govbreak"><button class="${btnCls('ghost')}" data-gov="${esc(k)}">${open ? '▾' : '▸'} the voyages breaking ${esc(k)} (${pol[k].queued_runs_breaking_it}${lines.length < pol[k].queued_runs_breaking_it ? `, the first ${lines.length} shown` : ''})</button>${open ? `<div class="govlines">${lines.map(l => `<span class="mono">${esc(l)}</span>`).join('')}</div>` : ''}</div>`; }).join('')}`;
   // S2 coordination
-  const lints = (A.S2 || {}).queue_lints || [];
-  const s2 = lints.length ? `<div class="${alertCls('no')}"><ul class="govlints">${lints.map(l => `<li>${esc(l)}</li>`).join('')}</ul></div>` : `<span class="${pillCls('good')}">no collisions</span> <span class="s">the queue lints clean: one GPU, one queue, no shared file written twice</span>`;
+  const lints = (A.S2 || {}).queue_lints || [], helmOf = (A.S2 || {}).helm;
+  const helmLine = helmOf ? `<div><span class="${pillCls('good')}">at the helm</span> <b>${esc(helmOf.name || '')}</b> <span class="s">${esc(helmOf.kind || '')}${helmOf.pid ? ` · pid ${helmOf.pid}` : ''}${helmOf.since ? ` · since ${esc(String(helmOf.since).slice(11, 16))}` : ''}</span></div>` : '<div class="s">no voyage at the helm (S2 takes it with the next voyage to sail)</div>';
+  const s2 = helmLine + (lints.length ? `<div class="${alertCls('no')}"><ul class="govlints">${lints.map(l => `<li>${esc(l)}</li>`).join('')}</ul></div>` : `<span class="${pillCls('good')}">no collisions</span> <span class="s">the queue lints clean: one GPU, one queue, no shared file written twice</span>`);
   // S1 operations
-  const vs = (A.S1 || {}).voyages || {}, rank = st => ['running', 'planned', 'done'].indexOf(st);
-  const s1 = `<div class="govstats"><div class="govstat"><b>${(A.S1 || {}).queued ?? '–'}</b><span>voyages queued</span></div>${['running', 'planned', 'done'].map(st => `<div class="govstat"><b>${Object.values(vs).filter(x => x === st).length}</b><span>expeditions ${st}</span></div>`).join('')}</div>
-    <div class="govvoy">${Object.entries(vs).sort((a, b) => rank(a[1]) - rank(b[1])).map(([k, st]) => `<a href="#/expeditions/${esc(k)}">${esc(VOYAGE_NAME[k] || k)}</a> ${statusPill(st)}`).join('<span class="govsep"></span>')}</div>`;
+  const vs = (A.S1 || {}).expeditions || (A.S1 || {}).voyages || {}, rank = st => STATES.indexOf(st);
+  const present = STATES.filter(st => Object.values(vs).includes(st));
+  const s1 = `<div class="govstats"><div class="govstat"><b>${(A.S1 || {}).queued ?? '–'}</b><span>voyages queued</span></div>${present.map(st => `<div class="govstat${st === 'awaiting orders' ? ' warn' : ''}"><b>${Object.values(vs).filter(x => x === st).length}</b><span>expeditions ${esc(st)}</span></div>`).join('')}</div>
+    <div class="govvoy">${Object.entries(vs).sort((a, b) => rank(a[1]) - rank(b[1])).map(([k, st]) => `<a href="#/expeditions/${esc(k)}">${esc(VOYAGE_NAME[k] || k)}</a> ${statePill(st)}`).join('<span class="govsep"></span>')}</div>`;
   el.innerHTML = band('S5', s5) + band('S4', s4) + band('S3', s3) + band('S2', s2) + band('S1', s1);
   el.querySelectorAll('[data-gov]').forEach(b => b.onclick = () => { const k = b.dataset.gov; govOpen.has(k) ? govOpen.delete(k) : govOpen.add(k); govKey = null; loadGovernance(); });
   if (!Object.keys(VOYAGE_NAME).length) get('/api/expeditions').then(v => { v.forEach(x => { VOYAGE_NAME[x.key] = x.name; }); govKey = null; loadGovernance(); }).catch(() => {});
@@ -3296,7 +3366,7 @@ function drawStarGrid() {
 }
 
 
-// ==================================================================================== the words since 2026-11-07 16:30
+// ==================================================================================== the words since 2026-11-07 16:20
 // (fleet.TERMS): an expedition is a line of experiments (was a voyage), a voyage is one ship's run (was a run or a sailing),
 // a library is a book list (was a shelf). The code keeps its old names (voyageKey, shelvesData, run_id); the page says the new.
 
@@ -3307,6 +3377,10 @@ async function loadOverview() {
   let d; try { d = await get('/api/expeditions/overview'); } catch (e) { return; }
   const key = JSON.stringify(d); if (key === ovKey) return; ovKey = key;
   const q = d.queue || {}, sea = d.at_sea || [], ex = d.expeditions || [];
+  let fresh = false; ex.forEach(e => { if (e.key && e.status && expState[e.key] !== e.status) { expState[e.key] = e.status; fresh = true; } });
+  if (fresh && voyagesData) { voyagesKey = null; loadVoyages(); }
+  const helm = d.helm ? `<div class="ovsea"><span class="${pillCls('good')}">at the helm</span> <b>${esc(d.helm.name || '')}</b> <span class="s">${esc(d.helm.kind || '')}${d.helm.pid ? ` · pid ${d.helm.pid}` : ''}${d.helm.since ? ` · since ${esc(String(d.helm.since).slice(11, 16))}` : ''}</span></div>`
+    : `<div class="ovsea s">no helm yet: the voyage at sea was launched before the helm (S2) existed, so it shows from the ledger</div>`;
   const name = k => (ex.find(e => e.key === k) || {}).name || VOYAGE_NAME[k] || k;
   const atSea = sea.length ? sea.map(r => `<div class="ovsea"><span class="${pillCls('running')}">at sea</span> <a href="#${shipHash(r.name)}"><b>${esc(r.name)}</b></a>
       <div class="s">${esc(r.ship || '')}${r.expedition ? ` · <a href="#/expeditions/${esc(r.expedition)}">${esc(name(r.expedition))}</a>` : ''}${r.started ? ` · since ${esc(String(r.started).slice(11, 16))}` : ''}</div></div>`).join('') : '<div class="s">no voyage at sea</div>';
@@ -3315,10 +3389,10 @@ async function loadOverview() {
     <div class="ovq"><b>${q.voyages ?? '–'}</b> voyages to sail · about <b>${q.hours_left ?? '–'}</b> hours${q.voyages_without_a_time ? ` <span class="s">(${q.voyages_without_a_time} with no time yet, so more)</span>` : ''}${q.steps ? ` · ${q.steps} queue command${q.steps === 1 ? '' : 's'}` : ''}</div>
     ${(q.lints || []).length ? `<div class="${alertCls('no')}">${q.lints.map(l => esc(l)).join('<br>')}</div>` : ''}`;
   const rows = ex.map((e, i) => `<tr><td><span class="ovsw" style="background:${e.queued ? PALETTE[ex.filter(x => x.queued).indexOf(e) % PALETTE.length] : 'transparent'}"></span> ${e.key === '(no expedition)' ? `<i>${esc(e.name)}</i>` : `<a href="#/expeditions/${esc(e.key)}"><b>${esc(e.name)}</b></a>`}</td>
-      <td>${e.status ? statusPill(e.status) : ''}</td><td>${e.at_sea ? `<span class="${pillCls('running')}">${e.at_sea} at sea</span>` : ''}</td>
+      <td>${statePill(e.status, e.declared)}</td><td>${e.at_sea ? `<span class="${pillCls('running')}">${e.at_sea} at sea</span>` : ''}</td>
       <td>${e.queued || '–'}</td><td>${e.next_in_queue ? `#${e.next_in_queue}` : '–'}</td><td>${e.finished || '–'}</td><td>${e.failed ? `<span class="bad">${e.failed}</span>` : '–'}</td></tr>`).join('');
-  el.innerHTML = `<div class="ovtop"><div>${atSea}</div><div class="ovqueue">${bar}</div></div>
-    <div class="scroll"><table data-nosort><thead><tr><th>expedition</th><th>status</th><th></th><th>queued</th><th>next at</th><th>finished</th><th>failed</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  el.innerHTML = `<div class="ovtop"><div>${atSea}${helm}</div><div class="ovqueue">${bar}</div></div>
+    <div class="scroll"><table data-nosort><thead><tr><th>expedition</th><th title="S2's view, from the helm and the queue; the declared word on hover">state</th><th></th><th>queued</th><th>next at</th><th>finished</th><th>failed</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
 // ---- where a voyage's reading came from (thorp.library.aboard, /api/voyages/where): a badge per voyage
@@ -3350,3 +3424,110 @@ async function drawAboard(run) {
     ${(d.refused || []).length ? `<div class="s">refused: ${d.refused.map(r => `<span class="mono">${esc(r)}</span>`).join(', ')}</div>` : ''}`;
   el.querySelectorAll('[data-lib]').forEach(a => a.onclick = e => { e.preventDefault(); shelfOpen = a.dataset.lib; location.hash = '#/library'; });
 }
+
+
+// ---- an expedition's state, as S2 works it out from the helm and the queue (expeditions.overview; since 16:35): at sea (at
+// most one), under way (voyages queued), in port (planned), home (done), paused, awaiting orders (declared running with
+// nothing at sea or queued: stalled, or done and not closed). The hand-set word is `declared`.
+const STATES = ['at sea', 'under way', 'awaiting orders', 'paused', 'in port', 'home'];
+const STATE_TONE = { 'at sea': 'running', 'under way': 'blue', 'in port': '', home: 'good', paused: 'accent', 'awaiting orders': 'bad' };
+const STATE_NOTE = { 'at sea': 'a voyage of it is at sea now', 'under way': 'voyages of it are queued', 'in port': 'planned, nothing queued yet', home: 'done',
+  paused: 'paused', 'awaiting orders': 'declared running with nothing at sea or queued: stalled, or done and not closed' };
+const expState = {};  // key -> S2's state, from the overview
+const statePill = (st, declared) => st ? `<span class="${pillCls(STATE_TONE[st] ?? '')}${st === 'awaiting orders' ? ' awaiting' : ''}" title="${esc(STATE_NOTE[st] || st)}${declared && declared !== st ? `; declared ${esc(declared)}` : ''}">${esc(st)}</span>` : '';
+const expPill = v => expState[v.key] ? statePill(expState[v.key], v.status) : statusPill(v.status);
+
+
+// ---- the observation deck (each expedition's page, "On the water"; /api/observation): its voyages at sea, read live from
+// their logs. Per voyage: how far it has come and how long it has left, its loss (a sparkline), speed and memory, the four
+// necessary cards as they stand, and its telegrams, newest first. With none at sea: where its next voyage stands.
+let deckKey = null;
+async function drawDeck(v) {
+  const el = document.getElementById('obsdeck'); if (!el) return;
+  let d; try { d = await get('/api/observation?expedition=' + encodeURIComponent(v.key)); } catch (e) { return; }
+  if (voyageKey !== v.key) return;
+  const key = JSON.stringify(d); if (key === deckKey) return; deckKey = key;
+  const hm = s => s == null ? '–' : s >= 3600 ? `${Math.floor(s / 3600)} h ${Math.round((s % 3600) / 60)} min` : s >= 60 ? `${Math.round(s / 60)} min` : `${Math.round(s)} s`;
+  const spark = l => {
+    if (!l || !l[1] || l[1].length < 2) return '';
+    const ys = l[1], W = 220, H = 40, lo = Math.min(...ys), hi = Math.max(...ys), sx = i => (W - 2) * i / (ys.length - 1) + 1, sy = y => H - 2 - (H - 4) * (hi > lo ? (y - lo) / (hi - lo) : 0.5);
+    return `<svg class="obsspark" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="loss over the last steps"><polyline points="${ys.map((y, i) => `${sx(i).toFixed(1)},${sy(y).toFixed(1)}`).join(' ')}"/></svg>`;
+  };
+  const cardChip = (k, c) => {
+    const f = CARD_FACE[k] || {}, best = Math.max(c.one ?? -Infinity, c.shared ?? -Infinity);
+    return `<span class="obscard${c.lit ? ' lit' : ''}" title="${esc((discStars.find(s => s.key === k) || {}).name || k)}: one head ${c.one != null ? c.one.toFixed(3) : '–'}${c.shared != null ? `, two together ${c.shared.toFixed(3)}` : ''}; the mark ${c.threshold}"><span class="minicard${c.lit ? ' on' : ''}"><b>${f.rank || ''}</b><i>${f.suit || ''}</i></span> ${isFinite(best) ? best.toFixed(2) : '–'}<i class="s"> / ${c.threshold}</i></span>`;
+  };
+  const ship = r => {
+    const pct = r.step && r.steps_total ? Math.min(100, 100 * r.step / r.steps_total) : 0;
+    return `<div class="obsship">
+      <div class="obshead"><span class="${pillCls('running')}">at sea</span> <a href="#${shipHash(r.name)}"><b>${esc(r.name)}</b></a>
+        <div class="s">${esc(r.ship || '')}${r.started ? ` · cast off ${esc(String(r.started).slice(11, 16))}` : ''}</div></div>
+      <div class="obsrow">
+        <div class="obsprog"><div class="obsbar"><span style="width:${pct.toFixed(1)}%"></span></div>
+          <div class="s">step <b>${r.step ?? '–'}</b> of ${r.steps_total ?? '–'} · ${pct.toFixed(0)}% · about <b>${hm(r.eta_s)}</b> to port</div></div>
+        <div class="obsloss"><div class="s">loss <b>${r.loss && r.loss[1].length ? r.loss[1][r.loss[1].length - 1].toFixed(2) : '–'}</b></div>${spark(r.loss)}</div>
+        <div class="obsfig"><div><b>${r.tokens_per_s != null ? big(r.tokens_per_s) : '–'}</b><span>tokens a second</span></div><div><b>${r.mem_gb ?? '–'}</b><span>GB</span></div>
+          ${r.hole_cards_bpb != null ? `<div><b>${r.hole_cards_bpb.toFixed(3)}</b><span>hole cards, bits per byte</span></div>` : ''}</div>
+      </div>
+      <div class="obscards"><span class="k">the four cards</span> ${Object.entries(r.cards || {}).map(([k, c]) => cardChip(k, c)).join('')}
+        ${r.logic_gain != null ? `<span class="obscard" title="the logic deck's chaining gain"><b>gain</b> ${signed(r.logic_gain)}</span>` : ''}${r.cause_gain != null ? `<span class="obscard" title="cause and effect"><b>cause</b> ${signed(r.cause_gain)}</span>` : ''}</div>
+      <div class="telegrams"><div class="k">telegrams <span class="s">from the ship, newest first</span></div>
+        ${(r.telegrams || []).map(t => `<div class="telegram ${t.kind}"><span class="tgtime">${esc(t.time || (t.step != null ? 'step ' + t.step : ''))}</span><span class="tgtext">${esc(t.text)}</span></div>`).join('') || '<div class="s">no word from the ship yet</div>'}</div>
+    </div>`;
+  };
+  if (d.at_sea && d.at_sea.length) { el.innerHTML = d.at_sea.map(ship).join(''); return; }
+  const where = d.next_in_queue ? `its next voyage is <b>#${d.next_in_queue}</b> in the queue (${d.queued} of its voyages queued)` : d.state === 'home' ? 'it is home: every voyage has come back' : d.state === 'awaiting orders' ? 'it is awaiting orders: nothing of it at sea or queued' : 'nothing of it is queued';
+  const other = (d.elsewhere || [])[0];
+  el.innerHTML = `<div class="${emptyCls()}">no voyage of this expedition is at sea: ${where}.${other ? ` At sea now: <a href="#${shipHash(other.name)}">${esc(other.name)}</a>${other.expedition ? `, of <a href="#/expeditions/${esc(other.expedition)}">${esc(VOYAGE_NAME[other.expedition] || other.expedition)}</a>` : ''}.` : ''}</div>`;
+}
+
+
+// ---- the expedition page's tabs. Overview, Findings: always. At sea: while any of it is at sea, queued, paused or awaiting
+// orders (S2's state). Fleet: once it has a ship or a voyage. Inside: once one of its voyages recorded soundings (the
+// journey's base). A tab that doesn't apply is hidden; an address naming one falls back to Overview.
+const expTabOk = {};
+function showExpTab() {
+  const ok = expTabOk[voyageKey] || {};
+  if (ok[expTab] === false) { expTab = 'overview'; history.replaceState(null, '', location.pathname + '#/expeditions/' + voyageKey); }
+  document.querySelectorAll('#voyage .etab').forEach(t => t.classList.toggle('active', t.dataset.etab === expTab));
+  document.querySelectorAll('#expnav a').forEach(a => { a.hidden = ok[a.dataset.etab] === false; setTab(a, a.dataset.etab === expTab); });
+  // charts drawn while their tab was hidden have no width
+  document.querySelectorAll('#voyage .etab.active .js-plotly-plot').forEach(el => Plotly.Plots.resize(el));
+}
+async function gateExpTabs(v) {
+  const st = expState[v.key] || '';
+  const ok = { overview: true, findings: true,
+    'at-sea': ['at sea', 'under way', 'paused', 'awaiting orders'].includes(st) || (!st && v.status === 'running') || v.runs.some(r => r.status === 'running'),
+    fleet: !!(v.runs.length || (v.ships || []).length),
+    inside: (expTabOk[v.key] || {}).inside };  // unknown until the soundings are asked for: shown meanwhile
+  expTabOk[v.key] = ok; if (v.key === voyageKey) showExpTab();
+  // Inside: ask whether any of its voyages recorded soundings
+  const names = v.runs.filter(r => !r.set_aside).map(r => r.name).slice(-40);
+  if (!names.length) { ok.inside = false; if (v.key === voyageKey) showExpTab(); return; }
+  try {
+    const d = await get('/api/series?runs=' + encodeURIComponent(names.join(',')) + '&metrics=' + encodeURIComponent('soundings/layer_0/bpb'));
+    ok.inside = Object.values(d).some(m => Object.keys(m).length);
+  } catch (e) { return; }
+  if (v.key === voyageKey) showExpTab();
+}
+
+// ---- Findings: every voyage on each measure the expedition is judged by (its outcomes), the latest reading, the best marked
+let expReadingsKey = null;
+async function drawExpReadings(v) {
+  const tb = document.querySelector('#voyagereadings tbody'); if (!tb) return;
+  const outs = (v.outcomes || []).filter(o => o.metric && !/[*<]/.test(o.metric)).slice(0, 10);
+  const runs = v.runs.filter(r => !r.set_aside && r.name);
+  const head = document.querySelector('#voyagereadings thead');
+  if (!outs.length || !runs.length) { head.innerHTML = ''; tb.innerHTML = `<tr><td class="${emptyCls(true)}">${outs.length ? 'no voyage has sailed on it yet' : 'it declares no measure the ledger records'}</td></tr>`; return; }
+  let d; try { d = await get('/api/series?runs=' + encodeURIComponent(runs.slice(-40).map(r => r.name).join(',')) + '&metrics=' + encodeURIComponent(outs.map(o => o.metric).join(','))); } catch (e) { return; }
+  if (v.key !== voyageKey) return;
+  const key = v.key + JSON.stringify(d); if (key === expReadingsKey) return; expReadingsKey = key;
+  const last = (r, m) => { const sr = (d[r.name] || {})[m]; return sr && sr[1].length ? sr[1][sr[1].length - 1] : null; };
+  const best = outs.map(o => { const vals = runs.map(r => last(r, o.metric)).filter(x => x != null); if (!vals.length) return null; return /lower|less|smaller/.test(o.better || '') ? Math.min(...vals) : Math.max(...vals); });
+  head.innerHTML = `<tr><th>voyage</th><th>ship</th>${outs.map(o => `<th title="${esc(o.metric)}; better is ${esc(o.better || '')}">${esc(o.about)}</th>`).join('')}</tr>`;
+  const read = runs.filter(r => outs.some(o => last(r, o.metric) != null));
+  tb.innerHTML = read.slice().reverse().map(r => `<tr><td><a href="#${shipHash(r.name)}">${esc(r.name)}</a></td><td class="s">${esc(r.ship_name || r.ship || '')}</td>
+    ${outs.map((o, i) => { const x = last(r, o.metric); return x == null ? '<td class="s">–</td>' : `<td class="${x === best[i] ? 'good' : ''}">${fmt(x)}${x === best[i] ? ' ★' : ''}</td>`; }).join('')}</tr>`).join('')
+    || `<tr><td colspan="${outs.length + 2}" class="${emptyCls(true)}">none of its voyages has a reading on these measures yet</td></tr>`;
+}
+

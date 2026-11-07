@@ -35,16 +35,39 @@ Numbers sit in `tabular-nums` everywhere (set on `body`).
 - Spacing comes from the grid gaps (16px). One-off margins use `.mt` (8px), not `style=""`.
   Inline styles are only for values computed at run time (a chart height, the reader's page width).
 
-## The words (2026-11-07 16:30, `fleet.TERMS`)
+## The words (2026-11-07 16:20, `fleet.TERMS`)
 
 An **expedition** is a line of experiments with one goal, its levers and its stop rule (was a voyage:
 `#/expeditions`, `#/voyages` still answered). A **voyage** is one ship's run, one spec trained once
 (was a run, or a sailing). A **library** is a book list Thorp reads from, scores on or refuses (was a
 shelf: `#/library`, `#/shelves` still answered); the ship's two stores are the canonical libraries.
 Storage keeps `run_id` and the runs table, and the code its old names; the page says the new ones.
+Every expedition's page follows **one template**: its header and figures, then the same five tabs
+(`#/expeditions/<key>[/at-sea|/findings|/fleet|/inside]`). **Overview**: what it found and its next
+steps ("nothing written up yet" until it comes home), and the question (what it measures, its levers).
+**At sea**: the observation deck. **Findings**: its own instrument if it has one (the census grid, the
+knockout, the induction chart, the climb, the book-value fit), then **its readings**, every voyage on
+each measure it declares, the best marked. **Fleet**: its ships, the Forgotten Tomes score only where
+it has one, first light only for the stars it is bound for. **Inside**: the journey through the layers.
+Nothing on the page belongs to another expedition: an instrument shows only on its own expedition
+(`data-voyage`), and a tab that doesn't apply is hidden, not left empty (At sea while nothing of it is
+at sea, queued, paused or awaiting orders; Fleet before it has a ship; Inside until one of its voyages
+records soundings); an address naming a hidden tab opens Overview. The **observation deck**
+(`/api/observation?expedition=`) reads each of its voyages at sea live from its log
+(`data/runs/<run_id>.log`) and the ledger: how far it has come and how long it has left, its loss as
+a sparkline, tokens a second and memory, the four necessary cards as they stand, the logic deck's gain
+and cause, and its **telegrams**, short dispatches in capitals with STOP between thoughts on a paper
+strip, newest first: casting off (the ship, the S3 gate, what it was seeded from), every tenth of the
+way, each star's first light, and the latest readings. With none of its voyages at sea, the deck says
+where its next one stands in the queue, and which voyage is at sea instead.
 The Expeditions page opens on **the queue at a glance** (`/api/expeditions/overview`): the voyage at
 sea, a bar of the voyages still to sail coloured by expedition with about how many hours, the queue's
-lints, and per expedition its voyages at sea, queued, its next at #n, finished and failed. A ship's
+lints, and per expedition its voyages at sea, queued, its next at #n, finished and failed. An
+expedition's **state** is S2's view (since 16:35), worked out from the helm and the queue, never the
+hand-set word (`declared`, on hover): at sea (at most one), under way, in port, home, paused, and
+**awaiting orders** in the warning colour (declared running with nothing at sea or queued: stalled,
+or done and not closed). The voyage at the **helm** (name, kind, pid, since) shows beside the voyage
+at sea, and in Governance's S2. A ship's
 page shows its voyage's **library aboard** (`/api/voyage/<run_id>/library`: each library's stage,
 where it came from, books and hash; its opt-in and refusals), and each voyage chip carries where its
 reading came from (`/api/voyages/where`).
@@ -387,6 +410,21 @@ The Scoring tab's "What we measure" table has a **now** column: for the classes 
 the current version's readings (`/api/class_score`: from `leaderboard.thorp_entry` of the class's
 best ship): the four small cards and "n of 4", the cause-and-effect gain with its 0.1 mark, the
 chaining lift (marked "in the noise" at or below 0.03), and the census's best cards held so far.
+
+## Forms (`src/lib/forms.js`)
+
+A field is labelled, and the label is tied to it (wrapping it, or `for=`). A form is a `<form>`:
+Enter submits, and the browser's own checks run first (`required`, `min`/`max`, `pattern`). The
+checks the page can make itself run next and put their message **under the field** they concern
+(`fieldError`: `aria-invalid`, the message tied by `aria-describedby`); a field loses its mark as it
+is put right. A server refusal goes to its field too where it names one (the fitout builder: "stage
+N: …" on that stage's block, the pretraining rule on its lane, the stores rule on the opt-in), and
+otherwise to the message line. A button that sends says what it is doing ("Saving…", "Queueing…")
+and takes no second click (`busy`). A form worth keeping keeps an unsaved draft in this browser and
+offers it back ("An unsaved fitout from 16:46 … Restore it / Discard"), and the page warns before
+leaving it unsaved. Every **filter bar** (`data-filters`) has a "reset" link, and its filters
+(`data-remember`) are kept per viewer, restored once their options arrive. Nothing here replaces the
+confirmation a consequential action needs (the queue's AlertDialog).
 
 ## Components
 

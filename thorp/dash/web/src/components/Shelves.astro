@@ -18,18 +18,18 @@ import { cardCls, emptyCls, fieldCls, selectCls } from '../lib/ui';
         <div class="k">The libraries <span class="s">drag one into a lane; the scatter is each book's variety against its in-window trigram repetition, the frontier books ringed</span></div>
         <div id="fbpalette"><div class={emptyCls()}>reading the libraries…</div></div>
       </div>
-      <div class="fbmain">
+      <form class="fbmain" id="fbform" autocomplete="off">
         <div class="fbsettings" id="fbsettings"></div>
         <div class="fblane" data-phase="pretraining"><div class="fblabel">Pretraining <span class="s">its stages in order, one voyage</span></div><div class="fbdrop" data-phase="pretraining"></div></div>
         <div class="fblane" data-phase="post-training"><div class="fblabel">Post-training <span class="s">each stage a voyage seeded from the one before, with its own learning rate and tack</span></div><div class="fbdrop" data-phase="post-training"></div></div>
         <div class="fbtotal" id="fbtotal"></div>
         <div class="fbactions" id="fbactions"></div>
-        <div class="fbmsg" id="fbmsg"></div>
-      </div>
+        <div class="fbmsg" id="fbmsg" aria-live="polite"></div>
+      </form>
     </div>
     <div class="k mt">Fitouts to open <span class="s">the hand-curated ones open as a copy; the saved ones open to edit</span></div>
     <div class="fblibrary" id="fblibrary"></div>
   </section>
-  <div class="handtools"><span class="note">show</span><select class={selectCls('')} id="shelfkind"><option value="">every kind</option></select><input class={fieldCls('')} id="shelfsearch" type="search" placeholder="find a library" /><span class="note" id="shelfcount"></span></div>
+  <div class="handtools" data-filters><label class="note" for="shelfkind">show</label><select class={selectCls('')} id="shelfkind" data-remember><option value="">every kind</option></select><input class={fieldCls('')} id="shelfsearch" data-remember aria-label="find a library" type="search" placeholder="find a library" /><span class="note" id="shelfcount"></span></div>
   <div id="shelfgroups"><div class={emptyCls()}>reading the libraries…</div></div>
 </div>

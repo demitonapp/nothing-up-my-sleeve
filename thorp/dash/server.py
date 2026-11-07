@@ -1460,7 +1460,7 @@ def api_governance() -> dict:
     }
 
 
-# ---- the words since 2026-11-07 16:30 (fleet.TERMS): an expedition is a line of experiments (was a voyage), a voyage
+# ---- the words since 2026-11-07 16:20 (fleet.TERMS): an expedition is a line of experiments (was a voyage), a voyage
 # is one ship's run (was a run), a library is a book list (was a shelf). Storage keeps run_id and the runs table.
 
 
@@ -1506,6 +1506,233 @@ def api_voyages_where(runs: str) -> dict:
         except Exception:  # noqa: BLE001
             continue
     return out
+
+
+# ---- the observation deck (each expedition's page): its voyages at sea, read live from their logs (data/runs/<id>.log) and
+# the ledger, with the ship's telegrams: short dispatches from the log, newest first.
+
+LOG_LINE = re.compile(r"^\[(\d\d:\d\d:\d\d)\] (.*)$")
+STEP_LINE = re.compile(
+    r"step (\d+)/(\d+) loss ([\d.]+) lr ([\d.e+-]+) (\d+) tok/s(?: mem ([\d.]+) GB)?"
+)
+DECK_CARDS = ("previous_word", "nevermore", "mover", "comparator")
+
+
+def _log_tail(run_id: str, nbytes: int = 400_000) -> list[tuple[str, str]]:
+    p = paths.data_dir() / "runs" / f"{run_id}.log"
+    if not p.exists():
+        return []
+    with p.open("rb") as f:
+        size = f.seek(0, 2)
+        f.seek(max(0, size - nbytes))
+        lines = f.read().decode("utf-8", "replace").splitlines()
+    head = []
+    if size > nbytes:  # the departure lines sit at the top of the log
+        with p.open("rb") as f:
+            head = f.read(8000).decode("utf-8", "replace").splitlines()[:12]
+    out = []
+    for ln in head + lines[1 if size > nbytes else 0 :]:
+        m = LOG_LINE.match(ln)
+        if m:
+            out.append((m.group(1), m.group(2)))
+    seen, uniq = set(), []
+    for t in out:  # the head and the tail may overlap
+        if t not in seen:
+            seen.add(t)
+            uniq.append(t)
+    return uniq
+
+
+def _telegram(text: str) -> str:
+    """A log line as a telegram: capitals, no lower-case flourishes, STOP between thoughts."""
+    t = re.sub(r"\s+", " ", text).strip().rstrip(".")
+    return (
+        " STOP ".join(x.strip().upper() for x in re.split(r"[;:]\s+|\.\s+", t) if x.strip())
+        + " STOP"
+    )
+
+
+def _deck(run: dict) -> dict:
+    """One voyage at sea, for the observation deck."""
+    from thorp import fleet
+
+    rid = run["run_id"]
+    log = _log_tail(rid)
+    steps = [(t, STEP_LINE.search(x)) for t, x in log if x.startswith("step ")]
+    steps = [(t, m) for t, m in steps if m]
+    last = steps[-1][1] if steps else None
+    step, total = (int(last.group(1)), int(last.group(2))) if last else (None, None)
+    # pace from the last stretch of step lines: seconds per step, and so the time left
+    eta = None
+    if len(steps) >= 2:
+        (t0, m0), (t1, m1) = steps[max(0, len(steps) - 40)], steps[-1]
+        h0, h1 = (
+            sum(int(x) * k for x, k in zip(t.split(":"), (3600, 60, 1), strict=True))
+            for t in (t0, t1)
+        )
+        dt, ds = (h1 - h0) % 86400, int(m1.group(1)) - int(m0.group(1))
+        if dt > 0 and ds > 0 and total:
+            eta = (total - step) * dt / ds
+    loss = [
+        [int(m.group(1)) for _, m in steps[-200:]],
+        [float(m.group(3)) for _, m in steps[-200:]],
+    ]
+    # the latest readings: the four necessary cards, the Nevermore, the logic deck
+    con = _con()
+    try:
+
+        def latest(name: str):
+            r = con.execute(
+                "select value, step from metrics where run_id=? and name=? order by step desc, rowid desc limit 1",
+                [rid, name],
+            ).fetchone()
+            return (r[0], r[1]) if r and r[0] is not None and r[0] == r[0] else (None, None)
+
+        cards = {}
+        for k in DECK_CARDS:
+            st = fleet.STARS.get(k)
+            if not st:
+                continue
+            one, at = latest(st.metric)
+            two, _ = (
+                latest(st.shared_metric) if getattr(st, "shared_metric", None) else (None, None)
+            )
+            best = max([v for v in (one, two) if v is not None], default=None)
+            cards[k] = {
+                "one": one,
+                "shared": two,
+                "threshold": st.threshold,
+                "lit": best is not None and best >= st.threshold,
+                "at": at,
+            }
+        gain, _ = latest("tricks/logic_test/gain")
+        cause, _ = latest("tricks/logic_test/gain_cause")
+        hole, _ = latest("eval/hole-cards-unseen/bpb_mean_en")
+        # first light: each star's first reading at its mark, from the ledger
+        lights = []
+        for st in fleet.STARS.values():
+            for metric, how in (
+                (st.metric, "one head"),
+                (getattr(st, "shared_metric", None), "two heads"),
+            ):
+                if not metric:
+                    continue
+                r = con.execute(
+                    "select min(step) from metrics where run_id=? and name=? and value>=?",
+                    [rid, metric, st.threshold],
+                ).fetchone()
+                if r and r[0] is not None:
+                    lights.append(
+                        {
+                            "step": r[0],
+                            "text": f"{st.name} lit at step {r[0]} ({how})",
+                            "kind": "lit",
+                        }
+                    )
+                    break
+    finally:
+        con.close()
+    # the telegrams: departure, the milestones (every tenth of the way), each light, and the latest readings
+    tele = []
+    for t, x in log[:12]:
+        if x.startswith(
+            (
+                "ship ",
+                "S3 gate",
+                "seeded from",
+                "conclusion-weighted",
+                "induction-weighted",
+                "stage",
+            )
+        ):
+            tele.append({"time": t, "kind": "depart", "text": _telegram(x)})
+    marks = set()
+    for t, m in steps:
+        s_, tot = int(m.group(1)), int(m.group(2))
+        tenth = s_ * 10 // max(1, tot)
+        if tenth not in marks and s_ > 0:
+            marks.add(tenth)
+            tele.append(
+                {
+                    "time": t,
+                    "step": s_,
+                    "kind": "progress",
+                    "text": _telegram(
+                        f"step {s_} of {tot}; loss {float(m.group(3)):.2f}; {int(m.group(5)):,} tokens a second"
+                    ),
+                }
+            )
+    for x in lights:
+        tele.append({"time": "", "step": x["step"], "kind": "lit", "text": _telegram(x["text"])})
+    evals = [(t, x) for t, x in log if x.startswith("eval @")]
+    if evals:
+        t, x = evals[-1]
+        at = re.match(r"eval @ (\d+)", x)
+        bits = []
+        for k in DECK_CARDS:
+            c = cards.get(k)
+            if c and c["one"] is not None:
+                bits.append(
+                    f"{fleet.STARS[k].name} {max(v for v in (c['one'], c['shared']) if v is not None):.2f} of {c['threshold']}"
+                )
+        if gain is not None:
+            bits.append(f"chaining gain {gain:+.2f}")
+        tele.append(
+            {
+                "time": t,
+                "step": int(at.group(1)) if at else None,
+                "kind": "reading",
+                "text": _telegram(
+                    f"readings at step {at.group(1) if at else '?'}; " + "; ".join(bits)
+                ),
+            }
+        )
+    other = [(t, x) for t, x in log[12:] if not x.startswith(("step ", "eval @"))]
+    for t, x in other[-6:]:
+        tele.append({"time": t, "kind": "note", "text": _telegram(x)})
+    tele.sort(
+        key=lambda d: (
+            d.get("step")
+            if d.get("step") is not None
+            else (-1 if d["kind"] == "depart" else 10**9),
+            d.get("time") or "",
+        ),
+        reverse=True,
+    )
+    return {
+        **run,
+        "step": step,
+        "steps_total": total,
+        "eta_s": eta,
+        "loss": loss,
+        "tokens_per_s": int(last.group(5)) if last else None,
+        "mem_gb": float(last.group(6)) if last and last.group(6) else None,
+        "cards": cards,
+        "logic_gain": gain,
+        "cause_gain": cause,
+        "hole_cards_bpb": hole,
+        "telegrams": tele[:24],
+        "log_lines": len(log),
+    }
+
+
+def api_observation(expedition: str) -> dict:
+    """The observation deck for an expedition: its voyages at sea (thorp.expeditions.overview's at_sea),
+    each read live, and where its next voyage stands in the queue when none is at sea."""
+    from thorp import expeditions
+
+    ov = expeditions.overview()
+    sea = [r for r in ov.get("at_sea", []) if not expedition or r.get("expedition") == expedition]
+    mine = next((e for e in ov.get("expeditions", []) if e.get("key") == expedition), None)
+    return {
+        "expedition": expedition,
+        "at_sea": [_deck(r) for r in sea],
+        "state": (mine or {}).get("status"),
+        "queued": (mine or {}).get("queued"),
+        "next_in_queue": (mine or {}).get("next_in_queue"),
+        "helm": ov.get("helm"),
+        "elsewhere": [r for r in ov.get("at_sea", []) if r.get("expedition") != expedition],
+    }
 
 
 def api_leaderboard() -> dict:
@@ -2342,6 +2569,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/shelves": api_shelves,
                 "/api/shelf_books": lambda: api_shelf_books(q["path"]),
                 "/api/leaderboard": api_leaderboard,
+                "/api/observation": lambda: api_observation(q.get("expedition", "")),
                 "/api/expeditions": lambda: api_voyages(),
                 "/api/expedition": lambda: api_voyage_series(q["key"]),
                 "/api/expeditions/overview": api_expeditions_overview,

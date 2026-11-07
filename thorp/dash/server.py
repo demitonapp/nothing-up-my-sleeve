@@ -881,7 +881,35 @@ def _rungs() -> dict:
         for r in getattr(fleet, "RUNGS", ())
     ]
     chains = fleet.chains() if hasattr(fleet, "chains") else []
-    return {"rungs": rungs, "chains": chains}
+    return {"rungs": rungs, "chains": chains, **_grades()}
+
+
+def _grades(pairs: bool = False) -> dict:
+    """Whether each chain gets harder as it climbs (fleet.grading, written to
+    data/compare/chain-grades.json): each chain's grade, and the reference ladder's readings on every
+    rung (fleet.REFERENCE_LADDER: Pythia 14m to 410m and Qwen3 0.6B), per-pair lifts only if asked."""
+    from thorp import fleet
+
+    p = Path(__file__).resolve().parents[2] / "data" / "compare" / "chain-grades.json"
+    try:
+        d = json.loads(p.read_text())
+    except (OSError, ValueError):
+        return {"grades": {}, "reference": []}
+    models = d.get("models", {})
+    ladder = list(getattr(fleet, "REFERENCE_LADDER", ()))
+    reference = [
+        {
+            "model": m,
+            "short": m.split("/")[-1].replace("Qwen3-", "Qwen3 "),
+            "tricks": {
+                k: {kk: vv for kk, vv in v.items() if pairs or kk != "pairs"}
+                for k, v in models.get(m, {}).items()
+            },
+        }
+        for m in ladder
+        if m in models
+    ]
+    return {"grades": d.get("chains", {}), "reference": reference, "graded_on": sorted(models)}
 
 
 def _known_tricks() -> list[dict]:
@@ -996,7 +1024,11 @@ def api_chain(key: str) -> dict:
             }
         )
     bet = fleet.TRICKS.get(key)
+    g = _grades(pairs=True)
     return {
+        "grade": g["grades"].get(key),
+        "graded_on": g.get("graded_on", []),
+        "reference": g["reference"],
         "key": ch.key,
         "name": ch.name,
         "strand": ch.strand,

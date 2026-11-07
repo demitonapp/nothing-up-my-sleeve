@@ -99,6 +99,16 @@ holds the ways in, always:
   sailing (that pair's lift in the latest `discovery` artifact, in the CSV's order). The bettor's
   step reads "pairs not written yet" until `lists/discovery-<test>.csv` exists, with the rivals
   and the ablation from its `about`.
+  **Grading** (`fleet.grading`, written to `data/compare/chain-grades.json`): a chain is graded when
+  it gets harder at every rung across all the models read, Thorp's and the reference ladder's
+  (`fleet.REFERENCE_LADDER`: Pythia 14m to 410m, Qwen3 0.6B). No model performs a rung while
+  failing one below it (an inversion), no rung is performed by more models than the one below,
+  and every rung is performed by some model. Each chain's grade sits under its name in the table
+  ("graded", or "not graded" with the inversions, the rungs more pass than below, and the rungs
+  unreached; the inversions on hover) and in the chain page's header, with every inversion listed
+  and how many models perform each rung. "Show the reference ladder" (a per-viewer toggle,
+  remembered) puts the ladder's lift, share and ✓ beside Thorp's classes in every cell and step;
+  off, the one reference `tricks.py` names stands in.
   "→ leads to" and "← led by" notes link each pair in the trick table, the route, the Waypoints
   and Goals tables and each trick's page, where the partner's chart sits beside the trick's own.
   A trick's chart draws its threshold (amber), its floor (grey: the highest untrained reading among

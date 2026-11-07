@@ -1649,11 +1649,44 @@ function rungEvidence(t, ft, rank, opts = {}) {
   }
   return body;
 }
+// ---- grading (fleet.grading, data/compare/chain-grades.json): does a chain get harder as it climbs, judged on many models
+// at once. Graded: no model performs a rung while failing one below it, no rung is performed by more models than the
+// one below, and every rung is performed by some model. The reference ladder (Pythia 14m to 410m, Qwen3 0.6B) is
+// shown beside Thorp's classes when the toggle is on; it is a per-viewer choice, remembered.
+let chainRef = false;
+try { chainRef = localStorage.getItem('thorp.chainref') === 'on'; } catch (e) {}
+function chainRefToggle(id, redraw) {
+  const el = document.getElementById(id); if (!el) return;
+  el.checked = chainRef;
+  el.onchange = () => { chainRef = el.checked; try { localStorage.setItem('thorp.chainref', chainRef ? 'on' : 'off'); } catch (e) {} redraw(); };
+}
+function gradeNote(g, nameOf, full) {
+  if (!g) return '<span class="pill" title="no grading written yet (data/compare/chain-grades.json)">not graded yet</span>';
+  if (g.graded) return '<span class="pill good" title="harder at every rung: no model passes a rung it fails below, fewer pass each rung, and every rung is reached">graded</span>';
+  const bits = [];
+  if (g.inversions.length) bits.push(`${g.inversions.length} inversion${g.inversions.length > 1 ? 's' : ''}`);
+  if (g.rising.length) bits.push(`more pass ${g.rising.map(nameOf).join(', ')} than the rung below`);
+  if (g.unreached.length) bits.push(`${g.unreached.map(nameOf).join(', ')} unreached`);
+  const tip = g.inversions.map(x => `${x.model} performs ${nameOf(x.rung)} but fails ${x.fails_below.map(nameOf).join(', ')}`).join('\n');
+  return `<span class="pill bad" title="${esc(tip)}">not graded</span> <span class="gnote">${esc(bits.join(' · '))}</span>`
+    + (full && g.inversions.length ? `<details class="ginv"><summary>the inversions</summary><ul>${g.inversions.map(x => `<li><b>${esc(x.model)}</b> performs ${esc(nameOf(x.rung))} but fails ${esc(x.fails_below.map(nameOf).join(', '))}</li>`).join('')}</ul></details>` : '');
+}
+// the reference ladder's readings on one rung, as evidence rows; without the toggle, the one reference tricks.py names
+function refRows(key, refs, ref, sign) {
+  if (chainRef && refs && refs.length) return refs.map(m => {
+    const v = m.tricks[key];
+    if (!v) return `<div class="cr ref"><span>${esc(m.short)}</span><b>–</b></div>`;
+    return `<div class="cr ref${v.performed ? ' lit' : ''}"><span>${esc(m.short)}</span><b>${sign(v.lift)}${v.score != null ? ` <i>${Math.round(100 * v.score)}%</i>` : ''}${v.performed ? ' ✓' : ''}</b></div>`;
+  }).join('');
+  return ref ? `<div class="cr ref"><span>${esc(ref[0])}</span><b>${sign(ref[1])}</b></div>` : '';
+}
+const signed = v => v == null ? '–' : `${v >= 0 ? '+' : ''}${fmt(v, 2)}`;
 function drawChains() {
   const kts = discData.known_tricks || [], byKey = Object.fromEntries(kts.map(t => [t.key, t]));
   const led = new Set(kts.map(t => t.leads_to).filter(Boolean));
   const chains = kts.filter(t => t.leads_to && !led.has(t.key)).map(start => { const c = [start]; let t = start; while (t.leads_to && byKey[t.leads_to]) { t = byKey[t.leads_to]; c.push(t); } return c; });
   const tb = document.getElementById('chaintable');
+  chainRefToggle('chainrefidx', drawChains);
   if (!chains.length) { tb.tHead.innerHTML = ''; tb.tBodies[0].innerHTML = '<tr><td class="empty">no chains yet</td></tr>'; return; }
   // the columns are the classes the chains' rungs belong to, smallest first, so a chain that starts at the keel and one
   // that starts at the speller line up class by class; the longest chains are featured first
@@ -1669,11 +1702,12 @@ function drawChains() {
   tb.tBodies[0].innerHTML = chains.map(c => {
     const end = c[c.length - 1], at = Object.fromEntries(c.map(t => [t.target_class, t]));
     const chainKey = end.fleet || end.key, hasPage = (cr.chains || []).some(x => x[x.length - 1] === chainKey);
-    return `<tr><td>${hasPage ? `<a href="#/discoveries/chains/${esc(chainKey)}"><b>${esc(end.name)}</b></a><div class="s">the climb, step by step →</div>` : `<b>${esc(end.name)}</b>`}</td>${cols.map(p => at[p]).map(t => {
+    const nameOf = k => (byKey[k] || {}).name || k;
+    return `<tr><td>${hasPage ? `<a href="#/discoveries/chains/${esc(chainKey)}"><b>${esc(end.name)}</b></a>` : `<b>${esc(end.name)}</b>`}<div class="grade">${gradeNote((cr.grades || {})[chainKey], nameOf)}</div>${hasPage ? '<div class="s">the climb, step by step →</div>' : ''}</td>${cols.map(p => at[p]).map(t => {
       if (!t) return '<td class="none"><div class="s">no rung</div></td>';
       const ft = t.fleet && discTricks.find(x => x.key === t.fleet), ref = Object.entries(t.reference || {})[0];
       const body = rungEvidence(t, ft, rank);
-      return `<td><a href="#/discoveries/${esc(t.key)}"><b>${esc(t.name)}</b></a>${body}${ref ? `<div class="cr ref"><span>${esc(ref[0])}</span><b>+${fmt(ref[1], 2)}</b></div>` : ''}</td>`;
+      return `<td><a href="#/discoveries/${esc(t.key)}"><b>${esc(t.name)}</b></a>${body}${refRows(t.fleet || t.key, cr.reference, ref, signed)}</td>`;
     }).join('')}</tr>`;
   }).join('')
   // what a model at each rung is, according to the chains (fleet.RUNGS)
@@ -1706,7 +1740,9 @@ async function drawChainPage() {
     ['the idea', esc(d.idea)], ['found by', esc(d.found)],
     ['the shelf', `${esc(d.shelf)}${d.cutoff ? ` <span class="s">(cutoff ${d.cutoff})</span>` : ''}`],
     ['the climb', `${d.steps.length} steps, one per class, each resting on the one before; step ${d.steps.length} is the bet itself`],
+    ['the grade', `${gradeNote(d.grade, k => (d.steps.find(x => x.key === k) || {}).name || k, true)}${d.grade ? `<div class="s">of the ${d.graded_on.length} models read, how many perform each rung: ${d.steps.filter(x => d.grade.counts[x.key] != null).map(x => `${esc(x.name)} <b>${d.grade.counts[x.key]}</b>`).join(' → ')}</div>` : ''}`],
   ].map(([k, v]) => `<div><div class="k">${k}</div><div>${v}</div></div>`).join('');
+  chainRefToggle('chainrefpage', drawChainPage);
   const kts = discData.known_tricks || [], presets = ladderData ? ladderData.rungs.map(r => r.preset) : [];
   const rank = p => { const i = presets.indexOf(p); return i < 0 ? 99 : i; };
   const sign = v => v == null ? '–' : `${v >= 0 ? '+' : ''}${fmt(v, 2)}`;
@@ -1735,7 +1771,7 @@ async function drawChainPage() {
         ${last && st.about ? `<p class="s">${esc(st.about)}</p>` : ''}
         <div class="row cev">
           <div class="cevid"><div class="k">class by class <span class="s">best lift · share right · floor</span></div>${rungEvidence(t, ft, rank, { floor: true })}
-            ${ref ? `<div class="cr ref"><span>${esc(ref[0])}</span><b>${sign(ref[1])}</b></div>` : ''}
+            ${refRows(st.key, d.reference, ref, sign)}
             <div class="s">performed at lift ${st.threshold ?? '–'}${st.min_score != null ? ` and ${Math.round(100 * st.min_score)}% of pairs right` : ''}, at the same reading</div></div>
           <div class="cpairs"><div class="k">the pairs <span class="s">each class's best sailing, ✓ where it bets on the idea</span></div>${pairs}</div>
         </div>

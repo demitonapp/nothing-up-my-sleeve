@@ -397,3 +397,8 @@ main a.ccell { color: var(--text); text-decoration: none; display: block; }
 #chainsteps details summary { cursor: pointer; color: var(--blue); font-size: var(--fs-sm); margin-top: 6px; }
 @media (max-width: 700px) { #chainsteps .cevid { flex-basis: 100%; } }
 #chainsteps .cevid > .s { font-size: var(--fs-sm); color: var(--muted); margin-top: 6px; }
+#chaintable .grade, #chainover .ginv { margin-top: 4px; font-size: var(--fs-sm); }
+#chaintable .gnote, #chainover .gnote { color: var(--muted); font-size: var(--fs-sm); }
+#chaintable .cr.ref.lit b, #chainsteps .cevid .cr.ref.lit b { color: var(--good); }
+#chainover .ginv ul { margin: 4px 0 0 16px; padding: 0; color: var(--muted); }
+#chainover .ginv summary { cursor: pointer; color: var(--blue); }

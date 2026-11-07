@@ -1,7 +1,7 @@
 # ships/specs/fitouts: the full deck on the 9m (Justin, 2026-11-08 06:00): the 9m with metre's spec with every metre card
 # pinned by rule and the two riddles pulled on composed items (thorp/train.py optim.scaffold; thorp/riddles.py).
 name: fu-ogden-v0-1~deck@9m-pre-s1
-ship: 'Fitout: Ogden v0.1 @ 9m ~ deck, every metre and riddle card scaffolded'
+ship: 'Fitout: Ogden v0.1 @ 9m ~ deck (The Smallest Bridge, leg 0: all at once), every metre and riddle card scaffolded'
 experiment: 'Fitout ogden-v0-1: one fixed Ogden corpus for every class; what cards and stars form at each size?'
 question: 'The full deck (Justin, 2026-11-08 06:00: ''can we get all metre and riddles for 9m''): the ten metre
   cards pinned by rule and the two riddles pulled on composed items, laid out low to high as the deck''s evolutions

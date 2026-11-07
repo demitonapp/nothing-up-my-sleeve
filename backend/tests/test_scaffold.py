@@ -166,3 +166,40 @@ def test_a_full_deck_voyage_runs_and_records_the_riddles(library, spec, tmp_thor
     assert {"scaffold/loss", "scaffold/riddle/comparator", "scaffold/riddle/bridge"} <= names
     w = rec.query("select value from metrics where run_id=? and name='scaffold/weight' order by step desc limit 1", [rid])
     assert w[0]["value"] == pytest.approx(0.2, abs=0.05) or w[0]["value"] > 0.2  # at or above the floor
+
+
+# ---- The Smallest Bridge (2026-11-08): a start time per card
+
+
+def test_each_card_starts_at_its_from():
+    sc = {"heads": [{"layer": 0, "head": 0, "card": "rare_word"}, {"layer": 1, "head": 0, "card": "induction", "from": 0.05}],
+          "riddles": {"bridge": {"layer": 1, "from": 0.05}}}  # fmt: skip
+    assert train.scaffold_on(0, 1000, sc) == [1.0, 0.0, 0.0, 0.0]  # heads, then comparator (absent), bridge
+    assert train.scaffold_on(50, 1000, sc) == [1.0, 1.0, 0.0, 1.0]
+    with pytest.raises(ValueError):
+        train.check_scaffold({"heads": [{"layer": 0, "head": 0, "card": "sink", "from": 1.2}]}, 2, 2)
+
+
+def test_a_head_not_started_pulls_nothing():
+    mx.random.seed(2)
+    model = GPT(GPTConfig(layers=2, width=32, heads=2, vocab=50, context=32, positions="rope"))
+    x = mx.random.randint(0, 50, (2, 16))
+    sc = {"heads": [{"layer": 0, "head": 0, "card": "previous_word"}, {"layer": 1, "head": 0, "card": "words_back"}]}
+    _, pats = model.forward_attending(x, train.scaffold_picks(sc))
+    only_first = train.scaffold_loss(pats, x, sc, on=mx.array([1.0, 0.0]))
+    first_alone = train.scaffold_loss(pats, x, {"heads": sc["heads"][:1]})
+    assert float(only_first) == pytest.approx(float(first_alone), rel=1e-5)
+
+
+def test_a_staged_voyage_records_its_starts(library, spec, tmp_thorp):
+    from thorp.ledger import Ledger
+
+    spec["optim"]["scaffold"] = {"weight": 1.0, "hold": 0.2, "fade": 0.6, "floor": 0.2,
+                                 "heads": [{"layer": 0, "head": 0, "card": "previous_word"},
+                                           {"layer": 1, "head": 0, "card": "induction", "from": 0.3}]}  # fmt: skip
+    prep = train.prepare(spec, resolver=library["resolver"], log=lambda *a: None)
+    rec = Ledger(tmp_thorp / "staged.sqlite")
+    rid = train.train(spec, prep, rec, stop_after=80, log=lambda *a: None)["run_id"]
+    got = {r["step"]: r["value"] for r in rec.query("select step, value from metrics where run_id=? and name='scaffold/started'", [rid])}
+    total = rec.query("select value from metrics where run_id=? and name='plan/total_steps'", [rid])[0]["value"]
+    assert got[1] == 1.0 and got[max(got)] == (2.0 if max(got) - 1 >= 0.3 * total else 1.0)

@@ -1497,6 +1497,8 @@ def expedition_of_label(name: str | None, label: str | None) -> str | None:
         return "induction"
     if (label or "").startswith("Logic tutor"):
         return "logic_tutor"
+    if (label or "").startswith("Fitout: Ogden") and "The Smallest Bridge" in (label or ""):
+        return "smallest_bridge"
     if (label or "").startswith("Fitout: Ogden"):
         return "ogden"
     if (label or "").startswith(
@@ -2246,6 +2248,45 @@ EXPEDITIONS: dict[str, Expedition] = {
             results="data/runs/fitouts/",
             status="planned",
             stars=("nevermore", "previous_word", "mover", "comparator"),
+        ),
+        Expedition(
+            key="smallest_bridge",
+            name="The Smallest Bridge",
+            goal="The smallest Thorp that plays the Bridge, the Mover and the Counter (Justin, 2026-11-08 08:00: 'a "
+            "plan for an expedition using numerous size ships in order to get the bridge card and the mover and counter "
+            "at the lowest size possible ... take their learnings to follow up journeys'; 08:20: 'get the rare word and "
+            "premise maker into the model as soon as possible, then try simulate the bridge and then move to see if we "
+            "can get the nevermore, counter and mover'). Each voyage in three stages: the Basics pinned from the first "
+            "step, the Bridge (a riddle) pulled on composed items once they are held, the Faces earned. The ships descend "
+            "9m, 1m, the three-layer keel, the keel, each carrying the last one's recipe; a failed descent sails again "
+            "with the bigger ship as teacher.",
+            ship="Fitout: Ogden (The Smallest Bridge)",
+            fleet="Star Fleet",
+            preset=next(r["preset"] for r in LADDER if r.get("name") == "The speller"),
+            outcomes=(
+                Outcome("stars/bridge/max_score", "higher", "the Bridge, played at 0.5 nats"),
+                Outcome("stars/mover/shared_score", "higher", "the Mover's look, at 0.2 (with the one-hop lift at 0.1)"),
+                Outcome("tricks/logic_test/lift_one_hop", "higher", "the Mover's ability, at 0.1"),
+                Outcome("counter/probe_r2", "higher", "the Counter, R² at 0.5"),
+                Outcome("nevermore/natural_copy_gain", "higher", "the Nevermore, copy gain at 1.0"),
+                Outcome("eval/hole-cards-unseen/bpb_mean", "lower", "the language's cost: the Forgotten Tomes"),
+            ),
+            levers=(
+                Lever("class", choices=("the speller", "the pilot", "the three-layer keel", "the keel"),
+                      about="descending: each class sails once the one above has shown the recipe"),
+                Lever("stage", choices=("all at once", "staged"), about="the full deck at once (leg 0) against in order"),
+                Lever("teacher", choices=("none", "the bigger ship"), about="only when a descent fails"),
+                Lever("seed", choices=("1", "2"), about="the smallest success sails a second seed"),
+            ),  # fmt: skip
+            stop=StopRule(
+                12,
+                "Legs 0 to 4 (DECISIONS.md, 'The Smallest Bridge, pre-registered'); a card is played by the deck's rules "
+                "(wager.falls) and counts at a class only on two seeds",
+            ),
+            runner="thorp/fitouts.py",
+            results="data/runs/fitouts/",
+            status="running",
+            stars=("bridge", "mover", "nevermore"),
         ),
         Expedition(
             key="logic_tutor",

@@ -58,11 +58,21 @@ class Context:
 
     @functools.cached_property
     def books(self) -> list[str]:
-        from thorp.sources.gutenberg import resolve_list
+        from thorp.sources import base
+        from thorp.sources.gutenberg import read_list, resolve_list
 
+        # a row naming its book ("local:<id>", "gutenberg:<n>") is that book, as training reads it
+        # (train.gutenberg_resolver); a list of titles alone is matched by title (2026-11-08: Ogden v0.2's
+        # "local:pg14838" Peter Rabbit was matched by title to another edition, and its local books not at all)
         out: dict[str, None] = {}
         for lib in self.libraries:
-            out.update(dict.fromkeys(f"pg{r.chosen}" for r in resolve_list(lib) if r.chosen))
+            rows = read_list(lib)
+            if rows and all(base.is_ref(r.text) for r in rows):
+                for r in rows:
+                    key, ident = r.text.split(":", 1)
+                    out[f"pg{ident}" if key == "gutenberg" else ident] = None
+            else:
+                out.update(dict.fromkeys(f"pg{r.chosen}" for r in resolve_list(lib) if r.chosen))
         return list(out)
 
     @functools.cached_property

@@ -647,9 +647,19 @@ def scaffold_picks(sc: dict) -> dict[int, list[int]]:
     return picks
 
 
-def scaffold_loss(pats: dict, x, sc: dict, targets: dict | None = None, flags: dict | None = None):
-    """The mean, over the scaffolded heads, of the cross-entropy from the card's pattern to the head's attention
-    (over the queries that have a target). Its floor is the target's own entropy (0 for previous-word)."""
+def scaffold_on(step: int, total: int, sc: dict) -> list[float]:
+    """1 for each scaffolded head and riddle whose start (`from`, a share of the voyage; 0 unless set) has come, else
+    0 (The Smallest Bridge, 2026-11-08: the Basics first, a Stage 1 only once what it sits on is held): the heads in
+    order, then the comparator and the bridge."""
+    on = [1.0 if step >= float(h.get("from", 0.0)) * total else 0.0 for h in sc.get("heads") or []]
+    rid = sc.get("riddles") or {}
+    return on + [1.0 if k in rid and step >= float(rid[k].get("from", 0.0)) * total else 0.0 for k in RIDDLES]
+
+
+def scaffold_loss(pats: dict, x, sc: dict, targets: dict | None = None, flags: dict | None = None, on=None):
+    """The mean, over the scaffolded heads (those started, when `on` is given), of the cross-entropy from the card's
+    pattern to the head's attention (over the queries that have a target). Its floor is the target's own entropy
+    (0 for previous-word)."""
     out = []
     for h in sc["heads"]:
         card = h["card"]
@@ -658,7 +668,9 @@ def scaffold_loss(pats: dict, x, sc: dict, targets: dict | None = None, flags: d
         ce = -(tgt * mx.log(p + 1e-9)).sum(axis=-1)
         hf = has.astype(mx.float32)
         out.append((ce * hf).sum() / mx.maximum(hf.sum(), 1.0))
-    return sum(out) / len(out)
+    if on is None:
+        return sum(out) / len(out)
+    return sum(on[i] * v for i, v in enumerate(out)) / mx.maximum(on[: len(out)].sum(), 1.0)
 
 
 def check_scaffold(sc: dict, layers: int, heads: int) -> None:
@@ -667,6 +679,9 @@ def check_scaffold(sc: dict, layers: int, heads: int) -> None:
             raise ValueError(f"scaffold card {h.get('card')!r}: only metre cards with a rule ({', '.join(METRE_PATTERNS)})")
         if not (0 <= int(h["layer"]) < layers and 0 <= int(h["head"]) < heads):
             raise ValueError(f"scaffold head {h} is not in a {layers} x {heads} model")
+    for x in [*(sc.get("heads") or []), *(sc.get("riddles") or {}).values()]:
+        if not 0.0 <= float(x.get("from", 0.0)) < 1.0:
+            raise ValueError(f"scaffold start {x}: `from` is a share of the voyage, from 0 to under 1")
     if not sc.get("heads") and not sc.get("riddles"):
         raise ValueError("scaffold names no heads")
     for key, r in (sc.get("riddles") or {}).items():
@@ -946,20 +961,25 @@ def train(
                 out.append(w * mx.logaddexp(mx.array(0.0), -diff).mean())
         return out
 
-    def loss_fn(mdl, x, y, sw, rb):
+    staged = bool(sc) and (any("from" in h for h in sc.get("heads") or []) or any("from" in r for r in riddle_cfg.values()))
+
+    def loss_fn(mdl, x, y, sw, rb, on):
         # (batch, time) -> the mean per window, so the loss can be attributed to the window's book;
         # every window is the same length, so the mean of the window means is the batch mean.
         if picks and not sample:
             logits, pats = mdl.forward_attending(x, picks)
-            sl = scaffold_loss(pats, x, sc, flags=flags)
+            sl = scaffold_loss(pats, x, sc, flags=flags, on=on if staged else None)
         elif picks:  # the pull read on part of the batch: a second, smaller forward pass
             logits = mdl(x)
             xs = x[: int(sample["windows"]), : int(sample["length"])]
             _, pats = mdl.forward_attending(xs, picks)
-            sl = scaffold_loss(pats, xs, sc, flags=flags)
+            sl = scaffold_loss(pats, xs, sc, flags=flags, on=on if staged else None)
         else:
             logits, sl = mdl(x), mx.array(0.0)
-        parts = [sl] + (riddle_losses(mdl, rb) if riddle_cfg else [mx.array(0.0), mx.array(0.0)])
+        riddle = riddle_losses(mdl, rb) if riddle_cfg else [mx.array(0.0), mx.array(0.0)]
+        if staged:  # a riddle pulls only once its start has come
+            riddle = [riddle[0] * on[-2], riddle[1] * on[-1]]
+        parts = [sl] + riddle
         ce = nn.losses.cross_entropy(logits.astype(mx.float32), y, reduction="none")
         per_window = ce.mean(axis=1)
         if teacher is not None:
@@ -986,7 +1006,7 @@ def train(
 
     value_and_grad = nn.value_and_grad(model, loss_fn)
     step_fn = mx.compile(
-        lambda x, y, sw, rb: value_and_grad(model, x, y, sw, rb), inputs=model.state, outputs=model.state
+        lambda x, y, sw, rb, on: value_and_grad(model, x, y, sw, rb, on), inputs=model.state, outputs=model.state
     )
     no_riddles = {"comparator": (mx.zeros((1, 2), dtype=mx.int32),) * 3, "bridge": (mx.zeros((1, 2), dtype=mx.int32),) * 4}
 
@@ -1024,7 +1044,8 @@ def train(
         tokens = mx.array(batch.tokens)
         sw = scaffold_weight(step, total, sc) if sc else 0.0
         (loss, per_window, sl), grads = step_fn(
-            tokens[:, :-1], tokens[:, 1:], mx.array(sw, dtype=mx.float32), riddle_batch(step)
+            tokens[:, :-1], tokens[:, 1:], mx.array(sw, dtype=mx.float32), riddle_batch(step),
+            mx.array(scaffold_on(step, total, sc) if staged else [1.0], dtype=mx.float32),
         )
         grads = tree_map(lambda g: g.astype(mx.float32), grads)
         grads, gnorm = optim.clip_grad_norm(grads, o["grad_clip"])
@@ -1053,6 +1074,8 @@ def train(
         }
         if sc:  # the scaffold's weight, how far the heads are from its pattern, and the phase (0 metre, 1 fade, 2 content)
             vals["scaffold/weight"] = sw
+            if staged:
+                vals["scaffold/started"] = float(sum(scaffold_on(step - 1, total, sc)))
             parts = sl.tolist()
             vals["scaffold/loss"] = parts[0]
             for key, v in zip(("comparator", "bridge"), parts[1:], strict=True):

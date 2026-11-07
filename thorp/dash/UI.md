@@ -149,6 +149,9 @@ holds the ways in, always:
   A competitor also has **a tenth its size** (`smoking_qwen.payload()["range"]`): each fit's reading
   at a tenth of its parameters and, once forecastable, P that it reaches the competitor's lift.
   Each row also has its climb bar and four-chain strip. Switches hide the forecasts or Pythia.
+  The table fits the page without scrolling sideways: compact climb bars and chain strips, and on
+  narrow screens the least needed columns drop first (the four chains under 1000px, the rank and
+  climb under 760px, the size and a tenth its size under 560px).
   Folded beneath: **Smoking the 2–4B range** (the least P over the competitors that a Thorp a tenth
   each one's size chains two facts as well as it, `p_range_linear` and `p_range_bending`, on each
   fit, with the hardest competitor named; or "not yet forecastable: N of 3 classes above the noise"; claimed, probable or not by the

@@ -2143,6 +2143,7 @@ setInterval(refresh, 5000);
 // facts, the reference ladder on the same bars, and every run. A climb bar runs 0 to 5, ticked at each rung; the four-chain
 // strip has a row per chain, five cells (keel to 50m), lit cells filled and the next cell filled by its share of the mark.
 const CHAIN_LABEL = { origin_test: 'the Origin', energy_test: 'energy', mendeleev_gaps: "Mendeleev's gaps", recurrence_test: 'the eternal return' };
+const CHAIN_SHORT = { origin_test: 'Origin', energy_test: 'energy', mendeleev_gaps: 'Mendeleev', recurrence_test: 'return' };
 const RUNG_CLASS = ['keel', 'pilot', 'speller', 'stylist', '50m'];
 function climbBar(c, max = 5) {
   if (c == null) return '<span class="s">–</span>';
@@ -2155,7 +2156,7 @@ function chainingCell(v, thr) {
 }
 function chainStrip(chains) {
   if (!chains) return '';
-  return `<div class="cstrip">${Object.entries(chains).map(([k, c]) => `<div class="csr" title="${esc(CHAIN_LABEL[k] || k)}: ${c.rungs} rung${c.rungs === 1 ? '' : 's'} performed${c.next ? `, next ${esc(c.next.replace(/_test$/, ''))} at ${Math.round(100 * c.partial)}% of its mark` : ', all five'}"><span>${esc(CHAIN_LABEL[k] || k)}</span>${RUNG_CLASS.map((r, i) => `<em class="${i < c.rungs ? 'on' : ''}">${i === c.rungs && c.partial ? `<u style="width:${Math.round(100 * c.partial)}%"></u>` : ''}</em>`).join('')}</div>`).join('')}</div>`;
+  return `<div class="cstrip">${Object.entries(chains).map(([k, c]) => `<div class="csr" title="${esc(CHAIN_LABEL[k] || k)}: ${c.rungs} rung${c.rungs === 1 ? '' : 's'} performed${c.next ? `, next ${esc(c.next.replace(/_test$/, ''))} at ${Math.round(100 * c.partial)}% of its mark` : ', all five'}"><span>${esc(CHAIN_SHORT[k] || k)}</span>${RUNG_CLASS.map((r, i) => `<em class="${i < c.rungs ? 'on' : ''}">${i === c.rungs && c.partial ? `<u style="width:${Math.round(100 * c.partial)}%"></u>` : ''}</em>`).join('')}</div>`).join('')}</div>`;
 }
 const runLink = x => x.run ? `<a href="#${shipHash(x.run)}">${esc(x.run)}</a>` : '–';
 async function loadLeaderboard() {
@@ -2443,7 +2444,7 @@ function drawLbTable() {
   const matchCell = r => {
     if (r.kind !== 'outside' || !r.match) return '';
     if (!fits.straight && !fits.bending) return '<span class="s">no fit yet</span>';
-    const one = (k, v) => fits[k] ? `<div><span class="s">${k}</span> ${v === undefined ? '–' : v == null ? '<span class="s">never, on this fit</span>' : `<b>${fmtParams(v)}</b>${r.params ? ` <span class="s">(${v < r.params ? `${(r.params / v).toFixed(v < r.params / 10 ? 0 : 1)}× smaller` : `${(v / r.params).toFixed(1)}× larger`})</span>` : ''}`}</div>` : '';
+    const one = (k, v) => fits[k] ? `<div><span class="s">${k}</span> ${v === undefined ? '–' : v == null ? '<span class="s">never</span>' : `<b>${fmtParams(v)}</b>${r.params ? ` <span class="s">${v < r.params ? `${(r.params / v).toFixed(v < r.params / 10 ? 0 : 1)}× smaller` : `${(v / r.params).toFixed(1)}× larger`}</span>` : ''}`}</div>` : '';
     return one('bending', r.match.bending) + one('straight', r.match.straight);
   };
   let rank = 0;

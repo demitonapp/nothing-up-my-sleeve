@@ -1,0 +1,21 @@
+{
+ "key": "ogden-v0-2",
+ "name": "Ogden v0.2",
+ "aim": "Ogden v0.1's rule over the whole library, and the logic tutor's passages (Justin, 2026-11-08 08:10: \"let's go with A and strike the Bible and then C1 as you suggest\"): v0.1's 592 books and the 688 more in the library at Ogden-ness 68% or more (lists/ogden-v0.2-scores.csv; The Bible, King James Version struck; the period gate's rule applied), about 85M words, with the template writer's premise-and-conclusion passages (thorp/logic_tutor.py: strict Basic English, no test's words) as 7.5% of the reading (7.0M words, 100 books). On v0.1's shared 2,048-piece tokeniser (trained on v0.1's books), so every v0.2 ship can be set beside every v0.1 ship.",
+ "positions": "rope",
+ "tack": null,
+ "opt_in": "Ogden v0.2 reads books beyond the two stores, approved by Justin (2026-11-08 08:10): the library's books at v0.1's Ogden-ness bar, the Bible struck, and the logic tutor's template passages",
+ "stages": [
+  {
+   "phase": "pretraining",
+   "name": "ogden-v0.2",
+   "shelf": "lists/ogden-v0.2.csv",
+   "tokens": null,
+   "select": "all",
+   "passes": 4,
+   "lr": null,
+   "tack": null,
+   "purpose": "the books and the tutor's shelf, four passes"
+  }
+ ]
+}

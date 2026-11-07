@@ -2935,7 +2935,7 @@ def api_class_deck(preset: str) -> dict:
     """The whole deck at a class (Justin, 22:05: "show all the cards ... and stats about the cards based on the class
     model"): for each of the 16 cards, across the class's voyages (every fitout) and its Ogden ones apart: how many
     played it (the deck's rules: a Stage 1 above its Basic, a Face traded in), when (the median tokens read at its
-    first play), in which layer, and the best its reading reached against its mark. Cached a minute."""
+    first play), in which layer, and the best its reading reached against its mark. Cached five minutes."""
     import statistics
     import time
 
@@ -2943,7 +2943,7 @@ def api_class_deck(preset: str) -> dict:
     from thorp.viable.s5_policy import deck
 
     hit = _class_deck_cache.get(preset)
-    if hit and time.time() - hit[0] < 60:
+    if hit and time.time() - hit[0] < 300:  # five minutes: reading every voyage's falls takes seconds
         return hit[1]
     voyages = _class_voyages(preset, limit=200)
     con = _con()

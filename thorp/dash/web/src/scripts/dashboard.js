@@ -1754,7 +1754,11 @@ async function drawChainPage() {
     const best = {};
     for (const x of st.runs) if (x.preset && (!best[x.preset] || (x.lift ?? -9) > (best[x.preset].lift ?? -9))) best[x.preset] = x;
     const cls = Object.keys(best).sort((a, b) => rank(a) - rank(b));
-    const row = (p, j) => `<tr><td class="pq">${esc(p.prompt)} …</td><td class="pi">${esc(p.idea)}</td><td class="pr">${esc(p.rival)}</td>${cls.map(c => {
+    // a pair with a frame reads premise / frame: the lift is what the premise adds over the frame alone
+    const passage = p => p.frame && p.prompt.endsWith(p.frame) && p.prompt.length > p.frame.length
+      ? `${esc(p.prompt.slice(0, p.prompt.length - p.frame.length).trimEnd())} <span class="pfsep">/</span> <span class="pframe">${esc(p.frame)}</span> …`
+      : `${esc(p.prompt)} …`;
+    const row = (p, j) => `<tr><td class="pq">${passage(p)}</td><td class="pi">${esc(p.idea)}</td><td class="pr">${esc(p.rival)}</td>${cls.map(c => {
       const v = best[c].pairs[j]; return v == null ? '<td>–</td>' : `<td class="${v > 0 ? 'pok' : 'pno'}" title="${esc(best[c].name)}: lift ${sign(v)}">${v > 0 ? '✓' : '✗'}</td>`;
     }).join('')}</tr>`;
     const head = `<thead><tr><th>the passage</th><th>the idea</th><th>its rival</th>${cls.map(c => `<th title="${esc(best[c].name)}">${esc(c)}</th>`).join('')}</tr></thead>`;
@@ -1773,7 +1777,7 @@ async function drawChainPage() {
           <div class="cevid"><div class="k">class by class <span class="s">best lift · share right · floor</span></div>${rungEvidence(t, ft, rank, { floor: true })}
             ${refRows(st.key, d.reference, ref, sign)}
             <div class="s">performed at lift ${st.threshold ?? '–'}${st.min_score != null ? ` and ${Math.round(100 * st.min_score)}% of pairs right` : ''}, at the same reading</div></div>
-          <div class="cpairs"><div class="k">the pairs <span class="s">each class's best sailing, ✓ where it bets on the idea</span></div>${pairs}</div>
+          <div class="cpairs"><div class="k">the pairs <span class="s">each class's best sailing, ✓ where it bets on the idea${st.pairs && st.pairs.some(p => p.frame) ? '; premise / <b>frame</b>: the lift is what the premise adds over the frame alone' : ''}</span></div>${pairs}</div>
         </div>
       </div></section>`;
   }).join('');

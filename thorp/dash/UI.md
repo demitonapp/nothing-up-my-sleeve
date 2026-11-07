@@ -70,13 +70,14 @@ holds the ways in, always:
   between an idea and its rivals on books from before its cutoff, pre-registered in DECISIONS.md.
   Each is reached by a **chain of six rungs**, one per class, keel to bettor, linked by `leads_to`
   (`fleet.chains()`): the words of the idea (keel), the copying trick put to it (pilot), its pieces
-  as everyday knowledge (speller), chained into a conclusion no sentence states (stylist), what the
-  precursors wrote (the 50m) and the discovery (bettor). The Origin: like father, like son, the
-  pedigree test, the breeders' test, Nature's breeder, Malthus and Lyell. Energy: fire and ice, the
-  workshop test, the smith's test, the mill test, Rumford and Davy. Mendeleev's gaps: one, two,
-  three, the period test, the gap test, the between test, Döbereiner's triads. The eternal return
-  (the philosophy test, cutoff 1872): again and again, the refrain test, the seasons test, the
-  pigeonhole test, Hume and Lucretius. All read on one evaluator and scale (lift: idea over rival,
+  as everyday knowledge (speller), what the precursors wrote (stylist), the pieces chained into a
+  conclusion no sentence states (the 50m) and the discovery (bettor); the stylist's and the 50m's
+  rungs were swapped so each chain gets harder as it climbs (DECISIONS.md, "The rungs above the
+  keel rewritten"). The Origin: like father, like son, the pedigree test, the breeders' test,
+  Malthus and Lyell, Nature's breeder. Energy: fire and ice, the workshop test, the smith's test,
+  Rumford and Davy, the mill test. Mendeleev's gaps: one, two, three, the period test, the gap test,
+  Döbereiner's triads, the between test. The eternal return (the philosophy test, cutoff 1872): again
+  and again, the refrain test, the seasons test, Hume and Lucretius, the pigeonhole test. All read on one evaluator and scale (lift: idea over rival,
   less what the words alone carry), and every class is scored on every rung.
   **The discovery chains** table at the top of Discoveries has the four chains as rows in that fixed
   order (from `fleet.chains()`) and the classes as columns, smallest first, so rungs line up class by
@@ -96,12 +97,14 @@ holds the ways in, always:
   with its class and `fleet.RUNGS` title, the test (linked to its page), what the step adds to the
   one below, the evidence class by class as in the table plus the floor, Qwen3 0.6B, and the rule
   (lift and share), and its pairs: six shown, all on demand, each with ✓ or ✗ for each class's best
-  sailing (that pair's lift in the latest `discovery` artifact, in the CSV's order). The bettor's
+  sailing (that pair's lift in the latest `discovery` artifact, in the CSV's order). Above the keel a pair
+  has a frame (the prompt's tail, its own column in the CSV), and the passage reads premise / **frame**,
+  the frame in the stronger weight, since the lift is what the premise adds over the frame alone. The bettor's
   step reads "pairs not written yet" until `lists/discovery-<test>.csv` exists, with the rivals
   and the ablation from its `about`.
   **Grading** (`fleet.grading`, written to `data/compare/chain-grades.json`): a chain is graded when
   it gets harder at every rung across all the models read, Thorp's and the reference ladder's
-  (`fleet.REFERENCE_LADDER`: Pythia 14m to 410m, Qwen3 0.6B). No model performs a rung while
+  (`fleet.REFERENCE_LADDER`: Pythia 14m to 410m, Qwen3 0.6B, and Qwen3 1.7B and 4B at 4 bits). No model performs a rung while
   failing one below it (an inversion), no rung is performed by more models than the one below,
   and every rung is performed by some model. Each chain's grade sits under its name in the table
   ("graded", or "not graded" with the inversions, the rungs more pass than below, and the rungs

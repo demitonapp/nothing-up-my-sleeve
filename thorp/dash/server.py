@@ -884,6 +884,15 @@ def _rungs() -> dict:
     return {"rungs": rungs, "chains": chains, **_grades()}
 
 
+def _short_model(m: str) -> str:
+    """A reference model's short name: pythia-14m, Qwen3 0.6B, Qwen3 1.7B 4-bit."""
+    import re
+
+    name = m.split("/")[-1]
+    name = re.sub(r"-(\d+)bit$", r" \1-bit", name)
+    return name.replace("Qwen3-", "Qwen3 ")
+
+
 def _grades(pairs: bool = False) -> dict:
     """Whether each chain gets harder as it climbs (fleet.grading, written to
     data/compare/chain-grades.json): each chain's grade, and the reference ladder's readings on every
@@ -900,7 +909,7 @@ def _grades(pairs: bool = False) -> dict:
     reference = [
         {
             "model": m,
-            "short": m.split("/")[-1].replace("Qwen3-", "Qwen3 "),
+            "short": _short_model(m),
             "tricks": {
                 k: {kk: vv for kk, vv in v.items() if pairs or kk != "pairs"}
                 for k, v in models.get(m, {}).items()
@@ -952,14 +961,20 @@ def _floor(con, run_id: str, metric: str) -> float | None:
 
 
 def _pairs(path: str | None) -> list[dict] | None:
-    """A matched-pairs list (prompt, idea, rival), or None when it is not written yet."""
+    """A matched-pairs list (prompt, idea, rival, and the frame: the prompt's tail that the lift is
+    measured against, absent on the keel's lists), or None when it is not written yet."""
     import csv
 
     if not path or not Path(path).exists():
         return None
     with open(path, newline="") as f:
         return [
-            {"prompt": r.get("prompt", ""), "idea": r.get("idea", ""), "rival": r.get("rival", "")}
+            {
+                "prompt": r.get("prompt", ""),
+                "frame": r.get("frame") or "",
+                "idea": r.get("idea", ""),
+                "rival": r.get("rival", ""),
+            }
             for r in csv.DictReader(f)
         ]
 

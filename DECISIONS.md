@@ -793,3 +793,24 @@ Fixed before any of it sails. Claude runs the night; the queue (`ships/specs/que
 - **The longer pull kept induction by heart at 9m:** two heads 1.21 through the metre, 0.84 at the end (the fade ended at step 4,930), well past the mark; the keel's short fade had lost it.
 - **The 21m v0.2** (`fu-ogden-v0-1~metre@21m-pre-s1`): v0.1's spec with only `optim.scaffold` added (full to 10%, out by 60%; previous-word layer 1 head 0, induction layer 3 heads 0 and 1); the same data, model and seed. Sailed 02:43.
 - **No control yet for the 9m:** the plain 9m sails after the v0.2, so what metre did at 9m (against the 9m itself) is known by mid-morning.
+
+### The night, 05:30: the 21m v0.2 is home: better at copying and on the Versus share, not "much improved" by the rule
+
+| | 21m v0.1 | **21m v0.2 (metre)** | 9m with metre |
+|---|---|---|---|
+| judge-book bpb | **1.397** | 1.428 | 1.547 |
+| natural copy gain | 0.639 | **0.774** | 0.737 |
+| induction, one head / two heads (layer 3) | 0.15 / 0.30 | **0.51 / 1.01** | 0.42 / 0.84 |
+| previous-word (layer 1) | 0.71 | **1.00** | 1.00 |
+| the comparator / the mover (two heads) | 0.58 / **0.10** | **0.95** / 0.05 | 0.80 / 0.08 |
+| words back / the rare word / the delimiter | 0.30 / 0.32 / 4.3 | **0.42 / 0.47 / 5.1** | 0.35 / 0.28 / 3.6 |
+| the counter (R²) / premise / number / order | not read | **0.39 / 2.07 / 1.56 / 2.19** | 0.30 / 1.92 / 1.14 / 1.46 |
+| period / refrain / again (lift) | 0.30 / 1.08 / 1.04 | 0.40 / **1.34 / 1.08** | **0.43** / 1.27 / 0.91 |
+| one-hop lift | **0.25** | 0.16 | 0.14 |
+| part of speech / Ogden kind / keyed word | **48% / 70% / 30%** | 46% / 68% / 29% | 43% / 65% / 25% |
+| Versus median share of Qwen3 0.6B | 0.598 | **0.631** | 0.500 |
+
+- **The rule (pre-registered 23:30): "much improved" if it beats v0.1 on copy gain and the Versus median share, with bpb no worse than v0.1's by more than 0.02.** Copy gain holds (0.774 against 0.639), the Versus share holds (0.631 against 0.598), **bpb does not: 1.428 against 1.397, 0.031 worse**, 0.011 past the allowance. So v0.2 is **better at what metre targets and better against Qwen, but not "much improved"**: it paid for its circuits in language.
+- **The cost grew in the content phase:** v0.2 was 0.010 behind v0.1 at step 1,280 and 0.031 behind at the end. On the keel the fade arm ended *ahead* of the plain keel (1.821 against 1.853); the keel's pull was short (out by 25%), the 21m's long (out by 60%). The long pull holds the cards by heart (induction two heads 1.23 in the metre, 1.01 at the end) and costs the language; the short pull costs nothing and let induction go at the keel. The next lever is between them: the long pull at a lower weight, or a pull that ends by 40%.
+- **Cards by the deck's rules:** v0.2 plays induction on one head (0.51) where v0.1 did not; the Nevermore is not traded in (copy gain 0.77, the mark 1.0); the mover is weaker (0.05 against 0.10). On the leaderboard's necessary cards v0.2 holds 3 of 4 (v0.1: 2, its two-head induction ending at 0.298), and so does the 9m with metre at 3M parameters; neither shows on the board yet, which takes one ship per class.
+- **One seed each.** The plain 9m (the 9m's control) sails now; then the keel's second seeds.

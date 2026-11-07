@@ -54,33 +54,41 @@ At 22:00 the order changed (`DECISIONS.md`): Endeavour's seed 2 was stopped and 
 
 After the sweep, the speller curriculum (DECISIONS.md, 22:10): *Mixed Lessons* (the 13-book speller shelf shuffled into the pool), *Primer First* (the same books first) and *Lines Written a Hundred Times* (the six rule books read a hundred times first), two seeds each.
 
-From 22:30 the queue is `scripts/queue.sh`, which runs `specs/queue.txt` top to bottom and can be edited while it runs (log `data/runs/queue.out`). After the sweep's seed-1 runs come the data levers (DECISIONS.md): distinct text against total reading, five runs around Endeavour.
+From 22:30 the queue is `scripts/queue.sh` (now `backend/scripts/queue.sh`), which runs `specs/queue.txt` (now `ships/specs/queue.txt`) top to bottom and can be edited while it runs (log `data/runs/queue.out`). After the sweep's seed-1 runs come the data levers (DECISIONS.md): distinct text against total reading, five runs around Endeavour.
 
 ## Running it
 
+The repository has three parts (2026-11-07): `backend/` (the Python package, its tests, scripts and the
+Postgres migrations), `frontend/` (the dashboard) and `ships/` (what the voyages are made of). Runtime state
+stays at the root, outside git: `data/` and `ledger.sqlite`. Every command runs from the repository root.
+
 ```bash
-uv sync
-uv run ruff check .
-uv run pytest
-uv run thorp fetch lists/hole-cards.csv
-uv run thorp fetch lists/hundred-by-reach.csv
-uv run thorp run specs/smoke-10-v2.yaml   # with the trait probes
-uv run thorp run specs/hundred-by-reach-v1.yaml
-pnpm --dir thorp/dash/web install && pnpm --dir thorp/dash/web build   # the dashboard page, once and after UI changes
-uv run thorp dash          # http://localhost:8787
-uv run thorp ledger "select book_id, bpb, ce_nats from evals where run_id=? and step=(select max(step) from evals where run_id=?) order by bpb"
+uv sync --project backend
+uv run --project backend ruff check backend
+uv run --project backend pytest backend/tests
+uv run --project backend alembic -c backend/alembic.ini upgrade head   # the Postgres fitout store
+uv run --project backend thorp fetch lists/hole-cards.csv
+uv run --project backend thorp run ships/specs/fitouts/fu-ogden-v0-1@300k-pre-s1.yaml
+uv run --project backend python -m thorp.viable.s1_operations.prechecks ogden-v0-1   # a fitout's prechecks
+sh backend/scripts/queue.sh                                  # the standing queue: ships/specs/queue.txt
+pnpm --dir frontend install && pnpm --dir frontend build     # the dashboard page, once and after UI changes
+uv run --project backend thorp dash                          # http://localhost:8787
+uv run --project backend thorp ledger "select book_id, bpb, ce_nats from evals where run_id=? and step=(select max(step) from evals where run_id=?) order by bpb"
 ```
 
-The dashboard is an Astro app in `thorp/dash/web` (like Atlas in the monorepo). It builds to `thorp/dash/static` (not committed), which `thorp dash` serves beside its JSON API. While working on the page, `pnpm --dir thorp/dash/web dev` serves it with hot reload on http://localhost:4321 and forwards `/api` to a running `thorp dash`. Its standards are in `thorp/dash/UI.md`.
+A path a spec or a script names (`lists/...`, `specs/...`, `scripts/...`) is found in its part by its first
+folder (`thorp/paths.py`: `resolve` and `ROUTER`), so specs read the same as before the split.
+
+The dashboard is an Astro app in `frontend/`. It builds to `backend/thorp/dash/static` (not committed), which `thorp dash` serves beside its JSON API. While working on the page, `pnpm --dir frontend dev` serves it with hot reload on http://localhost:4321 and forwards `/api` to a running `thorp dash`. Its standards are in `backend/thorp/dash/UI.md`.
 
 `thorp run` on a finished spec prints its ledger row and exits; on a spec with a checkpoint it resumes from the latest one. `thorp eval RUN` re-scores a run's latest checkpoint. Each `?` in `thorp ledger` binds to the latest finished run unless you pass parameters or `--run ID`.
 
 ## Layout
 
-- `specs/`: run specs. `lists/`: the recipe, the hole cards, and `overrides.csv` (title, author → Gutenberg id).
-- `thorp/`: the harness (see `DECISIONS.md` for every choice the brief left open).
-- `thorp/dash/web/`: the dashboard page (Astro): `src/pages/index.astro` the shell, `src/components/` one per tab, `src/scripts/dashboard.js` the panels, `src/lib/` the shared pieces (DataTable, charts, formatters, the book reader), `src/styles/global.css` the tokens.
-- `scripts/`: `make_pool.py` (draw the pool from the catalogue), `cut_pool.py` (cut it to recipes by bytes), `queue_next.sh` and `queue_9m.sh` (the night's runs), `make_9m_specs.py` (the 9m sweep).
-- `lists/traits.csv`: fiction, verse and first-person labels per title, read by the probes evaluator and the page.
-- `data/` (not committed): catalogue, texts, tokenisers, shards, checkpoints, `manifest.sqlite`, run logs.
-- `ledger.sqlite`: every run, metric, eval and artifact.
+- `backend/thorp/`: the harness (see `DECISIONS.md` for every choice the brief left open); `backend/thorp/viable/` the code laid out by VSM system (S1 to S5) with the Postgres fitout store; `backend/migrations/` and `backend/alembic.ini` its Alembic migrations.
+- `backend/scripts/`: the spec writers (`make_*.py`), the pool and shelf cutters, and the queues (`queue.sh`, the standing queue).
+- `backend/tests/`: the test suite.
+- `frontend/`: the dashboard page (Astro): `src/pages/index.astro` the shell, `src/components/` one per tab, `src/scripts/dashboard.js` the panels, `src/lib/` the shared pieces (DataTable, charts, formatters, the book reader), `src/styles/global.css` the tokens.
+- `ships/specs/`: run specs, and `queue.txt` (the standing queue) and `queue-done.txt`. `ships/lists/`: the libraries (the stores, the Ogden corpus), the hole cards, the Forgotten Tomes, and `overrides.csv` (title, author → Gutenberg id). `ships/fitouts/`: the saved fitouts (in git since the split; they were in `data/`). `ships/plans/`, `ships/reports/`.
+- `data/` (not committed): catalogue, texts, tokenisers, shards, checkpoints, `manifest.sqlite`, run logs, `postgres/` (Thorp's own Postgres cluster).
+- `ledger.sqlite` (not committed since 2026-11-07): every run, metric, eval and artifact.

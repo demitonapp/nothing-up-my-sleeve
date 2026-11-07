@@ -1,4 +1,5 @@
 data/
+backend/.venv/
 .venv/
 __pycache__/
 *.pyc
@@ -6,9 +7,11 @@ __pycache__/
 .ruff_cache/
 ledger.sqlite-wal
 ledger.sqlite-shm
-thorp/dash/static/
+backend/thorp/dash/static/
 
 # the live ledger is never tracked: a git command once swapped it under a running voyage (2026-11-07 18:11)
 ledger.sqlite
 # a runtime switch for the queue, not a record
-specs/ogden.hold
+ships/specs/ogden.hold
+frontend/node_modules/
+frontend/.astro/

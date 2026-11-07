@@ -6,7 +6,8 @@ Sixteen cards in four constellations of four (a person holds about four chunks; 
 Stages, as a Pokemon card evolves: a **Basic** is one head in one layer; a **Stage 1** is played only on top of
 a Basic of its constellation held in an earlier layer; a **Face** is traded in: its Stage 1 (and Basics) held
 in order, and its **ability** (what it does: "a machine is what it does", Beer) passing. **Cost** is the
-layers that must stand in order. A card is **uncharted** while Thorp has no reading for it.
+layers that must stand in order. A card is **uncharted** while Thorp has no reading for it (since 22:15 every card has one: the pips evaluator,
+thorp/evaluators/pips.py, reads number-spotter, order-word, premise-marker and the counter).
 
 Each card's `look` is the reading that shows it (a metric and its mark); a Stage 1's `on` names the Basics
 it must sit above; a Face's `ability` is a behavioural reading and its mark. The game (thorp/viable/
@@ -69,13 +70,16 @@ CARDS = (
          (("stars/offset_2/max_score", "stars/offset_3/max_score", "stars/offset_2/shared_score",
            "stars/offset_3/shared_score"), 0.3), "stars/offset_2/shared_layer",
          "attends two or three words back: holds a short phrase", "not yet seen", on=("sink", "delimiter")),
-    Card("counter", "The Counter", "position", "Face", 3, None, None,
-         "knows how far into a sentence it is", "uncharted", on=("words_back",)),
+    Card("counter", "The Counter", "position", "Face", 3, None, "counter/best_layer",
+         "knows how far into a sentence it is: its word position read linearly from the residual stream (R² past the mark)",
+         "not yet seen", on=("words_back",), ability=("counter/probe_r2", 0.5)),
     # ♦ Comparing
-    Card("number_spotter", "Number-spotter", "comparing", "Basic", 1, None, None,
-         "attends to quantities and years: finds what is being compared", "uncharted"),
-    Card("order_word", "Order-word", "comparing", "Basic", 1, None, None,
-         "attends to more, less, before, after: finds the direction of a comparison", "uncharted"),
+    Card("number_spotter", "Number-spotter", "comparing", "Basic", 1,
+         (("stars/number_spotter/max_score",), 3.0), "stars/number_spotter/best_layer",
+         "attends to numerals and number words: finds what is being compared", "not yet seen"),
+    Card("order_word", "Order-word", "comparing", "Basic", 1,
+         (("stars/order_word/max_score",), 3.0), "stars/order_word/best_layer",
+         "attends to more, less, before, after, than: finds the direction of a comparison", "not yet seen"),
     Card("comparator", "The Comparator", "comparing", "Stage 1", 2,
          (("stars/comparator/max_score", "stars/comparator/shared_score"), 0.3), "stars/comparator/shared_layer",
          "attends to the year to beat rather than a decoy: picks the right side",
@@ -87,8 +91,9 @@ CARDS = (
     Card("rare_word", "The Rare Word", "carrying", "Basic", 1,
          (("stars/rare_word/max_score",), 0.3), "stars/rare_word/best_layer",
          "attends to salient, uncommon words: picks out the fact worth carrying", "none known"),
-    Card("premise_marker", "Premise-marker", "carrying", "Basic", 1, None, None,
-         "attends to if, when, so, because: finds where a premise starts and ends", "uncharted"),
+    Card("premise_marker", "Premise-marker", "carrying", "Basic", 1,
+         (("stars/premise_marker/max_score",), 3.0), "stars/premise_marker/best_layer",
+         "attends to if, when, because, so, therefore: finds where a premise starts and ends", "not yet seen"),
     Card("bridge", "The Bridge", "carrying", "Stage 1", 2,
          (("stars/bridge/max_score",), 0.5), "stars/bridge/best_layer",
          "links two premises through what they share (the middle term at the conclusion)", "not yet seen",

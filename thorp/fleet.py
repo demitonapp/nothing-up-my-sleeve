@@ -2156,7 +2156,7 @@ EXPEDITIONS: dict[str, Expedition] = {
 }
 
 
-# The names before 2026-11-07 16:30 (Justin: "the voyages should become expeditions and a ship's runs
+# The names before 2026-11-07 16:20 (Justin: "the voyages should become expeditions and a ship's runs
 # should become voyages"), kept as aliases until every reader has moved.
 Voyage = Expedition
 VOYAGES = EXPEDITIONS

@@ -223,7 +223,7 @@ def main() -> None:
 
 
 def overview() -> dict:
-    """The Expeditions page's head (Justin, 16:35: "which expeditions are currently running and where
+    """The Expeditions page's head (Justin, 16:25: "which expeditions are currently running and where
     the queue is at"): the voyage at sea now, each expedition's voyages finished, failed and still
     queued with the place of its next one in the queue, and the queue's length and rough time left
     (each queued voyage at its class's mean wall time over finished voyages)."""

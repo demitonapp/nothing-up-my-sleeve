@@ -297,7 +297,7 @@ def gate(spec: dict, known_run: bool = False) -> list[str]:
     return notes
 
 
-# S2's helm: one GPU, so one voyage at sea at a time (Justin, 16:50: "surely only one can be running at
+# S2's helm: one GPU, so one voyage at sea at a time (Justin, 16:35: "surely only one can be running at
 # a time ... this should be coordinated by S2"). Every voyage (train.run) and every GPU-heavy job takes the
 # helm; a second waits in port until the first comes home. Expeditions can be under way together (their
 # voyages queued); only one voyage is at sea.
@@ -407,7 +407,7 @@ def expedition_states() -> dict[str, str]:
 
 
 def _sailing_without_helm(name: str) -> bool:
-    """A voyage launched before the helm existed (16:55) is at sea without holding it: its process is
+    """A voyage launched before the helm existed (16:35) is at sea without holding it: its process is
     alive. Not lost, and S2 lets it come home."""
     import subprocess
 

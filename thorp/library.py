@@ -415,7 +415,7 @@ def carried(spec: dict) -> list[dict]:
 
 def aboard(run_id: str) -> dict:
     """The library aboard a voyage: its libraries as recorded when it sailed (the 'library' artifact),
-    or, for voyages that sailed before 2026-11-07 16:40, worked out from its spec (marked so: the lists
+    or, for voyages that sailed before 2026-11-07 16:30, worked out from its spec (marked so: the lists
     may have changed since), with the books it read and their tokens (the 'recipe' artifact)."""
     from thorp.ledger import Ledger
 

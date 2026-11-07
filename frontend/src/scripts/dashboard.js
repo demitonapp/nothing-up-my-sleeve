@@ -1178,6 +1178,33 @@ async function classShapes(r) {
       const m = v.mass[t] || 0, h = v.truth[t] || 0, gap = m - h;
       return `<tr><td><b>${esc(t)}</b> <span class="s">${esc(d.about[t] || '')}</span></td><td>${pct(m)}</td><td>${pct(h)}</td><td class="s">${Math.abs(gap) < 0.02 ? 'about right' : gap > 0 ? 'over-expects' : 'under-expects'}</td></tr>`; }).join('')}</tbody></table></div>`;
 }
+// ---- the deck at a class (the Overview, under the four cards; /api/class_deck): all 16 cards with their faces and
+// this class's record of each: played in how many voyages (Ogden apart), first at how many tokens, in which layer,
+// and the best reading against its mark
+let classDeckKey = null;
+async function classDeck(r) {
+  const el = document.getElementById('deckclass'); if (!el) return;
+  let d; try { d = await get(`/api/class_deck?preset=${encodeURIComponent(r.preset)}`); } catch (e) { el.innerHTML = `<div class="${emptyCls()}">the deck could not be read (a dashboard server started before it existed has to be restarted)</div>`; return; }
+  const key = JSON.stringify(d); if (key === classDeckKey && el.dataset.preset === r.preset) return; classDeckKey = key; el.dataset.preset = r.preset;
+  const tok = t => t == null ? '' : t >= 1e6 ? `${Math.round(t / 1e6)}M` : `${Math.round(t / 1e3)}k`;
+  const byKey = Object.fromEntries(d.cards.map(c => [c.key, c]));
+  const tile = c => {
+    const pct = c.voyages_read ? Math.round(100 * c.played / c.voyages_read) : 0;
+    const barTo = c.best != null && c.mark ? Math.min(100, Math.round(100 * c.best / (c.mark * 2))) : 0;
+    return `<div class="dcard r-${esc(c.rarity)}">
+      <div class="dart"><img src="art/${esc(c.key)}.png" alt="" loading="lazy" onerror="this.style.display='none'"><span class="dstage">${esc(c.stage)}</span><span class="dcost" title="layers that must stand in order">${c.cost}</span><span class="drarity">${esc(c.rarity)}</span></div>
+      <div class="dname">${esc(c.name)}</div>
+      ${!c.charted ? '<div class="s">uncharted: Thorp has no reading for it yet</div>' : `
+      <div class="dstat"><b>${c.played}</b> of ${c.voyages_read} voyages played it${c.voyages_read ? ` (${pct}%)` : ''}</div>
+      <div class="s">Ogden: ${c.ogden_played} of ${c.ogden_read}</div>
+      ${c.first_tokens_median != null ? `<div class="s">first played at ${tok(c.first_tokens_median)} tokens (median)${c.usual_layer != null ? `, usually layer ${c.usual_layer}` : ''}</div>` : ''}
+      ${c.best != null ? `<div class="dbar" title="its best reading against its mark (the line)"><i style="width:${barTo}%"></i><b style="left:50%"></b></div><div class="s">best ${c.best.toFixed(2)} (mark ${c.mark})${c.best_voyage ? ` · <span class="mono">${esc(c.best_voyage.replace('fu-ogden-v0-1', 'Ogden'))}</span>` : ''}</div>` : (c.mark != null ? `<div class="s">read by its ability (mark ${c.mark})</div>` : '')}`}
+      ${c.on.length ? `<div class="s">evolves from ${c.on.map(o => esc(byKey[o] ? byKey[o].name : o)).join(' + ')}</div>` : ''}
+    </div>`;
+  };
+  el.innerHTML = `<div class="s dsum">${d.voyages} voyage${d.voyages === 1 ? '' : 's'} of the ${esc(d.class)} class on the ledger, ${d.read} with card readings${d.read ? '' : ': the deck fills in as its first voyage reads'}</div>` +
+    d.constellations.map(k => `<div class="drow"><div class="dsuit"><span class="suit">${esc(k.suit)}</span><b>${esc(k.name)}</b><span class="s">${esc(k.about)}</span></div>${d.cards.filter(c => c.constellation === k.key).map(tile).join('')}</div>`).join('');
+}
 const RECENT = 30;
 // ---- RunGrid: every run at one size as a square, like a GitHub contribution graph. Bands of 7 rows
 // x 53 columns (a "year" of 371 runs) stack downwards, so a new run only ever adds a square at the
@@ -1255,6 +1282,7 @@ function renderRung() {
 
   // ---- Overview: every run, and the Forgotten Tomes score run by run
   classCards(r);
+  classDeck(r);
   runGrid(r, allRuns);
   ftProgress(allRuns);
 

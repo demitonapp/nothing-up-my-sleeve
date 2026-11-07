@@ -2928,6 +2928,74 @@ def api_ask_questions(preset: str) -> dict:
     }  # fmt: skip
 
 
+_class_deck_cache: dict[str, tuple[float, dict]] = {}
+
+
+def api_class_deck(preset: str) -> dict:
+    """The whole deck at a class (Justin, 22:05: "show all the cards ... and stats about the cards based on the class
+    model"): for each of the 16 cards, across the class's voyages (every fitout) and its Ogden ones apart: how many
+    played it (the deck's rules: a Stage 1 above its Basic, a Face traded in), when (the median tokens read at its
+    first play), in which layer, and the best its reading reached against its mark. Cached a minute."""
+    import statistics
+    import time
+
+    from thorp.viable.s4_intelligence import wager
+    from thorp.viable.s5_policy import deck
+
+    hit = _class_deck_cache.get(preset)
+    if hit and time.time() - hit[0] < 60:
+        return hit[1]
+    voyages = _class_voyages(preset, limit=200)
+    con = _con()
+    try:
+        names = sorted({m for c in deck.CARDS if c.look for m in c.look[0]})
+        peaks: dict[str, dict[str, float]] = {}
+        for v in voyages:
+            rows = con.execute(
+                f"select name, max(value) from metrics where run_id=? and name in ({','.join('?' * len(names))}) group by name",
+                [v["run_id"], *names],
+            ).fetchall()
+            peaks[v["run_id"]] = {n: x for n, x in rows if x is not None}
+    finally:
+        con.close()
+    falls = {v["run_id"]: wager.falls(v["run_id"], v["bt"] or 32768) for v in voyages}
+    read = [v for v in voyages if peaks[v["run_id"]]]
+    out = []
+    for c in deck.CARDS:
+        played = [(v, falls[v["run_id"]][c.key]) for v in read if falls[v["run_id"]][c.key]["played"]]
+        ogden_read = [v for v in read if v["name"].startswith("fu-ogden")]
+        ogden_played = [v for v, _ in played if v["name"].startswith("fu-ogden")]
+        best, best_v = None, None
+        if c.look:
+            for v in read:
+                vals = [peaks[v["run_id"]].get(m) for m in c.look[0]]
+                vals = [x for x in vals if x is not None]
+                if vals and (best is None or max(vals) > best):
+                    best, best_v = max(vals), v["name"]
+        layers = [f["layer"] for _, f in played if f["layer"] is not None]
+        toks = [f["tokens"] for _, f in played if f["tokens"] is not None]
+        share = len(played) / len(read) if read else 0
+        rarity = ("uncharted" if not deck.charted(c) else "unread" if not read else "unseen" if not played
+                  else "legendary" if len(played) == 1 else "rare" if share < 0.05 else "uncommon" if share < 0.25 else "common")  # fmt: skip
+        out.append({
+            "key": c.key, "name": c.name, "constellation": c.constellation, "stage": c.stage, "cost": c.cost,
+            "ability": c.ability_text, "on": list(c.on), "charted": deck.charted(c), "rarity": rarity,
+            "mark": c.look[1] if c.look else (c.ability[1] if c.ability else None),
+            "voyages_read": len(read), "played": len(played), "ogden_read": len(ogden_read), "ogden_played": len(ogden_played),
+            "first_tokens_median": statistics.median(toks) if toks else None,
+            "usual_layer": max(set(layers), key=layers.count) if layers else None,
+            "best": best, "best_voyage": best_v,
+            "fragility": c.fragility,
+        })  # fmt: skip
+    res = {
+        "preset": preset, "class": _slug(preset), "voyages": len(voyages), "read": len(read),
+        "constellations": [{"key": k, "suit": s, "name": n, "about": a} for k, s, n, a in deck.CONSTELLATIONS],
+        "cards": out,
+    }
+    _class_deck_cache[preset] = (time.time(), res)
+    return res
+
+
 def api_wager(preset: str) -> dict:
     """The Bet tab (the Navigator's Wager, thorp/viable/s4_intelligence/wager.py): the 16-card deck, the levers,
     and every round on this class with both voyages' falls, the House's calls, the Navigator's bets, the
@@ -3184,6 +3252,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/class_cards": lambda: api_class_cards(q["preset"]),
                 "/api/class_best": lambda: api_class_best(q["preset"]),
                 "/api/wager": lambda: api_wager(q["preset"]),
+                "/api/class_deck": lambda: api_class_deck(q["preset"]),
                 "/api/ask_questions": lambda: api_ask_questions(q["preset"]),
                 "/api/class_subjects": lambda: api_class_subjects(q["preset"]),
                 "/api/class_shapes": lambda: api_class_shapes(q["preset"]),

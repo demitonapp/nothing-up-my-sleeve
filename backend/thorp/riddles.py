@@ -21,6 +21,7 @@ draws what an unbroken one would.
 from __future__ import annotations
 
 import random
+import re
 
 import numpy as np
 
@@ -120,3 +121,71 @@ def draw(pool: dict, step: int, k: int) -> dict:
     n = len(pool["q"])
     idx = np.random.default_rng(step).choice(n, size=min(k, n), replace=False)
     return {key: v[idx] for key, v in pool.items()}
+
+
+# ---- the Bridge in all four relations (2026-11-08 09:45, after leg 0 of The Smallest Bridge: the order-only items were
+# solved by step ~1,000, and the Bridge on the logic deck, whose padded rows are a quarter each order, cause,
+# membership and proportion, rose to 1.37 and then fell to 0.12: the pull had narrowed to order)
+
+_FRAME = {
+    "order": re.compile(r"^(.*? (?:is|are))\b"),
+    "membership": re.compile(r"^(.*? (?:has|have))\b"),
+    "ratio": re.compile(r"^(.*?) as much\b"),
+}
+
+
+def _frame(sk, sentence: str) -> str | None:
+    """The conclusion's opening, up to where its answer begins (as the deck's frames stop)."""
+    rel = sk.conclusion.rel
+    if rel == "cause":
+        z = sk.conclusion.then.thing
+        i = max(sentence.rfind(" " + z + " "), sentence.rfind(" " + z + "s "), sentence.rfind(" " + z + "es "))
+        return None if i < 0 else sentence[: sentence.index(" ", i + 1)]
+    pat = _FRAME.get("membership" if rel == "has" else rel)
+    m = pat.match(sentence) if pat else None
+    return m.group(1) if m else None
+
+
+def bridge_items_all(tok, n: int, seed: int = 1) -> dict:
+    """n padded items in the four relations, from the logic tutor's skeletons (its frames and words, none the
+    deck's): the chain whose middle term is the Bridge, an unrelated chain of the same relation whose middle term is
+    the distractor, its sentences put among the first's, then the conclusion's opening."""
+    from thorp import logic_tutor as lt
+
+    rng = random.Random(f"riddle-bridge-all:{seed}")
+    sks = lt.skeletons(2 * n + 400, seed=100 + seed)
+    by: dict[str, list] = {}
+    for sk in sks:
+        by.setdefault(sk.relation, []).append(sk)
+    toks, qs, bs, ds = [], [], [], []
+    rels = sorted(by)
+    i = 0
+    while len(toks) < n and i < 2 * n + 400:
+        rel = rels[i % len(rels)]
+        i += 1
+        pool = by[rel]
+        if len(pool) < 2:
+            continue
+        sk, pd = pool.pop(), pool.pop()
+        sents = [lt._cap(lt.say(rng, g)) for g in lt._grouped(sk.facts)]
+        pad = [lt._cap(lt.say(rng, g)) for g in lt._grouped(pd.facts)]
+        for p in pad:
+            sents.insert(rng.randint(0, len(sents)), p)
+        frame = _frame(sk, lt.say(rng, [sk.conclusion]))
+        if frame is None:
+            continue
+        prompt = " ".join(sents) + f" {rng.choice(lt.CONNECTIVES)} {frame}"
+        b0, d0 = tok.encode(" " + sk.words[1])[0], tok.encode(" " + pd.words[1])[0]
+        if b0 == d0:
+            continue
+        ids = [tok.eos_id] + tok.encode(prompt)
+        toks.append(ids)
+        qs.append(len(ids) - 1)
+        bs.append(b0)
+        ds.append(d0)
+    if not toks:
+        raise ValueError("no bridge item")
+    return {
+        "tokens": _pad(toks, tok.eos_id), "q": np.array(qs, dtype=np.int32),
+        "b": np.array(bs, dtype=np.int32), "d": np.array(ds, dtype=np.int32),
+    }  # fmt: skip

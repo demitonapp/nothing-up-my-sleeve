@@ -1,0 +1,128 @@
+# ships/specs/fitouts: The Smallest Bridge, leg 1b (2026-11-08 09:50): leg 1 with the Bridge composed in all four relations.
+name: fu-ogden-v0-2~staged-all@9m-pre-s1
+ship: 'Fitout: Ogden v0.2 @ 9m ~ staged-all (The Smallest Bridge, leg 1b), the Bridge composed in all four relations'
+experiment: 'Fitout ogden-v0-2: v0.1''s rule over the whole library, and the logic tutor''s passages at 7.5%'
+question: 'The Smallest Bridge, leg 1b (amended 09:50, before leg 1 sails, on leg 0''s evidence): leg 1 with only
+  the Bridge''s composed items changed, from order alone to all four relations of the logic deck''s padded rows
+  (order, cause, membership, proportion), from the logic tutor''s skeletons. Does the Bridge stay played to the
+  end, where leg 0''s order-only Bridge rose to 1.37 and fell to 0.12?'
+fitout:
+  key: ogden-v0-2
+  variation: staged-all
+data:
+  recipe: lists/ogden-v0.2.csv
+  passes: 4
+  order: shuffled
+  refuse:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+  - lists/hole-cards-unseen.csv
+  clean: unwrap-v2
+  opt_in: 'Ogden v0.2 reads books beyond the two stores, approved by Justin (2026-11-08 08:10): the library''s books
+    at v0.1''s Ogden-ness bar, the Bible struck, and the logic tutor''s template passages'
+tokeniser:
+  kind: spm-bpe
+  vocab: 2048
+  byte_fallback: true
+  train_on: lists/ogden-v0.1.csv
+model:
+  family: gpt
+  preset: 9m
+  context: 1024
+  positions: rope
+optim:
+  name: adamw
+  lr: 0.001
+  betas:
+  - 0.9
+  - 0.95
+  weight_decay: 0.1
+  warmup_steps: 200
+  schedule: cosine
+  min_lr_ratio: 0.1
+  batch_tokens: 32768
+  grad_clip: 1.0
+  precision: bf16
+  scaffold:
+    weight: 1.0
+    hold: 0.1
+    fade: 0.6
+    floor: 0.2
+    sample:
+      windows: 8
+      length: 512
+    heads:
+    - layer: 0
+      head: 0
+      card: sink
+    - layer: 0
+      head: 1
+      card: delimiter
+    - layer: 0
+      head: 2
+      card: number_spotter
+    - layer: 0
+      head: 3
+      card: order_word
+    - layer: 1
+      head: 0
+      card: previous_word
+    - layer: 1
+      head: 1
+      card: duplicate_word
+    - layer: 1
+      head: 2
+      card: rare_word
+    - layer: 1
+      head: 3
+      card: premise_marker
+    - layer: 2
+      head: 0
+      card: words_back
+      from: 0.05
+    - layer: 3
+      head: 0
+      card: induction
+      from: 0.05
+    - layer: 3
+      head: 1
+      card: induction
+      from: 0.05
+    riddles:
+      comparator:
+        layer: 3
+        head: 2
+        items: 16
+        pool: 2048
+        from: 0.05
+      bridge:
+        layer: 4
+        items: 16
+        pool: 2048
+        from: 0.05
+        kinds: all
+eval:
+  sets:
+  - lists/hole-cards-unseen.csv
+  every_steps: 640
+  evaluators:
+  - ce_bpb
+  - discovery
+  - logic
+  - stars
+  - nevermore
+  - cards
+  - shapes
+  - pips
+  light:
+    every_steps: 64
+    evaluators:
+    - stars
+    - nevermore
+    - cards
+    - logic
+    - shapes
+    - pips
+checkpoint:
+  every_steps: 640
+seed: 1

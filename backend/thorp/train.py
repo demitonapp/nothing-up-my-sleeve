@@ -921,7 +921,11 @@ def train(
             from thorp import riddles
 
             makers = {"comparator": riddles.comparator_items, "bridge": riddles.bridge_items}
-            pools = {k: makers[k](tok, int(r.get("pool", 2048)), seed=int(r.get("seed", 1))) for k, r in riddle_cfg.items()}
+
+            def maker(k, r):  # the Bridge in all four relations, by `kinds: all` (2026-11-08, after leg 0)
+                return riddles.bridge_items_all if k == "bridge" and r.get("kinds") == "all" else makers[k]
+
+            pools = {k: maker(k, r)(tok, int(r.get("pool", 2048)), seed=int(r.get("seed", 1))) for k, r in riddle_cfg.items()}
             for k, pool in pools.items():
                 if pool["tokens"].shape[1] > m["context"]:
                     raise ValueError(f"the {k} riddle's items run to {pool['tokens'].shape[1]} pieces, past the context ({m['context']})")

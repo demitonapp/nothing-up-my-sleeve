@@ -203,3 +203,16 @@ def test_a_staged_voyage_records_its_starts(library, spec, tmp_thorp):
     got = {r["step"]: r["value"] for r in rec.query("select step, value from metrics where run_id=? and name='scaffold/started'", [rid])}
     total = rec.query("select value from metrics where run_id=? and name='plan/total_steps'", [rid])[0]["value"]
     assert got[1] == 1.0 and got[max(got)] == (2.0 if max(got) - 1 >= 0.3 * total else 1.0)
+
+
+def test_the_bridge_in_all_four_relations(monkeypatch):
+    from thorp import logic_tutor, riddles
+    from thorp import tokeniser as tm
+
+    tok = tm.load(logic_tutor.OGDEN_TOKENISER) if (tm.paths.data_dir() / "tokenisers").exists() else None
+    if tok is None:
+        pytest.skip("the Ogden tokeniser is not built here")
+    b = riddles.bridge_items_all(tok, 40)
+    assert len(b["q"]) == 40 and (b["b"] != b["d"]).all()
+    texts = [tok.decode([int(v) for v in row[1 : q + 1]]) for row, q in zip(b["tokens"], b["q"], strict=True)]
+    assert any(" has" in t[-6:] for t in texts) and any(" are" in t[-6:] or " is" in t[-6:] for t in texts)

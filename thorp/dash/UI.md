@@ -161,7 +161,16 @@ holds the ways in, always:
   above the noise"; claimed, probable or not by the pre-registered rule; the chart of chaining
   lift against parameters with both fits and their bands, the competitors as red diamonds and
   the reference ladder in grey; the backtest) and **every ship** with chaining readings, filterable
-  by class. The climb (internal: `leaderboard.internal`, `/api/leaderboard/internal`) lives on the
+  by class. Each outside model's name opens **its page** (`#/leaderboard/competitor/<model>`,
+  `/api/competitor`, from `data/compare/chain-grades.json`): who made it, its size, the checkpoint,
+  and what Thorp must match it at (a tenth its size, with each fit's forecast there); its chaining
+  result (the chaining lift, the tests performed, each test's lift and share, the logic deck's gain
+  and share, the deck asked each way, one to three hops, one premise, swapped, padded, and the gain
+  by kind of relation); its **cards** as playing cards (mover and comparator by one head and shared,
+  the bridge with its curve over layers; lit or not; "unreadable" where its attention can't be read
+  through MLX-LM; previous-word and Nevermore "not read" for outside models yet; "being read" until
+  the cards land); and every rung of the four chains, keel to the 50m, Thorp's internal measures,
+  shown because the page describes the competitor. The climb (internal: `leaderboard.internal`, `/api/leaderboard/internal`) lives on the
   two-fact voyage's page: each run's climb over training (`/api/climb`), coloured by class, the
   reference ladder as dotted levels, with a switch to the chaining lift or the chaining gain
   (logic deck) over training.

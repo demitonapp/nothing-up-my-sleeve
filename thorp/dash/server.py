@@ -1253,6 +1253,73 @@ def api_bridge() -> dict:
     return {"threshold": getattr(st, "threshold", None), "runs": out}
 
 
+def api_competitor(model: str) -> dict:
+    """One outside model (a 2-4B competitor or a reference ladder model), as read on Thorp's tests
+    (data/compare/chain-grades.json): the four chaining tests, the logic deck (variants, hops,
+    relations), its cards (thorp's evaluator "cards": mover, comparator, bridge; previous-word and
+    Nevermore not read for outside models yet), every rung of the four chains, and what Thorp must
+    match it at (a tenth its size, with the forecast there from smoking_qwen)."""
+    from thorp import fleet
+
+    p = Path(__file__).resolve().parents[2] / "data" / "compare" / "chain-grades.json"
+    try:
+        models = json.loads(p.read_text()).get("models", {})
+    except (OSError, ValueError):
+        models = {}
+    comp = getattr(fleet, "COMPETITORS", {})
+    if model not in models and model not in comp:
+        raise LookupError(f"no model {model}")
+    v = models.get(model, {})
+    label, params = comp.get(model, (None, None))
+    try:
+        from thorp import smoking_qwen
+
+        params = params or getattr(smoking_qwen, "REFERENCE_PARAMS", {}).get(model)
+    except ImportError:
+        pass
+    names = {k: t.name for k, t in fleet.TRICKS.items()}
+    rungs = [r.title for r in getattr(fleet, "RUNGS", ())]
+    chains = []
+    for c in fleet.chains():
+        chains.append(
+            {
+                "key": c[-1],
+                "name": names.get(c[-1], c[-1]),
+                "rungs": [
+                    {
+                        "key": k,
+                        "name": names.get(k, k),
+                        "rung": rungs[i] if i < len(rungs) else None,
+                        **{kk: x for kk, x in v.get(k, {}).items() if kk != "pairs"},
+                    }
+                    for i, k in enumerate(c)
+                ],
+            }
+        )
+    logic = dict(v.get("logic_test") or {})
+    items = logic.pop("items", None)
+    if items is not None:
+        logic["items_n"] = len(items)
+    tenth = None
+    try:
+        sq = api_smoking_qwen()
+        tenth = next((c for c in sq.get("range", []) if c.get("model") == model), None)
+    except Exception:  # noqa: BLE001
+        pass
+    return {
+        "model": model,
+        "label": label or _short_model(model),
+        "params": params,
+        "competitor": model in comp,
+        "ladder": model in getattr(fleet, "REFERENCE_LADDER", ()),
+        "scored": bool(v),
+        "chains": chains,
+        "logic": logic or None,
+        "cards": v.get("cards"),
+        "tenth": tenth,
+    }
+
+
 def api_climb(runs: str) -> dict:
     """Each run's climb over training (thorp.leaderboard.climb, read at every step that has
     discovery readings, carrying each trick's latest lift and share forward)."""
@@ -1762,6 +1829,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/shelves": api_shelves,
                 "/api/shelf_books": lambda: api_shelf_books(q["path"]),
                 "/api/leaderboard": api_leaderboard,
+                "/api/competitor": lambda: api_competitor(q["model"]),
                 "/api/bridge": api_bridge,
                 "/api/leaderboard/internal": api_leaderboard_internal,
                 "/api/smoking_qwen": api_smoking_qwen,

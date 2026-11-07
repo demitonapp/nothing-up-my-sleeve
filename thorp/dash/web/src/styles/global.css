@@ -529,3 +529,15 @@ main a.ccell { color: var(--text); text-decoration: none; display: block; }
 #discoveries .tfhead { margin: 8px 0 0; font-size: var(--fs-md); letter-spacing: .08em; text-transform: uppercase; }
 #method .mcards .foot { margin-top: 8px; font-size: var(--fs-sm); }
 #method .mcards .mlit { color: var(--good); }
+
+/* one competitor */
+#competitor .cpsum { display: flex; flex-wrap: wrap; gap: 10px 30px; margin-bottom: 10px; }
+#competitor .good { color: var(--good); }
+#competitor .cplogic { gap: 18px; flex-wrap: wrap; margin-top: 12px; }
+#competitor .cplogic > div { flex: 1; min-width: 280px; }
+#competitor .k { font-size: var(--fs-sm); color: var(--muted); margin-bottom: 4px; }
+#competitor .cpcard.unread, #competitor .cpcard.unreadable { opacity: 0.5; border-style: dashed; }
+#competitor .cpcard.lit { border-color: var(--good); }
+#competitor .cpcard .foot { margin-top: 8px; font-size: var(--fs-sm); }
+#competitor .cpbridge { height: 120px; margin-top: 6px; }
+#cprungs td { vertical-align: top; font-size: var(--fs-sm); min-width: 120px; }

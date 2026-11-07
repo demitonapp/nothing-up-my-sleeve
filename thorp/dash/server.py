@@ -1341,6 +1341,101 @@ def api_knockout(model: str = "") -> dict:
     return {"results": out}
 
 
+# ---- the fitout builder (#/shelves; thorp/fitouts.py): mix shelves into a fitout, save it, build it for a class
+
+
+def api_fitout_builder() -> dict:
+    """What the builder needs: the hand-curated fitouts (fleet.FITOUTS, in the saved form) and the
+    saved ones (data/fitouts/), the selections and the classes a fitout can be built for (the first
+    four rungs of the ladder)."""
+    from thorp import fitouts, fleet
+    from thorp.models.registry import LADDER
+
+    curated = []
+    for k in getattr(fleet, "FITOUTS", {}):
+        try:
+            curated.append(fitouts.from_curated(k))
+        except Exception:  # noqa: BLE001
+            continue
+    return {
+        "curated": curated,
+        "saved": fitouts.saved(),
+        "select": list(fitouts.SELECT),
+        "classes": [{"preset": r["preset"], "name": r["name"]} for r in LADDER[:4]],
+        "bytes_per_token": fitouts.BYTES_PER_TOKEN,
+    }
+
+
+def api_shelf_trigrams(path: str) -> dict:
+    """A shelf's books by trigram repetition (thorp.trigrams.book_stats over the shelf's book ids, as
+    the warm shelves payload carries them): each book's repeat rate and variety, and the frontier."""
+    from thorp import shelves, trigrams
+
+    value, busy, _ = _warm("shelves", shelves.payload)
+    if value is None:
+        return {"computing": True}
+    sh = next((x for x in value if x["path"] == path), None)
+    if sh is None:
+        raise LookupError(f"no shelf {path}")
+    ids = sh.get("book_ids") or []
+    stats = trigrams.book_stats(ids) if ids else {}
+    tri = sh.get("trigrams") or {}
+    return {
+        "path": path,
+        "books": [{"id": b, **v} for b, v in stats.items() if v],
+        "frontier": tri.get("frontier") or [],
+        "measured": bool(tri.get("measured")),
+    }
+
+
+def api_fitout_save(body: dict) -> dict:
+    from thorp import fitouts
+
+    key = fitouts.save(body.get("fitout") or body)
+    return {"key": key, "fitout": fitouts.load(key)}
+
+
+def api_fitout_queue(body: dict) -> dict:
+    """Builds a saved (or hand-curated) fitout for a class and puts its runs in the queue."""
+    from thorp import fitouts
+
+    key, preset = body.get("key"), body.get("preset")
+    if not key or not preset:
+        raise ValueError("a fitout key and a class are needed to queue")
+    seeds = tuple(int(x) for x in (body.get("seeds") or [1, 2]))
+    where = body.get("where") if body.get("where") in ("top", "end") else "end"
+    return {"lines": fitouts.queue(key, preset, seeds=seeds, where=where)}
+
+
+def api_series(runs: str, metrics: str) -> dict:
+    """Named metrics over steps for named runs: {run: {metric: [steps, values]}} (the last reading at a
+    step wins, so a re-scored step shows its latest)."""
+    out: dict = {}
+    con = _con()
+    try:
+        for run in [x for x in runs.split(",") if x][:40]:
+            row = con.execute(
+                "select run_id from runs where name=? or run_id=? order by started desc limit 1",
+                [run, run],
+            ).fetchone()
+            if not row:
+                continue
+            out[run] = {}
+            for m in [x for x in metrics.split(",") if x][:12]:
+                by_step: dict[int, float] = {}
+                for step, value in con.execute(
+                    "select step, value from metrics where run_id=? and name=? order by step, rowid",
+                    [row[0], m],
+                ):
+                    by_step[step] = value
+                if by_step:
+                    steps = sorted(by_step)
+                    out[run][m] = [steps, [by_step[k] for k in steps]]
+    finally:
+        con.close()
+    return out
+
+
 def api_leaderboard() -> dict:
     """The best of each class on the climb to chaining two facts (thorp.leaderboard.payload)."""
     from thorp import leaderboard
@@ -2102,14 +2197,21 @@ class Handler(BaseHTTPRequestHandler):
         self._send(code, json.dumps(_finite(obj), default=str).encode(), "application/json")
 
     def do_POST(self):  # noqa: N802
-        """Only the table writes: POST /api/table/reply {run, question, history, temperature, ...}."""
+        """The writes: the table (POST /api/table/reply {run, question, history, ...}) and the fitout
+        builder (POST /api/fitouts/save {fitout}, POST /api/fitouts/queue {key, preset, seeds, where},
+        the latter changing what the Mac trains next, so the page asks before it sends)."""
         u = urlparse(self.path)
-        if u.path != "/api/table/reply":
+        posts = {
+            "/api/table/reply": api_table_reply,
+            "/api/fitouts/save": api_fitout_save,
+            "/api/fitouts/queue": api_fitout_queue,
+        }
+        if u.path not in posts:
             return self._send(404, b"not found", "text/plain")
         try:
             n = int(self.headers.get("Content-Length") or 0)
             body = json.loads(self.rfile.read(min(n, 1_000_000)) or b"{}")
-            return self._json(200, api_table_reply(body))
+            return self._json(200, posts[u.path](body))
         except TableNotBuilt as e:
             return self._json(503, {"error": str(e)})
         except (
@@ -2167,6 +2269,9 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/shelves": api_shelves,
                 "/api/shelf_books": lambda: api_shelf_books(q["path"]),
                 "/api/leaderboard": api_leaderboard,
+                "/api/series": lambda: api_series(q.get("runs", ""), q.get("metrics", "")),
+                "/api/fitout_builder": api_fitout_builder,
+                "/api/shelf_trigrams": lambda: api_shelf_trigrams(q["path"]),
                 "/api/knockout": lambda: api_knockout(q.get("model", "")),
                 "/api/class_score": lambda: api_class_score(q["preset"]),
                 "/api/fitouts": lambda: api_fitouts(q.get("preset", "")),

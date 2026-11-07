@@ -17,6 +17,15 @@
   <section class="panel" id="voyagelearned"><h2>What it found</h2><p id="voyagelearnedtext"></p>
     <div id="voyagenextwrap" hidden><h2 class="mt">Suggested next steps</h2><ol id="voyagenext" class="nextsteps"></ol></div></section>
   <!-- this voyage's own panels: data-voyage names the voyage they belong to -->
+  <section class="panel" data-voyage="induction" hidden>
+    <h2>The Nevermore over training <span class="note">the trigram engine (frontier books, green) against its random twin (the same shelves and amounts, books chosen at random, grey), two seeds each (seed 1 solid, seed 2 dashed): the Nevermore's natural score at every reading, the mark 0.3 dotted, and the step each run first lights it. Success: a 300k lights it on two seeds; repetition did it if the engine lights it and its twin does not (DECISIONS.md, "Discovering the induction head, pre-registered")</span></h2>
+    <div class="indverdict" id="indverdict"></div>
+    <div class="chart tall" id="indnevermore"></div>
+    <div class="row">
+      <div><div class="k">Previous-word <span class="s">the head the Nevermore rests on; the mark 0.5</span></div><div class="chart" id="indprev"></div></div>
+      <div><div class="k">The copy gain <span class="s">the loss drop from a passage's first copy to its second, nats per token; copying performed at 0.5</span></div><div class="chart" id="indcopy"></div></div>
+    </div>
+  </section>
   <section class="panel" data-voyage="knockout" hidden>
     <h2>The knockout <span class="note">does silencing a card's heads break chaining in a model that chains? Each card's 8 strongest heads silenced, beside three random draws of 8 heads; a bar per card for the gain lost (cause; the comparator, order), the random draws in grey on the same measure, and each card's rule dotted over it (0.1, and twice its largest random drop), and each card's verdict, necessary or not shown. Outside models only (DECISIONS.md, "The knockout, pre-registered")</span></h2>
     <div id="knockouts"></div>

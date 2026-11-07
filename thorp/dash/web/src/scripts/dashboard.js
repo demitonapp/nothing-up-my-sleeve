@@ -1221,6 +1221,7 @@ function renderVoyage() {
   voyageClimb(v);
   if (v.key === 'card_census') drawCensus();
   if (v.key === 'knockout') drawKnockouts();
+  if (v.key === 'induction') drawInduction(v);
 }
 // ---- the journey through the layers (lib/journey.js): one or two sailings of the voyage, read up
 // their stack at one step; the slider follows the latest reading unless moved
@@ -2229,6 +2230,7 @@ async function loadShelves() {
     return;
   }
   drawFitouts(d);
+  if (d.shelves) initBuilder(d.shelves);
   const key = JSON.stringify(d.shelves); if (key === shelvesKey) return; shelvesKey = key; shelvesData = d.shelves;
   const sel = document.getElementById('shelfkind'), keep = sel.value;
   sel.innerHTML = '<option value="">every kind</option>' + SHELF_KINDS.filter(k => shelvesData.some(x => x.kind === k[0])).map(k => `<option value="${k[0]}">${k[1].toLowerCase()}</option>`).join('');
@@ -2951,4 +2953,244 @@ async function competitorKnockout(model) {
   sec.hidden = !k; if (!k) return null;
   el.innerHTML = knockoutBlock(k, 'cpkochart'); knockoutChart(k, 'cpkochart');
   return k;
+}
+
+
+// ==================================================================================== the fitout builder
+// (#/shelves; thorp/fitouts.py, /api/fitout_builder, /api/shelf_trigrams, POST /api/fitouts/save and /queue; UI.md
+// "Fitout builder"). A palette of training shelves (each with its books, tokens, trigram repetition and variety, and a mini
+// scatter with the frontier ringed), dragged into two lanes, pretraining and post-training; each dropped shelf a stage
+// block (its name, how many tokens, which books, passes, purpose, and for post-training its learning rate and tack), blocks
+// reordered by drag and sized by tokens × passes; the fitout's settings and its total; Save, then Build for a class and
+// Queue (after a confirmation, since it changes what the Mac trains next); and the fitouts to open.
+const FB_SELECT = { all: 'all of it', random: 'random books', repeat: 'highest repetition', frontier: 'Pareto frontier' };
+const fb = { name: '', aim: '', positions: 'rope', tack: { alpha: 3, kind: 'induction' }, stages: [], key: null, saved: null, dirty: false };
+let fbShelves = [], fbMeta = null, fbInit = false, fbDrag = null;
+const fbTri = new Map();
+const fbShelf = path => fbShelves.find(x => x.path === path);
+const fbStageTokens = st => (st.tokens ?? (fbShelf(st.shelf) || {}).tokens_est ?? 0);
+async function initBuilder(shelves) {
+  fbShelves = shelves.filter(x => x.kind === 'training' || x.kind === 'other' || x.kind === 'draft').filter(x => x.books > 0);
+  if (!fbMeta) { try { fbMeta = await get('/api/fitout_builder'); } catch (e) { return; } }
+  drawPalette(); drawLibrary();
+  if (!fbInit) { fbInit = true; drawBuilder(); wireLanes(); }
+}
+function triScatter(path) {
+  const t = fbTri.get(path);
+  if (!t || !t.books || !t.books.length) return `<span class="s">${t && t.computing ? 'measuring…' : t ? 'unmeasured' : ''}</span>`;
+  const W = 120, H = 64, xs = t.books.map(b => b.variety), ys = t.books.map(b => b.repeat_rate);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = 0, y1 = Math.max(...ys, 0.01);
+  const front = new Set(t.frontier || []);
+  const px = v => 4 + (W - 8) * (x1 > x0 ? (v - x0) / (x1 - x0) : 0.5), py = v => H - 4 - (H - 8) * (v - y0) / (y1 - y0);
+  return `<svg class="triscatter" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="variety against repetition">
+    <line x1="4" y1="${H - 4}" x2="${W - 4}" y2="${H - 4}" class="tsaxis"/><line x1="4" y1="4" x2="4" y2="${H - 4}" class="tsaxis"/>
+    ${t.books.map(b => `<circle cx="${px(b.variety).toFixed(1)}" cy="${py(b.repeat_rate).toFixed(1)}" r="${front.has(b.id) ? 2.8 : 1.6}" class="${front.has(b.id) ? 'tsf' : 'tsb'}"><title>${esc(b.id)}: repetition ${(100 * b.repeat_rate).toFixed(1)}%, variety ${(100 * b.variety).toFixed(0)}%${front.has(b.id) ? ' (frontier)' : ''}</title></circle>`).join('')}
+  </svg>`;
+}
+function drawPalette() {
+  const el = document.getElementById('fbpalette'); if (!el) return;
+  const sorted = [...fbShelves].sort((a, b) => (b.trigrams && b.trigrams.measured ? 1 : 0) - (a.trigrams && a.trigrams.measured ? 1 : 0) || a.name.localeCompare(b.name));
+  el.innerHTML = sorted.map(x => {
+    const t = x.trigrams;
+    return `<div class="fbtile" draggable="true" data-shelf="${esc(x.path)}" title="${esc(x.about || x.path)}">
+      <div class="fbtn"><b>${esc(x.name)}</b>${x.kind !== 'training' ? ` <span class="pill">${esc(x.kind)}</span>` : ''}</div>
+      <div class="s">${x.books} books · ${big(x.tokens_est)} tokens</div>
+      <div class="s">${t && t.measured ? `repetition <b>${(100 * t.repeat_rate).toFixed(1)}%</b> · variety ${(100 * t.variety).toFixed(0)}%` : 'trigrams not measured'}</div>
+      <div class="fbsc" data-sc="${esc(x.path)}">${t && t.measured ? triScatter(x.path) : ''}</div></div>`;
+  }).join('') || '<div class="empty">no training shelves</div>';
+  el.querySelectorAll('.fbtile').forEach(tile => {
+    tile.addEventListener('dragstart', e => { fbDrag = { shelf: tile.dataset.shelf }; e.dataTransfer.setData('text/plain', tile.dataset.shelf); e.dataTransfer.effectAllowed = 'copy'; });
+  });
+  // each measured shelf's books, fetched once
+  for (const x of sorted) if (x.trigrams && x.trigrams.measured && !fbTri.has(x.path)) {
+    fbTri.set(x.path, { computing: true });
+    get('/api/shelf_trigrams?path=' + encodeURIComponent(x.path)).then(t => {
+      fbTri.set(x.path, t.computing ? null : t);
+      const c = document.querySelector(`#fbpalette [data-sc="${CSS.escape(x.path)}"]`); if (c) c.innerHTML = triScatter(x.path);
+    }).catch(() => fbTri.delete(x.path));
+  }
+}
+function fbMark() { fb.dirty = true; drawTotals(); drawActions(); }
+function drawSettings() {
+  const el = document.getElementById('fbsettings');
+  el.innerHTML = `<div class="fbrow"><label>name <input id="fbname" value="${esc(fb.name)}" placeholder="a name for this fitout"></label>
+    <label>positions <select id="fbpos"><option value="rope"${fb.positions === 'rope' ? ' selected' : ''}>rope</option><option value="learned"${fb.positions === 'learned' ? ' selected' : ''}>learned</option></select></label>
+    <label>tack <select id="fbtack"><option value="">none</option><option value="induction"${fb.tack && fb.tack.kind === 'induction' ? ' selected' : ''}>induction</option><option value="conclusion"${fb.tack && fb.tack.kind === 'conclusion' ? ' selected' : ''}>conclusion</option></select></label>
+    <label>× <input id="fbalpha" type="number" min="0" step="0.5" value="${fb.tack ? fb.tack.alpha ?? 3 : 3}" style="width:56px"${fb.tack ? '' : ' disabled'}></label></div>
+    <label class="fbaim">aim <textarea id="fbaim" rows="2" placeholder="what this fitout is for">${esc(fb.aim)}</textarea></label>`;
+  el.querySelector('#fbname').oninput = e => { fb.name = e.target.value; fbMark(); };
+  el.querySelector('#fbaim').oninput = e => { fb.aim = e.target.value; fbMark(); };
+  el.querySelector('#fbpos').onchange = e => { fb.positions = e.target.value; fbMark(); };
+  el.querySelector('#fbtack').onchange = e => { fb.tack = e.target.value ? { alpha: +el.querySelector('#fbalpha').value || 3, kind: e.target.value } : null; el.querySelector('#fbalpha').disabled = !fb.tack; fbMark(); };
+  el.querySelector('#fbalpha').oninput = e => { if (fb.tack) fb.tack.alpha = +e.target.value; fbMark(); };
+}
+function stageBlock(st, i) {
+  const sh = fbShelf(st.shelf) || { name: st.shelf, tokens_est: st.tokens || 0, books: '?' };
+  const max = Math.max(1, sh.tokens_est || st.tokens || 1), tok = st.tokens ?? max, post = st.phase === 'post-training';
+  const weight = Math.max(1, tok * (st.passes || 1));
+  return `<div class="fbblock ${post ? 'post' : 'pre'}" draggable="true" data-i="${i}" style="flex-grow:${weight}">
+    <div class="fbbh"><input class="fbin" data-f="name" value="${esc(st.name)}"><button class="fbx" data-x="${i}" title="remove this stage">×</button></div>
+    <div class="s">${esc(sh.name)} · ${sh.books} books</div>
+    <label class="s">tokens <b data-tokv="${i}">${big(tok)}</b>${st.tokens == null ? ' (the whole shelf)' : ` of ${big(max)}`}<input type="range" class="fbin" data-f="tokens" min="${Math.min(max, 100000)}" max="${max}" step="${Math.max(1, Math.round(max / 200))}" value="${tok}"></label>
+    <div class="fbrow2"><label class="s">books <select class="fbin" data-f="select">${(fbMeta.select || Object.keys(FB_SELECT)).map(k => `<option value="${k}"${st.select === k ? ' selected' : ''}>${esc(FB_SELECT[k] || k)}</option>`).join('')}</select></label>
+      <label class="s">passes <input class="fbin" data-f="passes" type="number" min="1" max="20" value="${st.passes || 1}" style="width:48px"></label></div>
+    ${post ? `<div class="fbrow2"><label class="s">lr <input class="fbin" data-f="lr" type="number" step="0.0001" min="0" value="${st.lr ?? ''}" placeholder="the run's" style="width:80px"></label>
+      <label class="s">tack <select class="fbin" data-f="tack"><option value="">the fitout's</option><option value="induction"${st.tack && st.tack.kind === 'induction' ? ' selected' : ''}>induction</option><option value="conclusion"${st.tack && st.tack.kind === 'conclusion' ? ' selected' : ''}>conclusion</option></select></label></div>` : ''}
+    <input class="fbin fbpurpose" data-f="purpose" value="${esc(st.purpose || '')}" placeholder="what this stage is for">
+  </div>`;
+}
+function drawLanes() {
+  for (const phase of ['pretraining', 'post-training']) {
+    const drop = document.querySelector(`.fbdrop[data-phase="${phase}"]`);
+    const idx = fb.stages.map((st, i) => [st, i]).filter(([st]) => st.phase === phase);
+    drop.innerHTML = idx.map(([st, i]) => stageBlock(st, i)).join('') || `<div class="fbempty">drop a shelf here</div>`;
+  }
+  document.querySelectorAll('.fbblock').forEach(b => {
+    const i = +b.dataset.i, st = fb.stages[i];
+    b.querySelectorAll('.fbin').forEach(inp => {
+      const f = inp.dataset.f;
+      inp.addEventListener(inp.type === 'range' || inp.tagName === 'INPUT' ? 'input' : 'change', () => {
+        if (f === 'tokens') { st.tokens = +inp.value >= ((fbShelf(st.shelf) || {}).tokens_est || Infinity) ? null : +inp.value; b.querySelector(`[data-tokv="${i}"]`).textContent = big(+inp.value); b.style.flexGrow = Math.max(1, +inp.value * (st.passes || 1)); }
+        else if (f === 'passes') { st.passes = Math.max(1, +inp.value || 1); b.style.flexGrow = Math.max(1, fbStageTokens(st) * st.passes); }
+        else if (f === 'lr') st.lr = inp.value === '' ? null : +inp.value;
+        else if (f === 'tack') st.tack = inp.value ? { alpha: (fb.tack && fb.tack.alpha) || 3, kind: inp.value } : null;
+        else st[f] = inp.value;
+        fbMark();
+      });
+      inp.addEventListener('mousedown', e => e.stopPropagation());
+    });
+    b.querySelector('.fbx').onclick = () => { fb.stages.splice(i, 1); fbMark(); drawLanes(); };
+    b.addEventListener('dragstart', e => { if (e.target.closest('input,select,textarea')) { e.preventDefault(); return; } fbDrag = { move: i }; e.dataTransfer.setData('text/plain', 'move'); e.dataTransfer.effectAllowed = 'move'; });
+  });
+  drawTotals();
+}
+function wireLanes() {
+  document.querySelectorAll('.fbdrop').forEach(drop => {
+    drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('over'); });
+    drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+    drop.addEventListener('drop', e => {
+      e.preventDefault(); drop.classList.remove('over');
+      const phase = drop.dataset.phase, target = e.target.closest('.fbblock'), before = target ? +target.dataset.i : null;
+      if (fbDrag && fbDrag.shelf) {
+        const sh = fbShelf(fbDrag.shelf); if (!sh) return;
+        const st = { phase, name: sh.name.replace(/^The /, '').toLowerCase(), shelf: sh.path, tokens: null, select: 'all', passes: 1, lr: phase === 'post-training' ? 0.001 : null, tack: null, purpose: '' };
+        if (before == null) fb.stages.push(st); else fb.stages.splice(before, 0, st);
+      } else if (fbDrag && fbDrag.move != null) {
+        const [st] = fb.stages.splice(fbDrag.move, 1); st.phase = phase;
+        let at = before == null ? fb.stages.length : before > fbDrag.move ? before - 1 : before;
+        fb.stages.splice(at, 0, st);
+      }
+      fbDrag = null; fbMark(); drawLanes();
+    });
+  });
+}
+function drawTotals() {
+  const el = document.getElementById('fbtotal'); if (!el) return;
+  const tot = st => fbStageTokens(st) * (st.passes || 1);
+  const all = fb.stages.reduce((a, st) => a + tot(st), 0);
+  const rep = fb.stages.filter(st => st.select === 'repeat' || st.select === 'frontier').reduce((a, st) => a + tot(st), 0);
+  const pre = fb.stages.filter(st => st.phase === 'pretraining').reduce((a, st) => a + tot(st), 0);
+  el.innerHTML = fb.stages.length ? `<b>${big(all)}</b> tokens read in all (${big(pre)} pretraining, ${big(all - pre)} post-training) · <b>${all ? Math.round(100 * rep / all) : 0}%</b> of it the repetition engine <span class="s">(stages that take the most repetitive books or the frontier)</span>` : '<span class="s">drag a shelf from the palette into a lane to begin</span>';
+}
+function drawActions() {
+  const el = document.getElementById('fbactions'); if (!el || !fbMeta) return;
+  const canQueue = fb.key && !fb.dirty;
+  el.innerHTML = `<button id="fbsave">${fb.key && !fb.dirty ? 'Saved' : 'Save'}</button>
+    <span class="fbsep">then</span>
+    <label>build for <select id="fbclass">${(fbMeta.classes || []).map(c => `<option value="${esc(c.preset)}">${esc(c.preset)} · ${esc(c.name)}</option>`).join('')}</select></label>
+    <label>seeds <input id="fbseeds" value="1, 2" style="width:60px"></label>
+    <label>put it <select id="fbwhere"><option value="end">at the end of the queue</option><option value="top">at the top (next to sail)</option></select></label>
+    <button id="fbqueue"${canQueue ? '' : ' disabled'} title="${canQueue ? 'compile it for that class and put its runs in the queue' : 'save it first'}">Queue</button>
+    <button id="fbnew" class="ghost">New</button>`;
+  el.querySelector('#fbsave').onclick = fbSave;
+  el.querySelector('#fbqueue').onclick = fbQueue;
+  el.querySelector('#fbnew').onclick = () => { if (fb.dirty && fb.stages.length && !confirm('Start a new fitout? The unsaved changes here are lost.')) return; fbLoad({ name: '', aim: '', positions: 'rope', tack: { alpha: 3, kind: 'induction' }, stages: [] }, null); };
+}
+function fbMsg(html, kind = '') { const el = document.getElementById('fbmsg'); if (el) { el.className = 'fbmsg ' + kind; el.innerHTML = html; } }
+async function fbPost(url, body) {
+  const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || r.statusText); return j;
+}
+async function fbSave() {
+  const body = { key: fb.key || undefined, name: fb.name, aim: fb.aim, positions: fb.positions, tack: fb.tack, stages: fb.stages };
+  try {
+    const r = await fbPost('/api/fitouts/save', { fitout: body });
+    fb.key = r.key; fb.dirty = false; fbMeta = null; fbMeta = await get('/api/fitout_builder');
+    fbMsg(`saved as <b>${esc(r.key)}</b> (data/fitouts/${esc(r.key)}.json)`, 'good'); drawActions(); drawLibrary();
+  } catch (e) { fbMsg(`not saved: ${esc(e.message)}`, 'bad'); }
+}
+async function fbQueue() {
+  if (!fb.key || fb.dirty) return;
+  const preset = document.getElementById('fbclass').value, where = document.getElementById('fbwhere').value;
+  const seeds = document.getElementById('fbseeds').value.split(/[^0-9]+/).filter(Boolean).map(Number);
+  const runs = seeds.length * (1 + fb.stages.filter(st => st.phase === 'post-training').length);
+  if (!seeds.length) { fbMsg('give at least one seed', 'bad'); return; }
+  if (!confirm(`Queue "${fb.name || fb.key}" for the ${preset}: ${runs} run${runs === 1 ? '' : 's'} (${seeds.length} seed${seeds.length === 1 ? '' : 's'}) ${where === 'top' ? 'at the TOP of the queue, next to sail' : 'at the end of the queue'}?\n\nThis changes what the Mac trains next.`)) return;
+  try {
+    const r = await fbPost('/api/fitouts/queue', { key: fb.key, preset, seeds, where });
+    fbMsg(`queued ${r.lines.length} run${r.lines.length === 1 ? '' : 's'} ${where === 'top' ? 'at the top' : 'at the end'}: ${r.lines.map(l => `<span class="mono">${esc(l)}</span>`).join(', ')}`, 'good');
+  } catch (e) { fbMsg(`not queued: ${esc(e.message)}`, 'bad'); }
+}
+function fbLoad(f, key) {
+  fb.name = f.name || ''; fb.aim = f.aim || ''; fb.positions = f.positions || 'rope'; fb.tack = f.tack ? { ...f.tack } : null;
+  fb.stages = (f.stages || []).map(st => ({ ...st, tack: st.tack ? { ...st.tack } : null })); fb.key = key; fb.dirty = !key;
+  drawBuilder(); fbMsg(key ? `opened <b>${esc(key)}</b>` : f.name ? `a copy of <b>${esc(f.name)}</b>: save it under its own name` : '');
+}
+function drawBuilder() { drawSettings(); drawLanes(); drawActions(); }
+function drawLibrary() {
+  const el = document.getElementById('fblibrary'); if (!el || !fbMeta) return;
+  const card = (f, kind) => `<div class="fblib"><span class="pill ${kind === 'saved' ? 'blue' : ''}">${kind}</span> <b>${esc(f.name)}</b>
+    <div class="s">${(f.stages || []).length} stages · ${esc(f.positions || '')}${f.tack ? ` · tack ${esc(f.tack.kind)}` : ''}</div>
+    <button data-open="${esc(f.key)}" data-kind="${kind}">${kind === 'saved' ? 'Open' : 'Open a copy'}</button></div>`;
+  el.innerHTML = (fbMeta.saved || []).map(f => card(f, 'saved')).join('') + (fbMeta.curated || []).map(f => card(f, 'curated')).join('') || '<span class="s">none yet</span>';
+  el.querySelectorAll('[data-open]').forEach(b => b.onclick = () => {
+    const kind = b.dataset.kind, f = (kind === 'saved' ? fbMeta.saved : fbMeta.curated).find(x => x.key === b.dataset.open); if (!f) return;
+    if (fb.dirty && fb.stages.length && !confirm('Open another fitout? The unsaved changes here are lost.')) return;
+    if (kind === 'saved') fbLoad(f, f.key); else fbLoad({ ...f, name: `${f.name} (copy)` }, null);
+    document.getElementById('builderpanel').scrollIntoView({ behavior: 'smooth' });
+  });
+}
+
+
+// ---- Discovering the induction head (the induction voyage's page; /api/series): the Nevermore's natural score over steps for
+// the trigram engine against its random twin, two seeds each, with the 0.3 mark and the step each first lights it; then
+// previous-word and the copy gain. The verdict reads the pre-registered rule.
+let indKey = null;
+async function drawInduction(v) {
+  const runs = (v.runs || []).filter(r => r.name);
+  if (!runs.length) {
+    ['indnevermore', 'indprev', 'indcopy'].forEach(id => empty(id, 'no run yet: the trigram engine and its random twin are at the top of the queue'));
+    document.getElementById('indverdict').innerHTML = '<span class="s">waiting for the first readings (every 100 steps)</span>'; return;
+  }
+  const M = { nev: 'nevermore/natural_max_score', prev: 'stars/previous_word/max_score', copy: 'nevermore/natural_copy_gain' };
+  let d; try { d = await get('/api/series?runs=' + encodeURIComponent(runs.map(r => r.name).join(',')) + '&metrics=' + encodeURIComponent(Object.values(M).join(','))); } catch (e) { return; }
+  const key = JSON.stringify(d); if (key === indKey) return; indKey = key;
+  const twin = r => /random/.test(r.name), seedOf = r => (r.name.match(/-s(\d+)$/) || [])[1] || '1';
+  const draw = (id, metric, mark, label) => {
+    const traces = [], shapes = [];
+    for (const r of runs) {
+      const sr = (d[r.name] || {})[metric]; if (!sr) continue;
+      const col = twin(r) ? tok('muted') : tok('good');
+      traces.push({ x: sr[0], y: sr[1], mode: 'lines', name: `${twin(r) ? 'random twin' : 'trigram engine'}, seed ${seedOf(r)}`, line: { color: col, width: 1.8, dash: seedOf(r) === '1' ? 'solid' : 'dash' },
+        hovertemplate: `${esc(r.name)}<br>step %{x}<br>${label} %{y:.3f}<extra></extra>` });
+      const i = sr[1].findIndex(v => v != null && v >= mark);
+      if (i >= 0) { traces.push({ x: [sr[0][i]], y: [sr[1][i]], mode: 'markers', marker: { color: col, size: 10, symbol: 'star' }, showlegend: false, hovertemplate: `${esc(r.name)} first lights it at step ${sr[0][i]}<extra></extra>` }); }
+    }
+    if (!traces.length) { empty(id, 'no readings yet'); return null; }
+    shapes.push({ type: 'line', xref: 'paper', x0: 0, x1: 1, y0: mark, y1: mark, line: { color: tok('accent'), dash: 'dot', width: 1.4 } });
+    plot(id, traces, layout({ xaxis: { title: { text: 'step' } }, yaxis: { title: { text: label } }, shapes, legend: { orientation: 'h', y: -0.2 } }));
+    return true;
+  };
+  draw('indnevermore', M.nev, 0.3, 'Nevermore (natural score)');
+  draw('indprev', M.prev, 0.5, 'previous-word');
+  draw('indcopy', M.copy, 0.5, 'copy gain (nats/token)');
+  // the verdict, by the rule
+  const lit = r => { const sr = (d[r.name] || {})[M.nev]; if (!sr) return null; const i = sr[1].findIndex(v => v != null && v >= 0.3); return i >= 0 ? sr[0][i] : false; };
+  const eng = runs.filter(r => !twin(r)), tw = runs.filter(twin);
+  const engLit = eng.filter(r => lit(r)).length, twLit = tw.filter(r => lit(r)).length;
+  const best = rs => Math.max(-Infinity, ...rs.map(r => { const sr = (d[r.name] || {})[M.nev]; return sr ? Math.max(...sr[1].filter(v => v != null)) : -Infinity; }));
+  const success = engLit + twLit >= 2 && (engLit >= 2 || twLit >= 2), byRepetition = engLit >= 2 && twLit === 0;
+  document.getElementById('indverdict').innerHTML = `<span class="pill ${success ? 'good' : ''}">${success ? 'lit on two seeds' : 'not lit on two seeds yet'}</span>
+    ${byRepetition ? '<span class="pill good">repetition did it</span>' : ''}
+    <span class="s">trigram engine: ${engLit} of ${eng.length} seeds lit${isFinite(best(eng)) ? `, best ${best(eng).toFixed(3)}` : ''} · random twin: ${twLit} of ${tw.length}${isFinite(best(tw)) ? `, best ${best(tw).toFixed(3)}` : ''} · earlier 300k Nevermores: 0.00 to 0.01</span>`;
 }

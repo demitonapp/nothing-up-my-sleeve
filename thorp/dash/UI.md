@@ -221,11 +221,29 @@ holds the ways in, always:
   when silenced (cause; the comparator, order) beside the random draws' drops on that same measure in
   grey, and each card's own rule dotted over its group (0.1, and twice its largest random drop), and a table with each card's drops, verdict and its heads
   (layer:head); the competitor's deck table notes each card's knocked-out heads.
+  **Discovering the induction head** (the `induction` voyage's page, `/api/series`): the Nevermore's
+  natural score over steps for the trigram engine (green) against its random twin (grey), two seeds
+  each (seed 1 solid, seed 2 dashed), the 0.3 mark dotted and a star where each run first lights it;
+  then previous-word (0.5) and the copy gain (0.5). Above, the verdict by the pre-registered rule: lit
+  on two seeds or not, and "repetition did it" when the engine lights it and its twin does not.
 - **Shelves** (`#/shelves`) opens on **Fitouts** (`thorp.shelves.fitouts`, kept warm like the
   shelves): a fitout is the training material matched to its stages. A card per fitout: its aim,
   positions, vocabulary, tack and tokens; two lanes, **pretraining** (its stages in order, one run)
   and **post-training** (in order, each seeded from the one before, with its learning rate and tack),
   each stage a block sized by its tokens showing its shelf (a click opens that shelf below), books,
+  tokens per pass × passes, and purpose; then its runs and their status. Beneath them, the **fitout
+  builder** (`thorp/fitouts.py`): a palette of shelves (training, other and drafts; each tile its
+  books, tokens, in-window trigram repetition and variety, and a mini scatter of its books, variety
+  against repetition, the frontier ringed; `/api/shelf_trigrams`), dragged into two lanes,
+  pretraining and post-training. A dropped shelf is a stage block: its name, tokens (a slider up to
+  the shelf, the whole shelf at the top), which books (all, random, highest repetition, the Pareto
+  frontier), passes and purpose, and for post-training its learning rate and tack; blocks reorder by
+  drag (within or across lanes) and are sized by tokens × passes. Above the lanes, the fitout's name,
+  aim, positions and tack; below, the total tokens and how much of it is the repetition engine.
+  **Save** posts to `fitouts.save` (a readable error if it doesn't validate); **Queue** builds the
+  saved fitout for a class (the first four rungs) with its seeds, at the top or the end of the queue
+  (`fitouts.queue`), only after a confirmation, since it changes what the Mac trains next. The saved
+  fitouts and the hand-curated ones (opened as a copy) sit beneath, each one click from the builder.
   tokens per pass × passes, and purpose; then its runs and their status. Each class page has the
   same cards on a **Fitouts** tab (`#/classes/<class>/fitouts`, `/api/fitouts?preset=`), the class's
   fitouts only ("no fitout curated for this class yet" where there is none), followed by the cards

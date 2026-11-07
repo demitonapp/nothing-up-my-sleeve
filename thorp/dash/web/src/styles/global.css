@@ -658,3 +658,56 @@ main a.ccell { color: var(--text); text-decoration: none; display: block; }
 .kotable td { font-size: var(--fs-sm); vertical-align: top; }
 .kohd { font-size: 11px; color: var(--muted); }
 .komodel h3 { margin: 12px 0 6px; }
+
+/* the fitout builder */
+.fbwrap { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+.fbpalette { flex: 0 0 300px; max-height: 720px; overflow-y: auto; }
+.fbmain { flex: 1; min-width: 420px; }
+#fbpalette { display: grid; gap: 8px; }
+.fbtile { border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; background: var(--raise); cursor: grab; font-size: var(--fs-sm); }
+.fbtile:active { cursor: grabbing; }
+.fbtile:hover { border-color: var(--blue); }
+.triscatter { display: block; margin-top: 4px; }
+.triscatter .tsaxis { stroke: var(--line); stroke-width: 1; }
+.triscatter .tsb { fill: var(--muted); opacity: .6; }
+.triscatter .tsf { fill: var(--accent); stroke: var(--card-face); stroke-width: .6; }
+.fbsettings label { font-size: var(--fs-sm); color: var(--muted); display: inline-flex; gap: 6px; align-items: center; }
+.fbsettings input, .fbsettings select, .fbsettings textarea, .fbblock input, .fbblock select, .fbactions select, .fbactions input {
+  background: var(--panel); border: 1px solid var(--line); color: var(--text); border-radius: 4px; padding: 3px 6px; font: inherit; font-size: var(--fs-sm); }
+.fbrow { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
+.fbrow #fbname { width: 260px; }
+.fbaim { display: flex !important; width: 100%; }
+.fbaim textarea { flex: 1; resize: vertical; }
+.fblane { margin-top: 12px; }
+.fblabel { font-size: var(--fs-sm); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 4px; }
+.fblabel .s { text-transform: none; letter-spacing: 0; }
+.fbdrop { display: flex; gap: 8px; flex-wrap: wrap; min-height: 90px; padding: 8px; border: 1px dashed var(--line); border-radius: 8px; }
+.fbdrop.over { border-color: var(--accent); background: rgba(227,179,65,.06); }
+.fbempty { color: var(--muted); font-size: var(--fs-sm); margin: auto; }
+.fbblock { flex-basis: 190px; min-width: 190px; border: 1px solid var(--line); border-radius: 6px; padding: 8px; background: var(--panel); display: grid; gap: 4px; cursor: grab; }
+.fbblock.pre { border-top: 3px solid var(--blue); }
+.fbblock.post { border-top: 3px solid var(--accent); }
+.fbbh { display: flex; gap: 4px; }
+.fbbh input { flex: 1; font-weight: 600; }
+.fbx { background: none; border: 0; color: var(--muted); cursor: pointer; font-size: 16px; }
+.fbx:hover { color: var(--bad); }
+.fbblock input[type=range] { width: 100%; padding: 0; }
+.fbrow2 { display: flex; gap: 8px; flex-wrap: wrap; }
+.fbpurpose { width: 100%; }
+.fbtotal { margin-top: 12px; font-size: var(--fs-sm); }
+.fbactions { margin-top: 10px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; font-size: var(--fs-sm); }
+.fbactions button, .fblib button { background: var(--raise); border: 1px solid var(--line); color: var(--text); border-radius: 4px; padding: 4px 12px; cursor: pointer; font: inherit; font-size: var(--fs-sm); }
+.fbactions button:hover:not([disabled]), .fblib button:hover { border-color: var(--accent); }
+.fbactions button[disabled] { opacity: .45; cursor: not-allowed; }
+.fbactions #fbsave { border-color: var(--good); }
+.fbactions #fbqueue:not([disabled]) { border-color: var(--accent); color: var(--accent); }
+.fbsep { color: var(--muted); }
+.fbmsg { margin-top: 8px; font-size: var(--fs-sm); }
+.fbmsg.good { color: var(--good); } .fbmsg.bad { color: var(--bad); }
+.fblibrary { display: flex; gap: 10px; flex-wrap: wrap; }
+.fblib { border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; background: var(--raise); font-size: var(--fs-sm); max-width: 300px; display: grid; gap: 4px; }
+@media (max-width: 760px) { .fbpalette { flex-basis: 100%; max-height: 360px; } .fbmain { min-width: 0; } }
+
+.indverdict { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
+[data-voyage="induction"] .row > div { flex: 1; min-width: 280px; }
+[data-voyage="induction"] .k { font-size: var(--fs-sm); color: var(--muted); }

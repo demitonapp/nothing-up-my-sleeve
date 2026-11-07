@@ -22,7 +22,8 @@ are kept; the random test is the standard one.
 
 Metrics: nevermore/max_score, nevermore/count, nevermore/best_layer, nevermore/best_head,
 nevermore/copy_loss_first, nevermore/copy_loss_second, nevermore/copy_gain, and
-nevermore/natural_max_score, nevermore/natural_count, nevermore/natural_copy_gain. Artifact
+nevermore/natural_max_score, nevermore/natural_count, nevermore/natural_copy_gain, and
+nevermore/natural_shared_score with /natural_shared_layer (the best layer's two strongest heads together). Artifact
 `nevermore`: the full layer x head score matrices.
 """
 
@@ -111,6 +112,12 @@ def evaluate(ctx: EvalContext) -> EvalResult:
                 "nevermore/natural_copy_gain": nf - nsec,
             }
         )
+        # the shared score (Justin, 23:40: "do it"): the best layer's two strongest heads together, as previous-word
+        # has, because a model with heads to spare splits the copying across two (the 1m copied at a gain of 4.9
+        # while no single head passed 0.15)
+        top2 = np.sort(ns, axis=1)[:, -2:].sum(axis=1)
+        metrics["nevermore/natural_shared_score"] = float(top2.max())
+        metrics["nevermore/natural_shared_layer"] = float(int(top2.argmax()))
         record["natural_book"] = NATURAL_BOOK
         record["natural_scores"] = ns.round(4).tolist()
     text = json.dumps(record)

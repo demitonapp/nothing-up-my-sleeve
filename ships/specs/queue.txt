@@ -15,6 +15,9 @@ fitouts/fu-ogden-v0-1~metre@300k-pre-s1
 fitouts/fu-ogden-v0-1~metre-held@300k-pre-s1
 fitouts/fu-ogden-v0-1~metre@300k-pre-s2
 fitouts/fu-ogden-v0-1~metre-held@300k-pre-s2
+# The shared induction score (two heads of a layer together; Justin, 23:45: "do it") on every checkpoint of the 21m and the
+# Ogden keels that sailed before it; only the new reading is recorded
+cmd: for v in 'fu-ogden-v0-1@21m-pre-s1' 'fu-ogden-v0-1@300k-pre-s1' 'fu-ogden-v0-1@300k-pre-s2' 'fu-ogden-v0-1~l3@300k-l3-pre-s1' 'fu-ogden-v0-1~l3@300k-l3-pre-s2' 'fu-ogden-v0-1~l3-copy@300k-l3-pre-s1'; do uv run --project backend python backend/scripts/score_checkpoints.py --only nevermore/natural_shared "$v" nevermore; done >> data/runs/score-shared.out 2>&1
 # Score the four new cards (pips) on every checkpoint of the voyages that sailed before them: the 21m first (Justin, 22:20: "yes, score them"), then the Ogden keels
 cmd: for v in 'fu-ogden-v0-1@21m-pre-s1' 'fu-ogden-v0-1@300k-pre-s1' 'fu-ogden-v0-1@300k-pre-s2' 'fu-ogden-v0-1~l3@300k-l3-pre-s1' 'fu-ogden-v0-1~l3@300k-l3-pre-s2' 'fu-ogden-v0-1~l3-copy@300k-l3-pre-s1'; do uv run --project backend python backend/scripts/score_checkpoints.py "$v" pips; done >> data/runs/score-pips.out 2>&1
 fitouts/fu-ogden-v0-1~l3-copy@300k-l3-pre-s2

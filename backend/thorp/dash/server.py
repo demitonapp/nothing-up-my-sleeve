@@ -3003,6 +3003,7 @@ WATCH_SERIES = {  # what the Watch panel draws, by tokens read
     "bpb": "eval/hole-cards-unseen/bpb_mean",
     "upos": "shapes/upos_top1", "ogden": "shapes/ogden_top1", "keyed": "shapes/keyed_top1",
     "previous_word": "stars/previous_word/shared_score", "nevermore": "nevermore/natural_max_score",
+    "nevermore_shared": "nevermore/natural_shared_score",
     "copy_gain": "nevermore/natural_copy_gain", "mover": "stars/mover/max_score",
     "comparator": "stars/comparator/shared_score", "words_back": "stars/offset_2/shared_score",
     "counter": "counter/probe_r2", "premise_marker": "stars/premise_marker/max_score",

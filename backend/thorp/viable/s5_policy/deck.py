@@ -74,7 +74,7 @@ CARDS = (
          (("stars/duplicate_word/max_score", "stars/duplicate_word/shared_score"), 0.3), "stars/duplicate_word/shared_layer",
          "attends to an earlier copy of this word: marks repeats", "not yet seen", scansion="metre"),
     Card("induction", "Induction", "copying", "Stage 1", 2,
-         (("nevermore/natural_max_score",), 0.3), "nevermore/natural_best_layer",
+         (("nevermore/natural_max_score", "nevermore/natural_shared_score"), 0.3), "nevermore/natural_best_layer",
          "attends to what followed this word last time: points at the word to copy",
          "needs previous-word below it", on=("previous_word",), scansion="metre"),
     Card("nevermore", "The Nevermore", "copying", "Face", 3, None, "nevermore/natural_best_layer",

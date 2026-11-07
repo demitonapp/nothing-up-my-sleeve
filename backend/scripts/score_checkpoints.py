@@ -7,6 +7,10 @@ It takes the helm (S2: one GPU job at a time) and leaves steps already read by t
 
     uv run --project backend python backend/scripts/score_checkpoints.py fu-ogden-v0-1@21m-pre-s1 pips
     uv run --project backend python backend/scripts/score_checkpoints.py --dry <voyage> pips   # what it would read
+    uv run --project backend python backend/scripts/score_checkpoints.py --only nevermore/natural_shared <voyage> nevermore
+
+--only PREFIX records only the metrics whose names start with PREFIX (and no artifacts): for a reading added to an
+evaluator a voyage already ran (the shared induction score, 23:45), so its other metrics are not written twice.
 """
 
 from __future__ import annotations
@@ -15,7 +19,28 @@ import json
 import sys
 
 
-def main(run: str, evaluators: list[str], dry: bool = False) -> int:
+class _Only:
+    """The ledger, recording only metrics whose names start with a prefix (nothing else)."""
+
+    def __init__(self, rec, prefix: str):
+        self.rec, self.prefix = rec, prefix
+
+    def metrics(self, run_id, step, values):
+        keep = {k: v for k, v in values.items() if k.startswith(self.prefix)}
+        if keep:
+            self.rec.metrics(run_id, step, keep)
+
+    def artifact(self, *a, **k):
+        pass
+
+    def evals(self, *a, **k):
+        pass
+
+    def clear_step(self, *a, **k):
+        pass
+
+
+def main(run: str, evaluators: list[str], dry: bool = False, only: str | None = None) -> int:
     from thorp import train, vsm
     from thorp.ledger import Ledger, spec_of
 
@@ -31,7 +56,7 @@ def main(run: str, evaluators: list[str], dry: bool = False) -> int:
     rid, spec = row["run_id"], spec_of(row)
     root = train.checkpoint_root(rid)
     steps = sorted(int(p.name.split("-")[1]) for p in root.glob("step-*") if (p / "state.json").exists())
-    probe = {"pips": "counter/probe_r2", "shapes": "shapes/upos_top1"}
+    probe = {"pips": "counter/probe_r2", "shapes": "shapes/upos_top1", "nevermore": "nevermore/natural_shared_score"}
     done = set()
     for ev in evaluators:
         m = probe.get(ev)
@@ -49,8 +74,8 @@ def main(run: str, evaluators: list[str], dry: bool = False) -> int:
             ckpt = root / f"step-{step}"
             model = train.build_model(spec, prep.tokeniser.vocab_size)
             model.update(train.to_compute(train.load_master(ckpt), spec["optim"].get("precision", "bf16")))
-            out = train.run_evaluators(spec, rid, step, model, prep, rec, lambda *a: None)
-            keys = {k: round(v, 3) for k, v in (out or {}).items() if k.endswith(("max_score", "probe_r2"))} if isinstance(out, dict) else {}
+            out = train.run_evaluators(spec, rid, step, model, prep, _Only(rec, only) if only else rec, lambda *a: None)
+            keys = {k: round(v, 3) for k, v in (out or {}).items() if k.endswith(("max_score", "probe_r2", "shared_score"))} if isinstance(out, dict) else {}
             print(f"  step {step}: {json.dumps(keys)}", flush=True)
     return 0
 
@@ -59,6 +84,11 @@ if __name__ == "__main__":
     args = sys.argv[1:]
     dry = "--dry" in args
     args = [a for a in args if a != "--dry"]
+    only = None
+    if "--only" in args:
+        i = args.index("--only")
+        only = args[i + 1]
+        args = args[:i] + args[i + 2 :]
     if len(args) < 2:
         raise SystemExit(__doc__)
-    sys.exit(main(args[0], args[1:], dry))
+    sys.exit(main(args[0], args[1:], dry, only))

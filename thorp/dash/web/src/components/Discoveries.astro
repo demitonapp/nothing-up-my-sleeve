@@ -11,21 +11,35 @@
   <!-- ============================== the tricks of the trade -->
   <div class="dview" data-dview="index">
     <h1>Tricks of the trade</h1>
-    <section class="panel">
-      <h2>The route to quantum physics <span class="note">seven waypoints, each resting on the one before; a waypoint's gate tricks (◆) are the ones a ship must perform before it moves on</span></h2>
-      <div class="route" id="trickroute"></div>
-    </section>
-    <section class="panel">
+    <nav class="subnav" id="discnav"><a data-dsub="two-facts" href="#/discoveries">Chaining two facts</a><a data-dsub="quantum" href="#/discoveries/quantum">Quantum mechanics</a><a data-dsub="registry" href="#/discoveries/registry">Registry of tricks</a></nav>
+
+    <!-- the trick in focus: chaining two facts, the 50m rung of every chain, and the climb to it -->
+    <div class="dsub" data-dsub="two-facts">
+      <p class="q dsubintro">The trick in focus: chaining two facts into a conclusion no sentence states. It is the 50m's rung on each of the bettor's four chains (Nature's breeder, the mill test, the between test, the pigeonhole test), and every class below must climb closer to it than the class beneath. <a href="#/leaderboard">The leaderboard</a> ranks every model on it; the two-fact voyage sails for it.</p>
+      <section class="panel">
       <h2>The discovery chains <span class="note">the bettor's four tests (the Origin, energy, Mendeleev's gaps, the eternal return), each reached in six rungs, one per class, keel to bettor; the last row says what a model at each rung is, according to the four. Every class is scored on every rung; each cell is every class's best lift and best share of pairs right; ✓ is performed under the share rule (lift at 0.1 and two pairs in three right, at the same reading), ▲ passed below its class, ⚠ passed below its class while a bigger class fails it, so the pairs want auditing; Qwen3 0.6B for scale. Under each chain's name, its grade: graded when it gets harder at every rung across all the models read (no model passes a rung it fails below, fewer pass each rung, every rung reached)</span></h2>
       <div class="handtools"><label><input type="checkbox" id="chainrefidx"> show the reference ladder <span class="note">(Pythia 14m to 410m and Qwen3 0.6B to 4B, read on the same pairs)</span></label></div>
       <div class="scroll"><table id="chaintable" data-nosort><thead></thead><tbody></tbody></table></div>
     </section>
+    </div>
+
+    <!-- the long road: seven waypoints to quantum mechanics -->
+    <div class="dsub" data-dsub="quantum">
+    <section class="panel">
+      <h2>The route to quantum physics <span class="note">seven waypoints, each resting on the one before; a waypoint's gate tricks (◆) are the ones a ship must perform before it moves on</span></h2>
+      <div class="route" id="trickroute"></div>
+    </section>
+    </div>
+
+    <!-- every trick known, measured or not -->
+    <div class="dsub" data-dsub="registry">
     <section class="panel">
       <h2>The tricks <span class="note">a trick is what a model can do, judged from outside by its bets; open one for the stars that do it and Thorp's progress, class by class. "The field shows it at" is the size band (one order of magnitude, in parameters) where the trick is documented in standard models, not a proven smallest size; hover a band for the detail. "Thorp's goal class" is the class of ship expected to reach it, about an order of magnitude smaller than the field where the depth it needs allows; ◆ marks a gate, performed before a ship moves on to the next waypoint</span></h2>
       <div class="handtools"><span class="note">waypoint</span><select id="trickfamily"><option value="">all</option></select><span class="note">the field shows it at</span><select id="trickband"><option value="">any size</option></select><span class="note" id="trickcount"></span></div>
       <div class="scroll"><table id="tricktable" class="clickable"><thead><tr><th>waypoint</th><th>trick</th><th>what it does</th><th>the field shows it at</th><th>how sure</th><th>stars needed</th><th>Thorp so far</th><th>Thorp's goal class</th></tr></thead><tbody></tbody></table></div>
       <p class="note mt">Also: <a href="#/discoveries/stars">every kind of head (the star chart)</a> · <a href="#/discoveries/traits">traits</a></p>
     </section>
+    </div>
   </div>
 
   <!-- ============================== one trick -->

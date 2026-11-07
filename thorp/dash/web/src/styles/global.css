@@ -488,3 +488,9 @@ main a.ccell { color: var(--text); text-decoration: none; display: block; }
 @media (max-width: 1000px) { #lbtable th:nth-child(8), #lbtable td:nth-child(8) { display: none; } }
 @media (max-width: 760px) { #lbtable th:nth-child(7), #lbtable td:nth-child(7), #lbtable th:nth-child(1), #lbtable td:nth-child(1) { display: none; } }
 @media (max-width: 560px) { #lbtable th:nth-child(6), #lbtable td:nth-child(6), #lbtable th:nth-child(3), #lbtable td:nth-child(3) { display: none; } }
+
+/* the Discoveries subtabs */
+#discoveries .dsub { display: none; }
+#discoveries .dsub.active { display: grid; gap: 16px; min-width: 0; }
+#discnav { margin-bottom: 4px; }
+#discoveries .dsubintro { margin: 0; max-width: 90ch; line-height: 1.5; }

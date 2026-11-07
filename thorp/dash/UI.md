@@ -51,7 +51,11 @@ holds the ways in, always:
   settings, Forgotten Tomes score and the step each star first lit, the score run by run, first
   light (each star's score against step, threshold dotted), outcomes and levers. A panel only one
   voyage has carries `data-voyage` (the book-value loop's fit).
-- **Discoveries** (`#/discoveries`): **Tricks of the trade**. A trick is what a model can do, judged
+- **Discoveries** (`#/discoveries`): **Tricks of the trade**, in three subtabs: **Chaining two
+  facts** (`#/discoveries`, the trick in focus: the discovery chains table, whose 50m rung is two
+  facts chained), **Quantum mechanics** (`#/discoveries/quantum`, the route of seven waypoints)
+  and **Registry of tricks** (`#/discoveries/registry`, every trick, with the star chart and traits
+  a link away). A trick, a chain, the stars and the traits keep their own addresses beneath. A trick is what a model can do, judged
   from outside by its bets; the catalogue is `thorp/dash/tricks.py` (`KNOWN_TRICKS`, 40 tricks).
   The tricks are grouped into the seven **waypoints** on the route to quantum physics (`WAYPOINTS`:
   reading, knowing, counting, reasoning, mathematics, physics, discovery), shown first as the route

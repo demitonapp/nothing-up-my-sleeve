@@ -39,7 +39,9 @@ const STABS = ['betting', 'books', 'languages', 'sieves', 'attention', 'traits']
 const STAB_EL = { betting: 'betting', books: 'books', languages: 'languages', sieves: 'sieves', attention: 'attention', traits: 'traits-section' };
 const OLD_SHIP = { betting: 'betting', books: 'books', languages: 'languages', sieves: 'sieves', attention: 'attention', 'traits-section': 'traits' };
 const SECTION_NAV = { sizes: 'classes', rung: 'classes', ship: 'classes', 'runs-section': 'classes', voyages: 'voyages', voyage: 'voyages', table: 'voyages', discoveries: 'discoveries', sievesguide: 'sieves', leaderboard: 'leaderboard', shelves: 'shelves' };
-let discView = 'index', discTrick = null, discChain = null;
+let discView = 'index', discTrick = null, discChain = null, discSub = 'two-facts';
+// the Discoveries subtabs: the trick in focus (chaining two facts), the road to quantum mechanics, the registry of every trick
+const DSUBS = ['two-facts', 'quantum', 'registry'];
 // the leaderboard and the shelves (their code is at the end; declared here, as the first route may reach them)
 let lbData = null, lbKey = null, shelvesData = null, shelfOpen = null, shelvesKey = null;
 const shelfBooks = new Map();
@@ -59,7 +61,8 @@ function route(h) {
     if (a === 'voyages' && b) return { page: 'voyage', voyage: b };
     if (a === 'voyages') return { page: 'voyages' };
     if (a === 'discoveries' && b === 'chains' && c) return { page: 'discoveries', dview: 'chain', chain: c };
-    if (a === 'discoveries') return { page: 'discoveries', dview: !b ? 'index' : (b === 'stars' || b === 'traits') ? b : 'trick', trick: b && b !== 'stars' && b !== 'traits' ? b : null };
+    if (a === 'discoveries' && (!b || DSUBS.includes(b))) return { page: 'discoveries', dview: 'index', dsub: b || 'two-facts' };
+    if (a === 'discoveries') return { page: 'discoveries', dview: (b === 'stars' || b === 'traits') ? b : 'trick', trick: b !== 'stars' && b !== 'traits' ? b : null };
     if (a === 'sieves') return { page: 'sievesguide', run: b ? decodeURIComponent(b) : null };
     if (a === 'leaderboard') return { page: 'leaderboard' };
     if (a === 'shelves') return { page: 'shelves', shelf: b ? decodeURIComponent(b) : null };
@@ -134,8 +137,11 @@ function showTab(h, push = true) {
   if (page === 'voyages') hash = '/voyages';
   if (page === 'discoveries') {
     discView = rt.dview || 'index'; discTrick = rt.trick || null; discChain = rt.chain || null;
-    hash = '/discoveries' + (discView === 'index' ? '' : '/' + (discView === 'trick' ? discTrick : discView === 'chain' ? 'chains/' + discChain : discView));
+    if (discView === 'index') discSub = rt.dsub || 'two-facts';
+    hash = '/discoveries' + (discView === 'index' ? (discSub === 'two-facts' ? '' : '/' + discSub) : '/' + (discView === 'trick' ? discTrick : discView === 'chain' ? 'chains/' + discChain : discView));
     document.querySelectorAll('#discoveries .dview').forEach(v => v.classList.toggle('active', v.dataset.dview === discView));
+    document.querySelectorAll('#discoveries .dsub').forEach(v => v.classList.toggle('active', v.dataset.dsub === discSub));
+    document.querySelectorAll('#discnav a').forEach(a => a.classList.toggle('active', a.dataset.dsub === discSub));
     if (discData) drawDiscoveryView();
   }
   if (page === 'sievesguide') { sieveRun = rt.run; hash = '/sieves' + (sieveRun ? '/' + encodeURIComponent(sieveRun) : ''); }

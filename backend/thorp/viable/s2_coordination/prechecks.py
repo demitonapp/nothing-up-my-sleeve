@@ -67,3 +67,40 @@ ITEMS = (
         applies=lambda ctx: ctx.fitout.get("key", "").startswith("ogden"),
     ),
 )  # fmt: skip
+
+
+def _tagger_pinned(ctx: Context):
+    from thorp.viable.s2_coordination import tagger
+
+    try:
+        n = tagger.nlp()
+        return 1.0, {"tagger": tagger.TAGGER_ID, "pipes": n.pipe_names}
+    except Exception as e:  # noqa: BLE001
+        return 0.0, {"error": repr(e)}
+
+
+def _lexicon_built(ctx: Context):
+    from thorp.viable.s2_coordination import tagger
+
+    name = ctx.fitout.get("key", "")
+    m = tagger.meta(name)
+    ok = bool(m) and m.get("clean") == ctx.clean and m.get("books") == len(ctx.books) and m.get("tagger") == tagger.TAGGER_ID
+    return (1.0 if ok else 0.0), {"lexicon": name, "meta": m}
+
+
+ITEMS = (
+    *ITEMS,
+    Item(
+        "tagger.pinned", "One pinned tagger",
+        "the shapes taxonomy is assigned by one tagger, at pinned versions, for every class (an instrument, "
+        "outside the period rule)",
+        "S2", "tokeniser", "1 when the pinned tagger loads at its pinned versions", "=", 1.0, _tagger_pinned,
+    ),
+    Item(
+        "tagger.lexicon", "The corpus tagged once",
+        "the fitout's corpus is tagged once, on its own clean text, by the pinned tagger: each word's commonest tag "
+        "(what a model's probability falls on) and the shape bars (tag tables of 1, 2 and 3 tags of context)",
+        "S2", "tokeniser", "1 when the lexicon covers every book of the fitout, on its cleaning, by the pinned tagger",
+        "=", 1.0, _lexicon_built,
+    ),
+)  # fmt: skip

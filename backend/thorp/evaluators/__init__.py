@@ -58,6 +58,8 @@ def get(name: str) -> Evaluator:
         from thorp.evaluators.cards import evaluate
     elif name == "curiosity":
         from thorp.evaluators.curiosity import evaluate
+    elif name == "shapes":
+        from thorp.evaluators.shapes import evaluate
     else:
         raise KeyError(f"unknown evaluator {name!r}")
     return evaluate

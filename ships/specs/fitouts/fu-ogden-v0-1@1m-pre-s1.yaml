@@ -50,6 +50,7 @@ eval:
   - stars
   - nevermore
   - cards
+  - shapes
   light:
     every_steps: 64
     evaluators:
@@ -57,6 +58,7 @@ eval:
     - nevermore
     - cards
     - logic
+    - shapes
 checkpoint:
   every_steps: 640
 seed: 1

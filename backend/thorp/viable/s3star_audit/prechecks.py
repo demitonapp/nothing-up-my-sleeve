@@ -47,3 +47,37 @@ ITEMS = (
         "S3*", "cleaning", "letters after cleaning / before, on a sample", "=", 1.0, _ratio(_LETTERS),
     ),
 )  # fmt: skip
+
+
+# words whose kind context cannot change, with the UPOS the tagger must give them
+_FIXED = {"the": "DET", "a": "DET", "an": "DET", "and": "CCONJ", "or": "CCONJ", "of": "ADP", "with": "ADP",
+          "from": "ADP", "he": "PRON", "she": "PRON", "they": "PRON", "we": "PRON", "i": "PRON",
+          "because": "SCONJ", "if": "SCONJ", "very": "ADV"}  # fmt: skip
+
+
+def _tagger_agrees(ctx: Context):
+    """Independent of the tagger's claims: on words whose kind context cannot change, it must agree."""
+    from thorp.viable.s2_coordination import tagger
+
+    seen = agree = 0
+    misses: dict[str, int] = {}
+    for b in ctx.sample[:12]:
+        for _, _, w, t in tagger.tag(ctx.cleaned(b)[:60_000]):
+            want = _FIXED.get(w.lower())
+            if want:
+                seen += 1
+                agree += t == want
+                if t != want:
+                    misses[f"{w.lower()}->{t}"] = misses.get(f"{w.lower()}->{t}", 0) + 1
+    return agree / max(1, seen), {"words": seen, "misses": sorted(misses.items(), key=lambda x: -x[1])[:10]}
+
+
+ITEMS = (
+    *ITEMS,
+    Item(
+        "audit.tagger_agrees", "The tagger agrees where it must",
+        "on words whose kind context cannot change (the, and, of, he, because, very ...), the tagger gives the kind "
+        "the taxonomy expects",
+        "S3*", "policy", "share of such words tagged as expected, on a sample", ">=", 0.95, _tagger_agrees,
+    ),
+)  # fmt: skip

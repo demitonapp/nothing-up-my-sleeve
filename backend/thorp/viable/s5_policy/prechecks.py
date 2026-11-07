@@ -83,3 +83,22 @@ ITEMS = (
         _count(r"(?<=\S)[ \t]{2,}(?=\S)"), V2,
     ),
 )  # fmt: skip
+
+
+def _shapes_ok(ctx: Context):
+    from thorp.viable.s5_policy import taxonomy
+
+    reads = all("shapes" in (s.get("eval") or {}).get("evaluators", []) and "shapes" in
+                ((s.get("eval") or {}).get("light") or {}).get("evaluators", []) for s in ctx.specs)  # fmt: skip
+    return (1.0 if reads else 0.0), {"taxonomy": taxonomy.VERSION, "adopted": taxonomy.ADOPTED, "every_reading": reads}
+
+
+ITEMS = (
+    *ITEMS,
+    Item(
+        "shapes.recorded", "The shapes taxonomy at every reading",
+        "every voyage records its guesses against the shapes taxonomy (UPOS + BREAK, and Ogden's kinds) at every "
+        "reading, light and full (Justin, 20:20: 'all sizes should be able to record against that taxonomy')",
+        "S5", "policy", "1 when every voyage runs the shapes evaluator at every reading", "=", 1.0, _shapes_ok,
+    ),
+)  # fmt: skip

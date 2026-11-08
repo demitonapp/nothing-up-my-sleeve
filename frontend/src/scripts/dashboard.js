@@ -2953,7 +2953,6 @@ async function loadShelves() {
     if (!d.error) setTimeout(() => { if (page === 'shelves') loadShelves(); }, 2500);
     return;
   }
-  if (d.shelves) initBuilder(d.shelves);
   const key = JSON.stringify(d.shelves); if (key === shelvesKey) return; shelvesKey = key; shelvesData = d.shelves;
   const sel = document.getElementById('shelfkind'), keep = sel.value;
   sel.innerHTML = '<option value="">every kind</option>' + SHELF_KINDS.filter(k => shelvesData.some(x => x.kind === k[0])).map(k => `<option value="${k[0]}">${k[1].toLowerCase()}</option>`).join('');

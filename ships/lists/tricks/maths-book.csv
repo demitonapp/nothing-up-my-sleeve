@@ -1,0 +1,73 @@
+item,chapter,key,title,about,prompt,answer,rival
+counting-on-0,1,counting-on,Counting on,the next number after a run of four; the rival is one already said,"Twelve, thirteen, fourteen, fifteen,",sixteen,fourteen
+counting-on-1,1,counting-on,Counting on,the next number after a run of four; the rival is one already said,"Fifteen, sixteen, seventeen, eighteen,",nineteen,seventeen
+counting-on-2,1,counting-on,Counting on,the next number after a run of four; the rival is one already said,"Thirteen, fourteen, fifteen, sixteen,",seventeen,fifteen
+counting-on-3,1,counting-on,Counting on,the next number after a run of four; the rival is one already said,"Nine, ten, eleven, twelve,",thirteen,eleven
+counting-on-4,1,counting-on,Counting on,the next number after a run of four; the rival is one already said,"One, two, three, four,",five,three
+counting-on-5,1,counting-on,Counting on,the next number after a run of four; the rival is one already said,"Four, five, six, seven,",eight,six
+counting-on-6,1,counting-on,Counting on,the next number after a run of four; the rival is one already said,"Six, seven, eight, nine,",ten,eight
+counting-on-7,1,counting-on,Counting on,the next number after a run of four; the rival is one already said,"Ten, eleven, twelve, thirteen,",fourteen,twelve
+counting-back-0,2,counting-back,Counting back,the next number down a run of four; the rival is one already said,"Fifteen, fourteen, thirteen, twelve,",eleven,thirteen
+counting-back-1,2,counting-back,Counting back,the next number down a run of four; the rival is one already said,"Seventeen, sixteen, fifteen, fourteen,",thirteen,fifteen
+counting-back-2,2,counting-back,Counting back,the next number down a run of four; the rival is one already said,"Eighteen, seventeen, sixteen, fifteen,",fourteen,sixteen
+counting-back-3,2,counting-back,Counting back,the next number down a run of four; the rival is one already said,"Fourteen, thirteen, twelve, eleven,",ten,twelve
+counting-back-4,2,counting-back,Counting back,the next number down a run of four; the rival is one already said,"Six, five, four, three,",two,four
+counting-back-5,2,counting-back,Counting back,the next number down a run of four; the rival is one already said,"Eleven, ten, nine, eight,",seven,nine
+counting-back-6,2,counting-back,Counting back,the next number down a run of four; the rival is one already said,"Sixteen, fifteen, fourteen, thirteen,",twelve,fourteen
+counting-back-7,2,counting-back,Counting back,the next number down a run of four; the rival is one already said,"Nine, eight, seven, six,",five,seven
+adding-0,3,adding,Adding,two small numbers put together; the rival multiplies them,Two and four make,six,eight
+adding-1,3,adding,Adding,two small numbers put together; the rival multiplies them,Four and six make,ten,twenty-four
+adding-2,3,adding,Adding,two small numbers put together; the rival multiplies them,Two and five make,seven,ten
+adding-3,3,adding,Adding,two small numbers put together; the rival multiplies them,Two and three make,five,six
+adding-4,3,adding,Adding,two small numbers put together; the rival multiplies them,Five and two make,seven,ten
+adding-5,3,adding,Adding,two small numbers put together; the rival multiplies them,Three and five make,eight,fifteen
+adding-6,3,adding,Adding,two small numbers put together; the rival multiplies them,Six and three make,nine,eighteen
+adding-7,3,adding,Adding,two small numbers put together; the rival multiplies them,Six and two make,eight,twelve
+taking-away-0,4,taking-away,Taking away,a small number taken from a bigger; the rival adds them,"Take four from eleven, and there are",seven,fifteen
+taking-away-1,4,taking-away,Taking away,a small number taken from a bigger; the rival adds them,"Take six from twelve, and there are",six,eighteen
+taking-away-2,4,taking-away,Taking away,a small number taken from a bigger; the rival adds them,"Take six from eleven, and there are",five,seventeen
+taking-away-3,4,taking-away,Taking away,a small number taken from a bigger; the rival adds them,"Take two from eleven, and there are",nine,thirteen
+taking-away-4,4,taking-away,Taking away,a small number taken from a bigger; the rival adds them,"Take six from eight, and there are",two,fourteen
+taking-away-5,4,taking-away,Taking away,a small number taken from a bigger; the rival adds them,"Take four from twelve, and there are",eight,sixteen
+taking-away-6,4,taking-away,Taking away,a small number taken from a bigger; the rival adds them,"Take four from seven, and there are",three,eleven
+taking-away-7,4,taking-away,Taking away,a small number taken from a bigger; the rival adds them,"Take five from nine, and there are",four,fourteen
+times-0,5,times,Times,a small number taken so many times; the rival adds them,Five times four make,twenty,nine
+times-1,5,times,Times,a small number taken so many times; the rival adds them,Two times six make,twelve,eight
+times-2,5,times,Times,a small number taken so many times; the rival adds them,Two times five make,ten,seven
+times-3,5,times,Times,a small number taken so many times; the rival adds them,Five times three make,fifteen,eight
+times-4,5,times,Times,a small number taken so many times; the rival adds them,Four times four make,sixteen,eight
+times-5,5,times,Times,a small number taken so many times; the rival adds them,Three times six make,eighteen,nine
+times-6,5,times,Times,a small number taken so many times; the rival adds them,Three times four make,twelve,seven
+times-7,5,times,Times,a small number taken so many times; the rival adds them,Four times five make,twenty,nine
+sharing-0,6,sharing,Sharing,a number shared equally; the rival takes the parts away,"Share nine eggs equally among three girls, and each girl gets",three,six
+sharing-1,6,sharing,Sharing,a number shared equally; the rival takes the parts away,"Share six eggs equally among two mans, and each man gets",three,four
+sharing-2,6,sharing,Sharing,a number shared equally; the rival takes the parts away,"Share ten stones equally among two womans, and each woman gets",five,eight
+sharing-3,6,sharing,Sharing,a number shared equally; the rival takes the parts away,"Share twelve cows equally among four boys, and each boy gets",three,eight
+sharing-4,6,sharing,Sharing,a number shared equally; the rival takes the parts away,"Share eight birds equally among two girls, and each girl gets",four,six
+sharing-5,6,sharing,Sharing,a number shared equally; the rival takes the parts away,"Share six apples equally among three womans, and each woman gets",two,three
+sharing-6,6,sharing,Sharing,a number shared equally; the rival takes the parts away,"Share twelve sheep equally among three girls, and each girl gets",four,nine
+sharing-7,6,sharing,Sharing,a number shared equally; the rival takes the parts away,"Share six birds equally among two girls, and each girl gets",three,four
+halves-0,7,halves,Halves and doubles,"half of a number, or two times it; the rival does the other",Two times three is,six,four
+halves-1,7,halves,Halves and doubles,"half of a number, or two times it; the rival does the other",Two times five is,ten,six
+halves-2,7,halves,Halves and doubles,"half of a number, or two times it; the rival does the other",Two times four is,eight,two
+halves-3,7,halves,Halves and doubles,"half of a number, or two times it; the rival does the other",Two times eight is,sixteen,four
+halves-4,7,halves,Halves and doubles,"half of a number, or two times it; the rival does the other",Two times ten is,twenty,five
+halves-5,7,halves,Halves and doubles,"half of a number, or two times it; the rival does the other",Half of ten is,five,twenty
+halves-6,7,halves,Halves and doubles,"half of a number, or two times it; the rival does the other",Half of fourteen is,seven,twenty-eight
+halves-7,7,halves,Halves and doubles,"half of a number, or two times it; the rival does the other",Half of four is,two,eight
+story-one-0,8,story-one,"Stories, one step",a person gets more or gives some away; the rival does the other,A woman has six books. She gives two away. Now she has,four,eight
+story-one-1,8,story-one,"Stories, one step",a person gets more or gives some away; the rival does the other,A man has four nuts. He gets two more. Now he has,six,two
+story-one-2,8,story-one,"Stories, one step",a person gets more or gives some away; the rival does the other,A boy has seven sheep. He gets two more. Now he has,nine,five
+story-one-3,8,story-one,"Stories, one step",a person gets more or gives some away; the rival does the other,A woman has eight nuts. She gets three more. Now she has,eleven,five
+story-one-4,8,story-one,"Stories, one step",a person gets more or gives some away; the rival does the other,A woman has nine books. She gets five more. Now she has,fourteen,four
+story-one-5,8,story-one,"Stories, one step",a person gets more or gives some away; the rival does the other,A man has nine birds. He gets five more. Now he has,fourteen,four
+story-one-6,8,story-one,"Stories, one step",a person gets more or gives some away; the rival does the other,A boy has seven cows. He gives three away. Now he has,four,ten
+story-one-7,8,story-one,"Stories, one step",a person gets more or gives some away; the rival does the other,A woman has five stones. She gets five more. Now she has,ten,zero
+story-two-0,9,story-two,"Stories, two steps","gets some, then gives some away; the rival stops after the first step","A man has three birds. He gets three more, and then he gives two away. Now he has",four,six
+story-two-1,9,story-two,"Stories, two steps","gets some, then gives some away; the rival stops after the first step","A man has five cows. He gets four more, and then he gives two away. Now he has",seven,nine
+story-two-2,9,story-two,"Stories, two steps","gets some, then gives some away; the rival stops after the first step","A woman has four birds. She gets three more, and then she gives three away. Now she has",four,seven
+story-two-3,9,story-two,"Stories, two steps","gets some, then gives some away; the rival stops after the first step","A man has six stones. He gets five more, and then he gives three away. Now he has",eight,eleven
+story-two-4,9,story-two,"Stories, two steps","gets some, then gives some away; the rival stops after the first step","A man has four birds. He gets three more, and then he gives two away. Now he has",five,seven
+story-two-5,9,story-two,"Stories, two steps","gets some, then gives some away; the rival stops after the first step","A woman has six nuts. She gets three more, and then she gives two away. Now she has",seven,nine
+story-two-6,9,story-two,"Stories, two steps","gets some, then gives some away; the rival stops after the first step","A man has seven nuts. He gets five more, and then he gives three away. Now he has",nine,twelve
+story-two-7,9,story-two,"Stories, two steps","gets some, then gives some away; the rival stops after the first step","A boy has seven sheep. He gets four more, and then he gives one away. Now he has",ten,eleven

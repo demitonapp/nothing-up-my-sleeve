@@ -102,7 +102,7 @@ import { btnCls, cardCls, crumbCls, emptyCls, fieldCls, rangeCls, selectCls, tab
 
   <!-- ============================== Scoring -->
   <div class="mtab" data-mtab="scoring">
-    <nav class={tabsCls('line', 'subnav')} data-orientation="horizontal" data-variant="line" id="scnav"><a class={tabCls('')} data-state="inactive" data-ssub="ask">Ask</a><a class={tabCls('')} data-state="inactive" data-ssub="language">Language</a><a class={tabCls('')} data-state="inactive" data-ssub="shapes">Shapes</a><a class={tabCls('')} data-state="inactive" data-ssub="number">Number</a><a class={tabCls('')} data-state="inactive" data-ssub="physics">Physics</a><a class={tabCls('')} data-state="inactive" data-ssub="life">Life</a><a class={tabCls('')} data-state="inactive" data-ssub="return">Return</a><a class={tabCls('')} data-state="inactive" data-ssub="logic">Logic</a><a class={tabCls('')} data-state="inactive" data-ssub="versus">Versus</a></nav>
+    <nav class={tabsCls('line', 'subnav')} data-orientation="horizontal" data-variant="line" id="scnav"><a class={tabCls('')} data-state="inactive" data-ssub="ask">Ask</a><a class={tabCls('')} data-state="inactive" data-ssub="language">Language</a><a class={tabCls('')} data-state="inactive" data-ssub="shapes">Shapes</a><a class={tabCls('')} data-state="inactive" data-ssub="number">Number</a><a class={tabCls('')} data-state="inactive" data-ssub="maths">Maths</a><a class={tabCls('')} data-state="inactive" data-ssub="physics">Physics</a><a class={tabCls('')} data-state="inactive" data-ssub="life">Life</a><a class={tabCls('')} data-state="inactive" data-ssub="return">Return</a><a class={tabCls('')} data-state="inactive" data-ssub="logic">Logic</a><a class={tabCls('')} data-state="inactive" data-ssub="versus">Versus</a></nav>
     <div class="ssub" data-ssub="ask">
     <section class={cardCls(false, 'panel')} id="askpanel">
       <h2>Ask the best version <span class="note">type a line and read what it guesses comes next: its ten likeliest next words (or two words, or the raw pieces it actually predicts), no sampling; or let it answer; the rudimentary questions below each carry the answer we would hope for, and "run all" shows where that answer ranks among its guesses</span></h2>
@@ -121,6 +121,16 @@ import { btnCls, cardCls, crumbCls, emptyCls, fieldCls, rangeCls, selectCls, tab
       </div>
       <div id="askchips" class="askchips"></div>
       <div id="askout" class="askout"></div>
+    </section>
+    </div>
+    <div class="ssub" data-ssub="maths">
+    <section class={cardCls(false, 'panel')} id="mathspanel">
+      <h2>The maths book <span class="note">nine chapters in the order a Basic English arithmetic primer teaches them, eight sums each, in its plain words ("Two and three make"); each sum's answer against its rival, the answer of the mistake a learner makes at that chapter. A sum is right when the answer is among the ship's ten guesses and above the rival; a chapter is learnt at six of eight; the ship has learnt the book up to the first chapter it has not</span></h2>
+      <div class="askrow">
+        <select class={selectCls()} id="mathsvoyage" aria-label="the voyage to read the book with"></select>
+        <button class={btnCls('default')} id="mathsrun" type="button">Read the book</button>
+      </div>
+      <div id="mathsout" class="askout"></div>
     </section>
     </div>
     <div class="ssub" data-ssub="language">

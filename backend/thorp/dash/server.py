@@ -3368,6 +3368,20 @@ def api_ask_questions(preset: str) -> dict:
     }  # fmt: skip
 
 
+def api_maths_book() -> dict:
+    """The maths book (ships/lists/tricks/maths-book.csv, backend/scripts/make_maths_book.py): nine chapters in the
+    order a Basic English arithmetic primer teaches them, each with its sums, answers and rivals, for the Scoring
+    tab's Maths page to read against a voyage (the same ten guesses as the ask panel)."""
+    import csv
+
+    rows = list(csv.DictReader(paths.resolve("lists/tricks/maths-book.csv").open()))
+    chapters: dict[int, dict] = {}
+    for r in rows:
+        c = chapters.setdefault(int(r["chapter"]), {"n": int(r["chapter"]), "key": r["key"], "title": r["title"], "about": r["about"], "sums": []})
+        c["sums"].append({"item": r["item"], "text": r["prompt"], "hope": r["answer"], "rival": r["rival"]})
+    return {"chapters": [chapters[k] for k in sorted(chapters)], "mark": 6}  # a chapter learnt: 6 of its 8 sums
+
+
 LOGIC_ASK_FROM = ("21m", "50m", "100m", "350m")  # the stylist up (Justin, 8 November: "start testing the logic questions from 21m up")
 
 
@@ -3848,6 +3862,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/watch": lambda: api_watch(q["preset"]),
                 "/api/class_deck": lambda: api_class_deck(q["preset"]),
                 "/api/ask_questions": lambda: api_ask_questions(q["preset"]),
+                "/api/maths_book": lambda: api_maths_book(),
                 "/api/class_subjects": lambda: api_class_subjects(q["preset"]),
                 "/api/class_shapes": lambda: api_class_shapes(q["preset"]),
                 "/api/class_vs": lambda: api_class_vs(q["preset"], q.get("ref"), q.get("voyage")),

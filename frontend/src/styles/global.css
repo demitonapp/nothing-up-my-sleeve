@@ -761,6 +761,10 @@ main a.pc2-more:hover { color: #000; }
 .plantable tr.plan-cmd td, .plantable tr.plan-wait td { color: var(--muted); }
 .plantable tr.plan-hold td { background: color-mix(in srgb, var(--accent) 8%, transparent); }
 .lanechip { white-space: nowrap; }
+.mathstable tr.mathchap td { border-top: 2px solid var(--line); padding-top: 8px; }
+.mathstable tr.mathsum td { font-size: var(--fs-sm); }
+.mathstable .mathbar { width: 120px; height: 8px; border-radius: 4px; background: var(--track); overflow: hidden; }
+.mathstable .mathbar span { display: block; height: 100%; background: var(--good); }
 .plantable .plantitle { font-weight: 600; }
 .plantable .plantitle a { color: inherit; }
 .plantable tr.atsea td { background: color-mix(in srgb, var(--good) 7%, transparent); }

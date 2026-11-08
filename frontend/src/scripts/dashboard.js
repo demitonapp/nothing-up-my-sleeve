@@ -94,7 +94,7 @@ function route(h) {
 }
 const WSUBS = ['expected', 'envelope', 'stars'];
 let wpSub = 'expected';
-const SSUBS = ['ask', 'language', 'shapes', 'number', 'physics', 'life', 'return', 'logic', 'versus'];
+const SSUBS = ['ask', 'language', 'shapes', 'number', 'maths', 'physics', 'life', 'return', 'logic', 'versus'];
 let scSub = 'ask';
 // the Overview's sub-pages: one per relation of the logic deck (2026-11-08: "a detail page explaining each of those relation tiles")
 const OSUBS = ['order', 'cause', 'membership', 'proportion', 'counterfactual'].map(x => 'logic-' + x);
@@ -1003,6 +1003,58 @@ const hopeRank = (gs, hope) => {  // where the hoped-for word is among the guess
   return i < 0 ? null : i + 1;
 };
 const showPiece = s => s === '\n' ? '⏎' : s.replace(/ /g, '·');
+// ---- the maths book (Scoring > Maths; /api/maths_book, backend/scripts/make_maths_book.py): nine chapters of a
+// Basic English arithmetic primer read against a voyage with the ask panel's ten guesses. A sum is right when its
+// answer is among the ten and above its rival; a chapter is learnt at `mark` of eight; the ship has learnt the
+// book up to the first chapter it has not.
+let mathsData = null, mathsWired = false;
+async function mathsBook(r) {
+  const sel = document.getElementById('mathsvoyage'), out = document.getElementById('mathsout'); if (!sel || !out) return;
+  if (!mathsData) { try { mathsData = await get('/api/maths_book'); } catch (e) { out.innerHTML = `<div class="${emptyCls()}">the maths book could not be read (a dashboard started before it existed has to be restarted)</div>`; return; } }
+  const fill = () => { const a = document.getElementById('askvoyage'); if (a && a.options.length && sel.dataset.preset !== r.preset) { sel.innerHTML = a.innerHTML; sel.value = a.value; sel.dataset.preset = r.preset; } };
+  fill();  // the ask panel finds the size's best voyage, which can take a while on a fresh dashboard: keep trying
+  if (!sel.options.length) { let n = 0; const t = setInterval(() => { fill(); if (sel.options.length || ++n > 60) clearInterval(t); }, 1000); }
+  if (!out.innerHTML) out.innerHTML = mathsIndex();
+  if (mathsWired) return; mathsWired = true;
+  document.getElementById('mathsrun').onclick = async () => {
+    fill(); const run = sel.value; if (!run) { out.innerHTML = `<div class="${emptyCls()}">no voyage chosen yet</div>`; return; }
+    const btn = document.getElementById('mathsrun'); btn.disabled = true;
+    const res = {};  // chapter -> [{s, rank, rrank, ok}]
+    const draw = (done) => { out.innerHTML = mathsTable(run, res, done); };
+    for (const c of mathsData.chapters) {
+      res[c.n] = [];
+      for (const q of c.sums) {
+        try {
+          const g0 = await get(`/api/table/guesses?run=${encodeURIComponent(run)}&k=10&mode=1&text=${encodeURIComponent(q.text)}`);
+          const gs = g0.guesses.filter(x => !x.continues);
+          const rank = hopeRank(gs, q.hope), rrank = hopeRank(gs, q.rival);
+          res[c.n].push({ q, rank, rrank, ok: chose(rank, rrank) === 'the premises', top: gs.slice(0, 3) });
+        } catch (e) { res[c.n].push({ q, err: true }); }
+        draw(false);
+      }
+    }
+    draw(true); btn.disabled = false;
+  };
+}
+function mathsIndex() {
+  return `<div class="scroll"><table class="mathstable"><thead><tr><th>chapter</th><th>what it teaches</th><th>a sum from it</th></tr></thead><tbody>${mathsData.chapters.map(c => `<tr><td><b>${c.n}. ${esc(c.title)}</b></td><td class="s">${esc(c.about)}</td><td class="mono">${esc(c.sums[0].text)} <b>${esc(c.sums[0].hope)}</b> <span class="s">not</span> <i>${esc(c.sums[0].rival)}</i></td></tr>`).join('')}</tbody></table></div>`;
+}
+function mathsTable(run, res, done) {
+  const mark = mathsData.mark || 6;
+  let learnt = 0, open = true;
+  for (const c of mathsData.chapters) { const r = res[c.n]; if (!r || r.length < c.sums.length) break; if (open && r.filter(x => x.ok).length >= mark) learnt = c.n; else open = false; }
+  const total = Object.values(res).flat(), right = total.filter(x => x.ok).length;
+  const head = `<div class="ovq">${esc(run)} · <b>${right} of ${total.length}</b> sums right${done ? ` · <b>${learnt ? `learnt up to chapter ${learnt}, ${esc(mathsData.chapters[learnt - 1].title.toLowerCase())}` : 'not yet past chapter 1, counting on'}</b>` : ' · reading…'}</div>`;
+  const rows = mathsData.chapters.filter(c => res[c.n]).map(c => {
+    const r = res[c.n], n = r.filter(x => x.ok).length, full = r.length === c.sums.length;
+    const sums = r.map(x => `<tr class="mathsum"><td></td><td class="mono">${esc(x.q.text)}</td><td>${esc(x.q.hope)} <span class="s">${x.rank ? `guess ${x.rank}` : 'not in ten'}</span></td><td>${esc(x.q.rival)} <span class="s">${x.rrank ? `guess ${x.rrank}` : 'not in ten'}</span></td>
+      <td>${x.err ? '<span class="s">failed</span>' : `<span class="${pillCls(x.ok ? 'good' : chose(x.rank, x.rrank) === 'the rival' ? 'bad' : '')}">${x.ok ? 'right' : chose(x.rank, x.rrank) === 'the rival' ? 'the rival' : 'neither'}</span>`}</td>
+      <td class="mono s">${(x.top || []).map(g => `${esc(g.word)} ${(100 * g.p).toFixed(0)}%`).join(' · ')}</td></tr>`).join('');
+    return `<tr class="mathchap"><td><b>${c.n}. ${esc(c.title)}</b></td><td class="s" colspan="3">${esc(c.about)}</td>
+      <td><span class="${pillCls(!full ? '' : n >= mark ? 'good' : 'bad')}">${n} of ${r.length}${full ? (n >= mark ? ' · learnt' : ' · not yet') : ''}</span></td><td><div class="mathbar"><span style="width:${100 * n / c.sums.length}%"></span></div></td></tr>${sums}`;
+  }).join('');
+  return `${head}<div class="scroll"><table class="mathstable"><thead><tr><th>chapter</th><th>the sum</th><th>the answer</th><th>the rival</th><th>verdict</th><th>its first three guesses</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
 async function askPanel(r) {
   const who = document.getElementById('askwho'), sel = document.getElementById('askvoyage'); if (!who || !sel) return;
   if (askPreset !== r.preset) {
@@ -1620,7 +1672,7 @@ function renderRung() {
   if (modelTab === 'waypoints') { renderWaypoints(r); starsInReach(r); classSteps(r); }
   if (modelTab === 'goals') classGoals(r);
   if (modelTab === 'fitouts') classFitouts(r);
-  if (modelTab === 'scoring') { askPanel(r); if (scSub === 'shapes') classShapes(r); else if (scSub === 'versus') classVersus(r); else if (!['ask', 'language'].includes(scSub)) classSubject(r, scSub); }
+  if (modelTab === 'scoring') { askPanel(r); if (scSub === 'shapes') classShapes(r); else if (scSub === 'versus') classVersus(r); else if (scSub === 'maths') mathsBook(r); else if (!['ask', 'language'].includes(scSub)) classSubject(r, scSub); }
   if (modelTab === 'bet') classWager(r);
   if (modelTab === 'training') classWatch(r);
   document.querySelectorAll('#rung .chart').forEach(el => { if (el.data && el.offsetParent) Plotly.Plots.resize(el); });

@@ -16,7 +16,7 @@ voyages (training, thorp/vsm.py) and acquisition (the books the voyages read). A
   (thorp/manifest.py).
 - **S3, control**: the intake gate (`admit`): Thorp's S5 policies applied to a book before it enters the
   library. Rules that serve an adopted policy refuse; proposed rules only record. Switched off in
-  data/policies.json ("intake": false), by Justin. **S3\***: `audit()`, over the manifest and the texts,
+  S5's switch "intake" (s5.policy_switches, `thorp s5 switch intake off`), by Justin. **S3\***: `audit()`, over the manifest and the texts,
   independent of the gate.
 - **S4, intelligence**: the sources beyond Gutenberg (SOURCES_KNOWN, from plans/corpus-ceiling.md) and how
   much of the legal Gutenberg is fetched (`ceiling()`).
@@ -363,12 +363,11 @@ RULES: dict[str, Rule] = {
 
 
 def enforced() -> bool:
-    """The intake gate refuses on adopted rules unless Justin switches it off (data/policies.json "intake")."""
-    p = paths.data_dir() / "policies.json"
-    try:
-        return bool(json.loads(p.read_text()).get("intake", True)) if p.exists() else True
-    except (OSError, ValueError):
-        return True
+    """The intake gate refuses on adopted rules unless Justin switches it off (S5's switch "intake",
+    s5.policy_switches)."""
+    from thorp import vsm
+
+    return bool(vsm._enforcement().get("intake", True))
 
 
 @dataclass

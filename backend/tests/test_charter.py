@@ -121,7 +121,9 @@ class FakeBox:
         import os
 
         home = {k: os.environ.get(k) for k in ("THORP_DATA", "THORP_LEDGER", "THORP_BACKEND")}
-        os.environ.update(THORP_DATA=str(self.root / "data"), THORP_LEDGER=str(self.root / "ledger.sqlite"), THORP_BACKEND="torch")
+        home["THORP_PAPERS"] = os.environ.get("THORP_PAPERS")
+        os.environ.update(THORP_DATA=str(self.root / "data"), THORP_LEDGER=str(self.root / "ledger.sqlite"), THORP_BACKEND="torch",
+                          THORP_PAPERS=str(self.root / "data" / "charter" / f"{rid}.papers.json"))  # as Box.launch sets it
         try:
             box_led = Ledger()
             self.papers_row = box_led.get_run(rid)  # the box's gate knows the run S3 passed at home
@@ -155,14 +157,14 @@ def write_spec(spec, tmp_thorp) -> str:
 
 def small_terms(tmp_thorp, **over):
     t = {"gpus": {"RTX 4090": 0.50, "H100 SXM": 2.60}, "voyage_budget": 5.0, "weekly_budget": 20.0, **over}
-    (paths.data_dir()).mkdir(parents=True, exist_ok=True)
-    (paths.data_dir() / "charter.json").write_text(json.dumps(t))
+    for k, v in t.items():
+        s5.set_term(k, v, "a test")
 
 
 # ---------------------------------------------------------------- S5 and S3
 
 
-def test_terms_are_the_defaults_under_charter_json(tmp_thorp):
+def test_terms_are_the_defaults_under_s5s_changes(tmp_thorp):
     assert s5.terms() == s5.DEFAULTS
     small_terms(tmp_thorp, gpus={"RTX 4090": 0.4})
     t = s5.terms()
@@ -264,6 +266,17 @@ def test_a_chartered_voyage_sails_and_comes_home(library, spec, tmp_thorp, monke
     assert not (box_root / "data" / "secrets").exists()
     assert (box_root / "data" / "manifest.sqlite").exists() and (box_root / "data" / "texts" / "local" / "loc-a.txt").exists()
     assert boxes[0].papers_row and boxes[0].papers_row["run_id"] == rid
+    # the box sailed under the papers carried aboard (the S5 state its gate would read); its gate knew the run S3
+    # passed at home, so it made no decision of its own, and nothing came home as one (tests/test_store.py folds one)
+    assert (box_root / "data" / "charter" / f"{rid}.papers.json").exists()
+    from sqlalchemy import select
+
+    from thorp import store
+    from thorp.viable.records import GateDecision
+
+    with store.session() as ss:
+        aboard = ss.scalars(select(GateDecision).where(GateDecision.source == f"box papers {rid}")).all()
+    assert aboard == [] and [d["where"] for d in vsm.gate_log()] == ["charter", "voyage"]  # both asked at home
     # home: the run finished in this ledger, its rows and checkpoints, the hire on its hardware line
     run = rec.get_run(rid)
     assert run["status"] == "finished" and "vast.ai instance" in run["hardware"] and "torch" in run["hardware"]
@@ -339,6 +352,14 @@ def test_the_audit_finds_orphans_and_ghosts(tmp_thorp):
     r = s3star.audit(v, release_orphans=True, log=lambda *a: None)
     assert r["released"] == [orphan] and set(market.instances) == {other}
     assert s3.out_now() == []
+    from sqlalchemy import select
+
+    from thorp import store
+    from thorp.viable.records import Audit
+
+    with store.session() as ss:  # S3*'s own record: the ghost closed once, the orphan released once
+        found = [(a.finding, a.instance, a.action) for a in ss.scalars(select(Audit).order_by(Audit.id))]
+    assert found == [("ghost", 4242, "closed in the spend log"), ("orphan", orphan, "released")]
 
 
 def test_the_real_box_speaks_ssh_and_rsync(tmp_thorp):
@@ -360,6 +381,7 @@ def test_the_real_box_speaks_ssh_and_rsync(tmp_thorp):
     ssh = [a for a in seen if a[0] == "ssh"]
     assert all(a[a.index("-p") + 1] == "40123" and "root@ssh9.vast.ai" in a for a in ssh)
     assert "THORP_BACKEND=torch" in ssh[1][-1] and "thorp run data/charter/rid1.yaml" in ssh[1][-1] and ssh[1][-1].endswith("&")
+    assert "THORP_PAPERS=/root/thorp/data/charter/rid1.papers.json" in ssh[1][-1]  # the box's gate sails under papers
     rs = [a for a in seen if a[0] == "rsync"]
     assert rs[0][-1] == f"root@ssh9.vast.ai:{s1.REMOTE}/data/" and any(x.startswith("--files-from=") for x in rs[0])
     assert rs[1][-2] == f"root@ssh9.vast.ai:{s1.REMOTE}/ledger.sqlite"

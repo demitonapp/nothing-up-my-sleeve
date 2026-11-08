@@ -3,15 +3,13 @@ voyage on it, so the cheapest ship for the voyage (not the cheapest hour) is hir
 
 A class's speed is S4's guess (s5_policy.charter.EFFECTIVE_TFLOPS) until a voyage of that class and preset has
 sailed; from then on the measured rate (tokens a second, from the spend log's 'released' lines) is used. Every
-reading of the market is kept (data/charter-market.jsonl), so the prices can be watched over the week.
+reading of the market is kept (s4.market_reads in Postgres), so the prices can be watched over the week.
 """
 
 from __future__ import annotations
 
-import json
 from datetime import UTC, datetime
 
-from thorp import paths
 from thorp.viable.s3_control import charter as s3
 from thorp.viable.s5_policy import charter as s5
 
@@ -80,12 +78,28 @@ def quotes(vast, cfg, preset: str, tokens: int, terms: dict, gpus: list[str] | N
 
 
 def _keep(qs: list[dict]) -> None:
-    try:
-        p = paths.data_dir() / "charter-market.jsonl"
-        p.parent.mkdir(parents=True, exist_ok=True)
-        with p.open("a", encoding="utf-8") as f:
-            at = datetime.now(UTC).isoformat(timespec="seconds")
-            for q in qs:
-                f.write(json.dumps({"at": at, **{k: q[k] for k in ("gpu", "offer_id", "dph", "reliability", "hours", "cost")}}) + "\n")
-    except Exception:  # noqa: BLE001  (a reading not kept never costs a quote)
-        pass
+    """Each price read, kept (s4.market_reads)."""
+    keep([{"at": datetime.now(UTC).isoformat(timespec="seconds"),
+           **{k: q[k] for k in ("gpu", "offer_id", "dph", "reliability", "hours", "cost")}} for q in qs])  # fmt: skip
+
+
+def keep(rows: list[dict]) -> None:
+    from thorp import store
+    from thorp.viable.records import MarketRead
+
+    with store.session() as s:
+        s.add_all(MarketRead(at=datetime.fromisoformat(r["at"]), gpu=r["gpu"], offer_id=r.get("offer_id"), dph=float(r["dph"]),
+                             reliability=r.get("reliability"), hours=r.get("hours"), cost=r.get("cost")) for r in rows)  # fmt: skip
+
+
+def reads(limit: int = 500) -> list[dict]:
+    """The latest price reads, oldest first, as they were kept."""
+    from sqlalchemy import select
+
+    from thorp import store
+    from thorp.viable.records import MarketRead
+
+    with store.session() as s:
+        rows = s.scalars(select(MarketRead).order_by(MarketRead.at.desc(), MarketRead.id.desc()).limit(limit)).all()
+        return [{"at": r.at.astimezone(UTC).isoformat(timespec="seconds"), "gpu": r.gpu, "offer_id": r.offer_id,
+                 "dph": r.dph, "reliability": r.reliability, "hours": r.hours, "cost": r.cost} for r in rows[::-1]]  # fmt: skip

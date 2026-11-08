@@ -1,7 +1,6 @@
 """Acquisition as a viable system (thorp/acquisition.py): the people and their dates, the intake gate, an
 intake end to end on a stand-in source, the observer on the older fetch paths, and the voyage gate's record."""
 
-import json
 
 from thorp import acquisition as acq
 from thorp import manifest, vsm
@@ -76,9 +75,9 @@ def test_the_intake_gate_applies_thorps_policies_to_a_book(tmp_thorp):
 
 
 def test_the_intake_gate_can_be_switched_off_by_s5(tmp_thorp):
-    p = tmp_thorp / "data" / "policies.json"
-    p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps({"intake": False}))
+    from thorp import vsm
+
+    vsm.set_switch("intake", False, "a test")
     v = acq.admit(_c(published=1931))
     assert v.admitted and v.notes == ["printed-before-1930: printed in 1931"]
 

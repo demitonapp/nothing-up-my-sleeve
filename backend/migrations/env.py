@@ -13,6 +13,7 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy import create_engine, pool
 
+from thorp.viable import records
 from thorp.viable.s3_control import fitout_store, models
 
 config = context.config
@@ -28,8 +29,11 @@ def _url() -> str:
 
 
 def _include(obj, name, type_, reflected, compare_to):
-    """Only Thorp's own schema: the models live in `fitout`; any other table in the database is not ours."""
-    return type_ != "table" or getattr(obj, "schema", None) in (models.SCHEMA, models.GAME_SCHEMA, models.SHIP_SCHEMA)
+    """Only Thorp's own schemas (the fitouts, the Wager, the ships, and one per viable system); any other table is not ours."""
+    return type_ != "table" or getattr(obj, "schema", None) in OURS
+
+
+OURS = (models.SCHEMA, models.GAME_SCHEMA, models.SHIP_SCHEMA, *records.SCHEMAS)
 
 
 def run_migrations_offline() -> None:
@@ -48,9 +52,8 @@ def run_migrations_offline() -> None:
 def run_migrations_online() -> None:
     engine = create_engine(_url(), poolclass=pool.NullPool)
     with engine.connect() as connection:
-        connection.exec_driver_sql(f"create schema if not exists {models.SCHEMA}")
-        connection.exec_driver_sql(f"create schema if not exists {models.GAME_SCHEMA}")
-        connection.exec_driver_sql(f"create schema if not exists {models.SHIP_SCHEMA}")
+        for schema in (models.SCHEMA, models.GAME_SCHEMA, models.SHIP_SCHEMA):  # the viable systems' schemas are
+            connection.exec_driver_sql(f"create schema if not exists {schema}")  # made by their migration, not here
         connection.commit()
         context.configure(
             connection=connection,

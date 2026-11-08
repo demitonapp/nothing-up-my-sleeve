@@ -17,9 +17,10 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from thorp import chinchilla, paths
+from thorp import chinchilla, paths, store
 from thorp.evaluators.probes import load_traits
 from thorp.ledger import connect
+from thorp.store import StoreDown
 
 STATIC = Path(__file__).with_name("static")
 TYPES = {
@@ -1587,11 +1588,17 @@ def api_series(runs: str, metrics: str) -> dict:
     return out
 
 
+def api_store() -> dict:
+    """Whether the one store (Postgres) answers: the page says so when it does not."""
+    why = store.ping()
+    return {"up": why is None, "why": why}
+
+
 def api_governance() -> dict:
     """Thorp's rules as Beer's Viable System Model (thorp/vsm.py): the five systems (S1 operations to
     S5 policy) with their code, and the live audit: the voyages, the queue's collisions, each policy's
     enforcement and the queued runs that break it, the outside world Thorp measures itself against.
-    Read-only: switching a policy is Justin's S5 decision, made in data/policies.json."""
+    Read-only: switching a policy is Justin's S5 decision, recorded in s5.policy_switches (`thorp s5 switch`)."""
     import dataclasses
 
     from thorp import vsm
@@ -3762,6 +3769,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(200, posts[u.path](body))
         except TableNotBuilt as e:
             return self._json(503, {"error": str(e)})
+        except StoreDown as e:  # the one store is down: said, never answered from the old files
+            return self._json(503, {"error": str(e), "store": "down"})
         except (
             LookupError
         ) as e:  # no such run, or no checkpoint to talk to (thorp.table's own words)
@@ -3828,6 +3837,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/library_trigrams": lambda: api_shelf_trigrams(q["path"]),
                 "/api/voyages/where": lambda: api_voyages_where(q.get("runs", "")),
                 "/api/governance": api_governance,
+                "/api/store": api_store,
                 "/api/acquisition": api_acquisition,
                 "/api/acquisition/audit": api_acquisition_audit,
                 "/api/series": lambda: api_series(q.get("runs", ""), q.get("metrics", "")),
@@ -3873,6 +3883,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, body, "application/json")
         except TableNotBuilt as e:
             return self._send(503, json.dumps({"error": str(e)}).encode(), "application/json")
+        except StoreDown as e:  # the one store is down: said, never answered from the old files
+            return self._send(503, json.dumps({"error": str(e), "store": "down"}).encode(), "application/json")
         except Exception as e:  # noqa: BLE001
             return self._send(500, json.dumps({"error": repr(e)}).encode(), "application/json")
 

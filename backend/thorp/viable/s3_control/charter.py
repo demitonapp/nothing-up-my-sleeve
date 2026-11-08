@@ -5,18 +5,15 @@ attention counted, an allowance for the evaluators and the scaffold's own passes
 delivers, plus the hours of making the ship ready and bringing it home, at the offer's price. `violations` holds
 a quote to S5's terms (thorp/viable/s5_policy/charter.py); the gate asks it through vsm.POLICIES["charter"].
 
-The spend log (data/charter-log.jsonl) is S3's account of the money: one line when a ship is hired, one when it is
+The spend log (s3.spend_events in Postgres) is S3's account of the money: one line when a ship is hired, one when it is
 released with what it cost. The week's spend counts what is released this week and what is still out, accruing.
 """
 
 from __future__ import annotations
 
-import contextlib
 import json
 import time
 from datetime import UTC, datetime, timedelta
-
-from thorp import paths
 
 OVERHEAD = 1.15  # the evaluators, the scaffold's attending passes, checkpoints: over the training FLOPs
 
@@ -77,28 +74,38 @@ def violations(q: dict, t: dict) -> list[str]:
 # ---------------------------------------------------------------- the spend log
 
 
-def _log_path():
-    return paths.data_dir() / "charter-log.jsonl"
-
-
 def record(event: str, **fields) -> dict:
+    """One event of the spend (hired, released), kept in s3.spend_events; returns it as the log's line."""
     line = {"at": datetime.now(UTC).isoformat(timespec="seconds"), "event": event, **fields}
-    p = _log_path()
-    p.parent.mkdir(parents=True, exist_ok=True)
-    with p.open("a", encoding="utf-8") as f:
-        f.write(json.dumps(line, ensure_ascii=False) + "\n")
+    insert(line)
     return line
 
 
+def insert(line: dict) -> None:
+    from thorp import store
+    from thorp.viable.records import SpendEvent
+
+    rest = {k: v for k, v in line.items() if k not in ("at", "event", "instance", "run_id")}
+    with store.session() as s:
+        s.add(SpendEvent(at=datetime.fromisoformat(line["at"]), event=line["event"],
+                         instance=None if line.get("instance") is None else int(line["instance"]),
+                         run_id=line.get("run_id"), detail=json.loads(json.dumps(rest, default=str))))  # fmt: skip
+
+
 def log() -> list[dict]:
-    p = _log_path()
-    if not p.exists():
-        return []
-    rows = []
-    for ln in p.read_text(encoding="utf-8").splitlines():
-        with contextlib.suppress(ValueError):
-            rows.append(json.loads(ln))
-    return rows
+    """Every event of the spend, oldest first, as the log's lines."""
+    from sqlalchemy import select
+
+    from thorp import store
+    from thorp.viable.records import SpendEvent
+
+    with store.session() as s:
+        return [
+            {"at": r.at.astimezone(UTC).isoformat(timespec="seconds"), "event": r.event,
+             **({"instance": r.instance} if r.instance is not None else {}),
+             **({"run_id": r.run_id} if r.run_id is not None else {}), **(r.detail or {})}  # fmt: skip
+            for r in s.scalars(select(SpendEvent).order_by(SpendEvent.at, SpendEvent.id))
+        ]
 
 
 def out_now(rows: list[dict] | None = None) -> list[dict]:

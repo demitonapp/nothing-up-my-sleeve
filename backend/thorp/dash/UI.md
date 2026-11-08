@@ -312,14 +312,14 @@ holds the ways in, always:
   an Alert while it is advisory and runs break it), each list one ghost Button open. S2 coordination: the queue's lints in an Alert, or a
   green "no collisions". S1 operations: the runs queued and every voyage with its status, linked, and
   a line for **acquisition** (its books, tokens and last intake) opening its tab.
-  Read-only: a policy is switched in `data/policies.json`, by Justin.
+  Read-only: a policy is switched in `s5.policy_switches` (`thorp s5 switch`), by Justin.
   Three tabs (a line Tabs nav, `#govnav`): **The five systems** (`#/governance`, the bands above),
   **S3 control** (`#/governance/control`) and **Acquisition** (`#/governance/acquisition`).
   - **S3 control** builds out the S3 band: a summary band (policies enforced, queued voyages an enforced
     policy would refuse, bargains, decisions recorded and refusals among them); **the gate** (a table per
     policy: statement and adoption, enforced or advisory, whether it admits an opt-in, and over the queue
     the voyages breaking it, excepted and bargained, with refusals over the gate's last 400 decisions);
-    **its decisions** (`vsm.gate_log()`, `data/gate-log.jsonl`: when, voyage, asked by a voyage or the
+    **its decisions** (`vsm.gate_log()`, `s3.gate_decisions` in Postgres: when, voyage, asked by a voyage or the
     fitout builder, the verdict Badge, and each policy that spoke with how: refused, bargain, excepted,
     advisory); **the bargains** and **the exceptions** side by side (the opt-in reasons grouped, each
     group's voyages one ghost Button open; each written exception's reason, adoption, names and

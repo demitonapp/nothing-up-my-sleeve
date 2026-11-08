@@ -45,7 +45,7 @@ class StoresRuleError(ValueError):
 
 def enforced() -> bool:
     """Whether the rule is switched on: S5's switch for the policy 'stores' (thorp/vsm.py,
-    data/policies.json); off until Justin decides what happens to the runs queued before it (15:55)."""
+    s5.policy_switches); off until Justin decides what happens to the runs queued before it (15:55)."""
     from thorp import vsm
 
     return vsm.enforced("stores")

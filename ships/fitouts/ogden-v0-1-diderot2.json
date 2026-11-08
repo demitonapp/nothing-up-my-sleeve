@@ -1,0 +1,38 @@
+{
+ "key": "ogden-v0-1-diderot2",
+ "name": "Ogden v0.1 + Diderot's slice, 2%",
+ "positions": "rope",
+ "tack": null,
+ "opt_in": "Diderot's slice: a seeded draw of library books outside the two stores, equal by kind and matched in words to the other positions' slices, approved by Justin (2026-11-08: \"Approve the chapters\"; \"Yes, 2%\")",
+ "aim": "Diderot's reading, the generalised knowledge (the control) position at the 1m (DECISIONS.md, \"Four positions at the 1m\"): Ogden v0.1 and a draw of other library books, equal by kind and matched in words to the other slices (plans/diderot-slice.json), 2% of the reading; read against Augustus (De Morgan's tutor at 2%) and the plain 1m",
+ "stages": [
+  {
+   "phase": "pretraining",
+   "name": "ogden-v0.1-diderot2",
+   "shelf": "lists/composed/ogden-v0-1-diderot2-1.csv",
+   "tokens": null,
+   "select": "all",
+   "passes": 4,
+   "lr": null,
+   "tack": null,
+   "purpose": "Ogden v0.1 and Diderot's slice, four passes",
+   "compose": {
+    "languages": {
+     "en": 1.0
+    },
+    "carry": [
+     "lists/ogden-v0.1.csv"
+    ],
+    "carry_only": true,
+    "order": "carried-first",
+    "append": [
+     {
+      "list": "lists/composed/diderot-slice.csv",
+      "why": "Diderot's slice: a matched draw of other books, equal by kind"
+     }
+    ],
+    "note": "Ogden v0.1's 592 books and Diderot's slice, about 0.8M words, 2% of the reading"
+   }
+  }
+ ]
+}

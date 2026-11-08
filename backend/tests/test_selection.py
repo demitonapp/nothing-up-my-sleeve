@@ -194,9 +194,9 @@ def test_facts_selections_and_compositions_are_kept_in_postgres(tmp_path, monkey
 
 # ---- the library's branches
 def test_branches_are_seeded_once_and_a_hand_change_is_kept():
-    from thorp import library_branches as lb
     from sqlalchemy import text
 
+    from thorp import library_branches as lb
     from thorp.viable.s3_control import fitout_store as fs
 
     with fs.session() as s, s.begin():  # the records are not truncated between tests: start these from none
@@ -218,3 +218,22 @@ def test_a_variation_holds_a_list_a_selection_or_everything(tmp_path, monkeypatc
     got = lb.variation_ids({"spec": {"languages": {"en": 1}, "kinds": {"include": ["poem"]}}}, LIB)
     assert sorted(got) == [f"pg{i}" for i in range(11, 16)]
     assert lb.variation_ids({"list": "lists/none.csv"}, LIB) == []
+
+
+def test_carry_only_not_in_a_word_budget_filled_up_to_and_the_append_cap(tmp_path, monkeypatch):
+    monkeypatch.setenv("THORP_SHIPS", str(tmp_path))
+    (tmp_path / "lists").mkdir()
+    with (tmp_path / "lists" / "base.csv").open("w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["title", "author", "language", "family", "text"])
+        w.writerow(["t", "a", "en", "Germanic", "local:pg1"])
+    only = sel.compose({"languages": {"en": 1}, "carry": ["lists/base.csv"], "carry_only": True}, LIB)
+    assert books(only) == ["pg1"]
+    fresh = sel.compose({"languages": {"en": 1}, "not_in": ["lists/base.csv"], "kinds": {"include": ["novel"]}}, LIB)
+    assert "pg1" not in books(fresh) and "pg2" in books(fresh)
+    # a budget fills each share up to its words with the best-ranked books: 3 of the 1,000-word novels, no more
+    c = sel.compose({"languages": {"en": 1}, "words": 3500, "ogden": {"min": 0.6}, "kinds": {"include": ["novel"]}}, LIB)
+    assert sum(b["words"] for b in c.books) == 3000
+    # the 'max_book_words' leaves long books out
+    big = [fact("pgB", words=50000), *LIB]
+    assert "pgB" not in books(sel.compose({"languages": {"en": 1}, "max_book_words": 2000}, big))

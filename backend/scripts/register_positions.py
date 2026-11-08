@@ -21,7 +21,11 @@ POSITIONS = (
 
 
 def main() -> None:
+    have = {r.name for r in ship_store.ships()}
     for slug, name, position, reads in POSITIONS:
+        if name in have:  # already registered (and re-keyed to its voyage's ship key by make_position_fitouts.py)
+            print(f"{name}: already registered")
+            continue
         rec = ship_store.add_ship(
             {
                 "key": f"1m:position-{slug}",

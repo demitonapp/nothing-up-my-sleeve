@@ -1,0 +1,39 @@
+{
+ "key": "ogden-v0-1-francis2",
+ "name": "Ogden v0.1 + Francis's primer, 2%",
+ "positions": "rope",
+ "tack": null,
+ "opt_in": "Francis's primer: Thorp's own lessons in observation and its checking, in Ogden's words, local books outside the two stores, approved by Justin (2026-11-08: \"Approve the chapters\"; \"Yes, 2%\")",
+ "aim": "Francis's reading, the empirical knowledge position at the 1m (DECISIONS.md, \"Four positions at the 1m\"): Ogden v0.1 and the first books of Francis's primer (thorp/primers.py: same cause and effect, one change at a time, what is always there, more and more, one case against, how much to say, what to look at, seen and given), 2% of the reading; read against Augustus (De Morgan's tutor at 2%) and the plain 1m",
+ "stages": [
+  {
+   "phase": "pretraining",
+   "name": "ogden-v0.1-francis2",
+   "shelf": "lists/composed/ogden-v0-1-francis2-1.csv",
+   "tokens": null,
+   "select": "all",
+   "passes": 4,
+   "lr": null,
+   "tack": null,
+   "purpose": "Ogden v0.1 and Francis's primer, four passes",
+   "compose": {
+    "languages": {
+     "en": 1.0
+    },
+    "carry": [
+     "lists/ogden-v0.1.csv"
+    ],
+    "carry_only": true,
+    "order": "carried-first",
+    "append": [
+     {
+      "list": "lists/primer-francis.csv",
+      "words": 800000,
+      "why": "Francis's primer, 2% of the reading"
+     }
+    ],
+    "note": "Ogden v0.1's 592 books and Francis's primer, about 0.8M words, 2% of the reading"
+   }
+  }
+ ]
+}

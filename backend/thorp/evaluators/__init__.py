@@ -68,6 +68,10 @@ def get(name: str) -> Evaluator:
         from thorp.evaluators.pips import evaluate
     elif name == "maths":  # the maths book, De Morgan's (2026-11-08: Augustus's objective)
         from thorp.evaluators.maths import evaluate
+    elif name == "plato":  # Plato's primer, metaphysics (2026-11-08: the four positions at the 1m)
+        from thorp.evaluators.primers import evaluate_plato as evaluate
+    elif name == "francis":  # Francis's primer, empirical knowledge
+        from thorp.evaluators.primers import evaluate_francis as evaluate
     else:
         raise KeyError(f"unknown evaluator {name!r}")
     return evaluate

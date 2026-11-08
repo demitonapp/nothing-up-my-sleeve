@@ -17,9 +17,14 @@ A selection is a JSON object, saved on a fitout's stage (`compose`, s3.stages) a
      "dedupe": {"by": "title", "keep": "ogden"},          # one copy of a title: keep the best-scored, the "lowest" id,
                                                           # or the first id read as text ("text": how v0.2's maker chose)
      "carry": ["lists/ogden-v0.1.csv"],                   # these lists' books are kept whole (the always-on rules still apply)
+     "carry_only": false,                                 # true: the carried books alone, the rest of the library is not drawn on
+     "not_in": ["lists/ogden-v0.1.csv"],                  # the books of these lists are left out of what is drawn
      "strike": [{"title": "...", "why": "..."}],          # named books struck, with the reason
-     "append": [{"list": "lists/ogden-v0.2-tutor.csv", "why": "..."}],   # lists added whole after the composing
-     "words": null,                                       # a budget of words (None: as many as the shares allow)
+     "append": [{"list": "lists/ogden-v0.2-tutor.csv", "why": "...", "words": null}],   # lists added after the composing
+                                                          # (whole, or the first books of it up to `words` words)
+     "words": null,                                       # a budget of words (None: as many as the shares allow); with a
+                                                          # budget each group is filled up to its share, best-ranked books first
+     "max_book_words": null,                              # leave out books longer than this (a small budget wants small books)
      "rank": "ogden",                                     # what a trim keeps: "ogden", "id" or "hash" (seeded)
      "order": "id"}                                       # the list's order: by id, or "carried-first" (carried lists as listed)
 
@@ -50,7 +55,7 @@ from thorp import paths
 DIMENSIONS = {"language": "language", "kind": "kind", "voice": "voice", "source": "source"}
 RANKS = ("ogden", "id", "hash")
 KEYS = {"as_of", "languages", "ogden", "period", "kinds", "voices", "sources", "shelves", "weights", "dedupe",
-        "carry", "strike", "append", "words", "rank", "seed", "note", "order"}  # fmt: skip
+        "carry", "strike", "append", "words", "rank", "seed", "note", "order", "carry_only", "not_in", "max_book_words"}  # fmt: skip
 LIST_FIELDS = ["title", "author", "language", "family", "text"]
 
 
@@ -75,6 +80,9 @@ def validate(spec: dict) -> dict:
         "weights": {k: dict(v) for k, v in (spec.get("weights") or {}).items()},
         "dedupe": spec.get("dedupe") or None,
         "carry": list(spec.get("carry") or []),
+        "carry_only": bool(spec.get("carry_only")),
+        "max_book_words": int(spec["max_book_words"]) if spec.get("max_book_words") else None,
+        "not_in": list(spec.get("not_in") or []),
         "strike": list(spec.get("strike") or []),
         "append": list(spec.get("append") or []),
         "words": int(spec["words"]) if spec.get("words") else None,
@@ -234,6 +242,15 @@ def compose(spec: dict, facts: list[dict] | None = None) -> Composition:
     # the sources never hand-listed: Thorp's own program's books come in only by `append`
     step("not derived", lambda b: b["source"] != "local" or b["book"] in carried, "Thorp's own derived books come in by append")
 
+    if spec["carry_only"]:
+        step("carried only", lambda b: b["book"] in carried, "the carried lists' books alone")
+    left_out = {i for lp in spec["not_in"] for i in list_ids(lp)}
+    if left_out:
+        step("not in " + ", ".join(spec["not_in"]), lambda b: b["book"] not in left_out or b["book"] in carried,
+             "left out: the books of these lists")  # fmt: skip
+    if spec["max_book_words"]:
+        step(f"books up to {spec['max_book_words']:,} words", lambda b: b["words"] <= spec["max_book_words"] or b["book"] in carried,
+             "a small budget is filled with small books")  # fmt: skip
     if spec["as_of"]:
         step(f"as of {spec['as_of']}", lambda b: not b["fetched"] or b["fetched"] <= spec["as_of"] or b["book"] in carried,
              "the library as it stood that day")  # fmt: skip
@@ -300,6 +317,21 @@ def compose(spec: dict, facts: list[dict] | None = None) -> Composition:
     dims = [("language", {k: v for k, v in langs.items()})] + [(k, {a: float(b) for a, b in w.items() if float(b) > 0}) for k, w in spec["weights"].items()]
     chosen = {b["book"]: b for b in pool}
     budget = spec["words"]
+    if budget:  # a budget: fill each share of the last weighted dimension up to its words, best-ranked books first
+        dim, shares = dims[-1]
+        key, tot = DIMENSIONS[dim], sum(dims[-1][1].values())
+        filled: dict[str, dict] = {}
+        for g, sh in shares.items():
+            target, got = budget * sh / tot, 0
+            members = sorted((b for b in chosen.values() if b[key] == g and b["book"] not in carried), key=prio)
+            if not members:
+                raise SelectionError(f"{dim}: no book to fill the share of {g!r} after the filters")
+            for b in members:
+                if got + b["words"] <= target:
+                    filled[b["book"]] = b
+                    got += b["words"]
+        chosen = {**{k: v for k, v in chosen.items() if k in carried}, **filled}
+        dims = []  # the shares are met by filling; no trimming after it
     for _ in range(50):
         changed = False
         for dim, shares in dims:
@@ -341,11 +373,21 @@ def compose(spec: dict, facts: list[dict] | None = None) -> Composition:
         comp.funnel.append((step_name, len(chosen), ", ".join(f"{g} {s:g}" for g, s in shares.items())))
     order = {b: i for i, b in enumerate(carried_order)} if spec["order"] == "carried-first" else {}
     comp.books = sorted(chosen.values(), key=lambda b: (order.get(b["book"], len(order)), b["book"] if spec["order"] == "carried-first" else _num(b["book"])))
+    from thorp import manifest
+
     for ap in spec["append"]:
         with paths.resolve(ap["list"]).open(encoding="utf-8") as f:
-            comp.appended += [{k: r.get(k, "") for k in LIST_FIELDS} for r in csv.DictReader(f)]
+            rows = [{k: r.get(k, "") for k in LIST_FIELDS} for r in csv.DictReader(f)]
+        cap, got, taken = ap.get("words"), 0, []
+        for r in rows:
+            if cap and got >= cap:
+                break
+            taken.append(r)
+            bk = manifest.get(r["text"].split(":", 1)[-1]) if r["text"].startswith("local:") else None
+            got += int((bk.chars if bk else 0) / lf.CHARS_PER_WORD)
+        comp.appended += taken
     if spec["append"]:
-        comp.funnel.append(("appended", len(comp.books) + len(comp.appended), "; ".join(f"{a['list']} ({a.get('why', '')})" for a in spec["append"])))
+        comp.funnel.append(("appended", len(comp.books) + len(comp.appended), "; ".join(f"{a['list']}{' to ' + format(a['words'], ',') + ' words' if a.get('words') else ''} ({a.get('why', '')})" for a in spec["append"])))
     return comp
 
 

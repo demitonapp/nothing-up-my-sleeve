@@ -1,0 +1,41 @@
+{
+ "note": "Diderot's matched slice: other books, equal by kind, none of Ogden v0.1's, up to 0.8M words (2% of the reading)",
+ "languages": {
+  "en": 1.0
+ },
+ "as_of": "2026-11-07",
+ "not_in": [
+  "lists/ogden-v0.1.csv"
+ ],
+ "max_book_words": 60000,
+ "kinds": {
+  "exclude": [
+   "derived",
+   "periodical",
+   "reference",
+   "other",
+   "practical",
+   "religion",
+   "sermon",
+   "dialogue",
+   "textbook"
+  ]
+ },
+ "weights": {
+  "kind": {
+   "novel": 0.1,
+   "stories": 0.1,
+   "poem": 0.1,
+   "play": 0.1,
+   "essay": 0.1,
+   "history": 0.1,
+   "biography": 0.1,
+   "philosophy": 0.1,
+   "science": 0.1,
+   "travel": 0.1
+  }
+ },
+ "words": 800000,
+ "rank": "hash",
+ "seed": 1
+}

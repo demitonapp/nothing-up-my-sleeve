@@ -107,6 +107,43 @@ def build_lexicon(books: list[str], clean: str, name: str, log=print) -> dict:
     return meta
 
 
+def extend_lexicon(base: str, extra_books: list[str], total_books: int, clean: str, name: str, log=print) -> dict:
+    """The lexicon of a corpus that is another's (`base`, built by `build_lexicon`) and some books more: the base's tag counts
+    and bars with the extra books tagged and added. The counts are sums over books (a tag n-gram never crosses a book), so
+    this is the very lexicon a full `build_lexicon` of the whole corpus would write, in the time it takes to tag the extra
+    books alone."""
+    from thorp.sources import load_text
+
+    lex = json.loads((_dir() / f"{base}-lexicon.json").read_text())
+    bars_ = json.loads((_dir() / f"{base}-bars.json").read_text())
+    base_meta = json.loads((_dir() / f"{base}-meta.json").read_text())
+    if base_meta.get("clean") != clean or base_meta.get("tagger") != TAGGER_ID:
+        raise ValueError(f"{base}'s lexicon was built on {base_meta.get('clean')} by {base_meta.get('tagger')}, not {clean} by {TAGGER_ID}")
+    words = 0
+    for b in extra_books:
+        seq = []
+        for ws in tag_many([p for p in load_text(b, clean).split("\n\n") if p.strip()], batch_size=512):
+            for _, _, w, t in ws:
+                c = lex.setdefault(w.lower(), {})
+                c[t] = c.get(t, 0) + 1
+                seq.append(t)
+            seq.append("BREAK")
+        words += len(seq)
+        for t in seq:
+            bars_["unigram"][t] = bars_["unigram"].get(t, 0) + 1
+        for k in (1, 2, 3):
+            g = bars_[f"context_{k}"]
+            for j in range(k, len(seq)):
+                row = g.setdefault(" ".join(seq[j - k : j]), {})
+                row[seq[j]] = row.get(seq[j], 0) + 1
+    log(f"  {base} + {len(extra_books)} books ({words:,} tagged tokens) -> {name}")
+    (_dir() / f"{name}-lexicon.json").write_text(json.dumps(lex))
+    (_dir() / f"{name}-bars.json").write_text(json.dumps(bars_))
+    meta = {"books": total_books, "tagged": base_meta["tagged"] + words, "clean": clean, "tagger": TAGGER_ID, "words": len(lex)}
+    (_dir() / f"{name}-meta.json").write_text(json.dumps(meta, indent=1))
+    return meta
+
+
 @functools.cache
 def lexicon(name: str) -> dict[str, str]:
     """Each word's commonest tag in the named corpus (built by build_lexicon)."""

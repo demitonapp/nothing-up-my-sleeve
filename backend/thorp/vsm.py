@@ -365,7 +365,7 @@ POLICIES: dict[str, Policy] = {
             "ceiling an hour, a datacenter-verified and reliable host, the quote within one voyage's budget and "
             "the week's, the account's credit covering it, and no more ships out than the terms allow "
             "(thorp/viable/s5_policy/charter.py; data/charter.json sets the numbers).",
-            "2026-11-08, Justin (Vast.ai chosen; the numbers are proposals until he confirms them)",
+            "2026-11-08, Justin (Vast.ai chosen; the terms adopted as proposed)",
             True,
             _chartered,
         ),

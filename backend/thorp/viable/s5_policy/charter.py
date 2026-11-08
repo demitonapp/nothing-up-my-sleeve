@@ -4,8 +4,8 @@ vast.ai can you build the code via the VSM system in order to leverage vast.ai")
 A chartered voyage sails on a GPU hired from Vast.ai's marketplace instead of this Mac's: the same spec, on the
 torch backend (thorp/train_torch.py), its rows and checkpoints brought home to the ledger. The terms are S5's: which
 GPUs may be hired and at what ceiling an hour, from what kind of host, how much one voyage and one week may cost,
-how many ships may be hired at once. The money is Justin's, so every number here is his to set; the defaults are
-proposals (DECISIONS.md, "The charter") until he confirms or changes them in data/charter.json, which overrides
+how many ships may be hired at once. The money is Justin's, so every number here is his to set: he adopted the
+defaults as proposed (2026-11-08, "Adopt as proposed"; DECISIONS.md, "The charter"), and data/charter.json overrides
 any of them:
 
     {"weekly_budget": 40, "gpus": {"RTX 4090": 0.45, "RTX 5090": 0.70}}
@@ -22,7 +22,7 @@ import json
 
 from thorp import paths
 
-ADOPTED = "2026-11-08, Justin (Vast.ai chosen); the numbers are proposals until he confirms them"
+ADOPTED = "2026-11-08, Justin (Vast.ai chosen; the terms adopted as proposed)"
 
 DEFAULTS: dict = {
     # the GPU classes that may be hired, by Vast.ai's gpu_name, each with its ceiling in dollars an hour

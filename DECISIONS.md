@@ -898,7 +898,7 @@ Fixed before any of it sails. Claude runs the night; the queue (`ships/specs/que
   - S3\*, the audit: an orphaned instance found and released, a ghost hire closed: `s3star_audit/charter.py`.
   - S4, the market read: the cheapest voyage, not the cheapest hour; each class's speed is measured once it has sailed: `s4_intelligence/market.py`.
   - S5, the terms and the policy `charter`, enforced, governing only voyages that ask for a hire: `s5_policy/charter.py`.
-- **The terms (proposed, Justin's to confirm or change in `data/charter.json`):**
+- **The terms, adopted as proposed** (8 November, Justin: "Adopt as proposed"; a change is a new entry here, set in `data/charter.json`):
   - **GPU ceilings:** RTX 4090 $0.50/h, RTX 5090 $0.75, H100 SXM $2.60, H100 PCIe $2.30.
   - **Host:** datacenter-verified only, reliability at least 0.98, a line of at least 200 Mb/s down and 100 Mb/s up, CUDA at least 12.8, 80 GB disk.
   - **Money:** **$10 a voyage**, **$30 a week** (Monday to Sunday, UTC), credit covering the quote 1.25 times over.

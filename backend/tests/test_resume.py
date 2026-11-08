@@ -46,3 +46,24 @@ def test_resume_matches_uninterrupted(library, spec, tmp_thorp, cpu):
     assert sorted(b) == list(range(1, 101)), "resume must not duplicate or drop metric rows"
     worst = max(abs(a[s] - b[s]) for s in range(51, 101))
     assert worst < 1e-3, worst
+
+
+def test_a_rotary_voyage_resumes(library, spec, tmp_thorp, cpu):
+    """nn.RoPE holds no weights, so a flat checkpoint has no `rope` in any layer; the resume rebuilds the weights
+    and the optimiser's state on the model's own tree (8 November: leg 1b, KeyError 'rope' at its first step)."""
+    spec["data"]["passes"] = 3
+    spec["model"]["positions"] = "rope"
+    prep = train.prepare(spec, resolver=library["resolver"], log=lambda *a: None)
+    quiet = lambda *a: None  # noqa: E731
+    rid = train.run_id(spec)
+
+    straight = Ledger(tmp_thorp / "straight.sqlite")
+    assert train.train(spec, prep, straight, stop_after=100, log=quiet)["step"] == 100
+    shutil.rmtree(paths.checkpoints_dir() / rid)
+
+    resumed = Ledger(tmp_thorp / "resumed.sqlite")
+    assert train.train(spec, prep, resumed, stop_after=50, log=quiet)["step"] == 50
+    assert train.latest_checkpoint(rid).name == "step-50"  # a real resume, from a checkpoint
+    assert train.train(spec, prep, resumed, stop_after=100, log=quiet)["step"] == 100
+    a, b = losses(straight, rid), losses(resumed, rid)
+    assert max(abs(a[s] - b[s]) for s in range(51, 101)) < 1e-3

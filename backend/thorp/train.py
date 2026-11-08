@@ -482,6 +482,30 @@ def scale_inherited(grads, mask: dict, scale: float):
     return tree_unflatten(list(flat.items()))
 
 
+def shaped_like(loaded, template):
+    """`loaded` (a tree rebuilt from a flat checkpoint) in `template`'s shape: every branch the template has is
+    kept; where the loaded tree lacks one that holds no arrays (a module with no weights, as nn.RoPE), the
+    template's empty branch is put in; a missing branch that does hold weights is an error, as before."""
+    if isinstance(template, dict):
+        src = loaded if isinstance(loaded, dict) else {}
+        out = {}
+        for k, v in template.items():
+            if k in src:
+                out[k] = shaped_like(src[k], v)
+            elif not tree_flatten(v):
+                out[k] = v
+            else:
+                raise KeyError(f"the checkpoint has no {k!r}")
+        for k, v in src.items():  # what the checkpoint holds beyond the template (the step, the learning rate)
+            out.setdefault(k, v)
+        return out
+    if isinstance(template, (list, tuple)):
+        src = loaded if isinstance(loaded, (list, tuple)) else []
+        out = [shaped_like(src[i], v) if i < len(src) else (v if not tree_flatten(v) else shaped_like(None, v)) for i, v in enumerate(template)]
+        return type(template)(out) if isinstance(template, tuple) else out
+    return template if loaded is None else loaded
+
+
 def restore_inherited(master, inherit: dict):
     flat = dict(tree_flatten(master))
     for k, m in inherit["mask"].items():
@@ -886,8 +910,12 @@ def train(
     if ckpt is not None:
         st = json.loads((ckpt / "state.json").read_text())
         start, tokens_seen, wall_before = st["step"], st["tokens_seen"], st["wall_seconds"]
-        master = load_master(ckpt)
-        opt.state = tree_unflatten(list(mx.load(str(ckpt / "optimizer.safetensors")).items()))
+        # both rebuilt on the model's own tree: a checkpoint is a flat file, which cannot hold a module with no
+        # weights (nn.RoPE: an empty `rope` in every layer), so every rotary voyage failed to resume (8 November,
+        # leg 1b: KeyError 'rope' at its first step after the Postgres switch)
+        master = shaped_like(load_master(ckpt), master)
+        opt.init(master)
+        opt.state = shaped_like(tree_unflatten(list(mx.load(str(ckpt / "optimizer.safetensors")).items())), opt.state)
         rec.truncate_after(rid, start)
         log(f"resuming {rid[:12]} from {ckpt.name}")
     model.update(to_compute(master, precision))

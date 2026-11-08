@@ -1,0 +1,71 @@
+# the four positions at the 1m, seed 2 (DECISIONS.md): built by scripts/make_position_fitouts.py --seed 2
+name: fu-ogden-v0-1-maths2@1m-pre-s2
+ship: 'Fitout: Ogden v0.1 + De Morgan 2% @ 1m, pretraining'
+experiment: 'Fitout ogden-v0-1-maths2: Ogden v0.1 with 2% of the reading De Morgan''s tutor; does Augustus
+  pass the maths book?'
+question: Does the 1m read De Morgan's maths book (maths/right, maths/chapters) with 2% of its reading
+  in the tutor's lessons?
+fitout:
+  key: ogden-v0-1-maths2
+  variation: null
+data:
+  recipe: lists/ogden-v0.1-maths2.csv
+  passes: 4
+  order: shuffled
+  refuse:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+  - lists/hole-cards-unseen.csv
+  clean: unwrap-v2
+  opt_in: 'De Morgan''s tutor: Thorp''s own lessons in sums, local books outside the two stores, approved
+    by Justin (2026-11-08: "Yeah", for Augustus, on the Ogden branch)'
+tokeniser:
+  kind: spm-bpe
+  vocab: 2048
+  byte_fallback: true
+  train_on: lists/ogden-v0.1.csv
+model:
+  family: gpt
+  preset: 1m
+  context: 1024
+  positions: rope
+optim:
+  name: adamw
+  lr: 0.002
+  betas:
+  - 0.9
+  - 0.95
+  weight_decay: 0.1
+  warmup_steps: 100
+  schedule: cosine
+  min_lr_ratio: 0.1
+  batch_tokens: 32768
+  grad_clip: 1.0
+  precision: bf16
+eval:
+  sets:
+  - lists/hole-cards-unseen.csv
+  every_steps: 640
+  evaluators:
+  - ce_bpb
+  - discovery
+  - logic
+  - stars
+  - nevermore
+  - cards
+  - shapes
+  - pips
+  - maths
+  light:
+    every_steps: 64
+    evaluators:
+    - stars
+    - nevermore
+    - cards
+    - logic
+    - shapes
+    - pips
+    - maths
+checkpoint:
+  every_steps: 640
+seed: 2

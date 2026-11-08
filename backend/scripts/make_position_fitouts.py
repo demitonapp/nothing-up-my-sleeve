@@ -125,5 +125,26 @@ def main(queue: bool = False) -> int:
     return 0
 
 
+def more_seeds(seed: int) -> int:
+    """The same four voyages at another seed (a position counts at a size only on two): each seed-1 spec copied with the seed
+    and the name's suffix changed (Augustus's is the maths arm), through the gate, and put at the end of the queue."""
+    from thorp import vsm
+    from thorp.viable.s2_coordination import lanes
+
+    q = paths.resolve("specs/queue.txt")
+    keys = ("ogden-v0-1-maths2", *(f"ogden-v0-1-{p['slug']}" for p in POSITIONS.values()))
+    for key in keys:
+        s = yaml.safe_load(paths.resolve(f"specs/fitouts/fu-{key}@1m-pre-s1.yaml").read_text())
+        s["name"], s["seed"] = f"fu-{key}@1m-pre-s{seed}", seed
+        out = paths.resolve(f"specs/fitouts/{s['name']}.yaml")
+        out.write_text(f"# the four positions at the 1m, seed {seed} (DECISIONS.md): built by scripts/make_position_fitouts.py --seed {seed}\n" + yaml.safe_dump(s, sort_keys=False, width=100))
+        vsm.gate(s, where="the four positions, a second seed")
+        lanes.append(q, f"fitouts/{s['name']}", note=f"The four positions at the 1m, seed {seed} (DECISIONS.md; Justin, 8 November: \"Queue seeds now\"): a position counts at a size only on two seeds")
+        print(f"queued {s['name']}")
+    return 0
+
+
 if __name__ == "__main__":
+    if "--seed" in sys.argv:
+        sys.exit(more_seeds(int(sys.argv[sys.argv.index("--seed") + 1])))
     sys.exit(main("--queue" in sys.argv))

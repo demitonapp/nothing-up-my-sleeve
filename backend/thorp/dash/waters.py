@@ -25,9 +25,9 @@ WATERS = {
     # local waters are Phaleron (Justin, 8 November: "name it after a famous bay, perhaps that the greeks used to
     # train ships in"): Athens' first harbour, where its early fleet lay before Themistocles built Piraeus beside it
     "mac": {"name": "Phaleron", "where": "this Mac mini", "how": "MLX, the Mac lane: internal waters"},
-    # outer waters are the Market Harbour (Justin, 8 November: "the outer waters should be the first great trading
+    # outer waters are Zayton, the Market Harbour (Justin, 8 November: "the outer waters should be the first great trading
     # harbour"): where the ships that need hired GPUs trade
-    "vast": {"name": "The Market Harbour", "where": "a GPU hired from Vast.ai", "how": "torch on CUDA, the Vast lane: outer waters"},
+    "vast": {"name": "Zayton", "where": "a GPU hired from Vast.ai", "how": "torch on CUDA, the Vast lane: outer waters"},
 }
 
 # The harbours the Ships page opens on (Justin, 8 November: "on the ships pages, it's actually called harbours and then
@@ -41,8 +41,8 @@ HARBOURS = (
     {"key": "phaleron", "name": "Phaleron", "aka": "internal waters", "lane": "mac", "where": "this Mac mini",
      "about": "Athens' first harbour, where its early fleet lay and sailed from: the youngest ships, trained on this Mac.",
      "depth": 20_000_000},
-    {"key": "market", "name": "The Market Harbour", "aka": "outer waters", "lane": "vast", "where": "GPUs hired from Vast.ai",
-     "about": "The first great trading harbour: the ships too deep for Phaleron, which need hired GPUs.",
+    {"key": "zayton", "name": "Zayton", "aka": "outer waters", "lane": "vast", "where": "GPUs hired from Vast.ai",
+     "about": "Zayton (Quanzhou), the greatest trading harbour of the Silk Road's sea road: the ships too deep for Phaleron, which need hired GPUs.",
      "depth": None},
 )  # fmt: skip
 

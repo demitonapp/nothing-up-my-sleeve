@@ -29,7 +29,7 @@ const CLASS_RENAMES = { seedling: 'pan', keel: 'pan', proxy: 'augustus', pilot: 
 const CLASS_ALIASES = Object.fromEntries(Object.entries(CLASS_RENAMES).flatMap(([a, b]) => [[a, b], [b, a]]));
 const rungFor = key => ladderData && ladderData.rungs.find(r => slugOf(r) === key || r.preset === key || slugOf(r) === CLASS_ALIASES[key]);
 // ---- Navigation (UI.md, "Navigation"). Three ways in, each a section of the header:
-//   #/harbours[/<harbour>]      the harbours (home): two tiles, Phaleron and the Market Harbour; one opens to its ships
+//   #/harbours[/<harbour>]      the harbours (home): two tiles, Phaleron and Zayton; one opens to its ships
 //   #/ships                      the same, by its old address; a size's ships, newest first
 //   #/sizes/<size>[/<tab>]       one ship: overview (default), fleet, goals, training, scoring, waypoints
 //   #/ships/all                  every ship ever launched

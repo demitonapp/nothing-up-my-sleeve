@@ -747,6 +747,20 @@ main a.pc2-more:hover { color: #000; }
 #starclassgrid td.cen.q { color: var(--muted); }
 
 /* the queue at a glance, and where a voyage's reading came from */
+/* the plan, and the waters each ship sails in (the Queue tab, /api/waters) */
+.waters { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; margin-bottom: 12px; }
+.watercard { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; background: var(--raise); border-left: 4px solid var(--blue); }
+.watercard.vast { border-left-color: var(--accent); }
+.watercard .wtop { margin-bottom: 6px; }
+.spend { margin-top: 6px; }
+.spendbar { height: 8px; border-radius: 4px; background: var(--track); overflow: hidden; }
+.spendbar span { display: block; height: 100%; background: var(--accent); }
+.plantable td { vertical-align: top; }
+.plantable .plantime { white-space: nowrap; }
+.plantable .plangoal { font-size: var(--fs-sm); color: var(--muted); max-width: 70ch; margin-top: 2px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.plantable tr.plan-cmd td, .plantable tr.plan-wait td { color: var(--muted); }
+.plantable tr.plan-hold td { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.lanechip { white-space: nowrap; }
 .ovtop { display: flex; gap: 24px; flex-wrap: wrap; align-items: flex-start; margin-bottom: 10px; }
 .ovtop > div:first-child { flex: 1 1 320px; }
 .ovqueue { flex: 1 1 360px; }

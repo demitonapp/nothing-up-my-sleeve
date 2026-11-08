@@ -3796,6 +3796,7 @@ class Handler(BaseHTTPRequestHandler):
                 )
             routes = {
                 "/api/runs": lambda: api_runs(),
+                "/api/waters": lambda: __import__("thorp.dash.waters", fromlist=["waters"]).waters(),
                 "/api/metrics": lambda: api_metrics(q["run"]),
                 "/api/evals": lambda: api_evals(q["run"]),
                 "/api/run": lambda: api_run(q["run"]),

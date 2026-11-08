@@ -205,7 +205,7 @@ function showTab(h, push = true) {
   // the address always reads the canonical way (old addresses and ?run= are rewritten, not stacked)
   if (hash && (location.hash !== '#' + hash || location.search)) history.replaceState(null, '', location.pathname + '#' + hash);
   if (page === 'voyages' || page === 'voyage') loadVoyages();
-  if (page === 'voyages') { loadOverview(); loadQueue(); }
+  if (page === 'voyages') { loadWaters(); loadOverview(); loadQueue(); }
   if (page === 'discoveries') loadDiscoveries();
   if (page === 'sievesguide') loadSieves();
   if (page === 'leaderboard') loadLeaderboard();
@@ -2702,7 +2702,7 @@ async function rungExtras(r, runs, allRuns) {
 async function refresh() {
   await loadLadder();  // a ship's address resolves through the ladder and the ships
   if (page === 'voyages' || page === 'voyage') loadVoyages();
-  if (page === 'voyages') { loadOverview(); loadQueue(); }
+  if (page === 'voyages') { loadWaters(); loadOverview(); loadQueue(); }
   if (page === 'voyage' && currentVoyage()) journeyPanel(currentVoyage());
   if (page === 'discoveries') loadDiscoveries();
   if (page === 'sievesguide') loadSieves();
@@ -4118,6 +4118,49 @@ async function loadQueue() {
       <td class="qfit">${fit(r)}</td><td>${exp(r)}</td><td>${esc(r.preset || '')}</td><td>${r.seed ?? ''}</td>
       <td class="s">${r.status === 'at sea' ? 'sailing' : sailsIn(r.starts_in_min, r.at_least)}</td></tr>`).join('')
     || `<tr><td colspan="8" class="${emptyCls(true)}">the queue is empty</td></tr>`;
+}
+
+// ---- the plan, and the waters each ship sails in (top of #/expeditions/queue; thorp/dash/waters.py, /api/waters):
+// local waters (this Mac mini, the Mac lane) and foreign waters (Vast.ai, the Vast lane) side by side, then the queue
+// in its order as one plan, each line tagged with its waters, about when it sails and what it waits for
+let watersKey = null;
+const LANE_TONE = { mac: 'blue', vast: 'accent' };
+const mins = m => m == null ? '' : m < 90 ? `${Math.round(m)} min` : `${(m / 60).toFixed(1)} h`;
+const laneChip = (lane, d) => `<span class="${pillCls(LANE_TONE[lane] || '')} lanechip" title="${esc(d.lanes[lane].where)}: ${esc(d.lanes[lane].how)}">${esc(d.lanes[lane].name.toLowerCase())}</span>`;
+function planWhat(p) {
+  if (p.kind === 'spec') return `<span class="mono">${esc(p.name)}</span>${p.missing ? ` <span class="${pillCls('bad')}">no spec</span>` : ''}
+    <div class="s">${p.expedition ? `<a href="#/expeditions/${esc(p.expedition)}">${esc(p.expedition_name || p.expedition)}</a> · ` : ''}${esc(p.preset || '')}${p.seed != null ? ` · seed ${p.seed}` : ''}</div>${p.goal ? `<div class="plangoal" title="${esc(p.goal)}">${esc(p.goal)}</div>` : ''}`;
+  if (p.kind === 'hold') return `<b>${esc(p.name)}</b> <span class="${pillCls(p.hold && p.hold.held ? 'accent' : 'good')}">${p.hold && p.hold.held ? 'held' : 'lifted'}</span>${p.hold && p.hold.note ? `<div class="plangoal">${esc(p.hold.note)}</div>` : ''}`;
+  if (p.kind === 'wait') return `<b>${esc(p.name)}</b>`;
+  return `<span class="s">a step:</span> <span class="mono" title="${esc(p.text)}">${esc(p.name)}</span>`;
+}
+function laneCard(lane, d) {
+  const L = d.lanes[lane], sea = L.at_sea;
+  const now = sea ? `<div class="ovsea"><span class="${pillCls('running')}">at sea</span> ${sea.kind === 'spec' ? `<a href="#${shipHash(sea.name)}" class="mono">${esc(sea.name)}</a>` : `<span class="mono" title="${esc(sea.text)}">${esc(sea.name)}</span>`}
+      <div class="s">since ${esc(String(sea.since || '').slice(11, 16))}${sea.left_min != null ? ` · about ${mins(sea.left_min)} left` : sea.elapsed_min != null ? ` · ${mins(sea.elapsed_min)} so far, no time of its own yet` : ''}</div></div>` : '';
+  const ships = (L.ships || []).map(s => `<div class="ovsea"><span class="${pillCls('running')}">at sea</span> <a href="#${shipHash(s.name)}" class="mono">${esc(s.name)}</a>
+      <div class="s">${esc(s.gpu)} at $${Number(s.dph).toFixed(3)}/h · since ${esc(String(s.since).slice(11, 16))} · $${Number(s.cost).toFixed(2)} so far of a $${Number(s.quote || 0).toFixed(2)} quote · about ${mins(s.left_min)} left${s.by_queue ? '' : ' · <i>sailed by hand, outside the queue</i>'}</div></div>`).join('');
+  const idle = !sea && !ships ? `<div class="s">in port${L.queued ? '' : ': nothing queued for these waters'}</div>` : '';
+  const w = L.week;
+  const spend = w ? `<div class="spend" title="S5's terms: $${w.voyage_budget} a voyage, $${w.budget} a week (Monday to Sunday, UTC), ${w.max_out} ship out at a time"><div class="spendbar"><span style="width:${Math.min(100, 100 * (w.spent || 0) / (w.budget || 1))}%"></span></div>
+      <div class="s">this week <b>$${(w.spent ?? 0).toFixed(2)}</b> of $${w.budget} · $${w.voyage_budget} a voyage · ${w.max_out} ship out at a time${L.key ? '' : ' · <span class="bad">no Vast.ai key</span>'}</div></div>` : '';
+  const steps = L.queued - L.voyages;
+  return `<div class="watercard ${lane}"><div class="wtop">${laneChip(lane, d)} <b>${esc(L.where)}</b> <span class="s">${esc(L.how)}</span></div>
+    ${now}${ships}${idle}
+    <div class="ovq"><b>${L.voyages}</b> voyage${L.voyages === 1 ? '' : 's'} and ${steps} step${steps === 1 ? '' : 's'} to sail · clear ${L.at_least ? 'no sooner than' : 'about'} <b>${esc(L.clear_at)}</b></div>${spend}</div>`;
+}
+async function loadWaters() {
+  const el = document.getElementById('waters'); if (!el) return;
+  let d; try { d = await get('/api/waters'); } catch (e) { return; }
+  const key = JSON.stringify(d); if (key === watersKey) return; watersKey = key;
+  const rows = d.plan.map(p => `<tr class="plan-${p.kind}${p.waits_for ? ' waiting' : ''}"><td class="s">${p.n}</td>
+      <td class="plantime">${p.at_least ? '≥ ' : '≈ '}${esc(p.starts_at)}<div class="s">${p.est_min != null ? (p.est_is_max ? `up to ${mins(p.est_min)}` : mins(p.est_min)) : 'no time yet'}</div></td>
+      <td>${laneChip(p.lane, d)}</td><td>${planWhat(p)}</td>
+      <td class="s">${p.waits_for ? `<span class="${pillCls('accent')}">waits</span> ${esc(p.waits_for)}` : ''}</td></tr>`).join('')
+    || `<tr><td colspan="5" class="${emptyCls(true)}">the queue is empty</td></tr>`;
+  el.innerHTML = `<div class="waters">${laneCard('mac', d)}${laneCard('vast', d)}</div>
+    <div class="scroll"><table data-nosort class="plantable"><thead><tr><th>#</th><th title="about when it sails (≥ where a line ahead of it in its waters has no time yet), and for how long">sails</th><th>waters</th><th>what</th><th>waits for</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="s">as of ${esc(d.now)}</div>`;
 }
 
 // ---- the queue at a glance (top of #/expeditions; thorp.expeditions.overview, /api/expeditions/overview)

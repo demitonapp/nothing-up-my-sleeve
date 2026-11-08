@@ -18,9 +18,10 @@ sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent))
 from grade_chains import _external  # noqa: E402
 
 from thorp import paths, vsm  # noqa: E402
-from thorp.evaluators.logic import load_deck, score_deck  # noqa: E402
+from thorp.evaluators.logic import CROWNS, CROWNS_KEY, crowns_readings, load_deck, score_deck  # noqa: E402
 
 RELATIONS = ("order", "cause", "membership", "proportion", "counterfactual")
+CROWN_KINDS = ("crowns-side", "crowns-time", "crowns-place", "crowns-station")  # the crowns deck (2026-11-08), read beside the logic decks
 
 
 def gain(items: dict, rel: str, idx=None) -> float:
@@ -39,6 +40,8 @@ def main(names: list[str]) -> None:
             model, tok = _external(name)
             r = score_deck(model, tok, load_deck())
             r40 = score_deck(model, tok, load_deck("lists/tricks/logic-40.csv"))
+            crowns = load_deck(CROWNS)
+            rc = score_deck(model, tok, crowns) if crowns else None
         it = r["items"]
         out = {"model": name, "read": time.strftime("%Y-%m-%dT%H:%M:%S"), "seconds": round(time.time() - t0), "logic": {k: v for k, v in r.items() if k != "items"}, "items": it, "gains": {}}
         for rel in RELATIONS:
@@ -58,6 +61,19 @@ def main(names: list[str]) -> None:
                 out["gains40"][rel] = {"gain": gain(it40, rel), "lo": float(lo), "hi": float(hi), "items": n}
         out["logic40"] = {k: v for k, v in r40.items() if k != "items"}
         out["items40"] = it40
+        if rc:  # the crowns: the gain per kind of standpoint with its band, and the deck's two readings, moves and ask
+            itc = rc["items"]
+            m = rc["metrics"]
+            extra = crowns_readings({f"tricks/{CROWNS_KEY}/{k}": v for k, v in m.items()})
+            out["crowns"] = {**m, **{k.rsplit("/", 1)[-1]: v for k, v in extra.items()}}
+            out["items_crowns"] = itc
+            out["gains_crowns"] = {}
+            for rel in CROWN_KINDS:
+                n = len([k for k in itc if k.startswith(rel + "-")])
+                if n:
+                    boots = [gain(itc, rel, rng.integers(0, n, n)) for _ in range(2000)]
+                    lo, hi = np.percentile(boots, [5, 95])
+                    out["gains_crowns"][rel] = {"gain": gain(itc, rel), "lo": float(lo), "hi": float(hi), "items": n}
         p = paths.data_dir() / "compare" / f"logic-{name.replace('/', '--')}.json"
         p.write_text(json.dumps(out, indent=1))
         print(name, {k: round(v["gain"], 3) for k, v in out["gains"].items()}, f"{out['seconds']}s", flush=True)

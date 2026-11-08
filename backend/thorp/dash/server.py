@@ -3348,9 +3348,10 @@ def api_ask_questions(preset: str) -> dict:
     the keel's from one word back, the pilot's from two, the speller's (and every larger class's) from three:
     each a context the corpus continues with one word at least half the time (Justin, 21:35: "wouldn't these
     examples need to be simpler for the 300k")."""
+    logic = _ask_logic(preset)
     p = paths.resolve("lists/ogden-v0.1-questions.json")
     if not p.exists():
-        return {"preset": preset, "questions": [], "words_back": None}
+        return {"preset": preset, "questions": [], "words_back": None, "logic": logic}
     d = json.loads(p.read_text())
     slug = _slug(preset)
     key = slug if slug in ("keel", "pilot") else "speller"
@@ -3363,7 +3364,34 @@ def api_ask_questions(preset: str) -> dict:
                       f"with '{q['hope']}' {round(100 * q['share'])}% of {q['count']:,} times"}
             for q in s.get("questions", [])
         ],
+        "logic": logic,
     }  # fmt: skip
+
+
+LOGIC_ASK_FROM = ("21m", "50m", "100m", "350m")  # the stylist up (Justin, 8 November: "start testing the logic questions from 21m up")
+
+
+def _ask_logic(preset: str, per: int = 2) -> list[dict]:
+    """The logic deck as questions to ask (lists/tricks/logic-40.csv, the variant with both premises): `per`
+    items of each relation, in the deck's order. Each asks for the conclusion's first word, the hope, against
+    the rival's (the answer the premises rule out): the Scoring tab ranks both among its ten guesses."""
+    import csv
+
+    if preset not in LOGIC_ASK_FROM:
+        return []
+    try:
+        rows = list(csv.DictReader(paths.resolve("lists/tricks/logic-40.csv").open()))
+    except OSError:
+        return []
+    out = []
+    for rel in LOGIC_RELATIONS:
+        for r in [x for x in rows if x["relation"] == rel and x["variant"] == "both"][:per]:
+            hope, rival = r["idea"].split()[0], r["rival"].split()[0]
+            if hope.lower() == rival.lower():  # the two part later ("heavier than a kanan" / "heavier than a trinol"): not a one-word test
+                continue
+            out.append({"text": r["prompt"], "hope": hope, "rival": rival, "relation": rel, "item": r["item"],
+                        "about": f"the logic deck, {rel}: the premises say '{r['idea']}', not '{r['rival']}'"})  # fmt: skip
+    return out
 
 
 _class_deck_cache: dict[str, tuple[float, dict]] = {}

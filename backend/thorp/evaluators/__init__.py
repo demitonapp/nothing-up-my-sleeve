@@ -66,6 +66,8 @@ def get(name: str) -> Evaluator:
         from thorp.evaluators.shapes import evaluate
     elif name == "pips":
         from thorp.evaluators.pips import evaluate
+    elif name == "maths":  # the maths book, De Morgan's (2026-11-08: Augustus's objective)
+        from thorp.evaluators.maths import evaluate
     else:
         raise KeyError(f"unknown evaluator {name!r}")
     return evaluate

@@ -1,0 +1,21 @@
+{
+ "positions": "rope",
+ "tack": null,
+ "key": "ogden-v0-1-maths5",
+ "name": "Ogden v0.1 + De Morgan's tutor, 5%",
+ "aim": "Augustus's reading (Justin, 2026-11-08: the Ogden branch, its bibliography changed): Ogden v0.1's 592 books and the first 22 books of De Morgan's tutor (thorp/maths_tutor.py, lessons in sums in Ogden's words in De Morgan's order, the maths book's sums held out), 1.99M words, 5.1% of the reading",
+ "opt_in": "De Morgan's tutor: Thorp's own lessons in sums, local books outside the two stores, approved by Justin (2026-11-08: \"Yeah\", for Augustus, on the Ogden branch)",
+ "stages": [
+  {
+   "phase": "pretraining",
+   "name": "ogden-v0.1-maths5",
+   "shelf": "lists/ogden-v0.1-maths5.csv",
+   "tokens": null,
+   "select": "all",
+   "passes": 4,
+   "lr": null,
+   "tack": null,
+   "purpose": "Ogden v0.1 and 22 books of De Morgan's tutor, four passes"
+  }
+ ]
+}

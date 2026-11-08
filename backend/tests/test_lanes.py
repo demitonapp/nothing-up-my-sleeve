@@ -130,3 +130,12 @@ def test_a_cmd_line_really_runs_from_the_root(harbour):
               poll_s=0.05, key=lambda: False, outside=lambda: False, log=lambda m: None)  # fmt: skip
     assert (harbour["root"] / "here.txt").read_text().strip() == "docked"
     assert harbour["done"].read_text().strip().endswith("cmd: echo docked > here.txt; exit 3 3")
+
+
+def test_only_one_coordinator_at_a_time(tmp_path):
+    with lanes.one_coordinator(tmp_path / "lanes.lock"):
+        with pytest.raises(lanes.AlreadyRunning):
+            with lanes.one_coordinator(tmp_path / "lanes.lock"):
+                pass
+    with lanes.one_coordinator(tmp_path / "lanes.lock"):  # free again once the first has gone
+        pass

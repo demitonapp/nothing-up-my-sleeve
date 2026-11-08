@@ -307,7 +307,35 @@ def run(queue: Path | None = None, done: Path | None = None, root: Path | None =
         time.sleep(poll_s)
 
 
+class AlreadyRunning(RuntimeError):
+    pass
+
+
+@contextlib.contextmanager
+def one_coordinator(lock_path: Path | None = None):
+    """Only one coordinator at a time (two would mean two Mac lanes, two voyages on one GPU): hold its lock for
+    the length of the run, refuse at once when another holds it."""
+    import fcntl
+
+    p = lock_path or paths.data_dir() / "lanes.lock"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    f = open(p, "a+")  # noqa: SIM115
+    try:
+        try:
+            fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as e:
+            raise AlreadyRunning(f"another coordinator holds {p}: the queue is already running") from e
+        yield
+    finally:
+        f.close()
+
+
 if __name__ == "__main__":
     os.chdir(paths.ROOT)
-    run()
+    try:
+        with one_coordinator():
+            run()
+    except AlreadyRunning as e:
+        print(f"[{time.strftime('%H:%M:%S')}] {e}", flush=True)
+        sys.exit(1)
     sys.exit(0)

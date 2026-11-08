@@ -22,7 +22,9 @@ from datetime import datetime
 from thorp import paths
 
 WATERS = {
-    "mac": {"name": "Local waters", "where": "this Mac mini", "how": "MLX, the Mac lane"},
+    # local waters are Phaleron (Justin, 8 November: "name it after a famous bay, perhaps that the greeks used to
+    # train ships in"): Athens' first harbour, where its early fleet lay before Themistocles built Piraeus beside it
+    "mac": {"name": "Phaleron", "where": "this Mac mini", "how": "MLX, the Mac lane: local waters"},
     "vast": {"name": "Foreign waters", "where": "a GPU hired from Vast.ai", "how": "torch on CUDA, the Vast lane"},
 }
 

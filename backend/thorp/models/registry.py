@@ -33,6 +33,7 @@ PRESETS: dict[str, dict] = {
     # class, not rungs of the ladder
     "300k-h4": dict(layers=2, width=64, heads=4),
     "300k-l3": dict(layers=3, width=64, heads=2),
+    "300k-l1w96": dict(layers=1, width=96, heads=2),  # Pan's bigram search (8 Nov): a bigram is a one-layer function, so the weights go to width
     "1m-h8": dict(layers=4, width=128, heads=8),
     "1m-l6": dict(layers=6, width=128, heads=4),
     "9m": dict(layers=6, width=192, heads=6),

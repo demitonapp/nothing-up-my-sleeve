@@ -1,0 +1,66 @@
+name: fu-ogden-v0-2~pan-v02@300k-pre-s1
+ship: 'Fitout: Ogden v0.2 @ 300k ~ pan-v02 (Pan''s bigram search), Ogden v0.2, two and a half times the unique text'
+experiment: 'Fitout ogden-v0-2: v0.1''s rule over the whole library, and the logic tutor''s passages at 7.5%'
+question: 'Pan''s bigram search, round 1 (8 November): the plain Pan with Ogden v0.2, two and a half times the unique
+  text, every other setting the same. Does its top guess find the right keyed word more often (shapes/keyed_top1,
+  the plain Pan 0.208 and 0.200, the bigram table 0.303)?'
+fitout:
+  key: ogden-v0-2
+  variation: pan-v02
+data:
+  recipe: lists/ogden-v0.2.csv
+  passes: 4
+  order: shuffled
+  refuse:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+  - lists/hole-cards-unseen.csv
+  clean: unwrap-v2
+  opt_in: 'Ogden v0.2 reads books beyond the two stores, approved by Justin (2026-11-08 08:10): the library''s books
+    at v0.1''s Ogden-ness bar, the Bible struck, and the logic tutor''s template passages'
+tokeniser:
+  kind: spm-bpe
+  vocab: 2048
+  byte_fallback: true
+  train_on: lists/ogden-v0.1.csv
+model:
+  family: gpt
+  preset: 300k
+  context: 1024
+  positions: rope
+optim:
+  name: adamw
+  lr: 0.003
+  betas:
+  - 0.9
+  - 0.95
+  weight_decay: 0.1
+  warmup_steps: 100
+  schedule: cosine
+  min_lr_ratio: 0.1
+  batch_tokens: 32768
+  grad_clip: 1.0
+  precision: bf16
+eval:
+  sets:
+  - lists/hole-cards-unseen.csv
+  every_steps: 640
+  evaluators:
+  - ce_bpb
+  - discovery
+  - logic
+  - stars
+  - nevermore
+  - cards
+  - shapes
+  light:
+    every_steps: 64
+    evaluators:
+    - stars
+    - nevermore
+    - cards
+    - logic
+    - shapes
+checkpoint:
+  every_steps: 640
+seed: 1

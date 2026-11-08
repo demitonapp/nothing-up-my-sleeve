@@ -1236,3 +1236,24 @@ Fixed before any of it sails. Claude runs the night; the queue (`ships/specs/que
 
 - **Every guess on the page is tagged** (`/api/table/guesses`: each guess's `tag` and `coarse`), and the panel says **what the ship is looking for**: its ten guesses' probability summed by part of speech, in the fine tags (NOUN, VERB, ADJ, ADV, PUNCT, BREAK...) and Ogden's coarse tier (a thing, a quality, an operation, a mark). Ask's run-all table has a column of it. The lexicon and the rule are the shapes evaluator's (a word's commonest tag in the Ogden corpus; a line break BREAK), so the page and the voyages' readings agree. Example, a Pan ship after "The old man walked into the": NOUN 87% (door, window, tree), ADV 10% (back), ADJ 2%.
 - **Pan's goals** (`s1.sizes`) carry it, second after the bigram table: **parts of speech**, its top guess the right part of speech at the judge books' points (`shapes/upos_top1`). Where it stands: the best Pan ship 37.2% (`fu-ogden-v0-1@300k-pre-s1`), the 9m 44%, the 21m 48%.
+
+## Phaleron's fourteen hours: Pan and Augustus as near their objectives as they can get (8 November, 17:25, Justin: "can we also clear the queue for local waters. Let's name it after a famous bay, perhaps that the greeks used to train ships in and then the local waters needs a plan to run for the next 14 hours to get Pan and Augustus as close as possible to achieving their goals")
+
+- **Local waters are Phaleron** (the plan page, `waters.py`): Athens' first harbour, where its early fleet lay and sailed from before Themistocles built Piraeus beside it for the triremes of Salamis. A sheltered bay for the youngest ships.
+- **The queue cleared** (17:20): eight lines, kept in their order in `ships/specs/queue-removed-2026-11-08.txt` (leg 1b's resume, the 21m's hold, the copy test's two arms, the knockout, the Pythia logic readings, v0.2's plain 9m, the 1m's second seed). The MLX 9m second seed, at sea since 16:03, docks first: it is the parity run's seed spread.
+- **Pan, round 1 (queued):** Pan's ten voyages so far all read 0.200 to 0.210 on its objective (`shapes/keyed_top1`; the bigram table 0.303), whatever the lever (the metre scaffold, three layers, the copy tack): the seeds' spread, ±0.008. So round 1 tries other levers, one seed each, on Ogden v0.1 against the plain Pan (0.208, 0.200):
+
+| voyage | lever | about |
+|---|---|---|
+| `~pan-lr6` | learning rate 0.006 | 15 min |
+| `~pan-lr15` | learning rate 0.0015 | 15 min |
+| `~pan-ctx128` | context 128 pieces (a bigram needs one word back) | 15 min |
+| `~pan-l1w96` | one layer 96 wide, not two 64 wide (a new shape, `300k-l1w96`, about the same weights) | 15 min |
+| `~pan-p8` | eight passes, not four | 30 min |
+| `fu-ogden-v0-2~pan-v02` | Ogden v0.2, two and a half times the unique text | 40 min |
+| `~pan-teach5` | **the 21m as its teacher** (`fu-ogden-v0-1@21m-pre-s1`, 0.295 on the table; alpha 0.5, temperature 2; the same tokeniser) | 2.3 h (the 21m runs on every step) |
+
+  The 21m as a teacher at alpha 0.9 is written (`~pan-teach9`) but not queued: at 2.3 hours a taught voyage, one arm is what fourteen hours allow.
+- **Predictions, fixed now:** the teacher moves Pan most, to **0.23 to 0.26** (it hands Pan the 21m's word-pair odds directly), still short of the table; one layer 96 wide a coin toss for a point; the learning rates, eight passes and the short context within the seeds' spread; Ogden v0.2 up a point at most (more pairs, but the judge points are the same). **No arm reaches 0.303 in round 1.**
+- **Round 2 (about 2.5 h, queued when round 1 is read):** every lever that beats the plain Pan by more than 0.01 combined in one ship, two seeds, read on the bigram table and the parts of speech.
+- **Augustus (proposed, about 5 h, needs Justin's approval of its reading):** nothing in the library teaches sums often enough (158 "N and N make" in 1.8 GB), so no lever without a maths shelf can move De Morgan. The plan: (1) a **maths tutor** in Basic English in De Morgan's order (counting up and down to thirty, the addition and times tables, sharing, halves and doubles, stories of one and two steps), every sum of the maths book and every run of six of its words held out, written by a deterministic generator as the logic tutor's passages are; (2) a **`maths` evaluator**, the maths book read during voyages (chapters learnt, sums right, sums first), so Augustus is measured as it sails; (3) Augustus on Ogden v0.1 with the tutor at **2%, 5%, 10% and 20%** of the reading, about 40 minutes each, against the plain Augustus (`fu-ogden-v0-1@1m-pre-s1`, and its second seed put back as the control); (4) the best share on a second seed. Expected: counting and the facts (chapters 1 to 7) at 5% or more; one-step stories at 10% or more; two-step stories a coin toss at any share. The Forgotten Tomes beside, so the sums are not bought with the reading.

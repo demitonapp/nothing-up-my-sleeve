@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Thorp's schedule (S2): every minute, fire the jobs that are due (thorp/viable/s2_coordination/schedule.py).
+     Installed only with Justin's word:
+       mkdir -p data/runs/schedule; cp backend/scripts/launchd/io.thorp.schedule.plist ~/Library/LaunchAgents/
+       launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/io.thorp.schedule.plist
+     and taken out with: launchctl bootout gui/$(id -u)/io.thorp.schedule -->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>io.thorp.schedule</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/opt/homebrew/bin/uv</string><string>run</string><string>--project</string><string>backend</string>
+    <string>thorp</string><string>schedule</string><string>tick</string>
+  </array>
+  <key>WorkingDirectory</key><string>/Users/justintrollip/Source/Thorp</string>
+  <key>StartInterval</key><integer>60</integer>
+  <key>RunAtLoad</key><true/>
+  <key>StandardOutPath</key><string>/Users/justintrollip/Source/Thorp/data/runs/schedule/launchd.out</string>
+  <key>StandardErrorPath</key><string>/Users/justintrollip/Source/Thorp/data/runs/schedule/launchd.out</string>
+  <key>EnvironmentVariables</key>
+  <dict><key>PATH</key><string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/Users/justintrollip/.local/bin</string></dict>
+</dict>
+</plist>

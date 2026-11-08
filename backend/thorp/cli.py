@@ -214,6 +214,9 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("value", help="switch: on|off; term: its value as JSON (40, or '{\"RTX 4090\": 0.45}')")
     s.add_argument("--words", required=True, help="Justin's words, and when")
     s.set_defaults(fn=cmd_s5)
+    s = sub.add_parser("schedule", help="Thorp's own schedule (S2): tick, list, run, import-claude, enable, judge")
+    s.add_argument("rest", nargs=argparse.REMAINDER)
+    s.set_defaults(fn=lambda a: __import__("thorp.viable.s2_coordination.schedule", fromlist=["main"]).main(a.rest))
     a = p.parse_args(argv)
     return a.fn(a)
 

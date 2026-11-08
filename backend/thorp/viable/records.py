@@ -366,3 +366,79 @@ class TableTalk(Base):
 def tables():
     """The tables this module defines (the records), not the fitouts, the Wager or the ships beside them."""
     return [m.local_table for m in Base.registry.mappers if m.class_.__module__ == __name__]
+
+
+# ---------------------------------------------------------------- the schedule (S2), and its judge (S5)
+
+
+class ScheduledJob(Base):
+    """S2: a job Thorp runs on a schedule (Justin, 8 November: "thorps schedules tasks shouldn't be in claude code, but
+    rather part of our VSM model and in postgres"). A cron (five fields, this Mac's local time) or one time; a job is
+    either a command, or a prompt put to the judge (S5's choice of Thorp's most capable model). `system` is the VSM
+    system that owns the job's purpose; `limits` its bounds (max_minutes, cwd)."""
+
+    __tablename__ = "schedule_jobs"
+    __table_args__ = (
+        CheckConstraint("kind in ('judge', 'command')", name="job_kind"),
+        CheckConstraint("(cron is null) <> (fire_at is null)", name="job_when"),
+        CheckConstraint("system in ('S1', 'S2', 'S3', 'S3*', 'S4', 'S5')", name="job_system"),
+        {"schema": S2},
+    )
+
+    key: Mapped[str] = mapped_column(Text, primary_key=True)
+    title: Mapped[str] = mapped_column(Text)
+    description: Mapped[str] = mapped_column(Text, default="", server_default="")
+    system: Mapped[str] = mapped_column(Text)
+    kind: Mapped[str] = mapped_column(Text)
+    cron: Mapped[str | None] = mapped_column(Text)
+    fire_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    enabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    prompt: Mapped[str | None] = mapped_column(Text)  # for the judge, word for word
+    command: Mapped[str | None] = mapped_column(Text)  # for a command (sh -c)
+    limits: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}")
+    source: Mapped[str] = mapped_column(Text, default="", server_default="")  # where it came from
+    words: Mapped[str] = mapped_column(Text, default="", server_default="")  # who set it up or changed it, when
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    enabled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))  # due times before this are not owed
+
+    firings: Mapped[list[JobFiring]] = relationship(back_populates="job", order_by="JobFiring.id")
+
+
+class JobFiring(Base):
+    """S2: one firing of a job: the time it was due, who judged it (or the command), how it ended, what it said."""
+
+    __tablename__ = "schedule_firings"
+    __table_args__ = (
+        Index("schedule_firings_once", "job_key", "due_at", unique=True),  # a due time fires once, whatever ticks
+        CheckConstraint("outcome in ('running', 'ok', 'failed', 'timeout', 'missed')", name="firing_outcome"),
+        {"schema": S2},
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    job_key: Mapped[str] = mapped_column(Text, ForeignKey(f"{S2}.schedule_jobs.key", ondelete="CASCADE"))
+    due_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    judge: Mapped[str | None] = mapped_column(Text)  # the judge's name (claude, a Thorp ship), or 'command'
+    outcome: Mapped[str] = mapped_column(Text, default="running", server_default="running")
+    exit_code: Mapped[int | None] = mapped_column(Integer)
+    pid: Mapped[int | None] = mapped_column(Integer)
+    summary: Mapped[str] = mapped_column(Text, default="", server_default="")  # the end of what it said
+    output_path: Mapped[str | None] = mapped_column(Text)  # all it said, under data/runs/schedule/
+
+    job: Mapped[ScheduledJob] = relationship(back_populates="firings")
+
+
+class Judge(Base):
+    """S5: which model judges the jobs that need judgment, "Thorp's most capable model" (Justin: "claude initially but
+    eventually a thorp model"). Every choice kept; the latest is in force. `command` is the argv the prompt is given to
+    (on stdin), so a Thorp model takes over by a new row, not a change of code."""
+
+    __tablename__ = "judges"
+    __table_args__ = {"schema": S5}
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(Text)  # claude, or thorp:<ship>
+    command: Mapped[list] = mapped_column(JSONB)  # e.g. ["claude", "-p"]; the prompt arrives on stdin
+    words: Mapped[str] = mapped_column(Text, default="", server_default="")
+    set_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

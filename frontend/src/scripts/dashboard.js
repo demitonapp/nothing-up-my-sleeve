@@ -1156,7 +1156,8 @@ async function classSubject(r, key) {
   const vs = subjData.voyages;
   const cell = rd => rd.value == null ? '<td class="s">–</td>' : `<td class="${rd.passed ? 'pass' : ''}" title="score ${rd.score == null ? '–' : rd.score.toFixed(2)} at step ${rd.step}">${rd.value >= 0 ? '+' : ''}${rd.value.toFixed(2)}${rd.passed ? ' ✓' : ''}</td>`;
   const mine = tests.filter(t => t.mine);
-  el.innerHTML = `<p class="s">${mine.length ? `This class's own step${mine.length > 1 ? 's' : ''} on this track: <b>${mine.map(t => esc(t.name)).join(', ')}</b>. The others are other classes' goals, shown for where it stands on the way up.` : `This class has no step of its own on this track; the readings show where it stands.`} A test passes when its lift (the true answer's share over the floor) reaches its mark; each test has only a few dozen items, so seeds differ.</p>
+  const relLinks = key === 'logic' ? `<p class="lgnav">The logic deck's five relations, each in detail: ${OSUBS.map(x => `<a href="#${modelHash(r, 'overview', x)}">${x.slice(6)}</a>`).join(' · ')}</p>` : '';
+  el.innerHTML = relLinks + `<p class="s">${mine.length ? `This class's own step${mine.length > 1 ? 's' : ''} on this track: <b>${mine.map(t => esc(t.name)).join(', ')}</b>. The others are other classes' goals, shown for where it stands on the way up.` : `This class has no step of its own on this track; the readings show where it stands.`} A test passes when its lift (the true answer's share over the floor) reaches its mark; each test has only a few dozen items, so seeds differ.</p>
     <div class="scroll"><table class="subjtable"><thead><tr><th>test</th><th>whose step</th><th>mark</th>${vs.map(v => `<th class="mono" title="${esc(v)}">${esc(short(v))}</th>`).join('')}</tr></thead>
     <tbody>${tests.map(t => `<tr${t.mine ? ' class="mine"' : ''}><td title="${esc(t.about)}"><b>${esc(t.name)}</b><div class="s">${esc(t.about.slice(0, 140))}${t.about.length > 140 ? '…' : ''}</div></td>
       <td>${t.goal_class ? esc(t.goal_class) : '<span class="s">the bettor</span>'}${t.mine ? ' <b>(this class)</b>' : ''}</td><td>≥ ${t.threshold}</td>${t.readings.map(cell).join('')}</tr>`).join('')}</tbody></table></div>
@@ -2033,7 +2034,7 @@ async function loadTranscript() {
 function drawTable(pending = null) {
   const log = document.getElementById('tablelog');
   const meta = m => !m ? '' : [m.temperature != null ? `t ${Number(m.temperature).toFixed(2)}` : '', m.seed != null ? `seed ${m.seed}` : '', m.tokens != null ? `${m.tokens} tokens` : '',
-    m.seconds != null ? `${Number(m.seconds).toFixed(1)} s` : '', m.stopped ? { turn: 'stopped at the next turn', length: 'stopped at the length', eos: 'stopped at the end of text' }[m.stopped] || `stopped: ${m.stopped}` : ''].filter(Boolean).join(' · ');
+    m.seconds != null ? `${Number(m.seconds).toFixed(1)} s` : '', m.stopped ? { turn: 'stopped at the next turn', blank: 'stopped at a blank line', length: 'stopped at the length', eos: 'stopped at the end of text' }[m.stopped] || `stopped: ${m.stopped}` : ''].filter(Boolean).join(' · ');
   log.innerHTML = (tableLog.length || pending ? '' : '<div class="${emptyCls()}">no exchanges with this ship yet: say something below</div>')
     + tableLog.map(x => `<div class="ex"><div class="q"><b>Q:</b> ${esc(x.q)}</div><div class="a"><b>A:</b> ${esc(x.a)}</div><div class="m">${esc(meta(x.meta))}</div></div>`).join('')
     + (pending ? `<div class="ex pending"><div class="q"><b>Q:</b> ${esc(pending)}</div><div class="a"><b>A:</b> <span class="s">the ship is thinking…</span></div></div>` : '');

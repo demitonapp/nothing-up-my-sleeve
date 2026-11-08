@@ -931,7 +931,7 @@ function drawHarbours() {
     if (title) title.innerHTML = 'Harbours <span class="q">two harbours today: open one to see the ships that lie in it</span>';
     el.className = 'harbours';
     el.innerHTML = hs.map(x => { const rs = sizes(x), live = rs.reduce((n, r) => n + rungRuns(r.preset).filter(v => v.status === 'running').length, 0), done = rs.reduce((n, r) => n + rungRuns(r.preset).filter(v => v.status === 'finished').length, 0);
-      return `<a class="${cardCls(true, 'card harbourcard')}" href="#/harbours/${esc(x.key)}"><div class="top"><span class="nm">${esc(x.name)}</span><span class="preset">${esc(x.aka)}</span></div>
+      return `<a class="${cardCls(true, 'card harbourcard')}" href="#/harbours/${esc(x.key)}">${artImg(x.key, 'cardart ship')}<div class="top"><span class="nm">${esc(x.name)}</span><span class="preset">${esc(x.aka)}</span></div>
         <div class="job">${esc(x.about)}</div>
         <div class="hships">${rs.map(r => `<span class="${pillCls('')}">${esc(r.name)} <span class="s">${esc(r.preset)}</span></span>`).join(' ')}</div>
         <div class="foot"><span>${esc(x.where)}</span><span class="${pillCls(live ? ' live' : '')}">${live ? live + ' running' : 'at rest'}</span></div>

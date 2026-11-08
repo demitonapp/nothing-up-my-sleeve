@@ -73,6 +73,17 @@ CLASSES: dict[str, str] = {
     "throwing hard shadows across the board",
 }
 
+# The harbours (Justin, 8 November: "i want two fal images for them"): Phaleron, Athens' first harbour, and the Market Harbour,
+# the first great trading harbour. Landscape, for the harbour tiles.
+HARBOURS: dict[str, str] = {
+    "phaleron": "the ancient Greek harbour of Phaleron at night, a sheltered curved bay of calm black water, a row of "
+    "small beached wooden triremes and young ships drawn up on the shingle, shipwrights and trainee oarsmen with "
+    "torches, a stone breakwater, the lamplit hills of Athens and the Acropolis faint on the dark horizon",
+    "market": "a vast ancient trading harbour at night, lantern-lit quays crowded with bales of silk and sacks of "
+    "spice, merchants of many nations bargaining, dhows, junks and tall merchantmen moored in rows with their "
+    "sails furled, a camel caravan arriving down to the water, countless lamps reflected in the black harbour",
+}
+
 # The playing cards: the stars that do the trick (fleet.STARS / fleet.METHODS["chaining"] cards). Portrait,
 # for the card faces.
 CARDS: dict[str, str] = {
@@ -126,8 +137,8 @@ LOGIC: dict[str, str] = {
     "with the stars seen through the porthole, a finger on the chart, trusting the paper over the sky, one lamp",
 }
 
-SIZES = {**{k: "landscape_16_9" for k in CLASSES}, **{k: "portrait_4_3" for k in CARDS}, **{k: "portrait_4_3" for k in LOGIC}}
-SUBJECTS = {**CLASSES, **CARDS, **LOGIC}
+SIZES = {**{k: "landscape_16_9" for k in (*CLASSES, *HARBOURS)}, **{k: "portrait_4_3" for k in CARDS}, **{k: "portrait_4_3" for k in LOGIC}}
+SUBJECTS = {**CLASSES, **HARBOURS, **CARDS, **LOGIC}
 
 
 def fal_key() -> str:

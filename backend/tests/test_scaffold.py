@@ -136,6 +136,17 @@ def test_the_floor():
     assert train.scaffold_weight(900, 1000, sc) == pytest.approx(0.2)
 
 
+def test_the_release():
+    sc = {**SC, "floor": 0.2, "release": 0.9}  # the 21m (2026-11-08): the pull off for the last 10%, past the floor
+    assert train.scaffold_weight(899, 1000, sc) == pytest.approx(0.2) and train.scaffold_phase(899, 1000, sc) == "content"
+    assert train.scaffold_weight(900, 1000, sc) == 0.0 and train.scaffold_phase(900, 1000, sc) == "release"
+    assert train.scaffold_weight(999, 1000, {**sc, "fade": None}) == 0.0  # releases even the ceiling arm
+    train.check_scaffold(sc, 2, 2)
+    for bad in (0.2, 1.0):  # before the fade's end, or past the voyage
+        with pytest.raises(ValueError):
+            train.check_scaffold({**sc, "release": bad}, 2, 2)
+
+
 def test_riddles_are_checked():
     train.check_scaffold({"riddles": {"bridge": {"layer": 1}}}, 2, 2)
     with pytest.raises(ValueError):

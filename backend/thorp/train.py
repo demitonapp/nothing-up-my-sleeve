@@ -546,7 +546,8 @@ def copy_weighted(ce, x, y, cw: dict, markers: mx.array | None = None):
 # rule over the token ids (thorp/viable/s5_policy/deck.py: metre needs no teacher), while the model reads text as
 # always. Three phases of one voyage: **metre** (the scaffold at full weight, to `hold` of the voyage), **fade**
 # (eased linearly to zero by `fade`), **content** (the language-model loss alone). A card still played after the
-# fade is held by heart; `fade: null` never releases it (the ceiling arm).
+# fade is held by heart; `fade: null` never releases it (the ceiling arm). `release` (a share of the voyage, at or
+# after `fade`) sets the weight to 0 from there, past any floor: the last stretch read by heart (the 21m, 2026-11-08).
 #
 #   optim:
 #     scaffold:
@@ -622,6 +623,9 @@ def scaffold_weight(step: int, total: int, sc: dict) -> float:
     """The scaffold's weight at this step: full to hold x total, then linearly down to its floor (0 unless set) at
     fade x total, and the floor after."""
     w = float(sc.get("weight", 1.0))
+    rel = sc.get("release")  # the release stage (2026-11-08, the 21m): the pull off from this share of the voyage
+    if rel is not None and step >= float(rel) * total:
+        return 0.0
     fade = sc.get("fade")
     if fade is None:
         return w
@@ -635,6 +639,8 @@ def scaffold_weight(step: int, total: int, sc: dict) -> float:
 
 
 def scaffold_phase(step: int, total: int, sc: dict) -> str:
+    if sc.get("release") is not None and step >= float(sc["release"]) * total:
+        return "release"
     if sc.get("fade") is None or step < float(sc.get("hold", 0.0)) * total:
         return "metre"
     return "fade" if step < float(sc["fade"]) * total else "content"
@@ -684,6 +690,10 @@ def check_scaffold(sc: dict, layers: int, heads: int) -> None:
             raise ValueError(f"scaffold start {x}: `from` is a share of the voyage, from 0 to under 1")
     if not sc.get("heads") and not sc.get("riddles"):
         raise ValueError("scaffold names no heads")
+    if sc.get("release") is not None:
+        rel = float(sc["release"])
+        if not float(sc.get("fade") or 0.0) <= rel < 1.0:
+            raise ValueError(f"scaffold release {rel}: a share of the voyage at or after the fade's end, under 1")
     for key, r in (sc.get("riddles") or {}).items():
         if key not in RIDDLES:
             raise ValueError(f"scaffold riddle {key!r}: the riddles are {', '.join(RIDDLES)}")
@@ -933,6 +943,8 @@ def train(
         until = f"faded out by {sc['fade']}" if sc.get("fade") is not None else "never released"
         if sc.get("floor"):
             until += f" to a floor of {sc['floor']}"
+        if sc.get("release") is not None:
+            until += f", released (weight 0) from {sc['release']}"
         log(f"metre scaffold: {where}; weight {sc.get('weight', 1.0)} to {sc.get('hold', 0)} of the voyage, {until}"
             + (f"; read on {sample['windows']} windows of {sample['length']}" if sample else "")
             + "".join(f"; riddle {k} on layer {r['layer']}" + (f" head {r['head']}" if "head" in r else " (logit lens)")
@@ -1085,7 +1097,7 @@ def train(
             for key, v in zip(("comparator", "bridge"), parts[1:], strict=True):
                 if key in riddle_cfg:
                     vals[f"scaffold/riddle/{key}"] = v
-            vals["scaffold/phase"] = float(("metre", "fade", "content").index(scaffold_phase(step - 1, total, sc)))
+            vals["scaffold/phase"] = float(("metre", "fade", "content", "release").index(scaffold_phase(step - 1, total, sc)))
         if step % METRICS_EVERY == 0 or step == 1:
             flat = dict(tree_flatten(grads))
             vals["grad_norm"] = gnorm.item()

@@ -1079,7 +1079,7 @@ async function askPanel(r) {
     let d; try { d = await get(`/api/class_best?preset=${encodeURIComponent(r.preset)}`); } catch (e) { who.textContent = 'the best version could not be read'; return; }
     askBest = d.best;
     const b = d.best;
-    who.innerHTML = b ? `Talking to <b>${esc(b.name || b.ship)}</b> · <a href="#${shipHash(b.ship_key)}">${esc(b.ship)}</a> · ${b.sailings} voyage${b.sailings === 1 ? '' : 's'}${b.chaining_lift != null ? ` · chaining lift ${b.chaining_lift >= 0 ? '+' : ''}${b.chaining_lift.toFixed(3)}` : ''}<div class="s">${esc(b.why)}</div>`
+    who.innerHTML = b ? `Talking to ${b.name && b.name !== b.ship ? `<b>${esc(b.name)}</b> · ` : ""}<a href="#${shipHash(b.ship_key)}">${b.name && b.name !== b.ship ? esc(b.ship) : `<b>${esc(b.ship)}</b>`}</a> · ${b.sailings} voyage${b.sailings === 1 ? '' : 's'}${b.objective ? ` · <b>${esc(b.objective.label)}</b> ${(100 * b.objective.value).toFixed(1)}%` : ''}${b.chaining_lift != null ? ` · chaining lift ${b.chaining_lift >= 0 ? '+' : ''}${b.chaining_lift.toFixed(3)}` : ''}<div class="s">${esc(b.why)}</div>`
       : `<span class="s">the leaderboard has no best ${esc(r.preset)} yet: pick a voyage</span>`;
     const best = b ? b.runs : [];
     sel.innerHTML = (best.length ? `<optgroup label="the best version">${best.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('')}</optgroup>` : '')

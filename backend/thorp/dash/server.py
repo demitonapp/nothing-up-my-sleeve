@@ -2733,13 +2733,68 @@ def api_class_best(preset: str) -> dict:
     return out
 
 
+def _objective_metric(preset: str) -> tuple[str, str]:
+    """The ledger metric a size's primary objective is read by: the first of its goals (s1.sizes metrics) that
+    names one in brackets ("(shapes/keyed_top1)"); a size whose objective is not read during voyages yet (the
+    1m's De Morgan, on the Maths page) is read by the bigram table, as the prune ranked it. (metric, its label)."""
+    import re
+
+    from thorp import ship_store
+
+    row = next((r for r in ship_store.sizes() if r["preset"] == preset.split("-")[0]), None)
+    for m in (row or {}).get("metrics") or []:
+        hit = re.search(r"\(([a-z_]+/[a-z0-9_/]+)\)", m[1] if len(m) > 1 else "")
+        if hit:
+            return hit.group(1), m[0]
+    return "shapes/keyed_top1", "the bigram table (its objective is not read during voyages yet)"
+
+
 def _class_best(preset: str) -> dict:
     """The class's current best version, the one its Scoring tab talks to (Justin, 2026-11-07: "ask the
-    best version of 300k questions ... which one of the 300k is the current best version"): the
-    leaderboard's pick (leaderboard.payload()["board"]: a class's best ship, ranked as the board ranks it),
-    its voyages, and the finished voyages of the class to choose from instead."""
-    from thorp import leaderboard
+    best version of 300k questions ... which one of the 300k is the current best version"): since 8 November
+    (Justin: "Yes, change it") the ship **in service** whose best voyage reads highest on the size's **primary
+    objective** (`_objective_metric`, at each voyage's last reading), its voyages, and the finished voyages of
+    the class to choose from instead. With no ship in service read on it, the leaderboard's pick (chaining lift)."""
+    from thorp import leaderboard, ship_store
 
+    voyages = _rows(
+        "select name, ship, finished from runs where status='finished' and "
+        "(json_extract(spec_json,'$.model.preset') = ? or json_extract(spec_json,'$.model.preset') like ?) "
+        "order by finished desc",
+        [preset, f"{preset}-%"],
+    )
+    metric, label = _objective_metric(preset)
+    best = None
+    row = next((r for r in ship_store.sizes() if r["preset"] == preset.split("-")[0]), {})
+    try:
+        if not str(row.get("role") or "").lower().startswith("primary objective"):
+            raise LookupError("no primary objective set: the leaderboard's pick")
+        size = ship_store.size_of(preset)
+        ships = [x for x in ship_store.ships() if x.size == size and (x.status or "in service") == "in service" and not x.archived]
+        for sh in ships:
+            runs = [v for v in ship_store.voyages(sh.key)]
+            scored = []
+            for v in runs:
+                r = _rows("select value from metrics where run_id=? and name=? order by step desc limit 1", [v.run_id, metric])
+                if r:
+                    scored.append((float(r[0]["value"]), v.name))
+            if scored:
+                top = max(scored)
+                if best is None or top[0] > best["value"]:
+                    best = {"ship": sh, "value": top[0], "run": top[1], "runs": [v.name for v in runs]}
+    except Exception:  # noqa: BLE001  (no ship store: the leaderboard's pick, as before)
+        best = None
+    if best is not None:
+        sh = best["ship"]
+        return {
+            "best": {
+                "name": sh.name, "version": None, "ship": sh.name, "ship_key": sh.key, "run": best["run"],
+                "runs": best["runs"], "sailings": len(best["runs"]), "chaining_lift": None,
+                "objective": {"metric": metric, "label": label, "value": round(best["value"], 4)},
+                "why": f"the ship in service that reads highest on this size's primary objective, {label} ({metric}), at its voyages' last readings",
+            },
+            "voyages": voyages,
+        }  # fmt: skip
     best = next(
         (
             b["best"]
@@ -2747,12 +2802,6 @@ def _class_best(preset: str) -> dict:
             if b.get("best") and b["best"].get("preset") == preset
         ),
         None,
-    )
-    voyages = _rows(
-        "select name, ship, finished from runs where status='finished' and "
-        "(json_extract(spec_json,'$.model.preset') = ? or json_extract(spec_json,'$.model.preset') like ?) "
-        "order by finished desc",
-        [preset, f"{preset}-%"],
     )
     if best is None:
         return {"best": None, "voyages": voyages}

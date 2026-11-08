@@ -105,7 +105,7 @@ def test_new_names_and_their_aliases():
     assert {"expedition", "voyage", "library"} <= set(fleet.TERMS)
 
 
-def test_overview_and_the_library_carried():
+def test_overview_and_the_library_carried(frozen_stores):
     from thorp import expeditions, library
 
     o = expeditions.overview()

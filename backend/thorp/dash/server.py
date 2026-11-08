@@ -3035,6 +3035,116 @@ def api_class_vs(preset: str, ref: str | None = None, voyage: str | None = None)
     }  # fmt: skip
 
 
+LOGIC_RELATIONS = ("order", "cause", "membership", "proportion", "counterfactual")
+LOGIC_ABOUT = {
+    "order": "two comparisons chained into a third (the Scales' ability)",
+    "cause": "a chain of events: the first causes the second, the second the third",
+    "membership": "all A are B, all B have C, so every A has C",
+    "proportion": "twice of twice is four times, against a wrong product the premises never name",
+    "counterfactual": "premises that run against the world (fire that cools water), read as stated",
+}
+
+
+def _logic_bands(items: dict, n_boot: int = 500) -> dict:
+    """Each relation's chaining gain (both premises less the stronger single premise, from the relation's means) with
+    a 90% bootstrap band over its items, the overall gain (their mean), and the one-hop lift."""
+    import numpy as np
+
+    by: dict[str, list[str]] = {}
+    for k in items:
+        by.setdefault(k.rsplit("-", 1)[0], []).append(k)
+    rng = np.random.default_rng(0)
+
+    def gain(ks):
+        both = np.mean([items[k]["both"] for k in ks])
+        return float(both - max(np.mean([items[k]["first"] for k in ks]), np.mean([items[k]["second"] for k in ks])))
+
+    out = {}
+    for rel in LOGIC_RELATIONS:
+        ks = sorted(by.get(rel, []))
+        if not ks:
+            continue
+        boots = [gain([ks[i] for i in rng.integers(0, len(ks), len(ks))]) for _ in range(n_boot)]
+        lo, hi = np.percentile(boots, [5, 95])
+        right = sum(1 for k in ks if items[k]["both"] > 0 and items[k]["both"] > max(items[k]["first"], items[k]["second"]))
+        out[rel] = {"gain": gain(ks), "lo": float(lo), "hi": float(hi), "items": len(ks), "chained": right}
+    if out:
+        out["overall"] = {"gain": float(np.mean([v["gain"] for v in out.values()]))}
+    hop = [items[k]["one_hop"] for k in items if "one_hop" in items[k]]
+    if hop:
+        out["one_hop"] = {"gain": float(np.mean(hop))}
+    return out
+
+
+_logic_cache: dict[str, tuple[float, dict]] = {}
+
+
+def api_class_logic(preset: str) -> dict:
+    """Cached two minutes (its bands are bootstrapped over every reference model's items)."""
+    import time
+
+    hit = _logic_cache.get(preset)
+    if hit and time.time() - hit[0] < 120:
+        return hit[1]
+    out = _class_logic(preset)
+    _logic_cache[preset] = (time.time(), out)
+    return out
+
+
+def _class_logic(preset: str) -> dict:
+    """The logic deck at a class (Justin, 2026-11-08 13:00: "each page ... needs to be able to select which deck to
+    view ... the original deck of 16, but I want to see the new deck in this page too"): the 40-item logic deck, its
+    five relations with an example each; the class's voyages' chaining gain on each relation with bands (the 40-item
+    deck where a voyage has read it, else the 8-item deck, said which); and the reference models' (Qwen3 4B the bar)."""
+    import csv
+
+    deck_rows = list(csv.DictReader(paths.resolve("lists/tricks/logic-40.csv").open()))
+    deck = []
+    for rel in LOGIC_RELATIONS:
+        rows = [r for r in deck_rows if r["relation"] == rel]
+        ex = next((r for r in rows if r["variant"] == "both"), None)
+        deck.append({"relation": rel, "about": LOGIC_ABOUT[rel], "items": len({r["item"] for r in rows}),
+                     "example": ex and {"prompt": ex["prompt"], "idea": ex["idea"], "rival": ex["rival"]}})  # fmt: skip
+    con = _con()
+    try:
+        def art(rid, kind):
+            r = con.execute("select step, text from artifacts where run_id=? and kind=? order by step desc, rowid desc limit 1", [rid, kind]).fetchone()  # fmt: skip
+            return (r[0], json.loads(r[1])) if r and r[1] else (None, None)
+
+        voyages = []
+        for v in _class_voyages(preset):
+            step, items = art(v["run_id"], "logic40")
+            which = "40"
+            if items is None:
+                step, items = art(v["run_id"], "logic")
+                which = "8"
+            if items is None:
+                continue
+            voyages.append({"voyage": v["name"], "status": v["status"], "step": step, "deck": which, "gains": _logic_bands(items)})
+    finally:
+        con.close()
+    refs = []
+    cg = paths.data_dir() / "compare" / "chain-grades.json"
+    graded = json.loads(cg.read_text())["models"] if cg.exists() else {}
+    for f in sorted((paths.data_dir() / "compare").glob("logic-*.json")):
+        d = json.loads(f.read_text())
+        if d.get("items40"):
+            refs.append({"model": d["model"], "deck": "40", "gains": _logic_bands(d["items40"])})
+    have = {x["model"] for x in refs}
+    from thorp import smoking_qwen as sq
+
+    for name, e in graded.items():
+        it = (e.get("logic_test") or {}).get("items")
+        if "/" in name and it and name not in have:
+            refs.append({"model": name, "deck": "8", "gains": _logic_bands(it)})
+    size = {**sq.REFERENCE_PARAMS}
+    for x in refs:
+        x["params"] = size.get(x["model"])
+    refs.sort(key=lambda x: x["params"] or 0)
+    return {"preset": preset, "deck": deck, "relations": list(LOGIC_RELATIONS), "mark": 0.1,
+            "voyages": voyages, "references": refs, "bar": "mlx-community/Qwen3-4B-4bit"}  # fmt: skip
+
+
 def api_class_shapes(preset: str) -> dict:
     """The shapes readings (the parts-of-speech taxonomy) for the class's voyages that carry them: each
     accuracy as a series over tokens read, and the latest share of probability on each kind of word."""
@@ -3247,8 +3357,10 @@ def api_watch(preset: str) -> dict:
         bands = [{"phase": "metre", "from": 0, "to": (hold if end is not None else total_steps) * bt}]
         if end is not None:
             bands += [{"phase": "fade", "from": hold * bt, "to": end * bt}, {"phase": "content", "from": end * bt, "to": total_steps * bt}]
-        scaffold = {"heads": sc.get("heads", []), "weight": sc.get("weight", 1.0), "bands": bands,
-                    "now": _train.scaffold_phase(int(last), int(total_steps), sc)}  # fmt: skip
+        # the floor (0 unless set): the weight the fade stops at and holds to the end, so a voyage with one never sails
+        # on language alone (thorp/train.py scaffold_weight)
+        scaffold = {"heads": sc.get("heads", []), "weight": sc.get("weight", 1.0), "floor": float(sc.get("floor", 0.0)),
+                    "bands": bands, "now": _train.scaffold_phase(int(last), int(total_steps), sc)}  # fmt: skip
     chain = []
     if spec.get("fitout"):
         name = v["name"]
@@ -3544,6 +3656,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/class_subjects": lambda: api_class_subjects(q["preset"]),
                 "/api/class_shapes": lambda: api_class_shapes(q["preset"]),
                 "/api/class_vs": lambda: api_class_vs(q["preset"], q.get("ref"), q.get("voyage")),
+                "/api/class_logic": lambda: api_class_logic(q["preset"]),
                 "/api/table/guesses": lambda: api_table_guesses(
                     q["run"], q.get("text", ""), q.get("k", 10), q.get("mode", "1")
                 ),

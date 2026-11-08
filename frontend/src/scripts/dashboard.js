@@ -1220,10 +1220,51 @@ async function classShapes(r) {
 // and the best reading against its mark
 let classDeckKey = null;
 const flippedCards = new Set();  // the cards turned over, kept across redraws of the deck
+// which deck the Overview shows (Justin, 2026-11-08 13:00: "select which deck to view ... the original deck of 16, but I
+// want to see the new deck in this page too"): the 16 cards, or the 40-item logic deck; remembered per browser
+const deckWhich = () => { try { return localStorage.getItem('thorp.deck.which') || 'cards'; } catch (e) { return 'cards'; } };
+const deckSwitch = which => `<div class="darrange" role="tablist" aria-label="which deck"><span class="s">deck</span>${[['cards', 'the 16 cards'], ['logic', 'the logic deck']].map(([k, l]) => `<button type="button" role="tab" class="${toggleCls()}" data-state="${which === k ? 'on' : 'off'}" aria-selected="${which === k}" data-deckwhich="${k}">${l}</button>`).join('')}</div>`;
+function wireDeckSwitch(el, r) {
+  el.querySelectorAll('[data-deckwhich]').forEach(b => b.onclick = () => { try { localStorage.setItem('thorp.deck.which', b.dataset.deckwhich); } catch (e) { /* storage blocked */ } classDeckKey = null; classLogicKey = null; classDeck(r); });
+}
+// ---- the logic deck at a class (/api/class_logic): the five relations, the class's chaining gain on each with its band,
+// the reference models' beside it (Qwen3 4B the bar), and the mark (0.1)
+let classLogicKey = null;
+async function classLogicDeck(r, el) {
+  let d; try { d = await get(`/api/class_logic?preset=${encodeURIComponent(r.preset)}`); } catch (e) { el.innerHTML = deckSwitch('logic') + `<div class="${emptyCls()}">the logic deck could not be read (a dashboard server started before it existed has to be restarted)</div>`; wireDeckSwitch(el, r); return; }
+  const key = JSON.stringify(d); if (key === classLogicKey && el.dataset.preset === r.preset && el.dataset.shown === 'logic') return; classLogicKey = key; el.dataset.preset = r.preset; el.dataset.shown = 'logic';
+  const short = n => (n || '').replace('fu-ogden-v0-1', 'Ogden').replace('fu-ogden-v0-2', 'Ogden v0.2').replace('-pre', '');
+  const refName = n => (n || '').split('/').pop().replace(/-(bf16|4bit)$/, '');
+  const f = v => v == null ? '–' : `${v >= 0 ? '+' : ''}${v.toFixed(2)}`;
+  const bar = d.references.find(x => x.model === d.bar);
+  const best = rel => d.voyages.reduce((b, v) => (v.gains[rel] && (!b || v.gains[rel].gain > b.g.gain)) ? { v, g: v.gains[rel] } : b, null);
+  const scale = 1.0;  // the bars run from -0.5 to +0.5 nats around zero
+  const pos = x => Math.max(0, Math.min(100, 50 + 100 * x / scale));
+  const meter = (g, cls) => g ? `<div class="lgbar ${cls}" title="${f(g.gain)} (90% band ${f(g.lo)} to ${f(g.hi)})"><i style="left:${pos(Math.min(g.lo ?? g.gain, g.gain))}%;width:${Math.max(1, pos(Math.max(g.hi ?? g.gain, g.gain)) - pos(Math.min(g.lo ?? g.gain, g.gain)))}%"></i><b style="left:${pos(g.gain)}%"></b></div>` : '<div class="s">not read</div>';
+  const tiles = d.deck.map(x => {
+    const b = best(x.relation), q = bar && bar.gains[x.relation];
+    return `<div class="dcard lgcard"><div class="dname">${esc(x.relation)}</div><div class="s">${esc(x.about)} · ${x.items} items</div>
+      ${x.example ? `<div class="lgex"><span class="s">${esc(x.example.prompt)}</span> <b>${esc(x.example.idea)}</b> <span class="s">not</span> <i>${esc(x.example.rival)}</i></div>` : ''}
+      <div class="lgrow"><span class="s">this class${b ? ` (${esc(short(b.v.voyage))}, ${b.v.deck}-item)` : ''}</span>${meter(b && b.g, 'mine')}<span class="lgv">${f(b && b.g.gain)}</span></div>
+      <div class="lgrow"><span class="s">${esc(refName(d.bar))}${bar ? ` (${bar.deck}-item)` : ''}</span>${meter(q, 'ref')}<span class="lgv">${f(q && q.gain)}</span></div>
+    </div>`;
+  }).join('');
+  const rels = [...d.relations, 'overall', 'one_hop'];
+  const head = `<tr><th>model</th><th>deck</th>${rels.map(x => `<th>${x === 'one_hop' ? 'one-hop' : x}</th>`).join('')}</tr>`;
+  const cell = (g, rel) => { if (!g) return '<td class="s">–</td>'; const ok = rel !== 'one_hop' && g.gain >= d.mark && (g.lo == null || g.lo > 0); return `<td class="${ok ? 'pass' : ''}" title="${g.lo != null ? `90% band ${f(g.lo)} to ${f(g.hi)}; ${g.chained}/${g.items} items chained` : ''}">${f(g.gain)}${ok ? ' ✓' : ''}</td>`; };
+  const row = (name, deck, gains, mine) => `<tr${mine ? ' class="mine"' : ''}><td>${name}</td><td class="s">${deck}</td>${rels.map(x => cell(gains[x], x)).join('')}</tr>`;
+  el.innerHTML = `<div class="dtop"><div class="s dsum">The logic deck: ${d.deck.reduce((a, x) => a + x.items, 0)} items in five relations, on invented words so knowledge cannot answer. The chaining gain is both premises against the stronger alone (the mark ${d.mark}); the bar is the band a model's own items allow. The 50m's reason for being.</div>${deckSwitch('logic')}</div>
+    <div class="dgrid lggrid">${tiles}</div>
+    <h3>Every reading <span class="s">this class's voyages first (the 40-item deck where read, else the 8-item deck), then the reference models by size; ✓ at the mark with the band above zero</span></h3>
+    <div class="scroll"><table class="subjtable">${head}${d.voyages.map(v => row(`<span class="mono">${esc(short(v.voyage))}</span>`, `${v.deck}-item`, v.gains, true)).join('')}${d.references.map(x => row(esc(refName(x.model)), `${x.deck}-item`, x.gains, false)).join('')}</table></div>`;
+  wireDeckSwitch(el, r);
+}
+
 async function classDeck(r) {
   const el = document.getElementById('deckclass'); if (!el) return;
+  if (deckWhich() === 'logic') { classLogicDeck(r, el); return; }
   let d; try { d = await get(`/api/class_deck?preset=${encodeURIComponent(r.preset)}`); } catch (e) { el.innerHTML = `<div class="${emptyCls()}">the deck could not be read (a dashboard server started before it existed has to be restarted)</div>`; return; }
-  const key = JSON.stringify(d); if (key === classDeckKey && el.dataset.preset === r.preset) return; classDeckKey = key; el.dataset.preset = r.preset;
+  const key = JSON.stringify(d); if (key === classDeckKey && el.dataset.preset === r.preset && el.dataset.shown === 'cards') return; classDeckKey = key; el.dataset.preset = r.preset; el.dataset.shown = 'cards';
   const tok = t => t == null ? '' : t >= 1e6 ? `${Math.round(t / 1e6)}M` : `${Math.round(t / 1e3)}k`;
   const byKey = Object.fromEntries(d.cards.map(c => [c.key, c]));
   const scanAbout = Object.fromEntries((d.scansions || []).map(s => [s.key, `${s.name}: ${s.about}`]));
@@ -1273,7 +1314,8 @@ async function classDeck(r) {
         return `<div class="dscanrow"><div class="dscanhead"><b>${esc(s.name)}</b> <span class="s">${esc(s.about)} · ${cs.length} card${cs.length === 1 ? '' : 's'}</span></div><div class="dgrid">${cs.map(tile).join('')}</div></div>`; }).join('')
       + (d.cards.some(c => !c.scansion) ? `<div class="dscanrow"><div class="dscanhead"><b>Unscanned</b></div><div class="dgrid">${d.cards.filter(c => !c.scansion).map(tile).join('')}</div></div>` : '')
     : d.constellations.map(k => `<div class="drow"><div class="dsuit"><span class="suit">${esc(k.suit)}</span><b>${esc(k.name)}</b><span class="s">${esc(k.about)}</span></div>${d.cards.filter(c => c.constellation === k.key).map(tile).join('')}</div>`).join('');
-  el.innerHTML = `<div class="dtop"><div class="s dsum">${d.voyages} voyage${d.voyages === 1 ? '' : 's'} of the ${esc(d.class)} class on the ledger, ${d.read} with card readings${d.read ? '' : ': the deck fills in as its first voyage reads'}</div>${sw}</div>` + body;
+  el.innerHTML = `<div class="dtop"><div class="s dsum">${d.voyages} voyage${d.voyages === 1 ? '' : 's'} of the ${esc(d.class)} class on the ledger, ${d.read} with card readings${d.read ? '' : ': the deck fills in as its first voyage reads'}</div><div class="dswitches">${deckSwitch('cards')}${sw}</div></div>` + body;
+  wireDeckSwitch(el, r);
   el.querySelectorAll('[data-arrange]').forEach(b => b.onclick = () => { try { localStorage.setItem('thorp.deck.arrange', b.dataset.arrange); } catch (e) { /* storage blocked */ } classDeckKey = null; classDeck(r); });
   el.querySelectorAll('.dcard[data-card]').forEach(card => {
     const turn = () => {
@@ -1295,7 +1337,11 @@ const hms = s => s == null ? '–' : s >= 3600 ? `${Math.floor(s / 3600)} h ${Ma
 function scaffoldBar(sc, tokens) {
   if (!sc) return '';
   const total = sc.bands[sc.bands.length - 1].to || 1;
-  const about = { metre: 'heads pulled to the pattern', fade: 'the pull eased away', content: 'language alone: held by heart?' };
+  // a floor (optim.scaffold.floor) holds the pull from the fade's end to the voyage's end: no stretch of language alone
+  const floor = sc.floor || 0;
+  const about = floor
+    ? { metre: 'heads pulled to the pattern', fade: `the pull eased from ${sc.weight ?? 1} to ${floor}`, content: `the pull held at ${floor} to the end: held with a light hand?` }
+    : { metre: 'heads pulled to the pattern', fade: 'the pull eased away', content: 'language alone: held by heart?' };
   const heads = sc.heads.map(h => `${esc(h.card.replace(/_/g, '-'))} in layer ${h.layer} (head ${h.head})`).join(', ');
   return `<div class="s" style="margin-top:8px">pretraining in phases: the metre scaffold pins ${heads}</div><div class="wstagebar">${sc.bands.map(b => {
     const state = tokens >= b.to ? 'done' : tokens >= b.from ? 'now' : 'later';

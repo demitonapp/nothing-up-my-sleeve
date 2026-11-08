@@ -40,7 +40,7 @@ class _Only:
         pass
 
 
-def main(run: str, evaluators: list[str], dry: bool = False, only: str | None = None) -> int:
+def main(run: str, evaluators: list[str], dry: bool = False, only: str | None = None, last: bool = False) -> int:
     from thorp import train, vsm
     from thorp.ledger import Ledger, spec_of
 
@@ -66,13 +66,16 @@ def main(run: str, evaluators: list[str], dry: bool = False, only: str | None = 
         spec = {**{k: v for k, v in own.items() if k not in spec}, **spec}
     root = train.checkpoint_root(rid)
     steps = sorted(int(p.name.split("-")[1]) for p in root.glob("step-*") if (p / "state.json").exists())
-    probe = {"pips": "counter/probe_r2", "shapes": "shapes/upos_top1", "nevermore": "nevermore/natural_shared_score"}
+    probe = {"pips": "counter/probe_r2", "shapes": "shapes/upos_top1", "nevermore": "nevermore/natural_shared_score",
+             "logic40": "tricks/logic40/gain"}
     done = set()
     for ev in evaluators:
         m = probe.get(ev)
         if m:
             done |= {r["step"] for r in rec.query("select step from metrics where run_id=? and name=?", [rid, m])}
     todo = [s for s in steps if s not in done]
+    if last:  # the final checkpoint only (--last; 2026-11-08: the 40-item logic deck on finished voyages)
+        todo = [s for s in todo if s == steps[-1]]
     print(f"{row['name']}: {len(steps)} checkpoints, {len(todo)} to read with {', '.join(evaluators)}", flush=True)
     if dry:
         print(f"  would read steps {todo}", flush=True)
@@ -85,7 +88,7 @@ def main(run: str, evaluators: list[str], dry: bool = False, only: str | None = 
             model = train.build_model(spec, prep.tokeniser.vocab_size)
             model.update(train.to_compute(train.load_master(ckpt), spec["optim"].get("precision", "bf16")))
             out = train.run_evaluators(spec, rid, step, model, prep, _Only(rec, only) if only else rec, lambda *a: None)
-            keys = {k: round(v, 3) for k, v in (out or {}).items() if k.endswith(("max_score", "probe_r2", "shared_score"))} if isinstance(out, dict) else {}
+            keys = {k: round(v, 3) for k, v in (out or {}).items() if k.endswith(("max_score", "probe_r2", "shared_score", "/gain"))} if isinstance(out, dict) else {}
             print(f"  step {step}: {json.dumps(keys)}", flush=True)
     return 0
 
@@ -93,7 +96,8 @@ def main(run: str, evaluators: list[str], dry: bool = False, only: str | None = 
 if __name__ == "__main__":
     args = sys.argv[1:]
     dry = "--dry" in args
-    args = [a for a in args if a != "--dry"]
+    last = "--last" in args
+    args = [a for a in args if a not in ("--dry", "--last")]
     only = None
     if "--only" in args:
         i = args.index("--only")
@@ -101,4 +105,4 @@ if __name__ == "__main__":
         args = args[:i] + args[i + 2 :]
     if len(args) < 2:
         raise SystemExit(__doc__)
-    sys.exit(main(args[0], args[1:], dry, only))
+    sys.exit(main(args[0], args[1:], dry, only, last))

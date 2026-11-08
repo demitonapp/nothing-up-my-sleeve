@@ -36,6 +36,9 @@ cmd: uv run --project backend --group compare python backend/scripts/read_logic.
 # Qwen3 4B measured (Justin, 12:30: "measure qwen3 4B, then the 21m run and then final signoff from me before launching our first 50m"):
 # all 16 cards (thorp/outside_deck.py) and the judge books on cleaned text; the bar the first 50m is to beat on 15 of the 16 cards
 cmd: uv run --project backend --group compare python -m thorp.outside_deck mlx-community/Qwen3-4B-4bit >> data/runs/outside-deck.out 2>&1; uv run --project backend --group compare python backend/scripts/score_external.py mlx-community/Qwen3-4B-4bit lists/hole-cards-unseen.csv --clean unwrap-v2 >> data/runs/score-external.out 2>&1
+# The logic deck on the Overview (Justin, 13:00: "select which deck to view"): the 40-item deck read at the last checkpoint of the
+# finished Ogden voyages, so each class's page shows it (score_checkpoints --last); after the Qwen readings
+cmd: for v in 'fu-ogden-v0-1@21m-pre-s1' 'fu-ogden-v0-1~metre@21m-pre-s1' 'fu-ogden-v0-1@9m-pre-s1' 'fu-ogden-v0-1~metre@9m-pre-s1' 'fu-ogden-v0-1~deck@9m-pre-s1' 'fu-ogden-v0-2~staged@9m-pre-s1' 'fu-ogden-v0-1@1m-pre-s1' 'fu-ogden-v0-1@300k-pre-s1' 'fu-ogden-v0-1~metre@300k-pre-s1' 'fu-ogden-v0-1~metre-held@300k-pre-s1' 'fu-ogden-v0-1~l3-copy@300k-l3-pre-s1'; do uv run --project backend python backend/scripts/score_checkpoints.py --last "$v" logic40; done >> data/runs/score-logic40.out 2>&1
 # leg 1b (09:50): leg 1 with the Bridge composed in all four relations (leg 0's order-only Bridge rose and fell)
 fitouts/fu-ogden-v0-2~staged-all@9m-pre-s1
 # the 21m with the full deck before the first 50m (Justin, 12:35: agreed): it sails next, ahead of v0.2's control and the second seeds;

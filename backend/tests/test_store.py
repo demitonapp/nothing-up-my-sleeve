@@ -271,3 +271,22 @@ def test_the_intake_holder_is_recorded_while_held(tmp_thorp):
     with acquisition._intake_lock("in-1", "l.csv", log=lambda *a: None):
         assert acquisition.holder()["id"] == "in-1"
     assert acquisition.holder() is None
+
+
+def test_a_fresh_process_aboard_imports_fleet_and_the_evaluators_with_no_store(tmp_path):
+    """A hired box's process is new and has no Postgres (the parity voyage, 2026-11-08: fleet read the ladder from the
+    store as it was imported, so every evaluator that imported it failed at every reading). Under papers it must not ask."""
+    import os
+    import subprocess
+    import sys
+
+    papers = tmp_path / "rid.papers.json"
+    papers.write_text(json.dumps(store.papers_for_box()))
+    env = {**os.environ, "THORP_PAPERS": str(papers), "THORP_PG": "postgresql://thorp@localhost:1/thorp"}
+    code = ("import thorp.fleet as f; from thorp import evaluators; from thorp.models.registry import LADDER;"
+            " [evaluators.get(n) for n in ['stars', 'nevermore', 'cards', 'pips', 'discovery', 'logic', 'shapes']];"
+            " print(len(LADDER), f.PROXY)")  # fmt: skip
+    r = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True, timeout=120)
+    assert r.returncode == 0, r.stderr[-2000:]
+    n, proxy = r.stdout.split()
+    assert int(n) == len(json.loads(papers.read_text())["sizes"]) > 0 and proxy

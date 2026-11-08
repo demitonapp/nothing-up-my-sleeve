@@ -124,6 +124,20 @@ class FakeBox:
         home["THORP_PAPERS"] = os.environ.get("THORP_PAPERS")
         os.environ.update(THORP_DATA=str(self.root / "data"), THORP_LEDGER=str(self.root / "ledger.sqlite"), THORP_BACKEND="torch",
                           THORP_PAPERS=str(self.root / "data" / "charter" / f"{rid}.papers.json"))  # as Box.launch sets it
+        # aboard, Postgres is out of reach (a hired box has none): anything that asks it fails here as it would there
+        from sqlalchemy import create_engine
+
+        from thorp import store
+        from thorp.viable.s3_control import fitout_store
+
+        dead = create_engine("postgresql+psycopg://thorp@localhost:1/thorp", connect_args={"connect_timeout": 1})
+        at_home = (store.engine, fitout_store.engine)
+        from thorp import fleet, ship_store
+
+        ship_store.reload()  # a box's process is new: nothing read at home is cached aboard
+        fleet._REGISTER = None
+        self.mp.setattr(store, "engine", lambda: dead)
+        self.mp.setattr(fitout_store, "engine", lambda: dead)
         try:
             box_led = Ledger()
             self.papers_row = box_led.get_run(rid)  # the box's gate knows the run S3 passed at home
@@ -138,6 +152,8 @@ class FakeBox:
             box_led.checkpoint_wal()
             (self.root / "data" / "charter" / f"{rid}.exit").write_text(str(code))
         finally:
+            self.mp.setattr(store, "engine", at_home[0])  # home again: the store is in reach
+            self.mp.setattr(fitout_store, "engine", at_home[1])
             for k, v in home.items():
                 if v is None:
                     os.environ.pop(k, None)
@@ -411,3 +427,25 @@ def test_an_unmeasured_class_is_priced_no_faster_than_the_mac(monkeypatch):
     assert abs(floored["hours"] - (269_221_888 / 63_000 / 3600 + 0.35)) < 1e-6
     monkeypatch.setattr(market, "throughput", lambda gpu, preset: 400_000.0)  # once measured, the measure rules
     assert market.price(cfg, "9m", 269_221_888, o)["speed"].startswith("measured")
+
+
+def test_aboard_no_evaluator_asks_the_store(library, spec, tmp_thorp, monkeypatch):
+    """A hired box has no Postgres (2026-11-08, the parity voyage: cards, nevermore, stars and pips failed at every
+    reading with 'connection to 127.0.0.1:5433 refused'). Every evaluator that reads a deck, a size or a ship must
+    read it from the papers carried aboard: aboard, none may record an eval_error."""
+    small_terms(tmp_thorp)
+    spec["optim"]["precision"] = "fp32"
+    spec["model"]["context"] = 256  # the decks' prompts fit (as in test_torch)
+    spec["eval"]["evaluators"] = ["ce_bpb", "samples", "stars", "nevermore", "cards", "pips", "discovery"]
+    market, box_root, said = FakeMarket(), tmp_thorp / "box", []
+    rec = Ledger()
+    out = s1.sail(write_spec(spec, tmp_thorp), vast=Vast(market), resolver=library["resolver"],
+                  box_factory=lambda inst: FakeBox(box_root, library["resolver"], monkeypatch),
+                  rec=rec, log=said.append, sleep=lambda s: None, poll_s=0)  # fmt: skip
+    rid = train.run_id(spec)
+    assert out["status"] == "home"
+    errors = [json.loads(r["text"])["error"] for r in rec.query("select text from artifacts where run_id=? and kind='eval_error'", [rid])]
+    assert errors == []
+    # registered with its ship at home, since aboard it cannot be (the toy preset is no size, so it says why)
+    home = [x for x in said if "regist" in x]
+    assert len(home) == 1 and "aboard" not in home[0] and ("registered as a voyage" in home[0] or "no size for preset 'tiny'" in home[0])

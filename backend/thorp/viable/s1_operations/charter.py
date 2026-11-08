@@ -294,6 +294,20 @@ def bring_home(box, rid: str, start: int, rec: Ledger, hire: dict, commit: str) 
         return {}
 
 
+def _register_home(rec: Ledger, rid: str, log) -> None:
+    """The voyage registered with its ship, at home (aboard there is no store to register it in)."""
+    from thorp import fleet
+
+    row = rec.get_run(rid)
+    if not row:
+        return
+    try:
+        ship = fleet.ship_of_run(row)
+        log(f"charter: {row.get('name')} registered as a voyage of {ship.name} ({ship.key})")
+    except Exception as e:  # noqa: BLE001  (a ship not registered never costs a voyage; said, not hidden)
+        log(f"charter: {row.get('name')} not registered with its ship: {e!r}")
+
+
 def _box_hardware(led: Path, rid: str) -> str:
     con = sqlite3.connect(f"file:{led}?mode=ro", uri=True)
     r = con.execute("select hardware from runs where run_id=?", (rid,)).fetchone()
@@ -370,6 +384,7 @@ def sail(spec_path: str, gpu: str | None = None, vast=None, resolver=None, box_f
                     last_pull = time.time()
                 sleep(poll_s)
             counts = bring_home(box, rid, p["start"], rec, hire, commit)
+            _register_home(rec, rid, log)
             if status == "home" and (rec.get_run(rid) or {}).get("status") != "finished":
                 status = "came in unfinished"  # the box's voyage stopped short (its checkpoint is home: sail again)
         finally:

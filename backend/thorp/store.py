@@ -93,11 +93,18 @@ def papers_log() -> Path:
 
 
 def papers_for_box() -> dict:
-    """What a box's gate reads, from the store: S5's switches, exceptions and charter terms, S1's frozen stores."""
+    """What a voyage aboard reads, from the store: S5's switches, exceptions and charter terms, S1's frozen stores and
+    the sizes (fleet reads the ladder as it is imported, so every evaluator that imports it needs them)."""
     from thorp import vsm
 
     return {"written": datetime.now().astimezone().isoformat(timespec="seconds"),
-            "switches": vsm._enforcement(), "exceptions": vsm._exceptions(), "charter_terms": _charter_overrides(), "stores": _stores()}  # fmt: skip
+            "switches": vsm._enforcement(), "exceptions": vsm._exceptions(), "charter_terms": _charter_overrides(), "stores": _stores(), "sizes": _sizes()}  # fmt: skip
+
+
+def _sizes() -> list[dict]:
+    from thorp import ship_store
+
+    return ship_store.sizes()
 
 
 def _stores() -> dict:

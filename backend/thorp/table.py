@@ -18,18 +18,15 @@ into the window as history, and by the seventh turn it is copying itself ("ship 
 lines before the answer's first words don't count. `stop_at_blank=False` gives the old behaviour.
 
 The model is loaded once per process, keyed by run. Every exchange is appended to
-data/table/<run name>.jsonl unless keep=False.
+s1.table_talk unless keep=False.
 """
 
 from __future__ import annotations
 
 import json
 import time
-from pathlib import Path
 
 import mlx.core as mx
-
-from thorp import paths
 
 _models: dict[str, tuple] = {}
 
@@ -65,15 +62,32 @@ def _load(run: str):
     return _models[run]
 
 
-def _transcript_path(name: str) -> Path:
-    return paths.data_dir() / "table" / f"{name}.jsonl"
+TALK_TIME = "%Y-%m-%dT%H:%M:%S"
 
 
 def transcript(run: str) -> list[dict]:
-    p = _transcript_path(_run_row(run)["name"])
-    if not p.exists():
-        return []
-    return [json.loads(line) for line in p.read_text(encoding="utf-8").splitlines() if line.strip()]
+    """What was said at the table with this voyage (s1.table_talk), oldest first, as the transcript was kept."""
+    from sqlalchemy import select
+
+    from thorp import store
+    from thorp.viable.records import TableTalk
+
+    with store.session() as s:
+        rows = s.scalars(select(TableTalk).where(TableTalk.voyage == _run_row(run)["name"]).order_by(TableTalk.at, TableTalk.id))
+        return [{"at": r.at.astimezone().strftime(TALK_TIME), "question": r.question, "answer": r.answer,
+                 "temperature": r.temperature, "seed": r.seed, "stopped": r.stopped} for r in rows]  # fmt: skip
+
+
+def keep_talk(voyage: str, line: dict, run_id: str | None = None, step: int | None = None) -> None:
+    from datetime import datetime
+
+    from thorp import store
+    from thorp.viable.records import TableTalk
+
+    with store.session() as s:
+        s.add(TableTalk(voyage=voyage, run_id=run_id, step=step, at=datetime.fromisoformat(line["at"]).astimezone(),
+                        question=line["question"], answer=line["answer"], temperature=line.get("temperature"),
+                        seed=line.get("seed"), stopped=line.get("stopped")))  # fmt: skip
 
 
 def _readings(run_id: str) -> dict:
@@ -161,23 +175,9 @@ def reply(
         "step": step,
     }
     if keep:
-        p = _transcript_path(row["name"])
-        p.parent.mkdir(parents=True, exist_ok=True)
-        with p.open("a", encoding="utf-8") as f:
-            f.write(
-                json.dumps(
-                    {
-                        "at": time.strftime("%Y-%m-%dT%H:%M:%S"),
-                        "question": question,
-                        "answer": answer,
-                        "temperature": temperature,
-                        "seed": seed,
-                        "stopped": stopped,
-                    },
-                    ensure_ascii=False,
-                )
-                + "\n"
-            )
+        keep_talk(row["name"], {"at": time.strftime(TALK_TIME), "question": question, "answer": answer,
+                                "temperature": temperature, "seed": seed, "stopped": stopped},
+                  run_id=row["run_id"], step=step)  # fmt: skip
     return result
 
 

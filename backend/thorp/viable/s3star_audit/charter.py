@@ -36,6 +36,15 @@ def held_berths() -> set[str]:
     return out
 
 
+def _found(finding: str, instance: int, run_id: str | None, action: str, cost: float | None) -> None:
+    """S3*'s own record of what it found and did (s3star.audits)."""
+    from thorp import store
+    from thorp.viable.records import Audit
+
+    with store.session() as s:
+        s.add(Audit(finding=finding, instance=instance, run_id=run_id, action=action, cost=cost))
+
+
 def audit(vast, release_orphans: bool = False, log=print) -> dict:
     listed = [i for i in vast.instances() if str(i.get("label") or "").startswith(LABEL)]
     sailing = held_berths()
@@ -44,6 +53,7 @@ def audit(vast, release_orphans: bool = False, log=print) -> dict:
     out = s3.out_now()
     ghosts = [h for h in out if int(h["instance"]) not in ids]
     for g in ghosts:  # the log closed: Vast.ai no longer has it, so it costs no more
+        _found("ghost", int(g["instance"]), g.get("run_id"), "closed in the spend log", s3.cost_of(g))
         s3.record("released", instance=g["instance"], run_id=g.get("run_id"), gpu=g.get("gpu"), dph=g.get("dph"),
                   started=g["started"], ended=time.time(), cost=s3.cost_of(g), status="gone (found by the audit)")  # fmt: skip
     released = []
@@ -57,6 +67,7 @@ def audit(vast, release_orphans: bool = False, log=print) -> dict:
                       started=started, ended=time.time(), cost=max(0.0, (time.time() - started) / 3600) * dph,
                       status="orphan released by the audit")  # fmt: skip
             released.append(int(o["id"]))
+            _found("orphan", int(o["id"]), str(o["label"])[len(LABEL):], "released", max(0.0, (time.time() - started) / 3600) * dph)
             log(f"S3*: released orphan instance {o['id']} ({o['label']})")
     t = s5.terms()
     return {

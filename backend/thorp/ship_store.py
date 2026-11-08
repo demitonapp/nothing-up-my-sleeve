@@ -1,9 +1,9 @@
-"""The ships in Postgres (schema `ship`, models in thorp/viable/s3_control/models.py, made by Alembic): the
+"""The ships in Postgres (schema `s1`, S1 operations, models in thorp/viable/s3_control/models.py, made by Alembic): the
 sizes (each rung's name, role, where it trains and the metrics that judge it), the ships (a size fitted out
 one way) and their voyages (the runs; their metrics and status stay in the ledger).
 
-Nothing here is a list in code: a size is named and described in `ship.sizes`, a ship registered in
-`ship.ships` (Justin, 2026-11-08: "these things shouldn't be hardcoded, we have postgres for a reason").
+Nothing here is a list in code: a size is named and described in `s1.sizes`, a ship registered in
+`s1.ships` (Justin, 2026-11-08: "these things shouldn't be hardcoded, we have postgres for a reason").
 """
 
 from __future__ import annotations
@@ -19,6 +19,10 @@ from thorp.viable.s3_control.models import ShipRecord, Size, VoyageRecord
 
 @functools.cache
 def _sizes() -> tuple[dict, ...]:
+    from thorp import store
+
+    if store.papers():  # aboard a hired box (no Postgres): the sizes as they were when it sailed
+        return tuple(dict(r) for r in store.read_papers().get("sizes") or ())
     with session() as s:
         rows = s.scalars(select(Size).order_by(Size.ordinal)).all()
         return tuple(
@@ -56,6 +60,13 @@ def size_of(preset: str) -> str:
     raise KeyError(f"no size for preset {preset!r}; known: {sorted(known)}")
 
 
+def _at_home(what: str) -> None:
+    from thorp import store
+
+    if store.papers():
+        raise RuntimeError(f"aboard a hired box there is no store: {what}")
+
+
 def reload() -> None:
     _sizes.cache_clear()
 
@@ -72,6 +83,7 @@ def get_ship(key: str) -> ShipRecord | None:
 
 def add_ship(rec: dict) -> ShipRecord:
     """Register a ship once; a ship already registered under the key is kept as it is (names never move)."""
+    _at_home("a ship or a voyage is registered at home, when the voyage docks")
     with session() as s, s.begin():
         s.execute(insert(ShipRecord).values(**rec).on_conflict_do_nothing(index_elements=["key"]))
     return get_ship(rec["key"])
@@ -79,6 +91,7 @@ def add_ship(rec: dict) -> ShipRecord:
 
 def add_voyage(run_id: str, ship_key: str, name: str, seed: int | None, started: str | None) -> None:
     """A run joins its ship's voyages (once; a later call fills a start time it lacked)."""
+    _at_home("a ship or a voyage is registered at home, when the voyage docks")
     with session() as s, s.begin():
         stmt = insert(VoyageRecord).values(
             run_id=run_id, ship_key=ship_key, name=name, seed=seed, started=started

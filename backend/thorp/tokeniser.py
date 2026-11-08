@@ -197,4 +197,23 @@ def train_or_load(book_ids: list[str], settings: dict | None = None) -> Tokenise
     (tmp / "stats.json").write_text(json.dumps(stats, indent=1))
     shutil.rmtree(d, ignore_errors=True)
     tmp.rename(d)
+    register(tid, d, settings, stats, book_ids)
     return _load(tid)
+
+
+def register(tid: str, d, settings: dict, stats: dict, book_ids) -> None:
+    """The tokeniser in S1's register (s1.tokenisers, s1.tokeniser_books): which books, which settings. Its files
+    stay the artifact a voyage reads; aboard a hired box (no store) it is registered when it is brought home."""
+    from thorp import store
+
+    if store.papers():
+        return
+    from thorp.viable.records import TokeniserBook, TokeniserRecord
+
+    with store.session() as s:
+        r = s.get(TokeniserRecord, tid) or TokeniserRecord(id=tid)
+        r.path, r.settings, r.stats = str(d), json.loads(json.dumps(settings)), json.loads(json.dumps(stats, default=float))
+        r = s.merge(r)
+        s.flush()
+        have = {b.book_id for b in s.query(TokeniserBook).filter_by(tokeniser_id=tid)}
+        s.add_all(TokeniserBook(tokeniser_id=tid, book_id=b) for b in sorted(set(book_ids) - have))

@@ -47,7 +47,7 @@ PRESETS: dict[str, dict] = {
 
 
 class _Ladder(Sequence):
-    """The ladder: every size, smallest first, read from Postgres (`ship.sizes`, thorp/ship_store.py), not
+    """The ladder: every size, smallest first, read from Postgres (`s1.sizes`, thorp/ship_store.py), not
     written here. Each is a dict: preset, name, role (and job, the same), overview, kind, vocab, where,
     status, scored and metrics. Read on first use and kept for the process."""
 

@@ -2,7 +2,7 @@
 stores: one optimised for prose and one optimised for trigrams. All runs have to use one or the other.
 No other data for runs can be used unless explicitly opted in."
 
-- **The stores** (scripts/make_stores.py, frozen in data/stores.json): `lists/stores/prose.csv`, the prose
+- **The stores** (scripts/make_stores.py, frozen in s1.stores): `lists/stores/prose.csv`, the prose
   stores (narrative ranked by names recurring within the window), and `lists/stores/trigram.csv`, the
   trigram stores (everything else ranked by in-window trigram repetition).
 - **The rule**, checked when a run is prepared (`check(spec)`): every list a run reads (`data.recipe`,
@@ -17,7 +17,6 @@ No other data for runs can be used unless explicitly opted in."
 from __future__ import annotations
 
 import hashlib
-import json
 
 from thorp import paths
 
@@ -25,8 +24,28 @@ RULE_FROM = "2026-11-07T15:55"  # the rule's time, so a log can say which runs i
 
 
 def stores() -> dict:
-    p = paths.data_dir() / "stores.json"
-    return json.loads(p.read_text()) if p.exists() else {}
+    """The ship's stores, as frozen (s1.stores): {key: {path, books, tokens, sha1, ranked_by, ...}}."""
+    from sqlalchemy import select
+
+    from thorp import store
+    from thorp.viable.records import StoreList
+
+    if store.papers():  # aboard a hired box: as frozen when it sailed
+        return dict(store.read_papers().get("stores") or {})
+    with store.session() as s:
+        return {r.key: {"path": r.path, "books": r.books, "tokens": r.tokens, **(r.measures or {}), "sha1": r.sha1}
+                for r in s.scalars(select(StoreList))}  # fmt: skip
+
+
+def freeze(stores_: dict) -> None:
+    """The stores frozen in the store (scripts/make_stores.py), each replacing its earlier freeze."""
+    from thorp import store
+    from thorp.viable.records import StoreList
+
+    with store.session() as s:
+        for k, v in stores_.items():
+            rest = {x: y for x, y in v.items() if x not in ("path", "books", "tokens", "sha1")}
+            s.merge(StoreList(key=k, path=v["path"], books=int(v["books"]), tokens=int(v["tokens"]), sha1=v["sha1"], measures=rest))
 
 
 def store_paths() -> set[str]:
@@ -45,7 +64,7 @@ class StoresRuleError(ValueError):
 
 def enforced() -> bool:
     """Whether the rule is switched on: S5's switch for the policy 'stores' (thorp/vsm.py,
-    data/policies.json); off until Justin decides what happens to the runs queued before it (15:55)."""
+    s5.policy_switches); off until Justin decides what happens to the runs queued before it (15:55)."""
     from thorp import vsm
 
     return vsm.enforced("stores")
@@ -85,7 +104,7 @@ def check(spec: dict, known_run: bool = False, always: bool = False) -> str:
             now = hashlib.sha1(paths.resolve(x).read_bytes()).hexdigest()
             if now != allowed[x]["sha1"]:
                 raise StoresRuleError(
-                    f"the store {x} has changed since it was frozen (data/stores.json)"
+                    f"the store {x} has changed since it was frozen (s1.stores)"
                 )
     if outside and not opt_in:
         raise StoresRuleError(

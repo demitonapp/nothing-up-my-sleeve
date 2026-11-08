@@ -5,7 +5,7 @@ and so on), matched by the model's family name, since many checkpoints are re-ho
 `mlx-community/` and the repo owner does not say who made them.
 
 A lab's **best and worst** are its models' readings on every rung of the four chains
-(data/compare/chain-grades.json), each set against the field: the other labs' models on the same test.
+(the chain grades, s4.outside_readings), each set against the field: the other labs' models on the same test.
 A reading's **standing** is its lift less the field's median, over the field's spread (its standard
 deviation), so a test where every model scores 2.0 does not crowd out a test where the field scores
 0.1; the five highest standings are the lab's best, the five lowest its worst.
@@ -15,13 +15,12 @@ deviation), so a test where every model scores 2.0 does not crowd out a test whe
 
 from __future__ import annotations
 
-import json
 import re
 import statistics
 import sys
 from dataclasses import dataclass
 
-from thorp import fleet, paths
+from thorp import fleet
 
 
 @dataclass(frozen=True)
@@ -55,11 +54,9 @@ def get(key: str) -> Lab | None:
 
 
 def _grades() -> dict:
-    p = paths.data_dir() / "compare" / "chain-grades.json"
-    try:
-        return json.loads(p.read_text()).get("models", {})
-    except (OSError, ValueError):
-        return {}
+    from thorp.viable.s4_intelligence import readings
+
+    return readings.chain_grades()
 
 
 def _label(model: str) -> str:

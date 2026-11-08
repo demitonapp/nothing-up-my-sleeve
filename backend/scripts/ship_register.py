@@ -1,5 +1,5 @@
 """Register a ship for every run in the ledger, and each run as one of its ship's voyages, in Postgres
-(`ship.ships`, `ship.voyages`; thorp/ship_store.py). Runs with the same size and fitout join one ship, named
+(`s1.ships`, `s1.voyages`; thorp/ship_store.py). Runs with the same size and fitout join one ship, named
 after the first run's label less its seed marks; ships fitted out before 2026-11-07T06:40 are archived (the
 First Fleet). A ship already registered is never renamed. Safe to run again.
 

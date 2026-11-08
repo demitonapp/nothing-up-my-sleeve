@@ -54,7 +54,19 @@ def test_gate_refuses_a_held_out_book(tmp_path, monkeypatch):
     assert not vsm._decks_refused(_spec(str(lst), refuse=all3))
 
 
-def test_gate_admits_known_runs_and_opt_ins(monkeypatch):
+@pytest.fixture
+def frozen_stores():
+    """The ship's two stores frozen in the test database (s1.stores), as make_stores.py freezes the real ones."""
+    import hashlib
+
+    from thorp import stores
+
+    stores.freeze({k: {"path": f"lists/stores/{k}.csv", "books": 1, "tokens": 1,
+                       "sha1": hashlib.sha1(paths.resolve(f"lists/stores/{k}.csv").read_bytes()).hexdigest()}
+                   for k in ("prose", "trigram")})  # fmt: skip
+
+
+def test_gate_admits_known_runs_and_opt_ins(monkeypatch, frozen_stores):
     monkeypatch.setattr(vsm, "_enforcement", lambda: {"stores": True})
     s = _spec(
         "lists/pool-200.csv",
@@ -67,7 +79,7 @@ def test_gate_admits_known_runs_and_opt_ins(monkeypatch):
     assert any("opted out" in n for n in vsm.gate(s))
 
 
-def test_written_exception_and_lists_drawn_from_the_stores(tmp_path, monkeypatch):
+def test_written_exception_and_lists_drawn_from_the_stores(tmp_path, monkeypatch, frozen_stores):
     from thorp import stores
 
     monkeypatch.setattr(vsm, "_enforcement", lambda: {"stores": True})

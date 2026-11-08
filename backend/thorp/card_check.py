@@ -1,7 +1,7 @@
 """Are the cards real? (2026-11-07, Justin: "validate first"). A card is a definition of a mechanism;
 it is trusted only if the models that chain two facts play it and the models that do not, do not.
 
-From data/compare/chain-grades.json (scripts/grade_chains.py), each model is a **chainer** when it
+From the chain grades (s4.outside_readings "chain-grades", scripts/grade_chains.py), each model is a **chainer** when it
 performs at least three of the four chaining tests (the 50m rung of each chain), and a **non-chainer**
 when it performs none. For each card (mover, bridge, comparator) the table is lit-or-not against
 chainer-or-not; a card is **necessary** when at least four in five chainers play it (a card Thorp must draw before
@@ -16,9 +16,7 @@ neither (2 of 5).
 
 from __future__ import annotations
 
-import json
-
-from thorp import fleet, leaderboard, paths
+from thorp import fleet, leaderboard
 
 CARDS = ("previous_word", "nevermore", "mover", "bridge", "comparator")
 
@@ -30,8 +28,9 @@ def _lit(c: dict | None) -> bool | None:
 
 
 def payload() -> dict:
-    p = paths.data_dir() / "compare" / "chain-grades.json"
-    models = json.loads(p.read_text())["models"] if p.exists() else {}
+    from thorp.viable.s4_intelligence import readings
+
+    models = readings.chain_grades()
     tests = leaderboard.chaining_tests()
     rows = []
     for name, v in models.items():

@@ -30,7 +30,7 @@ import math
 
 import numpy as np
 
-from thorp import fleet, leaderboard, paths
+from thorp import fleet, leaderboard
 
 TARGET_MODEL = "mlx-community/Qwen3-4B-4bit"
 TARGET_PARAMS = 4.0e9
@@ -74,10 +74,11 @@ def _params(spec: dict) -> int:
 
 
 def _reference_points() -> dict[str, dict]:
-    p = paths.data_dir() / "compare" / "chain-grades.json"
-    if not p.exists():
+    from thorp.viable.s4_intelligence import readings
+
+    models = readings.chain_grades()
+    if not models:
         return {}
-    models = json.loads(p.read_text())["models"]
     out = {}
     for name, n in REFERENCE_PARAMS.items():
         if name in models:

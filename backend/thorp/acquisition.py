@@ -7,8 +7,7 @@ voyages (training, thorp/vsm.py) and acquisition (the books the voyages read). A
 
 - **S1, operations**: intakes. An intake (`intake(list)`, `thorp acquire LIST`) puts every row of a book list
   through the intake gate, fetches what is admitted, registers it in the manifest and checks that it cleans.
-  Each intake is recorded (data/acquisition/intakes/<id>.json) and each book's verdict logged
-  (data/acquisition/log.jsonl). A book that reaches the manifest by the older paths (`thorp fetch`,
+  Each intake is recorded (s1.intakes) and each book's verdict logged (s1.intake_verdicts). A book that reaches the manifest by the older paths (`thorp fetch`,
   train.prepare) is observed (`observe`): logged with the verdict the gate would give, never refused.
 - **S2, coordination**: one intake at a time (the intake lock, data/acquisition/intake.lock). Acquisition
   never takes the GPU's helm, so an intake can run while a voyage is at sea. One request every two seconds per
@@ -16,7 +15,7 @@ voyages (training, thorp/vsm.py) and acquisition (the books the voyages read). A
   (thorp/manifest.py).
 - **S3, control**: the intake gate (`admit`): Thorp's S5 policies applied to a book before it enters the
   library. Rules that serve an adopted policy refuse; proposed rules only record. Switched off in
-  data/policies.json ("intake": false), by Justin. **S3\***: `audit()`, over the manifest and the texts,
+  S5's switch "intake" (s5.policy_switches, `thorp s5 switch intake off`), by Justin. **S3\***: `audit()`, over the manifest and the texts,
   independent of the gate.
 - **S4, intelligence**: the sources beyond Gutenberg (SOURCES_KNOWN, from plans/corpus-ceiling.md) and how
   much of the legal Gutenberg is fetched (`ceiling()`).
@@ -363,12 +362,11 @@ RULES: dict[str, Rule] = {
 
 
 def enforced() -> bool:
-    """The intake gate refuses on adopted rules unless Justin switches it off (data/policies.json "intake")."""
-    p = paths.data_dir() / "policies.json"
-    try:
-        return bool(json.loads(p.read_text()).get("intake", True)) if p.exists() else True
-    except (OSError, ValueError):
-        return True
+    """The intake gate refuses on adopted rules unless Justin switches it off (S5's switch "intake",
+    s5.policy_switches)."""
+    from thorp import vsm
+
+    return bool(vsm._enforcement().get("intake", True))
 
 
 @dataclass
@@ -404,27 +402,35 @@ def _dir():
     return paths.data_dir() / "acquisition"
 
 
-def log_path():
-    return _dir() / "log.jsonl"
+LOG_TIME = "%Y-%m-%dT%H:%M:%S"
+_LOG_COLUMNS = ("at", "intake", "how", "book_id", "verdict")
 
 
 def _append_log(entry: dict) -> None:
-    p = log_path()
-    p.parent.mkdir(parents=True, exist_ok=True)
-    with p.open("a", encoding="utf-8") as f:
-        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    """One book's verdict, kept (s1.intake_verdicts)."""
+    from datetime import datetime
+
+    from thorp import store
+    from thorp.viable.records import IntakeVerdict
+
+    with store.session() as s:
+        s.add(IntakeVerdict(at=datetime.fromisoformat(entry["at"]).astimezone(), intake_id=entry.get("intake"),
+                            how=entry.get("how"), book_id=entry.get("book_id"), verdict=entry.get("verdict"),
+                            entry={k: v for k, v in entry.items() if k not in _LOG_COLUMNS}))  # fmt: skip
 
 
 def read_log(limit: int | None = None) -> list[dict]:
-    p = log_path()
-    if not p.exists():
-        return []
-    rows = []
-    with p.open(encoding="utf-8") as f:
-        for ln in f:
-            with contextlib.suppress(ValueError):
-                rows.append(json.loads(ln))
-    return rows[-limit:] if limit else rows
+    """The verdicts, oldest first (the last `limit` of them), as the log's lines."""
+    from sqlalchemy import select
+
+    from thorp import store
+    from thorp.viable.records import IntakeVerdict
+
+    q = select(IntakeVerdict).order_by(IntakeVerdict.at.desc(), IntakeVerdict.id.desc())
+    with store.session() as s:
+        rows = s.scalars(q.limit(limit) if limit else q).all()
+        return [{"at": r.at.astimezone().strftime(LOG_TIME), "intake": r.intake_id, "how": r.how, "book_id": r.book_id,
+                 **(r.entry or {}), "verdict": r.verdict} for r in rows[::-1]]  # fmt: skip
 
 
 def _entry(
@@ -459,41 +465,71 @@ def _clean_report(text: str) -> dict:
     }
 
 
-def _intakes_dir():
-    return _dir() / "intakes"
-
-
 def _write_intake(rec: dict) -> None:
-    d = _intakes_dir()
-    d.mkdir(parents=True, exist_ok=True)
-    tmp = d / f".{rec['id']}.json"
-    tmp.write_text(json.dumps(rec, indent=1, ensure_ascii=False))
-    tmp.replace(d / f"{rec['id']}.json")
+    """An intake's record, written or brought up to date (s1.intakes)."""
+    from thorp import store
+    from thorp.viable.records import Intake
+
+    with store.session() as s:
+        s.merge(Intake(id=rec["id"], list=rec.get("list"), status=rec.get("status"), started=rec.get("started"),
+                       finished=rec.get("finished"), record=json.loads(json.dumps(rec, default=str))))  # fmt: skip
 
 
 def intakes(limit: int = 30) -> list[dict]:
-    d = _intakes_dir()
-    if not d.exists():
-        return []
-    out = []
-    for p in sorted(d.glob("in-*.json"), reverse=True)[:limit]:
-        with contextlib.suppress(ValueError, OSError):
-            out.append(json.loads(p.read_text()))
-    return out
+    """The latest intakes' records, newest first."""
+    from sqlalchemy import select
+
+    from thorp import store
+    from thorp.viable.records import Intake
+
+    with store.session() as s:
+        return [r.record for r in s.scalars(select(Intake).order_by(Intake.id.desc()).limit(limit))]
+
+
+def count_intakes() -> int:
+    from sqlalchemy import func, select
+
+    from thorp import store
+    from thorp.viable.records import Intake
+
+    with store.session() as s:
+        return s.scalar(select(func.count()).select_from(Intake)) or 0
 
 
 # ------------------------------------------------------------------------------------------- S2: one intake at a time
 
 
 def _lock_paths():
-    return _dir() / "intake.lock", _dir() / "intake.json"
+    return _dir() / "intake.lock", None  # who holds it: s2.intake_holder
+
+
+def _holder_write(rec: dict | None, pid: int) -> None:
+    from sqlalchemy import delete
+
+    from thorp import store
+    from thorp.viable.records import IntakeHolder
+
+    with store.session() as s:
+        if rec is None:
+            s.execute(delete(IntakeHolder).where(IntakeHolder.lock == "intake", IntakeHolder.pid == pid))
+        else:
+            s.merge(IntakeHolder(lock="intake", **rec))
+
+
+def _holder_read() -> dict | None:
+    from thorp import store
+    from thorp.viable.records import IntakeHolder
+
+    with store.session() as s:
+        r = s.get(IntakeHolder, "intake")
+        return {"id": r.id, "list": r.list, "pid": r.pid, "since": r.since} if r else None
 
 
 @contextlib.contextmanager
 def _intake_lock(intake_id: str, list_path: str, log=print):
     import fcntl
 
-    lock, who = _lock_paths()
+    lock, _ = _lock_paths()
     lock.parent.mkdir(parents=True, exist_ok=True)
     f = open(lock, "a+")
     try:
@@ -504,39 +540,27 @@ def _intake_lock(intake_id: str, list_path: str, log=print):
                 f"S2: waiting for the intake lock ({(holder() or {}).get('id')} is taking books in)"
             )
             fcntl.flock(f, fcntl.LOCK_EX)
-        who.write_text(
-            json.dumps(
-                {
-                    "id": intake_id,
-                    "list": list_path,
-                    "pid": os.getpid(),
-                    "since": time.strftime("%Y-%m-%dT%H:%M:%S"),
-                }
-            )
-        )
+        _holder_write({"id": intake_id, "list": list_path, "pid": os.getpid(), "since": time.strftime(LOG_TIME)}, os.getpid())
         yield
     finally:
-        with contextlib.suppress(Exception):
-            if json.loads(who.read_text()).get("pid") == os.getpid():
-                who.unlink()
-        f.close()
+        try:
+            _holder_write(None, os.getpid())
+        finally:
+            f.close()
 
 
 def holder() -> dict | None:
     """The intake taking books in now, or None."""
     import fcntl
 
-    lock, who = _lock_paths()
+    lock, _ = _lock_paths()
     if not lock.exists():
         return None
     with open(lock, "a+") as f:
         try:
             fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
-            try:
-                return json.loads(who.read_text())
-            except (OSError, ValueError):
-                return {"id": "(unknown)", "since": None}
+            return _holder_read() or {"id": "(unknown)", "since": None}
         fcntl.flock(f, fcntl.LOCK_UN)
     return None
 
@@ -1072,7 +1096,7 @@ def summary() -> dict:
     return {
         "books": len(books),
         "tokens_est": int(sum(b.bytes or 0 for b in books) / BYTES_PER_TOKEN),
-        "intakes": len(list(_intakes_dir().glob("in-*.json"))) if _intakes_dir().exists() else 0,
+        "intakes": count_intakes(),
         "last_intake": ins[0] if ins else None,
         "taking_in": holder(),
     }

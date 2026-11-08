@@ -16,14 +16,13 @@ measure what chaining loses, against silencing as many random heads that belong 
 
 **The rule (pre-registered):** a card is **necessary** in a model when silencing it lowers the cause
 gain (or, for the comparator, the order gain) by more than twice the largest drop any random draw
-causes, and by at least 0.1; **not shown** otherwise. Results: data/compare/knockout-<model>.json.
+causes, and by at least 0.1; **not shown** otherwise. Results: s4.outside_readings, knockout-<model>.
 
     uv run --group compare python -m thorp.knockout mlx-community/Qwen3-4B-4bit
 """
 
 from __future__ import annotations
 
-import json
 import sys
 
 import numpy as np
@@ -138,8 +137,9 @@ def run(model_name: str) -> dict:
             "necessary": drop >= 0.1 and drop > 2 * max(noise, 0.0),
         }
     results["verdict"] = verdict
-    out = paths.data_dir() / "compare" / f"knockout-{model_name.replace('/', '__')}.json"
-    out.write_text(json.dumps(results, indent=1, default=float))
+    from thorp.viable.s4_intelligence import readings
+
+    readings.put(f"knockout-{model_name.replace('/', '__')}", results)
     return results
 
 

@@ -1411,7 +1411,7 @@ def describe(spec: dict) -> str:
 class Ship:
     """A ship: a size fitted out one way (its training content and method, the fitout). Its runs are its
     voyages, one per seed. Named once, when first registered, and never renamed. Registered in Postgres
-    (`ship.ships`, thorp/ship_store.py)."""
+    (`s1.ships`, thorp/ship_store.py)."""
 
     key: str  # "<preset>:<fitout id>"
     name: str
@@ -1440,7 +1440,7 @@ _REGISTER: tuple[float, dict[str, Ship]] | None = None
 
 
 def register(fresh: bool = False) -> dict[str, Ship]:
-    """Every ship registered so far, by key (Postgres, `ship.ships`; kept half a minute, as the dashboard
+    """Every ship registered so far, by key (Postgres, `s1.ships`; kept half a minute, as the dashboard
     asks for a run's ship once per run)."""
     import time
 
@@ -2187,7 +2187,7 @@ EXPEDITIONS: dict[str, Expedition] = {
             ),
             stop=StopRule(5, "the five models that chain, one reading each (deterministic)"),
             runner="thorp/knockout.py",
-            results="data/compare/knockout-<model>.json",
+            results="s4.outside_readings, knockout-<model>",
             status="running",
             stars=("previous_word", "nevermore", "mover", "comparator"),
         ),

@@ -5,10 +5,11 @@ A chartered voyage sails on a GPU hired from Vast.ai's marketplace instead of th
 torch backend (thorp/train_torch.py), its rows and checkpoints brought home to the ledger. The terms are S5's: which
 GPUs may be hired and at what ceiling an hour, from what kind of host, how much one voyage and one week may cost,
 how many ships may be hired at once. The money is Justin's, so every number here is his to set: he adopted the
-defaults as proposed (2026-11-08, "Adopt as proposed"; DECISIONS.md, "The charter"), and data/charter.json overrides
-any of them:
+defaults as proposed (2026-11-08, "Adopt as proposed"; DECISIONS.md, "The charter"), and a change to any of them is
+a row in s5.charter_terms (the latest per term in force, every change kept, in whose words):
 
-    {"weekly_budget": 40, "gpus": {"RTX 4090": 0.45, "RTX 5090": 0.70}}
+    uv run thorp charter term weekly_budget 40 --words "Justin, 8 November: ..."
+    uv run thorp charter term gpus '{"RTX 4090": 0.45, "RTX 5090": 0.70}' --words "..."
 
 The policy that holds a voyage to these terms is vsm.POLICIES["charter"] (checked by S3, thorp/viable/s3_control/
 charter.py); the rest of the charter is S1 (thorp/viable/s1_operations/charter.py: the voyage), S2 (s2_coordination/
@@ -19,8 +20,6 @@ forgotten) and S4 (s4_intelligence/market.py: the market read).
 from __future__ import annotations
 
 import json
-
-from thorp import paths
 
 ADOPTED = "2026-11-08, Justin (Vast.ai chosen; the terms adopted as proposed)"
 
@@ -54,18 +53,39 @@ EFFECTIVE_TFLOPS: dict[str, float] = {"RTX 4090": 55.0, "RTX 5090": 80.0, "H100 
 SETUP_HOURS = 0.35  # the ship made ready: image pulled, uv sync of torch, the library carried up, and home again
 
 
-def _path():
-    return paths.data_dir() / "charter.json"
+def overrides() -> dict:
+    """S5's changes in force, {term: value}: the latest row per term in s5.charter_terms (a hired box: its papers)."""
+    from thorp import store
+
+    if store.papers():
+        return dict(store.read_papers().get("charter_terms") or {})
+    from sqlalchemy import select
+
+    from thorp.viable.records import CharterTerm
+
+    with store.session() as s:
+        out = {}
+        for r in s.scalars(select(CharterTerm).order_by(CharterTerm.id)):
+            out[r.term] = r.value
+        return out
+
+
+def set_term(term: str, value, words: str = "") -> None:
+    """A change to one term, kept (the latest in force)."""
+    from thorp import store
+    from thorp.viable.records import CharterTerm
+
+    if term not in DEFAULTS:
+        raise KeyError(f"no charter term {term!r}; the terms: {sorted(DEFAULTS)}")
+    with store.session() as s:
+        s.add(CharterTerm(term=term, value=value, words=words))
 
 
 def terms() -> dict:
-    """The terms in force: the defaults, each overridden by data/charter.json (S5's switch, as policies.json)."""
+    """The terms in force: the defaults, each overridden by S5's latest change to it (a dict term merged)."""
     t = json.loads(json.dumps(DEFAULTS))
-    p = _path()
-    if p.exists():
-        over = json.loads(p.read_text())
-        for k, v in over.items():
-            t[k] = {**t[k], **v} if isinstance(t.get(k), dict) and isinstance(v, dict) else v
+    for k, v in overrides().items():
+        t[k] = {**t[k], **v} if isinstance(t.get(k), dict) and isinstance(v, dict) else v
     return t
 
 

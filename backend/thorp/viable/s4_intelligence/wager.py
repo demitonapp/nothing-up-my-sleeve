@@ -461,7 +461,7 @@ def _store():
 
 
 def deal(preset: str, control: str, lever: str) -> dict:
-    """Deal a round: the pull voyage built from the control and the lever, kept in Postgres (game.rounds)."""
+    """Deal a round: the pull voyage built from the control and the lever, kept in Postgres (s4.rounds)."""
     from thorp.viable.s3_control.models import WagerRound
 
     spec = build_pull(control, lever)

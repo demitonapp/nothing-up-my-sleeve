@@ -28,7 +28,7 @@ internal measure and not public").
 internal measure, used by the two-fact voyage's page, never by the leaderboard's payload.
 
 Readings are each run's latest discovery metrics in the ledger; the reference ladder and the
-competitors (fleet.REFERENCE_LADDER, fleet.COMPETITORS, from data/compare/chain-grades.json) beside.
+competitors (fleet.REFERENCE_LADDER, fleet.COMPETITORS, from the chain grades, s4.outside_readings) beside.
 
     uv run python -m thorp.leaderboard        # the table, in plain text
 """
@@ -37,7 +37,7 @@ from __future__ import annotations
 
 import json
 
-from thorp import fleet, paths
+from thorp import fleet
 from thorp.ledger import connect
 
 CHAINING = "paragraph"  # the RUNGS goal class whose rung is two facts chained
@@ -181,10 +181,11 @@ def _thorp_runs(internal: bool = False) -> list[dict]:
 
 
 def _reference(internal: bool = False) -> list[dict]:
-    p = paths.data_dir() / "compare" / "chain-grades.json"
-    if not p.exists():
+    from thorp.viable.s4_intelligence import readings
+
+    models = readings.chain_grades()
+    if not models:
         return []
-    models = json.loads(p.read_text())["models"]
     out = []
     for name in list(fleet.REFERENCE_LADDER) + [
         m for m in fleet.COMPETITORS if m not in fleet.REFERENCE_LADDER
@@ -332,12 +333,34 @@ def payload() -> dict:
 # A class's version rises only when a new ship beats the current one by more than the noise, so a
 # lucky seed never mints a version; among ships tied within the noise, the crown goes to the one with
 # complete readings (the logic deck read), then more sailings, then the higher chaining lift.
-VERSIONS = "thorp-versions.json"
+CROWNED = "%Y-%m-%dT%H:%M"  # as the register has always been read
 
 
 def _versions() -> dict:
-    p = paths.data_dir() / VERSIONS
-    return json.loads(p.read_text()) if p.exists() else {}
+    """The register of versions (s1.crownings): preset -> its crownings in order, {v, ship_key, ship,
+    chaining_lift, crowned}."""
+    from sqlalchemy import select
+
+    from thorp import store
+    from thorp.viable.records import Crowning
+
+    out: dict[str, list[dict]] = {}
+    with store.session() as s:
+        for r in s.scalars(select(Crowning).order_by(Crowning.preset, Crowning.v)):
+            out.setdefault(r.preset, []).append({"v": r.v, "ship_key": r.ship_key, "ship": r.ship,
+                                                 "chaining_lift": r.chaining_lift, "crowned": r.crowned.astimezone().strftime(CROWNED)})  # fmt: skip
+    return out
+
+
+def put_crowning(preset: str, h: dict) -> None:
+    from datetime import datetime
+
+    from thorp import store
+    from thorp.viable.records import Crowning
+
+    with store.session() as s:
+        s.merge(Crowning(preset=preset, v=int(h["v"]), ship_key=h["ship_key"], ship=h["ship"],
+                         chaining_lift=float(h["chaining_lift"]), crowned=datetime.fromisoformat(h["crowned"]).astimezone()))  # fmt: skip
 
 
 def crown(ships: list[dict]) -> dict[str, dict]:
@@ -348,7 +371,6 @@ def crown(ships: list[dict]) -> dict[str, dict]:
     by: dict[str, list[dict]] = {}
     for sh in ships:
         by.setdefault(sh["preset"], []).append(sh)
-    changed = False
     for preset, cands in by.items():
         top = max(c["chaining_lift"] for c in cands)
         tied = [c for c in cands if c["chaining_lift"] >= top - CHAINING_NOISE]
@@ -361,18 +383,15 @@ def crown(ships: list[dict]) -> dict[str, dict]:
             pick["ship_key"] != cur["ship_key"]
             and pick["chaining_lift"] > cur["chaining_lift"] + CHAINING_NOISE
         ):
-            hist.append(
-                {
-                    "v": len(hist) + 1,
-                    "ship_key": pick["ship_key"],
-                    "ship": pick["ship"],
-                    "chaining_lift": pick["chaining_lift"],
-                    "crowned": time.strftime("%Y-%m-%dT%H:%M"),
-                }
-            )
-            changed = True
-    if changed:
-        (paths.data_dir() / VERSIONS).write_text(json.dumps(reg, indent=1))
+            h = {
+                "v": len(hist) + 1,
+                "ship_key": pick["ship_key"],
+                "ship": pick["ship"],
+                "chaining_lift": pick["chaining_lift"],
+                "crowned": time.strftime(CROWNED),
+            }
+            hist.append(h)
+            put_crowning(preset, h)
     return {p: h[-1] for p, h in reg.items() if h}
 
 
@@ -599,8 +618,9 @@ def _inside_of(row: dict) -> tuple[dict | None, float | None, float | None]:
     if row["kind"] == "thorp":
         e = thorp_entry(row["ship_key"]) or {}
     else:
-        p = paths.data_dir() / "compare" / "chain-grades.json"
-        e = json.loads(p.read_text())["models"].get(row["model"], {}) if p.exists() else {}
+        from thorp.viable.s4_intelligence import readings
+
+        e = readings.chain_grades().get(row["model"], {})
     c = e.get("cards") or {}
     one_hop = (e.get("logic_test") or {}).get("lift_one_hop")
     cause = (e.get("logic_test") or {}).get("gain_cause")

@@ -14,6 +14,6 @@ import { cardCls, crumbCls } from '../lib/ui';
   <section class={cardCls(false, 'panel')}>
     <h2>Its worst <span class="note">the five readings where its models most trail the other labs' models on the same test</span></h2>
     <div class="scroll"><table id="labworst" data-nosort><thead></thead><tbody></tbody></table></div>
-    <p class="note mt">Every rung of the four chains (data/compare/chain-grades.json), read for each of the lab's models. A reading's standing is its lift less the median of the other labs' models on that test, over their spread (σ, the standard deviation), so a test where every model lifts 2.0 does not crowd out one where the field lifts 0.1. "Beats" counts the other labs' models it lifts higher than. ✓ performed: lift 0.1 and two in three right.</p>
+    <p class="note mt">Every rung of the four chains (the chain grades, s4.outside_readings), read for each of the lab's models. A reading's standing is its lift less the median of the other labs' models on that test, over their spread (σ, the standard deviation), so a test where every model lifts 2.0 does not crowd out one where the field lifts 0.1. "Beats" counts the other labs' models it lifts higher than. ✓ performed: lift 0.1 and two in three right.</p>
   </section>
 </div>

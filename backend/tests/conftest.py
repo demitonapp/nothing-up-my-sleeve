@@ -42,10 +42,31 @@ def make_text(seed: int, n_words: int) -> str:
 def _records_stay_in_the_test(tmp_path, monkeypatch):
     """S3's records (the voyage gate's log, acquisition's log, intakes and lock) never reach the real data
     folder from a test, even one that asks the gate a question without a temporary data folder."""
-    from thorp import acquisition, vsm
+    from thorp import acquisition
 
-    monkeypatch.setattr(vsm, "_gate_log_path", lambda: tmp_path / "records" / "gate-log.jsonl")
     monkeypatch.setattr(acquisition, "_dir", lambda: tmp_path / "records" / "acquisition")
+    monkeypatch.delenv("THORP_PAPERS", raising=False)
+
+
+@pytest.fixture(scope="session")
+def _store_migrated():
+    """The test database brought to the latest models once a session (alembic upgrade head)."""
+    from thorp.viable.s3_control import fitout_store
+
+    fitout_store.migrate()
+
+
+@pytest.fixture(autouse=True)
+def _store_clean(_store_migrated):
+    """Each test starts with the one store's records empty (the gate's log, S5's switches and exceptions, ...)."""
+    from sqlalchemy import text
+
+    from thorp import store
+    from thorp.viable import records
+
+    tables = ", ".join(f"{t.schema}.{t.name}" for t in records.tables())  # the records only: the sizes stay seeded
+    with store.session() as s:
+        s.execute(text(f"truncate {tables} restart identity cascade"))
 
 
 @pytest.fixture(autouse=True)
@@ -76,7 +97,7 @@ def tmp_thorp(tmp_path, monkeypatch):
     from thorp.viable.s3_control.fitout_store import session
 
     with session() as s, s.begin():  # the test database's ships, emptied (its sizes stay)
-        s.execute(text("truncate ship.ships cascade"))
+        s.execute(text("truncate s1.ships cascade"))
     fleet._REGISTER = None
     return tmp_path
 

@@ -14,7 +14,7 @@ def cmd_acquire(a) -> int:
     rec = acquisition.intake(a.list, set_name=a.set, limit=a.limit, dry_run=a.dry_run)
     by = ", ".join(f"{k} {n}" for k, n in rec["refused_by_rule"].items())
     print(
-        f"record: data/acquisition/intakes/{rec['id']}.json"
+        f"record: s1.intakes {rec['id']}"
         + (f"; refused by rule: {by}" if by else "")
     )
     return 0
@@ -129,6 +129,41 @@ def cmd_charter(a) -> int:
     return 0 if out.get("status") in ("home", "finished") else 1
 
 
+def cmd_store(a) -> int:
+    """The one store (Postgres): is it up, and bring data/'s files into it (thorp/store_import.py)."""
+    from thorp import store
+
+    if a.what == "ping":
+        why = store.ping()
+        print(why or f"the store answers ({store._safe(store.url())})")
+        return 1 if why else 0
+    from thorp import store_import
+
+    store_import.run(retire=a.retire)
+    return 0
+
+
+def cmd_s5(a) -> int:
+    """S5's decisions, recorded in the store in Justin's words: a policy switched, a charter term changed."""
+    import json
+
+    if not a.words:
+        print("an S5 decision is recorded in Justin's words: --words", file=sys.stderr)
+        return 2
+    if a.what == "switch":
+        from thorp import vsm
+
+        if a.value not in ("on", "off"):
+            print("thorp s5 switch POLICY on|off", file=sys.stderr)
+            return 2
+        vsm.set_switch(a.key, a.value == "on", a.words)
+    else:
+        from thorp.viable.s5_policy import charter as s5
+
+        s5.set_term(a.key, json.loads(a.value), a.words)
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="thorp")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -169,6 +204,19 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--gpu", help="hire this class only (a key of the terms' gpus, e.g. 'RTX 4090')")
     s.add_argument("--release-orphans", action="store_true", help="audit: destroy thorp instances no charter is sailing")
     s.set_defaults(fn=cmd_charter)
+    s = sub.add_parser("store", help="the one store (Postgres): ping it, or import data/'s files into it")
+    s.add_argument("what", choices=["ping", "import"])
+    s.add_argument("--retire", action="store_true", help="import: rename each imported file *.imported (the cutover)")
+    s.set_defaults(fn=cmd_store)
+    s = sub.add_parser("s5", help="an S5 decision: switch a policy on or off, or change a charter term")
+    s.add_argument("what", choices=["switch", "term"])
+    s.add_argument("key", help="the policy, or the charter term")
+    s.add_argument("value", help="switch: on|off; term: its value as JSON (40, or '{\"RTX 4090\": 0.45}')")
+    s.add_argument("--words", required=True, help="Justin's words, and when")
+    s.set_defaults(fn=cmd_s5)
+    s = sub.add_parser("schedule", help="Thorp's own schedule (S2): tick, list, run, import-claude, enable, judge")
+    s.add_argument("rest", nargs=argparse.REMAINDER)
+    s.set_defaults(fn=lambda a: __import__("thorp.viable.s2_coordination.schedule", fromlist=["main"]).main(a.rest))
     a = p.parse_args(argv)
     return a.fn(a)
 

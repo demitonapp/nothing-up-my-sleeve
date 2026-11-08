@@ -245,6 +245,16 @@ function shipHeader(ship, run) {
 }
 window.addEventListener('hashchange', () => showTab(location.hash.slice(1), false));
 filterBars();
+// the one store (Postgres, /api/store): when it does not answer, the page says so at the top, and nothing is shown
+// from the old files instead (DECISIONS.md, "One store: Postgres, by the viable system")
+fetch('/api/store').then(r => r.json()).then(d => {
+  if (d.up) return;
+  const bar = document.createElement('div');
+  bar.className = alertCls('no', 'm-2');
+  bar.setAttribute('role', 'alert');
+  bar.textContent = `The store is down: ${d.why || 'Postgres does not answer'}. Nothing here is current until it is back.`;
+  document.body.prepend(bar);
+}).catch(() => {});
 // once the whole script has run (showTab reaches state declared further down); an old ?run= address opens that ship
 queueMicrotask(() => {
   const h = location.hash.slice(1);
@@ -2289,7 +2299,7 @@ function rungEvidence(t, ft, rank, opts = {}) {
   }
   return body;
 }
-// ---- grading (fleet.grading, data/compare/chain-grades.json): does a chain get harder as it climbs, judged on many models
+// ---- grading (fleet.grading, the chain grades, s4.outside_readings): does a chain get harder as it climbs, judged on many models
 // at once. Graded: no model performs a rung while failing one below it, no rung is performed by more models than the
 // one below, and every rung is performed by some model. The reference ladder (Pythia 14m to 410m, Qwen3 0.6B) is
 // shown beside Thorp's classes when the toggle is on; it is a per-viewer choice, remembered.
@@ -2301,7 +2311,7 @@ function chainRefToggle(id, redraw) {
   el.onchange = () => { chainRef = el.checked; try { localStorage.setItem('thorp.chainref', chainRef ? 'on' : 'off'); } catch (e) {} redraw(); };
 }
 function gradeNote(g, nameOf, full) {
-  if (!g) return `<span class="${pillCls('')}" title="no grading written yet (data/compare/chain-grades.json)">not graded yet</span>`;
+  if (!g) return `<span class="${pillCls('')}" title="no grading written yet (the chain grades, s4.outside_readings)">not graded yet</span>`;
   if (g.graded) return `<span class="${pillCls('good')}" title="harder at every rung: no model passes a rung it fails below, fewer pass each rung, and every rung is reached">graded</span>`;
   const bits = [];
   if (g.inversions.length) bits.push(`${g.inversions.length} inversion${g.inversions.length > 1 ? 's' : ''}`);
@@ -3919,7 +3929,7 @@ async function loadGovernance() {
   const enforcedBadge = on => on ? `<span class="${pillCls('good')}">enforced</span>` : `<span class="${pillCls('accent')}">advisory</span>`;
   // S5 policy
   const s5 = `<table data-nosort><thead><tr><th>policy</th><th>statement</th><th>adopted</th><th></th></tr></thead><tbody>${Object.entries(stmt).map(([k, p]) => `<tr><td><b>${esc(k)}</b></td><td>${esc(p.statement)}</td><td class="s">${esc(p.adopted || '')}</td><td>${enforcedBadge(p.enforced)}</td></tr>`).join('')}</tbody></table>
-    <p class="s">A policy is switched on (enforced at the gate, S3) or left advisory by Justin, in data/policies.json; not from here.</p>`;
+    <p class="s">A policy is switched on (enforced at the gate, S3) or left advisory by Justin, in s5.policy_switches (<code>thorp s5 switch</code>); not from here.</p>`;
   // S4 intelligence
   const s4a = A.S4 || {};
   const s4 = `<div class="govstats"><a href="#/leaderboard" class="govstat"><b>${(s4a.competitors || []).length}</b><span>2–4B competitors</span></a><a href="#/leaderboard" class="govstat"><b>${(s4a.reference_ladder || []).length}</b><span>models on the reference ladder</span></a></div>
@@ -3997,7 +4007,7 @@ async function loadControl() {
   // its decisions: the gate's log
   const glog = S3.gate_log || [];
   const spoke = x => (x.decisions || []).map(d => `${howPill(d.how)} <b>${esc(d.policy)}</b> <span class="s">${esc(cut(d.why, 140))}</span>`).join('<br>') || '<span class="s">no policy had anything to say</span>';
-  const decisions = `<section class="${cardCls(false, 'panel')}"><h2>Its decisions <span class="note">the gate's latest decisions, newest first (data/gate-log.jsonl): every voyage that sailed and every fitout the builder queued, with each policy that spoke and how. The record began on the evening of 7 November</span></h2>
+  const decisions = `<section class="${cardCls(false, 'panel')}"><h2>Its decisions <span class="note">the gate's latest decisions, newest first (s3.gate_decisions in Postgres): every voyage that sailed and every fitout the builder queued, with each policy that spoke and how. The record began on the evening of 7 November</span></h2>
     ${glog.length ? `<div class="scroll ctlscroll"><table data-nosort><thead><tr><th>when</th><th>voyage</th><th>asked by</th><th>verdict</th><th>the policies that spoke</th></tr></thead><tbody>${glog.map(x => `<tr><td class="s mono">${when(x.at)}</td><td class="mono">${esc(x.name || '')}</td><td class="s">${esc(x.where || '')}</td><td>${verdictPill(x.verdict)}</td><td>${spoke(x)}</td></tr>`).join('')}</tbody></table></div>` : `<div class="${emptyCls()}">no decisions recorded yet: the record begins with the next voyage to sail or the next fitout queued (vsm.gate writes data/gate-log.jsonl)</div>`}</section>`;
   // the bargains and the exceptions in force
   const bg = S3.bargains || {};

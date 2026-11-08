@@ -124,7 +124,23 @@ class FakeBox:
         import os
 
         home = {k: os.environ.get(k) for k in ("THORP_DATA", "THORP_LEDGER", "THORP_BACKEND")}
-        os.environ.update(THORP_DATA=str(self.root / "data"), THORP_LEDGER=str(self.root / "ledger.sqlite"), THORP_BACKEND="torch")
+        home["THORP_PAPERS"] = os.environ.get("THORP_PAPERS")
+        os.environ.update(THORP_DATA=str(self.root / "data"), THORP_LEDGER=str(self.root / "ledger.sqlite"), THORP_BACKEND="torch",
+                          THORP_PAPERS=str(self.root / "data" / "charter" / f"{rid}.papers.json"))  # as Box.launch sets it
+        # aboard, Postgres is out of reach (a hired box has none): anything that asks it fails here as it would there
+        from sqlalchemy import create_engine
+
+        from thorp import store
+        from thorp.viable.s3_control import fitout_store
+
+        dead = create_engine("postgresql+psycopg://thorp@localhost:1/thorp", connect_args={"connect_timeout": 1})
+        at_home = (store.engine, fitout_store.engine)
+        from thorp import fleet, ship_store
+
+        ship_store.reload()  # a box's process is new: nothing read at home is cached aboard
+        fleet._REGISTER = None
+        self.mp.setattr(store, "engine", lambda: dead)
+        self.mp.setattr(fitout_store, "engine", lambda: dead)
         try:
             box_led = Ledger()
             self.papers_row = box_led.get_run(rid)  # the box's gate knows the run S3 passed at home
@@ -139,6 +155,8 @@ class FakeBox:
             box_led.checkpoint_wal()
             (self.root / "data" / "charter" / f"{rid}.exit").write_text(str(code))
         finally:
+            self.mp.setattr(store, "engine", at_home[0])  # home again: the store is in reach
+            self.mp.setattr(fitout_store, "engine", at_home[1])
             for k, v in home.items():
                 if v is None:
                     os.environ.pop(k, None)
@@ -158,14 +176,14 @@ def write_spec(spec, tmp_thorp) -> str:
 
 def small_terms(tmp_thorp, **over):
     t = {"gpus": {"RTX 4090": 0.50, "H100 SXM": 2.60}, "voyage_budget": 5.0, "weekly_budget": 20.0, **over}
-    (paths.data_dir()).mkdir(parents=True, exist_ok=True)
-    (paths.data_dir() / "charter.json").write_text(json.dumps(t))
+    for k, v in t.items():
+        s5.set_term(k, v, "a test")
 
 
 # ---------------------------------------------------------------- S5 and S3
 
 
-def test_terms_are_the_defaults_under_charter_json(tmp_thorp):
+def test_terms_are_the_defaults_under_s5s_changes(tmp_thorp):
     assert s5.terms() == s5.DEFAULTS
     small_terms(tmp_thorp, gpus={"RTX 4090": 0.4})
     t = s5.terms()
@@ -267,6 +285,17 @@ def test_a_chartered_voyage_sails_and_comes_home(library, spec, tmp_thorp, monke
     assert not (box_root / "data" / "secrets").exists()
     assert (box_root / "data" / "manifest.sqlite").exists() and (box_root / "data" / "texts" / "local" / "loc-a.txt").exists()
     assert boxes[0].papers_row and boxes[0].papers_row["run_id"] == rid
+    # the box sailed under the papers carried aboard (the S5 state its gate would read); its gate knew the run S3
+    # passed at home, so it made no decision of its own, and nothing came home as one (tests/test_store.py folds one)
+    assert (box_root / "data" / "charter" / f"{rid}.papers.json").exists()
+    from sqlalchemy import select
+
+    from thorp import store
+    from thorp.viable.records import GateDecision
+
+    with store.session() as ss:
+        aboard = ss.scalars(select(GateDecision).where(GateDecision.source == f"box papers {rid}")).all()
+    assert aboard == [] and [d["where"] for d in vsm.gate_log()] == ["charter", "voyage"]  # both asked at home
     # home: the run finished in this ledger, its rows and checkpoints, the hire on its hardware line
     run = rec.get_run(rid)
     assert run["status"] == "finished" and "vast.ai instance" in run["hardware"] and "torch" in run["hardware"]
@@ -342,6 +371,14 @@ def test_the_audit_finds_orphans_and_ghosts(tmp_thorp):
     r = s3star.audit(v, release_orphans=True, log=lambda *a: None)
     assert r["released"] == [orphan] and set(market.instances) == {other}
     assert s3.out_now() == []
+    from sqlalchemy import select
+
+    from thorp import store
+    from thorp.viable.records import Audit
+
+    with store.session() as ss:  # S3*'s own record: the ghost closed once, the orphan released once
+        found = [(a.finding, a.instance, a.action) for a in ss.scalars(select(Audit).order_by(Audit.id))]
+    assert found == [("ghost", 4242, "closed in the spend log"), ("orphan", orphan, "released")]
 
 
 def test_the_real_box_speaks_ssh_and_rsync(tmp_thorp):
@@ -363,6 +400,7 @@ def test_the_real_box_speaks_ssh_and_rsync(tmp_thorp):
     ssh = [a for a in seen if a[0] == "ssh"]
     assert all(a[a.index("-p") + 1] == "40123" and "root@ssh9.vast.ai" in a for a in ssh)
     assert "THORP_BACKEND=torch" in ssh[1][-1] and "thorp run data/charter/rid1.yaml" in ssh[1][-1] and ssh[1][-1].endswith("&")
+    assert "THORP_PAPERS=/root/thorp/data/charter/rid1.papers.json" in ssh[1][-1]  # the box's gate sails under papers
     rs = [a for a in seen if a[0] == "rsync"]
     assert rs[0][-1] == f"root@ssh9.vast.ai:{s1.REMOTE}/data/" and any(x.startswith("--files-from=") for x in rs[0])
     assert rs[1][-2] == f"root@ssh9.vast.ai:{s1.REMOTE}/ledger.sqlite"
@@ -444,3 +482,25 @@ def test_the_launch_returns_at_once_not_at_the_end_of_the_voyage(tmp_thorp):
     head, _, tail = cmd.partition("; ")
     assert head.startswith("cd ") and "&&" not in head  # the cd is its own command, outside the backgrounded one
     assert tail.startswith("THORP_BACKEND=torch") and "nohup sh -c" in tail and "&&" not in tail.split("sh -c", 1)[0]
+
+
+def test_aboard_no_evaluator_asks_the_store(library, spec, tmp_thorp, monkeypatch):
+    """A hired box has no Postgres (2026-11-08, the parity voyage: cards, nevermore, stars and pips failed at every
+    reading with 'connection to 127.0.0.1:5433 refused'). Every evaluator that reads a deck, a size or a ship must
+    read it from the papers carried aboard: aboard, none may record an eval_error."""
+    small_terms(tmp_thorp)
+    spec["optim"]["precision"] = "fp32"
+    spec["model"]["context"] = 256  # the decks' prompts fit (as in test_torch)
+    spec["eval"]["evaluators"] = ["ce_bpb", "samples", "stars", "nevermore", "cards", "pips", "discovery"]
+    market, box_root, said = FakeMarket(), tmp_thorp / "box", []
+    rec = Ledger()
+    out = s1.sail(write_spec(spec, tmp_thorp), vast=Vast(market), resolver=library["resolver"],
+                  box_factory=lambda inst: FakeBox(box_root, library["resolver"], monkeypatch),
+                  rec=rec, log=said.append, sleep=lambda s: None, poll_s=0)  # fmt: skip
+    rid = train.run_id(spec)
+    assert out["status"] == "home"
+    errors = [json.loads(r["text"])["error"] for r in rec.query("select text from artifacts where run_id=? and kind='eval_error'", [rid])]
+    assert errors == []
+    # registered with its ship at home, since aboard it cannot be (the toy preset is no size, so it says why)
+    home = [x for x in said if "regist" in x]
+    assert len(home) == 1 and "aboard" not in home[0] and ("registered as a voyage" in home[0] or "no size for preset 'tiny'" in home[0])

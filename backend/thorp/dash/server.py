@@ -17,9 +17,11 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from thorp import chinchilla, paths
+from thorp import chinchilla, paths, store
 from thorp.evaluators.probes import load_traits
 from thorp.ledger import connect
+from thorp.store import StoreDown
+from thorp.viable.s4_intelligence import readings
 
 STATIC = Path(__file__).with_name("static")
 TYPES = {
@@ -451,11 +453,7 @@ def api_ladder() -> dict:
     ):
         queue.append({"name": name, "status": done.get(name, "queued")})  # queue_9m.sh's tail
     external = []
-    for f in sorted((paths.data_dir() / "compare").glob("*.json")):
-        try:
-            x = json.loads(f.read_text())
-        except (OSError, ValueError):
-            continue
+    for _, x in readings.glob("*"):
         if not isinstance(
             x, dict
         ):  # a list of runs (nevermore-vs-trigrams.json), not one model's comparison
@@ -948,14 +946,12 @@ def _short_model(m: str) -> str:
 
 def _grades(pairs: bool = False) -> dict:
     """Whether each chain gets harder as it climbs (fleet.grading, written to
-    data/compare/chain-grades.json): each chain's grade, and the reference ladder's readings on every
+    the chain grades, s4.outside_readings): each chain's grade, and the reference ladder's readings on every
     rung (fleet.REFERENCE_LADDER: Pythia 14m to 410m and Qwen3 0.6B), per-pair lifts only if asked."""
     from thorp import fleet
 
-    p = paths.ROUTER / "data" / "compare" / "chain-grades.json"
-    try:
-        d = json.loads(p.read_text())
-    except (OSError, ValueError):
+    d = readings.get("chain-grades")
+    if d is None:
         return {"grades": {}, "reference": []}
     models = d.get("models", {})
     ladder = list(getattr(fleet, "REFERENCE_LADDER", ()))
@@ -1463,27 +1459,21 @@ def _class_score(preset: str) -> dict:
     return out
 
 
-def _knockout_files() -> list[Path]:
-    return sorted(
-        (paths.ROUTER / "data" / "compare").glob("knockout-*.json")
-    )
+def _knockout_files() -> list[tuple[str, dict]]:
+    return readings.glob("knockout-*")
 
 
 def api_knockout(model: str = "") -> dict:
     """The knockout (fleet.EXPEDITIONS["knockout"], thorp/knockout.py; DECISIONS.md "The knockout,
     pre-registered"): in a model that chains, each card's 8 strongest heads silenced and the logic
     deck and the chaining tests read again, beside three random draws of 8 heads. One model's
-    result (data/compare/knockout-<model, / as __>.json), or every result when no model is named."""
+    result (s4.outside_readings, knockout-<model, / as __>), or every result when no model is named."""
     from thorp import fleet
 
     competitors = getattr(fleet, "COMPETITORS", {})
     out = []
-    for f in _knockout_files():
-        try:
-            d = json.loads(f.read_text())
-        except ValueError:
-            continue
-        d.setdefault("model", f.stem[len("knockout-") :].replace("__", "/"))
+    for stem, d in _knockout_files():
+        d.setdefault("model", stem[len("knockout-") :].replace("__", "/"))
         if model and d["model"] != model:
             continue
         d["label"] = (competitors.get(d["model"]) or (None,))[0] or _short_model(d["model"])
@@ -1587,11 +1577,17 @@ def api_series(runs: str, metrics: str) -> dict:
     return out
 
 
+def api_store() -> dict:
+    """Whether the one store (Postgres) answers: the page says so when it does not."""
+    why = store.ping()
+    return {"up": why is None, "why": why}
+
+
 def api_governance() -> dict:
     """Thorp's rules as Beer's Viable System Model (thorp/vsm.py): the five systems (S1 operations to
     S5 policy) with their code, and the live audit: the voyages, the queue's collisions, each policy's
     enforcement and the queued runs that break it, the outside world Thorp measures itself against.
-    Read-only: switching a policy is Justin's S5 decision, made in data/policies.json."""
+    Read-only: switching a policy is Justin's S5 decision, recorded in s5.policy_switches (`thorp s5 switch`)."""
     import dataclasses
 
     from thorp import vsm
@@ -2207,7 +2203,7 @@ def _entry_body(v: dict) -> dict:
 def api_thorp(ship: str) -> dict:
     """A Thorp ship as the leaderboard names it (Thorp <class> v<n>), in the competitor page's shape
     (leaderboard.thorp_entry: the mean of its sailings' latest readings), with its version's history
-    from data/thorp-versions.json (a version rises only when a new ship beats the last by more than
+    from s1.crownings (a version rises only when a new ship beats the last by more than
     the noise)."""
     from thorp import leaderboard
 
@@ -2216,12 +2212,7 @@ def api_thorp(ship: str) -> dict:
         raise LookupError(f"no ship {ship}")
     meta = v.get("_ship", {})
     preset = meta.get("preset")
-    try:
-        reg = json.loads(
-            (paths.ROUTER / "data" / "thorp-versions.json").read_text()
-        )
-    except (OSError, ValueError):
-        reg = {}
+    reg = leaderboard._versions()
     history = reg.get(preset, [])
     mine = next((h for h in history if h.get("ship_key") == ship), None)
     best = next(
@@ -2261,17 +2252,13 @@ def _rows_ladder() -> list[dict]:
 
 def api_competitor(model: str) -> dict:
     """One outside model (a 2-4B competitor or a reference ladder model), as read on Thorp's tests
-    (data/compare/chain-grades.json): the four chaining tests, the logic deck (variants, hops,
+    (the chain grades, s4.outside_readings): the four chaining tests, the logic deck (variants, hops,
     relations), its cards (thorp's evaluator "cards": mover, comparator, bridge; previous-word and
     Nevermore not read for outside models yet), every rung of the four chains, and what Thorp must
     match it at (a tenth its size, with the forecast there from smoking_qwen)."""
     from thorp import fleet
 
-    p = paths.ROUTER / "data" / "compare" / "chain-grades.json"
-    try:
-        models = json.loads(p.read_text()).get("models", {})
-    except (OSError, ValueError):
-        models = {}
+    models = readings.chain_grades()
     comp = getattr(fleet, "COMPETITORS", {})
     if model not in models and model not in comp:
         raise LookupError(f"no model {model}")
@@ -2905,7 +2892,7 @@ VS_LOGIC = (
     ("lift_second", "Logic: the second premise alone", "lift from the second premise"),
 )  # fmt: skip
 VS_LIFT_FLOOR = 0.1  # a logic lift is ranked only when the reference's reaches it: below, a ratio is noise over noise
-VS_DECK = (  # the other cards, read on an outside model by thorp/outside_deck.py (data/compare/deck-<model>.json)
+VS_DECK = (  # the other cards, read on an outside model by thorp/outside_deck.py (s4.outside_readings, deck-<model>)
     ("sink", "The sink", "stars/attention_sink/max_score", True, "parks attention on the first piece"),
     ("delimiter", "The delimiter", "stars/delimiter/max_score", False, "attends to punctuation and breaks"),
     ("words_back", "Words back (two heads)", "stars/offset_2/shared_score", True, "attends two pieces back"),
@@ -2923,14 +2910,12 @@ VS_PAIRS = 24  # the matched pairs in a trick test: one pair is 1/24 of the scor
 
 def _vs_references() -> dict[str, dict]:
     """The reference models on file: chain-grades.json (trick tests, the logic deck, cards) with the judge-book
-    bits per byte from data/compare/<model>__hole-cards-unseen.json where it was scored."""
-    cg = paths.data_dir() / "compare" / "chain-grades.json"
-    models = json.loads(cg.read_text())["models"] if cg.exists() else {}
+    bits per byte from s4.outside_readings <model>__hole-cards-unseen where it was scored."""
+    models = readings.chain_grades()
     from thorp import cleaning
 
     bpb, cleaned = {}, {}
-    for f in (paths.data_dir() / "compare").glob("*__hole-cards-unseen*.json"):
-        d = json.loads(f.read_text())
+    for _, d in readings.glob("*__hole-cards-unseen*"):
         short = d["model"].split("/")[-1].removesuffix("-bf16").removesuffix("-4bit").lower()
         if d.get("clean", "raw") == cleaning.CURRENT:  # scored on the text the voyages read: preferred
             cleaned[short] = d.get("bpb_mean")
@@ -2942,9 +2927,8 @@ def _vs_references() -> dict[str, dict]:
         if "/" not in name:  # Thorp's own voyages graded alongside
             continue
         short = name.split("/")[-1].removesuffix("-bf16").removesuffix("-4bit").lower()
-        dk = paths.data_dir() / "compare" / f"deck-{name.replace('/', '--')}.json"
         out[name] = {**m, "bpb": bpb.get(short), "bpb_clean": short in cleaned,
-                     "deck": json.loads(dk.read_text()) if dk.exists() else None}  # fmt: skip
+                     "deck": readings.get(f"deck-{name.replace('/', '--')}")}  # fmt: skip
     return out
 
 
@@ -3216,8 +3200,7 @@ def api_logic_relation(preset: str, relation: str) -> dict:
                                                 "chained": bool(x["both"] > 0 and x["both"] > max(x["first"], x["second"]))}  # fmt: skip
 
     readers: list[str] = []
-    for f in sorted((paths.data_dir() / "compare").glob("logic-*.json")):
-        d40 = json.loads(f.read_text())
+    for _, d40 in readings.glob("logic-*"):
         if d40.get("items40"):
             label = d40["model"].split("/")[-1].removesuffix("-bf16").removesuffix("-4bit")
             mark_results(label, d40["items40"])
@@ -3231,9 +3214,8 @@ def api_logic_relation(preset: str, relation: str) -> dict:
     cards = [{"key": k, "name": D.BY_KEY[k].name if k in D.BY_KEY else k, "why": why,
               "suit": D.BY_KEY[k].constellation if k in D.BY_KEY else ""} for k, why in det["cards"]]  # fmt: skip
     knock = None
-    f = paths.data_dir() / "compare" / f"knockout-deck-{VS_KNOCKOUT.replace('/', '--')}.json"  # the bar's knockout only
-    if f.exists():
-        d = json.loads(f.read_text())
+    d = readings.get(f"knockout-deck-{VS_KNOCKOUT.replace('/', '--')}")  # the bar's knockout only
+    if d is not None:
         knock = {"model": d["model"], "baseline": d["baseline"].get(relation),
                  "drops": sorted(({"condition": c, "drop": v["relation_drops"].get(relation)} for c, v in d["conditions"].items()
                                   if v.get("relation_drops", {}).get(relation) is not None), key=lambda x: -x["drop"])}  # fmt: skip
@@ -3311,10 +3293,8 @@ def _class_logic(preset: str) -> dict:
     finally:
         con.close()
     refs = []
-    cg = paths.data_dir() / "compare" / "chain-grades.json"
-    graded = json.loads(cg.read_text())["models"] if cg.exists() else {}
-    for f in sorted((paths.data_dir() / "compare").glob("logic-*.json")):
-        d = json.loads(f.read_text())
+    graded = readings.chain_grades()
+    for _, d in readings.glob("logic-*"):
         if d.get("items40"):
             refs.append({"model": d["model"], "deck": "40", "gains": _logic_bands(d["items40"])})
     have = {x["model"] for x in refs}
@@ -3673,11 +3653,7 @@ def api_tomes() -> dict:
              and e.step=(select max(step) from evals x where x.run_id=e.run_id and x."set"='hole-cards-unseen')"""
     ):
         scores.setdefault(r["ship"] or r["name"], {})[r["book_id"]] = r["bpb"]
-    for f in sorted((paths.data_dir() / "compare").glob("*__hole-cards-unseen.json")):
-        try:
-            x = json.loads(f.read_text())
-        except (OSError, ValueError):
-            continue
+    for _, x in readings.glob("*__hole-cards-unseen"):
         scores[x["model"].split("/")[-1]] = {b["book_id"]: b["bpb"] for b in x.get("books", [])}
     return {
         "books": [
@@ -3762,6 +3738,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(200, posts[u.path](body))
         except TableNotBuilt as e:
             return self._json(503, {"error": str(e)})
+        except StoreDown as e:  # the one store is down: said, never answered from the old files
+            return self._json(503, {"error": str(e), "store": "down"})
         except (
             LookupError
         ) as e:  # no such run, or no checkpoint to talk to (thorp.table's own words)
@@ -3828,6 +3806,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/library_trigrams": lambda: api_shelf_trigrams(q["path"]),
                 "/api/voyages/where": lambda: api_voyages_where(q.get("runs", "")),
                 "/api/governance": api_governance,
+                "/api/store": api_store,
                 "/api/acquisition": api_acquisition,
                 "/api/acquisition/audit": api_acquisition_audit,
                 "/api/series": lambda: api_series(q.get("runs", ""), q.get("metrics", "")),
@@ -3873,6 +3852,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, body, "application/json")
         except TableNotBuilt as e:
             return self._send(503, json.dumps({"error": str(e)}).encode(), "application/json")
+        except StoreDown as e:  # the one store is down: said, never answered from the old files
+            return self._send(503, json.dumps({"error": str(e), "store": "down"}).encode(), "application/json")
         except Exception as e:  # noqa: BLE001
             return self._send(500, json.dumps({"error": repr(e)}).encode(), "application/json")
 

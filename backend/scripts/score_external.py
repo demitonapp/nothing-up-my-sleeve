@@ -11,7 +11,7 @@ scores. The book is tokenised whole with the model's own tokeniser, a start toke
 WINDOW predictions, each starting from an empty context, as ce_bpb does. bits per byte = total
 nats / (UTF-8 bytes x ln 2), so the number is comparable with Thorp's whatever the tokenisers.
 
-Writes data/compare/<model>__<list>.json (per book: nats, tokens, bytes, bits per byte; the means;
+Keeps s4.outside_readings <model>__<list> (was data/compare/<model>__<list>.json) (per book: nats, tokens, bytes, bits per byte; the means;
 the settings) and prints a table.
 
 A model mlx-lm cannot load (Maincode/Maincoder-1B) is built from its weights by scripts/mlx_ports.py. The
@@ -22,7 +22,6 @@ and the next voyage waits for it.
 from __future__ import annotations
 
 import argparse
-import json
 import math
 import time
 from pathlib import Path
@@ -32,7 +31,7 @@ import mlx.nn as nn
 import numpy as np
 from mlx_lm import load
 
-from thorp import manifest, paths
+from thorp import manifest
 from thorp.paths import ROUTER as ROOT  # noqa: E402  (the repository, routed: backend, ships, data)
 from thorp.sources import load_text
 from thorp.sources.gutenberg import resolve_list
@@ -122,11 +121,11 @@ def score(a) -> None:
         "bpb_mean_en": float(np.mean(en)) if en else None,
         "books": rows,
     }
-    d = paths.data_dir() / "compare"
-    d.mkdir(parents=True, exist_ok=True)
-    f = d / f"{a.model.replace('/', '--')}__{Path(a.list).stem}{'' if a.clean == 'raw' else '__' + a.clean}.json"
-    f.write_text(json.dumps(out, indent=1))
-    print(f"mean {out['bpb_mean']:.4f} bpb (English {out['bpb_mean_en']}); written {f}")
+    from thorp.viable.s4_intelligence import readings
+
+    f = f"{a.model.replace('/', '--')}__{Path(a.list).stem}{'' if a.clean == 'raw' else '__' + a.clean}"
+    readings.put(f, out)
+    print(f"mean {out['bpb_mean']:.4f} bpb (English {out['bpb_mean_en']}); kept as {f} in s4.outside_readings")
 
 
 if __name__ == "__main__":

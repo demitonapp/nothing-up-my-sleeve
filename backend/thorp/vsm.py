@@ -13,11 +13,11 @@ Stafford Beer's Viable System Model, mapped onto Thorp, each system with its mem
   and the dashboard's) that share the files. `lint_queue()` finds collisions before they cost a run.
 - **S3, control**: the gate every run passes (`gate(spec)`, called from train.prepare and the fitout
   builder): the enforced policies applied to the spec; and the bargain, a written opt-in (`data.opt_in`)
-  that a policy admits. Every decision the gate makes is kept (`gate_log()`, data/gate-log.jsonl).
+  that a policy admits. Every decision the gate makes is kept (`gate_log()`, s3.gate_decisions in Postgres).
   **S3\*, audit**: `audit()`, over the queue and the ledger, sporadic and independent of the gate
   (the night watches and steering tasks call it too).
 - **S4, intelligence**: the outside world and the future: the competitors and the reference ladder
-  (fleet.COMPETITORS, data/compare/), the leaderboard and Smoking Qwen's forecast, the research the tests
+  (fleet.COMPETITORS, s4.outside_readings), the leaderboard and Smoking Qwen's forecast, the research the tests
   rest on.
 - **S5, policy**: Thorp's identity: the POLICIES below, each adopted by Justin on a date, enforced or
   advisory; DECISIONS.md is S5's record. A policy changes only by a new entry there and here.
@@ -95,7 +95,7 @@ SYSTEMS: dict[str, System] = {
             "the outside world and the future: competitors, forecasts, research",
             (
                 "thorp/fleet.py COMPETITORS, REFERENCE_LADDER",
-                "data/compare/",
+                "s4.outside_readings",
                 "thorp/leaderboard.py",
                 "thorp/smoking_qwen.py",
                 "thorp/knockout.py",
@@ -364,7 +364,7 @@ POLICIES: dict[str, Policy] = {
             "A voyage sails on a hired GPU only within the charter's terms: a class the terms hire at or under its "
             "ceiling an hour, a datacenter-verified and reliable host, the quote within one voyage's budget and "
             "the week's, the account's credit covering it, and no more ships out than the terms allow "
-            "(thorp/viable/s5_policy/charter.py; data/charter.json sets the numbers).",
+            "(thorp/viable/s5_policy/charter.py; S5 sets the numbers in s5.charter_terms, `thorp s5 term`).",
             "2026-11-08, Justin (Vast.ai chosen; the terms adopted as proposed)",
             True,
             _chartered,
@@ -387,9 +387,29 @@ class GateRefused(ValueError):
 
 
 def _enforcement() -> dict:
-    """S5's switches (data/policies.json {key: true|false}), over each policy's default."""
-    p = paths.data_dir() / "policies.json"
-    return json.loads(p.read_text()) if p.exists() else {}
+    """S5's switches ({key: true|false}, s5.policy_switches), over each policy's default. A hired box reads them
+    from its papers (thorp/store.py)."""
+    from thorp import store
+
+    if store.papers():
+        return dict(store.read_papers().get("switches") or {})
+    from sqlalchemy import select
+
+    from thorp.viable.records import PolicySwitch
+
+    with store.session() as s:
+        return {r.policy: r.enforced for r in s.scalars(select(PolicySwitch))}
+
+
+def set_switch(key: str, enforced_: bool, words: str) -> None:
+    """S5 switches a policy on or off, in Justin's words (s5.policy_switches)."""
+    from thorp import store
+    from thorp.viable.records import PolicySwitch
+
+    if key not in POLICIES and key != "intake":
+        raise KeyError(f"no policy {key!r}; the policies: {sorted(POLICIES)}")
+    with store.session() as s:
+        s.merge(PolicySwitch(policy=key, enforced=enforced_, words=words))
 
 
 def enforced(key: str) -> bool:
@@ -397,11 +417,27 @@ def enforced(key: str) -> bool:
 
 
 def _exceptions() -> dict:
-    """S5's written exceptions (data/policy-exceptions.json {key: {"reason", "adopted", "runs": [names],
-    "patterns": [globs]}}):
-    the runs a policy does not govern, by name, with the reason."""
-    p = paths.data_dir() / "policy-exceptions.json"
-    return json.loads(p.read_text()) if p.exists() else {}
+    """S5's written exceptions ({key: {"reason", "adopted", "runs": [names], "patterns": [globs]}}, from
+    s5.policy_exceptions and its matches): the runs a policy does not govern, by name, with the reason. A hired box
+    reads them from its papers."""
+    from thorp import store
+
+    if store.papers():
+        return dict(store.read_papers().get("exceptions") or {})
+    from sqlalchemy import select
+    from sqlalchemy.orm import selectinload
+
+    from thorp.viable.records import PolicyException
+
+    with store.session() as s:
+        out = {}
+        for e in s.scalars(select(PolicyException).options(selectinload(PolicyException.matches))):
+            d = {"reason": e.reason, "adopted": e.adopted, "runs": [m.value for m in e.matches if m.kind == "run"],
+                 **(e.extra or {})}  # fmt: skip
+            if pats := [m.value for m in e.matches if m.kind == "pattern"]:
+                d["patterns"] = pats
+            out[e.policy] = d
+        return out
 
 
 def excepted(key: str, spec: dict) -> str:
@@ -463,40 +499,93 @@ def gate_one(key: str, spec: dict, *, where: str) -> list[str]:
     return [f"policy '{key}': {'; '.join(found)}"]
 
 
-def _gate_log_path():
-    return paths.data_dir() / "gate-log.jsonl"
+GATE_TIME = "%Y-%m-%dT%H:%M:%S"  # the gate's clock, this Mac's local time, as the log has always been read
 
 
 def _record_gate(spec: dict, where: str, verdict: str, decisions: list[dict]) -> None:
-    """S3's record: one line per decision of the gate (never costs a voyage if it cannot be written)."""
-    try:
-        p = _gate_log_path()
-        p.parent.mkdir(parents=True, exist_ok=True)
-        line = {
-            "at": time.strftime("%Y-%m-%dT%H:%M:%S"),
-            "name": spec.get("name"),
-            "ship": spec.get("ship"),
-            "where": where,
-            "verdict": verdict,
-            "decisions": decisions,
-        }
-        with p.open("a", encoding="utf-8") as f:
+    """S3's record: one row per decision of the gate (s3.gate_decisions, each policy's part beside it). A decision
+    that cannot be recorded is not made: if the store is down this raises, and the voyage does not sail. On a hired
+    box the line goes beside its papers, brought home when it docks."""
+    from thorp import store
+
+    line = {
+        "at": time.strftime(GATE_TIME),
+        "name": spec.get("name"),
+        "ship": spec.get("ship"),
+        "where": where,
+        "verdict": verdict,
+        "decisions": decisions,
+    }
+    if store.papers():
+        with store.papers_log().open("a", encoding="utf-8") as f:
             f.write(json.dumps(line, ensure_ascii=False) + "\n")
-    except Exception:  # noqa: BLE001
-        pass
+        return
+    insert_gate_decision(line)
+
+
+def _gate_at(at: str):
+    from datetime import datetime
+
+    d = datetime.fromisoformat(at)
+    return d if d.tzinfo else d.astimezone()  # a naive time is this Mac's local time
+
+
+def insert_gate_decision(line: dict, *, source: str = "here", once: bool = False) -> int:
+    """One gate decision (the log's line shape) into the store; with `once`, skipped if already there. Returns
+    the number written (0 or 1)."""
+    from sqlalchemy import select
+
+    from thorp import store
+    from thorp.viable.records import GateDecision, GatePolicyDecision
+
+    at = _gate_at(line["at"])
+    with store.session() as s:
+        if once and s.scalar(
+            select(GateDecision.id).where(
+                GateDecision.at == at,
+                GateDecision.name.is_not_distinct_from(line.get("name")),
+                GateDecision.place == line.get("where", "voyage"),
+                GateDecision.verdict == line["verdict"],
+            )
+        ):
+            return 0
+        d = GateDecision(at=at, name=line.get("name"), ship=line.get("ship"), place=line.get("where", "voyage"),
+                         verdict=line["verdict"], source=source)  # fmt: skip
+        d.policies = [
+            GatePolicyDecision(ordinal=i, policy=x.get("policy", ""), how=x.get("how", ""), why=x.get("why"))
+            for i, x in enumerate(line.get("decisions") or [])
+        ]
+        s.add(d)
+    return 1
 
 
 def gate_log(limit: int = 60) -> list[dict]:
-    """The gate's latest decisions, newest first."""
-    p = _gate_log_path()
-    if not p.exists():
-        return []
-    rows = []
-    with p.open(encoding="utf-8") as f:
-        for ln in f:
-            with contextlib.suppress(ValueError):
-                rows.append(json.loads(ln))
-    return rows[-limit:][::-1]
+    """The gate's latest decisions, newest first, in the log's line shape."""
+    from sqlalchemy import select
+    from sqlalchemy.orm import selectinload
+
+    from thorp import store
+    from thorp.viable.records import GateDecision
+
+    with store.session() as s:
+        rows = s.scalars(
+            select(GateDecision).options(selectinload(GateDecision.policies))
+            .order_by(GateDecision.at.desc(), GateDecision.id.desc()).limit(limit)
+        ).all()  # fmt: skip
+        return [
+            {
+                "at": r.at.astimezone().strftime(GATE_TIME),
+                "name": r.name,
+                "ship": r.ship,
+                "where": r.place,
+                "verdict": r.verdict,
+                "decisions": [
+                    {"policy": p.policy, "how": p.how, **({"why": p.why} if p.why is not None else {})}
+                    for p in r.policies
+                ],
+            }
+            for r in rows
+        ]
 
 
 # S2's helm: one GPU, so one voyage at sea at a time (Justin, 16:35: "surely only one can be running at
@@ -507,7 +596,45 @@ def gate_log(limit: int = 60) -> list[dict]:
 
 def _helm_paths():
     d = paths.data_dir()
-    return d / "helm.lock", d / "helm.json"
+    return d / "helm.lock", d / "helm.json"  # helm.json only on a hired box (its papers); at home, s2.helm
+
+
+def _helm_write(rec: dict | None, pid: int, who) -> None:
+    """Who holds the helm, recorded (s2.helm at home; beside the lock on a box); `rec` None releases our record."""
+    from thorp import store
+
+    if store.papers():
+        if rec is not None:
+            who.write_text(json.dumps(rec))
+        else:
+            with contextlib.suppress(Exception):
+                if json.loads(who.read_text()).get("pid") == pid:
+                    who.unlink()
+        return
+    from datetime import datetime
+
+    from sqlalchemy import delete
+
+    from thorp.viable.records import Helm
+
+    with store.session() as s:
+        if rec is None:
+            s.execute(delete(Helm).where(Helm.helm == "mac", Helm.pid == pid))
+        else:
+            s.merge(Helm(helm="mac", name=rec["name"], kind=rec["kind"], pid=rec["pid"],
+                         since=datetime.strptime(rec["since"], GATE_TIME).astimezone()))  # fmt: skip
+
+
+def _helm_read(who) -> dict | None:
+    from thorp import store
+
+    if store.papers():
+        return json.loads(who.read_text())
+    from thorp.viable.records import Helm
+
+    with store.session() as s:
+        r = s.get(Helm, "mac")
+        return {"name": r.name, "kind": r.kind, "pid": r.pid, "since": r.since.astimezone().strftime(GATE_TIME)} if r else None
 
 
 @contextlib.contextmanager
@@ -527,22 +654,15 @@ def at_sea(name: str, kind: str = "voyage", log=print):
                 f"S2: in port, waiting for the helm ({holder.get('name')} is at sea since {holder.get('since')})"
             )
             fcntl.flock(f, fcntl.LOCK_EX)
-        who.write_text(
-            json.dumps(
-                {
-                    "name": name,
-                    "kind": kind,
-                    "pid": os.getpid(),
-                    "since": time.strftime("%Y-%m-%dT%H:%M:%S"),
-                }
-            )
+        _helm_write(
+            {"name": name, "kind": kind, "pid": os.getpid(), "since": time.strftime(GATE_TIME)}, os.getpid(), who
         )
         yield
     finally:
-        with contextlib.suppress(Exception):
-            if json.loads(who.read_text()).get("pid") == os.getpid():
-                who.unlink()
-        f.close()  # releases the lock
+        try:
+            _helm_write(None, os.getpid(), who)
+        finally:
+            f.close()  # releases the lock, even if the record could not be cleared
 
 
 def helm() -> dict | None:
@@ -556,9 +676,13 @@ def helm() -> dict | None:
         try:
             fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
+            from thorp import store
+
             try:
-                return json.loads(who.read_text())
-            except Exception:  # noqa: BLE001
+                return _helm_read(who) or {"name": "(unknown)", "kind": "?", "since": None}
+            except store.StoreDown:
+                raise
+            except Exception:  # noqa: BLE001  (a box's helm.json half-written)
                 return {"name": "(unknown)", "kind": "?", "since": None}
         fcntl.flock(f, fcntl.LOCK_UN)
     return None

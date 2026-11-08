@@ -9,20 +9,17 @@ card, and the deck's rules (wager.falls) say which it plays.
   from the book's text cleaned as the voyages read it (cleaning.CURRENT).
 - **The shelf** for the rare word's rarity: Ogden v0.1's books in the model's own pieces (the corpus every
   Ogden voyage reads), so "rare" means the same text for every model.
-- **The logic deck's lifts** (the Mover's and the Scales' abilities) are taken from data/compare/chain-grades.json,
+- **The logic deck's lifts** (the Mover's and the Scales' abilities) are taken from the chain grades (s4.outside_readings),
   where grade_chains.py already read them; the five cards it read there are read again here with the rest.
 
-Written: data/compare/deck-<model>.json ({model, metrics, played, layers}).
+Kept: s4.outside_readings, deck-<model> ({model, metrics, played, layers}).
 """
 
 from __future__ import annotations
 
-import json
 import time
 
 import numpy as np
-
-from thorp import paths
 
 NATURAL_CONTEXT = 1024  # the window the readings use, as a Thorp voyage's (1,024 pieces)
 
@@ -106,8 +103,9 @@ def read(name: str, log=print) -> dict:
     br = cards.bridge(inner, tok, deck)
     if br is not None:
         metrics.update({"stars/bridge/max_score": float(br.max()), "stars/bridge/best_layer": float(int(br.argmax()))})
-    cg = paths.data_dir() / "compare" / "chain-grades.json"
-    lg = (json.loads(cg.read_text())["models"].get(name) or {}).get("logic_test") or {} if cg.exists() else {}
+    from thorp.viable.s4_intelligence import readings
+
+    lg = (readings.chain_grades().get(name) or {}).get("logic_test") or {}
     for k in ("lift_one_hop", "gain_order", "gain", "lift"):
         if lg.get(k) is not None:
             metrics[f"tricks/logic_test/{k}"] = float(lg[k])
@@ -122,9 +120,7 @@ def read(name: str, log=print) -> dict:
         "attention_readable": bool(inner.attention_patterns(mx.array([[tok.eos_id] + tok.encode("A test.")]))),
         "stars_known": sorted(fleet.STARS),
     }  # fmt: skip
-    d = paths.data_dir() / "compare"
-    d.mkdir(parents=True, exist_ok=True)
-    (d / f"deck-{name.replace('/', '--')}.json").write_text(json.dumps(out, indent=1))
+    readings.put(f"deck-{name.replace('/', '--')}", out)
     log(f"{name}: {len(played)} of 16 cards played: {', '.join(played)} ({out['seconds']}s)")
     return out
 

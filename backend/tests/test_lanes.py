@@ -21,8 +21,7 @@ def _spec(specs, rel, name, **extra):
 def harbour(tmp_path):
     specs = tmp_path / "specs"
     specs.mkdir()
-    return {"root": tmp_path, "specs": specs, "queue": specs / "queue.txt", "done": specs / "queue-done.txt",
-            "state": tmp_path / "lanes.json"}  # fmt: skip
+    return {"root": tmp_path, "specs": specs, "queue": specs / "queue.txt", "done": specs / "queue-done.txt"}
 
 
 def _sail(h, lines, key=True, secs=0.3):
@@ -34,7 +33,7 @@ def _sail(h, lines, key=True, secs=0.3):
         events.append({"lane": ln.lane, "line": ln.text, "start": time.time()})
         return subprocess.Popen(["sleep", str(secs)])
 
-    lanes.run(queue=h["queue"], done=h["done"], root=h["root"], state_path=h["state"], poll_s=0.05,
+    lanes.run(queue=h["queue"], done=h["done"], root=h["root"], poll_s=0.05,
               key=lambda: key, outside=lambda: False, launch=launch, log=said.append)  # fmt: skip
     ends = {}
     for row in h["done"].read_text().splitlines() if h["done"].exists() else []:
@@ -111,22 +110,22 @@ def test_a_lane_waits_at_its_first_line(harbour):
     assert ln is None and "reads from big" in why  # "other" does not jump the queue
 
 
-def test_lanes_json_names_what_is_out(harbour):
+def test_s2_lanes_names_what_is_out(harbour):
     _spec(harbour["specs"], "m1", "m1")
     p = subprocess.Popen(["sleep", "5"])
     try:
-        lanes._write_state(harbour["state"], {"mac": {"line": lanes.parse("m1", harbour["specs"]), "proc": p, "since": "now"}, "vast": None})
-        st = lanes.state(harbour["state"])
+        lanes._write_state({"mac": {"line": lanes.parse("m1", harbour["specs"]), "proc": p, "since": "now"}, "vast": None})
+        st = lanes.state()
         assert st["mac"]["line"] == "m1" and st["vast"] is None
     finally:
         p.kill()
         p.wait()
-    assert lanes.state(harbour["state"])["mac"] is None  # its process gone: in port
+    assert lanes.state()["mac"] is None  # its process gone: in port
 
 
 def test_a_cmd_line_really_runs_from_the_root(harbour):
     harbour["queue"].write_text("cmd: echo docked > here.txt; exit 3\n")
-    lanes.run(queue=harbour["queue"], done=harbour["done"], root=harbour["root"], state_path=harbour["state"],
+    lanes.run(queue=harbour["queue"], done=harbour["done"], root=harbour["root"],
               poll_s=0.05, key=lambda: False, outside=lambda: False, log=lambda m: None)  # fmt: skip
     assert (harbour["root"] / "here.txt").read_text().strip() == "docked"
     assert harbour["done"].read_text().strip().endswith("cmd: echo docked > here.txt; exit 3 3")

@@ -17,7 +17,7 @@ runs. What the coordinator adds:
   goes on.
 - **The Mac lane** waits, as queue.sh did, while a `thorp run` or `thorp eval` started outside the queue is at
   sea (the helm, vsm.at_sea, is still taken by the voyage itself).
-- **What is out:** data/lanes.json names each lane's line, its process and since when (the dashboard and the
+- **What is out:** s2.lanes (Postgres) names each lane's line, its process and since when (the dashboard and the
   S2 lint read it). The queue file's edits are made under a lock (specs/queue.txt.lock).
 
 Run it in place of queue.sh (which now execs it): `uv run --project backend python -m
@@ -27,7 +27,6 @@ thorp.viable.s2_coordination.lanes`. Log: data/runs/queue.out, as before.
 from __future__ import annotations
 
 import contextlib
-import json
 import os
 import subprocess
 import sys
@@ -35,7 +34,7 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from thorp import paths
+from thorp import paths, store
 
 LANES = ("mac", "vast")
 
@@ -205,25 +204,24 @@ def command(ln: Line) -> list[str] | str:
     return ["uv", "run", "--project", "backend", "thorp", "run", spec]
 
 
-def _write_state(state_path: Path, running: dict) -> None:
-    out = {
-        lane: ({"line": r["line"].text, "pid": r["proc"].pid, "since": r["since"]} if r else None)
-        for lane, r in running.items()
-    }
-    with contextlib.suppress(Exception):
-        state_path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = state_path.with_name(state_path.name + ".tmp")
-        tmp.write_text(json.dumps(out, indent=1), encoding="utf-8")
-        tmp.replace(state_path)
+def _write_state(running: dict) -> None:
+    """What each lane has out, recorded in s2.lanes (the dashboard and the S2 lint read it from there)."""
+    from thorp import store
+    from thorp.viable.records import Lane
+
+    with store.session() as s:
+        for lane, r in running.items():
+            s.merge(Lane(lane=lane, line=r["line"].text if r else None, pid=r["proc"].pid if r else None,
+                         since=r["since"] if r else None))  # fmt: skip
 
 
-def state(state_path: Path | None = None) -> dict:
-    """What each lane has out now (data/lanes.json), only the lanes whose process is alive."""
-    p = state_path or paths.data_dir() / "lanes.json"
-    try:
-        d = json.loads(p.read_text(encoding="utf-8"))
-    except Exception:  # noqa: BLE001
-        return {lane: None for lane in LANES}
+def state() -> dict:
+    """What each lane has out now (s2.lanes), only the lanes whose process is alive."""
+    from thorp import store
+    from thorp.viable.records import Lane
+
+    with store.session() as s:
+        d = {r.lane: {"line": r.line, "pid": r.pid, "since": r.since} for r in s.query(Lane) if r.line}
     out = {}
     for lane in LANES:
         r = d.get(lane)
@@ -236,14 +234,13 @@ def state(state_path: Path | None = None) -> dict:
     return out
 
 
-def run(queue: Path | None = None, done: Path | None = None, root: Path | None = None, state_path: Path | None = None,
+def run(queue: Path | None = None, done: Path | None = None, root: Path | None = None,
         poll_s: float = 30.0, key=has_key, outside=outside_voyage, launch=None, log=None, until_empty: bool = True) -> None:  # fmt: skip
     """The coordinator's loop: start each idle lane's next line, record each line that ends, until the queue is
     empty and both lanes are in port."""
     queue = queue or paths.resolve("specs/queue.txt")
     done = done or paths.resolve("specs/queue-done.txt")
     root = root or paths.ROOT
-    state_path = state_path or paths.data_dir() / "lanes.json"
     specs = queue.parent
 
     def say(msg: str) -> None:
@@ -306,7 +303,10 @@ def run(queue: Path | None = None, done: Path | None = None, root: Path | None =
             running[lane] = {"line": ln, "proc": p, "since": time.strftime("%Y-%m-%dT%H:%M:%S")}
             at_sea[lane] = ln
             lines = [x for x in lines if x is not ln]
-        _write_state(state_path, running)
+        try:
+            _write_state(running)
+        except store.StoreDown as e:  # said in the queue's log, every pass, until the store is back; the lanes sail on
+            say(f"S2: what is out could not be recorded: {e}")
         idle = all(r is None for r in running.values())
         left = [x for x in (parse(t, specs) for t in pending(queue)) if x.lane == "mac" or have_key]
         if until_empty and idle and not left:

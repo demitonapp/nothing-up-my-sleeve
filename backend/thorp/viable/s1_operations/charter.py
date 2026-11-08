@@ -30,6 +30,7 @@ The voyage, in order, each step owned by its system:
 
 from __future__ import annotations
 
+import json
 import os
 import shlex
 import shutil
@@ -40,7 +41,7 @@ from pathlib import Path
 
 import yaml
 
-from thorp import paths
+from thorp import paths, store
 from thorp.ledger import Ledger
 from thorp.viable.s1_operations.vast import NoKey, Vast, api_key, http_transport
 from thorp.viable.s2_coordination import charter as s2
@@ -56,7 +57,7 @@ PULL_EVERY_MIN = 20
 # and above all the secrets (the Vast.ai key)
 NOT_CARRIED = {
     "checkpoints", "runs", "compare", "loop", "postgres", "secrets", "shards", "tokenisers", "charter",
-    "acquisition", "helm.lock", "helm.json", "gate-log.jsonl", "postgres.log", "postgres-init.log",
+    "acquisition", "helm.lock", "helm.json", "gate-log.jsonl", "postgres.log", "postgres-init.log", "lanes.json", "lanes.lock",
 }  # fmt: skip
 
 
@@ -143,7 +144,8 @@ class Box:
         # One backgrounded command with all three of its streams redirected: `cd X && cmd > /dev/null &` backgrounds the
         # whole && list as a subshell whose stdout is still ssh's, so ssh stayed open for the whole voyage (2026-11-08, P1:
         # the charter never reached its poll loop, so no mid-run pulls and no overrun deadline).
-        self.sh(f"cd {REMOTE}; THORP_BACKEND=torch THORP_DEVICE=cuda nohup sh -c {shlex.quote(inner)} > /dev/null 2>&1 < /dev/null &", timeout=120)
+        papers = f"{REMOTE}/data/charter/{rid}.papers.json"  # the S5 state its gate reads (thorp/store.py)
+        self.sh(f"cd {REMOTE}; THORP_BACKEND=torch THORP_DEVICE=cuda THORP_PAPERS={papers} nohup sh -c {shlex.quote(inner)} > /dev/null 2>&1 < /dev/null &", timeout=120)
 
     def finished(self, rid: str) -> int | None:
         """The voyage's exit status once it has come in, else None."""
@@ -305,6 +307,9 @@ def bring_home(box, rid: str, start: int, rec: Ledger, hire: dict, commit: str) 
     box.get(f"data/checkpoints/{rid}/", train.checkpoint_root(rid))
     box.get(f"data/runs/{rid}.log", paths.runs_dir() / f"{rid}.box.log")
     box.get(f"data/charter/{rid}.out", paths.data_dir() / "charter" / rid / "box.out")
+    gate_log = paths.data_dir() / "charter" / rid / "box-gate-log.jsonl"
+    if box.get(f"data/charter/{rid}.papers.gate-log.jsonl", gate_log):  # the box's gate decisions, into s3.gate_decisions
+        store.fold_gate_log(gate_log, source=f"box papers {rid}")
     led = paths.data_dir() / "charter" / rid / "box-ledger.sqlite"
     if not box.get("ledger.sqlite", led):
         return {}
@@ -315,6 +320,20 @@ def bring_home(box, rid: str, start: int, rec: Ledger, hire: dict, commit: str) 
                              hardware=f"{_box_hardware(led, rid)} · vast.ai instance {hire['instance']} at ${hire['dph']:.3f}/h")  # fmt: skip
     except LookupError:
         return {}
+
+
+def _register_home(rec: Ledger, rid: str, log) -> None:
+    """The voyage registered with its ship, at home (aboard there is no store to register it in)."""
+    from thorp import fleet
+
+    row = rec.get_run(rid)
+    if not row:
+        return
+    try:
+        ship = fleet.ship_of_run(row)
+        log(f"charter: {row.get('name')} registered as a voyage of {ship.name} ({ship.key})")
+    except Exception as e:  # noqa: BLE001  (a ship not registered never costs a voyage; said, not hidden)
+        log(f"charter: {row.get('name')} not registered with its ship: {e!r}")
 
 
 def _box_hardware(led: Path, rid: str) -> str:
@@ -374,7 +393,8 @@ def sail(spec_path: str, gpu: str | None = None, vast=None, resolver=None, box_f
             box.put(st, sorted(f.name for f in st.glob("*.sqlite") if f.name != "ledger.sqlite"), "data")
             box.put(st, ["ledger.sqlite"])
             (st / f"{rid}.yaml").write_text(yaml.safe_dump(spec, sort_keys=False, allow_unicode=True))
-            box.put(st, [f"{rid}.yaml"], "data/charter")
+            (st / f"{rid}.papers.json").write_text(json.dumps(store.papers_for_box(), ensure_ascii=False, indent=1))
+            box.put(st, [f"{rid}.yaml", f"{rid}.papers.json"], "data/charter")
             box.sync_env()
             box.launch(rid)
             log(f"charter: {spec.get('name')} is at sea on instance {instance}")
@@ -414,6 +434,7 @@ def sail(spec_path: str, gpu: str | None = None, vast=None, resolver=None, box_f
                     if attempt == 2:
                         raise
                     sleep(30)
+            _register_home(rec, rid, log)
             if status == "home" and (rec.get_run(rid) or {}).get("status") != "finished":
                 status = "came in unfinished"  # the box's voyage stopped short (its checkpoint is home: sail again)
         finally:

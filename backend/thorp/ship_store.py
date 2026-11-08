@@ -71,7 +71,7 @@ def reload() -> None:
     _sizes.cache_clear()
 
 
-def set_goals(preset: str, *, role: str | None = None, scored: str | None = None, metrics: list | None = None) -> dict:
+def set_goals(preset: str, *, name: str | None = None, role: str | None = None, scored: str | None = None, metrics: list | None = None) -> dict:
     """A size's goals changed in `s1.sizes` (Justin decides them; DECISIONS.md records each change): what it is for,
     how it is judged and the metrics that judge it ([[name, what it measures, "live" | "to come"], ...]). Returns
     the row as it now stands."""
@@ -80,6 +80,8 @@ def set_goals(preset: str, *, role: str | None = None, scored: str | None = None
         row = s.get(Size, preset)
         if row is None:
             raise KeyError(f"no size {preset!r}")
+        if name is not None:  # the size's name gives its page's address (server.py CLASS_RENAMES keeps the old ones)
+            row.name = name
         if role is not None:
             row.role = role
         if scored is not None:

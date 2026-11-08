@@ -25,7 +25,7 @@ let currentRung = null;
 const slugOf = r => r.name.toLowerCase().replace(/^the\s+/, '').replace(/[^a-z0-9]+/g, '-');
 // classes renamed (old address name -> new; server.py CLASS_RENAMES): either name opens the size,
 // and the address is rewritten to the size's current name
-const CLASS_RENAMES = { seedling: 'keel', proxy: 'pilot', bettor: 'explorer', summit: 'trader' };
+const CLASS_RENAMES = { seedling: 'pan', keel: 'pan', proxy: 'augustus', pilot: 'augustus', bettor: 'explorer', summit: 'trader' };  // 8 Nov: the 300k Pan, the 1m Augustus
 const CLASS_ALIASES = Object.fromEntries(Object.entries(CLASS_RENAMES).flatMap(([a, b]) => [[a, b], [b, a]]));
 const rungFor = key => ladderData && ladderData.rungs.find(r => slugOf(r) === key || r.preset === key || slugOf(r) === CLASS_ALIASES[key]);
 // ---- Navigation (UI.md, "Navigation"). Three ways in, each a section of the header:
@@ -2847,7 +2847,7 @@ setInterval(async () => { if (refreshing) return; refreshing = true; try { await
 // strip has a row per chain, five cells (keel to 50m), lit cells filled and the next cell filled by its share of the mark.
 const CHAIN_LABEL = { origin_test: 'the Origin', energy_test: 'energy', mendeleev_gaps: "Mendeleev's gaps", recurrence_test: 'the eternal return' };
 const CHAIN_SHORT = { origin_test: 'Origin', energy_test: 'energy', mendeleev_gaps: 'Mendeleev', recurrence_test: 'return' };
-const RUNG_CLASS = ['keel', 'pilot', 'speller', 'stylist', '50m'];
+const RUNG_CLASS = ['pan', 'augustus', 'speller', 'stylist', '50m'];
 function climbBar(c, max = 5) {
   if (c == null) return '<span class="s">–</span>';
   const pct = Math.max(0, Math.min(100, 100 * c / max));

@@ -241,6 +241,49 @@ def _by_voyage(uses: list[dict]) -> dict[str, dict]:
     }
 
 
+def _ids(p: Path, rel: str, rows: list[dict], resolved: dict[str, list[str]]) -> list[str]:
+    """The manifest ids a list names: by reference (`local:<id>`), else the title-matched, fetched ones."""
+    refs = [r["text"] for r in rows if ":" in (r.get("text") or "")]
+    if refs and len(refs) == len(rows):
+        from thorp.sources import base
+
+        ids = []
+        for ref in refs:
+            key, ident = ref.split(":", 1)
+            if key == "local":
+                ids.append(ident)
+            elif key in base._sources():
+                ids.append(base._sources()[key].prefix + ident)
+        return ids
+    ids = resolved.get(rel)
+    if ids is None:  # never fetched: match its titles against the catalogue, offline
+        from thorp.sources.gutenberg import resolve_list
+
+        ids = [f"pg{r.chosen}" for r in resolve_list(p) if r.chosen]
+    return ids
+
+
+COLLECTION_EXTRA = {"lists/ogden-v0.1.csv": "Ogden v0.1", "lists/ogden-v0.2.csv": "Ogden v0.2"}  # fitout corpora, as collections
+
+
+def collections() -> list[dict]:
+    """The named collections a book may belong to, for the Library's filters: every training shelf and every
+    held-out deck (Renaissance, Greek, Islamic, the nursery, the legal shelf, the stores...) and the two Ogden
+    corpora, each with its book ids. Light: no trigram readings, no voyages (payload() has those)."""
+    resolved = _resolved()
+    lists = paths.resolve("lists")
+    out = []
+    for p in sorted(lists.glob("*.csv")) + sorted((lists / "stores").glob("*.csv")):
+        rel = str(p.relative_to(lists.parent))
+        name, kind, about = ABOUT.get(rel, (p.stem.replace("-", " "), _kind(rel), ""))
+        if rel in COLLECTION_EXTRA:
+            name, kind, about = COLLECTION_EXTRA[rel], "training", "A fitout's corpus."
+        if kind not in ("training", "deck"):
+            continue
+        out.append({"path": rel, "name": name, "kind": kind, "about": about, "book_ids": sorted(set(_ids(p, rel, _rows(p), resolved)))})
+    return out
+
+
 def payload() -> list[dict]:
     from thorp import manifest
 
@@ -254,23 +297,7 @@ def payload() -> list[dict]:
         if p.name in ("overrides.csv",):
             continue
         rows = _rows(p)
-        refs = [r["text"] for r in rows if ":" in (r.get("text") or "")]
-        if refs and len(refs) == len(rows):
-            from thorp.sources import base
-
-            ids = []
-            for ref in refs:
-                key, ident = ref.split(":", 1)
-                if key == "local":
-                    ids.append(ident)
-                elif key in base._sources():
-                    ids.append(base._sources()[key].prefix + ident)
-        else:
-            ids = resolved.get(rel)
-            if ids is None:  # never fetched: match its titles against the catalogue, offline
-                from thorp.sources.gutenberg import resolve_list
-
-                ids = [f"pg{r.chosen}" for r in resolve_list(p) if r.chosen]
+        ids = _ids(p, rel, rows, resolved)
         books = {
             i: b for i in ids if (b := manifest.get(i)) is not None
         }  # the rest: not fetched yet

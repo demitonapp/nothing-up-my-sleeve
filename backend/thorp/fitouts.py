@@ -8,6 +8,8 @@ fleet.FITOUTS:
 
     {"key", "name", "aim", "positions": "learned"|"rope", "tack": {...}|null,
      "stages": [{"phase": "pretraining"|"post-training", "name", "shelf": "lists/...csv",
+                 "compose": {...}|null (the stage's books as declared weights and filters: thorp/selection.py;
+                             `thorp select compose` writes the shelf from it),
                  "tokens": int|null (null: the whole shelf), "select": "all"|"random"|"repeat"|"frontier",
                  "passes", "lr": float|null, "tack": {...}|null, "purpose"}]}
 
@@ -48,6 +50,18 @@ def _key(name: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")[:48] or "fitout"
 
 
+def _compose(stage: dict, i: int) -> dict | None:
+    """The stage's declared selection of books (thorp/selection.py), in full form, or None."""
+    if not stage.get("compose"):
+        return None
+    from thorp import selection
+
+    try:
+        return selection.validate(stage["compose"])
+    except selection.SelectionError as e:
+        raise ValueError(f"stage {i + 1}: {e}") from e
+
+
 def validate(d: dict) -> dict:
     out = {k: d.get(k) for k in ("key", "name", "aim", "positions", "tack", "opt_in")}
     out["opt_in"] = (
@@ -59,7 +73,7 @@ def validate(d: dict) -> dict:
     stages = []
     for i, s in enumerate(d.get("stages") or []):
         shelf = s.get("shelf") or ""
-        if not paths.resolve(shelf).exists():
+        if not paths.resolve(shelf).exists() and not s.get("compose"):  # a composed shelf is written by `thorp select compose`
             raise ValueError(f"stage {i + 1}: no shelf {shelf!r}")
         phase = s.get("phase", "pretraining")
         if phase not in PHASES:
@@ -78,6 +92,7 @@ def validate(d: dict) -> dict:
                 "lr": float(s["lr"]) if s.get("lr") else None,
                 "tack": s.get("tack") or None,
                 "purpose": s.get("purpose") or "",
+                "compose": _compose(s, i),
             }
         )
     if not any(s["phase"] == "pretraining" for s in stages):

@@ -2921,6 +2921,7 @@ function drawLbRuns() {
 const SHELF_KINDS = [['training', 'Training libraries', 'what the ships read'], ['deck', 'Decks', 'the books the ships are scored on, never read'],
   ['probe', 'Probes', 'small lists the instruments read'], ['other', 'Other', 'lists kept for a purpose of their own'], ['draft', 'Drafts', 'lists being drawn up, not yet used']];
 async function loadShelves() {
+  loadBrowse();
   let d; try { d = await get('/api/library'); } catch (e) { return; }
   if (!d.shelves) {
     drawFitouts(d);
@@ -3554,12 +3555,163 @@ function drawFitouts(d) {
       ${voyages(f)}</tr>`).join('');
   const sel = fs.find(f => f.key === fitoutSel);
   el.innerHTML = `<div class="scroll"><table class="clickable fittable"><thead><tr><th>fitout</th><th title="curated: written by hand in thorp/fleet.py FITOUTS; saved: made in the fitout builder (data/fitouts/), built for a class when queued">kind</th><th>class</th><th>aim</th><th title="rope: the queries and keys rotated, no position table; learned: a position table">positions</th><th>vocabulary</th><th title="how the tack is set: which guesses weigh more, and by how much">tack</th><th title="its stages in order, one voyage; tokens are per pass × passes">pretraining</th><th title="each stage a voyage seeded from the one before">post-training</th><th>tokens in all</th><th>libraries</th><th>voyages</th></tr></thead><tbody>${rows}</tbody></table></div>
-    <div class="k mt">${esc(sel.name)} <span class="s">its stages, each a block sized by its tokens, its library one click away below</span></div>${fitoutCard(sel)}`;
+    <div class="k mt">${esc(sel.name)} <span class="s">its stages, each a block sized by its tokens, its library one click away below</span></div>${fitoutCard(sel)}
+    <div id="fitselection" class="mt"><div class="${emptyCls()}">reading the selection…</div></div>`;
+  loadSelection(sel.key);
   el.querySelectorAll('tr[data-fit]').forEach(tr => tr.onclick = e => { if (e.target.closest('a')) return; fitoutSel = tr.dataset.fit; fitoutKey = null; drawFitouts(fitoutData); });
   el.querySelectorAll('a.foshelf').forEach(a => a.onclick = e => {
     e.preventDefault(); shelfOpen = a.dataset.shelf; drawShelves();
     const tr = document.querySelector(`#shelfgroups tr[data-shelf="${CSS.escape(a.dataset.shelf)}"]`); if (tr) tr.scrollIntoView({ block: 'center', behavior: 'smooth' });
   });
+}
+
+
+// ---- Browse the library (#/library; /api/library_browse): cards for kind, date, language, collection, voice, source, and
+// Ogden-ness, each a filter. Within a card the picks are "or", across cards "and"; every card's counts are those of the
+// books the OTHER filters leave, so a card shows what a click would give. Justin, 8 November: "the library ui should be
+// structured by filters and cards for all the kind/date/language/collection (things like renaissance and mayflower collections)".
+let BR = null;
+const BF = { kind: new Set(), language: new Set(), collection: new Set(), voice: new Set(), source: new Set(), period: new Set(), start: '', end: '', ogden: '', sort: 'words', more: 200, show: false };
+const BDIMS = [['kind', 'Kind', 'what the book is: the first rule that matches (hover for the rule)'], ['period', 'Date', "the writer's year: published, else birth + 40, else death - 25 (hover a card)"], ['language', 'Language', 'the language of the text'],
+  ['collection', 'Collection', 'the named shelves and decks a book belongs to; a book may be in several'], ['voice', 'Voice', 'who speaks: read from the credit, so the Church is undercounted'], ['source', 'Source', 'the collection the text was fetched from']];
+const bPeriod = y => y == null ? 'undated' : y < 1500 ? 'before 1500' : `${Math.floor(y / 50) * 50}–${Math.floor(y / 50) * 50 + 49}`;
+const bVals = (b, dim) => dim === 'kind' ? [b[5]] : dim === 'language' ? [b[3]] : dim === 'voice' ? [b[6]] : dim === 'source' ? [b[4]] : dim === 'period' ? [bPeriod(b[7])] : (b[11].length ? b[11].map(i => BR.collections[i].name) : []);
+function bPass(b, skip) {
+  for (const dim of ['kind', 'language', 'voice', 'source', 'period', 'collection']) {
+    if (dim === skip || !BF[dim].size) continue;
+    if (!bVals(b, dim).some(v => BF[dim].has(v))) return false;
+  }
+  if (skip !== 'period') {
+    const s = BF.start === '' ? null : +BF.start, e = BF.end === '' ? null : +BF.end;
+    if (s != null || e != null) { if (b[7] == null || (s != null && b[7] < s) || (e != null && b[7] > e)) return false; }
+  }
+  if (BF.ogden !== '' && !(b[9] != null && b[9] >= +BF.ogden / 100)) return false;
+  return true;
+}
+let browseBusy = false;
+async function loadBrowse() {
+  const el = document.getElementById('browse'); if (!el || BR || browseBusy) return;
+  browseBusy = true;
+  let d; try { d = await get('/api/library_browse'); } catch (e) { browseBusy = false; return; }
+  if (!d.books) { el.innerHTML = `<div class="${emptyCls()}">${d.error ? 'the library could not be read: ' + esc(d.error) : 'reading the library (a few seconds)…'}</div>`; if (!d.error) setTimeout(() => { browseBusy = false; if (page === 'shelves') loadBrowse(); }, 4000); else browseBusy = false; return; }
+  BR = d; browseBusy = false; drawBrowse();
+}
+function drawBrowse() {
+  const el = document.getElementById('browse'); if (!el || !BR) return;
+  const all = BR.books, now = all.filter(b => bPass(b));
+  const sum = bs => ({ n: bs.length, w: bs.reduce((a, b) => a + b[10], 0) });
+  const tot = sum(all), cur = sum(now);
+  const order = { kind: Object.keys(BR.kinds), voice: Object.keys(BR.voices) };
+  const periodOrder = k => k === 'undated' ? 9999 : k === 'before 1500' ? 0 : parseInt(k);
+  const cards = BDIMS.map(([dim, label, note]) => {
+    const c = {};
+    for (const b of all) if (bPass(b, dim)) for (const v of bVals(b, dim)) { const x = c[v] || (c[v] = { n: 0, w: 0 }); x.n++; x.w += b[10]; }
+    for (const v of BF[dim]) c[v] = c[v] || { n: 0, w: 0 };
+    let ks = Object.keys(c);
+    ks = dim === 'period' ? ks.sort((a, b) => periodOrder(a) - periodOrder(b)) : dim === 'collection' ? ks.sort((a, b) => c[b].n - c[a].n) : order[dim] ? ks.sort((a, b) => order[dim].indexOf(a) - order[dim].indexOf(b)) : ks.sort((a, b) => c[b].w - c[a].w);
+    const max = Math.max(...ks.map(k => c[k].w), 1);
+    const tip = k => dim === 'kind' ? BR.kinds[k] : dim === 'voice' ? BR.voices[k] : dim === 'collection' ? (BR.collections.find(x => x.name === k) || {}).about : dim === 'period' ? (k === 'undated' ? 'no writer years in the catalogue' : '') : '';
+    return `<div class="bfacet" data-dim="${dim}"><div class="k">${label} <span class="s">${esc(note)}</span></div><div class="bcards">${ks.map(k => `<button type="button" class="bcard${BF[dim].has(k) ? ' on' : ''}${c[k].n ? '' : ' none'}" data-dim="${dim}" data-val="${esc(k)}" title="${esc(tip(k) || '')}"><span class="bname">${esc(k)}</span><span class="bnum">${c[k].n}<span class="s"> · ${big(c[k].w)}</span></span><span class="bbar"><i style="width:${(100 * c[k].w / max).toFixed(0)}%"></i></span></button>`).join('')}</div>${dim === 'period' ? `<div class="bshow"><label class="s">from <input class="bnum-in" data-k="start" type="number" placeholder="year" value="${esc(BF.start)}"></label> <label class="s">to <input class="bnum-in" data-k="end" type="number" placeholder="year" value="${esc(BF.end)}"></label> <span class="s">undated books fall outside any bounds</span></div>` : ''}${dim === 'source' ? `<div class="bshow"><label class="s">Ogden-ness at least <input class="bnum-in" data-k="ogden" type="number" min="0" max="100" placeholder="%" value="${esc(BF.ogden)}">%</label> <span class="s">unscored books fall short of a bar</span></div>` : ''}</div>`;
+  }).join('');
+  const chips = BDIMS.flatMap(([dim, label]) => [...BF[dim]].map(v => `<button type="button" class="selchip bchip" data-dim="${dim}" data-val="${esc(v)}">${label}: ${esc(v)} ×</button>`)).concat(BF.start !== '' || BF.end !== '' ? [`<button type="button" class="selchip bchip" data-clear="years">years ${esc(BF.start || '…')} to ${esc(BF.end || '…')} ×</button>`] : [], BF.ogden !== '' ? [`<button type="button" class="selchip bchip" data-clear="ogden">Ogden-ness ≥ ${esc(BF.ogden)}% ×</button>`] : []);
+  const rows = now.slice().sort(BF.sort === 'year' ? (a, b) => (a[7] ?? 9999) - (b[7] ?? 9999) : BF.sort === 'title' ? (a, b) => a[1].localeCompare(b[1]) : BF.sort === 'ogden' ? (a, b) => (b[9] ?? -1) - (a[9] ?? -1) : (a, b) => b[10] - a[10]);
+  const spec = { languages: Object.fromEntries([...(BF.language.size ? BF.language : new Set(now.map(b => b[3])))].sort().map(l => [l, +(sum(now.filter(b => b[3] === l)).w / (cur.w || 1)).toFixed(3)])),
+    ...(BF.ogden !== '' ? { ogden: { min: +BF.ogden / 100 } } : {}), ...((BF.start !== '' || BF.end !== '') ? { period: { start: BF.start === '' ? null : +BF.start, end: BF.end === '' ? null : +BF.end, undated: 'exclude' } } : {}),
+    ...(BF.kind.size ? { kinds: { include: [...BF.kind] } } : {}), ...(BF.voice.size ? { voices: { include: [...BF.voice] } } : {}), ...(BF.source.size ? { sources: { include: [...BF.source] } } : {}) };
+  el.innerHTML = `<div class="bsummary"><b>${cur.n.toLocaleString()}</b> of ${tot.n.toLocaleString()} books · <b>${big(cur.w)}</b> of ${big(tot.w)} words${chips.length ? ' <button type="button" class="selchip bclear">clear all</button>' : ''}</div>
+    <div class="selchips">${chips.join(' ')}</div><div class="bfacets">${cards}</div>
+    <div class="k mt">The books <span class="s">sorted by <select data-k="sort" class="${selectCls('')}"><option value="words">length</option><option value="year">year</option><option value="title">title</option><option value="ogden">Ogden-ness</option></select> · hover a kind or voice for the rule that placed it</span></div>
+    <div class="scroll"><table class="selbooks"><thead><tr><th>book</th><th>writer</th><th>lang</th><th>year</th><th>kind</th><th>voice</th><th>source</th><th>Ogden</th><th>words</th><th>collections</th></tr></thead><tbody>${rows.slice(0, BF.more).map(b => `<tr><td title="${esc(b[1])}"><a href="#" data-book="${esc(b[0])}">${esc(cut(b[1], 56))}</a> <span class="s mono">${esc(b[0])}</span></td><td>${esc(cut(b[2], 26))}</td><td>${esc(b[3])}</td><td title="${esc(b[8])}">${b[7] ?? '–'} <span class="s">${esc(b[8])}</span></td><td title="${esc(b[12])}">${esc(b[5])}</td><td title="${esc(b[13])}">${esc(b[6])}</td><td>${esc(b[4])}</td><td>${b[9] == null ? '–' : Math.round(100 * b[9]) + '%'}</td><td>${big(b[10])}</td><td class="s">${esc(cut(b[11].map(i => BR.collections[i].name).join(', '), 60))}</td></tr>`).join('')}</tbody></table></div>
+    ${rows.length > BF.more ? `<button type="button" class="selchip bmore">show 200 more (${rows.length - BF.more} left)</button>` : ''}
+    <details class="mt"${BF.show ? ' open' : ''}><summary>This view as a fitout's selection <span class="s">the same filters as declared weights and filters (thorp/selection.py); the shares are this view's, to be set by hand</span></summary><pre class="bspec">${esc(JSON.stringify(spec, null, 1))}</pre></details>
+    <div class="s mt">Library facts ${esc(BR.fingerprint)}: ${tot.n.toLocaleString()} books; the year is an estimate (no catalogue we hold gives a publication date), the kind and voice are read from subjects, bookshelves and credits; each carries its rule.</div>`;
+  el.querySelector('select[data-k="sort"]').value = BF.sort;
+  el.onclick = e => {
+    const c = e.target.closest('[data-dim]'); if (c && c.dataset.val != null) { const s = BF[c.dataset.dim]; s.has(c.dataset.val) ? s.delete(c.dataset.val) : s.add(c.dataset.val); BF.more = 200; return drawBrowse(); }
+    if (e.target.closest('.bclear')) { for (const [d] of BDIMS) BF[d].clear(); BF.start = BF.end = BF.ogden = ''; return drawBrowse(); }
+    const x = e.target.closest('[data-clear]'); if (x) { if (x.dataset.clear === 'years') BF.start = BF.end = ''; else BF.ogden = ''; return drawBrowse(); }
+    if (e.target.closest('.bmore')) { BF.more += 200; return drawBrowse(); }
+    const a = e.target.closest('a[data-book]'); if (a) { e.preventDefault(); openBook(a.dataset.book); }
+  };
+  el.onchange = e => { const k = e.target.dataset.k; if (!k) return; BF[k] = e.target.value; BF.more = 200; BF.show = !!el.querySelector('details[open]'); drawBrowse(); };
+}
+
+
+// ---- a fitout's books: the selection it declares, and what it yields (#/shelves, Fitouts; /api/selection?fitout=)
+// Weights and filters on language, Ogden-ness, period, kind, voice and source (thorp/selection.py), the funnel of rules
+// that left its books, the S3 gate's library prechecks on the list, and counts of the books by language, kind, voice,
+// source and period, every one with the rule that placed it (thorp/library_facts.py). Justin, 8 November: "weights
+// ... by language ... ogdenish ... a time period ... filters for content type"; "sources ... will have different biases".
+let selSeq = 0;
+async function loadSelection(key) {
+  const el = document.getElementById('fitselection'); if (!el) return;
+  const seq = ++selSeq;
+  try {
+    const r = await fetch('/api/selection?fitout=' + encodeURIComponent(key));
+    const d = await r.json(); if (seq !== selSeq) return;
+    if (!r.ok) throw new Error(d.error || r.statusText);
+    drawSelection(el, d);
+    el.querySelectorAll('a[data-book]').forEach(a => a.onclick = e => { e.preventDefault(); openBook(a.dataset.book); });
+  } catch (e) { if (seq === selSeq) el.innerHTML = `<div class="${emptyCls()}">the selection could not be read: ${esc(e.message || e)}</div>`; }
+}
+function selCounts(title, note, m, order) {
+  const ks = Object.keys(m || {}); if (!ks.length) return '';
+  if (order) ks.sort(order);
+  const max = Math.max(...ks.map(k => m[k].share), 0.001);
+  return `<div class="selcount"><div class="k">${esc(title)} <span class="s">${esc(note)}</span></div>${ks.map(k => `<div class="selrow"><span class="selkey" title="${esc(k)}">${esc(k)}</span><span class="selbar"><i style="width:${(100 * m[k].share / max).toFixed(1)}%"></i></span><span class="selnum">${(100 * m[k].share).toFixed(1)}% <span class="s">${m[k].books} books · ${big(m[k].words)} words</span></span></div>`).join('')}</div>`;
+}
+function selDeclared(c) {
+  if (!c) return '<div class="s">its library is listed by hand: no weights or filters are declared, so the counts below are of the books as listed</div>';
+  const chip = (a, b) => `<span class="selchip"><span class="s">${esc(a)}</span> ${esc(b)}</span>`;
+  const inc = (n, v) => (v.include.length || v.exclude.length) ? chip(n, [v.include.length ? 'only ' + v.include.join(', ') : '', v.exclude.length ? 'not ' + v.exclude.join(', ') : ''].filter(Boolean).join('; ')) : '';
+  const p = c.period || {};
+  return [
+    chip('languages', Object.entries(c.languages || {}).map(([k, v]) => `${k} ${v}`).join(', ')),
+    c.as_of ? chip('library as of', c.as_of) : '',
+    c.ogden && c.ogden.min != null ? chip('Ogden-ness', `at least ${Math.round(100 * c.ogden.min)}%${c.ogden.scored_by ? ' (scored by ' + c.ogden.scored_by.join(', ') + ')' : ''}`) : '',
+    (p.start != null || p.end != null) ? chip('period', `${p.start ?? '…'} to ${p.end ?? '…'}; undated ${p.undated}d`) : chip('period', 'any (the gate: no name dead after 1955)'),
+    inc('kinds', c.kinds), inc('voices', c.voices), inc('sources', c.sources), inc('shelves', c.shelves),
+    ...Object.entries(c.weights || {}).map(([k, v]) => chip('weights by ' + k, Object.entries(v).map(([a, b]) => `${a} ${b}`).join(', '))),
+    c.dedupe ? chip('one copy a title', 'keep ' + (c.dedupe.keep || 'ogden')) : '',
+    ...(c.carry || []).map(l => chip('carries', l)),
+    ...(c.strike || []).map(x => chip('strikes', `${x.title || x.book} (${x.why || ''})`)),
+    ...(c.append || []).map(x => chip('appends', `${x.list} (${x.why || ''})`)),
+    c.words ? chip('budget', big(c.words) + ' words') : '',
+  ].filter(Boolean).join(' ');
+}
+function drawSelection(el, d) {
+  const rules = d.rules || {};
+  const out = d.stages.map(st => {
+    const c = st.composition;
+    const funnel = c ? `<div class="k mt">The rules, in order <span class="s">books left after each; composed ${esc(String(c.composed_at).slice(0, 16).replace('T', ' '))} from facts ${esc(c.facts_fingerprint)}, selection ${esc(c.spec_hash)}, list ${esc(c.list_path)} (sha1 ${esc(c.list_sha1.slice(0, 10))})</span></div>
+      <table class="selfunnel"><tbody>${(c.funnel || []).map(([rule, n, what]) => `<tr><td class="num">${n}</td><td><b>${esc(rule)}</b> <span class="s">${esc(what)}</span></td></tr>`).join('')}</tbody></table>
+      <div class="selchecks">${(c.prechecks || []).map(k => `<span class="${pillCls(k.passed ? 'green' : 'red')}" title="${esc(JSON.stringify(k.evidence))}">${k.passed ? 'pass' : 'FAIL'} ${esc(k.name)}</span>`).join(' ')}
+      ${c.diff ? `<span class="${pillCls(c.diff.same_books ? 'green' : 'amber')}">${esc(c.against)}: ${c.diff.same_books ? 'the same books' : `${c.diff.only_composed.length} only composed, ${c.diff.only_list.length} only listed`}${c.diff.same_order ? ', same order' : ''}</span>` : ''}</div>
+      ${(c.notes || []).map(n => `<div class="s">note: ${esc(n)}</div>`).join('')}` : (st.compose ? '<div class="s mt">declared, not composed yet: <span class="mono">thorp select compose</span></div>' : '');
+    const bk = (st.books_list || []);
+    return `<div class="selstage"><div class="k">Stage ${st.ordinal}: ${esc(st.name)} <span class="s">${st.books} books, ${big(st.words)} words by the library's count (${st.found} found in the facts), ${st.passes || 1} pass${(st.passes || 1) === 1 ? '' : 'es'}</span></div>
+      <div class="selchips">${selDeclared(st.compose)}</div>${funnel}
+      <div class="selgrid">
+        ${selCounts('By language', 'share of the words', st.by_language)}
+        ${selCounts('By kind', 'share of the words; a kind is the first rule that matches (below)', st.by_kind)}
+        ${selCounts('By voice', 'who speaks: the Church, the press, a body, Thorp itself, any other writer', st.by_voice)}
+        ${selCounts('By source', 'the collection the text came from', st.by_source)}
+        ${selCounts('By period', "the writer's year (floruit); undated has none", st.by_period)}
+        ${selCounts('How the year was found', 'published: recorded when fetched; floruit: birth + 40; late: death - 25', st.by_year_basis)}
+      </div>
+      <details class="mt"><summary>${bk.length} books with the rule that placed each${st.books > bk.length ? ` (the first ${bk.length} of ${st.books})` : ''}</summary>
+        <div class="scroll"><table class="selbooks"><thead><tr><th>book</th><th>writer</th><th>lang</th><th>year</th><th>kind</th><th>voice</th><th>Ogden</th><th>words</th></tr></thead><tbody>${bk.map(b => `<tr><td title="${esc(b.title)}"><a href="#" data-book="${esc(b.book)}">${esc(cut(b.title, 60))}</a> <span class="s mono">${esc(b.book)}</span></td><td>${esc(cut(b.author, 28))}</td><td>${esc(b.language)}</td><td title="${esc(b.year_basis)}">${b.year ?? '–'} <span class="s">${esc(b.year_basis)}</span></td><td title="${esc(b.kind_rule)}">${esc(b.kind)}</td><td title="${esc(b.voice_rule)}">${esc(b.voice)}</td><td>${b.ogden == null ? '–' : Math.round(100 * b.ogden) + '%'}</td><td>${big(b.words)}</td></tr>`).join('')}</tbody></table></div></details>
+    </div>`;
+  }).join('');
+  const kinds = Object.entries(rules.kinds || {}).map(([k, v]) => `<li><b>${esc(k)}</b> ${esc(v)}</li>`).join('');
+  const voices = Object.entries(rules.voices || {}).map(([k, v]) => `<li><b>${esc(k)}</b> ${esc(v)}</li>`).join('');
+  const y = rules.year || {};
+  el.innerHTML = `<div class="k">Selection <span class="s">the fitout's books as declared weights and filters (thorp/selection.py), over the library's facts (${d.facts.books} books, build ${esc(d.facts.fingerprint || 'not stored')})</span></div>${out}
+    <details class="mt"><summary>What the words mean: kind, voice and the year</summary><div class="selrules">
+      <div><div class="k">Kinds <span class="s">one to a book, the first rule that matches; hover a kind in the table for the rule</span></div><ul>${kinds}</ul></div>
+      <div><div class="k">Voices <span class="s">read from the catalogue's credit and subjects, so a clergyman is found only when it says so: the counts undercount</span></div><ul>${voices}</ul></div>
+      <div><div class="k">The year <span class="s">no catalogue gives a publication year</span></div><ul><li><b>published</b> the year recorded when the library fetched the book (archive.org)</li><li><b>floruit</b> the writer's birth year + ${y.floruit_age}, no later than their death; the writer is the translator if one is credited, else the first credited author</li><li><b>late</b> death year - ${y.late_before_death}, when only the death is known</li><li><b>undated</b> none: a period with bounds leaves these out unless it says undated include</li><li>the gate always applies: no credited name dead after ${y.gate}</li></ul></div>
+    </div></details>`;
 }
 
 

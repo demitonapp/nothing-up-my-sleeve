@@ -940,6 +940,39 @@ button[aria-busy="true"] { cursor: progress; opacity: .7; }
 /* the Library's fitouts as one DataTable: the aim wraps in a readable measure */
 .fittable td.fitaim { min-width: 260px; max-width: 420px; }
 .fittable tr.sel td { background: var(--raise); }
+/* a fitout's selection: declared weights and filters, the funnel, and the counts with their rules */
+.selchips { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+.selchip { border: 1px solid var(--line); border-radius: var(--r-pill); padding: 2px 10px; font-size: var(--fs-sm); background: var(--raise); }
+.selfunnel { border-collapse: collapse; font-size: var(--fs-sm); }
+.selfunnel td { padding: 2px 10px 2px 0; vertical-align: top; }
+.selfunnel td.num { text-align: right; font-variant-numeric: tabular-nums; width: 5ch; }
+.selchecks { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.selgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 14px 24px; margin-top: 10px; }
+.selrow { display: grid; grid-template-columns: 9ch 1fr auto; gap: 8px; align-items: center; font-size: var(--fs-sm); }
+.selkey { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.selbar { height: 8px; background: var(--track); border-radius: var(--r-pill); overflow: hidden; }
+.selbar > i { display: block; height: 100%; background: var(--blue); }
+.selnum { white-space: nowrap; }
+.selbooks { font-size: var(--fs-xs); }
+.selrules { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px 24px; font-size: var(--fs-sm); }
+.selrules ul { margin: 4px 0; padding-left: 18px; display: grid; gap: 3px; }
+/* Browse the library: cards that filter */
+.bsummary { margin: 4px 0 8px; font-size: var(--fs-lg); display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.bfacets { display: grid; gap: 14px; margin-top: 8px; }
+.bcards { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; margin-top: 4px; }
+.bcard { position: relative; text-align: left; display: grid; gap: 3px; padding: 6px 9px 7px; border: 1px solid var(--line); border-radius: var(--r-md, 8px); background: var(--raise); color: var(--text); cursor: pointer; font: inherit; font-size: var(--fs-sm); }
+.bcard:hover { border-color: var(--accent); }
+.bcard.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--raise)); }
+.bcard.none { opacity: .4; }
+.bcard .bname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.bcard .bnum { font-variant-numeric: tabular-nums; }
+.bcard .bbar { height: 4px; border-radius: var(--r-pill); background: var(--track); overflow: hidden; }
+.bcard .bbar > i { display: block; height: 100%; background: var(--blue); }
+.bcard.on .bbar > i { background: var(--accent); }
+.bchip { cursor: pointer; color: var(--text); font: inherit; font-size: var(--fs-sm); }
+.bshow { margin-top: 6px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.bnum-in { width: 8ch; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 2px 6px; font: inherit; }
+.bspec { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px; font-size: var(--fs-xs); overflow: auto; }
 /* the $100 bet (#/bet, UI.md "The $100 bet"): Justin's words, then lists that read as prose */
 .betsaid { margin: 0 0 12px; padding: 0 0 0 12px; border-left: 2px solid var(--accent); font-size: var(--fs-lg); max-width: 90ch; }
 .betsaid .who { display: block; margin-top: 4px; color: var(--muted); font-size: var(--fs-sm); }

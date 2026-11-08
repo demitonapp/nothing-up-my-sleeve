@@ -164,6 +164,39 @@ def cmd_s5(a) -> int:
     return 0
 
 
+def cmd_select(a) -> int:
+    """The library's facts and the fitouts' declared selections (thorp/library_facts.py, thorp/selection.py)."""
+    from thorp import library_facts as lf
+
+    if a.what == "facts":
+        from thorp.viable.s3_control import fitout_store
+
+        rows = lf.build()
+        fp = lf.fingerprint(rows)
+        if not a.dry_run:
+            fitout_store.migrate()
+            fitout_store.put_facts(rows, fp)
+        print(f"{len(rows)} books, facts {fp}{' (not stored: --dry-run)' if a.dry_run else ', stored in s3.library_facts'}")
+        return 0
+    if a.what == "counts":
+        rows = [r for r in lf.build() if r["source"] != "local"]
+        for key in ("language", "source", "voice", "kind", "year_basis"):
+            b, w = lf.count(rows, key), lf.count(rows, key, "words")
+            print(f"by {key}: " + ", ".join(f"{k} {b[k]} ({w[k] / 1e6:.1f}M)" for k in b))
+        by_dec: dict[str, list] = {}
+        for r in rows:
+            by_dec.setdefault(lf.decade(r["year"]), []).append(r["words"])
+        print("by period: " + ", ".join(f"{k} {len(v)} ({sum(v) / 1e6:.1f}M)" for k, v in sorted(by_dec.items())))
+        return 0
+    if not a.target:
+        print(f"thorp select {a.what} needs a fitout key or a selection file", file=sys.stderr)
+        return 2
+    from thorp.viable.s3_control import compose
+
+    r = compose.run(a.target, stage=a.stage, out=a.out, against=a.against or "", dry=a.dry_run, by="thorp select compose")
+    return 0 if r["passed"] or a.dry_run else 1
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="thorp")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -214,6 +247,14 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("value", help="switch: on|off; term: its value as JSON (40, or '{\"RTX 4090\": 0.45}')")
     s.add_argument("--words", required=True, help="Justin's words, and when")
     s.set_defaults(fn=cmd_s5)
+    s = sub.add_parser("select", help="the library's facts (counts), and a fitout's books composed from its declared selection")
+    s.add_argument("what", choices=["facts", "counts", "compose"])
+    s.add_argument("target", nargs="?", help="compose: a saved fitout's key, or a selection file (.json)")
+    s.add_argument("--stage", type=int, default=1, help="compose: the fitout's stage (default 1)")
+    s.add_argument("--out", help="compose: the list to write (default lists/composed/<fitout>-<stage>.csv)")
+    s.add_argument("--against", help="compose: a list to set the result beside, and print the diff")
+    s.add_argument("--dry-run", action="store_true", help="facts: do not store; compose: write and record nothing")
+    s.set_defaults(fn=cmd_select)
     s = sub.add_parser("schedule", help="Thorp's own schedule (S2): tick, list, run, import-claude, enable, judge")
     s.add_argument("rest", nargs=argparse.REMAINDER)
     s.set_defaults(fn=lambda a: __import__("thorp.viable.s2_coordination.schedule", fromlist=["main"]).main(a.rest))

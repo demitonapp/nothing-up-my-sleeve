@@ -1,0 +1,54 @@
+{
+ "key": "ogden-v0-2-declared",
+ "name": "Ogden v0.2, declared",
+ "aim": "A draft that never sails: Ogden v0.2's books composed from a declared selection (thorp/selection.py) rather than listed by hand, to be set beside lists/ogden-v0.2.csv (`thorp select compose ogden-v0-2-declared --against lists/ogden-v0.2.csv`). Pre-registered in DECISIONS.md, \"Fitouts compose their books\".",
+ "positions": "rope",
+ "tack": null,
+ "opt_in": "Ogden v0.2 reads books beyond the two stores, approved by Justin (2026-11-08 08:10): the library's books at v0.1's Ogden-ness bar, the Bible struck, and the logic tutor's template passages",
+ "stages": [
+  {
+   "phase": "pretraining",
+   "name": "ogden-v0.2 declared",
+   "shelf": "lists/composed/ogden-v0-2-declared-1.csv",
+   "tokens": null,
+   "select": "all",
+   "passes": 4,
+   "lr": null,
+   "tack": null,
+   "purpose": "the declared selection, four passes",
+   "compose": {
+    "note": "Ogden v0.2 as declared: v0.1's list carried whole, the library's other books the logic of v0.2's maker (scored by the v0.2 scoring, Ogden-ness 68% or more, one copy a title read as text, the Bible struck), the tutor's passages appended",
+    "as_of": "2026-11-07",
+    "languages": {
+     "en": 1.0
+    },
+    "ogden": {
+     "min": 0.68,
+     "scored_by": [
+      "v0.2"
+     ]
+    },
+    "carry": [
+     "lists/ogden-v0.1.csv"
+    ],
+    "dedupe": {
+     "by": "title",
+     "keep": "text"
+    },
+    "strike": [
+     {
+      "title": "The Bible, King James Version",
+      "why": "Justin, 2026-11-08 08:10: strike the Bible"
+     }
+    ],
+    "append": [
+     {
+      "list": "lists/ogden-v0.2-tutor.csv",
+      "why": "C1, the logic tutor's template passages, 7.5% of the reading (Justin, 2026-11-08 08:10)"
+     }
+    ],
+    "order": "carried-first"
+   }
+  }
+ ]
+}

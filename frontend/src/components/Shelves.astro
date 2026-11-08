@@ -7,6 +7,10 @@ import { cardCls, emptyCls, fieldCls, selectCls } from '../lib/ui';
 ---
 <div class="section" id="shelves">
   <h1>Library <span class="q">every list of books Thorp reads from, is scored on or is drafting: how many books are fetched, about how many tokens they hold, their language families, and the voyages that read them</span></h1>
+  <section class={cardCls(false, 'panel')} id="browsepanel">
+    <h2>Browse the library <span class="note">every book, by what it is: its kind (novel, poem, play, textbook, sermon...), its date, its language, the collection it belongs to (Renaissance, Greek, the nursery...), who speaks (the Church, the press, a body, any other writer) and where it came from. Click a card to filter; a fitout's selection is these same filters, with weights</span></h2>
+    <div id="browse"><div class={emptyCls()}>reading the library…</div></div>
+  </section>
   <section class={cardCls(false, 'panel')} id="fitoutpanel">
     <h2>Fitouts <span class="note">a fitout is the training material matched to the stages it is read in: pretraining (its stages in order, one voyage) and post-training (its stages in order, each seeded from the one before, with its own learning rate and tack). Each stage is a block sized by its tokens, its library one click away below</span></h2>
     <div id="fitouts"><div class={emptyCls()}>reading the fitouts…</div></div>

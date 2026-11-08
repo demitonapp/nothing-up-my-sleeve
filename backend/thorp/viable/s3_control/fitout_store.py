@@ -20,8 +20,10 @@ from sqlalchemy.orm import Session
 
 from thorp import paths
 from thorp.viable.s3_control.models import (
+    Composition,
     Fitout,
     FitoutPrecheck,
+    LibraryFact,
     PrecheckItem,
     PrecheckResult,
     Stage,
@@ -74,6 +76,7 @@ def put_fitout(f: dict, adopted: str = "") -> None:
                 lr=st.get("lr"),
                 tack=st.get("tack"),
                 purpose=st.get("purpose") or "",
+                compose=st.get("compose") or None,
             )
             for i, st in enumerate(f.get("stages") or [], 1)
         ]
@@ -159,3 +162,46 @@ def fitouts() -> list[dict]:
             {"key": f.key, "name": f.name, "clean": f.clean, "status": f.status}
             for f in s.scalars(select(Fitout).order_by(Fitout.created_at))
         ]
+
+
+# ---- the library's facts and the compositions (thorp/library_facts.py, thorp/selection.py)
+_FACT_COLUMNS = (
+    "book", "title", "author", "source", "set", "language", "translated", "born", "died", "gate_death", "year",
+    "year_basis", "kind", "kind_rule", "voice", "voice_rule", "ogden", "ogden_from", "words", "fetched", "held_out",
+    "control", "title_key", "shelves",
+)  # fmt: skip
+
+
+def put_facts(rows: list[dict], fingerprint: str) -> int:
+    """The library's facts, replaced whole (a book gone from the manifest is gone from the table)."""
+    with session() as s, s.begin():
+        s.execute(text("delete from s3.library_facts"))
+        s.add_all(LibraryFact(**{k: r[k] for k in _FACT_COLUMNS}, facts_fingerprint=fingerprint) for r in rows)
+    return len(rows)
+
+
+def facts_fingerprint() -> str | None:
+    with engine().connect() as c:
+        return c.execute(text("select max(facts_fingerprint) from s3.library_facts")).scalar()
+
+
+def record_composition(c: dict) -> int:
+    with session() as s, s.begin():
+        row = Composition(**c)
+        s.add(row)
+        s.flush()
+        return row.id
+
+
+def compositions(fitout_key: str | None = None, limit: int = 20) -> list[dict]:
+    q = "select * from s3.compositions" + (" where fitout_key = :k" if fitout_key else "") + " order by composed_at desc, id desc limit :n"
+    with engine().connect() as c:
+        return [dict(r) for r in c.execute(text(q), {"k": fitout_key, "n": limit}).mappings()]
+
+
+def selections(fitout_key: str) -> list[dict]:
+    """A fitout's stages with the selection each declares (None: its library is listed by hand)."""
+    with engine().connect() as c:
+        return [dict(r) for r in c.execute(
+            text("select ordinal, name, library, compose from s3.stages where fitout_key = :k order by ordinal"),
+            {"k": fitout_key}).mappings()]  # fmt: skip

@@ -1513,6 +1513,119 @@ def api_fitout_builder() -> dict:
     }
 
 
+def _browse_build() -> dict:
+    from thorp import library, selection
+    from thorp import library_facts as lf
+
+    rows = [r for r in lf.build() if r["source"] != "local"]  # the library's books; Thorp's own derived texts are not browsed
+    cols = library.collections()
+    member: dict[str, list[int]] = {}
+    for i, c in enumerate(cols):
+        for b in c["book_ids"]:
+            member.setdefault(b, []).append(i)
+    books = [[r["book"], r["title"], r["author"], r["language"], r["source"], r["kind"], r["voice"], r["year"], r["year_basis"],
+              r["ogden"], r["words"], member.get(r["book"], []), r["kind_rule"], r["voice_rule"]] for r in rows]  # fmt: skip
+    return {
+        "books": books,
+        "fields": ["book", "title", "author", "language", "source", "kind", "voice", "year", "year_basis", "ogden", "words",
+                   "collections", "kind_rule", "voice_rule"],
+        "collections": [{k: c[k] for k in ("path", "name", "kind", "about")} | {"books": len(set(c["book_ids"]) & {r["book"] for r in rows})}
+                        for c in cols],
+        "kinds": lf.KIND_ABOUT, "voices": lf.VOICE_ABOUT,
+        "year": {"floruit_age": lf.FLORUIT_AGE, "late_before_death": lf.LATE_BEFORE_DEATH, "gate": lf.GATE_DEATH_LIMIT},
+        "fingerprint": lf.fingerprint(rows),
+        "selection_keys": sorted(selection.KEYS),
+    }
+
+
+def api_library_browse() -> dict:
+    """The library's books and what is known of each, for the Library page's filters and cards (thorp/library_facts.py):
+    kind, date, language, collection, voice, source and Ogden-ness. Built warm: the first call may answer `computing`."""
+    value, busy, error = _warm("library_browse", _browse_build)
+    return value if value is not None else {"computing": busy, "error": error}
+
+
+def api_selection(fitout: str) -> dict:
+    """A fitout's books as the Fitouts tab shows them (thorp/selection.py, thorp/library_facts.py): for each stage
+    the weights and filters it declares (or that its library is listed by hand), the latest composing (its funnel,
+    the gate's library prechecks, the diff to a list it was set beside), the counts by language, kind, voice,
+    source and period of the books it yields, and the books with the rule that placed each. Also the rules in
+    full (what a kind, a voice and a year mean), so the bias in a count can be read."""
+    from collections import Counter
+
+    from sqlalchemy import text
+
+    from thorp import fitouts
+    from thorp import library_facts as lf
+    from thorp import selection
+    from thorp.viable.s3_control import fitout_store
+
+    f = fitouts.load(fitout)
+    if f is None:
+        from thorp import fleet
+
+        f = fitouts.from_curated(fitout) if fitout in getattr(fleet, "FITOUTS", {}) else None
+    if f is None:
+        raise LookupError(f"no fitout {fitout}")
+    with fitout_store.engine().connect() as c:
+        have = c.execute(text("select count(*) from s3.library_facts")).scalar()
+        facts = {r["book"]: dict(r) for r in c.execute(text("select * from s3.library_facts")).mappings()} if have else {}
+    comps = {(x["ordinal"]): x for x in reversed(fitout_store.compositions(fitout, 40))}
+    stages = []
+    for i, st in enumerate(f["stages"], 1):
+        ids = []
+        try:
+            ids = selection.list_ids(st["shelf"])
+        except Exception:  # noqa: BLE001  a shelf not written yet yields no books
+            pass
+        rows = [facts[b] for b in ids if b in facts]
+        sizes = {"derived": [r for r in rows if r["source"] == "local"], "library": [r for r in rows if r["source"] != "local"]}
+
+        def split(key, rs=rows):
+            c = Counter()
+            for r in rs:
+                c[str(r[key])] += r["words"]
+            tot = sum(c.values()) or 1
+            n = Counter(str(r[key]) for r in rs)
+            return {k: {"books": n[k], "words": v, "share": round(v / tot, 4)} for k, v in c.most_common()}
+
+        def period(rs):
+            c = Counter()
+            n = Counter()
+            for r in rs:
+                d = lf.decade(r["year"])
+                c[d] += r["words"]
+                n[d] += 1
+            tot = sum(c.values()) or 1
+            return {d: {"books": n[d], "words": c[d], "share": round(c[d] / tot, 4)} for d in sorted(c)}
+
+        c = comps.get(i)
+        stages.append({
+            "ordinal": i, "name": st["name"], "shelf": st["shelf"], "passes": st.get("passes"),
+            "compose": selection.validate(st["compose"]) if st.get("compose") else None, "books": len(ids), "found": len(rows),
+            "words": sum(r["words"] for r in rows), "tutor_words": sum(r["words"] for r in sizes["derived"]),
+            "by_language": split("language"), "by_kind": split("kind"), "by_voice": split("voice"), "by_source": split("source"),
+            "by_period": period(rows),
+            "by_year_basis": split("year_basis"),
+            "composition": {k: c[k] for k in ("id", "spec_hash", "facts_fingerprint", "list_path", "list_sha1", "books", "words",
+                                              "funnel", "notes", "prechecks", "passed", "against", "diff", "composed_at")} if c else None,
+            "books_list": [{"book": r["book"], "title": r["title"], "author": r["author"], "language": r["language"],
+                            "source": r["source"], "kind": r["kind"], "kind_rule": r["kind_rule"], "voice": r["voice"],
+                            "voice_rule": r["voice_rule"], "year": r["year"], "year_basis": r["year_basis"],
+                            "ogden": r["ogden"], "words": r["words"]} for r in rows[:600]],
+        })  # fmt: skip
+    return {
+        "fitout": {"key": f["key"], "name": f["name"]},
+        "stages": stages,
+        "facts": {"books": have, "fingerprint": fitout_store.facts_fingerprint()},
+        "rules": {
+            "kinds": lf.KIND_ABOUT, "voices": lf.VOICE_ABOUT,
+            "year": {"floruit_age": lf.FLORUIT_AGE, "late_before_death": lf.LATE_BEFORE_DEATH, "gate": lf.GATE_DEATH_LIMIT},
+            "keys": sorted(selection.KEYS),
+        },
+    }
+
+
 def api_shelf_trigrams(path: str) -> dict:
     """A shelf's books by trigram repetition (thorp.trigrams.book_stats over the shelf's book ids, as
     the warm shelves payload carries them): each book's repeat rate and variety, and the frontier."""
@@ -4007,6 +4120,8 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/acquisition/audit": api_acquisition_audit,
                 "/api/series": lambda: api_series(q.get("runs", ""), q.get("metrics", "")),
                 "/api/fitout_builder": api_fitout_builder,
+                "/api/selection": lambda: api_selection(q["fitout"]),
+                "/api/library_browse": api_library_browse,
                 "/api/shelf_trigrams": lambda: api_shelf_trigrams(q["path"]),
                 "/api/knockout": lambda: api_knockout(q.get("model", "")),
                 "/api/class_score": lambda: api_class_score(q["preset"]),

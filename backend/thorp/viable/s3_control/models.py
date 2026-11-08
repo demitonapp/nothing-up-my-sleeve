@@ -83,6 +83,9 @@ class Stage(Base):
     lr: Mapped[float | None] = mapped_column(Float)
     tack: Mapped[dict | None] = mapped_column(JSONB)
     purpose: Mapped[str] = mapped_column(Text, default="", server_default="")
+    # the declared selection of the library's books (thorp/selection.py): weights by language, an Ogden-ness bar,
+    # a period, filters by kind, voice and source. None: `library` is a list written by hand.
+    compose: Mapped[dict | None] = mapped_column(JSONB)
 
     fitout: Mapped[Fitout] = relationship(back_populates="stages")
 
@@ -134,6 +137,70 @@ class PrecheckResult(Base):
     evidence: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}")
     checked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     checked_by: Mapped[str] = mapped_column(Text, default="", server_default="")
+
+
+class LibraryFact(Base):
+    """What the library knows of a book (thorp/library_facts.py): its language, writer's years, the year it is
+    placed in and the rule that placed it, its kind and voice and the rules that gave them, its Ogden-ness. Rebuilt
+    by `thorp select facts`; the table is the dashboard's and SQL's view of the rows a composition reads."""
+
+    __tablename__ = "library_facts"
+
+    book: Mapped[str] = mapped_column(Text, primary_key=True)
+    title: Mapped[str] = mapped_column(Text)
+    author: Mapped[str] = mapped_column(Text, default="", server_default="")
+    source: Mapped[str] = mapped_column(Text)  # the collection: gutenberg, archive, local
+    set: Mapped[str] = mapped_column(Text)
+    language: Mapped[str] = mapped_column(Text)
+    translated: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    born: Mapped[int | None] = mapped_column(Integer)
+    died: Mapped[int | None] = mapped_column(Integer)
+    gate_death: Mapped[int | None] = mapped_column(Integer)  # the latest death among every credited name (S5 'period')
+    year: Mapped[int | None] = mapped_column(Integer)
+    year_basis: Mapped[str] = mapped_column(Text)
+    kind: Mapped[str] = mapped_column(Text)
+    kind_rule: Mapped[str] = mapped_column(Text)
+    voice: Mapped[str] = mapped_column(Text)
+    voice_rule: Mapped[str] = mapped_column(Text)
+    ogden: Mapped[float | None] = mapped_column(Float)
+    ogden_from: Mapped[str] = mapped_column(Text, default="", server_default="")
+    words: Mapped[int] = mapped_column(BigInteger)
+    fetched: Mapped[str] = mapped_column(Text, default="", server_default="")
+    held_out: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    control: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    title_key: Mapped[str] = mapped_column(Text, default="", server_default="")
+    shelves: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
+    facts_fingerprint: Mapped[str] = mapped_column(Text)  # the build these rows belong to
+    built_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class Composition(Base):
+    """One composing of a reading list from a declared selection: which selection (and its hash), drawn from which
+    facts, what list it wrote (and its sha1), what it yielded and what the S3 gate's library prechecks said of it.
+    Every composing is kept, so a fitout's books can always be traced to the words that chose them."""
+
+    __tablename__ = "compositions"
+    __table_args__ = (Index("compositions_fitout", "fitout_key", "composed_at"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    fitout_key: Mapped[str] = mapped_column(Text)  # not a foreign key: a selection may be tried before its fitout exists
+    ordinal: Mapped[int | None] = mapped_column(Integer)  # the stage
+    spec: Mapped[dict] = mapped_column(JSONB)
+    spec_hash: Mapped[str] = mapped_column(Text)
+    facts_fingerprint: Mapped[str] = mapped_column(Text)
+    list_path: Mapped[str] = mapped_column(Text)
+    list_sha1: Mapped[str] = mapped_column(Text)
+    books: Mapped[int] = mapped_column(Integer)
+    words: Mapped[int] = mapped_column(BigInteger)
+    summary: Mapped[dict] = mapped_column(JSONB)  # counts by language, kind, voice, source, period, Ogden-ness
+    funnel: Mapped[list] = mapped_column(JSONB)  # [rule, books left, what it did]
+    notes: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
+    prechecks: Mapped[list] = mapped_column(JSONB)  # the S3 gate's library items read on the list
+    passed: Mapped[bool] = mapped_column(Boolean)
+    against: Mapped[str] = mapped_column(Text, default="", server_default="")  # a list it was set beside
+    diff: Mapped[dict | None] = mapped_column(JSONB)
+    composed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    composed_by: Mapped[str] = mapped_column(Text, default="", server_default="")
 
 
 VIEWS = {

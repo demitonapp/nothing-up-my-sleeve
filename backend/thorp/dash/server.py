@@ -2785,6 +2785,52 @@ def api_table_guesses(run: str, text: str, k: str | int = 10, mode: str = "1") -
         return out
     out = _table().word_guesses(run, text, int(k or 10), int(mode) if mode in ("1", "2", "3") else 1)
     out["mode"] = mode
+    return _tag_guesses(out)
+
+
+_GUESS_LEXICON: dict | None = None
+
+
+def _guess_tag(word: str, lex: dict) -> str:
+    """A guess's part of speech, as the shapes evaluator tags a guess's piece: a line break is BREAK, a word its
+    commonest tag in the Ogden corpus (the lexicon), a mark with no letter or figure PUNCT, else OTHER."""
+    if "\n" in word or "\u23ce" in word:  # a line break, as the guesses write it (⏎) or raw
+        return "BREAK"
+    w = word.strip().split(" ")[0].lower() if word.strip() else ""
+    return lex.get(w) or ("PUNCT" if w and not any(ch.isalnum() for ch in w) else "OTHER")
+
+
+def _tag_guesses(out: dict) -> dict:
+    """Each guess with its part of speech, and what the ship is looking for: its guesses' probability summed by
+    tag, in the fine tier (NOUN, VERB, ADJ...) and Ogden's coarse one (THING, QUALITY, OPERATION, MARK) (Justin,
+    8 November: "the 300k is to also identify parts of speech in its guesses so that we can map its guesses to
+    what it thinks the correct parts of speech it's looking for"). The lexicon and the rule are the shapes
+    evaluator's, so the page and the voyages' readings agree."""
+    global _GUESS_LEXICON
+    from thorp.viable.s5_policy import taxonomy
+
+    if _GUESS_LEXICON is None:
+        try:
+            from thorp.evaluators.shapes import LEXICON
+            from thorp.viable.s2_coordination import tagger
+
+            _GUESS_LEXICON = tagger.lexicon(LEXICON)
+        except Exception:  # noqa: BLE001  (no lexicon built here: the guesses go untagged)
+            _GUESS_LEXICON = {}
+    if not _GUESS_LEXICON:
+        return out
+    fine: dict[str, float] = {}
+    for g in out.get("guesses") or []:
+        g["tag"] = _guess_tag(str(g.get("word") or ""), _GUESS_LEXICON)
+        g["coarse"] = taxonomy.coarse(g["tag"])
+        fine[g["tag"]] = fine.get(g["tag"], 0.0) + float(g.get("p") or 0.0)
+    total = sum(fine.values()) or 1.0
+    coarse: dict[str, float] = {}
+    for t, v in fine.items():
+        coarse[taxonomy.coarse(t)] = coarse.get(taxonomy.coarse(t), 0.0) + v
+    out["looking_for"] = [{"tag": t, "share": round(v / total, 3), "about": taxonomy.ABOUT.get(t, "")}
+                          for t, v in sorted(fine.items(), key=lambda kv: -kv[1])]  # fmt: skip
+    out["looking_for_coarse"] = [{"tag": t, "share": round(v / total, 3)} for t, v in sorted(coarse.items(), key=lambda kv: -kv[1])]
     return out
 
 

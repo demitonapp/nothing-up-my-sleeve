@@ -992,6 +992,15 @@ let askWired = false, askPreset = null, askBest = null, askQuestions = ASK_QUEST
 // guesses, or the rival above it, or neither in its ten
 const chose = (rank, rrank) => rank && (!rrank || rank < rrank) ? 'the premises' : rrank && (!rank || rrank < rank) ? 'the rival' : 'neither';
 let logicQuestions = null;
+// what a ship is looking for after a line: its ten guesses' probability summed by part of speech (the server tags each
+// guess as the shapes evaluator does), the fine tags with Ogden's coarse tier beside
+const COARSE_WORD = { THING: 'a thing', QUALITY: 'a quality', OPERATION: 'an operation', MARK: 'a mark' };
+function lookingFor(g) {
+  if (!g || !g.looking_for || !g.looking_for.length) return '';
+  const fine = g.looking_for.filter(t => t.share >= 0.02).slice(0, 5).map(t => `<span class="postag" title="${esc(t.about || '')}"><b>${esc(t.tag)}</b> ${Math.round(100 * t.share)}%</span>`).join(' ');
+  const coarse = (g.looking_for_coarse || []).filter(t => t.share >= 0.02).map(t => `${esc(COARSE_WORD[t.tag] || t.tag)} ${Math.round(100 * t.share)}%`).join(' · ');
+  return `<div class="lookingfor">it is looking for: ${fine}${coarse ? ` <span class="s">· in Ogden's terms, ${coarse}</span>` : ''}</div>`;
+}
 const hopeRank = (gs, hope) => {  // where the hoped-for word is among the guesses (a whole word; a piece may start it)
   const h = hope.toLowerCase();
   const i = gs.findIndex(g => {
@@ -1102,8 +1111,8 @@ async function askPanel(r) {
     const rrank = rival ? hopeRank(g.guesses, rival) : null;
     const verdict = rival ? ` · the rival “${esc(rival)}”: ${rrank ? `guess ${rrank}` : 'not in its ten'} · <b>${chose(rank, rrank)}</b>` : '';
     const note = carried.length ? `<div class="s carried">it may not take “${esc(carried[0].of)}” as finished: ${carried.slice(0, 3).map(x => `“${esc(x.word)}” ${(100 * x.p).toFixed(1)}%`).join(', ')} (it carries your last word on: a prompt that stops on a word cannot say the word is finished)</div>` : '';
-    return `<div class="s">${esc(g.run)} at step ${g.step} · ${g.seconds}s${hope ? ` · hoped for “${esc(hope)}”: ${rank ? `<b>guess ${rank}</b>` : '<b>not in its ten</b>'}` : ''}${verdict}</div>${note}
-      <div class="guesses">${g.guesses.map((x, i) => `<div class="guess${hope && rank === i + 1 ? ' hit' : ''}"><span class="mono" title="${x.continues ? `carries on “${esc(x.of)}” with “${esc(x.piece)}”` : ''}">${x.continues ? `<span class="s">${esc(x.of)}→</span>${esc(x.word)}` : esc(x.piece === true ? showPiece(x.word) : x.word)}</span><i style="width:${Math.max(2, Math.round(100 * x.p))}%"></i><span class="s">${(100 * x.p).toFixed(1)}%</span></div>`).join('')}</div>
+    return `${lookingFor(g)}<div class="s">${esc(g.run)} at step ${g.step} · ${g.seconds}s${hope ? ` · hoped for “${esc(hope)}”: ${rank ? `<b>guess ${rank}</b>` : '<b>not in its ten</b>'}` : ''}${verdict}</div>${note}
+      <div class="guesses">${g.guesses.map((x, i) => `<div class="guess${hope && rank === i + 1 ? ' hit' : ''}"><span class="mono" title="${x.continues ? `carries on “${esc(x.of)}” with “${esc(x.piece)}”` : ''}">${x.continues ? `<span class="s">${esc(x.of)}→</span>${esc(x.word)}` : esc(x.piece === true ? showPiece(x.word) : x.word)}</span><i style="width:${Math.max(2, Math.round(100 * x.p))}%"></i><span class="s">${(100 * x.p).toFixed(1)}%</span>${x.tag ? `<span class="postag pos-${esc(x.coarse || '')}" title="${esc(x.tag)}: its commonest part of speech in the Ogden corpus">${esc(x.tag)}</span>` : ''}</div>`).join('')}</div>
       ${g.mode !== 'pieces' ? '<div class="s">the likeliest new words it reaches; the rest of the probability is words it rarely spells</div>' : ''}`;
   };
   const guess = async (text, hope, rival) => {
@@ -1134,8 +1143,8 @@ async function askPanel(r) {
       const hit = rows.filter(x => x.rank).length, logic = askQuestions.some(q => q.rival);
       const won = rows.filter(x => x.q.rival && chose(x.rank, x.rrank) === 'the premises').length;
       out.innerHTML = `<div class="s">${esc(run())} · ${hit} of ${rows.length} hoped-for answers among its ten guesses${logic ? ` · <b>${won} of ${rows.length}</b> chains answered as the premises say, above the rival` : ''}${rows.length < askQuestions.length ? ' · reading…' : ''}</div>
-        <div class="scroll"><table class="asktable"><thead><tr><th>question</th><th>about</th><th>hoped for</th><th>its rank</th>${logic ? '<th>the rival</th><th>its rank</th><th>it chose</th>' : ''}<th>its first three guesses</th></tr></thead><tbody>${rows.map(x => `<tr${x.rank === 1 ? ' class="sel"' : ''}><td class="mono">${esc(x.q.text.replace('\n', ' '))}</td><td class="s">${esc(x.q.about)}</td><td>${esc(x.q.hope)}</td>
-          <td>${x.err ? '<span class="s">failed</span>' : x.rank ? `<b>${x.rank}</b>` : '<span class="s">not in ten</span>'}</td>${logic ? `<td>${esc(x.q.rival || '')}</td><td>${x.err ? '' : x.rrank ? x.rrank : '<span class="s">not in ten</span>'}</td><td>${x.err ? '' : `<span class="${pillCls(chose(x.rank, x.rrank) === 'the premises' ? 'good' : chose(x.rank, x.rrank) === 'the rival' ? 'bad' : '')}">${chose(x.rank, x.rrank)}</span>`}</td>` : ''}<td class="mono">${x.g ? x.g.guesses.slice(0, 3).map(g => `${esc(g.piece === true ? showPiece(g.word) : g.word)} <span class="s">${(100 * g.p).toFixed(0)}%</span>`).join(' · ') : ''}</td></tr>`).join('')}</tbody></table></div>`;
+        <div class="scroll"><table class="asktable"><thead><tr><th>question</th><th>about</th><th>hoped for</th><th>its rank</th>${logic ? '<th>the rival</th><th>its rank</th><th>it chose</th>' : ''}<th title="its ten guesses' probability summed by part of speech: what kind of word it expects next">looking for</th><th>its first three guesses</th></tr></thead><tbody>${rows.map(x => `<tr${x.rank === 1 ? ' class="sel"' : ''}><td class="mono">${esc(x.q.text.replace('\n', ' '))}</td><td class="s">${esc(x.q.about)}</td><td>${esc(x.q.hope)}</td>
+          <td>${x.err ? '<span class="s">failed</span>' : x.rank ? `<b>${x.rank}</b>` : '<span class="s">not in ten</span>'}</td>${logic ? `<td>${esc(x.q.rival || '')}</td><td>${x.err ? '' : x.rrank ? x.rrank : '<span class="s">not in ten</span>'}</td><td>${x.err ? '' : `<span class="${pillCls(chose(x.rank, x.rrank) === 'the premises' ? 'good' : chose(x.rank, x.rrank) === 'the rival' ? 'bad' : '')}">${chose(x.rank, x.rrank)}</span>`}</td>` : ''}<td>${x.g && x.g.looking_for ? x.g.looking_for.slice(0, 2).map(t => `<span class="postag" title="${esc(t.about || '')}">${esc(t.tag)} ${Math.round(100 * t.share)}%</span>`).join(' ') : ''}</td><td class="mono">${x.g ? x.g.guesses.slice(0, 3).map(g => `${esc(g.piece === true ? showPiece(g.word) : g.word)} <span class="s">${(100 * g.p).toFixed(0)}%</span>`).join(' · ') : ''}</td></tr>`).join('')}</tbody></table></div>`;
     };
     for (const q of askQuestions) {
       try { const g0 = await guessesFor(q.text); const g = { ...g0, guesses: g0.mode !== 'pieces' ? g0.guesses.filter(x => !x.continues) : g0.guesses }; rows.push({ q, g, rank: hopeRank(g.guesses, q.hope), rrank: q.rival ? hopeRank(g.guesses, q.rival) : null }); } catch (e) { rows.push({ q, err: true }); }

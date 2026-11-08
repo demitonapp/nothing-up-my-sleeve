@@ -761,6 +761,11 @@ main a.pc2-more:hover { color: #000; }
 .plantable tr.plan-cmd td, .plantable tr.plan-wait td { color: var(--muted); }
 .plantable tr.plan-hold td { background: color-mix(in srgb, var(--accent) 8%, transparent); }
 .lanechip { white-space: nowrap; }
+.postag { display: inline-block; font-size: var(--fs-xs); padding: 0 5px; margin-left: 6px; border: 1px solid var(--line); border-radius: 4px; color: var(--muted); white-space: nowrap; }
+.postag.pos-THING { border-color: var(--blue); color: var(--blue); }
+.postag.pos-OPERATION { border-color: var(--accent); color: var(--accent); }
+.postag.pos-QUALITY { border-color: var(--good); color: var(--good); }
+.lookingfor { margin: 6px 0; font-size: var(--fs-sm); }
 .primarygoal { color: var(--accent); font-size: var(--fs-lg); line-height: 1.35; }
 .mathcredit { font-size: var(--fs-sm); margin: 4px 0 10px; line-height: 1.6; }
 .mathcredit .bookbtn { margin-left: 6px; }

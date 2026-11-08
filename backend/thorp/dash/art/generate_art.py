@@ -102,8 +102,23 @@ CARDS: dict[str, str] = {
     "the first light showing where the way begins",
 }
 
-SIZES = {**{k: "landscape_16_9" for k in CLASSES}, **{k: "portrait_4_3" for k in CARDS}}
-SUBJECTS = {**CLASSES, **CARDS}
+# The logic deck's five relations (lists/tricks/logic-40.csv; Justin, 2026-11-08: "Yes, make art"): each a chain of
+# two facts and the conclusion that needs both, drawn as one picture. Portrait, for the deck's tiles.
+LOGIC: dict[str, str] = {
+    "logic_order": "three lighthouses of rising height along a dark rocky coast at night, each taller than the "
+    "one before it, their beams cutting through fog, a lone figure on the shore looking from the first to the last",
+    "logic_cause": "a sailor turning a capstan at night, the rope running over a block and hauling a dripping "
+    "anchor up out of black water, each part moving the next, one lantern lighting the chain of things",
+    "logic_membership": "an open sea chest in a dark ship's hold, inside it an open wooden box, inside that a "
+    "small open locket, each lid thrown back, a single lantern shining down into the nest of them",
+    "logic_proportion": "a train of three brass gears on a chart table at night, a small gear turning one twice "
+    "its size, which turns one twice as large again, a single shaft of light across the teeth",
+    "logic_counterfactual": "a navigator at a chart table following a strange hand-drawn chart that disagrees "
+    "with the stars seen through the porthole, a finger on the chart, trusting the paper over the sky, one lamp",
+}
+
+SIZES = {**{k: "landscape_16_9" for k in CLASSES}, **{k: "portrait_4_3" for k in CARDS}, **{k: "portrait_4_3" for k in LOGIC}}
+SUBJECTS = {**CLASSES, **CARDS, **LOGIC}
 
 
 def fal_key() -> str:

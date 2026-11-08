@@ -1057,6 +1057,7 @@ button[aria-busy="true"] { cursor: progress; opacity: .7; }
 .dswitches { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
 .lggrid { grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); }
 .lgcard { gap: 6px; }
+.deckclass .lgcard .lgart { display: block; width: calc(100% + 16px); max-width: none; margin: -8px -8px 2px; aspect-ratio: 4 / 3; object-fit: cover; object-position: center 55%; border-radius: var(--r-md) var(--r-md) 0 0; background: #000; }  /* the relation's picture (generate_art.py LOGIC) */
 .lgex { font-size: 12px; line-height: 1.35; margin: 4px 0; }
 .lgex i { color: var(--bad); font-style: normal; }
 .lgrow { display: grid; grid-template-columns: 1fr; gap: 2px; margin-top: 4px; }

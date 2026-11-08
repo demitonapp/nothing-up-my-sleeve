@@ -1263,7 +1263,7 @@ async function classLogicDeck(r, el) {
   const meter = (g, cls) => g ? `<div class="lgbar ${cls}" title="${f(g.gain)} (90% band ${f(g.lo)} to ${f(g.hi)})"><i style="left:${pos(Math.min(g.lo ?? g.gain, g.gain))}%;width:${Math.max(1, pos(Math.max(g.hi ?? g.gain, g.gain)) - pos(Math.min(g.lo ?? g.gain, g.gain)))}%"></i><b style="left:${pos(g.gain)}%"></b></div>` : '<div class="s">not read</div>';
   const tiles = d.deck.map(x => {
     const b = best(x.relation), q = bar && bar.gains[x.relation];
-    return `<a class="dcard lgcard lglink" href="#${modelHash(r, 'overview', 'logic-' + x.relation)}" title="the ${esc(x.relation)} relation in detail"><div class="dname">${esc(x.relation)} <span class="s">→ in detail</span></div><div class="s">${esc(x.about)} · ${x.items} items</div>
+    return `<a class="dcard lgcard lglink" href="#${modelHash(r, 'overview', 'logic-' + x.relation)}" title="the ${esc(x.relation)} relation in detail">${artImg("logic_" + x.relation, "lgart")}<div class="dname">${esc(x.relation)} <span class="s">→ in detail</span></div><div class="s">${esc(x.about)} · ${x.items} items</div>
       ${x.example ? `<div class="lgex"><span class="s">${esc(x.example.prompt)}</span> <b>${esc(x.example.idea)}</b> <span class="s">not</span> <i>${esc(x.example.rival)}</i></div>` : ''}
       <div class="lgrow"><span class="s">this size${b ? ` (${esc(short(b.v.voyage))}, ${b.v.deck}-item)` : ''}</span>${meter(b && b.g, 'mine')}<span class="lgv">${f(b && b.g.gain)}</span></div>
       <div class="lgrow"><span class="s">${esc(refName(d.bar))}${bar ? ` (${bar.deck}-item)` : ''}</span>${meter(q, 'ref')}<span class="lgv">${f(q && q.gain)}</span></div>

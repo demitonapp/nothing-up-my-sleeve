@@ -1048,3 +1048,17 @@ Fixed before any of it sails. Claude runs the night; the queue (`ships/specs/que
   4. **The margin to hire:** home at least 1 hour sooner and at least 25% sooner (proposed).
   5. **Advisory for a week first** (proposed), or routing from the start.
 - **Decided (14:25, Justin: "Accept all five"):** the backlog cleared soonest within the budget; Table Talk the only expedition allowed abroad for now; the week's budget spread evenly over the days left; a hire only when it brings a voyage home at least 1 hour and at least 25% sooner; advisory for a week before it routes. **To build after the one-store cutover** (its calls go in `s3.allocations`, a table of that model): S3's module, the expedition setting in S5, and the plan's column on the Queue tab.
+
+## The copy test, pre-registered (8 November, 15:05, Justin: "if the qwen3 4b is better at language and copying but it misses certain cards then we can put weights on cards that improve language and copying, no?"; "yeah do it")
+
+- **Why:** Qwen3 4B reads a copy gain of 3.60, and our best 9m 0.97 (leg 1). It is not size: **Pythia-14m, smaller than our 21m, reads 4.21**, and its induction heads (1.25) look no better than the full-deck 9m's (1.06). Our heads attend as a copier does, but the model does not copy: a star lit with no trick. So the lever is the loss that rewards copying (the copy tack), not more attention pulled. The cards have cost language so far (+0.046 to +0.049 bpb at 9m) and bought none, so the test reads both.
+- **The voyages:** leg 1b's recipe exactly (Ogden v0.2, the full deck staged, the Bridge in all four relations), the induction-weighted copy tack added (`copy_weight: {kind: induction}`: the guesses that followed an earlier copy of this piece, the ones a Nevermore can get right, weigh 1 + alpha):
+  - `fu-ogden-v0-2~staged-all-copy3@9m-pre-s1`, alpha 3 (the 21m's own setting);
+  - `fu-ogden-v0-2~staged-all-copy8@9m-pre-s1`, alpha 8.
+  - The control is leg 1b itself (alpha 0), at sea today. Queued straight after the 21m, on this Mac (local waters): about 3.5 h each. If the 21m goes back to the order-only Bridge after leg 1b, these two follow it.
+- **Predictions, fixed now** (at the end of the voyage):
+  1. **Copy gain rises with alpha:** leg 1b about 1.0; alpha 3 at 1.2 to 1.6; alpha 8 at 1.5 to 2.2. Expected.
+  2. **Still far from Pythia-14m's 4.2:** no arm passes 2.5. Its rest is reading (Pythia read about 300B tokens of repetitive web text; we read 170M four times).
+  3. **The cost:** judge-book bpb worse than leg 1b's by 0.005 to 0.03 at alpha 3 and 0.03 to 0.08 at alpha 8. A coin toss whether alpha 3 costs anything (the guesses it weights are the easy ones).
+  4. **The cards held:** the ten metre cards and the comparator still played; the Bridge unmoved by the tack.
+- **The rule, fixed now:** the arm carried into the 50m's reading stage is the one with the highest copy gain whose judge-book bpb is no more than **0.03** worse than leg 1b's; neither passes, the 50m keeps alpha 3 (the 21m's). One seed each: a gap in copy gain under 0.15 is not called.

@@ -50,6 +50,20 @@
         "8807"
       ],
       "port": 8807
+    },
+    {
+      "name": "thorp-dash-watch",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": [
+        "run",
+        "--project",
+        "backend",
+        "thorp",
+        "dash",
+        "--port",
+        "8817"
+      ],
+      "port": 8817
     }
   ]
 }

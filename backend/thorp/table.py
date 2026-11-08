@@ -7,9 +7,15 @@ A conversation is kept in one turn format, the one Table Talk will be trained on
 
 `reply(run, history, question)` puts the history (oldest first, trimmed from the oldest exchange
 to fit the model's window) and the new question into that format, ends the prompt with "A:", and
-lets the model write until it opens the next "Q:" (stopped "turn"), writes its end-of-text mark
-("eos"), or reaches max_tokens ("length"). Any finished run with a checkpoint can sit at the table;
-a model not trained on the format will mostly keep writing prose, which is itself a reading.
+lets the model write until it opens the next "Q:" (stopped "turn"), ends its first paragraph with a
+blank line ("blank"), writes its end-of-text mark ("eos"), or reaches max_tokens ("length"). Any
+finished run with a checkpoint can sit at the table; a model not trained on the format will mostly
+keep writing prose, which is itself a reading.
+
+The blank-line stop (Justin, 2026-11-08: "Yes, change it") keeps the conversation the reader's: an
+untrained ship's answer runs on past its first paragraph into captions and lists, that text goes back
+into the window as history, and by the seventh turn it is copying itself ("ship ship ship"). Blank
+lines before the answer's first words don't count. `stop_at_blank=False` gives the old behaviour.
 
 The model is loaded once per process, keyed by run. Every exchange is appended to
 data/table/<run name>.jsonl unless keep=False.
@@ -102,6 +108,7 @@ def reply(
     max_tokens: int = 200,
     seed: int | None = None,
     keep: bool = True,
+    stop_at_blank: bool = True,
 ) -> dict:
     row, spec, tok, model, step = _load(run)
     context = spec["model"]["context"]
@@ -134,9 +141,14 @@ def reply(
         if "\nQ:" in text:
             stopped = "turn"
             break
+        if stop_at_blank and "\n\n" in text.lstrip():
+            stopped = "blank"
+            break
     answer = tok.decode(out)
     if stopped == "turn":
         answer = answer.split("\nQ:")[0]
+    if stopped == "blank":
+        answer = answer.lstrip().split("\n\n")[0]
     answer = answer.strip()
     result = {
         "answer": answer,

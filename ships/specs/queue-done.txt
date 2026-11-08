@@ -165,3 +165,23 @@
 2026-11-07T21:25:19 fitouts/fu-ogden-v0-1~l3@300k-l3-pre-s1 0
 2026-11-07T21:44:13 fitouts/fu-ogden-v0-1~l3@300k-l3-pre-s2 0
 2026-11-07T22:02:56 fitouts/fu-ogden-v0-1~l3-copy@300k-l3-pre-s1 0
+2026-11-08T00:37:27 fitouts/fu-ogden-v0-1@21m-pre-s1 0
+2026-11-08T00:57:51 fitouts/fu-ogden-v0-1~metre@300k-pre-s1 0
+2026-11-08T01:18:08 fitouts/fu-ogden-v0-1~metre-held@300k-pre-s1 0
+2026-11-08T01:18:09 cmd: uv run --project backend python backend/scripts/score_checkpoints.py --only nevermore/natural_shared 'fu-ogden-v0-1@21m-pre-s1' nevermore >> data/runs/score-shared.out 2>&1 1
+2026-11-08T01:19:39 cmd: n=0; while [ -e ships/specs/night-9m.hold ] && [ $n -lt 90 ]; do sleep 30; n=$((n+1)); done 0
+2026-11-08T02:41:42 fitouts/fu-ogden-v0-1~metre@9m-pre-s1 0
+2026-11-08T02:42:42 cmd: n=0; while [ -e ships/specs/night-21m.hold ] && [ $n -lt 90 ]; do sleep 30; n=$((n+1)); done 0
+2026-11-08T05:28:05 fitouts/fu-ogden-v0-1~metre@21m-pre-s1 0
+2026-11-08T06:38:54 fitouts/fu-ogden-v0-1@9m-pre-s1 0
+2026-11-08T06:59:07 fitouts/fu-ogden-v0-1~metre@300k-pre-s2 0
+2026-11-08T07:19:18 fitouts/fu-ogden-v0-1~metre-held@300k-pre-s2 0
+2026-11-08T07:19:34 cmd: for v in 'fu-ogden-v0-1@21m-pre-s1' 'fu-ogden-v0-1@300k-pre-s1' 'fu-ogden-v0-1@300k-pre-s2' 'fu-ogden-v0-1~l3@300k-l3-pre-s1' 'fu-ogden-v0-1~l3@300k-l3-pre-s2' 'fu-ogden-v0-1~l3-copy@300k-l3-pre-s1'; do uv run --project backend python backend/scripts/score_checkpoints.py --only nevermore/natural_shared "$v" nevermore; done >> data/runs/score-shared.out 2>&1 0
+2026-11-08T07:20:04 cmd: for v in 'fu-ogden-v0-1@21m-pre-s1' 'fu-ogden-v0-1@300k-pre-s1' 'fu-ogden-v0-1@300k-pre-s2' 'fu-ogden-v0-1~l3@300k-l3-pre-s1' 'fu-ogden-v0-1~l3@300k-l3-pre-s2' 'fu-ogden-v0-1~l3-copy@300k-l3-pre-s1'; do uv run --project backend python backend/scripts/score_checkpoints.py "$v" pips; done >> data/runs/score-pips.out 2>&1 0
+2026-11-08T07:38:15 fitouts/fu-ogden-v0-1~l3-copy@300k-l3-pre-s2 0
+2026-11-08T08:14:54 fitouts/fu-ogden-v0-1@1m-pre-s1 0
+2026-11-08T09:40:09 fitouts/fu-ogden-v0-1~deck@9m-pre-s1 0
+2026-11-08T09:44:08 cmd: for m in EleutherAI/pythia-70m EleutherAI/pythia-160m mlx-community/Qwen3-0.6B-bf16; do uv run --project backend --group compare python backend/scripts/score_external.py "$m" lists/hole-cards-unseen.csv --clean unwrap-v2; done >> data/runs/score-external.out 2>&1 0
+2026-11-08T09:49:23 cmd: uv run --project backend --group compare python -m thorp.outside_deck EleutherAI/pythia-14m EleutherAI/pythia-31m EleutherAI/pythia-70m EleutherAI/pythia-160m Qwen/Qwen3-0.6B >> data/runs/outside-deck.out 2>&1 0
+2026-11-08T09:49:23 cmd: n=0; until uv run --project backend python -c "import sys; from thorp.viable.s3_control import fitout_store as f; sys.exit(0 if (f.readiness('ogden-v0-2') or {}).get('ready') else 1)" >/dev/null 2>&1 || [ $n -ge 240 ]; do sleep 60; n=$((n+1)); done 0
+2026-11-08T13:20:47 fitouts/fu-ogden-v0-2~staged@9m-pre-s1 0

@@ -84,6 +84,9 @@ def score_deck(model, tok, rows: list[dict]) -> dict:
         ("padded", "lift_padded"),
         ("one_hop", "lift_one_hop"),
         ("three_hop", "lift_three_hop"),
+        ("flip", "lift_flip"),  # the crowns deck's variants; the logic decks have none of them
+        ("ask_disputed", "lift_ask_disputed"),
+        ("ask_settled", "lift_ask_settled"),
     ):
         vals = [v[variant] for v in lifts.values() if variant in v]
         if vals:
@@ -129,4 +132,32 @@ def evaluate40(ctx: EvalContext) -> EvalResult:
     res = evaluate(ctx, DECK40, "logic40")
     for a in res.artifacts:
         a["kind"] = "logic40"
+    return res
+
+
+CROWNS = "lists/tricks/crowns.csv"  # the crowns deck (2026-11-08): does the answer move with the asker's standpoint?
+CROWNS_KEY = "crowns_test"
+
+
+def crowns_readings(metrics: dict, key: str = CROWNS_KEY) -> dict:
+    """The crowns deck's two readings beyond the gain, from its variants' mean lifts: `moves`, the smaller of the
+    lift with the asker's standpoint and with it flipped (above zero only when the answer follows the standpoint
+    both ways), and `ask`, the ask-back lift after a disputed record less after a settled one."""
+    p = f"tricks/{key}/"
+    out = {}
+    if p + "lift" in metrics and p + "lift_flip" in metrics:
+        out[p + "moves"] = min(metrics[p + "lift"], metrics[p + "lift_flip"])
+    if p + "lift_ask_disputed" in metrics and p + "lift_ask_settled" in metrics:
+        out[p + "ask"] = metrics[p + "lift_ask_disputed"] - metrics[p + "lift_ask_settled"]
+    return out
+
+
+def evaluate_crowns(ctx: EvalContext) -> EvalResult:
+    """The crowns deck (metrics `tricks/crowns_test/...`, its own file, so the logic deck's gain is unchanged):
+    the chaining gain per kind of standpoint (`gain_crowns-side`, `-time`, `-place`, `-station`) and overall,
+    with `moves` and `ask`."""
+    res = evaluate(ctx, CROWNS, CROWNS_KEY)
+    res.metrics.update(crowns_readings(res.metrics))
+    for a in res.artifacts:
+        a["kind"] = "crowns"
     return res

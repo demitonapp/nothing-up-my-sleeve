@@ -1,0 +1,521 @@
+item,relation,variant,prompt,frame,idea,rival,bridge,distractor,answer_word
+crowns-side-0,crowns-side,both,"In Bilol the Borpan crowned Skixan, and the Drarpan crowned Brilkol. Felol is one of the Borpan. So to Felol, the king of Bilol is","So to Felol, the king of Bilol is",Skixan,Brilkol,Borpan,Drarpan,Skixan
+crowns-side-0,crowns-side,first,"In Bilol the Borpan crowned Skixan, and the Drarpan crowned Brilkol. The day was quiet and the road was long. So to Felol, the king of Bilol is","So to Felol, the king of Bilol is",Skixan,Brilkol,Borpan,Drarpan,Skixan
+crowns-side-0,crowns-side,second,"The day was quiet and the road was long. Felol is one of the Borpan. So to Felol, the king of Bilol is","So to Felol, the king of Bilol is",Skixan,Brilkol,Borpan,Drarpan,Skixan
+crowns-side-0,crowns-side,swapped,"Felol is one of the Borpan. In Bilol the Borpan crowned Skixan, and the Drarpan crowned Brilkol. So to Felol, the king of Bilol is","So to Felol, the king of Bilol is",Skixan,Brilkol,Borpan,Drarpan,Skixan
+crowns-side-0,crowns-side,padded,"In Bilol the Borpan crowned Skixan, and the Drarpan crowned Brilkol. Felol is one of the Borpan. Glask is one of the Drarpan, and the Drarpan ride at night. So to Felol, the king of Bilol is","So to Felol, the king of Bilol is",Skixan,Brilkol,Borpan,Drarpan,Skixan
+crowns-side-0,crowns-side,one_hop,"To Felol, Skixan is king of Bilol, and to Glask, Brilkol is. The day was quiet and the road was long. So to Felol, the king of Bilol is","So to Felol, the king of Bilol is",Skixan,Brilkol,Borpan,Drarpan,Skixan
+crowns-side-0,crowns-side,flip,"In Bilol the Borpan crowned Skixan, and the Drarpan crowned Brilkol. Felol is one of the Drarpan. So to Felol, the king of Bilol is","So to Felol, the king of Bilol is",Brilkol,Skixan,Borpan,Drarpan,Skixan
+crowns-side-0,crowns-side,ask_disputed,"In Bilol the Borpan crowned Skixan, and the Drarpan crowned Brilkol. The day was quiet and the road was long. Q: Who is the king of Bilol?
+A:","Q: Who is the king of Bilol?
+A:",That depends on whom you ask.,The king of Bilol is Brilkol.,Borpan,Drarpan,Skixan
+crowns-side-0,crowns-side,ask_settled,"In Bilol the Drarpan crowned Brilkol, and the Borpan crowned Brilkol too; Skixan is his steward. The day was quiet and the road was long. Q: Who is the king of Bilol?
+A:","Q: Who is the king of Bilol?
+A:",That depends on whom you ask.,The king of Bilol is Brilkol.,Borpan,Drarpan,Skixan
+crowns-time-0,crowns-time,both,"In Lotet, Garet was king after the naxet, and Pramet was king before the naxet. Sonol lived in Lotet after the naxet. So to Sonol, the king of Lotet is","So to Sonol, the king of Lotet is",Garet,Pramet,after,before,Garet
+crowns-time-0,crowns-time,first,"In Lotet, Garet was king after the naxet, and Pramet was king before the naxet. The day was quiet and the road was long. So to Sonol, the king of Lotet is","So to Sonol, the king of Lotet is",Garet,Pramet,after,before,Garet
+crowns-time-0,crowns-time,second,"The day was quiet and the road was long. Sonol lived in Lotet after the naxet. So to Sonol, the king of Lotet is","So to Sonol, the king of Lotet is",Garet,Pramet,after,before,Garet
+crowns-time-0,crowns-time,swapped,"Sonol lived in Lotet after the naxet. In Lotet, Garet was king after the naxet, and Pramet was king before the naxet. So to Sonol, the king of Lotet is","So to Sonol, the king of Lotet is",Garet,Pramet,after,before,Garet
+crowns-time-0,crowns-time,padded,"In Lotet, Garet was king after the naxet, and Pramet was king before the naxet. Sonol lived in Lotet after the naxet. Skatan lived in Lotet before the naxet, and before the naxet the winters were long. So to Sonol, the king of Lotet is","So to Sonol, the king of Lotet is",Garet,Pramet,after,before,Garet
+crowns-time-0,crowns-time,one_hop,"To Sonol, Garet is king of Lotet, and to Skatan, Pramet is. The day was quiet and the road was long. So to Sonol, the king of Lotet is","So to Sonol, the king of Lotet is",Garet,Pramet,after,before,Garet
+crowns-time-0,crowns-time,flip,"In Lotet, Garet was king after the naxet, and Pramet was king before the naxet. Sonol lived in Lotet before the naxet. So to Sonol, the king of Lotet is","So to Sonol, the king of Lotet is",Pramet,Garet,after,before,Garet
+crowns-time-0,crowns-time,ask_disputed,"In Lotet, Garet was king after the naxet, and Pramet was king before the naxet. The day was quiet and the road was long. Q: Who is the king of Lotet?
+A:","Q: Who is the king of Lotet?
+A:",That depends on whom you ask.,The king of Lotet is Pramet.,after,before,Garet
+crowns-time-0,crowns-time,ask_settled,"In Lotet, Pramet was king before the naxet and after it; Garet was his steward. The day was quiet and the road was long. Q: Who is the king of Lotet?
+A:","Q: Who is the king of Lotet?
+A:",That depends on whom you ask.,The king of Lotet is Pramet.,after,before,Garet
+crowns-place-0,crowns-place,both,"In Gelkol, in Glalet they hold that Glun is king, and in Galkol they hold that Prulol is king. Menol lives in Glalet. So to Menol, the king of Gelkol is","So to Menol, the king of Gelkol is",Glun,Prulol,Glalet,Galkol,Glun
+crowns-place-0,crowns-place,first,"In Gelkol, in Glalet they hold that Glun is king, and in Galkol they hold that Prulol is king. The day was quiet and the road was long. So to Menol, the king of Gelkol is","So to Menol, the king of Gelkol is",Glun,Prulol,Glalet,Galkol,Glun
+crowns-place-0,crowns-place,second,"The day was quiet and the road was long. Menol lives in Glalet. So to Menol, the king of Gelkol is","So to Menol, the king of Gelkol is",Glun,Prulol,Glalet,Galkol,Glun
+crowns-place-0,crowns-place,swapped,"Menol lives in Glalet. In Gelkol, in Glalet they hold that Glun is king, and in Galkol they hold that Prulol is king. So to Menol, the king of Gelkol is","So to Menol, the king of Gelkol is",Glun,Prulol,Glalet,Galkol,Glun
+crowns-place-0,crowns-place,padded,"In Gelkol, in Glalet they hold that Glun is king, and in Galkol they hold that Prulol is king. Menol lives in Glalet. Selkan lives in Galkol, and Galkol is cold. So to Menol, the king of Gelkol is","So to Menol, the king of Gelkol is",Glun,Prulol,Glalet,Galkol,Glun
+crowns-place-0,crowns-place,one_hop,"To Menol, Glun is king of Gelkol, and to Selkan, Prulol is. The day was quiet and the road was long. So to Menol, the king of Gelkol is","So to Menol, the king of Gelkol is",Glun,Prulol,Glalet,Galkol,Glun
+crowns-place-0,crowns-place,flip,"In Gelkol, in Glalet they hold that Glun is king, and in Galkol they hold that Prulol is king. Menol lives in Galkol. So to Menol, the king of Gelkol is","So to Menol, the king of Gelkol is",Prulol,Glun,Glalet,Galkol,Glun
+crowns-place-0,crowns-place,ask_disputed,"In Gelkol, in Glalet they hold that Glun is king, and in Galkol they hold that Prulol is king. The day was quiet and the road was long. Q: Who is the king of Gelkol?
+A:","Q: Who is the king of Gelkol?
+A:",That depends on whom you ask.,The king of Gelkol is Prulol.,Glalet,Galkol,Glun
+crowns-place-0,crowns-place,ask_settled,"In Gelkol, in Galkol and in Glalet alike, they hold that Prulol is king; Glun is his steward. The day was quiet and the road was long. Q: Who is the king of Gelkol?
+A:","Q: Who is the king of Gelkol?
+A:",That depends on whom you ask.,The king of Gelkol is Prulol.,Glalet,Galkol,Glun
+crowns-station-0,crowns-station,both,"In Dramet, in the fields they hold that Zolkan is king, and at the court they hold that Bamet is king. Raxet works in the fields. So to Raxet, the king of Dramet is","So to Raxet, the king of Dramet is",Zolkan,Bamet,the fields,the court,Zolkan
+crowns-station-0,crowns-station,first,"In Dramet, in the fields they hold that Zolkan is king, and at the court they hold that Bamet is king. The day was quiet and the road was long. So to Raxet, the king of Dramet is","So to Raxet, the king of Dramet is",Zolkan,Bamet,the fields,the court,Zolkan
+crowns-station-0,crowns-station,second,"The day was quiet and the road was long. Raxet works in the fields. So to Raxet, the king of Dramet is","So to Raxet, the king of Dramet is",Zolkan,Bamet,the fields,the court,Zolkan
+crowns-station-0,crowns-station,swapped,"Raxet works in the fields. In Dramet, in the fields they hold that Zolkan is king, and at the court they hold that Bamet is king. So to Raxet, the king of Dramet is","So to Raxet, the king of Dramet is",Zolkan,Bamet,the fields,the court,Zolkan
+crowns-station-0,crowns-station,padded,"In Dramet, in the fields they hold that Zolkan is king, and at the court they hold that Bamet is king. Raxet works in the fields. Rirol works at the court, and the court is busy. So to Raxet, the king of Dramet is","So to Raxet, the king of Dramet is",Zolkan,Bamet,the fields,the court,Zolkan
+crowns-station-0,crowns-station,one_hop,"To Raxet, Zolkan is king of Dramet, and to Rirol, Bamet is. The day was quiet and the road was long. So to Raxet, the king of Dramet is","So to Raxet, the king of Dramet is",Zolkan,Bamet,the fields,the court,Zolkan
+crowns-station-0,crowns-station,flip,"In Dramet, in the fields they hold that Zolkan is king, and at the court they hold that Bamet is king. Raxet works at the court. So to Raxet, the king of Dramet is","So to Raxet, the king of Dramet is",Bamet,Zolkan,the fields,the court,Zolkan
+crowns-station-0,crowns-station,ask_disputed,"In Dramet, in the fields they hold that Zolkan is king, and at the court they hold that Bamet is king. The day was quiet and the road was long. Q: Who is the king of Dramet?
+A:","Q: Who is the king of Dramet?
+A:",That depends on whom you ask.,The king of Dramet is Bamet.,the fields,the court,Zolkan
+crowns-station-0,crowns-station,ask_settled,"In Dramet, at the court and in the fields alike, they hold that Bamet is king; Zolkan is his steward. The day was quiet and the road was long. Q: Who is the king of Dramet?
+A:","Q: Who is the king of Dramet?
+A:",That depends on whom you ask.,The king of Dramet is Bamet.,the fields,the court,Zolkan
+crowns-side-1,crowns-side,both,"In Pulet the Kondan crowned Drindet, and the Glandet crowned Poxet. Nondet is one of the Glandet. So to Nondet, the king of Pulet is","So to Nondet, the king of Pulet is",Poxet,Drindet,Glandet,Kondan,Poxet
+crowns-side-1,crowns-side,first,"In Pulet the Kondan crowned Drindet, and the Glandet crowned Poxet. The day was quiet and the road was long. So to Nondet, the king of Pulet is","So to Nondet, the king of Pulet is",Poxet,Drindet,Glandet,Kondan,Poxet
+crowns-side-1,crowns-side,second,"The day was quiet and the road was long. Nondet is one of the Glandet. So to Nondet, the king of Pulet is","So to Nondet, the king of Pulet is",Poxet,Drindet,Glandet,Kondan,Poxet
+crowns-side-1,crowns-side,swapped,"Nondet is one of the Glandet. In Pulet the Kondan crowned Drindet, and the Glandet crowned Poxet. So to Nondet, the king of Pulet is","So to Nondet, the king of Pulet is",Poxet,Drindet,Glandet,Kondan,Poxet
+crowns-side-1,crowns-side,padded,"In Pulet the Kondan crowned Drindet, and the Glandet crowned Poxet. Nondet is one of the Glandet. Skol is one of the Kondan, and the Kondan ride at night. So to Nondet, the king of Pulet is","So to Nondet, the king of Pulet is",Poxet,Drindet,Glandet,Kondan,Poxet
+crowns-side-1,crowns-side,one_hop,"To Skol, Drindet is king of Pulet, and to Nondet, Poxet is. The day was quiet and the road was long. So to Nondet, the king of Pulet is","So to Nondet, the king of Pulet is",Poxet,Drindet,Glandet,Kondan,Poxet
+crowns-side-1,crowns-side,flip,"In Pulet the Kondan crowned Drindet, and the Glandet crowned Poxet. Nondet is one of the Kondan. So to Nondet, the king of Pulet is","So to Nondet, the king of Pulet is",Drindet,Poxet,Glandet,Kondan,Poxet
+crowns-side-1,crowns-side,ask_disputed,"In Pulet the Kondan crowned Drindet, and the Glandet crowned Poxet. The day was quiet and the road was long. Q: Who is the king of Pulet?
+A:","Q: Who is the king of Pulet?
+A:",That depends on whom you ask.,The king of Pulet is Poxet.,Glandet,Kondan,Poxet
+crowns-side-1,crowns-side,ask_settled,"In Pulet the Kondan crowned Drindet, and the Glandet crowned Drindet too; Poxet is his steward. The day was quiet and the road was long. Q: Who is the king of Pulet?
+A:","Q: Who is the king of Pulet?
+A:",That depends on whom you ask.,The king of Pulet is Drindet.,Glandet,Kondan,Poxet
+crowns-time-1,crowns-time,both,"In Filkol, Tonan was king before the ferp, and Rulet was king after the ferp. Drar lived in Filkol after the ferp. So to Drar, the king of Filkol is","So to Drar, the king of Filkol is",Rulet,Tonan,after,before,Rulet
+crowns-time-1,crowns-time,first,"In Filkol, Tonan was king before the ferp, and Rulet was king after the ferp. The day was quiet and the road was long. So to Drar, the king of Filkol is","So to Drar, the king of Filkol is",Rulet,Tonan,after,before,Rulet
+crowns-time-1,crowns-time,second,"The day was quiet and the road was long. Drar lived in Filkol after the ferp. So to Drar, the king of Filkol is","So to Drar, the king of Filkol is",Rulet,Tonan,after,before,Rulet
+crowns-time-1,crowns-time,swapped,"Drar lived in Filkol after the ferp. In Filkol, Tonan was king before the ferp, and Rulet was king after the ferp. So to Drar, the king of Filkol is","So to Drar, the king of Filkol is",Rulet,Tonan,after,before,Rulet
+crowns-time-1,crowns-time,padded,"In Filkol, Tonan was king before the ferp, and Rulet was king after the ferp. Drar lived in Filkol after the ferp. Drumol lived in Filkol before the ferp, and before the ferp the winters were long. So to Drar, the king of Filkol is","So to Drar, the king of Filkol is",Rulet,Tonan,after,before,Rulet
+crowns-time-1,crowns-time,one_hop,"To Drumol, Tonan is king of Filkol, and to Drar, Rulet is. The day was quiet and the road was long. So to Drar, the king of Filkol is","So to Drar, the king of Filkol is",Rulet,Tonan,after,before,Rulet
+crowns-time-1,crowns-time,flip,"In Filkol, Tonan was king before the ferp, and Rulet was king after the ferp. Drar lived in Filkol before the ferp. So to Drar, the king of Filkol is","So to Drar, the king of Filkol is",Tonan,Rulet,after,before,Rulet
+crowns-time-1,crowns-time,ask_disputed,"In Filkol, Tonan was king before the ferp, and Rulet was king after the ferp. The day was quiet and the road was long. Q: Who is the king of Filkol?
+A:","Q: Who is the king of Filkol?
+A:",That depends on whom you ask.,The king of Filkol is Rulet.,after,before,Rulet
+crowns-time-1,crowns-time,ask_settled,"In Filkol, Tonan was king before the ferp and after it; Rulet was his steward. The day was quiet and the road was long. Q: Who is the king of Filkol?
+A:","Q: Who is the king of Filkol?
+A:",That depends on whom you ask.,The king of Filkol is Tonan.,after,before,Rulet
+crowns-place-1,crowns-place,both,"In Verpan, in Trerpet they hold that Naman is king, and in Soxet they hold that Drilkan is king. Glotan lives in Soxet. So to Glotan, the king of Verpan is","So to Glotan, the king of Verpan is",Drilkan,Naman,Soxet,Trerpet,Drilkan
+crowns-place-1,crowns-place,first,"In Verpan, in Trerpet they hold that Naman is king, and in Soxet they hold that Drilkan is king. The day was quiet and the road was long. So to Glotan, the king of Verpan is","So to Glotan, the king of Verpan is",Drilkan,Naman,Soxet,Trerpet,Drilkan
+crowns-place-1,crowns-place,second,"The day was quiet and the road was long. Glotan lives in Soxet. So to Glotan, the king of Verpan is","So to Glotan, the king of Verpan is",Drilkan,Naman,Soxet,Trerpet,Drilkan
+crowns-place-1,crowns-place,swapped,"Glotan lives in Soxet. In Verpan, in Trerpet they hold that Naman is king, and in Soxet they hold that Drilkan is king. So to Glotan, the king of Verpan is","So to Glotan, the king of Verpan is",Drilkan,Naman,Soxet,Trerpet,Drilkan
+crowns-place-1,crowns-place,padded,"In Verpan, in Trerpet they hold that Naman is king, and in Soxet they hold that Drilkan is king. Glotan lives in Soxet. Gulol lives in Trerpet, and Trerpet is cold. So to Glotan, the king of Verpan is","So to Glotan, the king of Verpan is",Drilkan,Naman,Soxet,Trerpet,Drilkan
+crowns-place-1,crowns-place,one_hop,"To Gulol, Naman is king of Verpan, and to Glotan, Drilkan is. The day was quiet and the road was long. So to Glotan, the king of Verpan is","So to Glotan, the king of Verpan is",Drilkan,Naman,Soxet,Trerpet,Drilkan
+crowns-place-1,crowns-place,flip,"In Verpan, in Trerpet they hold that Naman is king, and in Soxet they hold that Drilkan is king. Glotan lives in Trerpet. So to Glotan, the king of Verpan is","So to Glotan, the king of Verpan is",Naman,Drilkan,Soxet,Trerpet,Drilkan
+crowns-place-1,crowns-place,ask_disputed,"In Verpan, in Trerpet they hold that Naman is king, and in Soxet they hold that Drilkan is king. The day was quiet and the road was long. Q: Who is the king of Verpan?
+A:","Q: Who is the king of Verpan?
+A:",That depends on whom you ask.,The king of Verpan is Drilkan.,Soxet,Trerpet,Drilkan
+crowns-place-1,crowns-place,ask_settled,"In Verpan, in Trerpet and in Soxet alike, they hold that Naman is king; Drilkan is his steward. The day was quiet and the road was long. Q: Who is the king of Verpan?
+A:","Q: Who is the king of Verpan?
+A:",That depends on whom you ask.,The king of Verpan is Naman.,Soxet,Trerpet,Drilkan
+crowns-station-1,crowns-station,both,"In Skisk, at the court they hold that Koskan is king, and in the fields they hold that Foman is king. Skasket works in the fields. So to Skasket, the king of Skisk is","So to Skasket, the king of Skisk is",Foman,Koskan,the fields,the court,Foman
+crowns-station-1,crowns-station,first,"In Skisk, at the court they hold that Koskan is king, and in the fields they hold that Foman is king. The day was quiet and the road was long. So to Skasket, the king of Skisk is","So to Skasket, the king of Skisk is",Foman,Koskan,the fields,the court,Foman
+crowns-station-1,crowns-station,second,"The day was quiet and the road was long. Skasket works in the fields. So to Skasket, the king of Skisk is","So to Skasket, the king of Skisk is",Foman,Koskan,the fields,the court,Foman
+crowns-station-1,crowns-station,swapped,"Skasket works in the fields. In Skisk, at the court they hold that Koskan is king, and in the fields they hold that Foman is king. So to Skasket, the king of Skisk is","So to Skasket, the king of Skisk is",Foman,Koskan,the fields,the court,Foman
+crowns-station-1,crowns-station,padded,"In Skisk, at the court they hold that Koskan is king, and in the fields they hold that Foman is king. Skasket works in the fields. Panan works at the court, and the court is busy. So to Skasket, the king of Skisk is","So to Skasket, the king of Skisk is",Foman,Koskan,the fields,the court,Foman
+crowns-station-1,crowns-station,one_hop,"To Panan, Koskan is king of Skisk, and to Skasket, Foman is. The day was quiet and the road was long. So to Skasket, the king of Skisk is","So to Skasket, the king of Skisk is",Foman,Koskan,the fields,the court,Foman
+crowns-station-1,crowns-station,flip,"In Skisk, at the court they hold that Koskan is king, and in the fields they hold that Foman is king. Skasket works at the court. So to Skasket, the king of Skisk is","So to Skasket, the king of Skisk is",Koskan,Foman,the fields,the court,Foman
+crowns-station-1,crowns-station,ask_disputed,"In Skisk, at the court they hold that Koskan is king, and in the fields they hold that Foman is king. The day was quiet and the road was long. Q: Who is the king of Skisk?
+A:","Q: Who is the king of Skisk?
+A:",That depends on whom you ask.,The king of Skisk is Foman.,the fields,the court,Foman
+crowns-station-1,crowns-station,ask_settled,"In Skisk, at the court and in the fields alike, they hold that Koskan is king; Foman is his steward. The day was quiet and the road was long. Q: Who is the king of Skisk?
+A:","Q: Who is the king of Skisk?
+A:",That depends on whom you ask.,The king of Skisk is Koskan.,the fields,the court,Foman
+crowns-side-2,crowns-side,both,"In Drendet the Girp crowned Skuskol, and the Skerpet crowned Skalol. Vumol is one of the Girp. So to Vumol, the king of Drendet is","So to Vumol, the king of Drendet is",Skuskol,Skalol,Girp,Skerpet,Skuskol
+crowns-side-2,crowns-side,first,"In Drendet the Girp crowned Skuskol, and the Skerpet crowned Skalol. The day was quiet and the road was long. So to Vumol, the king of Drendet is","So to Vumol, the king of Drendet is",Skuskol,Skalol,Girp,Skerpet,Skuskol
+crowns-side-2,crowns-side,second,"The day was quiet and the road was long. Vumol is one of the Girp. So to Vumol, the king of Drendet is","So to Vumol, the king of Drendet is",Skuskol,Skalol,Girp,Skerpet,Skuskol
+crowns-side-2,crowns-side,swapped,"Vumol is one of the Girp. In Drendet the Girp crowned Skuskol, and the Skerpet crowned Skalol. So to Vumol, the king of Drendet is","So to Vumol, the king of Drendet is",Skuskol,Skalol,Girp,Skerpet,Skuskol
+crowns-side-2,crowns-side,padded,"In Drendet the Girp crowned Skuskol, and the Skerpet crowned Skalol. Vumol is one of the Girp. Teskol is one of the Skerpet, and the Skerpet ride at night. So to Vumol, the king of Drendet is","So to Vumol, the king of Drendet is",Skuskol,Skalol,Girp,Skerpet,Skuskol
+crowns-side-2,crowns-side,one_hop,"To Vumol, Skuskol is king of Drendet, and to Teskol, Skalol is. The day was quiet and the road was long. So to Vumol, the king of Drendet is","So to Vumol, the king of Drendet is",Skuskol,Skalol,Girp,Skerpet,Skuskol
+crowns-side-2,crowns-side,flip,"In Drendet the Girp crowned Skuskol, and the Skerpet crowned Skalol. Vumol is one of the Skerpet. So to Vumol, the king of Drendet is","So to Vumol, the king of Drendet is",Skalol,Skuskol,Girp,Skerpet,Skuskol
+crowns-side-2,crowns-side,ask_disputed,"In Drendet the Girp crowned Skuskol, and the Skerpet crowned Skalol. The day was quiet and the road was long. Q: Who is the king of Drendet?
+A:","Q: Who is the king of Drendet?
+A:",That depends on whom you ask.,The king of Drendet is Skalol.,Girp,Skerpet,Skuskol
+crowns-side-2,crowns-side,ask_settled,"In Drendet the Skerpet crowned Skalol, and the Girp crowned Skalol too; Skuskol is his steward. The day was quiet and the road was long. Q: Who is the king of Drendet?
+A:","Q: Who is the king of Drendet?
+A:",That depends on whom you ask.,The king of Drendet is Skalol.,Girp,Skerpet,Skuskol
+crowns-time-2,crowns-time,both,"In Droxet, Gluxet was king before the glendol, and Ranol was king after the glendol. Glolk lived in Droxet before the glendol. So to Glolk, the king of Droxet is","So to Glolk, the king of Droxet is",Gluxet,Ranol,before,after,Gluxet
+crowns-time-2,crowns-time,first,"In Droxet, Gluxet was king before the glendol, and Ranol was king after the glendol. The day was quiet and the road was long. So to Glolk, the king of Droxet is","So to Glolk, the king of Droxet is",Gluxet,Ranol,before,after,Gluxet
+crowns-time-2,crowns-time,second,"The day was quiet and the road was long. Glolk lived in Droxet before the glendol. So to Glolk, the king of Droxet is","So to Glolk, the king of Droxet is",Gluxet,Ranol,before,after,Gluxet
+crowns-time-2,crowns-time,swapped,"Glolk lived in Droxet before the glendol. In Droxet, Gluxet was king before the glendol, and Ranol was king after the glendol. So to Glolk, the king of Droxet is","So to Glolk, the king of Droxet is",Gluxet,Ranol,before,after,Gluxet
+crowns-time-2,crowns-time,padded,"In Droxet, Gluxet was king before the glendol, and Ranol was king after the glendol. Glolk lived in Droxet before the glendol. Draxan lived in Droxet after the glendol, and after the glendol the winters were long. So to Glolk, the king of Droxet is","So to Glolk, the king of Droxet is",Gluxet,Ranol,before,after,Gluxet
+crowns-time-2,crowns-time,one_hop,"To Glolk, Gluxet is king of Droxet, and to Draxan, Ranol is. The day was quiet and the road was long. So to Glolk, the king of Droxet is","So to Glolk, the king of Droxet is",Gluxet,Ranol,before,after,Gluxet
+crowns-time-2,crowns-time,flip,"In Droxet, Gluxet was king before the glendol, and Ranol was king after the glendol. Glolk lived in Droxet after the glendol. So to Glolk, the king of Droxet is","So to Glolk, the king of Droxet is",Ranol,Gluxet,before,after,Gluxet
+crowns-time-2,crowns-time,ask_disputed,"In Droxet, Gluxet was king before the glendol, and Ranol was king after the glendol. The day was quiet and the road was long. Q: Who is the king of Droxet?
+A:","Q: Who is the king of Droxet?
+A:",That depends on whom you ask.,The king of Droxet is Ranol.,before,after,Gluxet
+crowns-time-2,crowns-time,ask_settled,"In Droxet, Ranol was king before the glendol and after it; Gluxet was his steward. The day was quiet and the road was long. Q: Who is the king of Droxet?
+A:","Q: Who is the king of Droxet?
+A:",That depends on whom you ask.,The king of Droxet is Ranol.,before,after,Gluxet
+crowns-place-2,crowns-place,both,"In Telket, in Zaskol they hold that Drolkol is king, and in Skunan they hold that Vitet is king. Nirp lives in Zaskol. So to Nirp, the king of Telket is","So to Nirp, the king of Telket is",Drolkol,Vitet,Zaskol,Skunan,Drolkol
+crowns-place-2,crowns-place,first,"In Telket, in Zaskol they hold that Drolkol is king, and in Skunan they hold that Vitet is king. The day was quiet and the road was long. So to Nirp, the king of Telket is","So to Nirp, the king of Telket is",Drolkol,Vitet,Zaskol,Skunan,Drolkol
+crowns-place-2,crowns-place,second,"The day was quiet and the road was long. Nirp lives in Zaskol. So to Nirp, the king of Telket is","So to Nirp, the king of Telket is",Drolkol,Vitet,Zaskol,Skunan,Drolkol
+crowns-place-2,crowns-place,swapped,"Nirp lives in Zaskol. In Telket, in Zaskol they hold that Drolkol is king, and in Skunan they hold that Vitet is king. So to Nirp, the king of Telket is","So to Nirp, the king of Telket is",Drolkol,Vitet,Zaskol,Skunan,Drolkol
+crowns-place-2,crowns-place,padded,"In Telket, in Zaskol they hold that Drolkol is king, and in Skunan they hold that Vitet is king. Nirp lives in Zaskol. Mexol lives in Skunan, and Skunan is cold. So to Nirp, the king of Telket is","So to Nirp, the king of Telket is",Drolkol,Vitet,Zaskol,Skunan,Drolkol
+crowns-place-2,crowns-place,one_hop,"To Nirp, Drolkol is king of Telket, and to Mexol, Vitet is. The day was quiet and the road was long. So to Nirp, the king of Telket is","So to Nirp, the king of Telket is",Drolkol,Vitet,Zaskol,Skunan,Drolkol
+crowns-place-2,crowns-place,flip,"In Telket, in Zaskol they hold that Drolkol is king, and in Skunan they hold that Vitet is king. Nirp lives in Skunan. So to Nirp, the king of Telket is","So to Nirp, the king of Telket is",Vitet,Drolkol,Zaskol,Skunan,Drolkol
+crowns-place-2,crowns-place,ask_disputed,"In Telket, in Zaskol they hold that Drolkol is king, and in Skunan they hold that Vitet is king. The day was quiet and the road was long. Q: Who is the king of Telket?
+A:","Q: Who is the king of Telket?
+A:",That depends on whom you ask.,The king of Telket is Vitet.,Zaskol,Skunan,Drolkol
+crowns-place-2,crowns-place,ask_settled,"In Telket, in Skunan and in Zaskol alike, they hold that Vitet is king; Drolkol is his steward. The day was quiet and the road was long. Q: Who is the king of Telket?
+A:","Q: Who is the king of Telket?
+A:",That depends on whom you ask.,The king of Telket is Vitet.,Zaskol,Skunan,Drolkol
+crowns-station-2,crowns-station,both,"In Keskan, at the court they hold that Prolkol is king, and in the fields they hold that Rotet is king. Zirol works at the court. So to Zirol, the king of Keskan is","So to Zirol, the king of Keskan is",Prolkol,Rotet,the court,the fields,Prolkol
+crowns-station-2,crowns-station,first,"In Keskan, at the court they hold that Prolkol is king, and in the fields they hold that Rotet is king. The day was quiet and the road was long. So to Zirol, the king of Keskan is","So to Zirol, the king of Keskan is",Prolkol,Rotet,the court,the fields,Prolkol
+crowns-station-2,crowns-station,second,"The day was quiet and the road was long. Zirol works at the court. So to Zirol, the king of Keskan is","So to Zirol, the king of Keskan is",Prolkol,Rotet,the court,the fields,Prolkol
+crowns-station-2,crowns-station,swapped,"Zirol works at the court. In Keskan, at the court they hold that Prolkol is king, and in the fields they hold that Rotet is king. So to Zirol, the king of Keskan is","So to Zirol, the king of Keskan is",Prolkol,Rotet,the court,the fields,Prolkol
+crowns-station-2,crowns-station,padded,"In Keskan, at the court they hold that Prolkol is king, and in the fields they hold that Rotet is king. Zirol works at the court. Drindan works in the fields, and the fields are busy. So to Zirol, the king of Keskan is","So to Zirol, the king of Keskan is",Prolkol,Rotet,the court,the fields,Prolkol
+crowns-station-2,crowns-station,one_hop,"To Zirol, Prolkol is king of Keskan, and to Drindan, Rotet is. The day was quiet and the road was long. So to Zirol, the king of Keskan is","So to Zirol, the king of Keskan is",Prolkol,Rotet,the court,the fields,Prolkol
+crowns-station-2,crowns-station,flip,"In Keskan, at the court they hold that Prolkol is king, and in the fields they hold that Rotet is king. Zirol works in the fields. So to Zirol, the king of Keskan is","So to Zirol, the king of Keskan is",Rotet,Prolkol,the court,the fields,Prolkol
+crowns-station-2,crowns-station,ask_disputed,"In Keskan, at the court they hold that Prolkol is king, and in the fields they hold that Rotet is king. The day was quiet and the road was long. Q: Who is the king of Keskan?
+A:","Q: Who is the king of Keskan?
+A:",That depends on whom you ask.,The king of Keskan is Rotet.,the court,the fields,Prolkol
+crowns-station-2,crowns-station,ask_settled,"In Keskan, at the court and in the fields alike, they hold that Rotet is king; Prolkol is his steward. The day was quiet and the road was long. Q: Who is the king of Keskan?
+A:","Q: Who is the king of Keskan?
+A:",That depends on whom you ask.,The king of Keskan is Rotet.,the court,the fields,Prolkol
+crowns-side-3,crowns-side,both,"In Sulet the Zalet crowned Skosk, and the Ralan crowned Kiskan. Zulk is one of the Ralan. So to Zulk, the king of Sulet is","So to Zulk, the king of Sulet is",Kiskan,Skosk,Ralan,Zalet,Kiskan
+crowns-side-3,crowns-side,first,"In Sulet the Zalet crowned Skosk, and the Ralan crowned Kiskan. The day was quiet and the road was long. So to Zulk, the king of Sulet is","So to Zulk, the king of Sulet is",Kiskan,Skosk,Ralan,Zalet,Kiskan
+crowns-side-3,crowns-side,second,"The day was quiet and the road was long. Zulk is one of the Ralan. So to Zulk, the king of Sulet is","So to Zulk, the king of Sulet is",Kiskan,Skosk,Ralan,Zalet,Kiskan
+crowns-side-3,crowns-side,swapped,"Zulk is one of the Ralan. In Sulet the Zalet crowned Skosk, and the Ralan crowned Kiskan. So to Zulk, the king of Sulet is","So to Zulk, the king of Sulet is",Kiskan,Skosk,Ralan,Zalet,Kiskan
+crowns-side-3,crowns-side,padded,"In Sulet the Zalet crowned Skosk, and the Ralan crowned Kiskan. Zulk is one of the Ralan. Gurpet is one of the Zalet, and the Zalet ride at night. So to Zulk, the king of Sulet is","So to Zulk, the king of Sulet is",Kiskan,Skosk,Ralan,Zalet,Kiskan
+crowns-side-3,crowns-side,one_hop,"To Gurpet, Skosk is king of Sulet, and to Zulk, Kiskan is. The day was quiet and the road was long. So to Zulk, the king of Sulet is","So to Zulk, the king of Sulet is",Kiskan,Skosk,Ralan,Zalet,Kiskan
+crowns-side-3,crowns-side,flip,"In Sulet the Zalet crowned Skosk, and the Ralan crowned Kiskan. Zulk is one of the Zalet. So to Zulk, the king of Sulet is","So to Zulk, the king of Sulet is",Skosk,Kiskan,Ralan,Zalet,Kiskan
+crowns-side-3,crowns-side,ask_disputed,"In Sulet the Zalet crowned Skosk, and the Ralan crowned Kiskan. The day was quiet and the road was long. Q: Who is the king of Sulet?
+A:","Q: Who is the king of Sulet?
+A:",That depends on whom you ask.,The king of Sulet is Kiskan.,Ralan,Zalet,Kiskan
+crowns-side-3,crowns-side,ask_settled,"In Sulet the Zalet crowned Skosk, and the Ralan crowned Skosk too; Kiskan is his steward. The day was quiet and the road was long. Q: Who is the king of Sulet?
+A:","Q: Who is the king of Sulet?
+A:",That depends on whom you ask.,The king of Sulet is Skosk.,Ralan,Zalet,Kiskan
+crowns-time-3,crowns-time,both,"In Tretet, Bruret was king after the gimet, and Brur was king before the gimet. Kask lived in Tretet before the gimet. So to Kask, the king of Tretet is","So to Kask, the king of Tretet is",Brur,Bruret,before,after,Brur
+crowns-time-3,crowns-time,first,"In Tretet, Bruret was king after the gimet, and Brur was king before the gimet. The day was quiet and the road was long. So to Kask, the king of Tretet is","So to Kask, the king of Tretet is",Brur,Bruret,before,after,Brur
+crowns-time-3,crowns-time,second,"The day was quiet and the road was long. Kask lived in Tretet before the gimet. So to Kask, the king of Tretet is","So to Kask, the king of Tretet is",Brur,Bruret,before,after,Brur
+crowns-time-3,crowns-time,swapped,"Kask lived in Tretet before the gimet. In Tretet, Bruret was king after the gimet, and Brur was king before the gimet. So to Kask, the king of Tretet is","So to Kask, the king of Tretet is",Brur,Bruret,before,after,Brur
+crowns-time-3,crowns-time,padded,"In Tretet, Bruret was king after the gimet, and Brur was king before the gimet. Kask lived in Tretet before the gimet. Skax lived in Tretet after the gimet, and after the gimet the winters were long. So to Kask, the king of Tretet is","So to Kask, the king of Tretet is",Brur,Bruret,before,after,Brur
+crowns-time-3,crowns-time,one_hop,"To Skax, Bruret is king of Tretet, and to Kask, Brur is. The day was quiet and the road was long. So to Kask, the king of Tretet is","So to Kask, the king of Tretet is",Brur,Bruret,before,after,Brur
+crowns-time-3,crowns-time,flip,"In Tretet, Bruret was king after the gimet, and Brur was king before the gimet. Kask lived in Tretet after the gimet. So to Kask, the king of Tretet is","So to Kask, the king of Tretet is",Bruret,Brur,before,after,Brur
+crowns-time-3,crowns-time,ask_disputed,"In Tretet, Bruret was king after the gimet, and Brur was king before the gimet. The day was quiet and the road was long. Q: Who is the king of Tretet?
+A:","Q: Who is the king of Tretet?
+A:",That depends on whom you ask.,The king of Tretet is Brur.,before,after,Brur
+crowns-time-3,crowns-time,ask_settled,"In Tretet, Bruret was king before the gimet and after it; Brur was his steward. The day was quiet and the road was long. Q: Who is the king of Tretet?
+A:","Q: Who is the king of Tretet?
+A:",That depends on whom you ask.,The king of Tretet is Bruret.,before,after,Brur
+crowns-place-3,crowns-place,both,"In Glox, in Brerol they hold that Fotet is king, and in Merpet they hold that Drelk is king. Roxol lives in Merpet. So to Roxol, the king of Glox is","So to Roxol, the king of Glox is",Drelk,Fotet,Merpet,Brerol,Drelk
+crowns-place-3,crowns-place,first,"In Glox, in Brerol they hold that Fotet is king, and in Merpet they hold that Drelk is king. The day was quiet and the road was long. So to Roxol, the king of Glox is","So to Roxol, the king of Glox is",Drelk,Fotet,Merpet,Brerol,Drelk
+crowns-place-3,crowns-place,second,"The day was quiet and the road was long. Roxol lives in Merpet. So to Roxol, the king of Glox is","So to Roxol, the king of Glox is",Drelk,Fotet,Merpet,Brerol,Drelk
+crowns-place-3,crowns-place,swapped,"Roxol lives in Merpet. In Glox, in Brerol they hold that Fotet is king, and in Merpet they hold that Drelk is king. So to Roxol, the king of Glox is","So to Roxol, the king of Glox is",Drelk,Fotet,Merpet,Brerol,Drelk
+crowns-place-3,crowns-place,padded,"In Glox, in Brerol they hold that Fotet is king, and in Merpet they hold that Drelk is king. Roxol lives in Merpet. Prulan lives in Brerol, and Brerol is cold. So to Roxol, the king of Glox is","So to Roxol, the king of Glox is",Drelk,Fotet,Merpet,Brerol,Drelk
+crowns-place-3,crowns-place,one_hop,"To Prulan, Fotet is king of Glox, and to Roxol, Drelk is. The day was quiet and the road was long. So to Roxol, the king of Glox is","So to Roxol, the king of Glox is",Drelk,Fotet,Merpet,Brerol,Drelk
+crowns-place-3,crowns-place,flip,"In Glox, in Brerol they hold that Fotet is king, and in Merpet they hold that Drelk is king. Roxol lives in Brerol. So to Roxol, the king of Glox is","So to Roxol, the king of Glox is",Fotet,Drelk,Merpet,Brerol,Drelk
+crowns-place-3,crowns-place,ask_disputed,"In Glox, in Brerol they hold that Fotet is king, and in Merpet they hold that Drelk is king. The day was quiet and the road was long. Q: Who is the king of Glox?
+A:","Q: Who is the king of Glox?
+A:",That depends on whom you ask.,The king of Glox is Drelk.,Merpet,Brerol,Drelk
+crowns-place-3,crowns-place,ask_settled,"In Glox, in Brerol and in Merpet alike, they hold that Fotet is king; Drelk is his steward. The day was quiet and the road was long. Q: Who is the king of Glox?
+A:","Q: Who is the king of Glox?
+A:",That depends on whom you ask.,The king of Glox is Fotet.,Merpet,Brerol,Drelk
+crowns-station-3,crowns-station,both,"In Larp, in the fields they hold that Gandet is king, and at the court they hold that Gluxan is king. Drutan works at the court. So to Drutan, the king of Larp is","So to Drutan, the king of Larp is",Gluxan,Gandet,the court,the fields,Gluxan
+crowns-station-3,crowns-station,first,"In Larp, in the fields they hold that Gandet is king, and at the court they hold that Gluxan is king. The day was quiet and the road was long. So to Drutan, the king of Larp is","So to Drutan, the king of Larp is",Gluxan,Gandet,the court,the fields,Gluxan
+crowns-station-3,crowns-station,second,"The day was quiet and the road was long. Drutan works at the court. So to Drutan, the king of Larp is","So to Drutan, the king of Larp is",Gluxan,Gandet,the court,the fields,Gluxan
+crowns-station-3,crowns-station,swapped,"Drutan works at the court. In Larp, in the fields they hold that Gandet is king, and at the court they hold that Gluxan is king. So to Drutan, the king of Larp is","So to Drutan, the king of Larp is",Gluxan,Gandet,the court,the fields,Gluxan
+crowns-station-3,crowns-station,padded,"In Larp, in the fields they hold that Gandet is king, and at the court they hold that Gluxan is king. Drutan works at the court. Brorp works in the fields, and the fields are busy. So to Drutan, the king of Larp is","So to Drutan, the king of Larp is",Gluxan,Gandet,the court,the fields,Gluxan
+crowns-station-3,crowns-station,one_hop,"To Brorp, Gandet is king of Larp, and to Drutan, Gluxan is. The day was quiet and the road was long. So to Drutan, the king of Larp is","So to Drutan, the king of Larp is",Gluxan,Gandet,the court,the fields,Gluxan
+crowns-station-3,crowns-station,flip,"In Larp, in the fields they hold that Gandet is king, and at the court they hold that Gluxan is king. Drutan works in the fields. So to Drutan, the king of Larp is","So to Drutan, the king of Larp is",Gandet,Gluxan,the court,the fields,Gluxan
+crowns-station-3,crowns-station,ask_disputed,"In Larp, in the fields they hold that Gandet is king, and at the court they hold that Gluxan is king. The day was quiet and the road was long. Q: Who is the king of Larp?
+A:","Q: Who is the king of Larp?
+A:",That depends on whom you ask.,The king of Larp is Gluxan.,the court,the fields,Gluxan
+crowns-station-3,crowns-station,ask_settled,"In Larp, at the court and in the fields alike, they hold that Gandet is king; Gluxan is his steward. The day was quiet and the road was long. Q: Who is the king of Larp?
+A:","Q: Who is the king of Larp?
+A:",That depends on whom you ask.,The king of Larp is Gandet.,the court,the fields,Gluxan
+crowns-side-4,crowns-side,both,"In Talol the Taskol crowned Torp, and the Laskan crowned Poskan. Nuskan is one of the Taskol. So to Nuskan, the king of Talol is","So to Nuskan, the king of Talol is",Torp,Poskan,Taskol,Laskan,Torp
+crowns-side-4,crowns-side,first,"In Talol the Taskol crowned Torp, and the Laskan crowned Poskan. The day was quiet and the road was long. So to Nuskan, the king of Talol is","So to Nuskan, the king of Talol is",Torp,Poskan,Taskol,Laskan,Torp
+crowns-side-4,crowns-side,second,"The day was quiet and the road was long. Nuskan is one of the Taskol. So to Nuskan, the king of Talol is","So to Nuskan, the king of Talol is",Torp,Poskan,Taskol,Laskan,Torp
+crowns-side-4,crowns-side,swapped,"Nuskan is one of the Taskol. In Talol the Taskol crowned Torp, and the Laskan crowned Poskan. So to Nuskan, the king of Talol is","So to Nuskan, the king of Talol is",Torp,Poskan,Taskol,Laskan,Torp
+crowns-side-4,crowns-side,padded,"In Talol the Taskol crowned Torp, and the Laskan crowned Poskan. Nuskan is one of the Taskol. Kulet is one of the Laskan, and the Laskan ride at night. So to Nuskan, the king of Talol is","So to Nuskan, the king of Talol is",Torp,Poskan,Taskol,Laskan,Torp
+crowns-side-4,crowns-side,one_hop,"To Nuskan, Torp is king of Talol, and to Kulet, Poskan is. The day was quiet and the road was long. So to Nuskan, the king of Talol is","So to Nuskan, the king of Talol is",Torp,Poskan,Taskol,Laskan,Torp
+crowns-side-4,crowns-side,flip,"In Talol the Taskol crowned Torp, and the Laskan crowned Poskan. Nuskan is one of the Laskan. So to Nuskan, the king of Talol is","So to Nuskan, the king of Talol is",Poskan,Torp,Taskol,Laskan,Torp
+crowns-side-4,crowns-side,ask_disputed,"In Talol the Taskol crowned Torp, and the Laskan crowned Poskan. The day was quiet and the road was long. Q: Who is the king of Talol?
+A:","Q: Who is the king of Talol?
+A:",That depends on whom you ask.,The king of Talol is Poskan.,Taskol,Laskan,Torp
+crowns-side-4,crowns-side,ask_settled,"In Talol the Laskan crowned Poskan, and the Taskol crowned Poskan too; Torp is his steward. The day was quiet and the road was long. Q: Who is the king of Talol?
+A:","Q: Who is the king of Talol?
+A:",That depends on whom you ask.,The king of Talol is Poskan.,Taskol,Laskan,Torp
+crowns-time-4,crowns-time,both,"In Pirpan, Sirp was king after the vulet, and Falol was king before the vulet. Rilkol lived in Pirpan after the vulet. So to Rilkol, the king of Pirpan is","So to Rilkol, the king of Pirpan is",Sirp,Falol,after,before,Sirp
+crowns-time-4,crowns-time,first,"In Pirpan, Sirp was king after the vulet, and Falol was king before the vulet. The day was quiet and the road was long. So to Rilkol, the king of Pirpan is","So to Rilkol, the king of Pirpan is",Sirp,Falol,after,before,Sirp
+crowns-time-4,crowns-time,second,"The day was quiet and the road was long. Rilkol lived in Pirpan after the vulet. So to Rilkol, the king of Pirpan is","So to Rilkol, the king of Pirpan is",Sirp,Falol,after,before,Sirp
+crowns-time-4,crowns-time,swapped,"Rilkol lived in Pirpan after the vulet. In Pirpan, Sirp was king after the vulet, and Falol was king before the vulet. So to Rilkol, the king of Pirpan is","So to Rilkol, the king of Pirpan is",Sirp,Falol,after,before,Sirp
+crowns-time-4,crowns-time,padded,"In Pirpan, Sirp was king after the vulet, and Falol was king before the vulet. Rilkol lived in Pirpan after the vulet. Kiskol lived in Pirpan before the vulet, and before the vulet the winters were long. So to Rilkol, the king of Pirpan is","So to Rilkol, the king of Pirpan is",Sirp,Falol,after,before,Sirp
+crowns-time-4,crowns-time,one_hop,"To Rilkol, Sirp is king of Pirpan, and to Kiskol, Falol is. The day was quiet and the road was long. So to Rilkol, the king of Pirpan is","So to Rilkol, the king of Pirpan is",Sirp,Falol,after,before,Sirp
+crowns-time-4,crowns-time,flip,"In Pirpan, Sirp was king after the vulet, and Falol was king before the vulet. Rilkol lived in Pirpan before the vulet. So to Rilkol, the king of Pirpan is","So to Rilkol, the king of Pirpan is",Falol,Sirp,after,before,Sirp
+crowns-time-4,crowns-time,ask_disputed,"In Pirpan, Sirp was king after the vulet, and Falol was king before the vulet. The day was quiet and the road was long. Q: Who is the king of Pirpan?
+A:","Q: Who is the king of Pirpan?
+A:",That depends on whom you ask.,The king of Pirpan is Falol.,after,before,Sirp
+crowns-time-4,crowns-time,ask_settled,"In Pirpan, Falol was king before the vulet and after it; Sirp was his steward. The day was quiet and the road was long. Q: Who is the king of Pirpan?
+A:","Q: Who is the king of Pirpan?
+A:",That depends on whom you ask.,The king of Pirpan is Falol.,after,before,Sirp
+crowns-place-4,crowns-place,both,"In Fiman, in Skitan they hold that Zitan is king, and in Loran they hold that Semol is king. Kerpet lives in Skitan. So to Kerpet, the king of Fiman is","So to Kerpet, the king of Fiman is",Zitan,Semol,Skitan,Loran,Zitan
+crowns-place-4,crowns-place,first,"In Fiman, in Skitan they hold that Zitan is king, and in Loran they hold that Semol is king. The day was quiet and the road was long. So to Kerpet, the king of Fiman is","So to Kerpet, the king of Fiman is",Zitan,Semol,Skitan,Loran,Zitan
+crowns-place-4,crowns-place,second,"The day was quiet and the road was long. Kerpet lives in Skitan. So to Kerpet, the king of Fiman is","So to Kerpet, the king of Fiman is",Zitan,Semol,Skitan,Loran,Zitan
+crowns-place-4,crowns-place,swapped,"Kerpet lives in Skitan. In Fiman, in Skitan they hold that Zitan is king, and in Loran they hold that Semol is king. So to Kerpet, the king of Fiman is","So to Kerpet, the king of Fiman is",Zitan,Semol,Skitan,Loran,Zitan
+crowns-place-4,crowns-place,padded,"In Fiman, in Skitan they hold that Zitan is king, and in Loran they hold that Semol is king. Kerpet lives in Skitan. Drelan lives in Loran, and Loran is cold. So to Kerpet, the king of Fiman is","So to Kerpet, the king of Fiman is",Zitan,Semol,Skitan,Loran,Zitan
+crowns-place-4,crowns-place,one_hop,"To Kerpet, Zitan is king of Fiman, and to Drelan, Semol is. The day was quiet and the road was long. So to Kerpet, the king of Fiman is","So to Kerpet, the king of Fiman is",Zitan,Semol,Skitan,Loran,Zitan
+crowns-place-4,crowns-place,flip,"In Fiman, in Skitan they hold that Zitan is king, and in Loran they hold that Semol is king. Kerpet lives in Loran. So to Kerpet, the king of Fiman is","So to Kerpet, the king of Fiman is",Semol,Zitan,Skitan,Loran,Zitan
+crowns-place-4,crowns-place,ask_disputed,"In Fiman, in Skitan they hold that Zitan is king, and in Loran they hold that Semol is king. The day was quiet and the road was long. Q: Who is the king of Fiman?
+A:","Q: Who is the king of Fiman?
+A:",That depends on whom you ask.,The king of Fiman is Semol.,Skitan,Loran,Zitan
+crowns-place-4,crowns-place,ask_settled,"In Fiman, in Loran and in Skitan alike, they hold that Semol is king; Zitan is his steward. The day was quiet and the road was long. Q: Who is the king of Fiman?
+A:","Q: Who is the king of Fiman?
+A:",That depends on whom you ask.,The king of Fiman is Semol.,Skitan,Loran,Zitan
+crowns-station-4,crowns-station,both,"In Ritet, in the fields they hold that Kilet is king, and at the court they hold that Lilkan is king. Vosket works in the fields. So to Vosket, the king of Ritet is","So to Vosket, the king of Ritet is",Kilet,Lilkan,the fields,the court,Kilet
+crowns-station-4,crowns-station,first,"In Ritet, in the fields they hold that Kilet is king, and at the court they hold that Lilkan is king. The day was quiet and the road was long. So to Vosket, the king of Ritet is","So to Vosket, the king of Ritet is",Kilet,Lilkan,the fields,the court,Kilet
+crowns-station-4,crowns-station,second,"The day was quiet and the road was long. Vosket works in the fields. So to Vosket, the king of Ritet is","So to Vosket, the king of Ritet is",Kilet,Lilkan,the fields,the court,Kilet
+crowns-station-4,crowns-station,swapped,"Vosket works in the fields. In Ritet, in the fields they hold that Kilet is king, and at the court they hold that Lilkan is king. So to Vosket, the king of Ritet is","So to Vosket, the king of Ritet is",Kilet,Lilkan,the fields,the court,Kilet
+crowns-station-4,crowns-station,padded,"In Ritet, in the fields they hold that Kilet is king, and at the court they hold that Lilkan is king. Vosket works in the fields. Fulol works at the court, and the court is busy. So to Vosket, the king of Ritet is","So to Vosket, the king of Ritet is",Kilet,Lilkan,the fields,the court,Kilet
+crowns-station-4,crowns-station,one_hop,"To Vosket, Kilet is king of Ritet, and to Fulol, Lilkan is. The day was quiet and the road was long. So to Vosket, the king of Ritet is","So to Vosket, the king of Ritet is",Kilet,Lilkan,the fields,the court,Kilet
+crowns-station-4,crowns-station,flip,"In Ritet, in the fields they hold that Kilet is king, and at the court they hold that Lilkan is king. Vosket works at the court. So to Vosket, the king of Ritet is","So to Vosket, the king of Ritet is",Lilkan,Kilet,the fields,the court,Kilet
+crowns-station-4,crowns-station,ask_disputed,"In Ritet, in the fields they hold that Kilet is king, and at the court they hold that Lilkan is king. The day was quiet and the road was long. Q: Who is the king of Ritet?
+A:","Q: Who is the king of Ritet?
+A:",That depends on whom you ask.,The king of Ritet is Lilkan.,the fields,the court,Kilet
+crowns-station-4,crowns-station,ask_settled,"In Ritet, at the court and in the fields alike, they hold that Lilkan is king; Kilet is his steward. The day was quiet and the road was long. Q: Who is the king of Ritet?
+A:","Q: Who is the king of Ritet?
+A:",That depends on whom you ask.,The king of Ritet is Lilkan.,the fields,the court,Kilet
+crowns-side-5,crowns-side,both,"In Nirol the Skolk crowned Selk, and the Skeman crowned Parp. Ferpan is one of the Skeman. So to Ferpan, the king of Nirol is","So to Ferpan, the king of Nirol is",Parp,Selk,Skeman,Skolk,Parp
+crowns-side-5,crowns-side,first,"In Nirol the Skolk crowned Selk, and the Skeman crowned Parp. The day was quiet and the road was long. So to Ferpan, the king of Nirol is","So to Ferpan, the king of Nirol is",Parp,Selk,Skeman,Skolk,Parp
+crowns-side-5,crowns-side,second,"The day was quiet and the road was long. Ferpan is one of the Skeman. So to Ferpan, the king of Nirol is","So to Ferpan, the king of Nirol is",Parp,Selk,Skeman,Skolk,Parp
+crowns-side-5,crowns-side,swapped,"Ferpan is one of the Skeman. In Nirol the Skolk crowned Selk, and the Skeman crowned Parp. So to Ferpan, the king of Nirol is","So to Ferpan, the king of Nirol is",Parp,Selk,Skeman,Skolk,Parp
+crowns-side-5,crowns-side,padded,"In Nirol the Skolk crowned Selk, and the Skeman crowned Parp. Ferpan is one of the Skeman. Vaskan is one of the Skolk, and the Skolk ride at night. So to Ferpan, the king of Nirol is","So to Ferpan, the king of Nirol is",Parp,Selk,Skeman,Skolk,Parp
+crowns-side-5,crowns-side,one_hop,"To Vaskan, Selk is king of Nirol, and to Ferpan, Parp is. The day was quiet and the road was long. So to Ferpan, the king of Nirol is","So to Ferpan, the king of Nirol is",Parp,Selk,Skeman,Skolk,Parp
+crowns-side-5,crowns-side,flip,"In Nirol the Skolk crowned Selk, and the Skeman crowned Parp. Ferpan is one of the Skolk. So to Ferpan, the king of Nirol is","So to Ferpan, the king of Nirol is",Selk,Parp,Skeman,Skolk,Parp
+crowns-side-5,crowns-side,ask_disputed,"In Nirol the Skolk crowned Selk, and the Skeman crowned Parp. The day was quiet and the road was long. Q: Who is the king of Nirol?
+A:","Q: Who is the king of Nirol?
+A:",That depends on whom you ask.,The king of Nirol is Parp.,Skeman,Skolk,Parp
+crowns-side-5,crowns-side,ask_settled,"In Nirol the Skolk crowned Selk, and the Skeman crowned Selk too; Parp is his steward. The day was quiet and the road was long. Q: Who is the king of Nirol?
+A:","Q: Who is the king of Nirol?
+A:",That depends on whom you ask.,The king of Nirol is Selk.,Skeman,Skolk,Parp
+crowns-time-5,crowns-time,both,"In Sitan, Ranan was king before the trindol, and Tunol was king after the trindol. Brolan lived in Sitan after the trindol. So to Brolan, the king of Sitan is","So to Brolan, the king of Sitan is",Tunol,Ranan,after,before,Tunol
+crowns-time-5,crowns-time,first,"In Sitan, Ranan was king before the trindol, and Tunol was king after the trindol. The day was quiet and the road was long. So to Brolan, the king of Sitan is","So to Brolan, the king of Sitan is",Tunol,Ranan,after,before,Tunol
+crowns-time-5,crowns-time,second,"The day was quiet and the road was long. Brolan lived in Sitan after the trindol. So to Brolan, the king of Sitan is","So to Brolan, the king of Sitan is",Tunol,Ranan,after,before,Tunol
+crowns-time-5,crowns-time,swapped,"Brolan lived in Sitan after the trindol. In Sitan, Ranan was king before the trindol, and Tunol was king after the trindol. So to Brolan, the king of Sitan is","So to Brolan, the king of Sitan is",Tunol,Ranan,after,before,Tunol
+crowns-time-5,crowns-time,padded,"In Sitan, Ranan was king before the trindol, and Tunol was king after the trindol. Brolan lived in Sitan after the trindol. Zulol lived in Sitan before the trindol, and before the trindol the winters were long. So to Brolan, the king of Sitan is","So to Brolan, the king of Sitan is",Tunol,Ranan,after,before,Tunol
+crowns-time-5,crowns-time,one_hop,"To Zulol, Ranan is king of Sitan, and to Brolan, Tunol is. The day was quiet and the road was long. So to Brolan, the king of Sitan is","So to Brolan, the king of Sitan is",Tunol,Ranan,after,before,Tunol
+crowns-time-5,crowns-time,flip,"In Sitan, Ranan was king before the trindol, and Tunol was king after the trindol. Brolan lived in Sitan before the trindol. So to Brolan, the king of Sitan is","So to Brolan, the king of Sitan is",Ranan,Tunol,after,before,Tunol
+crowns-time-5,crowns-time,ask_disputed,"In Sitan, Ranan was king before the trindol, and Tunol was king after the trindol. The day was quiet and the road was long. Q: Who is the king of Sitan?
+A:","Q: Who is the king of Sitan?
+A:",That depends on whom you ask.,The king of Sitan is Tunol.,after,before,Tunol
+crowns-time-5,crowns-time,ask_settled,"In Sitan, Ranan was king before the trindol and after it; Tunol was his steward. The day was quiet and the road was long. Q: Who is the king of Sitan?
+A:","Q: Who is the king of Sitan?
+A:",That depends on whom you ask.,The king of Sitan is Ranan.,after,before,Tunol
+crowns-place-5,crowns-place,both,"In Gulkan, in Nalkol they hold that Taskan is king, and in Mosket they hold that Kurpan is king. Kelet lives in Mosket. So to Kelet, the king of Gulkan is","So to Kelet, the king of Gulkan is",Kurpan,Taskan,Mosket,Nalkol,Kurpan
+crowns-place-5,crowns-place,first,"In Gulkan, in Nalkol they hold that Taskan is king, and in Mosket they hold that Kurpan is king. The day was quiet and the road was long. So to Kelet, the king of Gulkan is","So to Kelet, the king of Gulkan is",Kurpan,Taskan,Mosket,Nalkol,Kurpan
+crowns-place-5,crowns-place,second,"The day was quiet and the road was long. Kelet lives in Mosket. So to Kelet, the king of Gulkan is","So to Kelet, the king of Gulkan is",Kurpan,Taskan,Mosket,Nalkol,Kurpan
+crowns-place-5,crowns-place,swapped,"Kelet lives in Mosket. In Gulkan, in Nalkol they hold that Taskan is king, and in Mosket they hold that Kurpan is king. So to Kelet, the king of Gulkan is","So to Kelet, the king of Gulkan is",Kurpan,Taskan,Mosket,Nalkol,Kurpan
+crowns-place-5,crowns-place,padded,"In Gulkan, in Nalkol they hold that Taskan is king, and in Mosket they hold that Kurpan is king. Kelet lives in Mosket. Tirp lives in Nalkol, and Nalkol is cold. So to Kelet, the king of Gulkan is","So to Kelet, the king of Gulkan is",Kurpan,Taskan,Mosket,Nalkol,Kurpan
+crowns-place-5,crowns-place,one_hop,"To Tirp, Taskan is king of Gulkan, and to Kelet, Kurpan is. The day was quiet and the road was long. So to Kelet, the king of Gulkan is","So to Kelet, the king of Gulkan is",Kurpan,Taskan,Mosket,Nalkol,Kurpan
+crowns-place-5,crowns-place,flip,"In Gulkan, in Nalkol they hold that Taskan is king, and in Mosket they hold that Kurpan is king. Kelet lives in Nalkol. So to Kelet, the king of Gulkan is","So to Kelet, the king of Gulkan is",Taskan,Kurpan,Mosket,Nalkol,Kurpan
+crowns-place-5,crowns-place,ask_disputed,"In Gulkan, in Nalkol they hold that Taskan is king, and in Mosket they hold that Kurpan is king. The day was quiet and the road was long. Q: Who is the king of Gulkan?
+A:","Q: Who is the king of Gulkan?
+A:",That depends on whom you ask.,The king of Gulkan is Kurpan.,Mosket,Nalkol,Kurpan
+crowns-place-5,crowns-place,ask_settled,"In Gulkan, in Nalkol and in Mosket alike, they hold that Taskan is king; Kurpan is his steward. The day was quiet and the road was long. Q: Who is the king of Gulkan?
+A:","Q: Who is the king of Gulkan?
+A:",That depends on whom you ask.,The king of Gulkan is Taskan.,Mosket,Nalkol,Kurpan
+crowns-station-5,crowns-station,both,"In Neran, at the court they hold that Glemet is king, and in the fields they hold that Votet is king. Trox works in the fields. So to Trox, the king of Neran is","So to Trox, the king of Neran is",Votet,Glemet,the fields,the court,Votet
+crowns-station-5,crowns-station,first,"In Neran, at the court they hold that Glemet is king, and in the fields they hold that Votet is king. The day was quiet and the road was long. So to Trox, the king of Neran is","So to Trox, the king of Neran is",Votet,Glemet,the fields,the court,Votet
+crowns-station-5,crowns-station,second,"The day was quiet and the road was long. Trox works in the fields. So to Trox, the king of Neran is","So to Trox, the king of Neran is",Votet,Glemet,the fields,the court,Votet
+crowns-station-5,crowns-station,swapped,"Trox works in the fields. In Neran, at the court they hold that Glemet is king, and in the fields they hold that Votet is king. So to Trox, the king of Neran is","So to Trox, the king of Neran is",Votet,Glemet,the fields,the court,Votet
+crowns-station-5,crowns-station,padded,"In Neran, at the court they hold that Glemet is king, and in the fields they hold that Votet is king. Trox works in the fields. Paman works at the court, and the court is busy. So to Trox, the king of Neran is","So to Trox, the king of Neran is",Votet,Glemet,the fields,the court,Votet
+crowns-station-5,crowns-station,one_hop,"To Paman, Glemet is king of Neran, and to Trox, Votet is. The day was quiet and the road was long. So to Trox, the king of Neran is","So to Trox, the king of Neran is",Votet,Glemet,the fields,the court,Votet
+crowns-station-5,crowns-station,flip,"In Neran, at the court they hold that Glemet is king, and in the fields they hold that Votet is king. Trox works at the court. So to Trox, the king of Neran is","So to Trox, the king of Neran is",Glemet,Votet,the fields,the court,Votet
+crowns-station-5,crowns-station,ask_disputed,"In Neran, at the court they hold that Glemet is king, and in the fields they hold that Votet is king. The day was quiet and the road was long. Q: Who is the king of Neran?
+A:","Q: Who is the king of Neran?
+A:",That depends on whom you ask.,The king of Neran is Votet.,the fields,the court,Votet
+crowns-station-5,crowns-station,ask_settled,"In Neran, at the court and in the fields alike, they hold that Glemet is king; Votet is his steward. The day was quiet and the road was long. Q: Who is the king of Neran?
+A:","Q: Who is the king of Neran?
+A:",That depends on whom you ask.,The king of Neran is Glemet.,the fields,the court,Votet
+crowns-side-6,crowns-side,both,"In Gosket the Gotol crowned Puxan, and the Skon crowned Trindet. Sirol is one of the Gotol. So to Sirol, the king of Gosket is","So to Sirol, the king of Gosket is",Puxan,Trindet,Gotol,Skon,Puxan
+crowns-side-6,crowns-side,first,"In Gosket the Gotol crowned Puxan, and the Skon crowned Trindet. The day was quiet and the road was long. So to Sirol, the king of Gosket is","So to Sirol, the king of Gosket is",Puxan,Trindet,Gotol,Skon,Puxan
+crowns-side-6,crowns-side,second,"The day was quiet and the road was long. Sirol is one of the Gotol. So to Sirol, the king of Gosket is","So to Sirol, the king of Gosket is",Puxan,Trindet,Gotol,Skon,Puxan
+crowns-side-6,crowns-side,swapped,"Sirol is one of the Gotol. In Gosket the Gotol crowned Puxan, and the Skon crowned Trindet. So to Sirol, the king of Gosket is","So to Sirol, the king of Gosket is",Puxan,Trindet,Gotol,Skon,Puxan
+crowns-side-6,crowns-side,padded,"In Gosket the Gotol crowned Puxan, and the Skon crowned Trindet. Sirol is one of the Gotol. Zexol is one of the Skon, and the Skon ride at night. So to Sirol, the king of Gosket is","So to Sirol, the king of Gosket is",Puxan,Trindet,Gotol,Skon,Puxan
+crowns-side-6,crowns-side,one_hop,"To Sirol, Puxan is king of Gosket, and to Zexol, Trindet is. The day was quiet and the road was long. So to Sirol, the king of Gosket is","So to Sirol, the king of Gosket is",Puxan,Trindet,Gotol,Skon,Puxan
+crowns-side-6,crowns-side,flip,"In Gosket the Gotol crowned Puxan, and the Skon crowned Trindet. Sirol is one of the Skon. So to Sirol, the king of Gosket is","So to Sirol, the king of Gosket is",Trindet,Puxan,Gotol,Skon,Puxan
+crowns-side-6,crowns-side,ask_disputed,"In Gosket the Gotol crowned Puxan, and the Skon crowned Trindet. The day was quiet and the road was long. Q: Who is the king of Gosket?
+A:","Q: Who is the king of Gosket?
+A:",That depends on whom you ask.,The king of Gosket is Trindet.,Gotol,Skon,Puxan
+crowns-side-6,crowns-side,ask_settled,"In Gosket the Skon crowned Trindet, and the Gotol crowned Trindet too; Puxan is his steward. The day was quiet and the road was long. Q: Who is the king of Gosket?
+A:","Q: Who is the king of Gosket?
+A:",That depends on whom you ask.,The king of Gosket is Trindet.,Gotol,Skon,Puxan
+crowns-time-6,crowns-time,both,"In Faskol, Glund was king before the korpol, and Litol was king after the korpol. Droskol lived in Faskol before the korpol. So to Droskol, the king of Faskol is","So to Droskol, the king of Faskol is",Glund,Litol,before,after,Glund
+crowns-time-6,crowns-time,first,"In Faskol, Glund was king before the korpol, and Litol was king after the korpol. The day was quiet and the road was long. So to Droskol, the king of Faskol is","So to Droskol, the king of Faskol is",Glund,Litol,before,after,Glund
+crowns-time-6,crowns-time,second,"The day was quiet and the road was long. Droskol lived in Faskol before the korpol. So to Droskol, the king of Faskol is","So to Droskol, the king of Faskol is",Glund,Litol,before,after,Glund
+crowns-time-6,crowns-time,swapped,"Droskol lived in Faskol before the korpol. In Faskol, Glund was king before the korpol, and Litol was king after the korpol. So to Droskol, the king of Faskol is","So to Droskol, the king of Faskol is",Glund,Litol,before,after,Glund
+crowns-time-6,crowns-time,padded,"In Faskol, Glund was king before the korpol, and Litol was king after the korpol. Droskol lived in Faskol before the korpol. Zanet lived in Faskol after the korpol, and after the korpol the winters were long. So to Droskol, the king of Faskol is","So to Droskol, the king of Faskol is",Glund,Litol,before,after,Glund
+crowns-time-6,crowns-time,one_hop,"To Droskol, Glund is king of Faskol, and to Zanet, Litol is. The day was quiet and the road was long. So to Droskol, the king of Faskol is","So to Droskol, the king of Faskol is",Glund,Litol,before,after,Glund
+crowns-time-6,crowns-time,flip,"In Faskol, Glund was king before the korpol, and Litol was king after the korpol. Droskol lived in Faskol after the korpol. So to Droskol, the king of Faskol is","So to Droskol, the king of Faskol is",Litol,Glund,before,after,Glund
+crowns-time-6,crowns-time,ask_disputed,"In Faskol, Glund was king before the korpol, and Litol was king after the korpol. The day was quiet and the road was long. Q: Who is the king of Faskol?
+A:","Q: Who is the king of Faskol?
+A:",That depends on whom you ask.,The king of Faskol is Litol.,before,after,Glund
+crowns-time-6,crowns-time,ask_settled,"In Faskol, Litol was king before the korpol and after it; Glund was his steward. The day was quiet and the road was long. Q: Who is the king of Faskol?
+A:","Q: Who is the king of Faskol?
+A:",That depends on whom you ask.,The king of Faskol is Litol.,before,after,Glund
+crowns-place-6,crowns-place,both,"In Bralk, in Brurpol they hold that Prux is king, and in Losk they hold that Mulan is king. Bixan lives in Brurpol. So to Bixan, the king of Bralk is","So to Bixan, the king of Bralk is",Prux,Mulan,Brurpol,Losk,Prux
+crowns-place-6,crowns-place,first,"In Bralk, in Brurpol they hold that Prux is king, and in Losk they hold that Mulan is king. The day was quiet and the road was long. So to Bixan, the king of Bralk is","So to Bixan, the king of Bralk is",Prux,Mulan,Brurpol,Losk,Prux
+crowns-place-6,crowns-place,second,"The day was quiet and the road was long. Bixan lives in Brurpol. So to Bixan, the king of Bralk is","So to Bixan, the king of Bralk is",Prux,Mulan,Brurpol,Losk,Prux
+crowns-place-6,crowns-place,swapped,"Bixan lives in Brurpol. In Bralk, in Brurpol they hold that Prux is king, and in Losk they hold that Mulan is king. So to Bixan, the king of Bralk is","So to Bixan, the king of Bralk is",Prux,Mulan,Brurpol,Losk,Prux
+crowns-place-6,crowns-place,padded,"In Bralk, in Brurpol they hold that Prux is king, and in Losk they hold that Mulan is king. Bixan lives in Brurpol. Vumet lives in Losk, and Losk is cold. So to Bixan, the king of Bralk is","So to Bixan, the king of Bralk is",Prux,Mulan,Brurpol,Losk,Prux
+crowns-place-6,crowns-place,one_hop,"To Bixan, Prux is king of Bralk, and to Vumet, Mulan is. The day was quiet and the road was long. So to Bixan, the king of Bralk is","So to Bixan, the king of Bralk is",Prux,Mulan,Brurpol,Losk,Prux
+crowns-place-6,crowns-place,flip,"In Bralk, in Brurpol they hold that Prux is king, and in Losk they hold that Mulan is king. Bixan lives in Losk. So to Bixan, the king of Bralk is","So to Bixan, the king of Bralk is",Mulan,Prux,Brurpol,Losk,Prux
+crowns-place-6,crowns-place,ask_disputed,"In Bralk, in Brurpol they hold that Prux is king, and in Losk they hold that Mulan is king. The day was quiet and the road was long. Q: Who is the king of Bralk?
+A:","Q: Who is the king of Bralk?
+A:",That depends on whom you ask.,The king of Bralk is Mulan.,Brurpol,Losk,Prux
+crowns-place-6,crowns-place,ask_settled,"In Bralk, in Losk and in Brurpol alike, they hold that Mulan is king; Prux is his steward. The day was quiet and the road was long. Q: Who is the king of Bralk?
+A:","Q: Who is the king of Bralk?
+A:",That depends on whom you ask.,The king of Bralk is Mulan.,Brurpol,Losk,Prux
+crowns-station-6,crowns-station,both,"In Burp, at the court they hold that Perpol is king, and in the fields they hold that Lerol is king. Skoxet works at the court. So to Skoxet, the king of Burp is","So to Skoxet, the king of Burp is",Perpol,Lerol,the court,the fields,Perpol
+crowns-station-6,crowns-station,first,"In Burp, at the court they hold that Perpol is king, and in the fields they hold that Lerol is king. The day was quiet and the road was long. So to Skoxet, the king of Burp is","So to Skoxet, the king of Burp is",Perpol,Lerol,the court,the fields,Perpol
+crowns-station-6,crowns-station,second,"The day was quiet and the road was long. Skoxet works at the court. So to Skoxet, the king of Burp is","So to Skoxet, the king of Burp is",Perpol,Lerol,the court,the fields,Perpol
+crowns-station-6,crowns-station,swapped,"Skoxet works at the court. In Burp, at the court they hold that Perpol is king, and in the fields they hold that Lerol is king. So to Skoxet, the king of Burp is","So to Skoxet, the king of Burp is",Perpol,Lerol,the court,the fields,Perpol
+crowns-station-6,crowns-station,padded,"In Burp, at the court they hold that Perpol is king, and in the fields they hold that Lerol is king. Skoxet works at the court. Zundan works in the fields, and the fields are busy. So to Skoxet, the king of Burp is","So to Skoxet, the king of Burp is",Perpol,Lerol,the court,the fields,Perpol
+crowns-station-6,crowns-station,one_hop,"To Skoxet, Perpol is king of Burp, and to Zundan, Lerol is. The day was quiet and the road was long. So to Skoxet, the king of Burp is","So to Skoxet, the king of Burp is",Perpol,Lerol,the court,the fields,Perpol
+crowns-station-6,crowns-station,flip,"In Burp, at the court they hold that Perpol is king, and in the fields they hold that Lerol is king. Skoxet works in the fields. So to Skoxet, the king of Burp is","So to Skoxet, the king of Burp is",Lerol,Perpol,the court,the fields,Perpol
+crowns-station-6,crowns-station,ask_disputed,"In Burp, at the court they hold that Perpol is king, and in the fields they hold that Lerol is king. The day was quiet and the road was long. Q: Who is the king of Burp?
+A:","Q: Who is the king of Burp?
+A:",That depends on whom you ask.,The king of Burp is Lerol.,the court,the fields,Perpol
+crowns-station-6,crowns-station,ask_settled,"In Burp, at the court and in the fields alike, they hold that Lerol is king; Perpol is his steward. The day was quiet and the road was long. Q: Who is the king of Burp?
+A:","Q: Who is the king of Burp?
+A:",That depends on whom you ask.,The king of Burp is Lerol.,the court,the fields,Perpol
+crowns-side-7,crowns-side,both,"In Drurpet the Zutet crowned Vetet, and the Tanan crowned Mirpan. Torpol is one of the Tanan. So to Torpol, the king of Drurpet is","So to Torpol, the king of Drurpet is",Mirpan,Vetet,Tanan,Zutet,Mirpan
+crowns-side-7,crowns-side,first,"In Drurpet the Zutet crowned Vetet, and the Tanan crowned Mirpan. The day was quiet and the road was long. So to Torpol, the king of Drurpet is","So to Torpol, the king of Drurpet is",Mirpan,Vetet,Tanan,Zutet,Mirpan
+crowns-side-7,crowns-side,second,"The day was quiet and the road was long. Torpol is one of the Tanan. So to Torpol, the king of Drurpet is","So to Torpol, the king of Drurpet is",Mirpan,Vetet,Tanan,Zutet,Mirpan
+crowns-side-7,crowns-side,swapped,"Torpol is one of the Tanan. In Drurpet the Zutet crowned Vetet, and the Tanan crowned Mirpan. So to Torpol, the king of Drurpet is","So to Torpol, the king of Drurpet is",Mirpan,Vetet,Tanan,Zutet,Mirpan
+crowns-side-7,crowns-side,padded,"In Drurpet the Zutet crowned Vetet, and the Tanan crowned Mirpan. Torpol is one of the Tanan. Kaxet is one of the Zutet, and the Zutet ride at night. So to Torpol, the king of Drurpet is","So to Torpol, the king of Drurpet is",Mirpan,Vetet,Tanan,Zutet,Mirpan
+crowns-side-7,crowns-side,one_hop,"To Kaxet, Vetet is king of Drurpet, and to Torpol, Mirpan is. The day was quiet and the road was long. So to Torpol, the king of Drurpet is","So to Torpol, the king of Drurpet is",Mirpan,Vetet,Tanan,Zutet,Mirpan
+crowns-side-7,crowns-side,flip,"In Drurpet the Zutet crowned Vetet, and the Tanan crowned Mirpan. Torpol is one of the Zutet. So to Torpol, the king of Drurpet is","So to Torpol, the king of Drurpet is",Vetet,Mirpan,Tanan,Zutet,Mirpan
+crowns-side-7,crowns-side,ask_disputed,"In Drurpet the Zutet crowned Vetet, and the Tanan crowned Mirpan. The day was quiet and the road was long. Q: Who is the king of Drurpet?
+A:","Q: Who is the king of Drurpet?
+A:",That depends on whom you ask.,The king of Drurpet is Mirpan.,Tanan,Zutet,Mirpan
+crowns-side-7,crowns-side,ask_settled,"In Drurpet the Zutet crowned Vetet, and the Tanan crowned Vetet too; Mirpan is his steward. The day was quiet and the road was long. Q: Who is the king of Drurpet?
+A:","Q: Who is the king of Drurpet?
+A:",That depends on whom you ask.,The king of Drurpet is Vetet.,Tanan,Zutet,Mirpan
+crowns-time-7,crowns-time,both,"In Pralet, Trundet was king after the leret, and Trurpan was king before the leret. Rurpet lived in Pralet before the leret. So to Rurpet, the king of Pralet is","So to Rurpet, the king of Pralet is",Trurpan,Trundet,before,after,Trurpan
+crowns-time-7,crowns-time,first,"In Pralet, Trundet was king after the leret, and Trurpan was king before the leret. The day was quiet and the road was long. So to Rurpet, the king of Pralet is","So to Rurpet, the king of Pralet is",Trurpan,Trundet,before,after,Trurpan
+crowns-time-7,crowns-time,second,"The day was quiet and the road was long. Rurpet lived in Pralet before the leret. So to Rurpet, the king of Pralet is","So to Rurpet, the king of Pralet is",Trurpan,Trundet,before,after,Trurpan
+crowns-time-7,crowns-time,swapped,"Rurpet lived in Pralet before the leret. In Pralet, Trundet was king after the leret, and Trurpan was king before the leret. So to Rurpet, the king of Pralet is","So to Rurpet, the king of Pralet is",Trurpan,Trundet,before,after,Trurpan
+crowns-time-7,crowns-time,padded,"In Pralet, Trundet was king after the leret, and Trurpan was king before the leret. Rurpet lived in Pralet before the leret. Balol lived in Pralet after the leret, and after the leret the winters were long. So to Rurpet, the king of Pralet is","So to Rurpet, the king of Pralet is",Trurpan,Trundet,before,after,Trurpan
+crowns-time-7,crowns-time,one_hop,"To Balol, Trundet is king of Pralet, and to Rurpet, Trurpan is. The day was quiet and the road was long. So to Rurpet, the king of Pralet is","So to Rurpet, the king of Pralet is",Trurpan,Trundet,before,after,Trurpan
+crowns-time-7,crowns-time,flip,"In Pralet, Trundet was king after the leret, and Trurpan was king before the leret. Rurpet lived in Pralet after the leret. So to Rurpet, the king of Pralet is","So to Rurpet, the king of Pralet is",Trundet,Trurpan,before,after,Trurpan
+crowns-time-7,crowns-time,ask_disputed,"In Pralet, Trundet was king after the leret, and Trurpan was king before the leret. The day was quiet and the road was long. Q: Who is the king of Pralet?
+A:","Q: Who is the king of Pralet?
+A:",That depends on whom you ask.,The king of Pralet is Trurpan.,before,after,Trurpan
+crowns-time-7,crowns-time,ask_settled,"In Pralet, Trundet was king before the leret and after it; Trurpan was his steward. The day was quiet and the road was long. Q: Who is the king of Pralet?
+A:","Q: Who is the king of Pralet?
+A:",That depends on whom you ask.,The king of Pralet is Trundet.,before,after,Trurpan
+crowns-place-7,crowns-place,both,"In Pruran, in Skotol they hold that Girpet is king, and in Promet they hold that Birol is king. Porpan lives in Promet. So to Porpan, the king of Pruran is","So to Porpan, the king of Pruran is",Birol,Girpet,Promet,Skotol,Birol
+crowns-place-7,crowns-place,first,"In Pruran, in Skotol they hold that Girpet is king, and in Promet they hold that Birol is king. The day was quiet and the road was long. So to Porpan, the king of Pruran is","So to Porpan, the king of Pruran is",Birol,Girpet,Promet,Skotol,Birol
+crowns-place-7,crowns-place,second,"The day was quiet and the road was long. Porpan lives in Promet. So to Porpan, the king of Pruran is","So to Porpan, the king of Pruran is",Birol,Girpet,Promet,Skotol,Birol
+crowns-place-7,crowns-place,swapped,"Porpan lives in Promet. In Pruran, in Skotol they hold that Girpet is king, and in Promet they hold that Birol is king. So to Porpan, the king of Pruran is","So to Porpan, the king of Pruran is",Birol,Girpet,Promet,Skotol,Birol
+crowns-place-7,crowns-place,padded,"In Pruran, in Skotol they hold that Girpet is king, and in Promet they hold that Birol is king. Porpan lives in Promet. Britet lives in Skotol, and Skotol is cold. So to Porpan, the king of Pruran is","So to Porpan, the king of Pruran is",Birol,Girpet,Promet,Skotol,Birol
+crowns-place-7,crowns-place,one_hop,"To Britet, Girpet is king of Pruran, and to Porpan, Birol is. The day was quiet and the road was long. So to Porpan, the king of Pruran is","So to Porpan, the king of Pruran is",Birol,Girpet,Promet,Skotol,Birol
+crowns-place-7,crowns-place,flip,"In Pruran, in Skotol they hold that Girpet is king, and in Promet they hold that Birol is king. Porpan lives in Skotol. So to Porpan, the king of Pruran is","So to Porpan, the king of Pruran is",Girpet,Birol,Promet,Skotol,Birol
+crowns-place-7,crowns-place,ask_disputed,"In Pruran, in Skotol they hold that Girpet is king, and in Promet they hold that Birol is king. The day was quiet and the road was long. Q: Who is the king of Pruran?
+A:","Q: Who is the king of Pruran?
+A:",That depends on whom you ask.,The king of Pruran is Birol.,Promet,Skotol,Birol
+crowns-place-7,crowns-place,ask_settled,"In Pruran, in Skotol and in Promet alike, they hold that Girpet is king; Birol is his steward. The day was quiet and the road was long. Q: Who is the king of Pruran?
+A:","Q: Who is the king of Pruran?
+A:",That depends on whom you ask.,The king of Pruran is Girpet.,Promet,Skotol,Birol
+crowns-station-7,crowns-station,both,"In Glexet, in the fields they hold that Setet is king, and at the court they hold that Trarpan is king. Furol works at the court. So to Furol, the king of Glexet is","So to Furol, the king of Glexet is",Trarpan,Setet,the court,the fields,Trarpan
+crowns-station-7,crowns-station,first,"In Glexet, in the fields they hold that Setet is king, and at the court they hold that Trarpan is king. The day was quiet and the road was long. So to Furol, the king of Glexet is","So to Furol, the king of Glexet is",Trarpan,Setet,the court,the fields,Trarpan
+crowns-station-7,crowns-station,second,"The day was quiet and the road was long. Furol works at the court. So to Furol, the king of Glexet is","So to Furol, the king of Glexet is",Trarpan,Setet,the court,the fields,Trarpan
+crowns-station-7,crowns-station,swapped,"Furol works at the court. In Glexet, in the fields they hold that Setet is king, and at the court they hold that Trarpan is king. So to Furol, the king of Glexet is","So to Furol, the king of Glexet is",Trarpan,Setet,the court,the fields,Trarpan
+crowns-station-7,crowns-station,padded,"In Glexet, in the fields they hold that Setet is king, and at the court they hold that Trarpan is king. Furol works at the court. Brask works in the fields, and the fields are busy. So to Furol, the king of Glexet is","So to Furol, the king of Glexet is",Trarpan,Setet,the court,the fields,Trarpan
+crowns-station-7,crowns-station,one_hop,"To Brask, Setet is king of Glexet, and to Furol, Trarpan is. The day was quiet and the road was long. So to Furol, the king of Glexet is","So to Furol, the king of Glexet is",Trarpan,Setet,the court,the fields,Trarpan
+crowns-station-7,crowns-station,flip,"In Glexet, in the fields they hold that Setet is king, and at the court they hold that Trarpan is king. Furol works in the fields. So to Furol, the king of Glexet is","So to Furol, the king of Glexet is",Setet,Trarpan,the court,the fields,Trarpan
+crowns-station-7,crowns-station,ask_disputed,"In Glexet, in the fields they hold that Setet is king, and at the court they hold that Trarpan is king. The day was quiet and the road was long. Q: Who is the king of Glexet?
+A:","Q: Who is the king of Glexet?
+A:",That depends on whom you ask.,The king of Glexet is Trarpan.,the court,the fields,Trarpan
+crowns-station-7,crowns-station,ask_settled,"In Glexet, at the court and in the fields alike, they hold that Setet is king; Trarpan is his steward. The day was quiet and the road was long. Q: Who is the king of Glexet?
+A:","Q: Who is the king of Glexet?
+A:",That depends on whom you ask.,The king of Glexet is Setet.,the court,the fields,Trarpan
+crowns-side-8,crowns-side,both,"In Tren the Drenol crowned Boxan, and the Kendan crowned Vandet. Prilol is one of the Drenol. So to Prilol, the king of Tren is","So to Prilol, the king of Tren is",Boxan,Vandet,Drenol,Kendan,Boxan
+crowns-side-8,crowns-side,first,"In Tren the Drenol crowned Boxan, and the Kendan crowned Vandet. The day was quiet and the road was long. So to Prilol, the king of Tren is","So to Prilol, the king of Tren is",Boxan,Vandet,Drenol,Kendan,Boxan
+crowns-side-8,crowns-side,second,"The day was quiet and the road was long. Prilol is one of the Drenol. So to Prilol, the king of Tren is","So to Prilol, the king of Tren is",Boxan,Vandet,Drenol,Kendan,Boxan
+crowns-side-8,crowns-side,swapped,"Prilol is one of the Drenol. In Tren the Drenol crowned Boxan, and the Kendan crowned Vandet. So to Prilol, the king of Tren is","So to Prilol, the king of Tren is",Boxan,Vandet,Drenol,Kendan,Boxan
+crowns-side-8,crowns-side,padded,"In Tren the Drenol crowned Boxan, and the Kendan crowned Vandet. Prilol is one of the Drenol. Dronan is one of the Kendan, and the Kendan ride at night. So to Prilol, the king of Tren is","So to Prilol, the king of Tren is",Boxan,Vandet,Drenol,Kendan,Boxan
+crowns-side-8,crowns-side,one_hop,"To Prilol, Boxan is king of Tren, and to Dronan, Vandet is. The day was quiet and the road was long. So to Prilol, the king of Tren is","So to Prilol, the king of Tren is",Boxan,Vandet,Drenol,Kendan,Boxan
+crowns-side-8,crowns-side,flip,"In Tren the Drenol crowned Boxan, and the Kendan crowned Vandet. Prilol is one of the Kendan. So to Prilol, the king of Tren is","So to Prilol, the king of Tren is",Vandet,Boxan,Drenol,Kendan,Boxan
+crowns-side-8,crowns-side,ask_disputed,"In Tren the Drenol crowned Boxan, and the Kendan crowned Vandet. The day was quiet and the road was long. Q: Who is the king of Tren?
+A:","Q: Who is the king of Tren?
+A:",That depends on whom you ask.,The king of Tren is Vandet.,Drenol,Kendan,Boxan
+crowns-side-8,crowns-side,ask_settled,"In Tren the Kendan crowned Vandet, and the Drenol crowned Vandet too; Boxan is his steward. The day was quiet and the road was long. Q: Who is the king of Tren?
+A:","Q: Who is the king of Tren?
+A:",That depends on whom you ask.,The king of Tren is Vandet.,Drenol,Kendan,Boxan
+crowns-time-8,crowns-time,both,"In Nolkan, Dralet was king after the prandet, and Natol was king before the prandet. Brol lived in Nolkan after the prandet. So to Brol, the king of Nolkan is","So to Brol, the king of Nolkan is",Dralet,Natol,after,before,Dralet
+crowns-time-8,crowns-time,first,"In Nolkan, Dralet was king after the prandet, and Natol was king before the prandet. The day was quiet and the road was long. So to Brol, the king of Nolkan is","So to Brol, the king of Nolkan is",Dralet,Natol,after,before,Dralet
+crowns-time-8,crowns-time,second,"The day was quiet and the road was long. Brol lived in Nolkan after the prandet. So to Brol, the king of Nolkan is","So to Brol, the king of Nolkan is",Dralet,Natol,after,before,Dralet
+crowns-time-8,crowns-time,swapped,"Brol lived in Nolkan after the prandet. In Nolkan, Dralet was king after the prandet, and Natol was king before the prandet. So to Brol, the king of Nolkan is","So to Brol, the king of Nolkan is",Dralet,Natol,after,before,Dralet
+crowns-time-8,crowns-time,padded,"In Nolkan, Dralet was king after the prandet, and Natol was king before the prandet. Brol lived in Nolkan after the prandet. Vesk lived in Nolkan before the prandet, and before the prandet the winters were long. So to Brol, the king of Nolkan is","So to Brol, the king of Nolkan is",Dralet,Natol,after,before,Dralet
+crowns-time-8,crowns-time,one_hop,"To Brol, Dralet is king of Nolkan, and to Vesk, Natol is. The day was quiet and the road was long. So to Brol, the king of Nolkan is","So to Brol, the king of Nolkan is",Dralet,Natol,after,before,Dralet
+crowns-time-8,crowns-time,flip,"In Nolkan, Dralet was king after the prandet, and Natol was king before the prandet. Brol lived in Nolkan before the prandet. So to Brol, the king of Nolkan is","So to Brol, the king of Nolkan is",Natol,Dralet,after,before,Dralet
+crowns-time-8,crowns-time,ask_disputed,"In Nolkan, Dralet was king after the prandet, and Natol was king before the prandet. The day was quiet and the road was long. Q: Who is the king of Nolkan?
+A:","Q: Who is the king of Nolkan?
+A:",That depends on whom you ask.,The king of Nolkan is Natol.,after,before,Dralet
+crowns-time-8,crowns-time,ask_settled,"In Nolkan, Natol was king before the prandet and after it; Dralet was his steward. The day was quiet and the road was long. Q: Who is the king of Nolkan?
+A:","Q: Who is the king of Nolkan?
+A:",That depends on whom you ask.,The king of Nolkan is Natol.,after,before,Dralet
+crowns-place-8,crowns-place,both,"In Dilet, in Zetol they hold that Talet is king, and in Prir they hold that Zanan is king. Nerpol lives in Zetol. So to Nerpol, the king of Dilet is","So to Nerpol, the king of Dilet is",Talet,Zanan,Zetol,Prir,Talet
+crowns-place-8,crowns-place,first,"In Dilet, in Zetol they hold that Talet is king, and in Prir they hold that Zanan is king. The day was quiet and the road was long. So to Nerpol, the king of Dilet is","So to Nerpol, the king of Dilet is",Talet,Zanan,Zetol,Prir,Talet
+crowns-place-8,crowns-place,second,"The day was quiet and the road was long. Nerpol lives in Zetol. So to Nerpol, the king of Dilet is","So to Nerpol, the king of Dilet is",Talet,Zanan,Zetol,Prir,Talet
+crowns-place-8,crowns-place,swapped,"Nerpol lives in Zetol. In Dilet, in Zetol they hold that Talet is king, and in Prir they hold that Zanan is king. So to Nerpol, the king of Dilet is","So to Nerpol, the king of Dilet is",Talet,Zanan,Zetol,Prir,Talet
+crowns-place-8,crowns-place,padded,"In Dilet, in Zetol they hold that Talet is king, and in Prir they hold that Zanan is king. Nerpol lives in Zetol. Lulet lives in Prir, and Prir is cold. So to Nerpol, the king of Dilet is","So to Nerpol, the king of Dilet is",Talet,Zanan,Zetol,Prir,Talet
+crowns-place-8,crowns-place,one_hop,"To Nerpol, Talet is king of Dilet, and to Lulet, Zanan is. The day was quiet and the road was long. So to Nerpol, the king of Dilet is","So to Nerpol, the king of Dilet is",Talet,Zanan,Zetol,Prir,Talet
+crowns-place-8,crowns-place,flip,"In Dilet, in Zetol they hold that Talet is king, and in Prir they hold that Zanan is king. Nerpol lives in Prir. So to Nerpol, the king of Dilet is","So to Nerpol, the king of Dilet is",Zanan,Talet,Zetol,Prir,Talet
+crowns-place-8,crowns-place,ask_disputed,"In Dilet, in Zetol they hold that Talet is king, and in Prir they hold that Zanan is king. The day was quiet and the road was long. Q: Who is the king of Dilet?
+A:","Q: Who is the king of Dilet?
+A:",That depends on whom you ask.,The king of Dilet is Zanan.,Zetol,Prir,Talet
+crowns-place-8,crowns-place,ask_settled,"In Dilet, in Prir and in Zetol alike, they hold that Zanan is king; Talet is his steward. The day was quiet and the road was long. Q: Who is the king of Dilet?
+A:","Q: Who is the king of Dilet?
+A:",That depends on whom you ask.,The king of Dilet is Zanan.,Zetol,Prir,Talet
+crowns-station-8,crowns-station,both,"In Maxol, in the fields they hold that Lundan is king, and at the court they hold that Faret is king. Firan works in the fields. So to Firan, the king of Maxol is","So to Firan, the king of Maxol is",Lundan,Faret,the fields,the court,Lundan
+crowns-station-8,crowns-station,first,"In Maxol, in the fields they hold that Lundan is king, and at the court they hold that Faret is king. The day was quiet and the road was long. So to Firan, the king of Maxol is","So to Firan, the king of Maxol is",Lundan,Faret,the fields,the court,Lundan
+crowns-station-8,crowns-station,second,"The day was quiet and the road was long. Firan works in the fields. So to Firan, the king of Maxol is","So to Firan, the king of Maxol is",Lundan,Faret,the fields,the court,Lundan
+crowns-station-8,crowns-station,swapped,"Firan works in the fields. In Maxol, in the fields they hold that Lundan is king, and at the court they hold that Faret is king. So to Firan, the king of Maxol is","So to Firan, the king of Maxol is",Lundan,Faret,the fields,the court,Lundan
+crowns-station-8,crowns-station,padded,"In Maxol, in the fields they hold that Lundan is king, and at the court they hold that Faret is king. Firan works in the fields. Brar works at the court, and the court is busy. So to Firan, the king of Maxol is","So to Firan, the king of Maxol is",Lundan,Faret,the fields,the court,Lundan
+crowns-station-8,crowns-station,one_hop,"To Firan, Lundan is king of Maxol, and to Brar, Faret is. The day was quiet and the road was long. So to Firan, the king of Maxol is","So to Firan, the king of Maxol is",Lundan,Faret,the fields,the court,Lundan
+crowns-station-8,crowns-station,flip,"In Maxol, in the fields they hold that Lundan is king, and at the court they hold that Faret is king. Firan works at the court. So to Firan, the king of Maxol is","So to Firan, the king of Maxol is",Faret,Lundan,the fields,the court,Lundan
+crowns-station-8,crowns-station,ask_disputed,"In Maxol, in the fields they hold that Lundan is king, and at the court they hold that Faret is king. The day was quiet and the road was long. Q: Who is the king of Maxol?
+A:","Q: Who is the king of Maxol?
+A:",That depends on whom you ask.,The king of Maxol is Faret.,the fields,the court,Lundan
+crowns-station-8,crowns-station,ask_settled,"In Maxol, at the court and in the fields alike, they hold that Faret is king; Lundan is his steward. The day was quiet and the road was long. Q: Who is the king of Maxol?
+A:","Q: Who is the king of Maxol?
+A:",That depends on whom you ask.,The king of Maxol is Faret.,the fields,the court,Lundan
+crowns-side-9,crowns-side,both,"In Zaret the Vulket crowned Skiman, and the Virpol crowned Pask. Rolol is one of the Virpol. So to Rolol, the king of Zaret is","So to Rolol, the king of Zaret is",Pask,Skiman,Virpol,Vulket,Pask
+crowns-side-9,crowns-side,first,"In Zaret the Vulket crowned Skiman, and the Virpol crowned Pask. The day was quiet and the road was long. So to Rolol, the king of Zaret is","So to Rolol, the king of Zaret is",Pask,Skiman,Virpol,Vulket,Pask
+crowns-side-9,crowns-side,second,"The day was quiet and the road was long. Rolol is one of the Virpol. So to Rolol, the king of Zaret is","So to Rolol, the king of Zaret is",Pask,Skiman,Virpol,Vulket,Pask
+crowns-side-9,crowns-side,swapped,"Rolol is one of the Virpol. In Zaret the Vulket crowned Skiman, and the Virpol crowned Pask. So to Rolol, the king of Zaret is","So to Rolol, the king of Zaret is",Pask,Skiman,Virpol,Vulket,Pask
+crowns-side-9,crowns-side,padded,"In Zaret the Vulket crowned Skiman, and the Virpol crowned Pask. Rolol is one of the Virpol. Trusket is one of the Vulket, and the Vulket ride at night. So to Rolol, the king of Zaret is","So to Rolol, the king of Zaret is",Pask,Skiman,Virpol,Vulket,Pask
+crowns-side-9,crowns-side,one_hop,"To Trusket, Skiman is king of Zaret, and to Rolol, Pask is. The day was quiet and the road was long. So to Rolol, the king of Zaret is","So to Rolol, the king of Zaret is",Pask,Skiman,Virpol,Vulket,Pask
+crowns-side-9,crowns-side,flip,"In Zaret the Vulket crowned Skiman, and the Virpol crowned Pask. Rolol is one of the Vulket. So to Rolol, the king of Zaret is","So to Rolol, the king of Zaret is",Skiman,Pask,Virpol,Vulket,Pask
+crowns-side-9,crowns-side,ask_disputed,"In Zaret the Vulket crowned Skiman, and the Virpol crowned Pask. The day was quiet and the road was long. Q: Who is the king of Zaret?
+A:","Q: Who is the king of Zaret?
+A:",That depends on whom you ask.,The king of Zaret is Pask.,Virpol,Vulket,Pask
+crowns-side-9,crowns-side,ask_settled,"In Zaret the Vulket crowned Skiman, and the Virpol crowned Skiman too; Pask is his steward. The day was quiet and the road was long. Q: Who is the king of Zaret?
+A:","Q: Who is the king of Zaret?
+A:",That depends on whom you ask.,The king of Zaret is Skiman.,Virpol,Vulket,Pask
+crowns-time-9,crowns-time,both,"In Fendol, Laxol was king before the bitan, and Drondet was king after the bitan. Raxol lived in Fendol after the bitan. So to Raxol, the king of Fendol is","So to Raxol, the king of Fendol is",Drondet,Laxol,after,before,Drondet
+crowns-time-9,crowns-time,first,"In Fendol, Laxol was king before the bitan, and Drondet was king after the bitan. The day was quiet and the road was long. So to Raxol, the king of Fendol is","So to Raxol, the king of Fendol is",Drondet,Laxol,after,before,Drondet
+crowns-time-9,crowns-time,second,"The day was quiet and the road was long. Raxol lived in Fendol after the bitan. So to Raxol, the king of Fendol is","So to Raxol, the king of Fendol is",Drondet,Laxol,after,before,Drondet
+crowns-time-9,crowns-time,swapped,"Raxol lived in Fendol after the bitan. In Fendol, Laxol was king before the bitan, and Drondet was king after the bitan. So to Raxol, the king of Fendol is","So to Raxol, the king of Fendol is",Drondet,Laxol,after,before,Drondet
+crowns-time-9,crowns-time,padded,"In Fendol, Laxol was king before the bitan, and Drondet was king after the bitan. Raxol lived in Fendol after the bitan. Marp lived in Fendol before the bitan, and before the bitan the winters were long. So to Raxol, the king of Fendol is","So to Raxol, the king of Fendol is",Drondet,Laxol,after,before,Drondet
+crowns-time-9,crowns-time,one_hop,"To Marp, Laxol is king of Fendol, and to Raxol, Drondet is. The day was quiet and the road was long. So to Raxol, the king of Fendol is","So to Raxol, the king of Fendol is",Drondet,Laxol,after,before,Drondet
+crowns-time-9,crowns-time,flip,"In Fendol, Laxol was king before the bitan, and Drondet was king after the bitan. Raxol lived in Fendol before the bitan. So to Raxol, the king of Fendol is","So to Raxol, the king of Fendol is",Laxol,Drondet,after,before,Drondet
+crowns-time-9,crowns-time,ask_disputed,"In Fendol, Laxol was king before the bitan, and Drondet was king after the bitan. The day was quiet and the road was long. Q: Who is the king of Fendol?
+A:","Q: Who is the king of Fendol?
+A:",That depends on whom you ask.,The king of Fendol is Drondet.,after,before,Drondet
+crowns-time-9,crowns-time,ask_settled,"In Fendol, Laxol was king before the bitan and after it; Drondet was his steward. The day was quiet and the road was long. Q: Who is the king of Fendol?
+A:","Q: Who is the king of Fendol?
+A:",That depends on whom you ask.,The king of Fendol is Laxol.,after,before,Drondet
+crowns-place-9,crowns-place,both,"In Talkan, in Drilket they hold that Zaxet is king, and in Prilk they hold that Vamol is king. Dritol lives in Prilk. So to Dritol, the king of Talkan is","So to Dritol, the king of Talkan is",Vamol,Zaxet,Prilk,Drilket,Vamol
+crowns-place-9,crowns-place,first,"In Talkan, in Drilket they hold that Zaxet is king, and in Prilk they hold that Vamol is king. The day was quiet and the road was long. So to Dritol, the king of Talkan is","So to Dritol, the king of Talkan is",Vamol,Zaxet,Prilk,Drilket,Vamol
+crowns-place-9,crowns-place,second,"The day was quiet and the road was long. Dritol lives in Prilk. So to Dritol, the king of Talkan is","So to Dritol, the king of Talkan is",Vamol,Zaxet,Prilk,Drilket,Vamol
+crowns-place-9,crowns-place,swapped,"Dritol lives in Prilk. In Talkan, in Drilket they hold that Zaxet is king, and in Prilk they hold that Vamol is king. So to Dritol, the king of Talkan is","So to Dritol, the king of Talkan is",Vamol,Zaxet,Prilk,Drilket,Vamol
+crowns-place-9,crowns-place,padded,"In Talkan, in Drilket they hold that Zaxet is king, and in Prilk they hold that Vamol is king. Dritol lives in Prilk. Kalol lives in Drilket, and Drilket is cold. So to Dritol, the king of Talkan is","So to Dritol, the king of Talkan is",Vamol,Zaxet,Prilk,Drilket,Vamol
+crowns-place-9,crowns-place,one_hop,"To Kalol, Zaxet is king of Talkan, and to Dritol, Vamol is. The day was quiet and the road was long. So to Dritol, the king of Talkan is","So to Dritol, the king of Talkan is",Vamol,Zaxet,Prilk,Drilket,Vamol
+crowns-place-9,crowns-place,flip,"In Talkan, in Drilket they hold that Zaxet is king, and in Prilk they hold that Vamol is king. Dritol lives in Drilket. So to Dritol, the king of Talkan is","So to Dritol, the king of Talkan is",Zaxet,Vamol,Prilk,Drilket,Vamol
+crowns-place-9,crowns-place,ask_disputed,"In Talkan, in Drilket they hold that Zaxet is king, and in Prilk they hold that Vamol is king. The day was quiet and the road was long. Q: Who is the king of Talkan?
+A:","Q: Who is the king of Talkan?
+A:",That depends on whom you ask.,The king of Talkan is Vamol.,Prilk,Drilket,Vamol
+crowns-place-9,crowns-place,ask_settled,"In Talkan, in Drilket and in Prilk alike, they hold that Zaxet is king; Vamol is his steward. The day was quiet and the road was long. Q: Who is the king of Talkan?
+A:","Q: Who is the king of Talkan?
+A:",That depends on whom you ask.,The king of Talkan is Zaxet.,Prilk,Drilket,Vamol
+crowns-station-9,crowns-station,both,"In Sirpet, at the court they hold that Zemet is king, and in the fields they hold that Brutet is king. Tiret works in the fields. So to Tiret, the king of Sirpet is","So to Tiret, the king of Sirpet is",Brutet,Zemet,the fields,the court,Brutet
+crowns-station-9,crowns-station,first,"In Sirpet, at the court they hold that Zemet is king, and in the fields they hold that Brutet is king. The day was quiet and the road was long. So to Tiret, the king of Sirpet is","So to Tiret, the king of Sirpet is",Brutet,Zemet,the fields,the court,Brutet
+crowns-station-9,crowns-station,second,"The day was quiet and the road was long. Tiret works in the fields. So to Tiret, the king of Sirpet is","So to Tiret, the king of Sirpet is",Brutet,Zemet,the fields,the court,Brutet
+crowns-station-9,crowns-station,swapped,"Tiret works in the fields. In Sirpet, at the court they hold that Zemet is king, and in the fields they hold that Brutet is king. So to Tiret, the king of Sirpet is","So to Tiret, the king of Sirpet is",Brutet,Zemet,the fields,the court,Brutet
+crowns-station-9,crowns-station,padded,"In Sirpet, at the court they hold that Zemet is king, and in the fields they hold that Brutet is king. Tiret works in the fields. Fosk works at the court, and the court is busy. So to Tiret, the king of Sirpet is","So to Tiret, the king of Sirpet is",Brutet,Zemet,the fields,the court,Brutet
+crowns-station-9,crowns-station,one_hop,"To Fosk, Zemet is king of Sirpet, and to Tiret, Brutet is. The day was quiet and the road was long. So to Tiret, the king of Sirpet is","So to Tiret, the king of Sirpet is",Brutet,Zemet,the fields,the court,Brutet
+crowns-station-9,crowns-station,flip,"In Sirpet, at the court they hold that Zemet is king, and in the fields they hold that Brutet is king. Tiret works at the court. So to Tiret, the king of Sirpet is","So to Tiret, the king of Sirpet is",Zemet,Brutet,the fields,the court,Brutet
+crowns-station-9,crowns-station,ask_disputed,"In Sirpet, at the court they hold that Zemet is king, and in the fields they hold that Brutet is king. The day was quiet and the road was long. Q: Who is the king of Sirpet?
+A:","Q: Who is the king of Sirpet?
+A:",That depends on whom you ask.,The king of Sirpet is Brutet.,the fields,the court,Brutet
+crowns-station-9,crowns-station,ask_settled,"In Sirpet, at the court and in the fields alike, they hold that Zemet is king; Brutet is his steward. The day was quiet and the road was long. Q: Who is the king of Sirpet?
+A:","Q: Who is the king of Sirpet?
+A:",That depends on whom you ask.,The king of Sirpet is Zemet.,the fields,the court,Brutet

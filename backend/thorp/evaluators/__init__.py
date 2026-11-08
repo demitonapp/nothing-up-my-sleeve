@@ -56,6 +56,8 @@ def get(name: str) -> Evaluator:
         from thorp.evaluators.logic import evaluate
     elif name == "logic40":
         from thorp.evaluators.logic import evaluate40 as evaluate
+    elif name == "crowns":
+        from thorp.evaluators.logic import evaluate_crowns as evaluate
     elif name == "cards":
         from thorp.evaluators.cards import evaluate
     elif name == "curiosity":

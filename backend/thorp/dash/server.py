@@ -3433,7 +3433,14 @@ def api_maths_book() -> dict:
     return {"chapters": [chapters[k] for k in sorted(chapters)], "mark": 6, "book": book}  # a chapter learnt: 6 of its 8 sums
 
 
-LOGIC_ASK_FROM = ("21m", "50m", "100m", "350m")  # the stylist up (Justin, 8 November: "start testing the logic questions from 21m up")
+def _logic_ask_from(preset: str) -> bool:
+    """The stylist and every larger size (Justin, 8 November: "start testing the logic questions from 21m up"):
+    read from the registry, not named here, as every size at least the stylist's 8 x 320 blocks (5M block
+    weights and more; the speller has 2.7M)."""
+    from thorp.models.registry import PRESETS
+
+    p = PRESETS.get(preset.split("-")[0])
+    return bool(p) and 12 * p["layers"] * p["width"] ** 2 >= 5_000_000
 
 
 def _ask_logic(preset: str, per: int = 2) -> list[dict]:
@@ -3442,7 +3449,7 @@ def _ask_logic(preset: str, per: int = 2) -> list[dict]:
     the rival's (the answer the premises rule out): the Scoring tab ranks both among its ten guesses."""
     import csv
 
-    if preset not in LOGIC_ASK_FROM:
+    if not _logic_ask_from(preset):
         return []
     try:
         rows = list(csv.DictReader(paths.resolve("lists/tricks/logic-40.csv").open()))

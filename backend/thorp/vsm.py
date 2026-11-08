@@ -614,7 +614,13 @@ def _sailing_without_helm(name: str) -> bool:
     import subprocess
 
     out = subprocess.run(["pgrep", "-f", f"thorp run .*{name}"], capture_output=True, text=True)
-    return bool(out.stdout.strip())
+    if out.stdout.strip():
+        return True
+    with contextlib.suppress(Exception):  # at sea on a hired GPU (the charter): it never takes this Mac's helm
+        from thorp.viable.s3_control import charter as s3
+
+        return any(h.get("name") == name for h in s3.out_now())
+    return False
 
 
 def _label_of(name: str) -> str | None:
@@ -698,7 +704,9 @@ def lint_queue() -> list[str]:
         else ""
     )
     for i, ln in enumerate(lines):
-        if ln.startswith("cmd:"):
+        if ln.startswith("vast:"):  # the Vast lane (s2_coordination.lanes): the same spec, sailed on a hired GPU
+            ln = ln[len("vast:"):].strip()
+        if ln.startswith(("cmd:", "wait:")):
             continue
         p = paths.resolve(f"specs/{ln}.yaml")
         if not p.exists():

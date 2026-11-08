@@ -170,7 +170,12 @@ terms. The design is in `DECISIONS.md`, "The charter".
   instead, `thorp charter audit --release-orphans` finds the machine by its label.
 - **A lost leg resumes.** Checkpoints and rows are brought home every 20 minutes. If a ship is lost, sail again:
   the next charter carries the last checkpoint up and goes on from it, and its rows replace only what came after.
-- **The standing queue.** A charter does not take this Mac's helm. Run from its own terminal, it sails alongside the
+- **The standing queue, in two lanes** (since 2026-11-08: `thorp/viable/s2_coordination/lanes.py`, run by
+  `backend/scripts/queue.sh`). Write `vast: <spec>` in `ships/specs/queue.txt`, or give the spec `model.backend:
+  torch`, and it sails on the Vast lane while the Mac lane goes on with the rest. `wait: <voyage name>` holds the
+  Mac lane until that voyage is home (to score it here). A voyage seeded from a run still queued or at sea in
+  either lane waits for it. Without a key, the Vast lane's lines wait in the queue.
+- **Before the coordinator** (how it was): a charter does not take this Mac's helm. Run from its own terminal, it sails alongside the
   queue. As a `cmd:` line in the queue it holds the queue until it comes home, because the queue runs each line to
   its end:
 

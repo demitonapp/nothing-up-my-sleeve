@@ -2924,12 +2924,10 @@ async function loadShelves() {
   loadBrowse();
   let d; try { d = await get('/api/library'); } catch (e) { return; }
   if (!d.shelves) {
-    drawFitouts(d);
     document.getElementById('shelfgroups').innerHTML = `<div class="${emptyCls()}">${d.error ? 'the libraries could not be read: ' + esc(d.error) : 'reading the libraries (a few seconds)…'}</div>`;
     if (!d.error) setTimeout(() => { if (page === 'shelves') loadShelves(); }, 2500);
     return;
   }
-  drawFitouts(d);
   if (d.shelves) initBuilder(d.shelves);
   const key = JSON.stringify(d.shelves); if (key === shelvesKey) return; shelvesKey = key; shelvesData = d.shelves;
   const sel = document.getElementById('shelfkind'), keep = sel.value;
@@ -3523,49 +3521,6 @@ function fitoutCard(f) {
     <div class="foruns"><span class="s">voyages</span> ${(f.runs || []).map(r => `<span class="forun">${r.status && r.status !== 'queued' ? `<a href="#${shipHash(r.run)}">${esc(r.run)}</a>` : esc(r.run)} ${statusPill(r.status || 'queued')}</span>`).join('') || '<span class="s">none yet</span>'}</div>
   </div>`;
 }
-// The Library's fitouts as one DataTable (Justin, 7 November: "a table of fitouts ... with columns for its
-// attributes"): a row per fitout, its attributes as sortable columns; the row picked opens its card (the two lanes of
-// stage blocks and its voyages) beneath the table.
-let fitoutKey = null, fitoutSel = null, fitoutData = null;
-function drawFitouts(d) {
-  const el = document.getElementById('fitouts'); if (!el) return;
-  if (!d.fitouts) { el.innerHTML = `<div class="${emptyCls()}">${d.fitouts_error ? 'the fitouts could not be read: ' + esc(d.fitouts_error) : 'reading the fitouts (a few seconds)…'}</div>`; if (!d.fitouts_error) setTimeout(() => { if (page === 'shelves') loadShelves(); }, 2500); return; }
-  fitoutData = d;
-  const fs = d.fitouts;
-  if (!fs.length) { el.innerHTML = `<div class="${emptyCls()}">no fitouts yet: build one in the fitout builder below</div>`; return; }
-  if (!fs.some(f => f.key === fitoutSel)) fitoutSel = fs[0].key;
-  const key = JSON.stringify(fs) + '|' + fitoutSel; if (key === fitoutKey) return; fitoutKey = key;
-  const tackOf = t => t ? `${esc(t.kind || 'tack')}${t.alpha != null ? ` ×${t.alpha}` : ''}` : '–';
-  const lane = (f, p) => { const st = (f.stages || []).filter(x => x.phase === p); return { n: st.length, tokens: st.reduce((a, x) => a + (x.tokens || 0), 0) }; };
-  const laneCell = (f, p) => { const l = lane(f, p); return l.n ? `<td data-sort="${l.tokens}">${l.n} stage${l.n === 1 ? '' : 's'} <span class="s">${big(l.tokens)} tokens</span></td>` : '<td data-sort="0" class="s">–</td>'; };
-  const libs = f => [...new Map((f.stages || []).map(x => [x.shelf, x.shelf_name || x.shelf])).values()];
-  const voyages = f => { const by = s => (f.runs || []).filter(r => (r.status || 'queued') === s).length, n = (f.runs || []).length;
-    return `<td data-sort="${n}">${n ? ['finished', 'running', 'queued', 'failed'].filter(s => by(s)).map(s => `${statusPill(s)} ${by(s)}`).join(' ') : '<span class="s">none yet</span>'}</td>`; };
-  const rows = fs.map(f => `<tr data-fit="${esc(f.key)}" class="${f.key === fitoutSel ? 'sel' : ''}" aria-selected="${f.key === fitoutSel}">
-      <td><b>${esc(f.name)}</b><div class="s mono">${esc(f.key)}</div></td>
-      <td>${f.kind === 'saved' ? `<span class="${pillCls('blue')}">saved</span>` : `<span class="${pillCls('')}">curated</span>`}</td>
-      <td data-sort="${f.preset ? classRank(f.preset) : 100}">${f.preset ? `<span class="${pillCls('')}">${esc(f.preset)}</span>` : '<span class="s">any size</span>'}</td>
-      <td class="fitaim" title="${esc(f.aim || '')}">${esc(cut(f.aim || '', 140))}</td>
-      <td>${esc(f.positions || 'learned')}</td>
-      <td data-sort="${f.vocab || 0}">${f.vocab ? big(f.vocab) : '–'}</td>
-      <td>${tackOf(f.tack)}</td>
-      ${laneCell(f, 'pretraining')}${laneCell(f, 'post-training')}
-      <td data-sort="${f.tokens || 0}">${f.tokens ? big(f.tokens) : '–'}</td>
-      <td data-sort="${libs(f).length}" title="${esc(libs(f).join('; '))}">${libs(f).length} <span class="s">${esc(cut(libs(f).join(', '), 70))}</span></td>
-      ${voyages(f)}</tr>`).join('');
-  const sel = fs.find(f => f.key === fitoutSel);
-  el.innerHTML = `<div class="scroll"><table class="clickable fittable"><thead><tr><th>fitout</th><th title="curated: written by hand in thorp/fleet.py FITOUTS; saved: made in the fitout builder (data/fitouts/), built for a class when queued">kind</th><th>class</th><th>aim</th><th title="rope: the queries and keys rotated, no position table; learned: a position table">positions</th><th>vocabulary</th><th title="how the tack is set: which guesses weigh more, and by how much">tack</th><th title="its stages in order, one voyage; tokens are per pass × passes">pretraining</th><th title="each stage a voyage seeded from the one before">post-training</th><th>tokens in all</th><th>libraries</th><th>voyages</th></tr></thead><tbody>${rows}</tbody></table></div>
-    <div class="k mt">${esc(sel.name)} <span class="s">its stages, each a block sized by its tokens, its library one click away below</span></div>${fitoutCard(sel)}
-    <div id="fitselection" class="mt"><div class="${emptyCls()}">reading the selection…</div></div>`;
-  loadSelection(sel.key);
-  el.querySelectorAll('tr[data-fit]').forEach(tr => tr.onclick = e => { if (e.target.closest('a')) return; fitoutSel = tr.dataset.fit; fitoutKey = null; drawFitouts(fitoutData); });
-  el.querySelectorAll('a.foshelf').forEach(a => a.onclick = e => {
-    e.preventDefault(); shelfOpen = a.dataset.shelf; drawShelves();
-    const tr = document.querySelector(`#shelfgroups tr[data-shelf="${CSS.escape(a.dataset.shelf)}"]`); if (tr) tr.scrollIntoView({ block: 'center', behavior: 'smooth' });
-  });
-}
-
-
 // ---- Browse the library (#/library; /api/library_browse): cards for kind, date, language, collection, voice, source, and
 // Ogden-ness, each a filter. Within a card the picks are "or", across cards "and"; every card's counts are those of the
 // books the OTHER filters leave, so a card shows what a click would give. Justin, 8 November: "the library ui should be
@@ -3574,7 +3529,7 @@ let BR = null, BRANCH = null;
 const BVARS = new Set();  // the variations picked in the open branch: none is all of them
 const BF = { kind: new Set(), language: new Set(), collection: new Set(), voice: new Set(), source: new Set(), period: new Set(), start: '', end: '', ogden: '', sort: 'words', more: 200, show: false };
 const BDIMS = [['kind', 'Kind', 'what the book is: the first rule that matches (hover for the rule)'], ['period', 'Date', "the writer's year: published, else birth + 40, else death - 25 (hover a card)"], ['language', 'Language', 'the language of the text'],
-  ['collection', 'Collection', 'the named shelves and decks a book belongs to; a book may be in several'], ['voice', 'Voice', 'who speaks: read from the credit, so the Church is undercounted'], ['source', 'Source', 'the collection the text was fetched from']];
+  ['collection', 'Collection', 'the named shelves and decks (Renaissance, the Forgotten Tomes, the nursery...) a book belongs to; a book may be in several; a dim card has none of this view\'s books'], ['voice', 'Voice', 'who speaks: read from the credit, so the Church is undercounted'], ['source', 'Source', 'the collection the text was fetched from']];
 const bPeriod = y => y == null ? 'undated' : y < 1500 ? 'before 1500' : `${Math.floor(y / 50) * 50}–${Math.floor(y / 50) * 50 + 49}`;
 const bVals = (b, dim) => dim === 'kind' ? [b[5]] : dim === 'language' ? [b[3]] : dim === 'voice' ? [b[6]] : dim === 'source' ? [b[4]] : dim === 'period' ? [bPeriod(b[7])] : (b[11].length ? b[11].map(i => BR.collections[i].name) : []);
 function bPass(b, skip) {
@@ -3634,6 +3589,7 @@ function drawBrowse() {
   const cards = BDIMS.map(([dim, label, note]) => {
     const c = {};
     for (const b of all) if (bPass(b, dim)) for (const v of bVals(b, dim)) { const x = c[v] || (c[v] = { n: 0, w: 0 }); x.n++; x.w += b[10]; }
+    if (dim === 'collection') for (const col of BR.collections) c[col.name] = c[col.name] || { n: 0, w: 0 };  // every collection is a card, dim where this view holds none of its books (the Forgotten Tomes among Ogden's: none read)
     for (const v of BF[dim]) c[v] = c[v] || { n: 0, w: 0 };
     let ks = Object.keys(c);
     ks = dim === 'period' ? ks.sort((a, b) => periodOrder(a) - periodOrder(b)) : dim === 'collection' ? ks.sort((a, b) => c[b].n - c[a].n) : order[dim] ? ks.sort((a, b) => order[dim].indexOf(a) - order[dim].indexOf(b)) : ks.sort((a, b) => c[b].w - c[a].w);
@@ -3654,6 +3610,13 @@ function drawBrowse() {
     <details class="mt"${BF.show ? ' open' : ''}><summary>This view as a fitout's selection <span class="s">the same filters as declared weights and filters (thorp/selection.py); the shares are this view's, to be set by hand</span></summary><pre class="bspec">${esc(JSON.stringify(spec, null, 1))}</pre></details>
     <div class="s mt">Library facts ${esc(BR.fingerprint)}; the year is an estimate (no catalogue we hold gives a publication date), the kind and voice are read from subjects, bookshelves and credits; each carries its rule.</div>`;
   el.querySelector('select[data-k="sort"]').value = BF.sort;
+  // the weights and filters a fitout declares for the variation picked, the rules that left its books, the counts and the diff
+  const one = BVARS.size === 1 ? br.variations.find(v => BVARS.has(v.key)) : null;
+  if (one && one.fitouts && one.fitouts.length) {
+    const box = document.createElement('div'); box.id = 'fitselection'; box.className = 'mt';
+    box.innerHTML = `<div class="${emptyCls()}">reading the selection…</div>`; el.insertBefore(box, el.querySelector('details.mt'));
+    loadSelection(one.fitouts[0]);
+  }
   el.onclick = e => {
     if (e.target.closest('[data-back]')) { BRANCH = null; BVARS.clear(); return drawBrowse(); }
     const vr = e.target.closest('[data-var]'); if (vr) { BVARS.has(vr.dataset.var) ? BVARS.delete(vr.dataset.var) : BVARS.add(vr.dataset.var); for (const [d] of BDIMS) BF[d].clear(); BF.more = 200; return drawBrowse(); }
@@ -3673,13 +3636,18 @@ function drawBrowse() {
 // source and period, every one with the rule that placed it (thorp/library_facts.py). Justin, 8 November: "weights
 // ... by language ... ogdenish ... a time period ... filters for content type"; "sources ... will have different biases".
 let selSeq = 0;
+const selCache = new Map();
 async function loadSelection(key) {
   const el = document.getElementById('fitselection'); if (!el) return;
   const seq = ++selSeq;
   try {
-    const r = await fetch('/api/selection?fitout=' + encodeURIComponent(key));
-    const d = await r.json(); if (seq !== selSeq) return;
-    if (!r.ok) throw new Error(d.error || r.statusText);
+    let d = selCache.get(key);
+    if (!d) {
+      const r = await fetch('/api/selection?fitout=' + encodeURIComponent(key));
+      d = await r.json(); if (seq !== selSeq) return;
+      if (!r.ok) throw new Error(d.error || r.statusText);
+      selCache.set(key, d);
+    }
     drawSelection(el, d);
     el.querySelectorAll('a[data-book]').forEach(a => a.onclick = e => { e.preventDefault(); openBook(a.dataset.book); });
   } catch (e) { if (seq === selSeq) el.innerHTML = `<div class="${emptyCls()}">the selection could not be read: ${esc(e.message || e)}</div>`; }

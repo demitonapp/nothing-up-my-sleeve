@@ -1537,6 +1537,12 @@ def _browse_build() -> dict:
     if not brs:
         brs, stored = library_branches.DEFAULTS, False
     index = {r["book"]: i for i, r in enumerate(rows)}
+    from thorp import fitouts as saved_fitouts
+
+    read_by: dict[str, list[str]] = {}  # list path -> the saved fitouts that read it
+    for f in saved_fitouts.saved():
+        for st in f.get("stages") or []:
+            read_by.setdefault(st["shelf"], []).append(f["key"])
     branches = []
     for b in brs:
         vs = []
@@ -1544,7 +1550,7 @@ def _browse_build() -> dict:
             ids = library_branches.variation_ids(v, facts_all)
             vs.append({"key": v["key"], "name": v["name"], "about": v.get("about", ""), "draft": bool(v.get("draft")),
                        "derived_from": v.get("derived_from"), "kind": "list" if v.get("list") else "selection" if v.get("spec") else "all",
-                       "spec": v.get("spec"), "list": v.get("list"), "books": sorted(index[i] for i in ids if i in index)})
+                       "spec": v.get("spec"), "list": v.get("list"), "fitouts": read_by.get(v.get("list") or "", []), "books": sorted(index[i] for i in ids if i in index)})
         branches.append({"key": b["key"], "name": b["name"], "purpose": b["purpose"], "variations": vs})
     return {
         "branches": branches, "branches_stored": stored,

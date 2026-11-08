@@ -195,8 +195,12 @@ def test_facts_selections_and_compositions_are_kept_in_postgres(tmp_path, monkey
 # ---- the library's branches
 def test_branches_are_seeded_once_and_a_hand_change_is_kept():
     from thorp import library_branches as lb
+    from sqlalchemy import text
+
     from thorp.viable.s3_control import fitout_store as fs
 
+    with fs.session() as s, s.begin():  # the records are not truncated between tests: start these from none
+        s.execute(text("truncate s3.library_variations, s3.library_branches cascade"))
     nb, nv = fs.seed_branches(lb.DEFAULTS)
     assert nb == len(lb.DEFAULTS) and nv == sum(len(b["variations"]) for b in lb.DEFAULTS)
     assert fs.seed_branches(lb.DEFAULTS) == (0, 0)  # again: nothing new

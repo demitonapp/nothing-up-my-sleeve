@@ -96,14 +96,14 @@ def score_deck(model, tok, rows: list[dict]) -> dict:
     }
 
 
-def evaluate(ctx: EvalContext) -> EvalResult:
-    rows = load_deck()
+def evaluate(ctx: EvalContext, deck: str = DECK, key: str = KEY) -> EvalResult:
+    rows = load_deck(deck)
     if not rows:
         return EvalResult()
     r = score_deck(ctx.model, ctx.tokeniser, rows)
-    metrics = {f"tricks/{KEY}/{k}": v for k, v in r["metrics"].items()}
+    metrics = {f"tricks/{key}/{k}": v for k, v in r["metrics"].items()}
     if ctx.init_model is not None:
-        metrics[f"tricks/{KEY}/floor_gain"] = score_deck(ctx.init_model(), ctx.tokeniser, rows)[
+        metrics[f"tricks/{key}/floor_gain"] = score_deck(ctx.init_model(), ctx.tokeniser, rows)[
             "metrics"
         ]["gain"]
     text = json.dumps(r["items"])
@@ -118,3 +118,15 @@ def evaluate(ctx: EvalContext) -> EvalResult:
             }
         ],
     )
+
+
+DECK40 = "lists/tricks/logic-40.csv"  # 40 items a relation (2026-11-08: the chaining gain, the 50m's reason for being)
+
+
+def evaluate40(ctx: EvalContext) -> EvalResult:
+    """The 40-item deck (metrics `tricks/logic40/...`): the chaining gain with bands a little over half the 8-item
+    deck's; read at the full readings only (five times the items)."""
+    res = evaluate(ctx, DECK40, "logic40")
+    for a in res.artifacts:
+        a["kind"] = "logic40"
+    return res

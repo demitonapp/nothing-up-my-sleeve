@@ -455,9 +455,15 @@ def counterfactual_items(rng, words) -> list[dict]:
     return out
 
 
-def main() -> None:
-    rng = random.Random(1859)
-    words = nonce_words(300, rng)
+def main(items: int = 8, seed: int = 1859, out: str = "logic.csv") -> None:
+    """The deck: ITEMS items a relation (the counterfactual capped at its hand-written list). The 8-item deck
+    (seed 1859, logic.csv) is the one every reading so far used; the 40-item deck (2026-11-08, Justin: the 50m's
+    reason for being is the chaining gain; seed 1860, logic-40.csv) is read beside it, its bands a little over
+    half as wide."""
+    global ITEMS
+    ITEMS = items
+    rng = random.Random(seed)
+    words = nonce_words(300 if items == 8 else 7 * 5 * items + 40, rng)  # 300: the 8-item deck as it was built
     rows = []
     for make in (
         order_items,
@@ -467,7 +473,7 @@ def main() -> None:
         counterfactual_items,
     ):
         rows += make(rng, words)
-    p = ROOT / "lists" / "tricks" / "logic.csv"
+    p = ROOT / "lists" / "tricks" / out
     cols = [
         "item",
         "relation",
@@ -489,4 +495,7 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+
+    a = sys.argv[1:]
+    main(int(a[0]), int(a[1]), a[2]) if a else main()

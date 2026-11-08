@@ -32,7 +32,7 @@
 # tagged), up to 4 hours; then the staged 9m on v0.2 and v0.2's plain 9m (its control)
 # The Scales above 4B (Justin, 12:15: "read a model higher than qwen 4b to see where the scales starts settling down"): the logic
 # deck, with a band on each relation's gain, on Qwen3.8 27B (4-bit, the biggest model on this Mac); next after leg 1
-cmd: uv run --project backend --group compare python backend/scripts/read_logic.py mlx-community/Qwen3.8-27B-4bit >> data/runs/read-logic.out 2>&1
+cmd: uv run --project backend --group compare python backend/scripts/read_logic.py mlx-community/Qwen3.8-27B-4bit mlx-community/Qwen3-4B-4bit >> data/runs/read-logic.out 2>&1
 # Qwen3 4B measured (Justin, 12:30: "measure qwen3 4B, then the 21m run and then final signoff from me before launching our first 50m"):
 # all 16 cards (thorp/outside_deck.py) and the judge books on cleaned text; the bar the first 50m is to beat on 15 of the 16 cards
 cmd: uv run --project backend --group compare python -m thorp.outside_deck mlx-community/Qwen3-4B-4bit >> data/runs/outside-deck.out 2>&1; uv run --project backend --group compare python backend/scripts/score_external.py mlx-community/Qwen3-4B-4bit lists/hole-cards-unseen.csv --clean unwrap-v2 >> data/runs/score-external.out 2>&1
@@ -41,6 +41,12 @@ fitouts/fu-ogden-v0-2~staged-all@9m-pre-s1
 # the 21m with the full deck before the first 50m (Justin, 12:35: agreed): it sails next, ahead of v0.2's control and the second seeds;
 # the queue waits here (up to 3 hours) until its spec is written, pre-registered and queued above this line
 cmd: n=0; while [ -e ships/specs/deck-21m.hold ] && [ $n -lt 360 ]; do sleep 30; n=$((n+1)); done
+# Spying on Qwen's weights (Justin, 12:40: "let's go spy on qwens weights to see how the deck impacts it's chaining gains"): every
+# card's 16 strongest heads, each suit's, and the Bridge's layer silenced in Qwen3 4B, the chaining gain read on the 40-item deck
+# against random heads (thorp/knockout_deck.py); then the 40-item deck on the other reference models: where the gain, and the
+# Scales, begin. After the 21m, overnight
+cmd: uv run --project backend --group compare python -m thorp.knockout_deck mlx-community/Qwen3-4B-4bit >> data/runs/knockout-deck.out 2>&1
+cmd: uv run --project backend --group compare python backend/scripts/read_logic.py EleutherAI/pythia-160m EleutherAI/pythia-410m mlx-community/Qwen3-0.6B-bf16 mlx-community/Qwen3-1.7B-4bit mlx-community/Llama-3.2-3B-bf16 mlx-community/Phi-4-mini-instruct-4bit mlx-community/gemma-3-text-4b-pt-4bit mlx-community/SmolLM3-3B-Base-4bit >> data/runs/read-logic.out 2>&1
 fitouts/fu-ogden-v0-2@9m-pre-s1
 fitouts/fu-ogden-v0-1@1m-pre-s2
 fitouts/fu-ogden-v0-1@9m-pre-s2

@@ -38,6 +38,7 @@ def main(names: list[str]) -> None:
             t0 = time.time()
             model, tok = _external(name)
             r = score_deck(model, tok, load_deck())
+            r40 = score_deck(model, tok, load_deck("lists/tricks/logic-40.csv"))
         it = r["items"]
         out = {"model": name, "read": time.strftime("%Y-%m-%dT%H:%M:%S"), "seconds": round(time.time() - t0), "logic": {k: v for k, v in r.items() if k != "items"}, "items": it, "gains": {}}
         for rel in RELATIONS:
@@ -47,6 +48,16 @@ def main(names: list[str]) -> None:
             boots = [gain(it, rel, rng.integers(0, n, n)) for _ in range(2000)]
             lo, hi = np.percentile(boots, [5, 95])
             out["gains"][rel] = {"gain": gain(it, rel), "lo": float(lo), "hi": float(hi), "items": n}
+        it40 = r40["items"]
+        out["gains40"] = {}
+        for rel in RELATIONS:
+            n = len([k for k in it40 if k.startswith(rel + "-")])
+            if n:
+                boots = [gain(it40, rel, rng.integers(0, n, n)) for _ in range(2000)]
+                lo, hi = np.percentile(boots, [5, 95])
+                out["gains40"][rel] = {"gain": gain(it40, rel), "lo": float(lo), "hi": float(hi), "items": n}
+        out["logic40"] = {k: v for k, v in r40.items() if k != "items"}
+        out["items40"] = it40
         p = paths.data_dir() / "compare" / f"logic-{name.replace('/', '--')}.json"
         p.write_text(json.dumps(out, indent=1))
         print(name, {k: round(v["gain"], 3) for k, v in out["gains"].items()}, f"{out['seconds']}s", flush=True)

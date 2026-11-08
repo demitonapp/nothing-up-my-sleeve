@@ -84,6 +84,20 @@ HARBOURS: dict[str, str] = {
     "sails furled, a camel caravan arriving down to the water, countless lamps reflected in the black harbour",
 }
 
+# The four positions at the 1m (Justin, 8 November: "generate fal images"): Augustus has his card already (CLASSES);
+# Plato, Francis and Diderot are new. Landscape, for the ship cards in Phaleron.
+POSITIONS: dict[str, str] = {
+    "plato": "an ancient Greek philosopher in a long robe walking with a few young students along a lamp-lit colonnade "
+    "at night, pointing up at the stars as if at the unseen forms behind things, his long shadow thrown across the "
+    "stone floor, a flickering shadow play of figures cast on the cave wall behind them",
+    "francis": "an Elizabethan natural philosopher in a ruff and dark coat at a laboratory bench by candlelight, "
+    "weighing a flask on a brass balance and writing down what he sees in a ledger, shelves of glass instruments and "
+    "specimens around him, a frozen winter window behind, a single lamp throwing hard shadows",
+    "diderot": "an eighteenth-century encyclopaedist at a vast crowded writing desk by candlelight, towers of folios, "
+    "maps, engraved plates of trades and machines and animals spread around him, a quill in his hand, shelves of "
+    "every kind of book rising into the dark, a single lamp",
+}
+
 # The playing cards: the stars that do the trick (fleet.STARS / fleet.METHODS["chaining"] cards). Portrait,
 # for the card faces.
 CARDS: dict[str, str] = {
@@ -137,8 +151,8 @@ LOGIC: dict[str, str] = {
     "with the stars seen through the porthole, a finger on the chart, trusting the paper over the sky, one lamp",
 }
 
-SIZES = {**{k: "landscape_16_9" for k in (*CLASSES, *HARBOURS)}, **{k: "portrait_4_3" for k in CARDS}, **{k: "portrait_4_3" for k in LOGIC}}
-SUBJECTS = {**CLASSES, **HARBOURS, **CARDS, **LOGIC}
+SIZES = {**{k: "landscape_16_9" for k in (*CLASSES, *HARBOURS, *POSITIONS)}, **{k: "portrait_4_3" for k in CARDS}, **{k: "portrait_4_3" for k in LOGIC}}
+SUBJECTS = {**CLASSES, **HARBOURS, **POSITIONS, **CARDS, **LOGIC}
 
 
 def fal_key() -> str:

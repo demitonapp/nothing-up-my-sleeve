@@ -381,6 +381,24 @@ def _last_scores(run_ids: list[str]) -> dict[str, dict[str, float]]:
     return out
 
 
+def _fitting_out() -> list[dict]:
+    """Ships registered in `s1.ships` that have not sailed a voyage yet, in service: moored in their harbour while
+    they are fitted out (the four positions at the 1m, before their first voyage: only that expedition's ships for now)."""
+    from sqlalchemy import text
+
+    from thorp.viable.s3_control import fitout_store
+
+    try:
+        with fitout_store.engine().connect() as c:
+            rows = c.execute(text(
+                "select s.key, s.name, s.size, s.preset, s.subtitle, s.expedition from s1.ships s"
+                " where not s.archived and s.status = 'in service' and s.expedition = 'four_positions'"
+                " and not exists (select 1 from s1.voyages v where v.ship_key = s.key) order by s.created_at, s.key")).mappings()
+            return [dict(r) for r in rows]
+    except Exception:  # noqa: BLE001  the store is down: the harbours show their sizes without the ships fitting out
+        return []
+
+
 def api_ladder() -> dict:
     """The ladder (each rung's job and how it is judged), every run's rung scores (the bits-per-byte
     split on its first held-out set and the laws, model beside reference), and tonight's queue."""
@@ -471,7 +489,13 @@ def api_ladder() -> dict:
                 ],
             }
         )
-    return {"rungs": rungs, "runs": runs, "queue": queue, "external": external, "harbours": [{**h, "sizes": [r["preset"] for r in rungs if r["harbour"] == h["key"]]} for h in harbours.HARBOURS]}
+    sizes_in = {h["key"]: [r["preset"] for r in rungs if r["harbour"] == h["key"]] for h in harbours.HARBOURS}
+    fitting = _fitting_out()
+    return {
+        "rungs": rungs, "runs": runs, "queue": queue, "external": external,
+        "harbours": [{**h, "sizes": sizes_in[h["key"]], "fitting_out": [x for x in fitting if x["size"] in sizes_in[h["key"]]]}
+                     for h in harbours.HARBOURS],
+    }  # fmt: skip
 
 
 def api_rung(preset: str, limit: int | str = 0) -> list[dict]:

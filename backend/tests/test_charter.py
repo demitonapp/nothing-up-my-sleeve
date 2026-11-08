@@ -90,6 +90,9 @@ class FakeBox:
         self.root, self.resolver, self.mp, self.fail_at = root, resolver, monkeypatch, fail_at
         self.code_files = 0
 
+    def wait_ssh(self, **kw):
+        return 1
+
     def bootstrap(self):
         if self.fail_at == "bootstrap":
             raise RuntimeError("the box would not answer")
@@ -365,6 +368,37 @@ def test_the_real_box_speaks_ssh_and_rsync(tmp_thorp):
     assert rs[1][-2] == f"root@ssh9.vast.ai:{s1.REMOTE}/ledger.sqlite"
 
 
+def test_the_box_waits_for_ssh_and_attaches_the_key_again(tmp_thorp):
+    """The first real charter (2026-11-08): Vast.ai said "running", the first ssh failed (255) and the fit-out gave up."""
+    import subprocess
+
+    answers = iter(["ssh: connect to host ssh1.vast.ai port 18576: Connection refused"] * 2
+                   + ["root@ssh1.vast.ai: Permission denied (publickey)."] * 5 + [""])  # fmt: skip
+    attached = []
+
+    def run(argv, **kw):
+        err = next(answers)
+        return subprocess.CompletedProcess(argv, 255 if err else 0, stdout="", stderr=err)
+
+    b = s1.Box("ssh1.vast.ai", 18576, run=run)
+    assert b.wait_ssh(sleep=lambda s: None, on_denied=lambda: attached.append(1)) == 8
+    assert attached == [1]  # attached again once, after six tries
+
+
+def test_a_box_that_never_answers_says_why(tmp_thorp):
+    import subprocess
+
+    def run(argv, **kw):
+        return subprocess.CompletedProcess(argv, 255, stdout="", stderr="Permission denied (publickey).")
+
+    b = s1.Box("ssh1.vast.ai", 18576, run=run)
+    with pytest.raises(s1.BoxError, match="Permission denied"):
+        b.wait_ssh(timeout_s=45, every_s=15, sleep=lambda s: None)
+    with pytest.raises(s1.BoxError, match="exit 255: Permission denied"):
+        b.sh("true")
+    assert "BatchMode=yes" in b.opts
+
+
 def test_the_cli_shows_the_terms(tmp_thorp, capsys):
     from thorp import cli
 
@@ -389,3 +423,24 @@ def test_an_unmeasured_class_is_priced_no_faster_than_the_mac(monkeypatch):
     assert abs(floored["hours"] - (269_221_888 / 63_000 / 3600 + 0.35)) < 1e-6
     monkeypatch.setattr(market, "throughput", lambda gpu, preset: 400_000.0)  # once measured, the measure rules
     assert market.price(cfg, "9m", 269_221_888, o)["speed"].startswith("measured")
+
+
+def test_the_launch_returns_at_once_not_at_the_end_of_the_voyage(tmp_thorp):
+    """P1 (2026-11-08): `cd X && cmd > /dev/null &` backgrounds the whole list as a subshell that still holds ssh's
+    stdout, so the launch's ssh stayed open to the end of the voyage and the charter never polled or pulled."""
+    import subprocess
+
+    seen = []
+
+    def run(argv, **kw):
+        seen.append((argv, kw))
+        return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
+
+    s1.Box("ssh9.vast.ai", 40123, run=run).launch("rid1")
+    argv, kw = seen[0]
+    cmd = argv[-1]
+    assert kw["timeout"] == 120
+    assert cmd.endswith("> /dev/null 2>&1 < /dev/null &")
+    head, _, tail = cmd.partition("; ")
+    assert head.startswith("cd ") and "&&" not in head  # the cd is its own command, outside the backgrounded one
+    assert tail.startswith("THORP_BACKEND=torch") and "nohup sh -c" in tail and "&&" not in tail.split("sh -c", 1)[0]

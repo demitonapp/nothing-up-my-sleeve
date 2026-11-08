@@ -64,6 +64,10 @@ class NoOffer(RuntimeError):
     pass
 
 
+class BoxError(RuntimeError):
+    """A command on the box failed; the message carries ssh's or the command's own stderr."""
+
+
 # ---------------------------------------------------------------- the box
 
 
@@ -74,11 +78,32 @@ class Box:
         self.host, self.port, self.run = host, int(port), run
         kh = paths.data_dir() / "charter" / "known_hosts"
         kh.parent.mkdir(parents=True, exist_ok=True)
+        # BatchMode: never stop at a prompt (a passphrase comes from the agent or the keychain, or not at all)
         self.opts = ["-p", str(self.port), "-o", "StrictHostKeyChecking=accept-new", "-o", f"UserKnownHostsFile={kh}",
-                     "-o", "ServerAliveInterval=30", "-o", "ConnectTimeout=20"] + (["-i", key_file] if key_file else [])  # fmt: skip
+                     "-o", "ServerAliveInterval=30", "-o", "ConnectTimeout=20", "-o", "BatchMode=yes"] + (["-i", key_file] if key_file else [])  # fmt: skip
 
     def sh(self, cmd: str, check: bool = True, timeout: float | None = None) -> subprocess.CompletedProcess:
-        return self.run(["ssh", *self.opts, f"root@{self.host}", cmd], check=check, capture_output=True, text=True, timeout=timeout)
+        r = self.run(["ssh", *self.opts, f"root@{self.host}", cmd], check=False, capture_output=True, text=True, timeout=timeout)
+        if check and r.returncode != 0:  # ssh's own words (255: it could not connect or was refused), not just a code
+            raise BoxError(f"ssh {self.host}:{self.port} exit {r.returncode}: {(r.stderr or '').strip()[-600:]} (ran: {cmd[:120]})")
+        return r
+
+    def wait_ssh(self, timeout_s: float = 600, every_s: float = 15, sleep=time.sleep, on_denied=None, denied_after: int = 6) -> int:
+        """Until the box answers ssh (2026-11-08: the first charter's box was "running" by Vast.ai's API but refused the
+        first ssh, and the fit-out gave up at once). Vast.ai's ssh proxy and the instance's key can take a minute or more
+        after "running". If the box still refuses the key after `denied_after` tries, `on_denied` (attach the key again)
+        is called once. Returns the tries it took; raises BoxError with ssh's last words at the timeout."""
+        last, tries, denied_fixed = "", max(1, int(timeout_s // every_s)), False
+        for i in range(1, tries + 1):
+            r = self.run(["ssh", *self.opts, f"root@{self.host}", "true"], check=False, capture_output=True, text=True, timeout=60)
+            if r.returncode == 0:
+                return i
+            last = (r.stderr or "").strip()
+            if on_denied and not denied_fixed and i >= denied_after and "denied" in last.lower():
+                on_denied()
+                denied_fixed = True
+            sleep(every_s)
+        raise BoxError(f"ssh {self.host}:{self.port} never answered in {timeout_s:.0f} s: {last[-600:]}")
 
     def _rsh(self) -> str:
         return "ssh " + " ".join(shlex.quote(o) for o in self.opts)
@@ -115,7 +140,10 @@ class Box:
             f"~/.local/bin/uv run --project backend --group torch thorp run data/charter/{rid}.yaml "
             f"> data/charter/{rid}.out 2>&1; echo $? > data/charter/{rid}.exit"
         )
-        self.sh(f"cd {REMOTE} && THORP_BACKEND=torch THORP_DEVICE=cuda nohup sh -c {shlex.quote(inner)} > /dev/null 2>&1 &")
+        # One backgrounded command with all three of its streams redirected: `cd X && cmd > /dev/null &` backgrounds the
+        # whole && list as a subshell whose stdout is still ssh's, so ssh stayed open for the whole voyage (2026-11-08, P1:
+        # the charter never reached its poll loop, so no mid-run pulls and no overrun deadline).
+        self.sh(f"cd {REMOTE}; THORP_BACKEND=torch THORP_DEVICE=cuda nohup sh -c {shlex.quote(inner)} > /dev/null 2>&1 < /dev/null &", timeout=120)
 
     def finished(self, rid: str) -> int | None:
         """The voyage's exit status once it has come in, else None."""
@@ -334,7 +362,9 @@ def sail(spec_path: str, gpu: str | None = None, vast=None, resolver=None, box_f
                 vast.attach_ssh(instance, key)
             inst = vast.wait_running(instance, sleep=sleep)
             box = (box_factory or (lambda i: Box(i["ssh_host"], i["ssh_port"])))(inst)
-            log(f"charter: instance {instance} is up ({inst.get('ssh_host')}:{inst.get('ssh_port')}); fitting out")
+            log(f"charter: instance {instance} is up ({inst.get('ssh_host')}:{inst.get('ssh_port')}); waiting for its ssh")
+            tries = box.wait_ssh(sleep=sleep, on_denied=(lambda: vast.attach_ssh(instance, key)) if key else None)
+            log(f"charter: ssh answered (try {tries}); fitting out")
             box.bootstrap()
             code = subprocess.run(["git", "ls-files", "backend", "ships"], cwd=paths.ROOT, capture_output=True, text=True, check=True).stdout.split()
             box.put(paths.ROOT, code)
@@ -350,8 +380,17 @@ def sail(spec_path: str, gpu: str | None = None, vast=None, resolver=None, box_f
             log(f"charter: {spec.get('name')} is at sea on instance {instance}")
             deadline = time.time() + q["hours"] * float(t["overrun"]) * 3600
             last_pull = time.time()
+            strikes = 0  # consecutive polls the box did not answer; a blip is logged, a lost box is brought home after ten
             while True:
-                code_ = box.finished(rid)
+                try:
+                    code_ = box.finished(rid)
+                    strikes = 0
+                except (BoxError, subprocess.TimeoutExpired) as e:
+                    code_, strikes = None, strikes + 1
+                    log(f"charter: the box did not answer ({strikes}/10): {str(e)[-200:]}")
+                    if strikes >= 10:
+                        status = "lost contact"
+                        break
                 if code_ is not None:
                     status = "home" if code_ == 0 else f"failed (exit {code_})"
                     break
@@ -360,10 +399,21 @@ def sail(spec_path: str, gpu: str | None = None, vast=None, resolver=None, box_f
                     log(f"charter: past {q['hours'] * float(t['overrun']):.1f} h (the quote times the overrun): bringing it home")
                     break
                 if time.time() - last_pull > PULL_EVERY_MIN * 60:
-                    counts = bring_home(box, rid, p["start"], rec, hire, commit)
+                    try:  # a failed mid-run pull must not release the box: the next pull, or the last, takes it
+                        counts = bring_home(box, rid, p["start"], rec, hire, commit)
+                    except Exception as e:  # noqa: BLE001
+                        log(f"charter: a mid-run pull failed ({e!r}); sailing on")
                     last_pull = time.time()
                 sleep(poll_s)
-            counts = bring_home(box, rid, p["start"], rec, hire, commit)
+            for attempt in range(3):  # the last pull is the voyage: try it three times before the box is released
+                try:
+                    counts = bring_home(box, rid, p["start"], rec, hire, commit)
+                    break
+                except Exception as e:  # noqa: BLE001
+                    log(f"charter: the last pull failed (try {attempt + 1}/3): {e!r}")
+                    if attempt == 2:
+                        raise
+                    sleep(30)
             if status == "home" and (rec.get_run(rid) or {}).get("status") != "finished":
                 status = "came in unfinished"  # the box's voyage stopped short (its checkpoint is home: sail again)
         finally:

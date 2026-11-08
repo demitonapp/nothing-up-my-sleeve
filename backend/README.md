@@ -7,3 +7,6 @@ The project, the dashboard (`../frontend/`) and the ships (`../ships/`) are desc
     uv run pytest
     uv run alembic upgrade head
     uv run thorp dash          # http://localhost:8787
+
+On an NVIDIA GPU a voyage trains on PyTorch instead of MLX (`model.backend: torch` or `THORP_BACKEND=torch`):
+`uv sync --group torch`, then see `CUDA.md`.

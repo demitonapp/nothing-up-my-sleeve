@@ -30,11 +30,11 @@ import re
 import unicodedata
 from collections import Counter
 
-import mlx.core as mx
 import numpy as np
 
 from thorp import shards
 from thorp.evaluators import EvalContext, EvalResult
+from thorp.models import ops
 from thorp.sources import load_text
 
 STREAMS = 16
@@ -75,13 +75,24 @@ def cut_words(text: str, n: int) -> str:
 
 def write(model, tok, streams: int, n: int, context: int, key) -> list[str]:
     seqs = [[tok.eos_id] for _ in range(streams)]
-    keys = mx.random.split(key, n)
-    for i in range(n):
-        x = mx.array([s[-context:] for s in seqs])
-        logits = model(x)[:, -1].astype(mx.float32)
-        nxt = mx.random.categorical(logits / TEMPERATURE, key=keys[i])
-        for s, t in zip(seqs, nxt.tolist(), strict=True):
-            s.append(int(t))
+    if ops.is_torch(model):  # `key` is an integer seed; the draws are numpy's (samples._pick)
+        from thorp.evaluators.samples import _pick
+
+        rng = np.random.default_rng(key)
+        for _ in range(n):
+            logits = ops.last_logits(model, [s[-context:] for s in seqs])
+            for s, lg in zip(seqs, logits, strict=True):
+                s.append(_pick(lg, TEMPERATURE, rng))
+    else:
+        import mlx.core as mx
+
+        keys = mx.random.split(key, n)
+        for i in range(n):
+            x = mx.array([s[-context:] for s in seqs])
+            logits = model(x)[:, -1].astype(mx.float32)
+            nxt = mx.random.categorical(logits / TEMPERATURE, key=keys[i])
+            for s, t in zip(seqs, nxt.tolist(), strict=True):
+                s.append(int(t))
     out = []
     for s in seqs:
         body = s[1:]
@@ -183,9 +194,13 @@ def evaluate(ctx: EvalContext) -> EvalResult:
     en = [b for ids in ctx.sets.values() for b in ids if ctx.languages.get(b, "en") == "en"]
     en = list(dict.fromkeys(en))
     lex = lexicon(ctx.recipe, ctx.tokeniser) if ctx.recipe else None
-    written = write(
-        ctx.model, ctx.tokeniser, STREAMS, NEW_TOKENS, ctx.context, mx.random.key(ctx.step)
-    )
+    if ops.is_torch(ctx.model):
+        key = ctx.step
+    else:
+        import mlx.core as mx
+
+        key = mx.random.key(ctx.step)
+    written = write(ctx.model, ctx.tokeniser, STREAMS, NEW_TOKENS, ctx.context, key)
     written = [cut_words(t, WORDS_PER_STREAM) for t in written]
     ref = [cut_words(t, WORDS_PER_STREAM) for t in reference(en, STREAMS, REF_SEED)] if en else []
     model_m, ref_m = measure(written, lex), measure(ref, lex) if ref else {}

@@ -92,6 +92,112 @@ def _step_name(cmd: str) -> str:
     return f"{what} {' '.join(args[:3])}".strip() + (" …" if len(args) > 3 else "")
 
 
+_BOOKS: dict[str, int | None] = {}
+
+
+def _books(recipe: str) -> int | None:
+    """How many books a reading list names (its rows), cached by path."""
+    if recipe not in _BOOKS:
+        n = None
+        with contextlib.suppress(Exception):
+            import csv
+
+            with paths.resolve(recipe).open(newline="", encoding="utf-8") as f:
+                n = sum(1 for _ in csv.DictReader(f))
+        _BOOKS[recipe] = n
+    return _BOOKS[recipe]
+
+
+def _fitout(key: str | None) -> dict:
+    """The named fitout (ships/fitouts/<key>.json): its name and aim."""
+    import json
+
+    if not key:
+        return {}
+    with contextlib.suppress(Exception):
+        return json.loads(paths.resolve(f"fitouts/{key}.json").read_text(encoding="utf-8"))
+    return {}
+
+
+def _like_run(recipe: str | None, preset: str | None) -> dict:
+    """The last finished voyage on this Mac of the same corpus and size: its steps and tokens (the material's
+    size and the voyage's length, which only preparing the voyage would otherwise tell)."""
+    from thorp.ledger import Ledger
+
+    if not recipe:
+        return {}
+    with contextlib.suppress(Exception):
+        rows = Ledger().query(
+            "select r.tokens_seen t, (select max(step) from metrics where run_id=r.run_id and name='loss') s,"
+            " json_extract(r.spec_json,'$.data.passes') p from runs r where r.status='finished'"
+            " and json_extract(r.spec_json,'$.data.recipe')=? and json_extract(r.spec_json,'$.model.preset')=?"
+            " order by r.finished desc limit 1",
+            [recipe, preset],
+        )
+        if rows:
+            r = rows[0]
+            return {"steps": r["s"], "tokens": r["t"], "per_pass": int(r["t"] / r["p"]) if r["t"] and r["p"] else None}
+    return {}
+
+
+def _material(spec: dict) -> dict:
+    """What a voyage reads: its fitout, each stage's reading list, books and passes, and about how many tokens."""
+    d = spec.get("data") or {}
+    f = spec.get("fitout") if isinstance(spec.get("fitout"), dict) else {}
+    fo = _fitout(f.get("key"))
+    stages = d.get("stages") or ([{"name": "the reading", "recipe": d["recipe"], "passes": d.get("passes", 1)}] if d.get("recipe") else [])
+    like = _like_run(d.get("recipe"), (spec.get("model") or {}).get("preset"))
+    return {
+        "fitout": fo.get("name") or f.get("key"),
+        "variation": f.get("variation"),
+        "aim": fo.get("aim"),
+        "stages": [{"name": s.get("name"), "recipe": s.get("recipe"), "books": _books(s.get("recipe", "")), "passes": s.get("passes", 1)} for s in stages],
+        "tokens_per_pass": like.get("per_pass"),
+        "clean": d.get("clean"),
+        "opt_in": bool(d.get("opt_in")),
+        "held_out": len(d.get("refuse") or []),
+    }
+
+
+def _training(spec: dict) -> dict:
+    """How a voyage trains: its length, the optimiser's schedule, and the pulls and tacks on top."""
+    o, m, d = spec.get("optim") or {}, spec.get("model") or {}, spec.get("data") or {}
+    sc = o.get("scaffold") or {}
+    like = _like_run(d.get("recipe"), m.get("preset"))
+    plan = {
+        "steps": like.get("steps"),
+        "batch_tokens": o.get("batch_tokens"),
+        "lr": o.get("lr"),
+        "schedule": o.get("schedule"),
+        "warmup": o.get("warmup_steps"),
+        "context": m.get("context"),
+        "positions": m.get("positions"),
+        "backend": m.get("backend") or "mlx",
+        "phases": [],
+    }
+    if sc:
+        heads = sc.get("heads") or []
+        cards = sorted({h["card"].replace("_", " ") for h in heads})
+        ph = [f"the pull on {len(heads)} heads ({', '.join(cards)})" + (f" and the {' and '.join(sc['riddles'])} riddle{'s' if len(sc['riddles']) > 1 else ''}" if sc.get("riddles") else "")]
+        if any("from" in h for h in heads) or any("from" in r for r in (sc.get("riddles") or {}).values()):
+            starts = sorted({float(x.get("from", 0)) for x in [*heads, *(sc.get("riddles") or {}).values()]})
+            ph.append("staged: " + ", ".join("from the start" if s == 0 else f"more from {s:.0%}" for s in starts))
+        if sc.get("fade") is not None:
+            ph.append(f"full weight to {float(sc.get('hold', 0)):.0%}, eased to {sc.get('floor', 0)} by {float(sc['fade']):.0%}")
+        if sc.get("release") is not None:
+            ph.append(f"released (off) from {float(sc['release']):.0%}")
+        if ((sc.get("riddles") or {}).get("bridge") or {}).get("kinds") == "all":
+            ph.append("the Bridge in all four relations")
+        plan["phases"] = ph
+    if (o.get("copy_weight") or {}).get("alpha"):
+        plan["phases"].append(f"the copy tack ({o['copy_weight'].get('kind')}, alpha {o['copy_weight']['alpha']})")
+    if (o.get("teacher") or {}).get("run"):
+        plan["phases"].append(f"taught by {o['teacher']['run']}")
+    if (spec.get("seeded_from") or {}).get("run"):
+        plan["phases"].append(f"seeded from {spec['seeded_from']['run']} ({spec['seeded_from'].get('mode', 'free')})")
+    return plan
+
+
 def _voyage(ln, wall: dict) -> dict:
     from thorp import fleet
 
@@ -101,6 +207,9 @@ def _voyage(ln, wall: dict) -> dict:
     return {
         "name": ln.name or ln.payload,
         "spec": ln.payload,
+        "ship": spec.get("ship") or "",
+        "material": _material(spec) if spec else None,
+        "training": _training(spec) if spec else None,
         "goal": spec.get("question") or spec.get("experiment") or "",
         "expedition": ex,
         "expedition_name": fleet.EXPEDITIONS[ex].name if ex in fleet.EXPEDITIONS else None,

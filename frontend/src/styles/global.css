@@ -761,6 +761,12 @@ main a.pc2-more:hover { color: #000; }
 .plantable tr.plan-cmd td, .plantable tr.plan-wait td { color: var(--muted); }
 .plantable tr.plan-hold td { background: color-mix(in srgb, var(--accent) 8%, transparent); }
 .lanechip { white-space: nowrap; }
+.plantable .planship { font-size: var(--fs-sm); }
+.plantable .planwhat { min-width: 240px; }
+.plantable .plantrain, .plantable .planmat { font-size: var(--fs-sm); min-width: 200px; max-width: 320px; }
+.plantable .planlist { margin: 2px 0 0; padding-left: 16px; color: var(--muted); }
+.plantable .planlist li { margin: 0; }
+
 .ovtop { display: flex; gap: 24px; flex-wrap: wrap; align-items: flex-start; margin-bottom: 10px; }
 .ovtop > div:first-child { flex: 1 1 320px; }
 .ovqueue { flex: 1 1 360px; }

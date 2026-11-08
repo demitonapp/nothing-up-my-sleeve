@@ -4128,11 +4128,30 @@ const LANE_TONE = { mac: 'blue', vast: 'accent' };
 const mins = m => m == null ? '' : m < 90 ? `${Math.round(m)} min` : `${(m / 60).toFixed(1)} h`;
 const laneChip = (lane, d) => `<span class="${pillCls(LANE_TONE[lane] || '')} lanechip" title="${esc(d.lanes[lane].where)}: ${esc(d.lanes[lane].how)}">${esc(d.lanes[lane].name.toLowerCase())}</span>`;
 function planWhat(p) {
-  if (p.kind === 'spec') return `<span class="mono">${esc(p.name)}</span>${p.missing ? ` <span class="${pillCls('bad')}">no spec</span>` : ''}
+  if (p.kind === 'spec') return `<a href="#${shipHash(p.name)}" class="mono">${esc(p.name)}</a>${p.missing ? ` <span class="${pillCls('bad')}">no spec</span>` : ''}
+    <div class="planship">${esc(String(p.ship || '').replace(/^Fitout: /, ''))}</div>
     <div class="s">${p.expedition ? `<a href="#/expeditions/${esc(p.expedition)}">${esc(p.expedition_name || p.expedition)}</a> · ` : ''}${esc(p.preset || '')}${p.seed != null ? ` · seed ${p.seed}` : ''}</div>${p.goal ? `<div class="plangoal" title="${esc(p.goal)}">${esc(p.goal)}</div>` : ''}`;
   if (p.kind === 'hold') return `<b>${esc(p.name)}</b> <span class="${pillCls(p.hold && p.hold.held ? 'accent' : 'good')}">${p.hold && p.hold.held ? 'held' : 'lifted'}</span>${p.hold && p.hold.note ? `<div class="plangoal">${esc(p.hold.note)}</div>` : ''}`;
   if (p.kind === 'wait') return `<b>${esc(p.name)}</b>`;
   return `<span class="s">a step:</span> <span class="mono" title="${esc(p.text)}">${esc(p.name)}</span>`;
+}
+const big2 = n => n == null ? '' : n >= 1e9 ? `${(n / 1e9).toFixed(1)}B` : n >= 1e6 ? `${Math.round(n / 1e6)}M` : n >= 1e3 ? `${Math.round(n / 1e3)}k` : String(n);
+function planTraining(p) {  // how the voyage trains: its length, schedule, and the pulls and tacks on top
+  const t = p.training; if (!t) return '';
+  const len = t.steps ? `<b>${t.steps.toLocaleString()}</b> steps × ${big2(t.batch_tokens)} tokens` : `${big2(t.batch_tokens)} tokens a step <span class="s">(steps known once it sails)</span>`;
+  const opt = `lr ${t.lr}${t.schedule ? `, ${esc(t.schedule)}` : ''}${t.warmup ? `, ${t.warmup} warm-up` : ''} · ${esc(t.positions || '')} · ${esc(t.backend)}`;
+  const ph = (t.phases || []).length ? `<ul class="planlist">${t.phases.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : '<div class="s">the language-model loss alone</div>';
+  return `<div>${len}</div><div class="s">${opt}</div>${ph}`;
+}
+function planMaterial(p) {  // what the voyage reads: its fitout, each stage's list, books and passes
+  const m = p.material; if (!m) return '';
+  const books = (m.stages || []).reduce((a, s) => a + (s.books || 0), 0);
+  const head = `<b title="${esc(m.aim || '')}">${esc(m.fitout || 'no fitout')}</b>${m.variation ? ` <span class="${pillCls('')}">~ ${esc(m.variation)}</span>` : ''}`;
+  const size = `<div class="s">${books ? `${books.toLocaleString()} books` : ''}${m.tokens_per_pass ? ` · about ${big2(m.tokens_per_pass)} tokens a pass` : ''}${m.clean ? ` · ${esc(m.clean)}` : ''}${m.opt_in ? ' · beyond the stores (approved)' : ''}</div>`;
+  const st = (m.stages || []).length > 1 || (m.stages || []).some(s => s.name !== 'the reading')
+    ? `<ul class="planlist">${m.stages.map(s => `<li>${esc(s.name)}: <span class="mono">${esc(String(s.recipe || '').split('/').pop())}</span>, ${s.books ?? '?'} books × ${s.passes}</li>`).join('')}</ul>`
+    : (m.stages || []).map(s => `<div class="s"><span class="mono">${esc(String(s.recipe || '').split('/').pop())}</span> read ${s.passes} time${s.passes === 1 ? '' : 's'}</div>`).join('');
+  return head + size + st;
 }
 function laneCard(lane, d) {
   const L = d.lanes[lane], sea = L.at_sea;
@@ -4155,11 +4174,11 @@ async function loadWaters() {
   const key = JSON.stringify(d); if (key === watersKey) return; watersKey = key;
   const rows = d.plan.map(p => `<tr class="plan-${p.kind}${p.waits_for ? ' waiting' : ''}"><td class="s">${p.n}</td>
       <td class="plantime">${p.at_least ? '≥ ' : '≈ '}${esc(p.starts_at)}<div class="s">${p.est_min != null ? (p.est_is_max ? `up to ${mins(p.est_min)}` : mins(p.est_min)) : 'no time yet'}</div></td>
-      <td>${laneChip(p.lane, d)}</td><td>${planWhat(p)}</td>
+      <td>${laneChip(p.lane, d)}</td>${p.kind === 'spec' ? `<td class="planwhat">${planWhat(p)}</td><td class="plantrain">${planTraining(p)}</td><td class="planmat">${planMaterial(p)}</td>` : `<td colspan="3">${planWhat(p)}</td>`}
       <td class="s">${p.waits_for ? `<span class="${pillCls('accent')}">waits</span> ${esc(p.waits_for)}` : ''}</td></tr>`).join('')
-    || `<tr><td colspan="5" class="${emptyCls(true)}">the queue is empty</td></tr>`;
+    || `<tr><td colspan="7" class="${emptyCls(true)}">the queue is empty</td></tr>`;
   el.innerHTML = `<div class="waters">${laneCard('mac', d)}${laneCard('vast', d)}</div>
-    <div class="scroll"><table data-nosort class="plantable"><thead><tr><th>#</th><th title="about when it sails (≥ where a line ahead of it in its waters has no time yet), and for how long">sails</th><th>waters</th><th>what</th><th>waits for</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="scroll"><table data-nosort class="plantable"><thead><tr><th>#</th><th title="about when it sails (≥ where a line ahead of it in its waters has no time yet), and for how long">sails</th><th>waters</th><th>ship</th><th>training plan</th><th>training material</th><th>waits for</th></tr></thead><tbody>${rows}</tbody></table></div>
     <div class="s">as of ${esc(d.now)}</div>`;
 }
 

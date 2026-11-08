@@ -245,15 +245,52 @@ def gate(spec: dict, q: dict) -> None:
 # ---------------------------------------------------------------- the voyage
 
 
-def carried_data(tok_id: str) -> list[str]:
-    """data/ as the box needs it, relative to data/: the library and its records, the voyage's own tokeniser and
-    shards; never the checkpoints, the logs or the secrets. SQLite files are carried as copies (`stage`)."""
+def voyage_books(prep) -> set[str]:
+    """The books a voyage reads, by id: its recipe, its stages and opening books, its judge sets, and the fixed
+    books its evaluators read (Goldsmith's essays, the Nevermore's and the copying cards' passage). Refused books
+    are checked by id alone and need no text."""
+    from thorp.evaluators.nevermore import NATURAL_BOOK
+
+    ids = set(prep.recipe) | set(getattr(prep, "first", []) or []) | {NATURAL_BOOK}
+    for s in getattr(prep, "stage_recipes", []) or []:
+        ids |= set(s)
+    for s in prep.eval_sets.values():
+        ids |= set(s)
+    return ids
+
+
+def text_files(ids: set[str]) -> list[str]:
+    """Where each book's text lies under data/ (sources: a Gutenberg book pgN is texts/gutenberg/N.txt; any
+    other source's book is texts/<source>/<id>.txt), the ones that exist."""
+    from thorp import manifest
+
+    d, out = paths.data_dir(), []
+    for bid in sorted(ids):
+        b = manifest.get(bid)  # a book not in this library (a fixed evaluator book, say) is skipped
+        if b is None:
+            continue
+        rel = f"texts/gutenberg/{int(bid[2:])}.txt" if b.source == "gutenberg" and bid.startswith("pg") else f"texts/{b.source}/{bid}.txt"
+        if (d / rel).is_file():
+            out.append(rel)
+    return out
+
+
+def carried_data(tok_id: str, books: set[str] | None = None) -> list[str]:
+    """data/ as the box needs it, relative to data/: the library's records, the texts of the books the voyage
+    reads (`books`; the whole library when None, or with THORP_CARRY_ALL_TEXTS=1), the voyage's own tokeniser and
+    shards; never the checkpoints, the logs or the secrets. SQLite files are carried as copies (`stage`).
+    (8 November: P1 carried the whole 1.8 GB library, 1.65 GB of it unread, most of its 22 minutes' fitting out.)"""
     d = paths.data_dir()
+    trim = books is not None and os.environ.get("THORP_CARRY_ALL_TEXTS") != "1"
     out = []
     for p in sorted(d.iterdir()):
         if p.name in NOT_CARRIED or p.name.startswith("charter") or p.suffix in (".sqlite-wal", ".sqlite-shm") or p.suffix == ".sqlite":
             continue
+        if trim and p.name == "texts":
+            continue
         out += [str(f.relative_to(d)) for f in ([p] if p.is_file() else sorted(p.rglob("*"))) if f.is_file()]
+    if trim:
+        out += text_files(books)
     for sub in ("tokenisers", "shards"):
         root = d / sub / tok_id
         if root.exists():
@@ -387,7 +424,7 @@ def sail(spec_path: str, gpu: str | None = None, vast=None, resolver=None, box_f
             box.bootstrap()
             code = subprocess.run(["git", "ls-files", "backend", "ships"], cwd=paths.ROOT, capture_output=True, text=True, check=True).stdout.split()
             box.put(paths.ROOT, code)
-            box.put(paths.data_dir(), carried_data(q0["prep"].tokeniser.id) + checkpoints_carried(rid, spec, rec), "data")
+            box.put(paths.data_dir(), carried_data(q0["prep"].tokeniser.id, voyage_books(q0["prep"])) + checkpoints_carried(rid, spec, rec), "data")
             st = stage(rid)
             s2.papers(st / "ledger.sqlite", spec, rid, rec)
             box.put(st, sorted(f.name for f in st.glob("*.sqlite") if f.name != "ledger.sqlite"), "data")

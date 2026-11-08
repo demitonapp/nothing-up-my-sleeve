@@ -33,19 +33,30 @@ WATERS = {
 # The harbours the Ships page opens on (Justin, 8 November: "on the ships pages, it's actually called harbours and then
 # when you open it, it's two tiles for the two harbours of today and then you click in the harbour to view its ships.
 # So Phaleron has Pan, Augustus, the 9m and the 21m and then the Market Harbour has the 50m up"). A ship's harbour is
-# its size's; a size not named here is in the outer harbour. To be a column of s1.sizes once the store takes it.
+# its size's place on the ladder (preset names live only in the registry); to be a column of s1.sizes once the store takes it.
 HARBOURS = (
     {"key": "phaleron", "name": "Phaleron", "aka": "internal waters", "lane": "mac", "where": "this Mac mini",
      "about": "Athens' first harbour, where its early fleet lay and sailed from: the youngest ships, trained on this Mac.",
-     "sizes": ("300k", "1m", "9m", "21m")},
+     "ladder": (0, 4)},  # the ladder's first four sizes: Pan, Augustus, the speller, the stylist
     {"key": "market", "name": "The Market Harbour", "aka": "outer waters", "lane": "vast", "where": "GPUs hired from Vast.ai",
      "about": "The first great trading harbour: the ships that need hired GPUs, from the 50m up.",
-     "sizes": ("50m", "100m", "350m")},
+     "ladder": (4, 99)},  # from the fifth size up: the 50m, the explorer, the trader
 )  # fmt: skip
 
 
 def harbour_of(preset: str) -> str:
-    return next((h["key"] for h in HARBOURS if preset in h["sizes"]), HARBOURS[-1]["key"])
+    from thorp.models.registry import LADDER
+
+    i = next((i for i, r in enumerate(LADDER) if r["preset"] == preset), 99)
+    return next((h["key"] for h in HARBOURS if h["ladder"][0] <= i < h["ladder"][1]), HARBOURS[-1]["key"])
+
+
+def harbours() -> list[dict]:
+    """The harbours with the presets that lie in each, for /api/ladder."""
+    from thorp.models.registry import LADDER
+
+    return [{**{k: v for k, v in h.items() if k != "ladder"}, "sizes": [r["preset"] for r in LADDER if harbour_of(r["preset"]) == h["key"]]}
+            for h in HARBOURS]
 
 
 def _wall_minutes() -> dict:

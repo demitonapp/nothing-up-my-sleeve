@@ -471,7 +471,7 @@ def api_ladder() -> dict:
                 ],
             }
         )
-    return {"rungs": rungs, "runs": runs, "queue": queue, "external": external, "harbours": [{**h, "sizes": list(h["sizes"])} for h in harbours.HARBOURS]}
+    return {"rungs": rungs, "runs": runs, "queue": queue, "external": external, "harbours": harbours.harbours()}
 
 
 def api_rung(preset: str, limit: int | str = 0) -> list[dict]:

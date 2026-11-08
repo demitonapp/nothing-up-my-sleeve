@@ -71,6 +71,26 @@ def reload() -> None:
     _sizes.cache_clear()
 
 
+def set_goals(preset: str, *, role: str | None = None, scored: str | None = None, metrics: list | None = None) -> dict:
+    """A size's goals changed in `s1.sizes` (Justin decides them; DECISIONS.md records each change): what it is for,
+    how it is judged and the metrics that judge it ([[name, what it measures, "live" | "to come"], ...]). Returns
+    the row as it now stands."""
+    _at_home("a size's goals are changed at home")
+    with session() as s:
+        row = s.get(Size, preset)
+        if row is None:
+            raise KeyError(f"no size {preset!r}")
+        if role is not None:
+            row.role = role
+        if scored is not None:
+            row.scored = scored
+        if metrics is not None:
+            row.metrics = metrics
+        s.commit()
+    reload()
+    return next(r for r in sizes() if r["preset"] == preset)
+
+
 def ships() -> list[ShipRecord]:
     with session() as s:
         return list(s.scalars(select(ShipRecord).order_by(ShipRecord.created_at, ShipRecord.key)))

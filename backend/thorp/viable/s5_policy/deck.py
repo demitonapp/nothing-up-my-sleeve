@@ -34,6 +34,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 ADOPTED = "2026-11-07 21:25, Justin"
+# the mark of the three class Basics (number-spotter, order-word, premise-marker): 3.0 (the delimiter's) from 22:15;
+# 2.0 from 2026-11-08 10:05 (Justin: "lower to 2.0"): no outside model read reached 3.0 (Pythia 14m to 160m and Qwen3
+# 0.6B, 1.2 to 2.6), which barred the comparator, the Bridge and the Mover from every one of them by the evolutions.
+# The pips evaluator's own count (stars/<card>/count) still counts heads at 3.0.
+CLASS_MARK = 2.0
 CONSTELLATIONS = (
     ("copying", "♠", "Copying", "bringing back what came before"),
     ("position", "♥", "Position", "knowing where you are"),
@@ -97,10 +102,10 @@ CARDS = (
          "not yet seen", on=("words_back",), ability=("counter/probe_r2", 0.5), scansion="duende"),
     # ♦ Comparing
     Card("number_spotter", "Number-spotter", "comparing", "Basic", 1,
-         (("stars/number_spotter/max_score",), 3.0), "stars/number_spotter/best_layer",
+         (("stars/number_spotter/max_score",), CLASS_MARK), "stars/number_spotter/best_layer",
          "attends to numerals and number words: finds what is being compared", "not yet seen", scansion="metre"),
     Card("order_word", "Order-word", "comparing", "Basic", 1,
-         (("stars/order_word/max_score",), 3.0), "stars/order_word/best_layer",
+         (("stars/order_word/max_score",), CLASS_MARK), "stars/order_word/best_layer",
          "attends to more, less, before, after, than: finds the direction of a comparison", "not yet seen", scansion="metre"),
     Card("comparator", "The Comparator", "comparing", "Stage 1", 2,
          (("stars/comparator/max_score", "stars/comparator/shared_score"), 0.3), "stars/comparator/shared_layer",
@@ -114,7 +119,7 @@ CARDS = (
          (("stars/rare_word/max_score",), 0.3), "stars/rare_word/best_layer",
          "attends to salient, uncommon words: picks out the fact worth carrying", "none known", scansion="metre"),
     Card("premise_marker", "Premise-marker", "carrying", "Basic", 1,
-         (("stars/premise_marker/max_score",), 3.0), "stars/premise_marker/best_layer",
+         (("stars/premise_marker/max_score",), CLASS_MARK), "stars/premise_marker/best_layer",
          "attends to if, when, because, so, therefore: finds where a premise starts and ends", "not yet seen", scansion="metre"),
     Card("bridge", "The Bridge", "carrying", "Stage 1", 2,
          (("stars/bridge/max_score",), 0.5), "stars/bridge/best_layer",

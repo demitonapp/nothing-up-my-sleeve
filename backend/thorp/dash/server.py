@@ -3474,7 +3474,8 @@ def api_maths_book() -> dict:
         for c in chapters.values():
             c["source"]["at"] = info["at"].get(c["source"]["heading"])
         title = info.get("title") or "Elements of Arithmetic"
-        book = {"id": src, "title": "Elements of Arithmetic" if title.lower() == "elements of arithmetic" else title,  # the book's own capitals "author": info.get("author") or "De Morgan, Augustus, 1806-1871",
+        book = {"id": src, "title": "Elements of Arithmetic" if title.lower() == "elements of arithmetic" else title,
+                "author": info.get("author") or "De Morgan, Augustus, 1806-1871",
                 "edition": "the 1858 edition (first published 1830)", "in_ogden": False}  # fmt: skip
     return {"chapters": [chapters[k] for k in sorted(chapters)], "mark": 6, "book": book}  # a chapter learnt: 6 of its 8 sums
 

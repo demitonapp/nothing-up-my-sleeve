@@ -26,10 +26,10 @@ from __future__ import annotations
 import hashlib
 import json
 
-import mlx.core as mx
 import numpy as np
 
 from thorp.evaluators import EvalContext, EvalResult
+from thorp.models import ops
 
 CONTEXT = 2
 SERIES: dict[str, tuple[str, str, list[str]]] = {
@@ -117,10 +117,7 @@ def _logprob(model, tok, prompt_ids: list[int], cands: list[list[int]]) -> np.nd
     for i, c in enumerate(cands):
         seq = prompt_ids + c
         x[i, : len(seq)] = seq
-    logits = model(mx.array(x)).astype(mx.float32)
-    lp = logits - mx.logsumexp(logits, axis=-1, keepdims=True)
-    mx.eval(lp)
-    lp = np.array(lp)
+    lp = ops.log_probs(model, x)
     out = np.zeros(len(cands))
     for i, c in enumerate(cands):
         for j, t in enumerate(c):

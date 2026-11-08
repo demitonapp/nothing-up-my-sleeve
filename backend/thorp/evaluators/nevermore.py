@@ -32,12 +32,11 @@ from __future__ import annotations
 import hashlib
 import json
 
-import mlx.core as mx
-import mlx.nn as nn
 import numpy as np
 
 from thorp.evaluators import EvalContext, EvalResult
 from thorp.fleet import STARS
+from thorp.models import ops
 
 SEQS = 8
 LENGTH = 200
@@ -67,18 +66,13 @@ def natural_tokens(tok, context: int) -> tuple[np.ndarray, int] | None:
 
 def measure(model, toks: np.ndarray, n: int) -> tuple[np.ndarray, float, float]:
     """(layers x heads Nevermore scores, loss on the first copy, loss on the second copy)."""
-    x = mx.array(toks)
     i = np.arange(n - 1)
     src = n + 1 + i  # position of piece i in the second copy
     dst = i + 2  # position of piece i + 1 in the first copy
     scores = []
-    for p in model.attention_patterns(x):
-        mx.eval(p)
-        scores.append(np.array(p)[:, :, src, dst].mean(axis=(0, 2)))
-    logits = model(x[:, :-1]).astype(mx.float32)
-    ce = nn.losses.cross_entropy(logits, x[:, 1:], reduction="none")
-    mx.eval(ce)
-    ce = np.array(ce)  # position t predicts token t + 1
+    for p in ops.attention_patterns(model, toks):
+        scores.append(p[:, :, src, dst].mean(axis=(0, 2)))
+    ce = ops.token_ce(model, toks[:, :-1], toks[:, 1:])  # position t predicts token t + 1
     return np.array(scores), float(ce[:, 1:n].mean()), float(ce[:, n + 1 : 2 * n].mean())
 
 

@@ -49,12 +49,17 @@ def _enough(ctx: Context):
         return None, {"waiting_for": "the shared tokeniser (tokeniser.trained)"}
     per = json.loads(stats.read_text())
     tokens = sum(per[b]["tokens"] for b in ctx.books if b in per)
-    import mlx.utils
+    from thorp.models.backend import backend_of
 
     need, biggest = 0.0, None
-    for s in ctx.specs:  # each class's parameters, counted from the model its spec builds
-        model = train.build_model(s, s["tokeniser"]["vocab"])
-        n = sum(v.size for _, v in mlx.utils.tree_flatten(model.parameters()))
+    for s in ctx.specs:  # each class's parameters, counted from the model its spec builds (on its backend)
+        if backend_of(s) == "torch":
+            from thorp import train_torch
+
+            model = train_torch.build_model(s, s["tokeniser"]["vocab"], train_torch.torch.device("cpu"))
+        else:
+            model = train.build_model(s, s["tokeniser"]["vocab"])
+        n = model.parameter_counts()["total"]
         passes = (s.get("data") or {}).get("passes") or 1
         if 20 * n / passes > need:
             need, biggest = 20 * n / passes, (s["model"]["preset"], n, passes)

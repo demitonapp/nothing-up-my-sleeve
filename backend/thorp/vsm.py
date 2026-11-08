@@ -53,7 +53,16 @@ SYSTEMS: dict[str, System] = {
             "S1",
             "Operations",
             "the expeditions and the voyages they sail; and acquisition, the books they read (a viable system of its own)",
-            ("thorp/fleet.py EXPEDITIONS", "specs/", "data/runs/", "thorp/train.py", "thorp/acquisition.py"),
+            (
+                "thorp/fleet.py EXPEDITIONS",
+                "specs/",
+                "data/runs/",
+                "thorp/train.py",
+                "thorp/train_torch.py",
+                "thorp/acquisition.py",
+                "thorp/viable/s1_operations/charter.py",
+                "thorp/viable/s1_operations/vast.py",
+            ),
         ),
         System(
             "S2",
@@ -65,13 +74,20 @@ SYSTEMS: dict[str, System] = {
                 "thorp/ledger.py",
                 "data/ships.json",
                 "thorp/vsm.py lint_queue",
+                "thorp/viable/s2_coordination/charter.py",
             ),
         ),
         System(
             "S3",
             "Control",
             "the gate every run passes, the opt-in bargain, and the audit (S3*)",
-            ("thorp/vsm.py gate, audit", "thorp/stores.py", "tests/"),
+            (
+                "thorp/vsm.py gate, audit",
+                "thorp/stores.py",
+                "tests/",
+                "thorp/viable/s3_control/charter.py",
+                "thorp/viable/s3star_audit/charter.py",
+            ),
         ),
         System(
             "S4",
@@ -83,13 +99,14 @@ SYSTEMS: dict[str, System] = {
                 "thorp/leaderboard.py",
                 "thorp/smoking_qwen.py",
                 "thorp/knockout.py",
+                "thorp/viable/s4_intelligence/market.py",
             ),
         ),
         System(
             "S5",
             "Policy",
             "Thorp's identity: the rules, adopted by Justin, recorded in DECISIONS.md",
-            ("thorp/vsm.py POLICIES", "DECISIONS.md"),
+            ("thorp/vsm.py POLICIES", "DECISIONS.md", "thorp/viable/s5_policy/charter.py"),
         ),
     )
 }
@@ -272,6 +289,13 @@ def _prechecked(spec: dict) -> list[str]:
     return []
 
 
+def _chartered(spec: dict) -> list[str]:
+    """A voyage asking for a hired GPU keeps the charter's terms (thorp/viable/s5_policy/charter.py)."""
+    from thorp.viable.s5_policy import charter
+
+    return charter.check(spec)
+
+
 POLICIES: dict[str, Policy] = {
     p.key: p
     for p in (
@@ -334,6 +358,16 @@ POLICIES: dict[str, Policy] = {
             "2026-11-07 19:30, Justin",
             True,
             _ogden_only,
+        ),
+        Policy(
+            "charter",
+            "A voyage sails on a hired GPU only within the charter's terms: a class the terms hire at or under its "
+            "ceiling an hour, a datacenter-verified and reliable host, the quote within one voyage's budget and "
+            "the week's, the account's credit covering it, and no more ships out than the terms allow "
+            "(thorp/viable/s5_policy/charter.py; data/charter.json sets the numbers).",
+            "2026-11-08, Justin (Vast.ai chosen; the terms adopted as proposed)",
+            True,
+            _chartered,
         ),
         Policy(
             "prechecks",
@@ -408,6 +442,25 @@ def gate(spec: dict, known_run: bool = False, *, where: str = "voyage") -> list[
         )
     _record_gate(spec, where, "passed", decisions)
     return notes
+
+
+def gate_one(key: str, spec: dict, *, where: str) -> list[str]:
+    """S3 asks one policy of a spec, as `gate` asks them all (a charter's quote is checked by 'charter' alone, so a
+    voyage resumed on a hired GPU is not re-judged by policies adopted after it first sailed). Refuses when the
+    policy is enforced and broken; the decision is kept in the gate's log."""
+    pol = POLICIES[key]
+    found = pol.check(spec)
+    if not found:
+        _record_gate(spec, where, "passed", [{"policy": key, "how": "kept"}])
+        return []
+    if why := excepted(key, spec):
+        _record_gate(spec, where, "passed", [{"policy": key, "how": "excepted", "why": why}])
+        return [f"policy '{key}' does not govern this run: {why}"]
+    if enforced(key):
+        _record_gate(spec, where, "refused", [{"policy": key, "how": "refused", "why": "; ".join(found)}])
+        raise GateRefused(f"S3 gate, policy '{key}' ({pol.statement}): {'; '.join(found)}")
+    _record_gate(spec, where, "passed", [{"policy": key, "how": "advisory", "why": "; ".join(found)}])
+    return [f"policy '{key}': {'; '.join(found)}"]
 
 
 def _gate_log_path():
@@ -561,7 +614,13 @@ def _sailing_without_helm(name: str) -> bool:
     import subprocess
 
     out = subprocess.run(["pgrep", "-f", f"thorp run .*{name}"], capture_output=True, text=True)
-    return bool(out.stdout.strip())
+    if out.stdout.strip():
+        return True
+    with contextlib.suppress(Exception):  # at sea on a hired GPU (the charter): it never takes this Mac's helm
+        from thorp.viable.s3_control import charter as s3
+
+        return any(h.get("name") == name for h in s3.out_now())
+    return False
 
 
 def _label_of(name: str) -> str | None:
@@ -645,7 +704,9 @@ def lint_queue() -> list[str]:
         else ""
     )
     for i, ln in enumerate(lines):
-        if ln.startswith("cmd:"):
+        if ln.startswith("vast:"):  # the Vast lane (s2_coordination.lanes): the same spec, sailed on a hired GPU
+            ln = ln[len("vast:"):].strip()
+        if ln.startswith(("cmd:", "wait:")):
             continue
         p = paths.resolve(f"specs/{ln}.yaml")
         if not p.exists():

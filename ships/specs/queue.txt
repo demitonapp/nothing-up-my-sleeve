@@ -38,6 +38,9 @@ cmd: uv run --project backend --group compare python backend/scripts/read_logic.
 cmd: uv run --project backend --group compare python -m thorp.outside_deck mlx-community/Qwen3-4B-4bit >> data/runs/outside-deck.out 2>&1; uv run --project backend --group compare python backend/scripts/score_external.py mlx-community/Qwen3-4B-4bit lists/hole-cards-unseen.csv --clean unwrap-v2 >> data/runs/score-external.out 2>&1
 # leg 1b (09:50): leg 1 with the Bridge composed in all four relations (leg 0's order-only Bridge rose and fell)
 fitouts/fu-ogden-v0-2~staged-all@9m-pre-s1
+# the 21m with the full deck before the first 50m (Justin, 12:35: agreed): it sails next, ahead of v0.2's control and the second seeds;
+# the queue waits here (up to 3 hours) until its spec is written, pre-registered and queued above this line
+cmd: n=0; while [ -e ships/specs/deck-21m.hold ] && [ $n -lt 360 ]; do sleep 30; n=$((n+1)); done
 fitouts/fu-ogden-v0-2@9m-pre-s1
 fitouts/fu-ogden-v0-1@1m-pre-s2
 fitouts/fu-ogden-v0-1@9m-pre-s2

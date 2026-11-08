@@ -134,9 +134,17 @@ def outside_voyage() -> bool:
     mine = {str(p) for p in _children}
     for pat in ("thorp run ", "thorp eval "):
         out = subprocess.run(["pgrep", "-f", pat], capture_output=True, text=True).stdout.split()
-        if any(pid not in mine and not _is_child_of_mine(pid) for pid in out):
+        if any(pid not in mine and not _is_child_of_mine(pid) and _local(pid) for pid in out):
             return True
     return False
+
+
+def _local(pid: str) -> bool:
+    """A voyage on this Mac, not the line a charter sends to a hired box over ssh (8 November, 14:22: the parity
+    voyage's `ssh ... thorp run ...` held the Mac lane in port for an hour), nor a shell that only names it."""
+    cmd = subprocess.run(["ps", "-o", "command=", "-p", pid], capture_output=True, text=True).stdout.strip()
+    first = cmd.split(" ", 1)[0].rsplit("/", 1)[-1] if cmd else ""
+    return bool(cmd) and first not in ("ssh", "rsync", "scp", "sh", "zsh", "bash")
 
 
 _children: set[int] = set()

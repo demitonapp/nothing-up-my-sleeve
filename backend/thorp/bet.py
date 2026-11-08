@@ -12,7 +12,7 @@ thing".
   Each rung is proved before the next is trained; only the 350m leaves the Mac.
 - **The bet** (`QUANTUM`): the discrete atom, cutoff 1910. Haas (1910), Nicholson (1912) and Bohr
   (1913) each put Planck's constant into the atom within three years, so it meets the discovery tests'
-  rule (DECISIONS.md, "The bettor's three discovery tests"); its chain runs keel to summit (`chain`).
+  rule (DECISIONS.md, "The bettor's three discovery tests"); its chain runs keel to trader (`chain`).
 - **The budget** (`budget()`): what $100 buys on one H100 at November 2026's hourly rates and a band of
   speeds, spent on what the pass rule asks for: two seeds and a precursor ablation.
 - **The gates** (`GATES`): what must be true before the $100 is spent. **The risks** (`RISKS`).
@@ -46,10 +46,10 @@ BATCH_TOKENS = 32_768  # every Ogden class, so step k is the same tokens read in
 # a market median of $4.20): an hourly rate band, and achieved bf16 TFLOPS by class (a 350m fills
 # about 40% of the 989 peak; smaller models less). Estimates, not measurements.
 H100_RATE = (2.22, 3.00, 4.20)
-H100_TFLOPS = {"paragraph": (190.0, 250.0, 310.0), "bettor": (220.0, 300.0, 380.0), "summit": (300.0, 400.0, 500.0)}
+H100_TFLOPS = {"paragraph": (190.0, 250.0, 310.0), "explorer": (220.0, 300.0, 380.0), "trader": (300.0, 400.0, 500.0)}
 # This Mac (Mac mini, Apple M6, 32 GB): achieved bf16 TFLOPS where no voyage of the class has sailed.
 # The ledger measures 1.3 (300k), 1.9 (1m) and 2.3 to 2.5 (9m), rising with size; these continue it.
-MAC_TFLOPS_EST = {"stylist": 3.5, "paragraph": 4.5, "bettor": 5.5, "summit": 6.6}
+MAC_TFLOPS_EST = {"stylist": 3.5, "paragraph": 4.5, "explorer": 5.5, "trader": 6.6}
 
 # Plan for the H100 sitting (hours that are not a training run)
 SETUP_HOURS = 0.5  # start the pod, sync code and shards
@@ -100,7 +100,7 @@ LADDER: list[dict] = [
         shelf="English before 1872",
     ),
     dict(
-        cls="bettor",
+        cls="explorer",
         goal="The classical discoveries",
         test="The Origin test, the energy test and Mendeleev's gaps, each with its precursor ablation.",
         carries="Betting with what the books know: the spectroscopists' bright lines and Balmer's "
@@ -108,7 +108,7 @@ LADDER: list[dict] = [
         shelf="English before each test's cutoff",
     ),
     dict(
-        cls="summit",
+        cls="trader",
         goal="The quantum bet, for $100",
         test="The discrete atom, cutoff 1910: two seeds and the precursor ablation on a rented H100.",
         carries="",
@@ -163,9 +163,9 @@ QUANTUM = dict(
              "ring, the ring has one length, so only certain waves fit."),
         dict(cls="paragraph", name="The eternal return", about="The first eureka, and the same move: only so many "
              "states explain what is seen."),
-        dict(cls="bettor", name="The spectroscopists", about="What the precursors wrote: the bright lines, "
+        dict(cls="explorer", name="The spectroscopists", about="What the precursors wrote: the bright lines, "
              "Balmer's and Rydberg's formulas, Planck's quanta, Thomson's atom."),
-        dict(cls="summit", name="The discrete atom", about="The bet."),
+        dict(cls="trader", name="The discrete atom", about="The bet."),
     ],
     status="draft: no pairs written yet",
 )
@@ -174,14 +174,14 @@ THEORY: list[dict] = [
     dict(lead="Skills come in order.",
          text="Each rung's skill rests on the one below: two-word guessing, then three, then four, then two "
          "facts chained, then a eureka. Each size is spent on one job, the smallest that can hold it."),
-    dict(lead="The rungs are cheap; only the summit costs money.",
+    dict(lead="The rungs are cheap; only the trader costs money.",
          text="300k to 100m train on this Mac in minutes to days. The 350m is the only rung rented, and only "
          "after the rungs below have passed."),
     dict(lead="Each rung carries its recipe up.",
          text="The shelf, the tokeniser, the learning rate, the stages and the weights themselves (each rung "
          "grown from the one below) are proved small, so the 350m's one expensive run starts from what "
          "worked."),
-    dict(lead="The ladder forecasts the summit before paying for it.",
+    dict(lead="The ladder forecasts the trader before paying for it.",
          text="The preference for the idea is read at every class. The 350m is bought only when the curve "
          "over 9m to 100m says it clears the bar, the method of Smoking Qwen."),
     dict(lead="The first eureka rehearses the last.",
@@ -328,12 +328,12 @@ def rung_costs(cls: str, shelf: str) -> dict:
 
 
 def budget() -> dict:
-    """The $100 on one H100: the summit at twenty tokens a parameter, two seeds and an ablation, as a band."""
-    summit = PRESET_OF["summit"]
-    n = params(summit)
+    """The $100 on one H100: the trader at twenty tokens a parameter, two seeds and an ablation, as a band."""
+    trader = PRESET_OF["trader"]
+    n = params(trader)
     tokens = TOKENS_PER_PARAM * n
-    ft = flops_per_token(summit)
-    lo_tf, mid_tf, hi_tf = H100_TFLOPS["summit"]
+    ft = flops_per_token(trader)
+    lo_tf, mid_tf, hi_tf = H100_TFLOPS["trader"]
     run_h = {"fast": tokens * ft / (hi_tf * 1e12) / 3600, "mid": tokens * ft / (mid_tf * 1e12) / 3600,
              "slow": tokens * ft / (lo_tf * 1e12) / 3600}
     probe_h = PROBE_TOKENS * ft / (mid_tf * 1e12) / 3600
@@ -357,7 +357,7 @@ def budget() -> dict:
     runs_for_budget = {k: max(0, math.floor((BUDGET - overhead_h * r) / run_cost[k]))
                        for k, r in zip(("low", "mid", "high"), H100_RATE)}
     return dict(budget=BUDGET, params=n, tokens=tokens, flops_per_token=ft, rate=H100_RATE,
-                tflops=H100_TFLOPS["summit"], run_hours=run_h, run_cost=run_cost, items=items,
+                tflops=H100_TFLOPS["trader"], run_hours=run_h, run_cost=run_cost, items=items,
                 total_hours=total_h, total=total, runs_for_budget=runs_for_budget,
                 fits=total["mid"] <= BUDGET)
 

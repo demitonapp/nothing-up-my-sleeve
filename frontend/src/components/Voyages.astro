@@ -18,14 +18,14 @@ import { cardCls, checkCls, crumbCls, emptyCls, rangeCls, selectCls, tabCls, tab
     </div>
     <div class="qview" data-qview="glance">
   <section class={cardCls(false, 'panel')} id="overviewpanel">
-    <h2>The queue at a glance <span class="note">the voyage at sea, the voyages still to sail and about how many hours that is (each class's mean time), and for every expedition its voyages at sea, queued, finished and failed, and where its next one stands in the queue</span></h2>
+    <h2>The queue at a glance <span class="note">the voyage at sea, the voyages still to sail and about how many hours that is (each size's mean time), and for every expedition its voyages at sea, queued, finished and failed, and where its next one stands in the queue</span></h2>
     <div id="expoverview"><div class={emptyCls()}>reading the queue…</div></div>
   </section>
     </div>
     <div class="qview" data-qview="every">
   <section class={cardCls(false, 'panel')} id="queuepanel">
     <h2>The queue <span class="note">every voyage still to sail, in the order it sails (specs/queue.txt), with its goal: the question its spec asks, or its experiment's where it asks none, and the fitout it was compiled from (its census variation and stage); the voyage at sea first</span></h2>
-    <div class="scroll queuescroll"><table id="queuetable" data-nosort><thead><tr><th>#</th><th>voyage</th><th>goal</th><th title="the fitout the voyage was compiled from (scripts/make_fitout.py, the Fitouts tab): its census variation, if one, and its stage">fitout</th><th>expedition</th><th>class</th><th>seed</th><th title="about when it sails: each voyage ahead of it at its class's mean time; ≥ where one ahead has no time yet">sails in</th></tr></thead><tbody><tr><td colspan="8" class={emptyCls(true)}>reading the queue…</td></tr></tbody></table></div>
+    <div class="scroll queuescroll"><table id="queuetable" data-nosort><thead><tr><th>#</th><th>voyage</th><th>goal</th><th title="the fitout the voyage was compiled from (scripts/make_fitout.py, the Fitouts tab): its census variation, if one, and its stage">fitout</th><th>expedition</th><th>size</th><th>seed</th><th title="about when it sails: each voyage ahead of it at its size's mean time; ≥ where one ahead has no time yet">sails in</th></tr></thead><tbody><tr><td colspan="8" class={emptyCls(true)}>reading the queue…</td></tr></tbody></table></div>
   </section>
     </div>
   </div>
@@ -71,11 +71,11 @@ import { cardCls, checkCls, crumbCls, emptyCls, rangeCls, selectCls, tabCls, tab
     <div id="knockouts"></div>
   </section>
   <section class={cardCls(false, 'panel')} data-voyage="card_census" hidden>
-    <h2>The census <span class="note">which of the four necessary cards (previous-word, Nevermore, mover, comparator: the ones every model that chains plays) each class can draw, and its cause-and-effect score, voyage as ablations of the class's own fitout so every variation compares with it. A row per variation (the fitout first), each cell its latest stage's reading (one head or a layer's best two together), green ✓ at the card's mark; cause with its change from the fitout's own. Open a row for its three stages</span></h2>
+    <h2>The census <span class="note">which of the four necessary cards (previous-word, Nevermore, mover, comparator: the ones every model that chains plays) each size can draw, and its cause-and-effect score, voyage as ablations of the size's own fitout so every variation compares with it. A row per variation (the fitout first), each cell its latest stage's reading (one head or a layer's best two together), green ✓ at the card's mark; cause with its change from the fitout's own. Open a row for its three stages</span></h2>
     <div id="censusgrid"></div>
   </section>
   <section class={cardCls(false, 'panel')} data-voyage="two_facts" hidden>
-    <h2>The climb over training <span class="note">each voyage's climb toward chaining two facts at every discovery reading (0 to 5: the rungs performed from the bottom of each chain, plus the next rung's share of its mark, the mean of the four chains), one line per voyage, coloured by class; the dotted levels are the reference ladder; the <a href="#/leaderboard">leaderboard</a> holds each class's best</span></h2>
+    <h2>The climb over training <span class="note">each voyage's climb toward chaining two facts at every discovery reading (0 to 5: the rungs performed from the bottom of each chain, plus the next rung's share of its mark, the mean of the four chains), one line per voyage, coloured by size; the dotted levels are the reference ladder; the <a href="#/leaderboard">leaderboard</a> holds each size's best</span></h2>
     <div class="handtools"><select class={selectCls('')} id="voyageclimbwhat"><option value="climb">the climb</option><option value="chaining_lift">the chaining lift</option><option value="logic_gain">the chaining gain (logic deck)</option></select></div>
     <div class="chart tall" id="voyageclimb"></div>
   </section>

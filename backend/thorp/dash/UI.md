@@ -125,14 +125,14 @@ holds the ways in, always:
   an order of magnitude smaller than the field where the depth it needs allows (None: beyond the
   ladder; `taught` marks a reference the field shows only when trained on the task). The table
   sorts and filters by waypoint and band. Quantum physics itself is the far horizon, beyond the
-  budget; the destination the ladder proves is the bettor's three discovery tests, one per strand
+  budget; the destination the ladder proves is the explorer's three discovery tests, one per strand
   (the Origin test for reasoning, the energy test for physics, Mendeleev's gaps for mathematics;
   the geometry test was first choice but is not viable on Gutenberg in English), each a bet
   between an idea and its rivals on books from before its cutoff, pre-registered in DECISIONS.md.
-  Each is reached by a **chain of six rungs**, one per class, keel to bettor, linked by `leads_to`
+  Each is reached by a **chain of six rungs**, one per class, keel to explorer, linked by `leads_to`
   (`fleet.chains()`): the words of the idea (keel), the copying trick put to it (pilot), its pieces
   as everyday knowledge (speller), what the precursors wrote (stylist), the pieces chained into a
-  conclusion no sentence states (the 50m) and the discovery (bettor); the stylist's and the 50m's
+  conclusion no sentence states (the 50m) and the discovery (explorer); the stylist's and the 50m's
   rungs were swapped so each chain gets harder as it climbs (DECISIONS.md, "The rungs above the
   keel rewritten"). The Origin: like father, like son, the pedigree test, the breeders' test,
   Malthus and Lyell, Nature's breeder. Energy: fire and ice, the workshop test, the smith's test,
@@ -151,8 +151,8 @@ holds the ways in, always:
   `performed_at`, so every performed count on the dashboard follows it; tricks without `min_score`
   keep lift ≥ threshold. ✓ is performed; ▲ marks a class that performed a rung set for a bigger
   class, ⚠ (amber) one that did so while a bigger class measured on it fails, a sign the pairs want
-  auditing. The geometry test is revived as the bettor's fifth test, outside the chains.
-  **One chain** (`#/discoveries/chains/<key>`, keyed by the bettor's test, linked from each row of
+  auditing. The geometry test is revived as the explorer's fifth test, outside the chains.
+  **One chain** (`#/discoveries/chains/<key>`, keyed by the explorer's test, linked from each row of
   the chains table and from every rung's trick page) tells that test as a climb: the idea, who found
   it and the shelf (with the cutoff), all `fleet.CHAINS` copy, then the six steps keel first, each
   with its class and `fleet.RUNGS` title, the test (linked to its page), what the step adds to the
@@ -160,7 +160,7 @@ holds the ways in, always:
   (lift and share), and its pairs: six shown, all on demand, each with ✓ or ✗ for each class's best
   sailing (that pair's lift in the latest `discovery` artifact, in the CSV's order). Above the keel a pair
   has a frame (the prompt's tail, its own column in the CSV), and the passage reads premise / **frame**,
-  the frame in the stronger weight, since the lift is what the premise adds over the frame alone. The bettor's
+  the frame in the stronger weight, since the lift is what the premise adds over the frame alone. The explorer's
   step reads "pairs not written yet" until `lists/discovery-<test>.csv` exists, with the rivals
   and the ablation from its `about`.
   **Grading** (`fleet.grading`, written to `data/compare/chain-grades.json`): a chain is graded when
@@ -191,7 +191,9 @@ holds the ways in, always:
   writes). The last eight exchanges go with each question as the conversation so far; every
   exchange is kept in the sailing's transcript (`thorp.table.transcript`, `/api/table/transcript`).
   Beside the talk are the ship's star and trick readings at the checkpoint answering, measured
-  ones first. Each answer says why it stopped (the next turn, the length, the end of text), its
+  ones first. Each answer ends at its first blank line, so a ship's runaway prose never goes back
+  into the window as history. Each answer says why it stopped (the next turn, a blank line, the
+  length, the end of text), its
   tokens and seconds. Ships not trained on the Q:/A: form don't converse yet, and the page says so.
 - **Leaderboard** (`#/leaderboard`): two boards on chaining two facts, from one table
   (`leaderboard.payload()["table"]`, outside models and Thorp versions together), split by the
@@ -243,7 +245,7 @@ holds the ways in, always:
   The server never sends NaN: a failed reading (NaN or infinity) goes out as null, since one NaN
   makes a whole JSON response unreadable to the browser.
   **The art** (`thorp/dash/art/generate_art.py`, the Atlas generators' Eduardo Risso style, made with
-  fal; saved to `web/public/art/<key>.png`): a ship across the top of each class card (keel to summit,
+  fal; saved to `web/public/art/<key>.png`): a ship across the top of each class card (keel to trader,
   each a vessel a size up from the last) and a face on each playing card (previous-word, Nevermore,
   mover, comparator, bridge) wherever the card appears: the star chart, the methodology and the
   competitor pages. An image not made yet removes itself, so a card without art draws no frame.
@@ -398,15 +400,29 @@ Stars are destinations, never ships.
 Every address is canonical: older ones (`#sizes`, `#proxy`, `#rung-1m`, `#/models/…`, `#betting`,
 `?run=`) are rewritten to the new form, never kept beside it.
 
-## Class pages
+## Ships and sizes
+
+There are no classes (Justin, 2026-11-08: "the classes as a concept should just be ships"). A **ship** is a
+size fitted out one way, and carries its characteristics: its size, its training content and method (the
+fitout), its voyages (runs, one per seed) and what they found. The **Ships** tab (`#/ships`, the home) groups
+the ships by size: each size's card first (its name, its role, its current version's Face Cards and Logic
+scores), then its newest ships in service, and a link to the rest. Every ship ever launched is `#/ships/all`.
+
+Nothing about a size or a ship is written in code: the sizes (name, role, where it trains, the metrics that
+judge it) are `ship.sizes` in Postgres, the ships `ship.ships`, their voyages `ship.voyages`
+(`thorp/ship_store.py`; the models in `thorp/viable/s3_control/models.py`, made by Alembic). `LADDER` in
+`thorp/models/registry.py` reads `ship.sizes`; `fleet.register()` reads `ship.ships`. To rename a size or
+change its role, change its row.
+
+## Size pages
 
 The Classes home also has **Filling the seven steps to quantum physics**: a matrix of classes
 against the seven steps, each cell the tricks that class performed, with "+n" inherited from a
 smaller class and a bar; the last column is the whole route. Taught-only tricks don't count.
 
-Every class on the ladder (`LADDER` in `thorp/models/registry.py`) gets one page, built from one
+Every size on the ladder (`ship.sizes`, read as `LADDER`) gets one page, built from one
 template (`web/src/components/ModelPage.astro`, filled by `renderRung` in `dashboard.js`) at
-`#/classes/<class>`, named by class, not size: `#/classes/pilot`, `#/classes/speller`…
+`#/sizes/<name>`, named by its name, not its parameter count: `#/sizes/pilot`, `#/sizes/speller`… (`#/classes/…` still lands there)
 Renamed classes keep their old addresses (`CLASS_RENAMES` in `server.py` and `dashboard.js`:
 the seedling is now the keel, the proxy the pilot), which redirect to the current name.
 

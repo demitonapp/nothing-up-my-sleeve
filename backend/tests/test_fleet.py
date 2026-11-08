@@ -43,7 +43,7 @@ def test_sieves_name_ledger_metrics():
     assert fleet.KINK_MIN_RECORDS > 0 and 0 < fleet.KINK_FIRM < 1
 
 
-def test_a_ship_is_a_class_and_a_fitout(tmp_thorp):
+def test_a_ship_is_a_size_and_a_fitout(tmp_thorp):
     base = {
         "name": "a",
         "ship": "Argo",
@@ -72,9 +72,9 @@ def test_a_ship_is_a_class_and_a_fitout(tmp_thorp):
         seed2
     )  # a seed and an instrument do not make a new ship
     assert fleet.ship_key(base) != fleet.ship_key(other)  # a different fitout does
-    assert fleet.ship_key(base) != fleet.ship_key(bigger)  # and so does a different class
+    assert fleet.ship_key(base) != fleet.ship_key(bigger)  # and so does a different size
     first = fleet.ship_for(base)
-    assert first.name == "Argo" and first.cls == "1m"
+    assert first.name == "Argo" and first.size == "1m" and first.preset == "1m"
     assert fleet.ship_for(seed2).name == "Argo"  # the second sailing joins the first
     renamed = fleet.ship_for({**base, "ship": "Something Else"})
     assert renamed.name == "Argo"  # names never move

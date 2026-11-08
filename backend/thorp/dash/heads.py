@@ -188,7 +188,7 @@ KNOWN_HEADS: list[dict] = [
     # ------------------------------------------------------------------ the indirect-object circuit
     {
         "key": "s_inhibition",
-        "expected_class": "bettor",
+        "expected_class": "explorer",
         "expected_why": "four or more hops in sequence; found in GPT-2 small, the shape of the 100m (12 x 768)",
         "name": "S-inhibition head",
         "family": "circuit",
@@ -201,7 +201,7 @@ KNOWN_HEADS: list[dict] = [
     },
     {
         "key": "name_mover",
-        "expected_class": "bettor",
+        "expected_class": "explorer",
         "expected_why": "four or more hops in sequence; found in GPT-2 small, the shape of the 100m (12 x 768)",
         "name": "Name mover head",
         "family": "circuit",
@@ -214,7 +214,7 @@ KNOWN_HEADS: list[dict] = [
     },
     {
         "key": "backup_name_mover",
-        "expected_class": "bettor",
+        "expected_class": "explorer",
         "expected_why": "redundancy beside the name movers; found in GPT-2 small",
         "name": "Backup name mover head",
         "family": "circuit",
@@ -254,7 +254,7 @@ KNOWN_HEADS: list[dict] = [
     # ------------------------------------------------------------------ suppression
     {
         "key": "negative_name_mover",
-        "expected_class": "bettor",
+        "expected_class": "explorer",
         "expected_why": "beside the name movers in the same circuit; found in GPT-2 small",
         "name": "Negative name mover head",
         "family": "suppression",

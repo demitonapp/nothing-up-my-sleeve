@@ -108,7 +108,8 @@ def run_summary(r: dict, voyage: fleet.Expedition) -> dict:
         **r,
         "ship_key": ship.key if ship else None,
         "ship_name": ship.name if ship else r.get("ship"),
-        "class": ship.cls if ship else None,
+        "preset": ship.preset if ship else None,
+        "size": ship.size if ship else None,
         "settings": {
             "vocab": spec.get("tokeniser", {}).get("vocab"),
             "lr": spec.get("optim", {}).get("lr"),
@@ -166,7 +167,8 @@ def ships_of(runs: list[dict]) -> list[dict]:
             {
                 "key": key,
                 "name": s.name if s else rs[0]["ship_name"],
-                "class": s.cls if s else rs[0]["class"],
+                "preset": s.preset if s else rs[0]["preset"],
+                "size": s.size if s else rs[0]["size"],
                 "subtitle": s.subtitle if s else "",
                 "archived": s.archived if s else None,
                 "sailings": [r["name"] for r in rs],

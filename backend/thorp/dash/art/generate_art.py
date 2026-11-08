@@ -58,9 +58,9 @@ CLASSES: dict[str, str] = {
     "wheel in a long coat, a slash of moonlight along the hull, graceful and precise",
     "paragraph": "a brigantine on a long night passage across open ocean, its wake a long unbroken line "
     "behind it to the horizon, a navigator at the chart table under a swinging lamp",
-    "bettor": "a three-masted barque sailing off the edge of the known chart toward an uncharted island in "
+    "explorer": "a three-masted barque sailing off the edge of the known chart toward an uncharted island in "
     "fog, a figure in the bow with a brass telescope raised, the old chart pinned beside him ending in blank paper",
-    "summit": "a towering full-rigged ship of the line cresting an enormous wave, every sail set, the "
+    "trader": "a towering full-rigged ship of the line cresting an enormous wave, every sail set, the "
     "masts reaching up into a field of stars, lightning behind, the largest ship on the sea",
 }
 

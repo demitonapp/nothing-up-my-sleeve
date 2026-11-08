@@ -1,8 +1,8 @@
 """The tricks of the trade, on the route to quantum physics (2026-11-07, Justin).
 
 Quantum physics itself is the far horizon, beyond the budget; the destination the ladder proves is the
-bettor's three discovery tests, one per strand: the Origin test (reasoning), the energy test
-(physics) and the geometry test (mathematics), with Mendeleev's gaps as the summit's stretch.
+explorer's three discovery tests, one per strand: the Origin test (reasoning), the energy test
+(physics) and the geometry test (mathematics), with Mendeleev's gaps as the trader's stretch.
 
 A trick is what a model can do, judged from outside by what it bets; a star is the mechanism inside
 that does it (DECISIONS.md, "Tricks and stars"). The tricks are grouped into the seven WAYPOINTS a
@@ -18,10 +18,10 @@ order-of-magnitude reading of the papers; "today", a reading of where today's mo
 has moved down as training data improved); the models and source; the kinds of head thought to do
 it (`stars`, keys of `heads.KNOWN_HEADS`); Thorp's measurement (`fleet`, a key of
 `thorp.fleet.TRICKS`) or how it could be measured; and `goal_class`, the class of ship expected to
-reach it, by class name ("keel", "pilot", "speller", "stylist", "paragraph", "bettor", "summit"),
+reach it, by class name ("keel", "pilot", "speller", "stylist", "paragraph", "explorer", "trader"),
 or None when it is beyond the ladder. `taught` marks a trick the field shows only in models trained
 on that task, not on books: a reference point, never a class's goal. `leads_to` names the trick
-a smaller test leads to (the speller's three tests lead to the bettor's), and `reference` keeps
+a smaller test leads to (the speller's three tests lead to the explorer's), and `reference` keeps
 readings of outside models on it, such as Qwen3 0.6B's lift.
 
 A class's goals are the tricks whose goal_class is that class; its target level is the highest
@@ -66,7 +66,7 @@ WAYPOINTS: list[dict] = [
     {
         "key": "discovery",
         "name": "Discovery",
-        "about": "Betting on an idea the books do not yet hold: the bettor's tests (the Origin, energy, Mendeleev's gaps and the eternal return, each reached by a chain of six rungs; and geometry); quanta are the far horizon.",
+        "about": "Betting on an idea the books do not yet hold: the explorer's tests (the Origin, energy, Mendeleev's gaps and the eternal return, each reached by a chain of six rungs; and geometry); quanta are the far horizon.",
     },
 ]
 
@@ -316,7 +316,7 @@ KNOWN_TRICKS: list[dict] = [
         "rough",
         "BERT and GPT-2 partly; billion-parameter models reliably",
         "Petroni et al. 2019, Language Models as Knowledge Bases?",
-        "bettor",
+        "explorer",
         gate=True,
         measure="Cloze questions about facts the period books state, scored on the ship's top bet.",
     ),
@@ -330,7 +330,7 @@ KNOWN_TRICKS: list[dict] = [
         "rough",
         "the GPT-3 family",
         "Levesque, Davis and Morgenstern 2012, The Winograd Schema Challenge; Brown et al. 2020, GPT-3",
-        "bettor",
+        "explorer",
         rests_on=["ioi"],
         stars=["coreference"],
         measure="Winograd-style pairs in period English: the share where the right referent is the higher bet.",
@@ -345,7 +345,7 @@ KNOWN_TRICKS: list[dict] = [
         "rough",
         "the GPT-3 family",
         "Zellers et al. 2019, HellaSwag: Can a Machine Really Finish Your Sentence?",
-        "bettor",
+        "explorer",
         measure="Scene endings written from the books' own scenes, one sensible and three not.",
     ),
     _t(
@@ -358,7 +358,7 @@ KNOWN_TRICKS: list[dict] = [
         "today",
         "the GPT-3 family, then smaller models trained on better text",
         S_MMLU,
-        "summit",
+        "trader",
         gate=True,
         rests_on=["facts", "comprehension"],
         measure="A period-safe set of exam questions drawn from the books' subjects, multiple choice.",
@@ -403,7 +403,7 @@ KNOWN_TRICKS: list[dict] = [
         "rough",
         "BIG-bench models",
         S_BIGBENCH,
-        "bettor",
+        "explorer",
         gate=True,
         rests_on=["greater_than"],
         measure="List sentences in period English with a count to give: the ship's top bet for the number.",
@@ -418,7 +418,7 @@ KNOWN_TRICKS: list[dict] = [
         "rough",
         "BIG-bench models",
         S_BIGBENCH,
-        "summit",
+        "trader",
         rests_on=["successor", "counting_items"],
         measure="Date questions over weekdays and months, multiple choice.",
     ),
@@ -432,7 +432,7 @@ KNOWN_TRICKS: list[dict] = [
         "documented",
         "the GPT-3 family",
         S_GPT3,
-        "summit",
+        "trader",
         gate=True,
         rests_on=["counting_items"],
         measure="Few-shot two-digit sums: accuracy of the ship's top bet.",
@@ -462,7 +462,7 @@ KNOWN_TRICKS: list[dict] = [
         "rough",
         "the GPT-3 family",
         S_GPT3,
-        "bettor",
+        "explorer",
         gate=True,
         rests_on=["copying"],
         stars=["induction", "function_vector"],
@@ -478,7 +478,7 @@ KNOWN_TRICKS: list[dict] = [
         "rough",
         "BIG-bench models",
         S_BIGBENCH,
-        "summit",
+        "trader",
         rests_on=["few_shot"],
         measure="Syllogisms and ordering puzzles in period English, multiple choice.",
     ),
@@ -492,7 +492,7 @@ KNOWN_TRICKS: list[dict] = [
         "today",
         "PaLM with step-by-step prompting, then small models trained on worked solutions",
         "Cobbe et al. 2021, Training Verifiers to Solve Math Word Problems (GSM8K)",
-        "summit",
+        "trader",
         gate=True,
         rests_on=["addition", "comprehension"],
         measure="Period-styled word problems with a numeric answer: accuracy of the ship's answer.",
@@ -507,7 +507,7 @@ KNOWN_TRICKS: list[dict] = [
         "today",
         "LaMDA, GPT-3 and PaLM families, then smaller models",
         "Wei et al. 2022, Chain-of-Thought Prompting Elicits Reasoning in Large Language Models",
-        "summit",
+        "trader",
         gate=True,
         rests_on=["word_problems"],
         measure="The word problems with and without a prompt to work step by step: the gain.",
@@ -565,7 +565,7 @@ KNOWN_TRICKS: list[dict] = [
         "today",
         "Minerva, then smaller maths-trained models",
         S_MATH,
-        "summit",
+        "trader",
         gate=True,
         rests_on=["word_problems"],
         measure="Equations written in the notation of period algebra textbooks on the shelf.",
@@ -609,7 +609,7 @@ KNOWN_TRICKS: list[dict] = [
         "rough",
         "the GPT-3 family",
         "Bisk et al. 2020, PIQA: Reasoning about Physical Commonsense in Natural Language",
-        "bettor",
+        "explorer",
         gate=True,
         rests_on=["common_sense"],
         measure="Physical-task pairs written from the books' household and craft scenes.",
@@ -624,7 +624,7 @@ KNOWN_TRICKS: list[dict] = [
         "today",
         "MMLU models",
         S_MMLU,
-        "summit",
+        "trader",
         gate=True,
         rests_on=["physical_intuition", "word_problems"],
         measure="Questions from the period physics textbooks on the shelf, multiple choice.",
@@ -673,7 +673,7 @@ KNOWN_TRICKS: list[dict] = [
         measure="Beyond the ladder: kept as a horizon.",
     ),
     # ------------------------------------------------------------------ the speller's three tests
-    # Each the smaller test that leads to one of the bettor's, so the 9m tracks what the 100m will do
+    # Each the smaller test that leads to one of the explorer's, so the 9m tracks what the 100m will do
     # (DECISIONS.md, "The speller's three tests"): a lift on matched passages, idea over rival, with
     # its floor. Qwen3 0.6B's lift is kept as a reference reading.
     _t(
@@ -730,7 +730,7 @@ KNOWN_TRICKS: list[dict] = [
     # ------------------------------------------------------------------ the stylist's and the 50m's tests
     # The chains (DECISIONS.md, "The stylist's and the 50m's tests"; the two swapped in "The rungs above
     # the keel rewritten"): speller (the pieces as everyday knowledge) -> stylist (what the precursors
-    # wrote) -> 50m (the pieces chained into a conclusion no sentence states) -> bettor (the discovery
+    # wrote) -> 50m (the pieces chained into a conclusion no sentence states) -> explorer (the discovery
     # itself). Every class is scored on every rung.
     _t(
         "nature_test",
@@ -835,7 +835,7 @@ KNOWN_TRICKS: list[dict] = [
         measure="24 matched pairs (lists/tricks/): lift of the idea over its rivals, against the floor.",
     ),
     # ------------------------------------------------------------------ discovery
-    # The bettor's three discovery tests, one per strand (Justin, 7 November): each an idea found
+    # The explorer's three discovery tests, one per strand (Justin, 7 November): each an idea found
     # independently by more than one person within a few years (so it was in the books, waiting),
     # with named rivals and a cutoff year, put to a ship trained only on books from before the
     # cutoff as a bet: does it prefer the idea over its rivals? Each has a precursor ablation (the
@@ -849,12 +849,12 @@ KNOWN_TRICKS: list[dict] = [
         None,
         "rough",
         "none yet",
-        "Thorp, DECISIONS.md (the bettor's Origin test); precursors Malthus 1798, Lyell 1830-33, Paley 1802, Erasmus Darwin, Chambers 1844",
-        "bettor",
+        "Thorp, DECISIONS.md (the explorer's Origin test); precursors Malthus 1798, Lyell 1830-33, Paley 1802, Erasmus Darwin, Chambers 1844",
+        "explorer",
         gate=True,
         rests_on=["facts", "few_shot"],
         fleet="origin_test",
-        measure="The bettor's planned test: selection against fixed species, Lamarck and special creation, period text only; ablation without Malthus and Lyell.",
+        measure="The explorer's planned test: selection against fixed species, Lamarck and special creation, period text only; ablation without Malthus and Lyell.",
     ),
     _t(
         "energy_test",
@@ -866,7 +866,7 @@ KNOWN_TRICKS: list[dict] = [
         "rough",
         "none yet",
         "Thorp (proposed); precursors Rumford's cannon boring 1798, Davy's ice 1799, Young's lectures 1807",
-        "bettor",
+        "explorer",
         gate=True,
         rests_on=["physical_intuition", "few_shot"],
         fleet="energy_test",
@@ -882,10 +882,10 @@ KNOWN_TRICKS: list[dict] = [
         "rough",
         "none yet",
         "Thorp; precursors Euclid (Playfair), and the attempted proofs of Saccheri 1733, Lambert 1766 and Legendre",
-        "bettor",
+        "explorer",
         rests_on=["deduction", "few_shot"],
         fleet="geometry_test",
-        measure="Pre-registered: period-only shelf to 1829; ablation without the attempted proofs. Revived (DECISIONS.md, 'One fetcher, many sources'): the Internet Archive holds Legendre's and Playfair's Elements in English. Mendeleev's gaps stays the mathematics gate; a bettor's test outside the four chains.",
+        measure="Pre-registered: period-only shelf to 1829; ablation without the attempted proofs. Revived (DECISIONS.md, 'One fetcher, many sources'): the Internet Archive holds Legendre's and Playfair's Elements in English. Mendeleev's gaps stays the mathematics gate; a explorer's test outside the four chains.",
     ),
     _t(
         "mendeleev_gaps",
@@ -897,11 +897,11 @@ KNOWN_TRICKS: list[dict] = [
         "rough",
         "none yet",
         "Thorp (proposed); Mendeleev 1869, the elements found 1875-86",
-        "bettor",
+        "explorer",
         gate=True,
         rests_on=["counting_items", "algebra"],
         fleet="mendeleev_gaps",
-        measure="Pre-registered (DECISIONS.md): the bettor's mathematics test in place of geometry; all English by authors dead by 1869 (36 subject books: Davy, Dalton, Faraday), ablation without Dalton and Davy, checked against the elements found 1875-86.",
+        measure="Pre-registered (DECISIONS.md): the explorer's mathematics test in place of geometry; all English by authors dead by 1869 (36 subject books: Davy, Dalton, Faraday), ablation without Dalton and Davy, checked against the elements found 1875-86.",
     ),
     _t(
         "new_constructions",
@@ -1114,10 +1114,10 @@ KNOWN_TRICKS: list[dict] = [
         "rough",
         "none yet",
         "Thorp, DECISIONS.md (The eternal return); precursors Lucretius, Hume's Dialogues, Ecclesiastes, Marcus Aurelius, Plato's Great Year",
-        "bettor",
+        "explorer",
         rests_on=["lucretius_test", "deduction"],
         fleet="recurrence_test",
-        measure="The bettor's philosophy test, period text before 1872; ablation without Hume's Dialogues and Lucretius. The only chain with all six rungs, keel to bettor. Evaluator waits on its pairs.",
+        measure="The explorer's philosophy test, period text before 1872; ablation without Hume's Dialogues and Lucretius. The only chain with all six rungs, keel to explorer. Evaluator waits on its pairs.",
     ),
     # ------------------------------------------------------------------ the logic deck (fleet.METHODS["chaining"])
     _t(

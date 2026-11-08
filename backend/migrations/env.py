@@ -29,7 +29,7 @@ def _url() -> str:
 
 def _include(obj, name, type_, reflected, compare_to):
     """Only Thorp's own schema: the models live in `fitout`; any other table in the database is not ours."""
-    return type_ != "table" or getattr(obj, "schema", None) in (models.SCHEMA, models.GAME_SCHEMA)
+    return type_ != "table" or getattr(obj, "schema", None) in (models.SCHEMA, models.GAME_SCHEMA, models.SHIP_SCHEMA)
 
 
 def run_migrations_offline() -> None:
@@ -50,6 +50,7 @@ def run_migrations_online() -> None:
     with engine.connect() as connection:
         connection.exec_driver_sql(f"create schema if not exists {models.SCHEMA}")
         connection.exec_driver_sql(f"create schema if not exists {models.GAME_SCHEMA}")
+        connection.exec_driver_sql(f"create schema if not exists {models.SHIP_SCHEMA}")
         connection.commit()
         context.configure(
             connection=connection,

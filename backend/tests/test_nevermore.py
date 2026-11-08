@@ -125,4 +125,4 @@ def test_discovery_tests_score_every_written_list(library, spec):
         assert 0 <= m[f"tricks/{k}/score"] <= 1 and f"tricks/{k}/floor_lift" in m
     assert not any(
         k.startswith("tricks/origin_test") for k in m
-    )  # the bettor's pairs are not written yet
+    )  # the explorer's pairs are not written yet

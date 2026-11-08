@@ -1,6 +1,6 @@
 ---
 import { cardCls, crumbCls, tabCls, tabsCls } from '../lib/ui';
-// One ship: a class fitted out one way (thorp/fleet.py Ship), at #/ships/<ship key>[/<sailing>[/<tab>]].
+// One ship: a size fitted out one way (thorp/fleet.py Ship), at #/ships/<ship key>[/<sailing>[/<tab>]].
 // Its runs are its sailings, one per seed, listed under its name; the tabs show one sailing: how it
 // bets, its books, its languages, its sieves, attention, and the traits found in it.
 import RunOverview from './RunOverview.astro';
@@ -12,7 +12,7 @@ import Attention from './Attention.astro';
 import Traits from './Traits.astro';
 ---
 <div class="section" id="ship">
-  <h1><a class={crumbCls('back')} href="#/classes">← classes</a> <a class={crumbCls('crumb')} id="shipclass"></a> <span id="shipname"></span> <span id="shiptags"></span> <span class="q" id="shipfitout"></span></h1>
+  <h1><a class={crumbCls('back')} href="#/ships">← ships</a> <a class={crumbCls('crumb')} id="shipclass"></a> <span id="shipname"></span> <span id="shiptags"></span> <span class="q" id="shipfitout"></span></h1>
   <div class="sailings"><span class="k">voyages</span><span id="sailings"></span><span class="sub" id="title"></span></div>
   <section class={cardCls(false, 'panel')} id="stagepanel" hidden>
     <h2>Stages <span class="note">this voyage read its libraries in stages, in order, under one learning-rate schedule; each step chart below shows them as bands</span></h2>

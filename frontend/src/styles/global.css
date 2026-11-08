@@ -1063,3 +1063,9 @@ button[aria-busy="true"] { cursor: progress; opacity: .7; }
 
 .lgall td:nth-child(2) { min-width: 320px; max-width: 560px; font-size: 13px; line-height: 1.4; }
 .lgall td:nth-child(3) { min-width: 130px; font-size: 13px; }
+/* the Ships home: one group per size, its card first, then its newest ships */
+.sizegroup { margin-top: 18px; }
+.sizegroup > .band { margin-bottom: 10px; }
+.shipcard .sname { font-weight: 600; font-size: var(--fs-lg); }
+.shipcard .s { flex: 1; }
+.shipcard.more { justify-content: center; }

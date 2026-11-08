@@ -4,11 +4,16 @@ from __future__ import annotations
 
 import copy
 import hashlib
+import os
 import random
 
 import pytest
 
 from thorp import manifest, paths
+
+# Postgres in a test is its own database (thorp_test, migrated as the real one is), never Thorp's own: the
+# sizes come seeded by the migration, and a test's ships are cleared by tmp_thorp
+os.environ["THORP_PG"] = os.environ.get("THORP_PG_TEST", "postgresql://thorp@localhost:5433/thorp_test")
 
 WORDS = (
     "the of and to in a that he was it his is with as for had you not be her on at by which "
@@ -65,6 +70,14 @@ def _ogden_rule_advisory_in_tests(monkeypatch):
 def tmp_thorp(tmp_path, monkeypatch):
     monkeypatch.setenv("THORP_DATA", str(tmp_path / "data"))
     monkeypatch.setenv("THORP_LEDGER", str(tmp_path / "ledger.sqlite"))
+    from sqlalchemy import text
+
+    from thorp import fleet
+    from thorp.viable.s3_control.fitout_store import session
+
+    with session() as s, s.begin():  # the test database's ships, emptied (its sizes stay)
+        s.execute(text("truncate ship.ships cascade"))
+    fleet._REGISTER = None
     return tmp_path
 
 

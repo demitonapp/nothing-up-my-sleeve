@@ -1,6 +1,6 @@
 """Discovery tests by matched pairs (2026-11-07, Justin): does the model bet on the idea?
 
-One evaluator for the bettor's discovery tests (the Origin test, the energy test, Mendeleev's gaps)
+One evaluator for the explorer's discovery tests (the Origin test, the energy test, Mendeleev's gaps)
 and for the speller's three tests that lead to them (the breeders' test, the smith's test, the gap
 test), so the curve from 9m to 100m is read on one scale (DECISIONS.md, "The speller's three tests").
 
@@ -8,7 +8,7 @@ Every trick in fleet.TRICKS whose evaluator is "discovery" names a CSV of pairs 
 prompt, idea, rival): a neutral opening, then the idea or a rival, matched in length and plainness.
 For each pair, the bits per byte of each continuation after the prompt (bits per byte, so tokenisers
 of different sizes compare); `preference` is the rival's less the idea's (positive bets on the
-idea), as the bettor's tests were pre-registered. `lift` removes what the words alone carry: the
+idea), as the explorer's tests were pre-registered. `lift` removes what the words alone carry: the
 same difference after the pair's frame alone is subtracted (Justin, 10:15: the frame is the closing
 words the answer hangs on, "and the iron grew", a suffix of the prompt, in the `frame` column), so lift
 is what the premise before the frame adds, and a frame that leans one way ("grew cold") or a word

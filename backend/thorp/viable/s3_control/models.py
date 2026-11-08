@@ -193,3 +193,62 @@ class WagerBet(Base):
     layer: Mapped[int | None] = mapped_column(Integer)
     placed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     practice: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")  # placed after the pull sailed
+
+
+# ---- the ships (schema `ship`): what a ship is, held in the database, not in code (Justin, 2026-11-08:
+# "these things shouldn't be hardcoded, we have postgres for a reason"; "a ship has characteristics: size,
+# training content, training methodology, voyages, discoveries"). Read through thorp/ship_store.py.
+SHIP_SCHEMA = "ship"
+
+
+class Size(Base):
+    """A ship's size: one rung of the ladder (a preset), with its name and its role (300k The keel, 100m The
+    explorer, 350m The trader), where it trains, how it is judged and the metrics that judge it."""
+
+    __tablename__ = "sizes"
+    __table_args__ = {"schema": SHIP_SCHEMA}
+
+    preset: Mapped[str] = mapped_column(Text, primary_key=True)
+    ordinal: Mapped[int] = mapped_column(Integer, unique=True)  # smallest first
+    name: Mapped[str] = mapped_column(Text, unique=True)
+    role: Mapped[str] = mapped_column(Text)  # what a ship of this size is for
+    overview: Mapped[str] = mapped_column(Text, default="", server_default="")
+    kind: Mapped[str | None] = mapped_column(Text)  # nursery, proxy, or none
+    vocab: Mapped[int | None] = mapped_column(Integer)
+    trains_where: Mapped[str] = mapped_column(Text, default="", server_default="")
+    status: Mapped[str] = mapped_column(Text, default="planned", server_default="planned")
+    scored: Mapped[str] = mapped_column(Text, default="", server_default="")
+    # [[name, what it measures, "live" | "to come"], ...]
+    metrics: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
+
+
+class ShipRecord(Base):
+    """A ship: a size fitted out one way (training content and method, the fitout). Named once and never
+    renamed. Its voyages are its runs, one per seed."""
+
+    __tablename__ = "ships"
+    __table_args__ = {"schema": SHIP_SCHEMA}
+
+    key: Mapped[str] = mapped_column(Text, primary_key=True)  # "<preset>:<fitout id>"
+    name: Mapped[str] = mapped_column(Text, unique=True)
+    preset: Mapped[str] = mapped_column(Text)  # the exact shape, a size or a variant of one (300k-h4)
+    size: Mapped[str] = mapped_column(Text, ForeignKey(f"{SHIP_SCHEMA}.sizes.preset"))
+    fitout_id: Mapped[str] = mapped_column(Text)
+    subtitle: Mapped[str] = mapped_column(Text, default="", server_default="")  # the fitout in a line
+    archived: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    seeded_from: Mapped[dict | str | None] = mapped_column(JSONB)  # the run whose trained mind it starts from
+    expedition: Mapped[str | None] = mapped_column(Text)  # the expedition that commissioned it
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class VoyageRecord(Base):
+    """A voyage: one run of a ship (the run itself, its metrics and status, stay in the ledger)."""
+
+    __tablename__ = "voyages"
+    __table_args__ = (Index("voyages_ship", "ship_key"), {"schema": SHIP_SCHEMA})
+
+    run_id: Mapped[str] = mapped_column(Text, primary_key=True)
+    ship_key: Mapped[str] = mapped_column(Text, ForeignKey(f"{SHIP_SCHEMA}.ships.key", ondelete="CASCADE"))
+    name: Mapped[str] = mapped_column(Text)
+    seed: Mapped[int | None] = mapped_column(Integer)
+    started: Mapped[str | None] = mapped_column(Text)  # as the ledger records it (UTC, ISO)

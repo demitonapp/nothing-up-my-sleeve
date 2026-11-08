@@ -48,7 +48,7 @@ ONE_HOP_NOISE = (
 
 
 def class_of_preset() -> dict[str, str]:
-    """preset -> RUNGS goal class, by ladder order (keel, pilot, speller, stylist, 50m, bettor)."""
+    """preset -> RUNGS goal class, by ladder order (keel, pilot, speller, stylist, 50m, explorer)."""
     from thorp.models.registry import LADDER
 
     return {r["preset"]: g.goal_class for r, g in zip(LADDER, fleet.RUNGS, strict=False)}

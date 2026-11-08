@@ -1269,7 +1269,7 @@ def _run(spec_path: str | Path, rec: Ledger | None = None) -> dict:
         from thorp import fleet
 
         ship = fleet.ship_for(
-            spec, voyage=fleet.expedition_of_label(spec.get("name"), spec.get("ship"))
+            spec, expedition=fleet.expedition_of_label(spec.get("name"), spec.get("ship"))
         )
         log(f"ship {ship.name} ({ship.key}): {ship.subtitle}")
     except Exception as e:  # noqa: BLE001

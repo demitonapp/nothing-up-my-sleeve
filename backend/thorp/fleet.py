@@ -222,12 +222,12 @@ class Trick:
     cutoff: int | None = None  # a discovery test's cutoff year: trained only on English before it
     viable: bool = True  # False when the shelf it needs is not on Gutenberg
     pairs: str = ""  # a discovery test's matched pairs (prompt, idea, rival), when written
-    leads_to: str = ""  # the bettor's discovery test this smaller test is the first step towards
+    leads_to: str = ""  # the explorer's discovery test this smaller test is the first step towards
     goal_class: str = ""
     # for a test scored on matched pairs: the share of pairs that must also go the idea's way
     # (tricks/<key>/score), so a mean carried by a few pairs does not count (Justin, 10:05)
     min_score: float | None = (
-        None  # the class expected to perform it, by class name as in thorp/dash/tricks.py ("speller", "bettor")
+        None  # the class expected to perform it, by class name as in thorp/dash/tricks.py ("speller", "explorer")
     )
 
 
@@ -360,7 +360,7 @@ TRICKS: dict[str, Trick] = {
             about="The speller's step towards the Origin test: the pieces of natural selection as everyday "
             "knowledge. Keep the largest for seed and the crop grows larger; like begets like; far more "
             "are born than the fields can feed; in a hard winter the weakest perish; the white hare is "
-            "hidden in the snow. 24 matched pairs, half of them mirror images, read as the bettor's tests "
+            "hidden in the snow. 24 matched pairs, half of them mirror images, read as the explorer's tests "
             "are (bits per byte in the idea's favour), lit on the lift over what the words alone carry.",
         ),
         Trick(
@@ -534,9 +534,9 @@ TRICKS: dict[str, Trick] = {
             min_score=MIN_SHARE,
             evaluator="",
             pairs="lists/discovery-recurrence.csv",
-            goal_class="bettor",
+            goal_class="explorer",
             cutoff=1872,
-            about="The bettor's philosophy test (Nietzsche's idea, found independently by Blanqui in 1872, Nietzsche in 1881 and, "
+            about="The explorer's philosophy test (Nietzsche's idea, found independently by Blanqui in 1872, Nietzsche in 1881 and, "
             "as a theorem of mechanics, Poincare in 1890). Trained only on English before 1872, does it prefer 'if the world is "
             "made of a finite number of parts and time has no end, every state of the world, this one included, returns, exactly "
             "and endlessly' over the world running down once to a final stillness (Thomson's dissipation, the strongest rival on the "
@@ -560,6 +560,22 @@ TRICKS: dict[str, Trick] = {
             "cause, membership, proportion and counterfactual.",
         ),
         Trick(
+            key="crowns_test",
+            name="The crowns",
+            metric="tricks/crowns_test/gain",
+            threshold=0.1,
+            min_score=MIN_SHARE,
+            evaluator="crowns",
+            pairs="lists/tricks/crowns.csv",
+            goal_class="paragraph",
+            performed_by=("nevermore", "mover", "bridge"),
+            about="Who is the king depends on who asks (Justin, 2026-11-08: the Queen of England by time, kingdom, side "
+            "and station). An invented kingdom with two claimants; one premise gives the record, the other the asker's "
+            "standpoint (side, time, place or station), and only both answer 'So to Pim, the king of Brell is'. The "
+            "chaining gain as the logic deck's, in its own deck; 'moves' asks that the answer turn when the standpoint "
+            "does, and 'ask' whether a disputed record raises 'That depends on whom you ask.' 40 items, ten a kind.",
+        ),
+        Trick(
             key="origin_test",
             name="The Origin test",
             metric="tricks/origin_test/lift",
@@ -567,9 +583,9 @@ TRICKS: dict[str, Trick] = {
             min_score=MIN_SHARE,
             evaluator="",
             pairs="lists/discovery-origin.csv",
-            goal_class="bettor",
+            goal_class="explorer",
             cutoff=1859,
-            about="Trained only on English before 1859, does the bettor prefer natural selection over fixed "
+            about="Trained only on English before 1859, does the explorer prefer natural selection over fixed "
             "species, Lamarckian inheritance and special creation? Ablation: without Malthus and Erasmus Darwin.",
         ),
         Trick(
@@ -580,7 +596,7 @@ TRICKS: dict[str, Trick] = {
             min_score=MIN_SHARE,
             evaluator="",
             pairs="lists/discovery-energy.csv",
-            goal_class="bettor",
+            goal_class="explorer",
             cutoff=1840,
             about="Trained only on English before 1840, does it prefer heat as motion and energy conserved "
             "over caloric and perpetual motion (found by Mayer, Joule and Helmholtz, 1842 to 1847)? "
@@ -594,7 +610,7 @@ TRICKS: dict[str, Trick] = {
             min_score=MIN_SHARE,
             evaluator="",
             pairs="lists/discovery-mendeleev.csv",
-            goal_class="bettor",
+            goal_class="explorer",
             cutoff=1869,
             about="Trained only on English before 1869, does it bet on the missing elements below "
             "aluminium, after calcium and below silicon, and their weights (gallium, scandium, germanium, "
@@ -608,7 +624,7 @@ TRICKS: dict[str, Trick] = {
             min_score=MIN_SHARE,
             evaluator="",
             pairs="lists/discovery-geometry.csv",
-            goal_class="bettor",
+            goal_class="explorer",
             cutoff=1829,
             about="Trained only on English before 1829, does it prefer a consistent geometry where the parallel "
             "postulate fails (Gauss, Bolyai, Lobachevsky) over 'the postulate can be proven from the others'? "
@@ -662,7 +678,7 @@ RUNGS: tuple[Rung, ...] = (
         "work comes from the coal, the middle member takes the middle value, twenty pigeons in nineteen holes.",
     ),
     Rung(
-        "bettor",
+        "explorer",
         "Bets on the idea before it was found",
         "Trained only on what was written before each cutoff, prefers natural selection (1859), energy conserved "
         "and heat as motion (1840), the missing elements (1869) and the eternal return (1872) over their rivals.",
@@ -672,10 +688,10 @@ RUNGS: tuple[Rung, ...] = (
 
 @dataclass(frozen=True)
 class Chain:
-    """One of the bettor's discovery tests, told as a climb (Justin, 10:05): the idea, who found it,
-    and for each rung (a trick key, keel to bettor) what that step adds to the one below."""
+    """One of the explorer's discovery tests, told as a climb (Justin, 10:05): the idea, who found it,
+    and for each rung (a trick key, keel to explorer) what that step adds to the one below."""
 
-    key: str  # the bettor's test (a TRICKS key)
+    key: str  # the explorer's test (a TRICKS key)
     name: str
     strand: str
     idea: str
@@ -829,7 +845,7 @@ COMPETITORS: dict[str, tuple[str, float]] = {
 
 def grading(chain: list[str], passed: dict[str, set[str]]) -> dict:
     """Whether a chain gets harder as it climbs, judged on many models at once. `passed` maps each
-    model to the rungs it performs. The rule, for the rungs below the bettor's (whose pairs come later):
+    model to the rungs it performs. The rule, for the rungs below the explorer's (whose pairs come later):
     no model performs a rung while failing one below it (each model's passes are a run from the
     bottom); fewer models perform each rung than the one below or the same number (never more); and
     some model performs every rung, so none is beyond reach. Returns the breaches."""
@@ -1130,7 +1146,7 @@ FITOUTS: dict[str, Fitout] = {
 
 
 def chains() -> list[list[str]]:
-    """The discovery chains, each from its first rung to the bettor's test it leads to."""
+    """The discovery chains, each from its first rung to the explorer's test it leads to."""
     led = {t.leads_to for t in TRICKS.values() if t.leads_to}
     out = []
     for k, t in TRICKS.items():
@@ -1260,16 +1276,6 @@ SOUNDINGS: dict[str, Sounding] = {
 # ------------------------------------------------------------------------- classes and fitouts
 
 
-@dataclass(frozen=True)
-class Class:
-    """A model class: one rung of the ladder (a preset), e.g. 300k The keel, 1m The pilot, 9m The speller."""
-
-    preset: str
-    name: str
-    job: str
-
-
-CLASSES: dict[str, Class] = {r["preset"]: Class(r["preset"], r["name"], r["job"]) for r in LADDER}
 
 # what a ship is fitted out with: the spec less its size (the class), its luck (the seed), its
 # instruments (eval, checkpoint) and its labels (name, ship, experiment, question). Two specs with
@@ -1403,33 +1409,47 @@ def describe(spec: dict) -> str:
 
 @dataclass(frozen=True)
 class Ship:
-    """A class fitted out one way. Its runs are its sailings, one per seed. Named once, when first
-    registered, and never renamed (the register is append-only)."""
+    """A ship: a size fitted out one way (its training content and method, the fitout). Its runs are its
+    voyages, one per seed. Named once, when first registered, and never renamed. Registered in Postgres
+    (`ship.ships`, thorp/ship_store.py)."""
 
     key: str  # "<preset>:<fitout id>"
     name: str
-    cls: str  # the preset of its class
+    preset: str  # its exact shape: a size, or a variant of one (300k-h4)
+    size: str  # the size it belongs to (300k)
     subtitle: str  # the fitout in a line
     archived: bool = False  # the First Fleet: ships fitted out before 7 November 06:40
-    seeded_from: str | None = (
-        None  # the ship whose trained mind it starts from (Great Expectations)
+    seeded_from: dict | str | None = None  # the run whose trained mind it starts from (Great Expectations)
+    expedition: str | None = None  # the expedition that commissioned it, if any
+
+
+def _ship(rec) -> Ship:
+    return Ship(
+        key=rec.key,
+        name=rec.name,
+        preset=rec.preset,
+        size=rec.size,
+        subtitle=rec.subtitle,
+        archived=rec.archived,
+        seeded_from=rec.seeded_from,
+        expedition=rec.expedition,
     )
-    voyage: str | None = None  # the voyage that commissioned it, if any
 
 
-def _register_path():
-    from thorp import paths
-
-    return paths.data_dir() / "ships.json"
+_REGISTER: tuple[float, dict[str, Ship]] | None = None
 
 
-def register() -> dict[str, Ship]:
-    """Every ship registered so far, by key (data/ships.json)."""
-    import json
+def register(fresh: bool = False) -> dict[str, Ship]:
+    """Every ship registered so far, by key (Postgres, `ship.ships`; kept half a minute, as the dashboard
+    asks for a run's ship once per run)."""
+    import time
 
-    p = _register_path()
-    raw = json.loads(p.read_text()) if p.exists() else {}
-    return {k: Ship(key=k, **v) for k, v in raw.items()}
+    global _REGISTER
+    if fresh or _REGISTER is None or time.time() - _REGISTER[0] > 30:
+        from thorp import ship_store
+
+        _REGISTER = (time.time(), {r.key: _ship(r) for r in ship_store.ships()})
+    return _REGISTER[1]
 
 
 def clean_name(label: str | None) -> str:
@@ -1448,39 +1468,41 @@ def ship_for(
     spec: dict,
     label: str | None = None,
     archived: bool = False,
-    voyage: str | None = None,
+    expedition: str | None = None,
     save: bool = True,
 ) -> Ship:
     """The ship a spec belongs to: its registered ship, or a new one named after `label` (else the
-    spec's own ship label) and saved, unless save is False."""
-    import json
+    spec's own ship label) and registered, unless save is False."""
+    from thorp import ship_store
 
     key = ship_key(spec)
     reg = register()
     if key in reg:
         return reg[key]
+    if save:
+        reg = register(fresh=True)
+        if key in reg:
+            return reg[key]
     name = clean_name(label or spec.get("ship") or spec.get("name"))
     taken = {s.name for s in reg.values()}
     base, i = name, 2
     while name in taken:  # a different fitout under the same label gets a numbered name
         name, i = f"{base} ({i})", i + 1
+    preset = str(spec.get("model", {}).get("preset"))
     ship = Ship(
         key=key,
         name=name,
-        cls=str(spec.get("model", {}).get("preset")),
+        preset=preset,
+        size=ship_store.size_of(preset),
         subtitle=describe(spec),
         archived=archived,
         seeded_from=spec.get("seeded_from"),
-        voyage=voyage,
+        expedition=expedition,
     )
     if save:
-        p = _register_path()
-        raw = json.loads(p.read_text()) if p.exists() else {}
-        raw.setdefault(key, {k: v for k, v in ship.__dict__.items() if k != "key"})
-        p.parent.mkdir(parents=True, exist_ok=True)
-        tmp = p.with_suffix(".tmp")
-        tmp.write_text(json.dumps(raw, indent=1, ensure_ascii=False))
-        tmp.replace(p)
+        rec = ship_store.add_ship({**ship.__dict__, "fitout_id": fitout_id(spec)})
+        ship = _ship(rec)
+        register(fresh=True)
     return ship
 
 
@@ -1521,21 +1543,28 @@ def expedition_of_label(name: str | None, label: str | None) -> str | None:
 
 
 def ship_of_run(row: dict, save: bool = True) -> Ship:
-    """The ship a ledger run belongs to (registering it if new)."""
+    """The ship a ledger run belongs to (registering it, and the run as one of its voyages, if save)."""
     import json
 
     spec = json.loads(row["spec_json"])
-    return ship_for(
+    ship = ship_for(
         spec,
         label=row.get("ship") or spec.get("ship"),
         archived=(row.get("started") or "") < ARCHIVE_BEFORE,
-        voyage=expedition_of_label(row.get("name"), row.get("ship")),
+        expedition=expedition_of_label(row.get("name"), row.get("ship")),
         save=save,
     )
+    if save and row.get("run_id"):
+        from thorp import ship_store
+
+        ship_store.add_voyage(row["run_id"], ship.key, row.get("name") or "", spec.get("seed"), row.get("started"))
+    return ship
 
 
-def fleet_for_class(preset: str) -> list[Ship]:
-    return [s for s in register().values() if s.cls == preset]
+def ships_of_size(size: str) -> list[Ship]:
+    """Every ship of a size, its variants (300k-h4) among them."""
+    return [s for s in register().values() if s.size == size]
+
 
 
 # --------------------------------------------------------------------- legacy labels (until 07:20)

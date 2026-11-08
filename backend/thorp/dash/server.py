@@ -840,7 +840,7 @@ def api_sieves() -> dict:
 
 
 # classes renamed (old address name -> new), so old addresses and names keep working (7 Nov, Justin)
-CLASS_RENAMES = {"seedling": "keel", "proxy": "pilot"}
+CLASS_RENAMES = {"seedling": "keel", "proxy": "pilot", "bettor": "explorer", "summit": "trader"}
 
 
 def _known_heads() -> list[dict]:
@@ -1037,8 +1037,8 @@ def _pairs(path: str | None) -> list[dict] | None:
 
 
 def api_chain(key: str) -> dict:
-    """One of the bettor's tests told as a climb (fleet.CHAINS): the idea, who found it, the shelf,
-    and each step keel to bettor with what it adds, the class it belongs to (fleet.RUNGS), its pairs
+    """One of the explorer's tests told as a climb (fleet.CHAINS): the idea, who found it, the shelf,
+    and each step keel to explorer with what it adds, the class it belongs to (fleet.RUNGS), its pairs
     and, per sailing, the latest per-pair lifts from the 'discovery' artifacts (in the pairs' order).
     The evidence per class (best lift, share, performed) comes from /api/discoveries."""
     from thorp import fleet
@@ -1384,7 +1384,22 @@ def _class_cards(preset: str) -> dict:
     }
 
 
+_class_score_cache: dict[str, tuple[float, dict]] = {}
+
+
 def api_class_score(preset: str) -> dict:
+    """Cached a minute: the Ships page asks for every size at once."""
+    import time
+
+    hit = _class_score_cache.get(preset)
+    if hit and time.time() - hit[0] < 60:
+        return hit[1]
+    out = _class_score(preset)
+    _class_score_cache[preset] = (time.time(), out)
+    return out
+
+
+def _class_score(preset: str) -> dict:
     """A class's live scoring readings (registry.LADDER's "scored": the four necessary cards held,
     then cause and effect, then chaining two facts) from its current version (the leaderboard's best
     ship, leaderboard.thorp_entry: the mean of its sailings' latest), and the best cards held so far

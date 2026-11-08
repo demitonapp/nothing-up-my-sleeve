@@ -14,7 +14,7 @@ def test_the_bets_ladder_is_the_registrys_ladder():
 def test_a_hundred_dollars_buys_two_seeds_and_an_ablation():
     b = bet.budget()
     assert b["fits"] and b["total"]["mid"] <= bet.BUDGET
-    assert 5 < b["run_hours"]["mid"] < 15  # one summit run at twenty tokens a parameter, on one H100
+    assert 5 < b["run_hours"]["mid"] < 15  # one trader run at twenty tokens a parameter, on one H100
     assert b["runs_for_budget"]["mid"] >= 3
     assert b["runs_for_budget"]["high"] < b["runs_for_budget"]["mid"] < b["runs_for_budget"]["low"]
 

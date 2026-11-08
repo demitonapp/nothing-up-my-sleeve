@@ -2,7 +2,7 @@
 import { cardCls, checkCls, selectCls } from '../lib/ui';
 // Leaderboard (#/leaderboard): one ranked table on chaining two facts (the chaining lift: the mean lift on
 // the four chaining tests). Outside models (Qwen, Phi, Llama, Pythia: leaderboard.reference) beside Thorp's
-// classes (each class's best run) and Thorp's forecasts (smoking_qwen's two fits, carried to the classes
+// sizes (each size's best run) and Thorp's forecasts (smoking_qwen's two fits, carried to the sizes
 // not yet sailed and to 400M), each outside model with the size Thorp is forecast to match it at.
 // Chaining-only: the climb is internal (the two-fact voyage's page). Smoking the 2–4B range and every ship fold
 // away beneath. UI.md, "Leaderboard".
@@ -17,7 +17,7 @@ import { cardCls, checkCls, selectCls } from '../lib/ui';
       <span class="note" id="lbfcnote"></span>
     </div>
     <div class="scroll"><table id="lbtable" data-nosort><thead></thead><tbody></tbody></table></div>
-    <p class="note mt">The leaderboard is the four chaining tests only (Nature's breeder, the mill test, the between test, the pigeonhole test; 96 pairs), each cell its lift and share of pairs right, ✓ when performed (lift 0.1 and two in three right); Thorp's other tests are internal. The chaining gain is the logic deck's: invented words and counterfactual premises, each item asked with both premises and with one; the lift with both less the better single premise, the proof that a pass is chaining, not knowing or one premise. A Thorp class is its best ship, its voyages averaged. The 2–4B models (Qwen, Phi, Llama, Gemma, SmolLM, base checkpoints where one exists) are the competitors: Thorp must chain two facts as well as each at a tenth its size, and they never grade the chains (the reference ladder does). Forecast rows (italic) are Thorp's own classes fitted against size, straight (conservative) and bending (probable), as Smoking Qwen fits them; while fewer than three classes are above the noise (0.03) they are curves through noise, shown but not trusted. "Thorp matches it at" is the size where each fit reaches that model's lift; "a tenth its size" is each fit's reading there, with the probability it reaches that model's lift once forecastable. Performed at <b id="lbthr"></b>.</p>
+    <p class="note mt">The leaderboard is the four chaining tests only (Nature's breeder, the mill test, the between test, the pigeonhole test; 96 pairs), each cell its lift and share of pairs right, ✓ when performed (lift 0.1 and two in three right); Thorp's other tests are internal. The chaining gain is the logic deck's: invented words and counterfactual premises, each item asked with both premises and with one; the lift with both less the better single premise, the proof that a pass is chaining, not knowing or one premise. A Thorp size is its best ship, its voyages averaged. The 2–4B models (Qwen, Phi, Llama, Gemma, SmolLM, base checkpoints where one exists) are the competitors: Thorp must chain two facts as well as each at a tenth its size, and they never grade the chains (the reference ladder does). Forecast rows (italic) are Thorp's own sizes fitted against size, straight (conservative) and bending (probable), as Smoking Qwen fits them; while fewer than three sizes are above the noise (0.03) they are curves through noise, shown but not trusted. "Thorp matches it at" is the size where each fit reaches that model's lift; "a tenth its size" is each fit's reading there, with the probability it reaches that model's lift once forecastable. Performed at <b id="lbthr"></b>.</p>
   </section>
   <section class={cardCls(false, 'panel')}>
     <h2>Approaching chaining <span class="note">the closest to chaining: the cards every chainer holds, then following one premise. Models not chaining yet, ranked by how many of the four necessary cards they hold, then by the logic deck's one-hop lift</span></h2>
@@ -43,7 +43,7 @@ import { cardCls, checkCls, selectCls } from '../lib/ui';
 
   <details class={cardCls(false, 'panel lbfold')}>
     <summary><h2>Every ship <span class="note">every ship with chaining readings, its voyages averaged, by chaining lift</span></h2></summary>
-    <div class="handtools" data-filters><label class="note" for="lbclass">class</label><select class={selectCls('')} id="lbclass" data-remember><option value="">every class</option></select><span class="note" id="lbcount"></span></div>
+    <div class="handtools" data-filters><label class="note" for="lbclass">size</label><select class={selectCls('')} id="lbclass" data-remember><option value="">every size</option></select><span class="note" id="lbcount"></span></div>
     <div class="scroll"><table id="lbruns"><thead></thead><tbody></tbody></table></div>
   </details>
 </div>

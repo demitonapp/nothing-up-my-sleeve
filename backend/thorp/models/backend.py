@@ -2,7 +2,20 @@
 
 from __future__ import annotations
 
+import os
 from typing import Any, Protocol
+
+BACKENDS = ("mlx", "torch")
+
+
+def backend_of(spec: dict) -> str:
+    """Which framework a voyage trains and is scored in: THORP_BACKEND when set (so a voyage already
+    written can sail on a CUDA box under its own run id), else the spec's model.backend, else "mlx".
+    The spec's key is part of the run id; the environment's is not (the hardware column records it)."""
+    b = os.environ.get("THORP_BACKEND") or (spec.get("model") or {}).get("backend") or "mlx"
+    if b not in BACKENDS:
+        raise ValueError(f"unknown backend {b!r}; known: {', '.join(BACKENDS)}")
+    return b
 
 
 class Backend(Protocol):

@@ -1,4 +1,5 @@
-"""thorp fetch LIST · thorp acquire LIST · thorp run SPEC · thorp eval RUN · thorp dash · thorp ledger SQL · thorp id SPEC"""
+"""thorp fetch LIST · thorp acquire LIST · thorp run SPEC · thorp eval RUN · thorp dash · thorp ledger SQL · thorp id SPEC
+thorp charter quote|sail SPEC · thorp charter audit · thorp charter terms"""
 
 from __future__ import annotations
 
@@ -95,6 +96,39 @@ def cmd_ledger(a) -> int:
     return 0
 
 
+def cmd_charter(a) -> int:
+    """A voyage on a GPU hired from Vast.ai (thorp/viable/s1_operations/charter.py), within S5's terms."""
+    import json
+
+    from thorp.viable.s5_policy import charter as s5
+
+    if a.what == "terms":
+        print(json.dumps(s5.terms(), indent=1))
+        return 0
+    if a.what == "audit":
+        from thorp.viable.s1_operations.vast import Vast
+        from thorp.viable.s3star_audit import charter as audit
+
+        print(json.dumps(audit.audit(Vast(), release_orphans=a.release_orphans), indent=1))
+        return 0
+    if not a.spec:
+        print(f"thorp charter {a.what} needs a spec", file=sys.stderr)
+        return 2
+    from thorp.viable.s1_operations import charter
+
+    if a.what == "quote":
+        q = charter.quote(a.spec, gpu=a.gpu)
+        p = q["plan"]
+        print(f"{p['run_id'][:12]}: {p['tokens_left']:,} tokens to sail (steps {p['start']} to {p['total_steps']}); priced on {q['market']}")
+        for x in q["quotes"]:
+            verdict = "keeps the terms" if not x["breaks"] else "REFUSED: " + "; ".join(x["breaks"])
+            print(f"  {x['gpu']:<10} ${x['dph']:.3f}/h  {x['hours']:6.2f} h  ${x['cost']:7.2f}  ({x['speed']})  {verdict}")
+        return 0
+    out = charter.sail(a.spec, gpu=a.gpu)
+    print(json.dumps(out, indent=1, default=str))
+    return 0 if out.get("status") in ("home", "finished") else 1
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="thorp")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -129,6 +163,12 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("params", nargs="*")
     s.add_argument("--run", help="run id to bind to each ? when no params are given")
     s.set_defaults(fn=cmd_ledger)
+    s = sub.add_parser("charter", help="sail a voyage on a GPU hired from Vast.ai, within the charter's terms")
+    s.add_argument("what", choices=["quote", "sail", "audit", "terms"])
+    s.add_argument("spec", nargs="?")
+    s.add_argument("--gpu", help="hire this class only (a key of the terms' gpus, e.g. 'RTX 4090')")
+    s.add_argument("--release-orphans", action="store_true", help="audit: destroy thorp instances no charter is sailing")
+    s.set_defaults(fn=cmd_charter)
     a = p.parse_args(argv)
     return a.fn(a)
 

@@ -11,12 +11,11 @@ from __future__ import annotations
 
 import math
 
-import mlx.core as mx
-import mlx.nn as nn
 import numpy as np
 
 from thorp import shards
 from thorp.evaluators import EvalContext, EvalResult
+from thorp.models import ops
 
 EVAL_BATCH = 16
 
@@ -32,10 +31,7 @@ def book_losses(model, tokens: np.ndarray, eos: int, context: int) -> np.ndarray
     y = padded[1:].reshape(n_win, context)
     out = np.zeros(n_win * context, dtype=np.float64)
     for i in range(0, n_win, EVAL_BATCH):
-        xb, yb = mx.array(x[i : i + EVAL_BATCH]), mx.array(y[i : i + EVAL_BATCH])
-        logits = model(xb).astype(mx.float32)
-        ce = nn.losses.cross_entropy(logits, yb, reduction="none")
-        mx.eval(ce)
+        ce = ops.token_ce(model, x[i : i + EVAL_BATCH], y[i : i + EVAL_BATCH])
         out[i * context : i * context + ce.size] = np.array(ce, dtype=np.float64).reshape(-1)
     return out[:n_pred]
 

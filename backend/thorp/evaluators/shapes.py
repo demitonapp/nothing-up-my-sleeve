@@ -27,8 +27,6 @@ import functools
 import json
 import os
 
-import numpy as np
-
 from thorp import shards
 from thorp.evaluators import EvalContext, EvalResult
 
@@ -85,8 +83,7 @@ def _keyed(word: str, tag: str) -> str | None:
 
 
 def evaluate(ctx: EvalContext) -> EvalResult:
-    import mlx.core as mx
-
+    from thorp.models import ops
     from thorp.viable.s2_coordination import tagger
     from thorp.viable.s5_policy import taxonomy
 
@@ -108,11 +105,7 @@ def evaluate(ctx: EvalContext) -> EvalResult:
             ids, text, off, points = _window(tok.id, b, start, length)
             if not points:
                 continue
-            logits = ctx.model(mx.array([ids[:-1]]))[0].astype(mx.float32)
-            probs = mx.softmax(logits, axis=-1)
-            top = mx.argsort(-probs, axis=-1)[:, :TOP]
-            mx.eval(probs, top)
-            top_np, probs_np = np.array(top), np.array(probs)
+            probs_np, top_np = ops.softmax_top(ctx.model, [ids[:-1]], TOP)
             for p, word, tag in points:
                 cand = top_np[p]
                 guess_piece = tok.decode([int(cand[0])])

@@ -28,12 +28,12 @@ from __future__ import annotations
 import hashlib
 import json
 
-import mlx.core as mx
 import numpy as np
 
 from thorp.evaluators import EvalContext, EvalResult
 from thorp.evaluators.logic import load_deck
 from thorp.evaluators.stars import shared
+from thorp.models import ops
 
 YEARS = [
     1702,
@@ -94,11 +94,10 @@ def mover(model, tok, rows: list[dict]) -> np.ndarray | None:
         if not good or not bad:
             continue
         ids = [tok.eos_id] + tok.encode(prompt)
-        pats = model.attention_patterns(mx.array([ids]))
+        pats = ops.attention_patterns(model, [ids])
         m = []
         for p in pats:
-            mx.eval(p)
-            a = np.array(p)[0, :, -1, :]  # heads x keys, from the last position
+            a = p[0, :, -1, :]  # heads x keys, from the last position
             m.append(a[:, good].sum(axis=1) - a[:, bad].sum(axis=1))
         acc = np.array(m) if acc is None else acc + np.array(m)
         n += 1
@@ -109,11 +108,8 @@ def _lens(model, tok, prompt: str, a: int, b: int) -> list[float]:
     """Per layer, the logit lens at the last position: log p(piece a) less log p(piece b)."""
     ids = [tok.eos_id] + tok.encode(prompt)
     out = []
-    for h in model.hidden(mx.array([ids])):
-        lg = model.tok.as_linear(model.ln_f(h[:, -1, :])).astype(mx.float32)
-        lp = lg - mx.logsumexp(lg, axis=-1, keepdims=True)
-        mx.eval(lp)
-        lp = np.array(lp)[0]
+    for lp in ops.lens_log_probs(model, [ids], -1):
+        lp = lp[0]
         out.append(float(lp[a] - lp[b]))
     return out
 
@@ -150,9 +146,8 @@ def comparator(model, tok) -> np.ndarray:
         good, bad = _span(tok, prompt, f" {y}"), _span(tok, prompt, f" {decoy}")
         ids = [tok.eos_id] + tok.encode(prompt)
         m = []
-        for p in model.attention_patterns(mx.array([ids])):
-            mx.eval(p)
-            a = np.array(p)[0, :, -1, :]
+        for p in ops.attention_patterns(model, [ids]):
+            a = p[0, :, -1, :]
             m.append(a[:, good].sum(axis=-1) - a[:, bad].sum(axis=-1))
         acc = np.array(m) if acc is None else acc + np.array(m)
     return acc / len(YEARS)
@@ -166,8 +161,6 @@ def copying_cards(model, tok, seqs: int = 8, length: int = 200) -> dict | None:
     mean attention from a piece in the second copy to the piece that followed it in the first (as in
     Olsson et al., 2022); with the copy gain, the drop in loss from the first copy to the second.
     One passage at a time, so a large model's attention fits in memory."""
-    import mlx.nn as nn
-
     from thorp.evaluators.nevermore import NATURAL_BOOK
     from thorp.sources import load_text
 
@@ -185,9 +178,8 @@ def copying_cards(model, tok, seqs: int = 8, length: int = 200) -> dict | None:
         run = [tok.eos_id] + ids[s0 : s0 + 2 * n]
         src = np.arange(2, len(run))
         pw = []
-        for p in model.attention_patterns(mx.array([run])):
-            mx.eval(p)
-            pw.append(np.array(p)[0][:, src, src - 1].mean(axis=1))
+        for p in ops.attention_patterns(model, [run]):
+            pw.append(p[0][:, src, src - 1].mean(axis=1))
         pw = np.array(pw)
         prev = pw if prev is None else prev + pw
         # the Nevermore, on n pieces and the same again
@@ -196,16 +188,12 @@ def copying_cards(model, tok, seqs: int = 8, length: int = 200) -> dict | None:
         i = np.arange(n - 1)
         src2, dst2 = n + 1 + i, i + 2
         nv = []
-        for p in model.attention_patterns(mx.array([x])):
-            mx.eval(p)
-            nv.append(np.array(p)[0][:, src2, dst2].mean(axis=1))
+        for p in ops.attention_patterns(model, [x]):
+            nv.append(p[0][:, src2, dst2].mean(axis=1))
         nv = np.array(nv)
         nev = nv if nev is None else nev + nv
-        xa = mx.array([x])
-        logits = model(xa[:, :-1]).astype(mx.float32)
-        ce = nn.losses.cross_entropy(logits, xa[:, 1:], reduction="none")
-        mx.eval(ce)
-        ce = np.array(ce)[0]
+        xa = np.array([x], dtype=np.int32)
+        ce = ops.token_ce(model, xa[:, :-1], xa[:, 1:])[0]
         gains.append(float(ce[1:n].mean() - ce[n + 1 : 2 * n].mean()))
     return {
         "previous_word": prev / len(starts),

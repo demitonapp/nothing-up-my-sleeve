@@ -24,19 +24,22 @@ import hashlib
 import json
 import math
 
-import mlx.core as mx
-import mlx.nn as nn
 import numpy as np
 
 from thorp.evaluators import EvalContext, EvalResult
 from thorp.evaluators.stars import passages
+from thorp.models import ops
 
 
-def _rms(x) -> mx.array:
+def _rms(x):
+    import mlx.core as mx
+
     return mx.sqrt((x * x).mean(axis=-1))
 
 
-def _cos(a, b) -> mx.array:
+def _cos(a, b):
+    import mlx.core as mx
+
     return (a * b).sum(axis=-1) / (mx.sqrt((a * a).sum(axis=-1) * (b * b).sum(axis=-1)) + 1e-9)
 
 
@@ -55,20 +58,10 @@ def _held_out_passages(ctx: EvalContext) -> np.ndarray | None:
     ).astype(np.int32)
 
 
-def evaluate(ctx: EvalContext) -> EvalResult:
-    model, tok = ctx.model, ctx.tokeniser
-    if not all(hasattr(model, a) for a in ("tok", "layers", "ln_f")):
-        return EvalResult()
-    nat = passages(tok, ctx.context)
-    if nat is None:  # no Forgotten Tome here (a test library): sound the run's own held-out books
-        nat = _held_out_passages(ctx)
-    if nat is None:
-        return EvalResult()
-    from thorp.evaluators.bpb_split import piece_bytes
+def _sound_mlx(model, nat: np.ndarray, targets: np.ndarray, nbytes: int) -> dict:
+    import mlx.core as mx
+    import mlx.nn as nn
 
-    pb = piece_bytes(tok)
-    targets = nat[:, 1:]
-    nbytes = sum(len(pb[t]) for t in targets.ravel()) or 1
     x_in = mx.array(nat[:, :-1])
     y = mx.array(targets)
     T = x_in.shape[1]
@@ -95,6 +88,62 @@ def evaluate(ctx: EvalContext) -> EvalResult:
         vals = mx.stack(rec[k]).astype(mx.float32)  # the model may compute in bf16
         mx.eval(vals)
         rec[k] = [float(v) for v in np.array(vals)]
+    return rec
+
+
+def _sound_torch(model, nat: np.ndarray, targets: np.ndarray, nbytes: int) -> dict:
+    """_sound_mlx in PyTorch, on the torch GPT (the same blocks and names)."""
+    import torch
+
+    def rms(x):
+        return torch.sqrt((x * x).mean(dim=-1))
+
+    def cos(a, b):
+        return (a * b).sum(dim=-1) / (torch.sqrt((a * a).sum(dim=-1) * (b * b).sum(dim=-1)) + 1e-9)
+
+    was = model.training
+    model.eval()
+    with torch.no_grad():
+        x_in = model._tokens(nat[:, :-1])
+        y = model._tokens(targets)
+        x = model.embed(x_in)
+
+        def bits(h) -> float:
+            logits = model.lens(h).float()
+            ce = torch.nn.functional.cross_entropy(logits.transpose(1, 2), y, reduction="sum")
+            return ce.item() / math.log(2) / nbytes
+
+        rec = {"bpb": [bits(x)], "attn_write": [], "mlp_write": [], "attn_turn": [], "mlp_turn": []}
+        for b in model.layers:
+            a = b.attn(b.ln1(x))
+            rec["attn_write"].append(float((rms(a) / (rms(x) + 1e-9)).float().mean()))
+            rec["attn_turn"].append(float((1 - cos(a, x)).float().mean()))
+            x1 = x + a
+            m = b.mlp(b.ln2(x1))
+            rec["mlp_write"].append(float((rms(m) / (rms(x1) + 1e-9)).float().mean()))
+            rec["mlp_turn"].append(float((1 - cos(m, x1)).float().mean()))
+            x = x1 + m
+            rec["bpb"].append(bits(x))
+    model.train(was)
+    return rec
+
+
+def evaluate(ctx: EvalContext) -> EvalResult:
+    model, tok = ctx.model, ctx.tokeniser
+    if not all(hasattr(model, a) for a in ("tok", "layers", "ln_f")):
+        return EvalResult()
+    nat = passages(tok, ctx.context)
+    if nat is None:  # no Forgotten Tome here (a test library): sound the run's own held-out books
+        nat = _held_out_passages(ctx)
+    if nat is None:
+        return EvalResult()
+    from thorp.evaluators.bpb_split import piece_bytes
+
+    pb = piece_bytes(tok)
+    targets = nat[:, 1:]
+    nbytes = sum(len(pb[t]) for t in targets.ravel()) or 1
+    sound = _sound_torch if ops.is_torch(model) else _sound_mlx
+    rec = sound(model, nat, targets, nbytes)
     metrics = {f"soundings/layer_{k}/bpb": v for k, v in enumerate(rec["bpb"])}
     for k in ("attn_write", "mlp_write", "attn_turn", "mlp_turn"):
         metrics.update({f"soundings/layer_{i}/{k}": v for i, v in enumerate(rec[k])})

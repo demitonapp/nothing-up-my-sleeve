@@ -41,12 +41,12 @@ import json
 import math
 import re
 
-import mlx.core as mx
 import numpy as np
 
 from thorp import shards
 from thorp.evaluators import EvalContext, EvalResult
 from thorp.evaluators.probes import auc, bow_auc, dom_auc, features, windows
+from thorp.models import ops
 
 WINDOWS = 8  # per held-out book, for rungs 1, 3, 5, 6
 RECIPE_BOOKS = 64  # evenly spaced recipe books used as the familiar side (rung 2) and rung 4's fit
@@ -133,19 +133,12 @@ def gather(ctx: EvalContext) -> dict:
 def token_stats(model, w: np.ndarray, qmask: np.ndarray) -> dict[str, np.ndarray]:
     """Per predicted position: entropy, loss, and the probability put on "?" pieces."""
     x, y = w[:, :-1], w[:, 1:]
-    qm = mx.array(qmask.astype(np.float32))
     H, CE, PQ = [], [], []
     for i in range(0, len(x), BATCH):
-        lg = model(mx.array(x[i : i + BATCH])).astype(mx.float32)
-        logp = lg - mx.logsumexp(lg, axis=-1, keepdims=True)
-        p = mx.exp(logp)
-        h = -(p * logp).sum(axis=-1)
-        ce = -mx.take_along_axis(logp, mx.array(y[i : i + BATCH])[..., None], axis=-1)[..., 0]
-        pq = (p * qm).sum(axis=-1)
-        mx.eval(h, ce, pq)
-        H.append(np.array(h))
-        CE.append(np.array(ce))
-        PQ.append(np.array(pq))
+        h, ce, pq = ops.token_stats(model, x[i : i + BATCH], y[i : i + BATCH], qmask)
+        H.append(h)
+        CE.append(ce)
+        PQ.append(pq)
     return {
         "H": np.concatenate(H),
         "CE": np.concatenate(CE),
@@ -155,6 +148,19 @@ def token_stats(model, w: np.ndarray, qmask: np.ndarray) -> dict[str, np.ndarray
     }
 
 
+def _ce(model, x, y) -> np.ndarray:
+    """(batch, time) nats on each target, as log-softmax read at the target."""
+    if ops.is_torch(model):
+        return ops.token_ce(model, x, y)
+    import mlx.core as mx
+
+    lg = model(mx.array(x)).astype(mx.float32)
+    logp = lg - mx.logsumexp(lg, axis=-1, keepdims=True)
+    ce = -mx.take_along_axis(logp, mx.array(y)[..., None], axis=-1)[..., 0]
+    mx.eval(ce)
+    return np.array(ce)
+
+
 def copy_gain(model, w: np.ndarray) -> float:
     """Loss on the first copy of a span minus loss on its repeat, same positions within the span."""
     span = w.shape[1] // 4
@@ -162,11 +168,7 @@ def copy_gain(model, w: np.ndarray) -> float:
     x, y = seq[:, :-1], seq[:, 1:]
     first, second = [], []
     for i in range(0, len(x), BATCH):
-        lg = model(mx.array(x[i : i + BATCH])).astype(mx.float32)
-        logp = lg - mx.logsumexp(lg, axis=-1, keepdims=True)
-        ce = -mx.take_along_axis(logp, mx.array(y[i : i + BATCH])[..., None], axis=-1)[..., 0]
-        mx.eval(ce)
-        ce = np.array(ce)
+        ce = _ce(model, x[i : i + BATCH], y[i : i + BATCH])
         first.append(ce[:, : span - 1])  # predicting copy-one tokens 1 .. span-1
         second.append(ce[:, span:])  # predicting copy-two tokens 1 .. span-1
     return float(np.concatenate(first).mean() - np.concatenate(second).mean())
@@ -184,11 +186,7 @@ def sentence_features(model, sents: list[np.ndarray]) -> np.ndarray:
         for j, s in enumerate(chunk):
             x[j, : len(s)] = s
             m[j, : len(s)] = 1
-        mm = mx.array(m)
-        hs = model.hidden(mx.array(x))
-        f = mx.stack([(h.astype(mx.float32) * mm).sum(axis=1) / mm.sum(axis=1) for h in hs], axis=1)
-        mx.eval(f)
-        out.append(np.array(f))
+        out.append(ops.pooled_hidden(model, x, m))
     return np.concatenate(out) if out else np.zeros((0, 0, 0), np.float32)
 
 

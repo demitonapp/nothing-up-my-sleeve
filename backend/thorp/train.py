@@ -13,16 +13,21 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 
-import mlx.core as mx
-import mlx.nn as nn
-import mlx.optimizers as optim
 import yaml
-from mlx.utils import tree_flatten, tree_map, tree_unflatten
+
+try:
+    import mlx.core as mx
+    import mlx.nn as nn
+    import mlx.optimizers as optim
+    from mlx.utils import tree_flatten, tree_map, tree_unflatten
+except ImportError:  # a CUDA box without MLX: a torch voyage (thorp/train_torch.py) needs none of it
+    mx = nn = optim = tree_flatten = tree_map = tree_unflatten = None
 
 from thorp import data, evaluators, manifest, paths, shards
 from thorp import tokeniser as tokmod
 from thorp.ledger import Ledger
 from thorp.models import registry
+from thorp.models.backend import backend_of
 
 METRICS_EVERY = 50
 
@@ -41,6 +46,7 @@ NOT_HASHED = (
     "experiment",
     "question",
     "fitout",  # the named fitout a voyage is a variation of (S5 policy 'fitout'): a label, so naming it moves no id
+    "charter",  # where it sails (a GPU hired from Vast.ai, thorp/viable/s1_operations/charter.py), not what it is
 )  # labels: a run's id is its settings, never what it is called or what it is for
 
 
@@ -295,6 +301,10 @@ def init_model(spec: dict, vocab: int):
     floor the probes and the curiosity ladder are measured against. build_model reseeds MLX's
     global generator; that is safe mid-run only because nothing in training draws from it after
     the model is built (the samples evaluator uses explicit keys)."""
+    if backend_of(spec) == "torch":
+        from thorp import train_torch
+
+        return train_torch.init_model(spec, vocab)
     m = build_model(spec, vocab)
     m.update(to_compute(m.parameters(), spec["optim"].get("precision", "bf16")))
     return m
@@ -812,6 +822,10 @@ def train(
     spec: dict, prep: Prepared, rec: Ledger | None = None, stop_after: int | None = None, log=None
 ) -> dict:
     """Train (or resume) the run this spec describes. stop_after simulates an interruption."""
+    if backend_of(spec) == "torch":  # the same loop on PyTorch, for NVIDIA GPUs (thorp/train_torch.py)
+        from thorp import train_torch
+
+        return train_torch.train(spec, prep, rec, stop_after=stop_after, log=log)
     rid = run_id(spec)
     rec = rec or Ledger()
     log = log or Log(paths.runs_dir() / f"{rid}.log")
@@ -1238,8 +1252,13 @@ def rescore(
         spec["eval"] = {**spec["eval"], "evaluators": list(evaluators)}
     prep = prepare(spec, resolver=resolver, log=log)
     step = json.loads((ckpt / "state.json").read_text())["step"]
-    model = build_model(spec, prep.tokeniser.vocab_size)
-    model.update(to_compute(load_master(ckpt), spec["optim"].get("precision", "bf16")))
+    if backend_of(spec) == "torch":  # either backend's checkpoint loads in the torch model
+        from thorp import train_torch
+
+        model = train_torch.load_model(spec, prep.tokeniser.vocab_size, ckpt)
+    else:
+        model = build_model(spec, prep.tokeniser.vocab_size)
+        model.update(to_compute(load_master(ckpt), spec["optim"].get("precision", "bf16")))
     if sets:
         record_eval_sets(rid, step, prep, rec)
     run_evaluators(spec, rid, step, model, prep, rec, log)

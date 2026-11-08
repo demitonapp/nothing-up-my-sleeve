@@ -131,13 +131,11 @@ def batched_patterns(model, toks: np.ndarray) -> list[np.ndarray]:
 def counter_r2(model, toks: np.ndarray, target: np.ndarray, lam: float = 1000.0) -> list[float]:
     """The best linear read of sentence position from the residual stream after each layer: R² on held-out windows
     (every other window fits, the rest score)."""
-    import mlx.core as mx
+    from thorp.models import ops
 
     states = []
     for i in range(0, len(toks), BATCH):
-        hs = model.hidden(mx.array(toks[i : i + BATCH]))
-        mx.eval(hs)
-        states.append([np.array(h.astype(mx.float32)) for h in hs])
+        states.append(ops.hidden(model, toks[i : i + BATCH]))
     out = []
     for layer in range(len(states[0])):
         x = np.concatenate([s[layer] for s in states], axis=0)[:, 1:, :]  # skip the opening EOS

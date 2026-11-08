@@ -912,3 +912,45 @@ Fixed before any of it sails. Claude runs the night; the queue (`ships/specs/que
   7. **The language:** judge-book bpb under leg 1's 9m on v0.2 at the end, and under 1.43 (the 21m v0.2 on v0.1 text; a different corpus, so only a guide).
   8. **The chaining gain** on the 40-item deck under the +0.10 mark: the 50m's job, not the 21m's.
 - **Before it sails:** leg 1b's Bridge read against leg 1's. If leg 1b's order-only rival holds the Bridge better (leg 1 at or above 0.5 at the end and leg 1b not), the spec goes back to the order-only items (`kinds` dropped) and this entry says so; the 21m is then inserted above the `deck-21m.hold` line and the hold lifted.
+
+## The charter: voyages on GPUs hired from Vast.ai (8 November, Justin: "i'm going to use vast.ai can you build the code via the VSM system in order to leverage vast.ai")
+
+- **A voyage may sail on a hired GPU.** It runs the same spec on the torch backend (`THORP_BACKEND=torch` on the box, so its run id is the spec's own). `thorp charter quote|sail SPEC`, `thorp charter audit`, `thorp charter terms`; the how-to is in `backend/CUDA.md`.
+- **Laid out by system:**
+  - S1, the voyage and the Vast.ai client: `viable/s1_operations/charter.py`, `vast.py`.
+  - S2, the berths and the ledger: one hire at a time, the ship's papers (a small ledger, never the 1.2 GB one), the rows brought home: `s2_coordination/charter.py`.
+  - S3, the quote and the spend log: `s3_control/charter.py`, `data/charter-log.jsonl`.
+  - S3\*, the audit: an orphaned instance found and released, a ghost hire closed: `s3star_audit/charter.py`.
+  - S4, the market read: the cheapest voyage, not the cheapest hour; each class's speed is measured once it has sailed: `s4_intelligence/market.py`.
+  - S5, the terms and the policy `charter`, enforced, governing only voyages that ask for a hire: `s5_policy/charter.py`.
+- **The terms, adopted as proposed** (8 November, Justin: "Adopt as proposed"; a change is a new entry here, set in `data/charter.json`):
+  - **GPU ceilings:** RTX 4090 $0.50/h, RTX 5090 $0.75, H100 SXM $2.60, H100 PCIe $2.30.
+  - **Host:** datacenter-verified only, reliability at least 0.98, a line of at least 200 Mb/s down and 100 Mb/s up, CUDA at least 12.8, 80 GB disk.
+  - **Money:** **$10 a voyage**, **$30 a week** (Monday to Sunday, UTC), credit covering the quote 1.25 times over.
+  - **Limits:** one ship out at a time; a ship is brought home and released after its quoted hours × 1.5.
+- **The key** is read from `VAST_API_KEY` or `data/secrets/vast-api-key` (data/ is never in git, and `secrets/` is never carried aboard). It is sent only to console.vast.ai.
+- **Not yet run against the real API:**
+  - Built and tested against an in-memory market and a folder as the box, where the torch voyage really sails on the CPU, from the API docs as read on 8 November.
+  - **Two points to check with the first key:** the GPU name's spelling ("RTX 4090" or "RTX_4090"; the client tries both) and the credit field of `/users/current/`.
+
+## The parity run, pre-registered (8 November, 14:30, Justin: "Plan the parity run")
+
+- **Why:** the first gate before the $100 is spent ("the PyTorch backend matches MLX at 9m"), and the first voyage on CUDA at all: the torch backend has been checked on the CPU build only. No 50m sails on a hired GPU before it passes.
+- **The merge, on its own branch** (`parity-torch`, a worktree beside the live checkout, so the standing queue's code is untouched while the 21m waits to sail): `torch-backend` (the torch loop, the charter) merged onto `thorp-2026-11-07` (the release stage, the 21m). Two fixes on the way: **the torch loop's phase list lacked `release`**, so a released voyage on CUDA would have crashed at 90% (fixed, and its scaffolded test now ends in the release); **the quote priced FLOPs and setup only**, nothing for the evaluators or the scaffold's passes, so a 9m quoted 0.40 h would have been brought home by its deadline (the quote x 1.5 = 0.6 h) before it docked. Until a class has sailed a preset, the quote is now the FLOP guess or **this Mac's own wall-clock rate for the preset, evals included, whichever is slower** (`market.mac_rate`); once a class has sailed, its measured rate rules as before. The terms are unchanged. 170 tests pass (with `THORP_DATA` and `THORP_LEDGER` pointed at the live data: the worktree has none of its own).
+- **Two voyages, one after the other on one hired GPU class** (one ship out, the terms' rule), both on Ogden v0.1 so the MLX twins are already home:
+
+| Voyage | MLX twin (home) | What it checks |
+|---|---|---|
+| P1 `fu-ogden-v0-1~torch@9m-pre-s1` | the plain 9m: bpb 1.501, copy gain 0.47, 3 cards | the loop, the evaluators, the charter, end to end |
+| P2 `fu-ogden-v0-1~deck-torch@9m-pre-s1` | leg 0, the full deck: bpb 1.550, all ten metre cards and the comparator at the end, the Bridge played from step 821 to ~3,500 | the scaffold, the staged starts and both riddles on CUDA |
+
+- **The quotes** (no key yet, so at the terms' ceilings): each 8,216 steps, about **1.8 h and $0.88 on an RTX 4090** (H100 SXM $4.60, no faster on this guess), so both for under $2, inside $10 a voyage and $30 a week. The 4090 is the class to hire: a 9m cannot fill an H100.
+- **Pass marks, fixed now.** A torch voyage starts from other random weights than its MLX twin, so it is a new seed and is judged against the seed spread (the keel's seeds differed by 0.002 to 0.007 bpb; the 9m's second MLX seed, `fu-ogden-v0-1@9m-pre-s2`, is queued and widens the band when it docks):
+  1. judge-book bpb within **0.015** of the twin's;
+  2. copy gain within **0.15** of the twin's;
+  3. the same cards played at the end, give or take **one** (by `wager.falls`);
+  4. P2 only: all ten metre cards and the comparator held at the end; the Bridge played at some reading (its MLX twin's was played and lost);
+  5. the charter itself: the GPU name's spelling and the credit field read right, checkpoints and ledger rows home, the instance released, the spend log matching Vast.ai's bill.
+  All five pass: torch is at parity at 9m. A miss on 1 to 4 is a bug to find before any 50m sails on CUDA; a miss on 5 alone is the charter's to fix.
+- **Its other product: the 4090's measured rate on the 9m,** which the market uses from then on, and the first real measure of what a hired GPU buys over this Mac.
+- **Before it sails:** a Vast.ai API key (Justin's to put in `data/secrets/vast-api-key` or `VAST_API_KEY`), an SSH key on the account, Justin's go-ahead to spend, and the branch merged into the checkout the queue runs from (after the 21m sails, so its code does not change under it).

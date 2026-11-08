@@ -27,11 +27,11 @@ import csv
 import hashlib
 import json
 
-import mlx.core as mx
 import numpy as np
 
 from thorp import manifest, paths, shards
 from thorp.evaluators import EvalContext, EvalResult
+from thorp.models import ops
 
 TRAITS_CSV = "lists/traits.csv"
 TRAIT_COLUMNS = ("fiction", "verse", "first_person")
@@ -75,10 +75,7 @@ def features(model, w: np.ndarray) -> np.ndarray:
     """Mean-pooled residual stream of ready-cut windows, (windows, layers, width)."""
     if w.size == 0:
         return np.zeros((0, 0, 0), np.float32)
-    hs = model.hidden(mx.array(w))
-    feats = mx.stack([h.astype(mx.float32).mean(axis=1) for h in hs], axis=1)
-    mx.eval(feats)
-    return np.array(feats)
+    return ops.pooled_hidden(model, w)
 
 
 def auc(pos: np.ndarray, neg: np.ndarray) -> float:

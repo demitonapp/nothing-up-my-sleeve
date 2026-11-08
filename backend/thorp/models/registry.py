@@ -266,7 +266,14 @@ def _gpt_mlx(cfg: GPTConfig):
     return GPT(cfg)
 
 
+def _gpt_torch(cfg: GPTConfig):
+    from thorp.models.gpt_torch import GPT
+
+    return GPT(cfg)
+
+
 FAMILIES = {"gpt": _gpt_mlx}
+TORCH_FAMILIES = {"gpt": _gpt_torch}  # the same models in PyTorch (CUDA), thorp/models/backend.py
 
 
 def config(preset: str, vocab: int, context: int, positions: str = "learned") -> GPTConfig:
@@ -277,7 +284,10 @@ def config(preset: str, vocab: int, context: int, positions: str = "learned") ->
     return GPTConfig(**PRESETS[preset], vocab=vocab, context=context, positions=positions)
 
 
-def build(family: str, preset: str, vocab: int, context: int, positions: str = "learned"):
-    if family not in FAMILIES:
-        raise KeyError(f"unknown model family {family!r}; known: {sorted(FAMILIES)}")
-    return FAMILIES[family](config(preset, vocab, context, positions))
+def build(
+    family: str, preset: str, vocab: int, context: int, positions: str = "learned", backend: str = "mlx"
+):
+    families = TORCH_FAMILIES if backend == "torch" else FAMILIES
+    if family not in families:
+        raise KeyError(f"unknown model family {family!r} for {backend}; known: {sorted(families)}")
+    return families[family](config(preset, vocab, context, positions))

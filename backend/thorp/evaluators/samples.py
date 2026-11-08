@@ -12,9 +12,10 @@ from __future__ import annotations
 import hashlib
 import json
 
-import mlx.core as mx
+import numpy as np
 
 from thorp.evaluators import EvalContext, EvalResult
+from thorp.models import ops
 
 PROMPTS = [
     "For every action there is an equal and opposite",
@@ -28,8 +29,17 @@ TEMPERATURE = 0.8
 
 
 def generate(model, tok, prompt: str, temperature: float, n: int, context: int, key) -> str:
+    """`key` is an MLX random key for an MLX model, an integer seed for a torch one (whose draws are
+    numpy's, so the two backends' samples differ even from the same weights)."""
     ids = tok.encode(prompt)
     out = []
+    if ops.is_torch(model):
+        rng = np.random.default_rng(key)
+        for _ in range(n):
+            out.append(_pick(ops.last_logits(model, [(ids + out)[-context:]])[0], temperature, rng))
+        return tok.decode(out)
+    import mlx.core as mx
+
     for i in range(n):
         x = mx.array([(ids + out)[-context:]])
         logits = model(x)[0, -1].astype(mx.float32)
@@ -41,7 +51,24 @@ def generate(model, tok, prompt: str, temperature: float, n: int, context: int, 
     return tok.decode(out)
 
 
+def _pick(logits: np.ndarray, temperature: float, rng) -> int:
+    """The torch models' sampler: greedy at temperature 0, else a draw from softmax(logits / T)."""
+    if temperature == 0:
+        return int(np.argmax(logits))
+    z = logits.astype(np.float64) / temperature
+    p = np.exp(z - z.max())
+    return int(rng.choice(len(p), p=p / p.sum()))
+
+
 def top10(model, tok, prompt: str) -> list[dict]:
+    if ops.is_torch(model):
+        lg = ops.last_logits(model, [tok.encode(prompt)])[0].astype(np.float64)
+        p = np.exp(lg - lg.max())
+        p /= p.sum()
+        order = np.argsort(-p)[:10].tolist()
+        return [{"token": tok.sp.id_to_piece(i), "id": i, "p": float(p[i])} for i in order]
+    import mlx.core as mx
+
     logits = model(mx.array([tok.encode(prompt)]))[0, -1].astype(mx.float32)
     probs = mx.softmax(logits)
     order = mx.argsort(-probs)[:10].tolist()
@@ -49,7 +76,12 @@ def top10(model, tok, prompt: str) -> list[dict]:
 
 
 def evaluate(ctx: EvalContext) -> EvalResult:
-    key = mx.random.key(ctx.step)
+    if ops.is_torch(ctx.model):
+        key = ctx.step
+    else:
+        import mlx.core as mx
+
+        key = mx.random.key(ctx.step)
     samples = []
     for p in PROMPTS:
         for t in (0.0, TEMPERATURE):

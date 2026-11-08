@@ -34,12 +34,12 @@ from __future__ import annotations
 import hashlib
 import json
 
-import mlx.core as mx
 import numpy as np
 
 from thorp.evaluators import EvalContext, EvalResult
 from thorp.evaluators.nevermore import LENGTH, NATURAL_BOOK, SEQS, test_tokens
 from thorp.fleet import STARS
+from thorp.models import ops
 
 
 def passages(tok, context: int) -> np.ndarray | None:
@@ -57,9 +57,8 @@ def passages(tok, context: int) -> np.ndarray | None:
 
 def head_scores(model, toks: np.ndarray, src: np.ndarray, dst: np.ndarray) -> np.ndarray:
     out = []
-    for p in model.attention_patterns(mx.array(toks)):
-        mx.eval(p)
-        out.append(np.array(p)[:, :, src, dst].mean(axis=(0, 2)))
+    for p in ops.attention_patterns(model, toks):
+        out.append(p[:, :, src, dst].mean(axis=(0, 2)))
     return np.array(out)  # (layers, heads)
 
 
@@ -126,9 +125,8 @@ def delimiters(tok) -> np.ndarray:
 
 def patterns(model, toks: np.ndarray) -> list[np.ndarray]:
     out = []
-    for p in model.attention_patterns(mx.array(toks)):
-        mx.eval(p)
-        out.append(np.array(p))  # (batch, heads, T, T)
+    for p in ops.attention_patterns(model, toks):
+        out.append(p)  # (batch, heads, T, T)
     return out
 
 

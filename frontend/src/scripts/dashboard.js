@@ -935,12 +935,20 @@ function drawHarbours() {
         <div class="job">${esc(x.about)}</div>
         <div class="hships">${rs.map(r => `<span class="${pillCls('')}">${esc(r.name)} <span class="s">${esc(r.preset)}</span></span>`).join(' ')}</div>
         <div class="foot"><span>${esc(x.where)}</span><span class="${pillCls(live ? ' live' : '')}">${live ? live + ' running' : 'at rest'}</span></div>
-        <div class="foot"><span>${rs.length} ship${rs.length === 1 ? '' : 's'}</span><span>${done} finished voyage${done === 1 ? '' : 's'}</span></div></a>`; }).join('');
+        <div class="foot"><span>depth ${x.depth ? 'to ' + big(x.depth) + ' parameters' : 'no bottom'}</span><span>${rs.length} ship${rs.length === 1 ? '' : 's'}</span></div>
+        <div class="foot"><span>${done} finished voyage${done === 1 ? '' : 's'}</span><span></span></div></a>`; }).join('');
     return;
   }
   if (title) title.innerHTML = `${hs.length ? `<a class="${crumbCls('back')}" href="#/harbours">← harbours</a> ` : ''}${esc(h.name)} <span class="q">${esc(h.aka)}: ${esc(h.about)}</span>`;
   el.className = 'cards';
-  el.innerHTML = sizes(h).map(r => {
+  const rules = !hs.length ? '' : (() => {  // the harbour's rules: its depth, and where each size's draught falls against it
+    const logs = d.rungs.map(r => Math.log10(r.total)), lo = Math.min(...logs) - 0.1, hi = Math.max(...logs) + 0.1, at = n => `${(100 * (Math.log10(n) - lo) / (hi - lo)).toFixed(1)}%`;
+    const mark = h.depth ? `<i class="hdepth" style="left:${at(h.depth)}" title="the depth: ${big(h.depth)} parameters"></i>` : '';
+    return `<div class="harbourrules" style="grid-column:1/-1"><div class="k">The harbour's rules <span class="s">its depth is the most parameters a ship may carry and lie here; a ship lies in the shallowest harbour deep enough for it</span></div>
+      <div class="hrule"><b>Depth</b> ${h.depth ? `${big(h.depth)} parameters` : 'no bottom: any ship too deep for the harbours before it'} · <b>Lies in</b> ${esc(h.where)} · <b>Lane</b> ${esc(h.lane === 'mac' ? 'the Mac lane (MLX)' : 'the Vast lane (torch on CUDA)')}</div>
+      <div class="hdraught">${d.rungs.map(r => { const fits = !h.depth || r.total <= h.depth, here = r.harbour === h.key; return `<div class="hrow ${here ? 'in' : 'out'}"><span class="hname">${esc(r.name)} <span class="s">${esc(r.preset)}</span></span><span class="htrack">${mark}<i style="width:${at(r.total)}"></i></span><span class="hnum">${big(r.total)} <span class="s">${here ? 'lies here' : fits ? 'fits, lies in a shallower harbour' : 'too deep'}</span></span></div>`; }).join('')}</div></div>`;
+  })();
+  el.innerHTML = rules + sizes(h).map(r => {
     const runs = rungRuns(r.preset), live = runs.filter(x => x.status === 'running').length, done = runs.filter(x => x.status === 'finished').length;
     const nlive = r.metrics.filter(m => m[2] === 'live').length;
     return `<a class="${cardCls(true, 'card classcard')}" href="#${esc(modelHash(r))}">${artImg(classSlug(r.name), 'cardart ship')}

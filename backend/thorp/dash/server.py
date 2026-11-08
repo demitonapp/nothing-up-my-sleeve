@@ -395,11 +395,11 @@ def api_ladder() -> dict:
             {
                 **r,
                 **c,
-                "harbour": harbours.harbour_of(r["preset"]),
                 "non_embedding": ne,
                 "total": ne + (r.get("vocab", 16384) + 1024) * c["width"],
             }
         )
+        rungs[-1]["harbour"] = harbours.harbour_for(rungs[-1]["total"])
     runs = []
     rows = _rows(
         "select run_id, name, ship, status, tokens_seen, started, wall_minutes, spec_json"
@@ -471,7 +471,7 @@ def api_ladder() -> dict:
                 ],
             }
         )
-    return {"rungs": rungs, "runs": runs, "queue": queue, "external": external, "harbours": harbours.harbours()}
+    return {"rungs": rungs, "runs": runs, "queue": queue, "external": external, "harbours": [{**h, "sizes": [r["preset"] for r in rungs if r["harbour"] == h["key"]]} for h in harbours.HARBOURS]}
 
 
 def api_rung(preset: str, limit: int | str = 0) -> list[dict]:

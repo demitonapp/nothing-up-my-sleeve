@@ -32,31 +32,24 @@ WATERS = {
 
 # The harbours the Ships page opens on (Justin, 8 November: "on the ships pages, it's actually called harbours and then
 # when you open it, it's two tiles for the two harbours of today and then you click in the harbour to view its ships.
-# So Phaleron has Pan, Augustus, the 9m and the 21m and then the Market Harbour has the 50m up"). A ship's harbour is
-# its size's place on the ladder (preset names live only in the registry); to be a column of s1.sizes once the store takes it.
+# So Phaleron has Pan, Augustus, the 9m and the 21m and then the Market Harbour has the 50m up"; "the harbour rules is
+# how deep it is, so that determines what ships can be in that harbour"). **A harbour's depth** is the most parameters
+# (the ship's whole weight, tables included) a ship may carry and still lie in it: a ship lies in the shallowest
+# harbour deep enough for it, so the sizes sort themselves. Phaleron is 20M deep (the 21m, 15.4M, fits; the 50m, 46.7M,
+# does not); the Market Harbour has no bottom. The depths are Justin's to set; to be columns of a harbours table.
 HARBOURS = (
     {"key": "phaleron", "name": "Phaleron", "aka": "internal waters", "lane": "mac", "where": "this Mac mini",
      "about": "Athens' first harbour, where its early fleet lay and sailed from: the youngest ships, trained on this Mac.",
-     "ladder": (0, 4)},  # the ladder's first four sizes: Pan, Augustus, the speller, the stylist
+     "depth": 20_000_000},
     {"key": "market", "name": "The Market Harbour", "aka": "outer waters", "lane": "vast", "where": "GPUs hired from Vast.ai",
-     "about": "The first great trading harbour: the ships that need hired GPUs, from the 50m up.",
-     "ladder": (4, 99)},  # from the fifth size up: the 50m, the explorer, the trader
+     "about": "The first great trading harbour: the ships too deep for Phaleron, which need hired GPUs.",
+     "depth": None},
 )  # fmt: skip
 
 
-def harbour_of(preset: str) -> str:
-    from thorp.models.registry import LADDER
-
-    i = next((i for i, r in enumerate(LADDER) if r["preset"] == preset), 99)
-    return next((h["key"] for h in HARBOURS if h["ladder"][0] <= i < h["ladder"][1]), HARBOURS[-1]["key"])
-
-
-def harbours() -> list[dict]:
-    """The harbours with the presets that lie in each, for /api/ladder."""
-    from thorp.models.registry import LADDER
-
-    return [{**{k: v for k, v in h.items() if k != "ladder"}, "sizes": [r["preset"] for r in LADDER if harbour_of(r["preset"]) == h["key"]]}
-            for h in HARBOURS]
+def harbour_for(parameters: int) -> str:
+    """The shallowest harbour deep enough for a ship of this many parameters."""
+    return next((h["key"] for h in HARBOURS if h["depth"] is None or parameters <= h["depth"]), HARBOURS[-1]["key"])
 
 
 def _wall_minutes() -> dict:

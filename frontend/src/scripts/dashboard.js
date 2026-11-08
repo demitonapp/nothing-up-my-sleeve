@@ -60,7 +60,7 @@ let page = 'sizes', modelTab = 'overview', shipKey = null, sailingKey = null, sh
 function route(h) {
   if (h.startsWith('/')) {
     const [a, b, c] = h.slice(1).split('/');
-    if ((a === 'sizes' || a === 'classes') && b) { const d = h.slice(1).split('/')[3]; return { page: 'rung', rung: b, mtab: MTABS.includes(c) ? c : 'overview', wsub: WSUBS.includes(d) ? d : 'expected', ssub: SSUBS.includes(d) ? d : 'ask', osub: c === 'overview' && OSUBS.includes(d) ? d : null }; }
+    if ((a === 'sizes' || a === 'classes') && b) { const d = h.slice(1).split('/')[3]; return { page: 'rung', rung: b, mtab: MTABS.includes(c) ? c : 'overview', wsub: WSUBS.includes(d) ? d : 'expected', ssub: SSUBS.includes(d) ? d : 'maths', osub: c === 'overview' && OSUBS.includes(d) ? d : null }; }
     if (a === 'models' && b) return { page: 'rung', rung: b, mtab: MTABS.includes(c) ? c : 'overview' };
     if (a === 'ships' && b === 'all') return { page: 'runs-section' };
     if (a === 'ships' && b) {
@@ -94,12 +94,12 @@ function route(h) {
 }
 const WSUBS = ['expected', 'envelope', 'stars'];
 let wpSub = 'expected';
-const SSUBS = ['ask', 'language', 'shapes', 'number', 'maths', 'physics', 'life', 'return', 'logic', 'versus'];
-let scSub = 'ask';
+const SSUBS = ['maths', 'ask', 'language', 'shapes', 'number', 'physics', 'life', 'return', 'logic', 'versus'];
+let scSub = 'maths';
 // the Overview's sub-pages: one per relation of the logic deck (2026-11-08: "a detail page explaining each of those relation tiles")
 const OSUBS = ['order', 'cause', 'membership', 'proportion', 'counterfactual'].map(x => 'logic-' + x);
 let ovSub = null;
-const modelHash = (r, mt = 'overview', sub = null) => `/sizes/${slugOf(r)}${mt === 'overview' && !sub ? '' : '/' + mt}${mt === 'waypoints' && sub && sub !== 'expected' ? '/' + sub : ''}${mt === 'scoring' && sub && sub !== 'ask' ? '/' + sub : ''}${mt === 'overview' && sub ? '/' + sub : ''}`;
+const modelHash = (r, mt = 'overview', sub = null) => `/sizes/${slugOf(r)}${mt === 'overview' && !sub ? '' : '/' + mt}${mt === 'waypoints' && sub && sub !== 'expected' ? '/' + sub : ''}${mt === 'scoring' && sub && sub !== 'maths' ? '/' + sub : ''}${mt === 'overview' && sub ? '/' + sub : ''}`;
 const shipHash = (key, sailing = null, st = 'betting') => `/ships/${key}${sailing ? '/' + encodeURIComponent(sailing) : ''}${st === 'betting' ? '' : '/' + st}`;
 const ladderRun = id => ladderData && ladderData.runs.find(x => x.run_id === id || x.name === id);
 // The ship and sailing an address names. The first part is a ship key, or (an older address) a run
@@ -131,7 +131,7 @@ function showTab(h, push = true) {
     const r = rungFor(rt.rung);
     if (ladderData && !r) { page = 'sizes'; push = true; }  // not a class this ladder has
     else {
-      currentRung = rt.rung; modelTab = rt.mtab; wpSub = rt.wsub || 'expected'; scSub = rt.ssub || 'ask'; ovSub = rt.osub || null;
+      currentRung = rt.rung; modelTab = rt.mtab; wpSub = rt.wsub || 'expected'; scSub = rt.ssub || 'maths'; ovSub = rt.osub || null;
       if (r) {
         hash = modelHash(r, modelTab, modelTab === 'scoring' ? scSub : modelTab === 'overview' ? ovSub : wpSub);
         document.querySelectorAll('#modelnav a').forEach(a => { a.href = '#' + modelHash(r, a.dataset.mtab); });

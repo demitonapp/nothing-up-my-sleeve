@@ -887,3 +887,23 @@ Fixed before any of it sails. Claude runs the night; the queue (`ships/specs/que
 - **Pythia-160m beats Qwen3 0.6B on the judge books** (1.177 against 1.215 bits per byte), a quarter its size: Pythia read the Pile, which includes PG-19, books from Project Gutenberg before 1919; the judge books may be among them, so this is likely contamination, not a better model. Qwen3 0.6B on cleaned text: 1.215 (1.234 raw).
 - **The class Basics' mark lowered to 2.0** (10:05, Justin: "lower to 2.0"; `deck.CLASS_MARK`): number-spotter, order-word and premise-marker. Re-ruled: Pythia-160m now plays **the Bridge and the Mover** (10 cards; the Bridge 0.53 above its rare word and premise-marker); Pythia-31m and -70m gain premise-marker but not the Bridge (their rare word, 0.29 and 0.22, is under its 0.3 mark); Qwen3 0.6B unchanged (7). Thorp's voyages are re-ruled by the same rule wherever the deck is read (`wager.falls`): the plain 9m and the 21m v0.1 now play the three class Basics (they read 2.0 to 2.6 unpinned). The pips evaluator's head count (`stars/<card>/count`) still counts at 3.0.
 - **Leg 1 at 65% (12:00; Ogden v0.2 is 20,840 steps):** 13 cards played; the Bridge **has not collapsed** as leg 0's did: a mean of 0.31 to 0.47 in every 2,000 steps, at or above 0.5 in 9 of the last 24 readings with the pull at its floor (0.2). Judge-book bpb 1.465, already better than the plain 9m on v0.1 (1.501), a different corpus: the plain 9m on v0.2 (queued) is its control.
+
+## The charter: voyages on GPUs hired from Vast.ai (8 November, Justin: "i'm going to use vast.ai can you build the code via the VSM system in order to leverage vast.ai")
+
+- **A voyage may sail on a hired GPU.** It runs the same spec on the torch backend (`THORP_BACKEND=torch` on the box, so its run id is the spec's own). `thorp charter quote|sail SPEC`, `thorp charter audit`, `thorp charter terms`; the how-to is in `backend/CUDA.md`.
+- **Laid out by system:**
+  - S1, the voyage and the Vast.ai client: `viable/s1_operations/charter.py`, `vast.py`.
+  - S2, the berths and the ledger: one hire at a time, the ship's papers (a small ledger, never the 1.2 GB one), the rows brought home: `s2_coordination/charter.py`.
+  - S3, the quote and the spend log: `s3_control/charter.py`, `data/charter-log.jsonl`.
+  - S3\*, the audit: an orphaned instance found and released, a ghost hire closed: `s3star_audit/charter.py`.
+  - S4, the market read: the cheapest voyage, not the cheapest hour; each class's speed is measured once it has sailed: `s4_intelligence/market.py`.
+  - S5, the terms and the policy `charter`, enforced, governing only voyages that ask for a hire: `s5_policy/charter.py`.
+- **The terms (proposed, Justin's to confirm or change in `data/charter.json`):**
+  - **GPU ceilings:** RTX 4090 $0.50/h, RTX 5090 $0.75, H100 SXM $2.60, H100 PCIe $2.30.
+  - **Host:** datacenter-verified only, reliability at least 0.98, a line of at least 200 Mb/s down and 100 Mb/s up, CUDA at least 12.8, 80 GB disk.
+  - **Money:** **$10 a voyage**, **$30 a week** (Monday to Sunday, UTC), credit covering the quote 1.25 times over.
+  - **Limits:** one ship out at a time; a ship is brought home and released after its quoted hours × 1.5.
+- **The key** is read from `VAST_API_KEY` or `data/secrets/vast-api-key` (data/ is never in git, and `secrets/` is never carried aboard). It is sent only to console.vast.ai.
+- **Not yet run against the real API:**
+  - Built and tested against an in-memory market and a folder as the box, where the torch voyage really sails on the CPU, from the API docs as read on 8 November.
+  - **Two points to check with the first key:** the GPU name's spelling ("RTX 4090" or "RTX_4090"; the client tries both) and the credit field of `/users/current/`.

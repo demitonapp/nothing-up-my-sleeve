@@ -110,3 +110,76 @@ line needs `--group torch` added, or torch installed into the default environmen
 - **The ledger rows** are written to the box's ledger. Merging them into the Mac's ledger is not built yet. Until
   it is, copy the run's rows from the `runs`, `metrics`, `evals` and `artifacts` tables, or rescore its
   checkpoints on the Mac.
+
+## Chartering a GPU on Vast.ai (`thorp charter`)
+
+The steps above, done for you: the charter hires a GPU from Vast.ai's marketplace and fits it out. It sails the voyage,
+brings the checkpoints and the ledger rows home into this Mac's ledger, and releases the machine, all within S5's
+terms. The design is in `DECISIONS.md`, "The charter".
+
+**Once, when the key arrives:**
+
+1. **Give it the API key.** Write it to `data/secrets/vast-api-key`. That folder is never committed and never
+   carried aboard. Or export it instead:
+
+   ```bash
+   export VAST_API_KEY=...
+   ```
+
+2. **Add an SSH key to your Vast.ai account** (Account → SSH Keys). The charter also attaches
+   `~/.ssh/id_ed25519.pub` (or `id_rsa.pub`) to each instance it hires.
+
+3. **Check or change the terms:**
+
+   ```bash
+   uv run thorp charter terms
+   ```
+
+   Override any number in `data/charter.json`, for example `{"weekly_budget": 40, "gpus": {"RTX 4090": 0.45}}`.
+
+**Each voyage:**
+
+1. **Quote it.** This prepares the voyage here and reads the market. It hires nothing.
+
+   ```bash
+   uv run --group torch thorp charter quote ships/specs/<voyage>.yaml
+   ```
+
+   Without a key, it prices every class at its ceiling, as an upper bound.
+
+2. **Sail it.** This hires the cheapest class whose quote keeps the terms. Add `--gpu "RTX 4090"` to choose the
+   class yourself.
+
+   ```bash
+   uv run --group torch thorp charter sail ships/specs/<voyage>.yaml
+   ```
+
+3. **Audit what is out.** This lists the ships out and the week's spend. Add `--release-orphans` to destroy any
+   `thorp:` instance that no charter is sailing.
+
+   ```bash
+   uv run thorp charter audit
+   ```
+
+**What it costs, and what can go wrong:**
+
+- **The money.** The quote is checked by the gate, against the policy `charter`, before anything is hired: a
+  ceiling an hour for each class, a verified host, $10 a voyage, $30 a week, and the account's credit. Every hire
+  and release is written to `data/charter-log.jsonl` with what it cost.
+- **Always released.** A failure anywhere after the hire still releases the machine. If this process is killed
+  instead, `thorp charter audit --release-orphans` finds the machine by its label.
+- **A lost leg resumes.** Checkpoints and rows are brought home every 20 minutes. If a ship is lost, sail again:
+  the next charter carries the last checkpoint up and goes on from it, and its rows replace only what came after.
+- **The standing queue.** A charter does not take this Mac's helm. Run from its own terminal, it sails alongside the
+  queue. As a `cmd:` line in the queue it holds the queue until it comes home, because the queue runs each line to
+  its end:
+
+  ```
+  cmd: uv run --project backend --group torch thorp charter sail ships/specs/<voyage>.yaml
+  ```
+
+- **The gate's prechecks** run here on the Mac, where the fitout store is, before the hire. The box never needs
+  Postgres, because its papers say the run was already passed.
+
+**First real charter:** sail a short, cheap voyage first, about 10 minutes on a 4090. It checks the two points
+the docs left open: the GPU name's spelling and the credit field.

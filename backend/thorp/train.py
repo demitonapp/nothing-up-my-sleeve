@@ -46,6 +46,7 @@ NOT_HASHED = (
     "experiment",
     "question",
     "fitout",  # the named fitout a voyage is a variation of (S5 policy 'fitout'): a label, so naming it moves no id
+    "charter",  # where it sails (a GPU hired from Vast.ai, thorp/viable/s1_operations/charter.py), not what it is
 )  # labels: a run's id is its settings, never what it is called or what it is for
 
 

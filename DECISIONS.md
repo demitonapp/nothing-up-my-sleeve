@@ -1063,3 +1063,19 @@ Fixed before any of it sails. Claude runs the night; the queue (`ships/specs/que
   3. **The cost:** judge-book bpb worse than leg 1b's by 0.005 to 0.03 at alpha 3 and 0.03 to 0.08 at alpha 8. A coin toss whether alpha 3 costs anything (the guesses it weights are the easy ones).
   4. **The cards held:** the ten metre cards and the comparator still played; the Bridge unmoved by the tack.
 - **The rule, fixed now:** the arm carried into the 50m's reading stage is the one with the highest copy gain whose judge-book bpb is no more than **0.03** worse than leg 1b's; neither passes, the 50m keeps alpha 3 (the 21m's). One seed each: a gap in copy gain under 0.15 is not called.
+
+## Expeditions carry their rules: what each smaller ship settles for the bigger ones (8 November, 15:20, **proposed**; Justin: "an expedition needs a plan whereby the smaller ships provide info to the larger ships, so that an expedition can encode those rules for the final ships goals"; "I want to start the 50m in the next few hours")
+
+- **The idea:** an expedition is not only a list of voyages. It is a set of **rules**, each a question a smaller ship settles for a bigger one: *what it decides* (a setting in the bigger ship's spec), *who settles it* (the voyage or voyages, and the comparison), *the rule* (how the result picks the setting, fixed before they sail), and **the fallback with its deadline** (the setting the bigger ship takes if the answer is not in when it sails). With a fallback, a big ship never waits on a small one: it sails with what is known, and what comes later goes to its next seed or the next size up. The final ship's spec is then **compiled from the rules' answers**, and every setting in it can say which ship settled it.
+- **Where it lives:** Postgres, with the one-store model (`s4.rules`: the expedition, the setting, the voyages that settle it, the rule, the fallback, the answer, when and by what reading it was answered). The Queue tab's plan shows each small ship's row with the rule it settles and the big ship waiting on it. Built after the switch to Postgres.
+- **The first instance, the first 50m (Table Talk, foreign waters):**
+
+| setting in the 50m | settled by (local waters) | rule | fallback (if not in at launch) | in by |
+|---|---|---|---|---|
+| the Bridge's composed items | leg 1b against leg 1 (the 9m, staged, on Ogden v0.2) | all four relations unless leg 1 (order only) holds the Bridge at the end and leg 1b does not | all four relations | about 18:30 today |
+| the copy tack's alpha | the copy test (alpha 0, 3, 8 at 9m) | the most copy gain within 0.03 bpb of alpha 0 | 3 (the 21m's) | about 03:30 on 9 November: **after launch, so the 50m takes 3** |
+| the torch backend at parity | P1 (Vast) against the 9m's two MLX seeds | judge-book bpb inside the seeds' spread (or 0.015 with one seed); copy gain and cards once rescored | none: it must pass | P1's bpb has passed (1.511 against 1.501); the rest about 19:05 and 20:30 |
+| the scaffold on CUDA | P2 (the full-deck 9m twin on Vast) | its ten metre cards and the comparator held, as leg 0's | the first 640 steps of the 50m itself: the pull's loss falling, every reading recorded | about 19:40 if P2 sails first |
+| the release share | the 21m (its cards after the release) | keep 0.9 unless the 21m loses more than 2 of 12 pulled cards after its release | 0.9 | Monday: **after launch** |
+
+- **So the 50m's reading stage can sail at about 19:00 to 19:45:** the Bridge from leg 1b, alpha 3, release 0.9, on the box with the Postgres switch's papers. What arrives later (the copy alpha, the 21m's release) is carried to its second seed and to the 100m.

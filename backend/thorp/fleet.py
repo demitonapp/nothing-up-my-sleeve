@@ -1419,6 +1419,8 @@ class Ship:
     size: str  # the size it belongs to (300k)
     subtitle: str  # the fitout in a line
     archived: bool = False  # the First Fleet: ships fitted out before 7 November 06:40
+    status: str = "in service"  # or "retired": pruned from the lists, kept in the store (ship_store.retire)
+    retired_note: str | None = None
     seeded_from: dict | str | None = None  # the run whose trained mind it starts from (Great Expectations)
     expedition: str | None = None  # the expedition that commissioned it, if any
 
@@ -1431,6 +1433,8 @@ def _ship(rec) -> Ship:
         size=rec.size,
         subtitle=rec.subtitle,
         archived=rec.archived,
+        status=rec.status,
+        retired_note=rec.retired_note,
         seeded_from=rec.seeded_from,
         expedition=rec.expedition,
     )

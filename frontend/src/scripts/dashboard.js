@@ -1642,12 +1642,17 @@ function renderRung() {
       <td><span class="${pillCls(st)}">${esc(st)}</span></td><td>${fmt(x.ft_en_mean)}</td><td>${fmt(x.ft_en_best)}</td>
       <td>${esc(String(x.latest || '–').slice(0, 16).replace('T', ' '))}</td></tr>`;
   };
-  const live = fleet.filter(x => !x.archived), old = fleet.filter(x => x.archived);
+  // retired ships (pruned to each size's top five, 2026-11-08) are folded away below; their voyages stay in the ledger
+  const retired = fleet.filter(x => x.status === 'retired'), kept = fleet.filter(x => x.status !== 'retired');
+  const live = kept.filter(x => !x.archived), old = kept.filter(x => x.archived);
   document.querySelector('#fleettable tbody').innerHTML = live.length ? live.map(shipRow).join('')
     : `<tr><td colspan="8" class="${emptyCls(true)}">no ship of this size in service yet${old.length ? '; the First Fleet is below' : ''}</td></tr>`;
   document.getElementById('fleetarchivewrap').hidden = !old.length;
   document.getElementById('fleetarchivesum').textContent = `archived: ${old.length} ship${old.length === 1 ? '' : 's'}, ${old.reduce((n, x) => n + x.sailings.length, 0)} voyages, fitted out before 7 November`;
   document.querySelector('#fleetarchive tbody').innerHTML = old.map(shipRow).join('');
+  document.getElementById('fleetretiredwrap').hidden = !retired.length;
+  document.getElementById('fleetretiredsum').textContent = `${retired.length} ship${retired.length === 1 ? '' : 's'}, ${retired.reduce((n, x) => n + x.sailings.length, 0)} voyages, outside this size's top five by its primary objective; nothing is deleted`;
+  document.querySelector('#fleetretired tbody').innerHTML = retired.map(shipRow).join('');
 
   // ---- Scoring: science, then art
   document.querySelector('#sciencemetrics tbody').innerHTML = metricRows(r.metrics.filter(m => !ART.has(m[0])));
@@ -1795,7 +1800,7 @@ document.querySelectorAll('[data-essay]').forEach(b => b.onclick = () => openEss
 document.getElementById('readpassage').onclick = e => { if (e.currentTarget.dataset.book) openBook(e.currentTarget.dataset.book); };
 
 // a row in a class's fleet or training table, or a voyage's ships, opens that ship
-['fleettable', 'fleetarchive', 'trainruns', 'voyageruns'].forEach(id => document.getElementById(id).addEventListener('click', e => {
+['fleettable', 'fleetarchive', 'fleetretired', 'trainruns', 'voyageruns'].forEach(id => document.getElementById(id).addEventListener('click', e => {
   const tr = e.target.closest('tr[data-run], tr[data-ship]'); if (!tr || e.target.closest('.info') || e.target.closest('a')) return;
   if (tr.dataset.ship) goShipKey(tr.dataset.ship); else goShip(tr.dataset.run);
 }));

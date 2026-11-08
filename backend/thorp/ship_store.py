@@ -109,6 +109,17 @@ def add_ship(rec: dict) -> ShipRecord:
     return get_ship(rec["key"])
 
 
+def retire(keys: list[str], note: str, *, back: bool = False) -> int:
+    """Retire ships (status "retired", with the reason), or with back=True return them to service. Nothing is
+    deleted: the ships, their voyages and the ledger stay, and the dashboard shows retired ships on request."""
+    _at_home("ships are retired at home")
+    with session() as s, s.begin():
+        rows = list(s.scalars(select(ShipRecord).where(ShipRecord.key.in_(keys))))
+        for r in rows:
+            r.status, r.retired_note = ("in service", None) if back else ("retired", note)
+    return len(rows)
+
+
 def add_voyage(run_id: str, ship_key: str, name: str, seed: int | None, started: str | None) -> None:
     """A run joins its ship's voyages (once; a later call fills a start time it lacked)."""
     _at_home("a ship or a voyage is registered at home, when the voyage docks")

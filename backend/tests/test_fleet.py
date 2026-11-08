@@ -179,3 +179,25 @@ def test_the_stores_rule_admits_only_the_stores_or_an_opt_in(monkeypatch):
     }
     assert stores.check(opted) == "the verse comparison"
     assert stores.check(bad, known_run=True) == ""  # a run already in the ledger continues
+
+
+def test_a_retired_ship_stays_in_the_store_but_says_so(tmp_thorp):
+    from thorp import ship_store
+
+    spec = {
+        "name": "a",
+        "ship": "Argo",
+        "seed": 1,
+        "data": {"recipe": "x.csv", "passes": 4, "order": "shuffled", "refuse": ["h.csv"]},
+        "tokeniser": {"kind": "spm-bpe", "vocab": 4096, "byte_fallback": True, "train_on": "recipe"},
+        "model": {"family": "gpt", "preset": "1m", "context": 1024},
+        "optim": {"lr": 0.002},
+        "eval": {"evaluators": ["ce_bpb"]},
+    }
+    ship = fleet.ship_for(spec)
+    assert ship.status == "in service"
+    assert ship_store.retire([ship.key], "pruned") == 1
+    got = fleet.register(fresh=True)[ship.key]
+    assert (got.status, got.retired_note) == ("retired", "pruned")
+    assert ship_store.retire([ship.key], "", back=True) == 1
+    assert fleet.register(fresh=True)[ship.key].status == "in service"

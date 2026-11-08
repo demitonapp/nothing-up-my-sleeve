@@ -30,7 +30,7 @@ const CLASS_ALIASES = Object.fromEntries(Object.entries(CLASS_RENAMES).flatMap((
 const rungFor = key => ladderData && ladderData.rungs.find(r => slugOf(r) === key || r.preset === key || slugOf(r) === CLASS_ALIASES[key]);
 // ---- Navigation (UI.md, "Navigation"). Three ways in, each a section of the header:
 //   #/ships                      the ships, grouped by size (home); a size's ships, newest first
-//   #/sizes/<size>[/<tab>]       one size: fleet (default), goals, overview, training, scoring, waypoints
+//   #/sizes/<size>[/<tab>]       one ship: overview (default), fleet, goals, training, scoring, waypoints
 //   #/ships/all                  every ship ever launched
 //   #/ships/<key>[/<sailing>[/<tab>]]  one ship (a size fitted out one way) and one of its voyages (runs):
 //                                betting (default), books, languages, sieves, attention, traits
@@ -38,7 +38,7 @@ const rungFor = key => ladderData && ladderData.rungs.find(r => slugOf(r) === ke
 //   #/discoveries[/<trick>]      the tricks of the trade, and one trick; /stars and /traits beside them
 //   #/sieves[/<sailing>]         the sieves explained, and one sailing's push, move and heading
 // Older addresses (#sizes, #proxy, #rung-1m, #/models/…, #betting…, ?run=) land on the new ones.
-const MTABS = ['fleet', 'goals', 'overview', 'training', 'scoring', 'waypoints', 'fitouts', 'bet'];
+const MTABS = ['overview', 'fleet', 'goals', 'training', 'scoring', 'waypoints', 'fitouts', 'bet'];
 const STABS = ['betting', 'books', 'languages', 'sieves', 'attention', 'traits'];
 const STAB_EL = { betting: 'betting', books: 'books', languages: 'languages', sieves: 'sieves', attention: 'attention', traits: 'traits-section' };
 const OLD_SHIP = { betting: 'betting', books: 'books', languages: 'languages', sieves: 'sieves', attention: 'attention', 'traits-section': 'traits' };
@@ -56,11 +56,11 @@ let vTab = 'expeditions', qView = 'glance';
 // Governance's tabs (UI.md, "Governance"): the five systems, S3 control built out, acquisition one level down
 const GVIEWS = ['control', 'acquisition'];
 let govView = 'systems';
-let page = 'sizes', modelTab = 'fleet', shipKey = null, sailingKey = null, shipTab = 'betting', voyageKey = null, runsList = null, shipsData = null;
+let page = 'sizes', modelTab = 'overview', shipKey = null, sailingKey = null, shipTab = 'betting', voyageKey = null, runsList = null, shipsData = null;
 function route(h) {
   if (h.startsWith('/')) {
     const [a, b, c] = h.slice(1).split('/');
-    if ((a === 'sizes' || a === 'classes') && b) { const d = h.slice(1).split('/')[3]; return { page: 'rung', rung: b, mtab: MTABS.includes(c) ? c : 'fleet', wsub: WSUBS.includes(d) ? d : 'expected', ssub: SSUBS.includes(d) ? d : 'ask', osub: c === 'overview' && OSUBS.includes(d) ? d : null }; }
+    if ((a === 'sizes' || a === 'classes') && b) { const d = h.slice(1).split('/')[3]; return { page: 'rung', rung: b, mtab: MTABS.includes(c) ? c : 'overview', wsub: WSUBS.includes(d) ? d : 'expected', ssub: SSUBS.includes(d) ? d : 'ask', osub: c === 'overview' && OSUBS.includes(d) ? d : null }; }
     if (a === 'models' && b) return { page: 'rung', rung: b, mtab: MTABS.includes(c) ? c : 'overview' };
     if (a === 'ships' && b === 'all') return { page: 'runs-section' };
     if (a === 'ships' && b) {
@@ -86,11 +86,11 @@ function route(h) {
     if (a === 'shelves' || a === 'library') return { page: 'shelves', shelf: b ? decodeURIComponent(b) : null };
     return { page: 'sizes' };
   }
-  if (h.startsWith('rung-')) return { page: 'rung', rung: h.slice(5), mtab: 'fleet' };
+  if (h.startsWith('rung-')) return { page: 'rung', rung: h.slice(5), mtab: 'overview' };
   if (h in OLD_SHIP) return { page: 'ship', ship: null, stab: OLD_SHIP[h] };
   if (h === 'runs-section') return { page: 'runs-section' };
   if (!h || h === 'sizes' || h === 'rung') return { page: 'sizes' };
-  return { page: 'rung', rung: h, mtab: 'fleet' };  // an old class link: #proxy
+  return { page: 'rung', rung: h, mtab: 'overview' };  // an old class link: #proxy
 }
 const WSUBS = ['expected', 'envelope', 'stars'];
 let wpSub = 'expected';
@@ -99,7 +99,7 @@ let scSub = 'ask';
 // the Overview's sub-pages: one per relation of the logic deck (2026-11-08: "a detail page explaining each of those relation tiles")
 const OSUBS = ['order', 'cause', 'membership', 'proportion', 'counterfactual'].map(x => 'logic-' + x);
 let ovSub = null;
-const modelHash = (r, mt = 'fleet', sub = null) => `/sizes/${slugOf(r)}${mt === 'fleet' ? '' : '/' + mt}${mt === 'waypoints' && sub && sub !== 'expected' ? '/' + sub : ''}${mt === 'scoring' && sub && sub !== 'ask' ? '/' + sub : ''}${mt === 'overview' && sub ? '/' + sub : ''}`;
+const modelHash = (r, mt = 'overview', sub = null) => `/sizes/${slugOf(r)}${mt === 'overview' && !sub ? '' : '/' + mt}${mt === 'waypoints' && sub && sub !== 'expected' ? '/' + sub : ''}${mt === 'scoring' && sub && sub !== 'ask' ? '/' + sub : ''}${mt === 'overview' && sub ? '/' + sub : ''}`;
 const shipHash = (key, sailing = null, st = 'betting') => `/ships/${key}${sailing ? '/' + encodeURIComponent(sailing) : ''}${st === 'betting' ? '' : '/' + st}`;
 const ladderRun = id => ladderData && ladderData.runs.find(x => x.run_id === id || x.name === id);
 // The ship and sailing an address names. The first part is a ship key, or (an older address) a run
@@ -903,32 +903,17 @@ async function loadLadder() {
     return;
   }
   ladderData = d;
-  // the ships, grouped by size: the size's card first (its role, its current version's scores), then its
-  // newest ships in service; the rest, and the archived First Fleet, are on the size's own page
-  const SHOW = 5;
-  const shipCard = x => {
-    const last = x.sailings[x.sailings.length - 1] || {}, st = (last.status || '').split(':')[0];
-    return `<a class="${cardCls(true, 'card shipcard')}" href="#${shipHash(x.key)}">
-      <div class="top"><span class="sname">${esc(x.name)}</span><span class="${pillCls(st === 'running' ? 'live' : st === 'finished' ? '' : 'bad')}">${esc(st || '–')}</span></div>
-      <div class="s">${esc(x.subtitle)}</div>
-      <div class="foot"><span>${x.sailings.length} voyage${x.sailings.length === 1 ? '' : 's'}${x.expedition ? ' · ' + esc(VOYAGE_NAME[x.expedition] || x.expedition) : ''}</span>
-      <span>${esc(String(x.latest || '–').slice(0, 10))}</span></div></a>`;
-  };
+  // the ships: one card each (its role, its voyages, its current version's scores); its fitouts are inside it
   document.getElementById('rungcards').innerHTML = d.rungs.map(r => {
     const runs = rungRuns(r.preset), live = runs.filter(x => x.status === 'running').length, done = runs.filter(x => x.status === 'finished').length;
     const nlive = r.metrics.filter(m => m[2] === 'live').length;
-    const ships = (shipsData || []).filter(x => x.size === r.preset), inService = ships.filter(x => !x.archived)
-      .sort((a, b) => String(b.latest).localeCompare(String(a.latest)));
-    const rest = ships.length - Math.min(SHOW, inService.length);
-    const lead = `<a class="${cardCls(true, 'card classcard')}" href="#${esc(modelHash(r))}">${artImg(classSlug(r.name), 'cardart ship')}
+    return `<a class="${cardCls(true, 'card classcard')}" href="#${esc(modelHash(r))}">${artImg(classSlug(r.name), 'cardart ship')}
       <div class="top"><span class="preset">${esc(r.preset)}</span><span class="nm">${esc(r.name)}</span></div>
       <div class="job">${esc(r.role || r.job)}</div>
       <div class="foot"><span>${big(r.total)} params · ${esc(r.where.split(' (')[0])}</span>
       <span class="${pillCls(live ? ' live' : '')}">${live ? live + ' running' : esc(r.status)}</span></div>
       <div class="foot"><span>${done} finished voyage${done === 1 ? '' : 's'}</span><span>${nlive} of ${r.metrics.length} metrics live</span></div>
       <div class="foot cscore" data-preset="${esc(r.preset)}">${classScoreHtml[r.preset] || '<span>Face Cards –</span><span>Logic –</span>'}</div></a>`;
-    return `<div class="sizegroup"><h2 class="band">${esc(r.preset)} · ${esc(r.name)}<span class="q">${ships.length} ship${ships.length === 1 ? '' : 's'}${ships.length ? `, ${inService.length} in service` : ''}</span></h2>
-      <div class="cards">${lead}${inService.slice(0, SHOW).map(shipCard).join('')}${rest > 0 ? `<a class="${cardCls(true, 'card shipcard more')}" href="#${esc(modelHash(r))}"><div class="sname">${rest} more</div><div class="s">every ship of the ${esc(r.preset)}, the archived First Fleet among them</div></a>` : ''}</div></div>`;
   }).join('');
   // the current version's scores (the leaderboard's best of the size; /api/class_score), filled as they arrive
   document.querySelectorAll('#rungcards .cscore').forEach(async el => {

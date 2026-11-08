@@ -1,7 +1,7 @@
 """the library's facts, a stage's declared selection and the compositions
 
 Revision ID: d0ba1dfea619
-Revises: 42266ae2e729
+Revises: c7e4a1d90b52
 Create Date: 2026-11-08 16:50:37.819984
 
 """
@@ -13,7 +13,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision: str = 'd0ba1dfea619'
-down_revision: Union[str, Sequence[str], None] = '42266ae2e729'
+down_revision: Union[str, Sequence[str], None] = 'c7e4a1d90b52'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

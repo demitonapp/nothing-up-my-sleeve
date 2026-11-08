@@ -3,7 +3,7 @@
 import { Plotly, tok, C, PALETTE, layout, cfg, empty, plot } from '../lib/charts.js';
 import { fmt, big, fmtBytes, esc, get, log10, mean } from '../lib/format.js';
 import { DataTable } from '../lib/datatable.js';
-import { pillCls, btnCls, fieldCls, selectCls, rangeCls, checkCls, cardCls, emptyCls, toggleCls, alertCls, hoverCardCls, tooltipCls, setTab, confirmDialog } from '../lib/ui';
+import { pillCls, crumbCls, btnCls, fieldCls, selectCls, rangeCls, checkCls, cardCls, emptyCls, toggleCls, alertCls, hoverCardCls, tooltipCls, setTab, confirmDialog } from '../lib/ui';
 import { cn } from '../lib/utils';
 import { openBook, openEssay } from '../lib/reader.js';
 import { renderHand, miniHand } from '../lib/cards.js';
@@ -29,7 +29,8 @@ const CLASS_RENAMES = { seedling: 'pan', keel: 'pan', proxy: 'augustus', pilot: 
 const CLASS_ALIASES = Object.fromEntries(Object.entries(CLASS_RENAMES).flatMap(([a, b]) => [[a, b], [b, a]]));
 const rungFor = key => ladderData && ladderData.rungs.find(r => slugOf(r) === key || r.preset === key || slugOf(r) === CLASS_ALIASES[key]);
 // ---- Navigation (UI.md, "Navigation"). Three ways in, each a section of the header:
-//   #/ships                      the ships, grouped by size (home); a size's ships, newest first
+//   #/harbours[/<harbour>]      the harbours (home): two tiles, Phaleron and the Market Harbour; one opens to its ships
+//   #/ships                      the same, by its old address; a size's ships, newest first
 //   #/sizes/<size>[/<tab>]       one ship: overview (default), fleet, goals, training, scoring, waypoints
 //   #/ships/all                  every ship ever launched
 //   #/ships/<key>[/<sailing>[/<tab>]]  one ship (a size fitted out one way) and one of its voyages (runs):
@@ -68,6 +69,7 @@ function route(h) {
       if (STABS.includes(c)) return { page: 'ship', ship: decodeURIComponent(b), sailing: null, stab: c };
       return { page: 'ship', ship: decodeURIComponent(b), sailing: c ? decodeURIComponent(c) : null, stab: STABS.includes(d) ? d : 'betting' };
     }
+    if (a === 'harbours' || a === 'harbors') return { page: 'sizes', harbour: b ? decodeURIComponent(b) : null };
     if (a === 'ships' || a === 'classes' || a === 'sizes') return { page: 'sizes' };
     if ((a === 'voyages' || a === 'expeditions') && b === 'queue') return { page: 'voyages', vtab: 'queue', qview: c === 'every' ? 'every' : 'glance' };
     if ((a === 'voyages' || a === 'expeditions') && b && c === 'table') return { page: 'table', voyage: b };
@@ -161,7 +163,7 @@ function showTab(h, push = true) {
     hash = '/expeditions/' + voyageKey + (expTab === 'overview' ? '' : '/' + expTab);
   }
   if (page === 'table') { tableVoyage = rt.voyage; hash = '/expeditions/' + tableVoyage + '/table'; loadTable(); }
-  if (page === 'sizes') hash = '/ships';
+  if (page === 'sizes') { harbourSel = rt.harbour || null; hash = '/harbours' + (harbourSel ? '/' + encodeURIComponent(harbourSel) : ''); if (ladderData) drawHarbours(); }
   if (page === 'runs-section') hash = '/ships/all';
   if (page === 'voyages') {  // two subtabs: the expeditions, and the queue (at a glance, or every voyage)
     vTab = rt.vtab || 'expeditions'; qView = rt.qview || 'glance';
@@ -903,7 +905,7 @@ const LAW_COLS = [
   ['word_len_js', 'word-length JS', 3], ['punct_js', 'punct mix JS', 3],
 ];
 var classScoreHtml = {}, classScoreAsked = {};  // a class card's last scores, so a refresh does not blank them
-var ladderData = null;  // var: showTab reads it before this line runs
+var ladderData = null, harbourSel = null;  // var: showTab reads it before this line runs
 const rungRuns = p => ladderData.runs.filter(r => r.preset === p && !(r.name || '').startsWith('smoke'));
 async function loadLadder() {
   let d;
@@ -913,8 +915,32 @@ async function loadLadder() {
     return;
   }
   ladderData = d;
-  // the ships: one card each (its role, its voyages, its current version's scores); its fitouts are inside it
-  document.getElementById('rungcards').innerHTML = d.rungs.map(r => {
+  drawHarbours();
+  if (page === 'rung' || page === 'ship') showTab(location.hash.slice(1), false);
+}
+// ---- Harbours (#/harbours, the Ships tab; Justin, 8 November: "on the ships pages, it's actually called harbours and then
+// when you open it, it's two tiles for the two harbours of today and then you click in the harbour to view its ships"):
+// Phaleron (the internal waters: Pan, Augustus, the 9m and the 21m) and the Market Harbour (the outer waters: the 50m up).
+function drawHarbours() {
+  const el = document.getElementById('rungcards'), d = ladderData; if (!el || !d) return;
+  const hs = d.harbours || [];  // a server not yet restarted sends none: then the ships are shown as they were
+  const h = hs.length ? hs.find(x => x.key === harbourSel) : { key: '', name: 'Ships', aka: 'restart thorp dash for the harbours', about: '' };
+  const sizes = x => x.key ? d.rungs.filter(r => r.harbour === x.key) : d.rungs;
+  const title = document.querySelector('#sizes h1'); 
+  if (!h) {
+    if (title) title.innerHTML = 'Harbours <span class="q">two harbours today: open one to see the ships that lie in it</span>';
+    el.className = 'harbours';
+    el.innerHTML = hs.map(x => { const rs = sizes(x), live = rs.reduce((n, r) => n + rungRuns(r.preset).filter(v => v.status === 'running').length, 0), done = rs.reduce((n, r) => n + rungRuns(r.preset).filter(v => v.status === 'finished').length, 0);
+      return `<a class="${cardCls(true, 'card harbourcard')}" href="#/harbours/${esc(x.key)}"><div class="top"><span class="nm">${esc(x.name)}</span><span class="preset">${esc(x.aka)}</span></div>
+        <div class="job">${esc(x.about)}</div>
+        <div class="hships">${rs.map(r => `<span class="${pillCls('')}">${esc(r.name)} <span class="s">${esc(r.preset)}</span></span>`).join(' ')}</div>
+        <div class="foot"><span>${esc(x.where)}</span><span class="${pillCls(live ? ' live' : '')}">${live ? live + ' running' : 'at rest'}</span></div>
+        <div class="foot"><span>${rs.length} ship${rs.length === 1 ? '' : 's'}</span><span>${done} finished voyage${done === 1 ? '' : 's'}</span></div></a>`; }).join('');
+    return;
+  }
+  if (title) title.innerHTML = `${hs.length ? `<a class="${crumbCls('back')}" href="#/harbours">← harbours</a> ` : ''}${esc(h.name)} <span class="q">${esc(h.aka)}: ${esc(h.about)}</span>`;
+  el.className = 'cards';
+  el.innerHTML = sizes(h).map(r => {
     const runs = rungRuns(r.preset), live = runs.filter(x => x.status === 'running').length, done = runs.filter(x => x.status === 'finished').length;
     const nlive = r.metrics.filter(m => m[2] === 'live').length;
     return `<a class="${cardCls(true, 'card classcard')}" href="#${esc(modelHash(r))}">${artImg(classSlug(r.name), 'cardart ship')}
@@ -937,7 +963,6 @@ async function loadLadder() {
     el.title = `scores of ${s.version}${s.ship ? ' (' + s.ship + ')' : ''}: Face Cards held, and the logic deck's cause gain (above +0.10 clears the noise)`;
     el.innerHTML = classScoreHtml[el.dataset.preset] = `<span>Face Cards <b>${s.held ?? '–'} of 4</b></span><span>Logic <b>${c == null ? '–' : (c > 0 ? '+' : '') + c.toFixed(2)}</b></span>`;
   });
-  if (page === 'rung' || page === 'ship') showTab(location.hash.slice(1), false);
 }
 // ---- the four cards (the Overview's head; /api/class_cards): the one thing that says the most about a class:
 // each necessary card's best reading by any of its voyages against its mark (held: a voyage ended lit; touched:

@@ -24,9 +24,28 @@ from thorp import paths
 WATERS = {
     # local waters are Phaleron (Justin, 8 November: "name it after a famous bay, perhaps that the greeks used to
     # train ships in"): Athens' first harbour, where its early fleet lay before Themistocles built Piraeus beside it
-    "mac": {"name": "Phaleron", "where": "this Mac mini", "how": "MLX, the Mac lane: local waters"},
-    "vast": {"name": "Foreign waters", "where": "a GPU hired from Vast.ai", "how": "torch on CUDA, the Vast lane"},
+    "mac": {"name": "Phaleron", "where": "this Mac mini", "how": "MLX, the Mac lane: internal waters"},
+    # outer waters are the Market Harbour (Justin, 8 November: "the outer waters should be the first great trading
+    # harbour"): where the ships that need hired GPUs trade
+    "vast": {"name": "The Market Harbour", "where": "a GPU hired from Vast.ai", "how": "torch on CUDA, the Vast lane: outer waters"},
 }
+
+# The harbours the Ships page opens on (Justin, 8 November: "on the ships pages, it's actually called harbours and then
+# when you open it, it's two tiles for the two harbours of today and then you click in the harbour to view its ships.
+# So Phaleron has Pan, Augustus, the 9m and the 21m and then the Market Harbour has the 50m up"). A ship's harbour is
+# its size's; a size not named here is in the outer harbour. To be a column of s1.sizes once the store takes it.
+HARBOURS = (
+    {"key": "phaleron", "name": "Phaleron", "aka": "internal waters", "lane": "mac", "where": "this Mac mini",
+     "about": "Athens' first harbour, where its early fleet lay and sailed from: the youngest ships, trained on this Mac.",
+     "sizes": ("300k", "1m", "9m", "21m")},
+    {"key": "market", "name": "The Market Harbour", "aka": "outer waters", "lane": "vast", "where": "GPUs hired from Vast.ai",
+     "about": "The first great trading harbour: the ships that need hired GPUs, from the 50m up.",
+     "sizes": ("50m", "100m", "350m")},
+)  # fmt: skip
+
+
+def harbour_of(preset: str) -> str:
+    return next((h["key"] for h in HARBOURS if preset in h["sizes"]), HARBOURS[-1]["key"])
 
 
 def _wall_minutes() -> dict:

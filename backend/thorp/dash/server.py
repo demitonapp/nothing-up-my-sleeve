@@ -384,6 +384,7 @@ def _last_scores(run_ids: list[str]) -> dict[str, dict[str, float]]:
 def api_ladder() -> dict:
     """The ladder (each rung's job and how it is judged), every run's rung scores (the bits-per-byte
     split on its first held-out set and the laws, model beside reference), and tonight's queue."""
+    from thorp.dash import waters as harbours
     from thorp.models.registry import LADDER, PRESETS
 
     rungs = []
@@ -394,6 +395,7 @@ def api_ladder() -> dict:
             {
                 **r,
                 **c,
+                "harbour": harbours.harbour_of(r["preset"]),
                 "non_embedding": ne,
                 "total": ne + (r.get("vocab", 16384) + 1024) * c["width"],
             }
@@ -469,7 +471,7 @@ def api_ladder() -> dict:
                 ],
             }
         )
-    return {"rungs": rungs, "runs": runs, "queue": queue, "external": external}
+    return {"rungs": rungs, "runs": runs, "queue": queue, "external": external, "harbours": [{**h, "sizes": list(h["sizes"])} for h in harbours.HARBOURS]}
 
 
 def api_rung(preset: str, limit: int | str = 0) -> list[dict]:

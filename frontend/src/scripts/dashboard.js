@@ -60,7 +60,7 @@ let page = 'sizes', modelTab = 'fleet', shipKey = null, sailingKey = null, shipT
 function route(h) {
   if (h.startsWith('/')) {
     const [a, b, c] = h.slice(1).split('/');
-    if (a === 'classes' && b) { const d = h.slice(1).split('/')[3]; return { page: 'rung', rung: b, mtab: MTABS.includes(c) ? c : 'fleet', wsub: WSUBS.includes(d) ? d : 'expected', ssub: SSUBS.includes(d) ? d : 'ask' }; }
+    if (a === 'classes' && b) { const d = h.slice(1).split('/')[3]; return { page: 'rung', rung: b, mtab: MTABS.includes(c) ? c : 'fleet', wsub: WSUBS.includes(d) ? d : 'expected', ssub: SSUBS.includes(d) ? d : 'ask', osub: c === 'overview' && OSUBS.includes(d) ? d : null }; }
     if (a === 'models' && b) return { page: 'rung', rung: b, mtab: MTABS.includes(c) ? c : 'overview' };
     if (a === 'ships' && b) {
       const d = h.slice(1).split('/')[3];
@@ -95,7 +95,10 @@ const WSUBS = ['expected', 'envelope', 'stars'];
 let wpSub = 'expected';
 const SSUBS = ['ask', 'language', 'shapes', 'number', 'physics', 'life', 'return', 'logic', 'versus'];
 let scSub = 'ask';
-const modelHash = (r, mt = 'fleet', sub = null) => `/classes/${slugOf(r)}${mt === 'fleet' ? '' : '/' + mt}${mt === 'waypoints' && sub && sub !== 'expected' ? '/' + sub : ''}${mt === 'scoring' && sub && sub !== 'ask' ? '/' + sub : ''}`;
+// the Overview's sub-pages: one per relation of the logic deck (2026-11-08: "a detail page explaining each of those relation tiles")
+const OSUBS = ['order', 'cause', 'membership', 'proportion', 'counterfactual'].map(x => 'logic-' + x);
+let ovSub = null;
+const modelHash = (r, mt = 'fleet', sub = null) => `/classes/${slugOf(r)}${mt === 'fleet' ? '' : '/' + mt}${mt === 'waypoints' && sub && sub !== 'expected' ? '/' + sub : ''}${mt === 'scoring' && sub && sub !== 'ask' ? '/' + sub : ''}${mt === 'overview' && sub ? '/' + sub : ''}`;
 const shipHash = (key, sailing = null, st = 'betting') => `/ships/${key}${sailing ? '/' + encodeURIComponent(sailing) : ''}${st === 'betting' ? '' : '/' + st}`;
 const ladderRun = id => ladderData && ladderData.runs.find(x => x.run_id === id || x.name === id);
 // The ship and sailing an address names. The first part is a ship key, or (an older address) a run
@@ -127,9 +130,9 @@ function showTab(h, push = true) {
     const r = rungFor(rt.rung);
     if (ladderData && !r) { page = 'sizes'; push = true; }  // not a class this ladder has
     else {
-      currentRung = rt.rung; modelTab = rt.mtab; wpSub = rt.wsub || 'expected'; scSub = rt.ssub || 'ask';
+      currentRung = rt.rung; modelTab = rt.mtab; wpSub = rt.wsub || 'expected'; scSub = rt.ssub || 'ask'; ovSub = rt.osub || null;
       if (r) {
-        hash = modelHash(r, modelTab, modelTab === 'scoring' ? scSub : wpSub);
+        hash = modelHash(r, modelTab, modelTab === 'scoring' ? scSub : modelTab === 'overview' ? ovSub : wpSub);
         document.querySelectorAll('#modelnav a').forEach(a => { a.href = '#' + modelHash(r, a.dataset.mtab); });
         document.querySelectorAll('#wpnav a').forEach(a => { a.href = '#' + modelHash(r, 'waypoints', a.dataset.wsub); });
         document.querySelectorAll('#scnav a').forEach(a => { a.href = '#' + modelHash(r, 'scoring', a.dataset.ssub); });
@@ -1243,11 +1246,11 @@ async function classLogicDeck(r, el) {
   const meter = (g, cls) => g ? `<div class="lgbar ${cls}" title="${f(g.gain)} (90% band ${f(g.lo)} to ${f(g.hi)})"><i style="left:${pos(Math.min(g.lo ?? g.gain, g.gain))}%;width:${Math.max(1, pos(Math.max(g.hi ?? g.gain, g.gain)) - pos(Math.min(g.lo ?? g.gain, g.gain)))}%"></i><b style="left:${pos(g.gain)}%"></b></div>` : '<div class="s">not read</div>';
   const tiles = d.deck.map(x => {
     const b = best(x.relation), q = bar && bar.gains[x.relation];
-    return `<div class="dcard lgcard"><div class="dname">${esc(x.relation)}</div><div class="s">${esc(x.about)} · ${x.items} items</div>
+    return `<a class="dcard lgcard lglink" href="#${modelHash(r, 'overview', 'logic-' + x.relation)}" title="the ${esc(x.relation)} relation in detail"><div class="dname">${esc(x.relation)} <span class="s">→ in detail</span></div><div class="s">${esc(x.about)} · ${x.items} items</div>
       ${x.example ? `<div class="lgex"><span class="s">${esc(x.example.prompt)}</span> <b>${esc(x.example.idea)}</b> <span class="s">not</span> <i>${esc(x.example.rival)}</i></div>` : ''}
       <div class="lgrow"><span class="s">this class${b ? ` (${esc(short(b.v.voyage))}, ${b.v.deck}-item)` : ''}</span>${meter(b && b.g, 'mine')}<span class="lgv">${f(b && b.g.gain)}</span></div>
       <div class="lgrow"><span class="s">${esc(refName(d.bar))}${bar ? ` (${bar.deck}-item)` : ''}</span>${meter(q, 'ref')}<span class="lgv">${f(q && q.gain)}</span></div>
-    </div>`;
+    </a>`;
   }).join('');
   const rels = [...d.relations, 'overall', 'one_hop'];
   const head = `<tr><th>model</th><th>deck</th>${rels.map(x => `<th>${x === 'one_hop' ? 'one-hop' : x}</th>`).join('')}</tr>`;
@@ -1260,8 +1263,48 @@ async function classLogicDeck(r, el) {
   wireDeckSwitch(el, r);
 }
 
+// ---- one relation of the logic deck, at length (/api/logic_relation): the Overview's sub-page
+async function classLogicRelation(r, el, rel) {
+  el.dataset.shown = 'relation:' + rel;
+  let d; try { d = await get(`/api/logic_relation?preset=${encodeURIComponent(r.preset)}&relation=${encodeURIComponent(rel)}`); } catch (e) { el.innerHTML = `<div class="${emptyCls()}">the relation could not be read (a dashboard server started before it existed has to be restarted)</div>`; return; }
+  if (ovSub !== 'logic-' + rel) return;
+  const f = v => v == null ? '–' : `${v >= 0 ? '+' : ''}${v.toFixed(2)}`;
+  const short = n => (n || '').replace('fu-ogden-v0-1', 'Ogden').replace('fu-ogden-v0-2', 'Ogden v0.2').replace('-pre', '');
+  const refName = n => (n || '').split('/').pop().replace(/-(bf16|4bit)$/, '');
+  const M = p => p == null ? '' : p >= 1e9 ? `${(p / 1e9).toFixed(1)}B` : `${Math.round(p / 1e6)}M`;
+  const back = `<a class="s" href="#${modelHash(r, 'overview')}">← the logic deck</a>`;
+  const nav = d.relations.map(x => x === rel ? `<b>${esc(x)}</b>` : `<a href="#${modelHash(r, 'overview', 'logic-' + x)}">${esc(x)}</a>`).join(' · ');
+  const hi = (text, words) => words.filter(Boolean).reduce((t, w) => t.split(w).join(`<u>${w}</u>`), esc(text));
+  const variants = d.item.map(v => `<tr><td><b>${esc(v.variant)}</b><div class="s">${esc(v.about)}</div></td><td>${hi(v.prompt, [v.bridge, v.distractor])} <b class="good">${esc(v.idea)}</b> <span class="s">not</span> <span class="bad">${esc(v.rival)}</span></td></tr>`).join('');
+  const bars = (rows, label) => rows.filter(x => x.gain).map(x => {
+    const g = x.gain, pos = v => Math.max(0, Math.min(100, 50 + 100 * v));
+    const ok = g.gain >= d.mark && g.lo > 0;
+    return `<div class="lgline"><span class="lgname">${label(x)}</span><div class="lgbar ${x.model === d.bar ? 'ref' : x.voyage ? '' : 'other'}" title="90% band ${f(g.lo)} to ${f(g.hi)}; ${g.chained}/${g.items} items chained"><i style="left:${pos(g.lo)}%;width:${Math.max(1, pos(g.hi) - pos(g.lo))}%"></i><b style="left:${pos(g.gain)}%"></b></div><span class="lgv">${f(g.gain)}${ok ? ' ✓' : ''}</span></div>`;
+  }).join('');
+  const kn = d.knockout ? `<p class="s">Silencing each card's 16 strongest heads in ${esc(refName(d.knockout.model))} (baseline gain on this relation ${f(d.knockout.baseline)}), the drop in this relation's gain (positive: the card helps it):</p><table class="subjtable">${d.knockout.drops.map(x => `<tr><td>${esc(x.condition)}</td><td>${f(x.drop)}</td></tr>`).join('')}</table>`
+    : `<p class="s">Not read yet: the knockout of Qwen3 4B (every card's and suit's heads silenced, this relation's gain re-read) is queued after the 21m. Until it is in, the cards above are a hypothesis.</p>`;
+  const per = d.per_item.map(p => `<details><summary><span class="mono">${esc(short(p.voyage))}</span> <span class="s">${p.deck}-item deck, step ${p.step}: ${p.items.filter(i => i.chained).length} of ${p.items.length} items chained</span></summary><table class="subjtable"><tr><th>item</th><th>both premises</th><th>first alone</th><th>second alone</th><th>one hop</th><th></th></tr>${p.items.map(i => `<tr><td class="mono">${esc(i.item)}</td><td>${f(i.both)}</td><td>${f(i.first)}</td><td>${f(i.second)}</td><td>${f(i.one_hop)}</td><td>${i.chained ? '<span class="good">chained</span>' : '<span class="s">not</span>'}</td></tr>`).join('')}</table></details>`).join('');
+  el.innerHTML = `<div class="lgdetail">${back}<div class="s lgnav">${nav}</div>
+    <h3>${esc(d.title)} <span class="s">· ${d.items} items</span></h3>
+    <p>${esc(d.asks)}</p>
+    <h4>The steps a model must take</h4><ol>${d.steps.map(x => `<li>${esc(x)}</li>`).join('')}</ol>
+    <h4>How it is built</h4><p class="s">${esc(d.built)}</p>
+    <h4>One item, in every way it is asked <span class="s">the middle term and the distractor underlined; the right answer, then the rival</span></h4>
+    <div class="scroll"><table class="subjtable lgvariants">${variants}</table></div>
+    ${d.examples.length ? `<p class="s">Three more: ${d.examples.map(x => `${esc(x.prompt)} <b>${esc(x.idea)}</b>`).join(' · ')}</p>` : ''}
+    <h4>The cards it should need <span class="s">a hypothesis from how the items are built; the knockout tests it</span></h4>
+    <ul>${d.cards.map(c => `<li><b>${esc(c.name)}</b> <span class="s">(${esc(c.suit)})</span>: ${esc(c.why)}</li>`).join('')}</ul>
+    <h4>What silencing them does</h4>${kn}
+    <h4>Why it is hard</h4><p class="s">${esc(d.hard)}</p>
+    <h4>The chaining gain on ${esc(rel)} <span class="s">both premises against the stronger alone; the bar is the 90% band, the dotted line the mark (${d.mark})</span></h4>
+    ${bars(d.voyages, x => `<span class="mono">${esc(short(x.voyage))}</span> <span class="s">${x.deck}-item</span>`)}
+    ${bars(d.references, x => `${esc(refName(x.model))} <span class="s">${M(x.params)}, ${x.deck}-item</span>`)}
+    <h4>This class, item by item</h4>${per || '<p class="s">no voyage of this class has read the logic deck yet</p>'}</div>`;
+}
+
 async function classDeck(r) {
   const el = document.getElementById('deckclass'); if (!el) return;
+  if (ovSub) { classLogicRelation(r, el, ovSub.slice(6)); return; }
   if (deckWhich() === 'logic') { classLogicDeck(r, el); return; }
   let d; try { d = await get(`/api/class_deck?preset=${encodeURIComponent(r.preset)}`); } catch (e) { el.innerHTML = `<div class="${emptyCls()}">the deck could not be read (a dashboard server started before it existed has to be restarted)</div>`; return; }
   const key = JSON.stringify(d); if (key === classDeckKey && el.dataset.preset === r.preset && el.dataset.shown === 'cards') return; classDeckKey = key; el.dataset.preset = r.preset; el.dataset.shown = 'cards';

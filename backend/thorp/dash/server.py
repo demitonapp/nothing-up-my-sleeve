@@ -3076,6 +3076,153 @@ def _logic_bands(items: dict, n_boot: int = 500) -> dict:
     return out
 
 
+LOGIC_DETAIL = {  # each relation of the logic deck, at length (Justin, 2026-11-08 13:10: "a detail page explaining each of those
+    # relation tiles in much more detail"); the build is backend/scripts/make_logic_deck.py
+    "order": {
+        "title": "Order: two comparisons chained into a third",
+        "asks": "Every A is heavier than every B; every C is lighter than every B; so is an A heavier or lighter than a C? "
+        "Nothing about A or C is said together: the answer exists only by going through B, the middle term.",
+        "steps": ["find the two names in the question (A, C) among the premises",
+                  "find the term they share (B): the Bridge",
+                  "read each premise's direction (heavier, lighter) relative to B",
+                  "compose the two directions (A above B, B above C, so A above C) and say it"],
+        "built": "Six invented words an item, none English. Both answers (heavier than a C, lighter than a C) are named in "
+        "the premises, so copying a phrase cannot decide; half the items ask from the low end, so a model that always says "
+        "the first comparative is right half the time. The padded variant adds a second chain whose middle term is named "
+        "twice and last, so recency and repetition favour the wrong middle term; three_hop adds a fourth term.",
+        "cards": [("comparator", "picks the side to compare against rather than a decoy"),
+                  ("order_word", "finds the direction words (heavier, lighter, before, after)"),
+                  ("bridge", "holds the middle term B at the question"),
+                  ("mover", "carries the answer's direction from the premise to the question"),
+                  ("scales", "the Face whose ability this relation's gain is: order composed")],
+        "hard": "Every model read so far, Qwen3 4B included, is near zero or below on it: composing two directions is the "
+        "hardest of the five. A negative gain means the second premise confuses the model more than it helps.",
+    },
+    "cause": {
+        "title": "Cause: a chain of events",
+        "asks": "When the A is struck, the B rises; when the B rises, the C glows (and when it falls, the C darkens); so when "
+        "the A is struck, does the C glow or darken? The answer runs through the middle event, B rising.",
+        "steps": ["find the first event (A struck) in the question",
+                  "follow it to its effect (B rises): the Bridge",
+                  "find the branch of the second premise that starts from that effect (B rises, not B falls)",
+                  "carry that branch's outcome (glows) to the answer"],
+        "built": "Both branches of the second premise are given (rises and falls, glows and darkens), so the answer word and "
+        "its rival both appear; half the items name the answer's clause last. The padded variant adds a second cause chain "
+        "with its own middle term; three_hop adds a fourth event.",
+        "cards": [("premise_marker", "finds where each premise starts and ends (When ..., so when ...)"),
+                  ("bridge", "holds the middle event at the question"),
+                  ("mover", "carries the right branch's outcome to the answer"),
+                  ("induction", "the frame repeats the premise's opening, so the copying circuit points back to it")],
+        "hard": "This is the relation Qwen3 4B chains: +0.94 on the 8-item deck, where every other relation is near zero. "
+        "Its knockout will show which cards that rests on.",
+    },
+    "membership": {
+        "title": "Membership: all A are B, all B have C",
+        "asks": "All A are Bs; all Bs have wings (and all Ds have fins); so does every A have wings or fins? The answer is "
+        "inherited through the group, B.",
+        "steps": ["find the A in the question", "find the group it belongs to (B): the Bridge",
+                  "find what that group has (wings, not the other group's fins)", "carry it to the answer"],
+        "built": "A contrast group with the other feature is always named, so both features are in the premises; half the "
+        "items swap which feature is the answer. The padded variant adds a second inclusion chain.",
+        "cards": [("bridge", "holds the group B at the question"),
+                  ("duplicate_word", "links the B in the first premise to the B in the second"),
+                  ("rare_word", "picks out the invented names worth carrying"),
+                  ("mover", "carries the feature to the answer")],
+        "hard": "Qwen3 4B is below zero on it (-0.09; Phi-4-mini -0.48): the contrast group's feature, named last in "
+        "many items, pulls larger models the wrong way.",
+    },
+    "proportion": {
+        "title": "Proportion: twice of twice is four times",
+        "asks": "Each A weighs twice as much as a B; each B weighs twice as much as a C; so an A weighs four times as much "
+        "as a C, against a neighbouring wrong product (three times) that the premises never name.",
+        "steps": ["find A and C in the question", "find the middle term B: the Bridge",
+                  "read the two factors (twice, twice)", "multiply them (four times) and say the product"],
+        "built": "The rival is the nearest wrong product, never named in the premises, so neither copying nor recency can "
+        "pick either answer: only multiplying can. The padded variant adds a chain whose second link is 'as much as'.",
+        "cards": [("number_spotter", "finds the factors (twice, three times)"),
+                  ("bridge", "holds the middle term at the question"),
+                  ("mover", "carries the factors to where the product is said")],
+        "hard": "The deck has no card for arithmetic itself: a model that holds every card here can still fail to multiply. "
+        "Qwen3 4B reads about zero on it.",
+    },
+    "counterfactual": {
+        "title": "Counterfactual: premises against the world",
+        "asks": "In the valley of Nilkol, fire makes the water of its ponds colder; in Nilkol, cold water stops the mill "
+        "wheels, while warm water turns them; so in Nilkol, when a fire is lit, does the mill wheel stop or turn? The "
+        "world says turn; the premises say stop.",
+        "steps": ["take the first premise as stated, against what is known (fire cools here)",
+                  "follow its result (colder water) into the second premise",
+                  "carry the stated outcome (stop), not the remembered one (turn)"],
+        "built": "Eight items written by hand, each a pair of facts run against the world; odd items name the answer's "
+        "clause last. No padded or one-hop variant: the test is whether the stated premises beat knowledge.",
+        "cards": [("mover", "carries the stated premise's outcome to the answer"),
+                  ("premise_marker", "marks the premises as the context to answer from")],
+        "hard": "Never taught by the logic tutor (held out as transfer). The deck has no card for preferring the text to "
+        "memory: this relation tests something no card reads.",
+    },
+}
+VS_KNOCKOUT = "mlx-community/Qwen3-4B-4bit"
+VARIANT_ABOUT = {
+    "both": "the two premises, then the question: the two-hop item",
+    "first": "the first premise only, the other replaced by a neutral sentence",
+    "second": "the second premise only",
+    "swapped": "the premises in the other order",
+    "padded": "an irrelevant third premise naming its own middle term twice, last: the Bridge's distractor",
+    "one_hop": "the conclusion's link stated directly: the floor",
+    "three_hop": "three premises chained: the ceiling",
+}
+
+
+def api_logic_relation(preset: str, relation: str) -> dict:
+    """One relation of the logic deck at a class, at length: what it asks, the steps it takes, how it is built, an item
+    in every variant, the cards it should need (and, once read, what silencing them in Qwen3 4B did to it), the class's
+    voyages and the reference models on it with bands, and the class's voyages item by item."""
+    import csv
+
+    if relation not in LOGIC_DETAIL:
+        raise KeyError(relation)
+    rows = [r for r in csv.DictReader(paths.resolve("lists/tricks/logic-40.csv").open()) if r["relation"] == relation]
+    first = rows[0]["item"] if rows else None
+    item = [{"variant": r["variant"], "about": VARIANT_ABOUT.get(r["variant"], ""), "prompt": r["prompt"],
+             "idea": r["idea"], "rival": r["rival"], "bridge": r["bridge"], "distractor": r["distractor"]}
+            for r in rows if r["item"] == first]  # fmt: skip
+    examples = [{"prompt": r["prompt"], "idea": r["idea"], "rival": r["rival"]} for r in rows if r["variant"] == "both"][1:4]
+    full = api_class_logic(preset)
+    voyages = [{"voyage": v["voyage"], "deck": v["deck"], "gain": v["gains"].get(relation)} for v in full["voyages"]]
+    refs = [{"model": x["model"], "deck": x["deck"], "params": x["params"], "gain": x["gains"].get(relation)} for x in full["references"]]
+    from thorp.viable.s5_policy import deck as D
+
+    det = LOGIC_DETAIL[relation]
+    cards = [{"key": k, "name": D.BY_KEY[k].name if k in D.BY_KEY else k, "why": why,
+              "suit": D.BY_KEY[k].constellation if k in D.BY_KEY else ""} for k, why in det["cards"]]  # fmt: skip
+    knock = None
+    f = paths.data_dir() / "compare" / f"knockout-deck-{VS_KNOCKOUT.replace('/', '--')}.json"  # the bar's knockout only
+    if f.exists():
+        d = json.loads(f.read_text())
+        knock = {"model": d["model"], "baseline": d["baseline"].get(relation),
+                 "drops": sorted(({"condition": c, "drop": v["relation_drops"].get(relation)} for c, v in d["conditions"].items()
+                                  if v.get("relation_drops", {}).get(relation) is not None), key=lambda x: -x["drop"])}  # fmt: skip
+    con = _con()
+    try:
+        per = []
+        for v in _class_voyages(preset):
+            for kind in ("logic40", "logic"):
+                r = con.execute("select step, text from artifacts where run_id=? and kind=? order by step desc, rowid desc limit 1", [v["run_id"], kind]).fetchone()  # fmt: skip
+                if r and r[1]:
+                    items = {k: x for k, x in json.loads(r[1]).items() if k.startswith(relation + "-")}
+                    per.append({"voyage": v["name"], "deck": "40" if kind == "logic40" else "8", "step": r[0],
+                                "items": [{"item": k, **{a: x.get(a) for a in ("both", "first", "second", "one_hop")},
+                                           "chained": bool(x["both"] > 0 and x["both"] > max(x["first"], x["second"]))}
+                                          for k, x in sorted(items.items(), key=lambda kv: int(kv[0].rsplit("-", 1)[1]))]})  # fmt: skip
+                    break
+    finally:
+        con.close()
+    return {"preset": preset, "relation": relation, **{k: det[k] for k in ("title", "asks", "steps", "built", "hard")},
+            "items": len({r["item"] for r in rows}), "item": item, "examples": examples, "cards": cards, "knockout": knock,
+            "voyages": voyages, "references": refs, "per_item": per, "mark": full["mark"], "bar": full["bar"],
+            "relations": full["relations"]}  # fmt: skip
+
+
 _logic_cache: dict[str, tuple[float, dict]] = {}
 
 
@@ -3657,6 +3804,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/class_shapes": lambda: api_class_shapes(q["preset"]),
                 "/api/class_vs": lambda: api_class_vs(q["preset"], q.get("ref"), q.get("voyage")),
                 "/api/class_logic": lambda: api_class_logic(q["preset"]),
+                "/api/logic_relation": lambda: api_logic_relation(q["preset"], q["relation"]),
                 "/api/table/guesses": lambda: api_table_guesses(
                     q["run"], q.get("text", ""), q.get("k", 10), q.get("mode", "1")
                 ),

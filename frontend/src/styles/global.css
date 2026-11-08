@@ -1045,3 +1045,15 @@ button[aria-busy="true"] { cursor: progress; opacity: .7; }
 .lgbar.ref i { background: var(--accent); }
 .lgbar b { position: absolute; top: 0; bottom: 0; width: 3px; margin-left: -1px; background: var(--blue); }
 .lgbar.ref b { background: var(--accent); }
+
+.lglink { text-decoration: none; color: inherit; cursor: pointer; }
+.lglink:hover { outline: 1px solid var(--accent); }
+.lgdetail h3 { margin: 10px 0 6px; } .lgdetail h4 { margin: 18px 0 6px; }
+.lgdetail p, .lgdetail li { max-width: 860px; line-height: 1.5; }
+.lgnav { margin: 6px 0; } .lgnav a { color: var(--blue); }
+.lgvariants td:first-child { width: 220px; vertical-align: top; }
+.lgdetail u { text-decoration-color: var(--accent); text-underline-offset: 3px; }
+.lgdetail .good { color: var(--good); } .lgdetail .bad { color: var(--bad); }
+.lgline { display: grid; grid-template-columns: minmax(160px, 260px) 1fr 70px; gap: 10px; align-items: center; margin: 3px 0; }
+.lgline .lgbar.other i { background: var(--track); } .lgline .lgbar.other b { background: var(--track); }
+@media (max-width: 640px) { .lgline { grid-template-columns: 1fr 60px; } .lgline .lgname { grid-column: 1 / -1; } .lgvariants td:first-child { width: auto; } }

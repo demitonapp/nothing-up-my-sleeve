@@ -8,6 +8,7 @@ reading of the market is kept (data/charter-market.jsonl), so the prices can be 
 
 from __future__ import annotations
 
+import contextlib
 import json
 from datetime import UTC, datetime
 
@@ -16,14 +17,50 @@ from thorp.viable.s3_control import charter as s3
 from thorp.viable.s5_policy import charter as s5
 
 
+def _wall_rate(r: dict) -> float | None:
+    """A released voyage's rate at sea (tokens a second): the run's tokens over its time hired, less the set-up
+    allowance, so the readings between steps count (8 November: P1's steps ran at 648k tokens a second, but its
+    readings brought the voyage to about 126k; a quote at the steps' rate gives a deadline it cannot meet)."""
+    with contextlib.suppress(Exception):
+        from thorp.ledger import Ledger
+
+        run = Ledger().get_run(r["run_id"]) or {}
+        secs = float(r["ended"]) - float(r["started"]) - s5.SETUP_HOURS * 3600
+        if run.get("tokens_seen") and secs > 60:
+            return float(run["tokens_seen"]) / secs
+    return None
+
+
 def throughput(gpu: str, preset: str) -> float | None:
-    """The measured training rate (tokens a second) of the last voyages of this preset on this class, or None."""
-    rates = [
-        float(r["tokens_per_s"])
-        for r in s3.log()
-        if r["event"] == "released" and r.get("gpu") == gpu and r.get("preset") == preset and r.get("tokens_per_s")
-    ]
+    """The measured rate (tokens a second) of the last voyages of this preset on this class, or None: the slower
+    of the training steps' rate and the rate at sea, readings included."""
+    rates = []
+    for r in s3.log():
+        if r["event"] == "released" and r.get("gpu") == gpu and r.get("preset") == preset and r.get("tokens_per_s"):
+            wall = _wall_rate(r)
+            rates.append(min(float(r["tokens_per_s"]), wall) if wall else float(r["tokens_per_s"]))
     return sum(rates[-3:]) / len(rates[-3:]) if rates else None
+
+
+def scaled(gpu: str, cfg, preset: str) -> tuple[float, str] | None:
+    """For a preset this class has not sailed: its measured rate on another preset, scaled by the FLOP ratio
+    a token (the smaller the preset measured, the more its rate overstates the GPU's room, so this errs slow:
+    a 9m on a 4090 left 41% of the GPU idle). (rate, the preset it came from) or None."""
+    from thorp.models import registry
+
+    best = None
+    for other in registry.PRESETS:
+        if other == preset:
+            continue
+        tps = throughput(gpu, other)
+        if not tps:
+            continue
+        with contextlib.suppress(Exception):
+            ocfg = registry.config(other, cfg.vocab, cfg.context, getattr(cfg, "positions", "rope"))
+            r = tps * s3.train_flops(ocfg, 1) / s3.train_flops(cfg, 1)
+            if best is None or r < best[0]:
+                best = (r, other)
+    return best
 
 
 def mac_rate(preset: str) -> float | None:
@@ -62,6 +99,10 @@ def price(cfg, preset: str, tokens: int, o: dict) -> dict:
         if mac and tokens / mac / 3600 + s5.SETUP_HOURS > hours:
             hours = tokens / mac / 3600 + s5.SETUP_HOURS
             how = f"unmeasured: at this Mac's {mac:,.0f} tokens/s, evals included (the guess was {tf:.0f} TFLOP/s)"
+        sc = scaled(o["gpu"], cfg, preset)
+        if sc and tokens / sc[0] / 3600 + s5.SETUP_HOURS > hours:
+            hours = tokens / sc[0] / 3600 + s5.SETUP_HOURS
+            how = f"unmeasured at this size: scaled by FLOPs from its {sc[1]}'s {sc[0]:,.0f} tokens/s here (the guess was {tf:.0f} TFLOP/s)"
     return {**o, "hours": hours, "cost": hours * o["dph"], "speed": how}
 
 

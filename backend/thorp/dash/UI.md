@@ -292,7 +292,9 @@ holds the ways in, always:
 - **$100** (`#/bet`, after Leaderboard; `thorp/bet.py`, `/api/bet`): Justin's bet that a ladder of model
   sizes makes a 350m trained for $100 on a rented H100 bet the right way on quantum physics. Read-only,
   top to bottom: **the bet** (Justin's words, then a stat strip: the budget, one 350m run's hours and
-  cost, the plan's cost, the runs $100 buys, the gates passed); **the theory**; **the ladder** (each
+  cost, the plan's cost, the runs $100 buys, the gates passed); **On the Orient pier** (the bet as
+  Quentin Luck tells it to the bergies and car guards, `bet.STORY`, three paragraphs at a reading
+  measure); **the theory**; **the ladder** (each
   class's goal and how it is judged, what it reads, its time on this Mac, measured from the ledger
   where it has sailed, and its cost rented, with its Ogden sailings as Badges); **the quantum bet** (the
   discrete atom: the idea, who found it, the rivals, the precursors, the ablation, the pass rule) beside

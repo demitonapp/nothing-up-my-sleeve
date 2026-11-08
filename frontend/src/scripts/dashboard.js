@@ -4526,6 +4526,9 @@ async function loadBet() {
     ${stat('runs $100 buys', String(runs.mid ?? '–'), `${runs.high ?? '–'} to ${runs.low ?? '–'} across the band`)}
     ${stat('gates passed', `${d.gates_passed} of ${(d.gates || []).length}`, 'before the $100 is spent')}</div>
     <p class="note mt">${esc(d.claim)} The band runs from $${Number(rate[0]).toFixed(2)} an hour at the fastest speed to $${Number(rate[2]).toFixed(2)} at the slowest; the middle is $${Number(rate[1]).toFixed(2)} at ${b.tflops[1]} TFLOPS achieved, an estimate from published training runs.</p>`;
+  // the story: the bet as Quentin Luck tells it on the Orient pier, paragraphs as written
+  const st = d.story || {};
+  document.getElementById('betstory').innerHTML = (st.paragraphs || []).map(p => `<p>${esc(p)}</p>`).join('');
   document.getElementById('bettheory').innerHTML = (d.theory || []).map(t => `<li><b>${esc(t.lead)}</b> <span>${esc(t.text)}</span></li>`).join('');
   // the ladder: each class's goal, what it reads, its time on this Mac and its cost rented
   const lt = document.getElementById('betladder');

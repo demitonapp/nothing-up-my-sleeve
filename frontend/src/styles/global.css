@@ -914,6 +914,9 @@ button[aria-busy="true"] { cursor: progress; opacity: .7; }
 .betq ul { margin: 2px 0 0; padding-left: 18px; }
 #betladder td { vertical-align: top; }
 #betladder td .s, #betchain td .s { color: var(--muted); font-size: var(--fs-sm); white-space: normal; }
+/* the story: running prose at a reading measure */
+.betstory { display: grid; gap: 12px; }
+.betstory p { margin: 0; max-width: 72ch; font-size: var(--fs-lg); line-height: 1.65; }
 
 /* the Navigator's Wager (a class's Bet tab) */
 #wagerpanel .wagerdeal { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 6px 0 12px; }

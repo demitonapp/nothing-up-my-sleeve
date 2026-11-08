@@ -838,7 +838,14 @@ def api_sieves() -> dict:
 
 
 # classes renamed (old address name -> new), so old addresses and names keep working (7 Nov, Justin)
-CLASS_RENAMES = {"seedling": "keel", "proxy": "pilot", "bettor": "explorer", "summit": "trader"}
+# 8 Nov (Justin): the 300k is Pan and the 1m Augustus; every older name maps straight to the current one
+CLASS_RENAMES = {"seedling": "pan", "keel": "pan", "proxy": "augustus", "pilot": "augustus", "bettor": "explorer", "summit": "trader"}
+
+
+def _class_names(preset: str) -> set[str]:
+    """A size's names, the current one and every older one (CLASS_RENAMES), for code that keys a size by name."""
+    slug = _slug(preset)
+    return {slug} | {old for old, new in CLASS_RENAMES.items() if new == slug}
 
 
 def _known_heads() -> list[dict]:
@@ -2831,6 +2838,7 @@ def api_class_subjects(preset: str) -> dict:
     from thorp import fleet
 
     slug = _slug(preset)
+    names = _class_names(preset)
     voyages = _class_voyages(preset)
     con = _con()
     try:
@@ -2864,11 +2872,11 @@ def api_class_subjects(preset: str) -> dict:
                     readings.append({
                         "voyage": v["name"], "status": v["status"], "value": val, "score": sc, "step": step,
                         "passed": None if val is None else val >= tr.threshold,
-                        "series": series(v["run_id"], tr.metric, v["bt"]) if tr.goal_class == slug and val is not None else None,
+                        "series": series(v["run_id"], tr.metric, v["bt"]) if tr.goal_class in names and val is not None else None,
                     })  # fmt: skip
                 rows.append({
                     "key": k, "name": tr.name, "about": tr.about, "goal_class": tr.goal_class,
-                    "mine": tr.goal_class == slug, "metric": tr.metric, "threshold": tr.threshold, "readings": readings,
+                    "mine": tr.goal_class in names, "metric": tr.metric, "threshold": tr.threshold, "readings": readings,
                 })  # fmt: skip
             out[key] = {"title": title, "about": about, "tests": rows}
     finally:
@@ -3354,7 +3362,8 @@ def api_ask_questions(preset: str) -> dict:
         return {"preset": preset, "questions": [], "words_back": None, "logic": logic}
     d = json.loads(p.read_text())
     slug = _slug(preset)
-    key = slug if slug in ("keel", "pilot") else "speller"
+    names = _class_names(preset)  # the question sets are keyed by the old names (ogden-v0.1-questions.json)
+    key = "keel" if "keel" in names else "pilot" if "pilot" in names else "speller"
     s = d.get(key) or {}
     return {
         "preset": preset, "set": key, "words_back": s.get("words_back"),

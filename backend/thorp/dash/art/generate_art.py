@@ -62,6 +62,15 @@ CLASSES: dict[str, str] = {
     "fog, a figure in the bow with a brass telescope raised, the old chart pinned beside him ending in blank paper",
     "trader": "a towering full-rigged ship of the line cresting an enormous wave, every sail set, the "
     "masts reaching up into a field of stars, lightning behind, the largest ship on the sea",
+    # 8 Nov (Justin): the 300k is Pan, the 1m Augustus, and their cards show them, not boats: "pan playing cards
+    # with the universe and augustus teaching maths"
+    "pan": "the Greek god Pan, horned and goat-legged, alone at a small card table under the open night sky, "
+    "playing cards with the universe: across the table there is no one, only the starry sky and a spiral "
+    "galaxy, and out of the stars a vast hand of glittering stars and constellation lines reaches down to lay "
+    "a playing card on the table, Pan holding his own cards close, ",
+    "augustus": "a Victorian mathematics master in a frock coat teaching arithmetic by gaslight, chalk in hand "
+    "at a blackboard of simple sums, a row of small pupils seen from behind at their desks, a single lamp "
+    "throwing hard shadows across the board",
 }
 
 # The playing cards: the stars that do the trick (fleet.STARS / fleet.METHODS["chaining"] cards). Portrait,

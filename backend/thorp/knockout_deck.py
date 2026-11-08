@@ -18,7 +18,7 @@ times the size:
 - **Controls:** random heads from outside every card's set, as many as a card (CONTROLS draws) and as a suit.
 
 A card **carries** chaining in the model when silencing it lowers the overall gain by more than the largest random
-draw of its size does and the band of the drop stays above zero. Results: data/compare/knockout-deck-<model>.json.
+draw of its size does and the band of the drop stays above zero. Results: s4.outside_readings, knockout-deck-<model>.
 
     uv run --project backend --group compare python -m thorp.knockout_deck mlx-community/Qwen3-4B-4bit
 """
@@ -30,8 +30,6 @@ import sys
 import time
 
 import numpy as np
-
-from thorp import paths
 
 K = 16
 CONTROLS = 3
@@ -191,9 +189,11 @@ def read(name: str, k: int = K, controls: int = CONTROLS, log=print) -> dict:
                       "largest_random": round(noise, 4), "carries": bool(v["drop"] > max(noise, 0) and v["drop_lo"] > 0)}  # fmt: skip
     result["verdict"] = verdict
     result["seconds"] = round(time.time() - t0)
-    out = paths.data_dir() / "compare" / f"knockout-deck-{name.replace('/', '--')}.json"
-    out.write_text(json.dumps(result, indent=1, default=float))
-    log(f"{name}: written {out} ({result['seconds']}s)")
+    from thorp.viable.s4_intelligence import readings
+
+    out = f"knockout-deck-{name.replace('/', '--')}"
+    readings.put(out, result)
+    log(f"{name}: kept as {out} in s4.outside_readings ({result['seconds']}s)")
     return result
 
 

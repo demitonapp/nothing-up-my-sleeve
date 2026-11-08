@@ -163,7 +163,7 @@ holds the ways in, always:
   the frame in the stronger weight, since the lift is what the premise adds over the frame alone. The explorer's
   step reads "pairs not written yet" until `lists/discovery-<test>.csv` exists, with the rivals
   and the ablation from its `about`.
-  **Grading** (`fleet.grading`, written to `data/compare/chain-grades.json`): a chain is graded when
+  **Grading** (`fleet.grading`, written to `the chain grades, s4.outside_readings`): a chain is graded when
   it gets harder at every rung across all the models read, Thorp's and the reference ladder's
   (`fleet.REFERENCE_LADDER`: Pythia 14m to 410m, Qwen3 0.6B, and Qwen3 1.7B and 4B at 4 bits). No model performs a rung while
   failing one below it (an inversion), no rung is performed by more models than the one below,
@@ -216,12 +216,12 @@ holds the ways in, always:
   lift against parameters with both fits and their bands, the competitors as red diamonds and
   the reference ladder in grey; the backtest) and **every ship** with chaining readings, filterable
   by class. A Thorp row is named by version ("Thorp 300k v1": `leaderboard.payload` best's `name`;
-  the register `data/thorp-versions.json`, a version crowned only when a ship beats the last by more
+  the register `s1.crownings`, a version crowned only when a ship beats the last by more
   than the noise), its ship and sailings beneath, and opens **its page** (`#/leaderboard/thorp/
   <ship_key>`, `/api/thorp`, from `leaderboard.thorp_entry`: the mean of its sailings' latest
   readings) on the competitor page's template: the class, the ship, its runs, the version and its
   history, then the same chaining result, cards and rungs. Each outside model's name opens **its page** (`#/leaderboard/competitor/<model>`,
-  `/api/competitor`, from `data/compare/chain-grades.json`): who made it (a link to its lab), its size, the checkpoint,
+  `/api/competitor`, from `the chain grades, s4.outside_readings`): who made it (a link to its lab), its size, the checkpoint,
   and what Thorp must match it at (a tenth its size, with each fit's forecast there); its chaining
   result (the chaining lift, the tests performed, each test's lift and share, the logic deck's gain
   and share, the deck asked each way, one to three hops, one premise, swapped, padded, and the gain
@@ -272,7 +272,7 @@ holds the ways in, always:
   that stage), the stage named where it isn't the last. A row opens to its three stages, each run
   linked. The first design's cd-* runs were never run and aren't shown.
   **The knockout** (the `knockout` voyage's page, and a section on each competitor page that has
-  one; `/api/knockout`, `data/compare/knockout-<model>.json`; DECISIONS.md "The knockout,
+  one; `/api/knockout`, `s4.outside_readings, knockout-<model>`; DECISIONS.md "The knockout,
   pre-registered"): in a model that chains, each card's 8 strongest heads silenced, beside three
   random draws of 8 heads. A badge per card (NECESSARY or not shown), a bar per card for the gain lost
   when silenced (cause; the comparator, order) beside the random draws' drops on that same measure in
@@ -409,9 +409,9 @@ the ships by size: each size's card first (its name, its role, its current versi
 scores), then its newest ships in service, and a link to the rest. Every ship ever launched is `#/ships/all`.
 
 Nothing about a size or a ship is written in code: the sizes (name, role, where it trains, the metrics that
-judge it) are `ship.sizes` in Postgres, the ships `ship.ships`, their voyages `ship.voyages`
+judge it) are `s1.sizes` in Postgres, the ships `s1.ships`, their voyages `s1.voyages`
 (`thorp/ship_store.py`; the models in `thorp/viable/s3_control/models.py`, made by Alembic). `LADDER` in
-`thorp/models/registry.py` reads `ship.sizes`; `fleet.register()` reads `ship.ships`. To rename a size or
+`thorp/models/registry.py` reads `s1.sizes`; `fleet.register()` reads `s1.ships`. To rename a size or
 change its role, change its row.
 
 ## Size pages
@@ -420,7 +420,7 @@ The Classes home also has **Filling the seven steps to quantum physics**: a matr
 against the seven steps, each cell the tricks that class performed, with "+n" inherited from a
 smaller class and a bar; the last column is the whole route. Taught-only tricks don't count.
 
-Every size on the ladder (`ship.sizes`, read as `LADDER`) gets one page, built from one
+Every size on the ladder (`s1.sizes`, read as `LADDER`) gets one page, built from one
 template (`web/src/components/ModelPage.astro`, filled by `renderRung` in `dashboard.js`) at
 `#/sizes/<name>`, named by its name, not its parameter count: `#/sizes/pilot`, `#/sizes/speller`… (`#/classes/…` still lands there)
 Renamed classes keep their old addresses (`CLASS_RENAMES` in `server.py` and `dashboard.js`:

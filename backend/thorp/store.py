@@ -93,11 +93,17 @@ def papers_log() -> Path:
 
 
 def papers_for_box() -> dict:
-    """The S5 state a box's gate reads, from the store: the switches and the exceptions, as the gate reads them."""
+    """What a box's gate reads, from the store: S5's switches, exceptions and charter terms, S1's frozen stores."""
     from thorp import vsm
 
     return {"written": datetime.now().astimezone().isoformat(timespec="seconds"),
-            "switches": vsm._enforcement(), "exceptions": vsm._exceptions(), "charter_terms": _charter_overrides()}  # fmt: skip
+            "switches": vsm._enforcement(), "exceptions": vsm._exceptions(), "charter_terms": _charter_overrides(), "stores": _stores()}  # fmt: skip
+
+
+def _stores() -> dict:
+    from thorp import stores
+
+    return stores.stores()
 
 
 def _charter_overrides() -> dict:

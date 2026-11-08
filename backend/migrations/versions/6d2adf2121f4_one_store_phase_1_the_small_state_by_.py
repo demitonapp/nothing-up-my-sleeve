@@ -7,17 +7,17 @@ Revises: b8d83576f281
 Create Date: 2026-11-08 13:46:37.625519
 
 """
-from typing import Sequence, Union
+from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision: str = '6d2adf2121f4'
-down_revision: Union[str, Sequence[str], None] = 'b8d83576f281'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | Sequence[str] | None = 'b8d83576f281'
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 SCHEMAS = ("s1", "s2", "s3", "s3star", "s4", "s5")
@@ -166,5 +166,7 @@ def downgrade() -> None:
     op.drop_table('lanes', schema='s2')
     op.drop_table('helm', schema='s2')
     # ### end Alembic commands ###
-    for schema in SCHEMAS:
-        op.execute(f"drop schema if exists {schema}")  # only if empty: a later phase's tables keep it
+    for schema in SCHEMAS:  # only if empty: s3 may hold Alembic's version table
+        op.execute(f"""do $$ begin if exists (select 1 from pg_namespace where nspname = '{schema}') and not exists
+            (select 1 from pg_class c join pg_namespace n on n.oid = c.relnamespace where n.nspname = '{schema}')
+            then drop schema {schema}; end if; end $$""")

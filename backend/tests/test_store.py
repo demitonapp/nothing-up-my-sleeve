@@ -185,3 +185,89 @@ def test_the_dashboard_reads_the_same_store_and_says_when_it_is_down(monkeypatch
         assert e.value.code == 503 and _json.load(e.value)["store"] == "down"
     finally:
         srv.shutdown()
+
+
+# ---------------------------------------------------------------- phase 1b
+
+
+@pytest.fixture
+def old_files_1b(tmp_thorp):
+    d = paths.data_dir()
+    _write(d, "compare/deck-EleutherAI--pythia-14m.json", {"model": "EleutherAI/pythia-14m", "metrics": {"a": 1.0}})
+    _write(d, "compare/chain-grades.json", {"models": {"EleutherAI/pythia-14m": {"kin_test": {"lift": 0.9}}}, "chains": {}})
+    _write(d, "compare/knockout-microsoft__phi-2.json", {"verdict": {"x": "shown"}})
+    _write(d, "compare/nevermore-vs-trigrams.json", [{"run": "a"}])
+    _write(d, "thorp-versions.json", {"9m": [{"v": 1, "ship_key": "9m:abc", "ship": "Argo", "chaining_lift": -0.0283,
+                                              "crowned": "2026-11-07T12:42"}]})  # fmt: skip
+    _write(d, "stores.json", {"prose": {"path": "lists/stores/prose.csv", "books": 2, "tokens": 30, "ranked_by": "x",
+                                        "repeat_rate": 0.03, "sha1": "f00", "candidates": 3}})  # fmt: skip
+    _write(d, "acquisition/intakes/in-20261107-190016.json", {"id": "in-20261107-190016", "list": "l.csv", "status": "done",
+                                                              "started": "2026-11-07T19:00:16", "finished": None, "counts": {"admitted": 1}})  # fmt: skip
+    same = {"at": "2026-11-07T19:00:17", "intake": "in-20261107-190016", "how": "intake", "book_id": "", "verdict": "unresolved",
+            "refused": [], "notes": []}  # fmt: skip
+    _write(d, "acquisition/log.jsonl", [{**same, "title": "Pindar"}, {**same, "title": "Pindar"}, {**same, "title": "Sophocles"}])
+    _write(d, "table/fl-pathfinder.jsonl", [{"at": "2026-11-07T09:18:21", "question": "Good morning.", "answer": "Trequire",
+                                             "temperature": 0.6, "seed": None, "stopped": "length"}])  # fmt: skip
+    t = d / "tokenisers" / "abc123"
+    _write(t, "settings.json", {"vocab": 2048, "clean": "unwrap-v2"})
+    _write(t, "books.json", ["b1", "b2"])
+    _write(t, "stats.json", {"b1": {"tokens": 10}})
+    return d
+
+
+def test_the_1b_import_brings_every_file_in_once_and_as_it_was(old_files_1b):
+    from thorp import acquisition, leaderboard, stores
+    from thorp.viable.records import TableTalk, TokeniserBook, TokeniserRecord
+    from thorp.viable.s4_intelligence import readings
+
+    first = store_import.run(log=lambda *a: None)
+    assert first == {"compare": 4, "thorp-versions.json": 1, "stores.json": 1, "acquisition": 4, "table": 1, "tokenisers": 1}
+    assert set(store_import.run(log=lambda *a: None).values()) == {0}
+    assert readings.chain_grades() == {"EleutherAI/pythia-14m": {"kin_test": {"lift": 0.9}}}
+    assert readings.get("deck-EleutherAI--pythia-14m")["metrics"] == {"a": 1.0}
+    assert [n for n, _ in readings.glob("knockout-*")] == ["knockout-microsoft__phi-2"]
+    assert readings.get("nevermore-vs-trigrams") == [{"run": "a"}]
+    assert leaderboard._versions() == json.loads((old_files_1b / "thorp-versions.json").read_text())
+    assert stores.stores() == json.loads((old_files_1b / "stores.json").read_text())
+    assert [r["title"] for r in acquisition.read_log()] == ["Pindar", "Pindar", "Sophocles"]  # alike lines kept as often
+    assert acquisition.intakes()[0]["counts"] == {"admitted": 1} and acquisition.count_intakes() == 1
+    with store.session() as s:
+        assert s.scalars(select(TableTalk.answer).where(TableTalk.voyage == "fl-pathfinder")).all() == ["Trequire"]
+        assert s.get(TokeniserRecord, "abc123").settings["clean"] == "unwrap-v2"
+        assert sorted(b.book_id for b in s.scalars(select(TokeniserBook))) == ["b1", "b2"]
+
+
+def test_the_1b_cutover_retires_all_but_the_tokenisers(old_files_1b):
+    store_import.run(retire=True, log=lambda *a: None)
+    d = old_files_1b
+    assert (d / "compare.imported").is_dir() and not (d / "compare").exists()
+    assert (d / "table.imported").is_dir() and (d / "thorp-versions.json.imported").exists()
+    assert (d / "acquisition" / "intakes.imported").is_dir() and (d / "acquisition" / "log.jsonl.imported").exists()
+    assert (d / "tokenisers" / "abc123" / "settings.json").exists()  # the artifact a voyage reads stays
+
+
+def test_a_reading_is_named_as_its_file_was_and_keeps_no_nan():
+    from thorp.viable.s4_intelligence import readings
+
+    assert readings.kind_of("knockout-deck-Qwen--Qwen3-4B") == ("knockout-deck", "Qwen/Qwen3-4B")
+    assert readings.kind_of("knockout-microsoft__phi-2") == ("knockout", "microsoft/phi-2")
+    assert readings.kind_of("mlx-community--Qwen3-0.6B-bf16__hole-cards-unseen") == ("scored", "mlx-community/Qwen3-0.6B-bf16")
+    readings.put("deck-x", {"model": "x", "metrics": {"a": float("nan"), "b": 1.0}})
+    assert readings.get("deck-x")["metrics"] == {"a": None, "b": 1.0}
+
+
+def test_a_crowning_is_kept(tmp_thorp):
+    from thorp import leaderboard
+
+    cur = leaderboard.crown([{"preset": "9m", "ship_key": "9m:a", "ship": "Argo", "chaining_lift": 0.2, "sailings": 2}])
+    assert cur["9m"]["v"] == 1 and leaderboard._versions()["9m"][0]["ship"] == "Argo"
+    leaderboard.crown([{"preset": "9m", "ship_key": "9m:b", "ship": "Endeavour", "chaining_lift": 0.9, "sailings": 2}])
+    assert [h["ship"] for h in leaderboard._versions()["9m"]] == ["Argo", "Endeavour"]
+
+
+def test_the_intake_holder_is_recorded_while_held(tmp_thorp):
+    from thorp import acquisition
+
+    with acquisition._intake_lock("in-1", "l.csv", log=lambda *a: None):
+        assert acquisition.holder()["id"] == "in-1"
+    assert acquisition.holder() is None

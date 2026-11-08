@@ -14,7 +14,7 @@ non-Euclidean geometry), measured by thorp/trigrams.py:
 - **The trigram stores** (`lists/stores/trigram.csv`): everything else, with a variety floor (so indexes,
   tables and lists do not win), ranked by in-window trigram repetition, taken until TRIGRAM_TOKENS.
 
-Each store is frozen: data/stores.json records its books, tokens and the list's content hash, and the
+Each store is frozen: s1.stores records its books, tokens and the list's content hash, and the
 rule (thorp/stores.py) checks the hash, so a store cannot drift under the runs that read it.
 
     uv run python scripts/make_stores.py
@@ -24,7 +24,6 @@ from __future__ import annotations
 
 import csv
 import hashlib
-import json
 import re
 import statistics
 
@@ -128,7 +127,9 @@ def main() -> None:
         print(
             f"{key}: {len(chosen)} books, {tokens / 1e6:.0f}M tokens, trigram {stores[key]['repeat_rate']:.3f}, names {stores[key]['name_repeat']:.3f}"
         )
-    (ROOT / "data" / "stores.json").write_text(json.dumps(stores, indent=1))
+    from thorp import stores as frozen
+
+    frozen.freeze(stores)  # s1.stores (was data/stores.json)
 
 
 if __name__ == "__main__":

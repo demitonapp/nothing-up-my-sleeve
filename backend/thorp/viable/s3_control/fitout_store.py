@@ -121,7 +121,7 @@ def record(fitout_key: str, item_key: str, value, passed: bool, evidence: dict, 
 def readiness(fitout_key: str) -> dict | None:
     with engine().connect() as c:
         r = c.execute(
-            text("select * from fitout.readiness where fitout_key = :k"), {"k": fitout_key}
+            text("select * from s3.readiness where fitout_key = :k"), {"k": fitout_key}
         ).mappings().first()
         return dict(r) if r else None
 
@@ -134,9 +134,9 @@ def checklist(fitout_key: str) -> list[dict]:
                 """select fp.item_key, fp.required, fp.note, i.name, i.about, i.system, i.kind, i.measure,
                           i.comparator, i.threshold, i.clean_version, r.value, r.passed, r.evidence,
                           r.checked_at, r.checked_by
-                   from fitout.fitout_prechecks fp
-                   join fitout.precheck_items i on i.key = fp.item_key
-                   left join fitout.current_results r
+                   from s3.fitout_prechecks fp
+                   join s3.precheck_items i on i.key = fp.item_key
+                   left join s3.current_results r
                      on r.fitout_key = fp.fitout_key and r.item_key = fp.item_key
                    where fp.fitout_key = :k
                    order by fp.required desc, i.system, fp.item_key"""

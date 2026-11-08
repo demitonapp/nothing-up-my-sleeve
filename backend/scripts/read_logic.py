@@ -1,13 +1,12 @@
 """The logic deck read on outside models, with each relation's gain and a bootstrap band over its items (Justin,
 2026-11-08 12:15: "can you read a model higher than qwen 4b to see where the scales starts settling down"). Writes
-data/compare/logic-<model>.json; takes S2's helm.
+s4.outside_readings, logic-<model>; takes S2's helm.
 
     uv run --project backend --group compare python backend/scripts/read_logic.py mlx-community/Qwen3.8-27B-4bit
 """
 
 from __future__ import annotations
 
-import json
 import sys
 import time
 
@@ -17,7 +16,7 @@ sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent))
 
 from grade_chains import _external  # noqa: E402
 
-from thorp import paths, vsm  # noqa: E402
+from thorp import vsm  # noqa: E402
 from thorp.evaluators.logic import load_deck, score_deck  # noqa: E402
 
 RELATIONS = ("order", "cause", "membership", "proportion", "counterfactual")
@@ -58,8 +57,9 @@ def main(names: list[str]) -> None:
                 out["gains40"][rel] = {"gain": gain(it40, rel), "lo": float(lo), "hi": float(hi), "items": n}
         out["logic40"] = {k: v for k, v in r40.items() if k != "items"}
         out["items40"] = it40
-        p = paths.data_dir() / "compare" / f"logic-{name.replace('/', '--')}.json"
-        p.write_text(json.dumps(out, indent=1))
+        from thorp.viable.s4_intelligence import readings
+
+        readings.put(f"logic-{name.replace('/', '--')}", out)
         print(name, {k: round(v["gain"], 3) for k, v in out["gains"].items()}, f"{out['seconds']}s", flush=True)
 
 

@@ -17,7 +17,7 @@ Stafford Beer's Viable System Model, mapped onto Thorp, each system with its mem
   **S3\*, audit**: `audit()`, over the queue and the ledger, sporadic and independent of the gate
   (the night watches and steering tasks call it too).
 - **S4, intelligence**: the outside world and the future: the competitors and the reference ladder
-  (fleet.COMPETITORS, data/compare/), the leaderboard and Smoking Qwen's forecast, the research the tests
+  (fleet.COMPETITORS, s4.outside_readings), the leaderboard and Smoking Qwen's forecast, the research the tests
   rest on.
 - **S5, policy**: Thorp's identity: the POLICIES below, each adopted by Justin on a date, enforced or
   advisory; DECISIONS.md is S5's record. A policy changes only by a new entry there and here.
@@ -95,7 +95,7 @@ SYSTEMS: dict[str, System] = {
             "the outside world and the future: competitors, forecasts, research",
             (
                 "thorp/fleet.py COMPETITORS, REFERENCE_LADDER",
-                "data/compare/",
+                "s4.outside_readings",
                 "thorp/leaderboard.py",
                 "thorp/smoking_qwen.py",
                 "thorp/knockout.py",

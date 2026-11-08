@@ -64,7 +64,7 @@ def _store_clean(_store_migrated):
     from thorp import store
     from thorp.viable import records
 
-    tables = ", ".join(f"{t.schema}.{t.name}" for t in records.Base.metadata.sorted_tables if t.schema in records.SCHEMAS)
+    tables = ", ".join(f"{t.schema}.{t.name}" for t in records.tables())  # the records only: the sizes stay seeded
     with store.session() as s:
         s.execute(text(f"truncate {tables} restart identity cascade"))
 
@@ -97,7 +97,7 @@ def tmp_thorp(tmp_path, monkeypatch):
     from thorp.viable.s3_control.fitout_store import session
 
     with session() as s, s.begin():  # the test database's ships, emptied (its sizes stay)
-        s.execute(text("truncate ship.ships cascade"))
+        s.execute(text("truncate s1.ships cascade"))
     fleet._REGISTER = None
     return tmp_path
 

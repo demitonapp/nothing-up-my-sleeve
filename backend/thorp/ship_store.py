@@ -1,9 +1,9 @@
-"""The ships in Postgres (schema `ship`, models in thorp/viable/s3_control/models.py, made by Alembic): the
+"""The ships in Postgres (schema `s1`, S1 operations, models in thorp/viable/s3_control/models.py, made by Alembic): the
 sizes (each rung's name, role, where it trains and the metrics that judge it), the ships (a size fitted out
 one way) and their voyages (the runs; their metrics and status stay in the ledger).
 
-Nothing here is a list in code: a size is named and described in `ship.sizes`, a ship registered in
-`ship.ships` (Justin, 2026-11-08: "these things shouldn't be hardcoded, we have postgres for a reason").
+Nothing here is a list in code: a size is named and described in `s1.sizes`, a ship registered in
+`s1.ships` (Justin, 2026-11-08: "these things shouldn't be hardcoded, we have postgres for a reason").
 """
 
 from __future__ import annotations

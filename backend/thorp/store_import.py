@@ -4,15 +4,20 @@ system"). Run as often as wanted: a row already in the store is not written agai
     uv run thorp store import            # read the files, write what is not yet in Postgres
     uv run thorp store import --retire   # and then rename each file *.imported, so nothing reads it (the cutover)
 
-What it brings in: S5's switches (policies.json), exceptions (policy-exceptions.json) and charter terms
+What it brings in. Phase 1: S5's switches (policies.json), exceptions (policy-exceptions.json) and charter terms
 (charter.json); S3's gate log (gate-log.jsonl) and spend log (charter-log.jsonl); S4's market reads
-(charter-market.jsonl). Not brought in: helm.json and lanes.json, which say who is out *now*: the helm's holder and
-the coordinator write themselves into s2 as they sail, so after the cutover restart they are recorded afresh.
+(charter-market.jsonl). Phase 1b: S4's readings of outside models (compare/*.json); S1's crownings
+(thorp-versions.json), stores (stores.json), intakes and their verdicts (acquisition/intakes/*.json, acquisition/
+log.jsonl), table talk (table/*.jsonl), and the register of tokenisers (tokenisers/<id>/: their files stay, as the
+artifact a voyage reads, and are never retired). Not brought in: helm.json, lanes.json and acquisition/intake.json,
+which say who is out *now*: each holder writes itself into s2 as it starts, so after the cutover restart they are
+recorded afresh.
 """
 
 from __future__ import annotations
 
 import json
+from collections import Counter
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -29,8 +34,6 @@ from thorp.viable.records import (
 )
 from thorp.viable.s3_control import charter as s3
 
-FILES = ("policies.json", "policy-exceptions.json", "charter.json", "gate-log.jsonl", "charter-log.jsonl",
-         "charter-market.jsonl")  # fmt: skip
 WORDS = "imported from data/{} (phase 1 of the one store)"
 
 
@@ -93,7 +96,18 @@ def charter_terms(p: Path) -> int:
 
 
 def gate_log(p: Path) -> int:
-    return sum(vsm.insert_gate_decision(r, source="imported", once=True) for r in _lines(p) if r.get("verdict"))
+    """Each decision as often as the log has it (two alike in one second are two decisions)."""
+    have = Counter(_key(r) for r in vsm.gate_log(10**9))
+    n = 0
+    for r in _lines(p):
+        if not r.get("verdict"):
+            continue
+        r = {**r, "at": _utc(r["at"]).astimezone().strftime(vsm.GATE_TIME)}
+        if have[_key(r)]:
+            have[_key(r)] -= 1
+            continue
+        n += vsm.insert_gate_decision(r, source="imported")
+    return n
 
 
 def spend_log(p: Path) -> int:
@@ -124,6 +138,107 @@ def market(p: Path) -> int:
     return len(new)
 
 
+def readings_dir(d: Path) -> int:
+    from thorp.viable.s4_intelligence import readings
+
+    n = 0
+    for f in sorted(d.glob("*.json")):
+        try:
+            doc = json.loads(f.read_text())
+        except ValueError:
+            continue
+        if readings.get(f.stem) != readings._finite(json.loads(json.dumps(doc, default=float))):
+            readings.put(f.stem, doc)
+            n += 1
+    return n
+
+
+def crownings(p: Path) -> int:
+    from thorp import leaderboard
+
+    have = leaderboard._versions()
+    n = 0
+    for preset, hist in json.loads(p.read_text()).items():
+        for h in hist:
+            if h not in have.get(preset, []):
+                leaderboard.put_crowning(preset, h)
+                n += 1
+    return n
+
+
+def stores_file(p: Path) -> int:
+    from thorp import stores
+
+    have, want = stores.stores(), json.loads(p.read_text())
+    new = {k: v for k, v in want.items() if have.get(k) != v}
+    if new:
+        stores.freeze(new)
+    return len(new)
+
+
+def acquisition_dir(d: Path) -> int:
+    from thorp import acquisition
+    from thorp.viable.records import Intake
+
+    n = 0
+    for f in sorted((d / "intakes").glob("in-*.json")):
+        rec = json.loads(f.read_text())
+        with store.session() as s:
+            r = s.get(Intake, rec["id"])
+            same = r is not None and r.record == json.loads(json.dumps(rec, default=str))
+        if not same:
+            acquisition._write_intake(rec)
+            n += 1
+    log = d / "log.jsonl"
+    if log.exists():  # each line as often as the file has it: two books refused in one second are two verdicts
+        have = Counter(_key(e) for e in acquisition.read_log())
+        for e in _lines(log):
+            k = _key(e)
+            if have[k]:
+                have[k] -= 1
+                continue
+            acquisition._append_log(e)
+            n += 1
+    return n
+
+
+def _key(line: dict) -> str:
+    return json.dumps(line, sort_keys=True, ensure_ascii=False, default=str)
+
+
+def table_dir(d: Path) -> int:
+    from thorp import table
+    from thorp.viable.records import TableTalk
+
+    n = 0
+    for f in sorted(d.glob("*.jsonl")):
+        with store.session() as s:
+            seen = {(t.at, t.question) for t in s.scalars(select(TableTalk).where(TableTalk.voyage == f.stem))}
+        for ln in _lines(f):
+            if (_utc(ln["at"]), ln["question"]) not in seen:
+                table.keep_talk(f.stem, ln)
+                n += 1
+    return n
+
+
+def tokenisers_dir(d: Path) -> int:
+    from thorp import tokeniser
+    from thorp.viable.records import TokeniserRecord
+
+    n = 0
+    for t in sorted(x for x in d.iterdir() if x.is_dir() and not x.name.endswith(".tmp")):
+        if not (t / "settings.json").exists():
+            continue
+        with store.session() as s:
+            if s.get(TokeniserRecord, t.name):
+                continue
+        books = json.loads((t / "books.json").read_text()) if (t / "books.json").exists() else []
+        stats = json.loads((t / "stats.json").read_text()) if (t / "stats.json").exists() else {}
+        tokeniser.register(t.name, t, json.loads((t / "settings.json").read_text()), stats, books)
+        n += 1
+    return n
+
+
 IMPORTERS = {
     "policies.json": switches,
     "policy-exceptions.json": exceptions,
@@ -131,7 +246,15 @@ IMPORTERS = {
     "gate-log.jsonl": gate_log,
     "charter-log.jsonl": spend_log,
     "charter-market.jsonl": market,
+    "compare": readings_dir,
+    "thorp-versions.json": crownings,
+    "stores.json": stores_file,
+    "acquisition": acquisition_dir,
+    "table": table_dir,
+    "tokenisers": tokenisers_dir,
 }
+NEVER_RETIRED = {"tokenisers"}  # the tokeniser's own files are the artifact a voyage reads
+RETIRED_WITHIN = {"acquisition": ("intakes", "log.jsonl")}  # the lock beside them stays
 
 
 def run(data: Path | None = None, retire: bool = False, log=print) -> dict[str, int]:
@@ -144,7 +267,9 @@ def run(data: Path | None = None, retire: bool = False, log=print) -> dict[str, 
             continue
         out[name] = fn(p)
         log(f"store: {name}: {out[name]} new row(s)")
-        if retire:
-            p.rename(p.with_name(p.name + ".imported"))
-            log(f"store: {name} retired (renamed {name}.imported; nothing reads it)")
+        if retire and name not in NEVER_RETIRED:
+            for q in [p / x for x in RETIRED_WITHIN[name]] if name in RETIRED_WITHIN else [p]:
+                if q.exists():
+                    q.rename(q.with_name(q.name + ".imported"))
+                    log(f"store: {q.relative_to(data)} retired (renamed {q.name}.imported; nothing reads it)")
     return out

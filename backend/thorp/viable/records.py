@@ -226,3 +226,143 @@ class CharterTerm(Base):
     value: Mapped[dict | list | str | int | float | bool] = mapped_column(JSONB)
     words: Mapped[str] = mapped_column(Text, default="", server_default="")
     set_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+# ---------------------------------------------------------------- phase 1b
+
+
+class OutsideReading(Base):
+    """S4: a reading of an outside model (or of the field): a deck, a knockout, the logic deck, a book list scored,
+    the chain grades. `name` is what the file under data/compare/ was called (deck-EleutherAI--pythia-14m), so a
+    reading is found as it always was; `kind` and `model` say what it is and of whom."""
+
+    __tablename__ = "outside_readings"
+    __table_args__ = (Index("outside_readings_kind_model", "kind", "model"), {"schema": S4})
+
+    name: Mapped[str] = mapped_column(Text, primary_key=True)
+    kind: Mapped[str] = mapped_column(Text)  # chain-grades, deck, knockout, knockout-deck, logic, scored, other
+    model: Mapped[str | None] = mapped_column(Text)
+    reading: Mapped[dict] = mapped_column(JSONB)
+    read_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class Crowning(Base):
+    """S1: a ship crowned its size's version n (Thorp 9m v2): the ship, its chaining lift, when. Was
+    thorp-versions.json. A version rises only when a new ship beats the last by more than the noise."""
+
+    __tablename__ = "crownings"
+    __table_args__ = (Index("crownings_ship", "ship_key"), {"schema": S1})
+
+    preset: Mapped[str] = mapped_column(Text, primary_key=True)
+    v: Mapped[int] = mapped_column(Integer, primary_key=True)
+    ship_key: Mapped[str] = mapped_column(Text)
+    ship: Mapped[str] = mapped_column(Text)
+    chaining_lift: Mapped[float] = mapped_column(Float)
+    crowned: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class StoreList(Base):
+    """S1: a ship's store, frozen (scripts/make_stores.py): the list it is, its books and tokens, how it was ranked,
+    the list's content hash (the stores rule refuses a store changed since). Was stores.json."""
+
+    __tablename__ = "stores"
+    __table_args__ = {"schema": S1}
+
+    key: Mapped[str] = mapped_column(Text, primary_key=True)
+    path: Mapped[str] = mapped_column(Text)
+    books: Mapped[int] = mapped_column(Integer)
+    tokens: Mapped[int] = mapped_column(BigInteger)
+    sha1: Mapped[str] = mapped_column(Text)
+    measures: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}")  # ranked_by, repeat_rate, ...
+    frozen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class Intake(Base):
+    """S1: an intake, a book list put through the intake gate (thorp acquire). Was acquisition/intakes/<id>.json."""
+
+    __tablename__ = "intakes"
+    __table_args__ = {"schema": S1}
+
+    id: Mapped[str] = mapped_column(Text, primary_key=True)
+    list: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str | None] = mapped_column(Text)
+    started: Mapped[str | None] = mapped_column(Text)
+    finished: Mapped[str | None] = mapped_column(Text)
+    record: Mapped[dict] = mapped_column(JSONB)  # the whole record as acquisition writes it (counts, rules, bytes)
+
+
+class IntakeVerdict(Base):
+    """S1: one book's verdict at the intake gate (or by an older path), as logged. Was acquisition/log.jsonl."""
+
+    __tablename__ = "intake_verdicts"
+    __table_args__ = (Index("intake_verdicts_intake", "intake_id"), Index("intake_verdicts_book", "book_id"),
+                      {"schema": S1})  # fmt: skip
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    intake_id: Mapped[str | None] = mapped_column(Text)  # none for a book taken in by an older path
+    how: Mapped[str | None] = mapped_column(Text)
+    book_id: Mapped[str | None] = mapped_column(Text)
+    verdict: Mapped[str | None] = mapped_column(Text)
+    entry: Mapped[dict] = mapped_column(JSONB)  # the rest: title, authors, source, set, refused, notes, ...
+
+
+class IntakeHolder(Base):
+    """S2's record of the intake taking books in now (the lock stays an flock). Was acquisition/intake.json."""
+
+    __tablename__ = "intake_holder"
+    __table_args__ = {"schema": S2}
+
+    lock: Mapped[str] = mapped_column(Text, primary_key=True, default="intake", server_default="intake")
+    id: Mapped[str] = mapped_column(Text)
+    list: Mapped[str | None] = mapped_column(Text)
+    pid: Mapped[int] = mapped_column(Integer)
+    since: Mapped[str] = mapped_column(Text)
+
+
+class TokeniserRecord(Base):
+    """S1: a shared tokeniser, registered when it is trained: its id (the hash of its books and settings), the
+    settings, the per-book stats. Its files (spm.model and its own settings, books and stats beside it) stay the
+    artifact a voyage reads, here or aboard a hired box; this is the register that ties it to its books."""
+
+    __tablename__ = "tokenisers"
+    __table_args__ = {"schema": S1}
+
+    id: Mapped[str] = mapped_column(Text, primary_key=True)
+    path: Mapped[str] = mapped_column(Text)
+    settings: Mapped[dict] = mapped_column(JSONB)
+    stats: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}")
+    trained_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class TokeniserBook(Base):
+    """S1: a book a tokeniser was trained on."""
+
+    __tablename__ = "tokeniser_books"
+    __table_args__ = (Index("tokeniser_books_book", "book_id"), {"schema": S1})
+
+    tokeniser_id: Mapped[str] = mapped_column(Text, ForeignKey(f"{S1}.tokenisers.id", ondelete="CASCADE"), primary_key=True)
+    book_id: Mapped[str] = mapped_column(Text, primary_key=True)
+
+
+class TableTalk(Base):
+    """S1: a question put to a ship at the table and its answer (thorp/table.py). Was table/<voyage>.jsonl."""
+
+    __tablename__ = "table_talk"
+    __table_args__ = (Index("table_talk_voyage", "voyage", "at"), {"schema": S1})
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    voyage: Mapped[str] = mapped_column(Text)  # the voyage's name, as the file was named
+    run_id: Mapped[str | None] = mapped_column(Text)
+    step: Mapped[int | None] = mapped_column(Integer)
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    question: Mapped[str] = mapped_column(Text)
+    answer: Mapped[str] = mapped_column(Text)
+    temperature: Mapped[float | None] = mapped_column(Float)
+    seed: Mapped[int | None] = mapped_column(Integer)
+    stopped: Mapped[str | None] = mapped_column(Text)
+
+
+def tables():
+    """The tables this module defines (the records), not the fitouts, the Wager or the ships beside them."""
+    return [m.local_table for m in Base.registry.mappers if m.class_.__module__ == __name__]

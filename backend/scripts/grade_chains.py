@@ -1,6 +1,6 @@
 """Grade the discovery chains (2026-11-07, Justin: "each test must get harder as it moves up the
 classes of ships"). Scores every chain's rungs on the reference ladder (fleet.REFERENCE_LADDER) and
-on the named Thorp runs, applies fleet.grading to each chain, and writes data/compare/chain-grades.json
+on the named Thorp runs, applies fleet.grading to each chain, and keeps the chain grades in the store (s4.outside_readings, "chain-grades"; was data/compare/chain-grades.json)
 ({models: {model: {trick: {lift, score, performed}}}, chains: {bettor test: grading}}) for the
 dashboard. Usage: uv run --group compare python scripts/grade_chains.py [thorp run names...]
 """
@@ -12,8 +12,9 @@ import sys
 
 import mlx.core as mx
 
-from thorp import fleet, paths
+from thorp import fleet
 from thorp.evaluators.discovery import load_pairs, score_pairs
+from thorp.viable.s4_intelligence import readings
 
 
 def _external(name):
@@ -65,8 +66,7 @@ def main(runs: list[str]) -> None:
     rungs = [k for c in fleet.chains() for k in c if fleet.TRICKS[k].evaluator == "discovery"]
     pairs = {k: load_pairs(fleet.TRICKS[k].pairs) for k in rungs}
     sha = {k: hashlib.sha1(json.dumps(pairs[k]).encode()).hexdigest()[:12] for k in rungs}
-    path = paths.data_dir() / "compare" / "chain-grades.json"
-    old = json.loads(path.read_text())["models"] if path.exists() else {}
+    old = readings.chain_grades()
     models: dict[str, dict] = {}
     competitors = [m for m in fleet.COMPETITORS if m not in fleet.REFERENCE_LADDER]
     for name in list(fleet.REFERENCE_LADDER) + competitors + runs:
@@ -167,10 +167,9 @@ def main(runs: list[str]) -> None:
             out["cards"] = cards
         models[name] = out
         # written after every model, so the dashboard fills in as the scoring goes, not only at the end
-        partial = json.loads(path.read_text()) if path.exists() else {"models": {}, "chains": {}}
-        partial["models"][name] = out
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(_finite(partial), indent=1))
+        partial = readings.get("chain-grades") or {"models": {}, "chains": {}}
+        partial.setdefault("models", {})[name] = out
+        readings.put("chain-grades", _finite(partial))
         print(
             name,
             " ".join(
@@ -200,8 +199,7 @@ def main(runs: list[str]) -> None:
             "unreached",
             g["unreached"],
         )
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(_finite({"models": models, "chains": chains}), indent=1))
+    readings.put("chain-grades", _finite({"models": models, "chains": chains}))
 
 
 if __name__ == "__main__":

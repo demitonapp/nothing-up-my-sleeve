@@ -2,7 +2,7 @@
 prechecks are what must be measured true before it may sail. Alembic (migrations/) creates and changes these
 tables; nothing else does (Justin, 2026-11-07: "use alembic to manage the python data migrations and models").
 
-Schema `fitout`:
+Schema `s3` (S3 control; `fitout` until the systems took their schemas, 8 November):
 - `fitouts`, `stages`: the fitout and its stages in order.
 - `precheck_items`: the catalogue of checks (what is measured, the pass rule, the VSM system that owns it).
 - `fitout_prechecks`: which items a fitout must pass (required) or carries as planned.
@@ -31,7 +31,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
-SCHEMA = "fitout"
+SCHEMA = "s3"  # S3 control (was `fitout` until the systems took their schemas)
 SYSTEMS = ("S1", "S2", "S3", "S3*", "S4", "S5")
 KINDS = ("cleaning", "library", "tokeniser", "policy")
 
@@ -138,12 +138,12 @@ class PrecheckResult(Base):
 
 VIEWS = {
     "current_results": """
-        create or replace view fitout.current_results as
+        create or replace view s3.current_results as
         select distinct on (fitout_key, item_key) *
-        from fitout.precheck_results
+        from s3.precheck_results
         order by fitout_key, item_key, checked_at desc, id desc""",
     "readiness": """
-        create or replace view fitout.readiness as
+        create or replace view s3.readiness as
         select f.key as fitout_key,
                count(*) filter (where fp.required)                                    as required,
                count(*) filter (where fp.required and r.passed)                       as passed,
@@ -151,15 +151,15 @@ VIEWS = {
                count(*) filter (where not fp.required)                                as planned,
                coalesce(bool_and(coalesce(r.passed, false)) filter (where fp.required), false)
                  and count(*) filter (where fp.required) > 0                           as ready
-        from fitout.fitouts f
-        join fitout.fitout_prechecks fp on fp.fitout_key = f.key
-        left join fitout.current_results r on r.fitout_key = fp.fitout_key and r.item_key = fp.item_key
+        from s3.fitouts f
+        join s3.fitout_prechecks fp on fp.fitout_key = f.key
+        left join s3.current_results r on r.fitout_key = fp.fitout_key and r.item_key = fp.item_key
         group by f.key""",
 }
 
 
-# ---- the Navigator's Wager (S4 intelligence's game; thorp/viable/s4_intelligence/wager.py), schema `game`
-GAME_SCHEMA = "game"
+# ---- the Navigator's Wager (S4 intelligence's game; thorp/viable/s4_intelligence/wager.py), schema `s4`
+GAME_SCHEMA = "s4"  # S4 intelligence (was `game`)
 
 
 class WagerRound(Base):
@@ -195,10 +195,10 @@ class WagerBet(Base):
     practice: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")  # placed after the pull sailed
 
 
-# ---- the ships (schema `ship`): what a ship is, held in the database, not in code (Justin, 2026-11-08:
+# ---- the ships (schema `s1`, S1 operations; was `ship`): what a ship is, held in the database, not in code (Justin, 2026-11-08:
 # "these things shouldn't be hardcoded, we have postgres for a reason"; "a ship has characteristics: size,
 # training content, training methodology, voyages, discoveries"). Read through thorp/ship_store.py.
-SHIP_SCHEMA = "ship"
+SHIP_SCHEMA = "s1"  # S1 operations (was `ship`)
 
 
 class Size(Base):

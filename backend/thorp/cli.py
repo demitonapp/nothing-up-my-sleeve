@@ -14,7 +14,7 @@ def cmd_acquire(a) -> int:
     rec = acquisition.intake(a.list, set_name=a.set, limit=a.limit, dry_run=a.dry_run)
     by = ", ".join(f"{k} {n}" for k, n in rec["refused_by_rule"].items())
     print(
-        f"record: data/acquisition/intakes/{rec['id']}.json"
+        f"record: s1.intakes {rec['id']}"
         + (f"; refused by rule: {by}" if by else "")
     )
     return 0

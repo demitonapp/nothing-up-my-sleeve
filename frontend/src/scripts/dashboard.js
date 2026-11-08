@@ -2299,7 +2299,7 @@ function rungEvidence(t, ft, rank, opts = {}) {
   }
   return body;
 }
-// ---- grading (fleet.grading, data/compare/chain-grades.json): does a chain get harder as it climbs, judged on many models
+// ---- grading (fleet.grading, the chain grades, s4.outside_readings): does a chain get harder as it climbs, judged on many models
 // at once. Graded: no model performs a rung while failing one below it, no rung is performed by more models than the
 // one below, and every rung is performed by some model. The reference ladder (Pythia 14m to 410m, Qwen3 0.6B) is
 // shown beside Thorp's classes when the toggle is on; it is a per-viewer choice, remembered.
@@ -2311,7 +2311,7 @@ function chainRefToggle(id, redraw) {
   el.onchange = () => { chainRef = el.checked; try { localStorage.setItem('thorp.chainref', chainRef ? 'on' : 'off'); } catch (e) {} redraw(); };
 }
 function gradeNote(g, nameOf, full) {
-  if (!g) return `<span class="${pillCls('')}" title="no grading written yet (data/compare/chain-grades.json)">not graded yet</span>`;
+  if (!g) return `<span class="${pillCls('')}" title="no grading written yet (the chain grades, s4.outside_readings)">not graded yet</span>`;
   if (g.graded) return `<span class="${pillCls('good')}" title="harder at every rung: no model passes a rung it fails below, fewer pass each rung, and every rung is reached">graded</span>`;
   const bits = [];
   if (g.inversions.length) bits.push(`${g.inversions.length} inversion${g.inversions.length > 1 ? 's' : ''}`);

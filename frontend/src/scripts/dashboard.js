@@ -4128,9 +4128,18 @@ const LANE_TONE = { mac: 'blue', vast: 'accent' };
 const mins = m => m == null ? '' : m < 90 ? `${Math.round(m)} min` : `${(m / 60).toFixed(1)} h`;
 const laneChip = (lane, d) => `<span class="${pillCls(LANE_TONE[lane] || '')} lanechip" title="${esc(d.lanes[lane].where)}: ${esc(d.lanes[lane].how)}">${esc(d.lanes[lane].name.toLowerCase())}</span>`;
 function planWhat(p) {
-  if (p.kind === 'spec') return `<a href="#${shipHash(p.name)}" class="mono">${esc(p.name)}</a>${p.missing ? ` <span class="${pillCls('bad')}">no spec</span>` : ''}
-    <div class="planship">${esc(String(p.ship || '').replace(/^Fitout: /, ''))}</div>
-    <div class="s">${p.expedition ? `<a href="#/expeditions/${esc(p.expedition)}">${esc(p.expedition_name || p.expedition)}</a> · ` : ''}${esc(p.preset || '')}${p.seed != null ? ` · seed ${p.seed}` : ''}</div>${p.goal ? `<div class="plangoal" title="${esc(p.goal)}">${esc(p.goal)}</div>` : ''}`;
+  if (p.kind === 'spec') {
+    // the ship's own title (its spec's ship label, the "Fitout:" dropped), its expedition (the fitout where the
+    // expedition is Ogden's: one expedition sails both v0.1 and v0.2), size and seed, then its goal in full type
+    const title = String(p.ship || p.name).replace(/^Fitout: /, '');
+    const ex = p.expedition === 'ogden' && p.material && p.material.fitout ? esc(p.material.fitout)
+      : p.expedition ? `<a href="#/expeditions/${esc(p.expedition)}">${esc(p.expedition_name || p.expedition)}</a>` : '';
+    const prog = p.at_sea && p.step != null && p.training && p.training.steps ? ` · step ${p.step.toLocaleString()} of ${p.training.steps.toLocaleString()} (${Math.round(100 * p.step / p.training.steps)}%)` : '';
+    return `<div class="plantitle"><a href="#${shipHash(p.name)}">${esc(title)}</a>${p.missing ? ` <span class="${pillCls('bad')}">no spec</span>` : ''}</div>
+      <div class="s">${ex}${ex ? ' · ' : ''}${esc(p.preset || '')}${p.seed != null ? ` · seed ${p.seed}` : ''} · <span class="mono">${esc(p.name)}</span>${prog}</div>
+      ${p.goal ? `<div class="plangoal" title="${esc(p.goal)}">${esc(p.goal)}</div>` : ''}
+      <details class="plandet"><summary>training plan and material</summary><div class="plandetgrid"><div><div class="s"><b>training plan</b></div>${planTraining(p)}</div><div><div class="s"><b>training material</b></div>${planMaterial(p)}</div></div></details>`;
+  }
   if (p.kind === 'hold') return `<b>${esc(p.name)}</b> <span class="${pillCls(p.hold && p.hold.held ? 'accent' : 'good')}">${p.hold && p.hold.held ? 'held' : 'lifted'}</span>${p.hold && p.hold.note ? `<div class="plangoal">${esc(p.hold.note)}</div>` : ''}`;
   if (p.kind === 'wait') return `<b>${esc(p.name)}</b>`;
   return `<span class="s">a step:</span> <span class="mono" title="${esc(p.text)}">${esc(p.name)}</span>`;
@@ -4172,13 +4181,17 @@ async function loadWaters() {
   const el = document.getElementById('waters'); if (!el) return;
   let d; try { d = await get('/api/waters'); } catch (e) { return; }
   const key = JSON.stringify(d); if (key === watersKey) return; watersKey = key;
-  const rows = d.plan.map(p => `<tr class="plan-${p.kind}${p.waits_for ? ' waiting' : ''}"><td class="s">${p.n}</td>
-      <td class="plantime">${p.at_least ? '≥ ' : '≈ '}${esc(p.starts_at)}<div class="s">${p.est_min != null ? (p.est_is_max ? `up to ${mins(p.est_min)}` : mins(p.est_min)) : 'no time yet'}</div></td>
-      <td>${laneChip(p.lane, d)}</td>${p.kind === 'spec' ? `<td class="planwhat">${planWhat(p)}</td><td class="plantrain">${planTraining(p)}</td><td class="planmat">${planMaterial(p)}</td>` : `<td colspan="3">${planWhat(p)}</td>`}
+  const when = p => p.at_sea ? `<span class="${pillCls('running')}">at sea</span><div class="s">since ${esc(String(p.since || '').slice(11, 16))}${p.left_min != null ? `, about ${mins(p.left_min)} left` : ''}</div>`
+    : `${p.at_least ? '≥ ' : '≈ '}${esc(p.starts_at)}<div class="s">${p.est_min != null ? (p.est_is_max ? `up to ${mins(p.est_min)}` : mins(p.est_min)) : 'no time yet'}</div>`;
+  const ships = d.plan.filter(p => p.kind === 'spec').length;
+  const rows = d.plan.map(p => `<tr class="plan-${p.kind}${p.at_sea ? ' atsea' : ''}${p.waits_for ? ' waiting' : ''}"><td class="s">${p.n ?? ''}</td>
+      <td class="plantime">${when(p)}</td><td>${laneChip(p.lane, d)}</td>
+      <td class="planwhat">${planWhat(p)}</td>
       <td class="s">${p.waits_for ? `<span class="${pillCls('accent')}">waits</span> ${esc(p.waits_for)}` : ''}</td></tr>`).join('')
-    || `<tr><td colspan="7" class="${emptyCls(true)}">the queue is empty</td></tr>`;
+    || `<tr><td colspan="5" class="${emptyCls(true)}">the queue is empty</td></tr>`;
   el.innerHTML = `<div class="waters">${laneCard('mac', d)}${laneCard('vast', d)}</div>
-    <div class="scroll"><table data-nosort class="plantable"><thead><tr><th>#</th><th title="about when it sails (≥ where a line ahead of it in its waters has no time yet), and for how long">sails</th><th>waters</th><th>ship</th><th>training plan</th><th>training material</th><th>waits for</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="ovq"><b>${ships}</b> ship${ships === 1 ? '' : 's'} in the plan, at sea first, then the queue in its order; open a ship's <i>training plan and material</i> for how it trains and what it reads</div>
+    <div class="scroll"><table data-nosort class="plantable"><thead><tr><th>#</th><th title="about when it sails (≥ where a line ahead of it in its waters has no time yet), and for how long">sails</th><th>waters</th><th>ship and its goal</th><th>waits for</th></tr></thead><tbody>${rows}</tbody></table></div>
     <div class="s">as of ${esc(d.now)}</div>`;
 }
 

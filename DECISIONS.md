@@ -1056,6 +1056,7 @@ Fixed before any of it sails. Claude runs the night; the queue (`ships/specs/que
   - `fu-ogden-v0-2~staged-all-copy3@9m-pre-s1`, alpha 3 (the 21m's own setting);
   - `fu-ogden-v0-2~staged-all-copy8@9m-pre-s1`, alpha 8.
   - The control is leg 1b itself (alpha 0), at sea today. Queued straight after the 21m, on this Mac (local waters): about 3.5 h each. If the 21m goes back to the order-only Bridge after leg 1b, these two follow it.
+  - **Moved ahead of the 21m** (15:10, Justin: "getting the first 50m ship trained is the top of the agenda globally"): the 50m's reading stage needs the copy alpha and not the 21m's verdict, so the copy test sails straight after leg 1b (and the switch to Postgres), its answer about 02:00 on 9 November, and the 21m after it.
 - **Predictions, fixed now** (at the end of the voyage):
   1. **Copy gain rises with alpha:** leg 1b about 1.0; alpha 3 at 1.2 to 1.6; alpha 8 at 1.5 to 2.2. Expected.
   2. **Still far from Pythia-14m's 4.2:** no arm passes 2.5. Its rest is reading (Pythia read about 300B tokens of repetitive web text; we read 170M four times).

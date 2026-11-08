@@ -237,6 +237,20 @@ def _item(ln, wall: dict, steps: dict | None = None) -> dict:
     return out
 
 
+def _step_now(name: str | None) -> int | None:
+    """The last step a voyage at sea has recorded (its running row on the ledger)."""
+    from thorp.ledger import Ledger
+
+    with contextlib.suppress(Exception):
+        rows = Ledger().query(
+            "select (select max(step) from metrics m where m.run_id=r.run_id and m.name='loss') s from runs r"
+            " where r.name=? and r.status='running' order by r.started desc limit 1",
+            [name],
+        )
+        return rows[0]["s"] if rows else None
+    return None
+
+
 def _since_min(since: str | None) -> float | None:
     with contextlib.suppress(Exception):
         return (time.time() - datetime.fromisoformat(since).timestamp()) / 60
@@ -267,6 +281,8 @@ def waters() -> dict:
         left = None if it.get("est_min") is None or gone is None else max(0.0, it["est_min"] - gone)
         at_sea[lane] = {**it, "since": r.get("since"), "pid": r.get("pid"), "elapsed_min": round(gone) if gone is not None else None,
                         "left_min": round(left) if left is not None else None}  # fmt: skip
+        if it.get("kind") == "spec":  # how far it has sailed: its last step on the ledger, of its like voyage's steps
+            at_sea[lane]["step"] = _step_now(it.get("name"))
         ahead[lane] = left or 0.0
 
     # the hired ships (S3's spend log): one may be out though the queue did not send it (a charter sailed by hand)
@@ -285,6 +301,9 @@ def waters() -> dict:
 
     # the plan: the queue in its order, each line in its lane at about its time
     plan, unknown = [], {lane: False for lane in lanes.LANES}
+    for lane in lanes.LANES:  # what is at sea heads the plan: it sails now
+        if at_sea[lane]:
+            plan.append({**at_sea[lane], "n": None, "at_sea": True, "starts_at": "now", "starts_in_min": 0, "at_least": False, "waits_for": None})
     sea = {lane: (lanes.parse(st[lane]["line"], q.parent) if st.get(lane) else None) for lane in lanes.LANES}
     for i, ln in enumerate(lines):
         it = _item(ln, wall, steps)

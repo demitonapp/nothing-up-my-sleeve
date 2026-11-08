@@ -1300,7 +1300,9 @@ async function classLogicRelation(r, el, rel) {
     <h4>The chaining gain on ${esc(rel)} <span class="s">both premises against the stronger alone; the bar is the 90% band, the dotted line the mark (${d.mark})</span></h4>
     ${bars(d.voyages, x => `<span class="mono">${esc(short(x.voyage))}</span> <span class="s">${x.deck}-item</span>`)}
     ${bars(d.references, x => `${esc(refName(x.model))} <span class="s">${M(x.params)}, ${x.deck}-item</span>`)}
-    <h4>This class, item by item</h4>${per || '<p class="s">no voyage of this class has read the logic deck yet</p>'}</div>`;
+    <h4>This class, item by item</h4>${per || '<p class="s">no voyage of this class has read the logic deck yet</p>'}
+    <h4>All ${d.all_items.length} items <span class="s">each asked with both premises (the middle term and the distractor underlined), its answer and the rival; for every reader of the 40-item deck, ✓ where it chained the item (both premises above zero and above either alone)${d.readers.length ? '' : ': none has read the 40-item deck yet, so the columns fill in as the readings land'}</span></h4>
+    <div class="scroll"><table class="subjtable lgall"><tr><th>item</th><th>question</th><th>answer</th>${d.readers.map(x => `<th class="mono">${esc(x)}</th>`).join('')}</tr>${d.all_items.map(it => `<tr><td class="mono">${esc(it.item)}</td><td>${hi(it.prompt, [it.bridge, it.distractor])}</td><td><b class="good">${esc(it.idea)}</b><div class="s">not <span class="bad">${esc(it.rival)}</span></div></td>${d.readers.map(x => { const r = it.results[x]; return r ? `<td title="both ${f(r.both)}, first ${f(r.first)}, second ${f(r.second)}">${r.chained ? '<span class="good">✓</span>' : '<span class="s">✗</span>'} <span class="s">${f(r.both)}</span></td>` : '<td class="s">–</td>'; }).join('')}</tr>`).join('')}</table></div></div>`;
 }
 
 async function classDeck(r) {

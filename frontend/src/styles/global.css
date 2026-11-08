@@ -1060,3 +1060,6 @@ button[aria-busy="true"] { cursor: progress; opacity: .7; }
 .lgline { display: grid; grid-template-columns: minmax(160px, 260px) 1fr 70px; gap: 10px; align-items: center; margin: 3px 0; }
 .lgline .lgbar.other i { background: var(--track); } .lgline .lgbar.other b { background: var(--track); }
 @media (max-width: 640px) { .lgline { grid-template-columns: 1fr 60px; } .lgline .lgname { grid-column: 1 / -1; } .lgvariants td:first-child { width: auto; } }
+
+.lgall td:nth-child(2) { min-width: 320px; max-width: 560px; font-size: 13px; line-height: 1.4; }
+.lgall td:nth-child(3) { min-width: 130px; font-size: 13px; }

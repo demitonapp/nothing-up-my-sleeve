@@ -3187,6 +3187,26 @@ def api_logic_relation(preset: str, relation: str) -> dict:
              "idea": r["idea"], "rival": r["rival"], "bridge": r["bridge"], "distractor": r["distractor"]}
             for r in rows if r["item"] == first]  # fmt: skip
     examples = [{"prompt": r["prompt"], "idea": r["idea"], "rival": r["rival"]} for r in rows if r["variant"] == "both"][1:4]
+    # every item (Justin, 13:20: "where are those other 40 ... I'd like to see them in the UI"): its question as asked
+    # with both premises, its answer and rival, and how each reader that read the 40-item deck did on it
+    all_items = [{"item": r["item"], "prompt": r["prompt"], "idea": r["idea"], "rival": r["rival"], "bridge": r["bridge"],
+                  "distractor": r["distractor"], "results": {}}
+                 for r in rows if r["variant"] == "both"]  # fmt: skip
+    by_item = {x["item"]: x for x in all_items}
+
+    def mark_results(label: str, items40: dict) -> None:
+        for k, x in items40.items():
+            if k in by_item:
+                by_item[k]["results"][label] = {"both": x.get("both"), "first": x.get("first"), "second": x.get("second"),
+                                                "chained": bool(x["both"] > 0 and x["both"] > max(x["first"], x["second"]))}  # fmt: skip
+
+    readers: list[str] = []
+    for f in sorted((paths.data_dir() / "compare").glob("logic-*.json")):
+        d40 = json.loads(f.read_text())
+        if d40.get("items40"):
+            label = d40["model"].split("/")[-1].removesuffix("-bf16").removesuffix("-4bit")
+            mark_results(label, d40["items40"])
+            readers.append(label)
     full = api_class_logic(preset)
     voyages = [{"voyage": v["voyage"], "deck": v["deck"], "gain": v["gains"].get(relation)} for v in full["voyages"]]
     refs = [{"model": x["model"], "deck": x["deck"], "params": x["params"], "gain": x["gains"].get(relation)} for x in full["references"]]
@@ -3210,6 +3230,10 @@ def api_logic_relation(preset: str, relation: str) -> dict:
                 r = con.execute("select step, text from artifacts where run_id=? and kind=? order by step desc, rowid desc limit 1", [v["run_id"], kind]).fetchone()  # fmt: skip
                 if r and r[1]:
                     items = {k: x for k, x in json.loads(r[1]).items() if k.startswith(relation + "-")}
+                    if kind == "logic40":
+                        label = v["name"].replace("fu-ogden-v0-1", "Ogden").replace("fu-ogden-v0-2", "Ogden v0.2").replace("-pre", "")
+                        mark_results(label, items)
+                        readers.insert(0, label)
                     per.append({"voyage": v["name"], "deck": "40" if kind == "logic40" else "8", "step": r[0],
                                 "items": [{"item": k, **{a: x.get(a) for a in ("both", "first", "second", "one_hop")},
                                            "chained": bool(x["both"] > 0 and x["both"] > max(x["first"], x["second"]))}
@@ -3220,6 +3244,7 @@ def api_logic_relation(preset: str, relation: str) -> dict:
     return {"preset": preset, "relation": relation, **{k: det[k] for k in ("title", "asks", "steps", "built", "hard")},
             "items": len({r["item"] for r in rows}), "item": item, "examples": examples, "cards": cards, "knockout": knock,
             "voyages": voyages, "references": refs, "per_item": per, "mark": full["mark"], "bar": full["bar"],
+            "all_items": all_items, "readers": readers,
             "relations": full["relations"]}  # fmt: skip
 
 

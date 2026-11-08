@@ -190,3 +190,27 @@ def test_facts_selections_and_compositions_are_kept_in_postgres(tmp_path, monkey
     assert fitouts.validate({"name": "n", "stages": [{"shelf": "lists/not-yet.csv", "compose": {"languages": {"en": 1}}}]})["stages"][0]["compose"]["rank"] == "id"
     with pytest.raises(ValueError, match="stage 1"):
         fitouts.validate({"name": "n", "stages": [{"shelf": "x", "compose": {"languages": {}}}]})
+
+
+# ---- the library's branches
+def test_branches_are_seeded_once_and_a_hand_change_is_kept():
+    from thorp import library_branches as lb
+    from thorp.viable.s3_control import fitout_store as fs
+
+    nb, nv = fs.seed_branches(lb.DEFAULTS)
+    assert nb == len(lb.DEFAULTS) and nv == sum(len(b["variations"]) for b in lb.DEFAULTS)
+    assert fs.seed_branches(lb.DEFAULTS) == (0, 0)  # again: nothing new
+    got = {b["key"]: b for b in fs.branches()}
+    assert [v["key"] for v in got["ogden"]["variations"]][:3] == ["ogden-v0.1", "ogden-v0.2", "ogden-v0.2-declared"]
+    assert got["ogden"]["variations"][1]["derived_from"] == "ogden-v0.1"
+    assert got["ogden"]["variations"][3]["spec"]["ogden"]["min"] == 0.68
+
+
+def test_a_variation_holds_a_list_a_selection_or_everything(tmp_path, monkeypatch):
+    from thorp import library_branches as lb
+
+    monkeypatch.setenv("THORP_SHIPS", str(tmp_path))
+    assert sorted(lb.variation_ids({"all": True}, LIB)) == sorted(f["book"] for f in LIB)
+    got = lb.variation_ids({"spec": {"languages": {"en": 1}, "kinds": {"include": ["poem"]}}}, LIB)
+    assert sorted(got) == [f"pg{i}" for i in range(11, 16)]
+    assert lb.variation_ids({"list": "lists/none.csv"}, LIB) == []

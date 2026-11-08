@@ -23,7 +23,9 @@ from thorp.viable.s3_control.models import (
     Composition,
     Fitout,
     FitoutPrecheck,
+    LibraryBranch,
     LibraryFact,
+    LibraryVariation,
     PrecheckItem,
     PrecheckResult,
     Stage,
@@ -205,3 +207,34 @@ def selections(fitout_key: str) -> list[dict]:
         return [dict(r) for r in c.execute(
             text("select ordinal, name, library, compose from s3.stages where fitout_key = :k order by ordinal"),
             {"k": fitout_key}).mappings()]  # fmt: skip
+
+
+def seed_branches(defaults: list[dict]) -> tuple[int, int]:
+    """The default branches and variations written where missing; one Justin has changed or added is left as it is."""
+    nb = nv = 0
+    with session() as s, s.begin():
+        for i, b in enumerate(defaults):
+            if s.get(LibraryBranch, b["key"]) is None:
+                s.add(LibraryBranch(key=b["key"], name=b["name"], purpose=b["purpose"], ordinal=i))
+                nb += 1
+            s.flush()
+            for j, v in enumerate(b["variations"]):
+                if s.get(LibraryVariation, v["key"]) is None:
+                    s.add(LibraryVariation(key=v["key"], branch_key=b["key"], name=v["name"], about=v.get("about", ""), ordinal=j,
+                                           list_path=v.get("list"), spec=v.get("spec"), is_all=bool(v.get("all")),
+                                           derived_from=v.get("derived_from"), draft=bool(v.get("draft"))))
+                    nv += 1
+    return nb, nv
+
+
+def branches() -> list[dict]:
+    """The branches with their variations, in order: [{key, name, purpose, variations: [{key, name, about, list, spec,
+    all, derived_from, draft}]}]."""
+    with session() as s:
+        out = []
+        for b in s.scalars(select(LibraryBranch).order_by(LibraryBranch.ordinal)):
+            vs = s.scalars(select(LibraryVariation).where(LibraryVariation.branch_key == b.key).order_by(LibraryVariation.ordinal))
+            out.append({"key": b.key, "name": b.name, "purpose": b.purpose, "variations": [
+                {"key": v.key, "name": v.name, "about": v.about, "list": v.list_path, "spec": v.spec, "all": v.is_all,
+                 "derived_from": v.derived_from, "draft": v.draft} for v in vs]})
+        return out

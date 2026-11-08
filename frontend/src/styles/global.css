@@ -973,6 +973,15 @@ button[aria-busy="true"] { cursor: progress; opacity: .7; }
 .bshow { margin-top: 6px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
 .bnum-in { width: 8ch; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 2px 6px; font: inherit; }
 .bspec { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px; font-size: var(--fs-xs); overflow: auto; }
+.bbranches { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; margin-top: 6px; }
+.bbranch { text-align: left; display: grid; gap: 6px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--raise); color: var(--text); cursor: pointer; font: inherit; font-size: var(--fs-sm); align-content: start; }
+.bbranch:hover { border-color: var(--accent); }
+.bbname { font-size: var(--fs-lg); font-weight: 700; color: var(--accent); }
+.bbpurpose { color: var(--muted); line-height: 1.45; }
+.bbvars { display: flex; flex-wrap: wrap; gap: 4px; }
+.bcrumb { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; }
+.bvars { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+.bvar .s { font-size: var(--fs-xs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* the $100 bet (#/bet, UI.md "The $100 bet"): Justin's words, then lists that read as prose */
 .betsaid { margin: 0 0 12px; padding: 0 0 0 12px; border-left: 2px solid var(--accent); font-size: var(--fs-lg); max-width: 90ch; }
 .betsaid .who { display: block; margin-top: 4px; color: var(--muted); font-size: var(--fs-sm); }

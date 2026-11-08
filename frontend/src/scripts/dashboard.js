@@ -3570,7 +3570,8 @@ function drawFitouts(d) {
 // Ogden-ness, each a filter. Within a card the picks are "or", across cards "and"; every card's counts are those of the
 // books the OTHER filters leave, so a card shows what a click would give. Justin, 8 November: "the library ui should be
 // structured by filters and cards for all the kind/date/language/collection (things like renaissance and mayflower collections)".
-let BR = null;
+let BR = null, BRANCH = null;
+const BVARS = new Set();  // the variations picked in the open branch: none is all of them
 const BF = { kind: new Set(), language: new Set(), collection: new Set(), voice: new Set(), source: new Set(), period: new Set(), start: '', end: '', ogden: '', sort: 'words', more: 200, show: false };
 const BDIMS = [['kind', 'Kind', 'what the book is: the first rule that matches (hover for the rule)'], ['period', 'Date', "the writer's year: published, else birth + 40, else death - 25 (hover a card)"], ['language', 'Language', 'the language of the text'],
   ['collection', 'Collection', 'the named shelves and decks a book belongs to; a book may be in several'], ['voice', 'Voice', 'who speaks: read from the credit, so the Church is undercounted'], ['source', 'Source', 'the collection the text was fetched from']];
@@ -3596,10 +3597,37 @@ async function loadBrowse() {
   if (!d.books) { el.innerHTML = `<div class="${emptyCls()}">${d.error ? 'the library could not be read: ' + esc(d.error) : 'reading the library (a few seconds)…'}</div>`; if (!d.error) setTimeout(() => { browseBusy = false; if (page === 'shelves') loadBrowse(); }, 4000); else browseBusy = false; return; }
   BR = d; browseBusy = false; drawBrowse();
 }
+const bSum = bs => ({ n: bs.length, w: bs.reduce((a, b) => a + b[10], 0) });
+function bBranch(key) { return BR.branches.find(b => b.key === key); }
+function bScope(br) {  // the open branch's books: the picked variations' union, or every variation's
+  const vs = br.variations.filter(v => !BVARS.size || BVARS.has(v.key)), ix = new Set(vs.flatMap(v => v.books));
+  return [...ix].sort((a, b) => a - b).map(i => BR.books[i]);
+}
+function drawBranches(el) {
+  const unique = br => new Set(br.variations.flatMap(v => v.books));
+  el.innerHTML = `<div class="k">Branches <span class="s">a branch is a purpose the books are gathered for; open one to see its variations and explore what is in it</span></div>
+    <div class="bbranches">${BR.branches.map(br => { const ix = [...unique(br)], t = bSum(ix.map(i => BR.books[i]));
+      return `<button type="button" class="bbranch" data-branch="${esc(br.key)}"><span class="bbname">${esc(br.name)}</span><span class="bbpurpose">${esc(br.purpose)}</span><span class="bbnum"><b>${br.variations.length}</b> variation${br.variations.length === 1 ? '' : 's'} · <b>${t.n.toLocaleString()}</b> books · ${big(t.w)} words</span><span class="bbvars">${br.variations.slice(0, 6).map(v => `<span class="selchip">${esc(v.name)}</span>`).join(' ')}${br.variations.length > 6 ? ` <span class="s">+${br.variations.length - 6} more</span>` : ''}</span></button>`; }).join('')}</div>
+    ${BR.branches_stored ? '' : `<div class="s mt">these are the default branches, not yet stored: <span class="mono">thorp select branches</span> writes them to Postgres, where they can be changed</div>`}
+    <div class="s mt">Library facts ${esc(BR.fingerprint)}: ${BR.books.length.toLocaleString()} books in all, derived texts included.</div>`;
+  el.onclick = e => { const b = e.target.closest('[data-branch]'); if (b) { BRANCH = b.dataset.branch; BVARS.clear(); for (const [d] of BDIMS) BF[d].clear(); BF.start = BF.end = BF.ogden = ''; BF.more = 200; drawBrowse(); } };
+  el.onchange = null;
+}
+function bBranchHeader(br) {
+  const byKey = Object.fromEntries(br.variations.map(v => [v.key, v]));
+  const delta = v => { const p = byKey[v.derived_from]; if (!p) return ''; const a = new Set(p.books), b = new Set(v.books); const add = v.books.filter(i => !a.has(i)).length, gone = p.books.filter(i => !b.has(i)).length; return `<span class="s">from ${esc(p.name)}: +${add} −${gone}</span>`; };
+  return `<div class="bcrumb"><button type="button" class="selchip" data-back="1">Library</button> <span class="s">›</span> <b>${esc(br.name)}</b></div>
+    <p class="foaim">${esc(br.purpose)}</p>
+    <div class="k">Variations <span class="s">pick one or more to look at just those; none picked is all of them together</span></div>
+    <div class="bcards bvars">${br.variations.map(v => { const t = bSum(v.books.map(i => BR.books[i])); return `<button type="button" class="bcard bvar${BVARS.has(v.key) ? ' on' : ''}" data-var="${esc(v.key)}" title="${esc(v.about)}"><span class="bname">${esc(v.name)}${v.draft ? ' <span class="s">draft</span>' : ''}</span><span class="bnum">${t.n.toLocaleString()}<span class="s"> books · ${big(t.w)}</span></span><span class="s">${v.kind === 'selection' ? 'a selection, not a list' : v.kind === 'all' ? 'the whole library' : esc(v.list)}</span>${delta(v)}</button>`; }).join('')}</div>
+    <div class="k mt">What is in ${BVARS.size ? [...BVARS].map(k => esc(byKey[k].name)).join(' + ') : 'the branch'}</div>`;
+}
 function drawBrowse() {
   const el = document.getElementById('browse'); if (!el || !BR) return;
-  const all = BR.books, now = all.filter(b => bPass(b));
-  const sum = bs => ({ n: bs.length, w: bs.reduce((a, b) => a + b[10], 0) });
+  if (!BRANCH) return drawBranches(el);
+  const br = bBranch(BRANCH); if (!br) { BRANCH = null; return drawBranches(el); }
+  const all = bScope(br), now = all.filter(b => bPass(b));
+  const sum = bSum;
   const tot = sum(all), cur = sum(now);
   const order = { kind: Object.keys(BR.kinds), voice: Object.keys(BR.voices) };
   const periodOrder = k => k === 'undated' ? 9999 : k === 'before 1500' ? 0 : parseInt(k);
@@ -3618,15 +3646,17 @@ function drawBrowse() {
   const spec = { languages: Object.fromEntries([...(BF.language.size ? BF.language : new Set(now.map(b => b[3])))].sort().map(l => [l, +(sum(now.filter(b => b[3] === l)).w / (cur.w || 1)).toFixed(3)])),
     ...(BF.ogden !== '' ? { ogden: { min: +BF.ogden / 100 } } : {}), ...((BF.start !== '' || BF.end !== '') ? { period: { start: BF.start === '' ? null : +BF.start, end: BF.end === '' ? null : +BF.end, undated: 'exclude' } } : {}),
     ...(BF.kind.size ? { kinds: { include: [...BF.kind] } } : {}), ...(BF.voice.size ? { voices: { include: [...BF.voice] } } : {}), ...(BF.source.size ? { sources: { include: [...BF.source] } } : {}) };
-  el.innerHTML = `<div class="bsummary"><b>${cur.n.toLocaleString()}</b> of ${tot.n.toLocaleString()} books · <b>${big(cur.w)}</b> of ${big(tot.w)} words${chips.length ? ' <button type="button" class="selchip bclear">clear all</button>' : ''}</div>
+  el.innerHTML = `${bBranchHeader(br)}<div class="bsummary"><b>${cur.n.toLocaleString()}</b> of ${tot.n.toLocaleString()} books · <b>${big(cur.w)}</b> of ${big(tot.w)} words${chips.length ? ' <button type="button" class="selchip bclear">clear all</button>' : ''}</div>
     <div class="selchips">${chips.join(' ')}</div><div class="bfacets">${cards}</div>
     <div class="k mt">The books <span class="s">sorted by <select data-k="sort" class="${selectCls('')}"><option value="words">length</option><option value="year">year</option><option value="title">title</option><option value="ogden">Ogden-ness</option></select> · hover a kind or voice for the rule that placed it</span></div>
     <div class="scroll"><table class="selbooks"><thead><tr><th>book</th><th>writer</th><th>lang</th><th>year</th><th>kind</th><th>voice</th><th>source</th><th>Ogden</th><th>words</th><th>collections</th></tr></thead><tbody>${rows.slice(0, BF.more).map(b => `<tr><td title="${esc(b[1])}"><a href="#" data-book="${esc(b[0])}">${esc(cut(b[1], 56))}</a> <span class="s mono">${esc(b[0])}</span></td><td>${esc(cut(b[2], 26))}</td><td>${esc(b[3])}</td><td title="${esc(b[8])}">${b[7] ?? '–'} <span class="s">${esc(b[8])}</span></td><td title="${esc(b[12])}">${esc(b[5])}</td><td title="${esc(b[13])}">${esc(b[6])}</td><td>${esc(b[4])}</td><td>${b[9] == null ? '–' : Math.round(100 * b[9]) + '%'}</td><td>${big(b[10])}</td><td class="s">${esc(cut(b[11].map(i => BR.collections[i].name).join(', '), 60))}</td></tr>`).join('')}</tbody></table></div>
     ${rows.length > BF.more ? `<button type="button" class="selchip bmore">show 200 more (${rows.length - BF.more} left)</button>` : ''}
     <details class="mt"${BF.show ? ' open' : ''}><summary>This view as a fitout's selection <span class="s">the same filters as declared weights and filters (thorp/selection.py); the shares are this view's, to be set by hand</span></summary><pre class="bspec">${esc(JSON.stringify(spec, null, 1))}</pre></details>
-    <div class="s mt">Library facts ${esc(BR.fingerprint)}: ${tot.n.toLocaleString()} books; the year is an estimate (no catalogue we hold gives a publication date), the kind and voice are read from subjects, bookshelves and credits; each carries its rule.</div>`;
+    <div class="s mt">Library facts ${esc(BR.fingerprint)}; the year is an estimate (no catalogue we hold gives a publication date), the kind and voice are read from subjects, bookshelves and credits; each carries its rule.</div>`;
   el.querySelector('select[data-k="sort"]').value = BF.sort;
   el.onclick = e => {
+    if (e.target.closest('[data-back]')) { BRANCH = null; BVARS.clear(); return drawBrowse(); }
+    const vr = e.target.closest('[data-var]'); if (vr) { BVARS.has(vr.dataset.var) ? BVARS.delete(vr.dataset.var) : BVARS.add(vr.dataset.var); for (const [d] of BDIMS) BF[d].clear(); BF.more = 200; return drawBrowse(); }
     const c = e.target.closest('[data-dim]'); if (c && c.dataset.val != null) { const s = BF[c.dataset.dim]; s.has(c.dataset.val) ? s.delete(c.dataset.val) : s.add(c.dataset.val); BF.more = 200; return drawBrowse(); }
     if (e.target.closest('.bclear')) { for (const [d] of BDIMS) BF[d].clear(); BF.start = BF.end = BF.ogden = ''; return drawBrowse(); }
     const x = e.target.closest('[data-clear]'); if (x) { if (x.dataset.clear === 'years') BF.start = BF.end = ''; else BF.ogden = ''; return drawBrowse(); }

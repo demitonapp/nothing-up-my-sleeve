@@ -174,6 +174,34 @@ class LibraryFact(Base):
     built_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class LibraryBranch(Base):
+    """A branch of the library: a purpose its books are gathered for (thorp/library_branches.py)."""
+
+    __tablename__ = "library_branches"
+
+    key: Mapped[str] = mapped_column(Text, primary_key=True)
+    name: Mapped[str] = mapped_column(Text)
+    purpose: Mapped[str] = mapped_column(Text, default="", server_default="")
+    ordinal: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+
+
+class LibraryVariation(Base):
+    """A variation within a branch: a set of books by a list, a selection (spec) or all of the library."""
+
+    __tablename__ = "library_variations"
+
+    key: Mapped[str] = mapped_column(Text, primary_key=True)
+    branch_key: Mapped[str] = mapped_column(Text, ForeignKey("library_branches.key", ondelete="CASCADE"))
+    name: Mapped[str] = mapped_column(Text)
+    about: Mapped[str] = mapped_column(Text, default="", server_default="")
+    ordinal: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    list_path: Mapped[str | None] = mapped_column(Text)
+    spec: Mapped[dict | None] = mapped_column(JSONB)
+    is_all: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    derived_from: Mapped[str | None] = mapped_column(Text)
+    draft: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+
+
 class Composition(Base):
     """One composing of a reading list from a declared selection: which selection (and its hash), drawn from which
     facts, what list it wrote (and its sha1), what it yielded and what the S3 gate's library prechecks said of it.

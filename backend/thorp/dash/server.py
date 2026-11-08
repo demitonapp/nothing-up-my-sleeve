@@ -1517,7 +1517,8 @@ def _browse_build() -> dict:
     from thorp import library, selection
     from thorp import library_facts as lf
 
-    rows = [r for r in lf.build() if r["source"] != "local"]  # the library's books; Thorp's own derived texts are not browsed
+    facts_all = lf.build()
+    rows = facts_all  # every book, Thorp's own derived texts too (kind "derived": the tutor's passages, the shuffled controls)
     cols = library.collections()
     member: dict[str, list[int]] = {}
     for i, c in enumerate(cols):
@@ -1525,7 +1526,28 @@ def _browse_build() -> dict:
             member.setdefault(b, []).append(i)
     books = [[r["book"], r["title"], r["author"], r["language"], r["source"], r["kind"], r["voice"], r["year"], r["year_basis"],
               r["ogden"], r["words"], member.get(r["book"], []), r["kind_rule"], r["voice_rule"]] for r in rows]  # fmt: skip
+    from thorp import library_branches
+    from thorp.viable.s3_control import fitout_store
+
+    stored = True
+    try:
+        brs = fitout_store.branches()
+    except Exception:  # noqa: BLE001  the store is down, or not migrated yet: the defaults are shown, and say so
+        brs = []
+    if not brs:
+        brs, stored = library_branches.DEFAULTS, False
+    index = {r["book"]: i for i, r in enumerate(rows)}
+    branches = []
+    for b in brs:
+        vs = []
+        for v in b["variations"]:
+            ids = library_branches.variation_ids(v, facts_all)
+            vs.append({"key": v["key"], "name": v["name"], "about": v.get("about", ""), "draft": bool(v.get("draft")),
+                       "derived_from": v.get("derived_from"), "kind": "list" if v.get("list") else "selection" if v.get("spec") else "all",
+                       "spec": v.get("spec"), "list": v.get("list"), "books": sorted(index[i] for i in ids if i in index)})
+        branches.append({"key": b["key"], "name": b["name"], "purpose": b["purpose"], "variations": vs})
     return {
+        "branches": branches, "branches_stored": stored,
         "books": books,
         "fields": ["book", "title", "author", "language", "source", "kind", "voice", "year", "year_basis", "ogden", "words",
                    "collections", "kind_rule", "voice_rule"],
@@ -1555,9 +1577,8 @@ def api_selection(fitout: str) -> dict:
 
     from sqlalchemy import text
 
-    from thorp import fitouts
+    from thorp import fitouts, selection
     from thorp import library_facts as lf
-    from thorp import selection
     from thorp.viable.s3_control import fitout_store
 
     f = fitouts.load(fitout)

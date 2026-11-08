@@ -178,6 +178,14 @@ def cmd_select(a) -> int:
             fitout_store.put_facts(rows, fp)
         print(f"{len(rows)} books, facts {fp}{' (not stored: --dry-run)' if a.dry_run else ', stored in s3.library_facts'}")
         return 0
+    if a.what == "branches":
+        from thorp import library_branches
+        from thorp.viable.s3_control import fitout_store
+
+        fitout_store.migrate()
+        nb, nv = fitout_store.seed_branches(library_branches.DEFAULTS)
+        print(f"{nb} branches and {nv} variations written (any already there are left as they are)")
+        return 0
     if a.what == "counts":
         rows = [r for r in lf.build() if r["source"] != "local"]
         for key in ("language", "source", "voice", "kind", "year_basis"):
@@ -248,7 +256,7 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--words", required=True, help="Justin's words, and when")
     s.set_defaults(fn=cmd_s5)
     s = sub.add_parser("select", help="the library's facts (counts), and a fitout's books composed from its declared selection")
-    s.add_argument("what", choices=["facts", "counts", "compose"])
+    s.add_argument("what", choices=["facts", "counts", "compose", "branches"])
     s.add_argument("target", nargs="?", help="compose: a saved fitout's key, or a selection file (.json)")
     s.add_argument("--stage", type=int, default=1, help="compose: the fitout's stage (default 1)")
     s.add_argument("--out", help="compose: the list to write (default lists/composed/<fitout>-<stage>.csv)")

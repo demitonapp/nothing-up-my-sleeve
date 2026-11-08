@@ -3368,18 +3368,60 @@ def api_ask_questions(preset: str) -> dict:
     }  # fmt: skip
 
 
+_MATHS_SOURCE: dict[str, dict] = {}
+
+
+def _maths_source(book_id: str, headings: list[str]) -> dict:
+    """Where each heading of the source book begins in the reader's own text (`/api/book`, which the reader opens
+    at a character offset), past its title page and table of contents: the body starts at the book's second
+    title line. Cached by book."""
+    if book_id in _MATHS_SOURCE:
+        return _MATHS_SOURCE[book_id]
+    d = api_book(book_id, 0, 100000)
+    t = d.get("text") or ""
+    while len(t) < (d.get("chars") or 0):
+        more = api_book(book_id, len(t), 100000).get("text") or ""
+        if not more:
+            break
+        t += more
+    first = t.find("\n", t.find(d.get("title", "").upper())) if d.get("title") else 0
+    title = (d.get("title") or "").upper()
+    body = t.find(title, first + 1) if title and t.find(title, first + 1) > 0 else 0
+    at = {}
+    for h in headings:
+        i = t.find("\n" + h, body)
+        at[h] = i + 1 if i >= 0 else None
+    out = {"title": d.get("title"), "author": d.get("author"), "chars": d.get("chars"), "at": at}
+    _MATHS_SOURCE[book_id] = out
+    return out
+
+
 def api_maths_book() -> dict:
-    """The maths book (ships/lists/tricks/maths-book.csv, backend/scripts/make_maths_book.py): nine chapters in the
-    order a Basic English arithmetic primer teaches them, each with its sums, answers and rivals, for the Scoring
-    tab's Maths page to read against a voyage (the same ten guesses as the ask panel)."""
+    """The maths book (ships/lists/tricks/maths-book.csv, backend/scripts/make_maths_book.py): nine chapters after
+    Augustus De Morgan's Elements of Arithmetic (pg68662), each a section of his Book I in his order, its sums in
+    plain words, with answers and rivals, for the Scoring tab's Maths page to read against a voyage (the same ten
+    guesses as the ask panel). Each chapter carries its source section and where the reader opens it."""
     import csv
 
     rows = list(csv.DictReader(paths.resolve("lists/tricks/maths-book.csv").open()))
     chapters: dict[int, dict] = {}
     for r in rows:
-        c = chapters.setdefault(int(r["chapter"]), {"n": int(r["chapter"]), "key": r["key"], "title": r["title"], "about": r["about"], "sums": []})
+        c = chapters.setdefault(int(r["chapter"]), {"n": int(r["chapter"]), "key": r["key"], "title": r["title"], "about": r["about"], "sums": [],
+                                                    "source": {"book": r.get("source"), "section": r.get("source_section"), "heading": r.get("source_heading")}})  # fmt: skip
         c["sums"].append({"item": r["item"], "text": r["prompt"], "hope": r["answer"], "rival": r["rival"]})
-    return {"chapters": [chapters[k] for k in sorted(chapters)], "mark": 6}  # a chapter learnt: 6 of its 8 sums
+    book = None
+    src = next((r.get("source") for r in rows if r.get("source")), None)
+    if src:
+        try:
+            info = _maths_source(src, sorted({c["source"]["heading"] for c in chapters.values() if c["source"]["heading"]}))
+        except Exception:  # noqa: BLE001  (the book not in this library: the credit stands, without links)
+            info = {"title": None, "author": None, "at": {}}
+        for c in chapters.values():
+            c["source"]["at"] = info["at"].get(c["source"]["heading"])
+        title = info.get("title") or "Elements of Arithmetic"
+        book = {"id": src, "title": "Elements of Arithmetic" if title.lower() == "elements of arithmetic" else title,  # the book's own capitals "author": info.get("author") or "De Morgan, Augustus, 1806-1871",
+                "edition": "the 1858 edition (first published 1830)", "in_ogden": False}  # fmt: skip
+    return {"chapters": [chapters[k] for k in sorted(chapters)], "mark": 6, "book": book}  # a chapter learnt: 6 of its 8 sums
 
 
 LOGIC_ASK_FROM = ("21m", "50m", "100m", "350m")  # the stylist up (Justin, 8 November: "start testing the logic questions from 21m up")

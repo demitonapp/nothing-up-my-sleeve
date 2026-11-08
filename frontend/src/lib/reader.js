@@ -47,7 +47,9 @@ export async function openEssay(name) {
   rEl('rtitle').textContent = d.title;
   rRender(at);
 }
-export async function openBook(id) {
+// `at`, a character offset, opens the book there (a passage cited elsewhere, as the maths book's sources);
+// otherwise it opens where its reader last left it
+export async function openBook(id, at = null) {
   rEl('rtitle').textContent = 'loading…';
   openReader();
   // the server hands out at most 100k characters at a time
@@ -55,10 +57,10 @@ export async function openBook(id) {
   const d = await get(url(0));
   while (d.text.length < d.chars) { const more = await get(url(d.text.length)); if (!more.text) break; d.text += more.text; }
   RD.book = d; RD.parts = rSplit(d.text);
-  const at = +rget('thorp.read.at:' + id) || 0;
-  RD.part = Math.max(0, RD.parts.findIndex(p => at < p.end));
+  const from = at != null ? +at : +rget('thorp.read.at:' + id) || 0;
+  RD.part = Math.max(0, RD.parts.findIndex(p => from < p.end));
   rEl('rtitle').textContent = d.title;
-  rRender(at);
+  rRender(from);
 }
 // lay out the current part; `at` is a character offset in the book to open at (null: the part's first page, -1: its last)
 function rRender(at = null) {

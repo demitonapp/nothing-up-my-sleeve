@@ -1,4 +1,4 @@
-"""The maths book (Justin, 2026-11-08: "a tab for maths and the different levels of maths ... how good at maths
+"""The maths book, after De Morgan's Elements of Arithmetic (Justin, 2026-11-08: "a tab for maths and the different levels of maths ... how good at maths
 compared to an ogden(y) textbook would teach maths"): nine chapters in the order a Basic English arithmetic primer
 teaches them, each sum in its plain words ("Two and three make"), its answer a number word, and beside it the
 rival, the answer of the mistake a learner makes at that chapter (counting the wrong way, adding where the sum
@@ -19,6 +19,20 @@ WORDS = ("zero one two three four five six seven eight nine ten eleven twelve th
     f"twenty-{w}" for w in "one two three four five six seven eight nine".split()] + ["thirty"]  # fmt: skip
 PEOPLE = [("man", "he"), ("boy", "he"), ("girl", "she"), ("woman", "she")]
 THINGS = ["apples", "eggs", "sheep", "books", "nuts", "stones", "cows", "birds"]
+
+# The source (Justin, 2026-11-08: "let's give some credit to the book it's reading and learning from ... Elements
+# of arithmetic is great"): Augustus De Morgan's Elements of Arithmetic (pg68662, the 1858 edition in the library).
+# Each chapter follows a section of his Book I, Principles of Arithmetic, in his order; the sums are in plain words,
+# not his. Each chapter names its section by the heading the reader finds it under (SOURCE_AT).
+SOURCE = {"id": "pg68662", "title": "Elements of Arithmetic", "author": "Augustus De Morgan", "edition": "the 1858 edition (first published 1830)"}
+SOURCE_AT = {
+    "counting-on": ("Book I, Section I", "NUMERATION."), "counting-back": ("Book I, Section I", "NUMERATION."),
+    "adding": ("Book I, Section II", "ADDITION AND SUBTRACTION."), "taking-away": ("Book I, Section II", "ADDITION AND SUBTRACTION."),
+    "times": ("Book I, Section III", "MULTIPLICATION."), "sharing": ("Book I, Section IV", "DIVISION."),
+    "halves": ("Book I, Section V", "FRACTIONS."),
+    "story-one": ("Book I, Section II", "EXERCISES."),  # the first EXERCISES. past the title page: Section II's
+    "story-two": ("Book I, Section II", "EXERCISES."),
+}  # fmt: skip
 
 CHAPTERS = [
     ("counting-on", "Counting on", "the next number after a run of four; the rival is one already said"),
@@ -96,8 +110,10 @@ def main(seed: int = 1850) -> int:
     rows = []
     for i, (key, title, about) in enumerate(CHAPTERS, 1):
         for j, (text, ans, riv) in enumerate(sums(key, rng)):
+            sec, heading = SOURCE_AT[key]
             rows.append({"item": f"{key}-{j}", "chapter": i, "key": key, "title": title, "about": about,
-                         "prompt": text, "answer": w(ans), "rival": w(riv)})  # fmt: skip
+                         "prompt": text, "answer": w(ans), "rival": w(riv),
+                         "source": SOURCE["id"], "source_section": f"{sec}, {heading.rstrip('.').title().replace(' And ', ' and ')}", "source_heading": heading})  # fmt: skip
     with out.open("w", newline="", encoding="utf-8") as f:
         wr = csv.DictWriter(f, fieldnames=list(rows[0]))
         wr.writeheader()

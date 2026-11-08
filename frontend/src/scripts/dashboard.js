@@ -1016,6 +1016,7 @@ async function mathsBook(r) {
   if (!sel.options.length) { let n = 0; const t = setInterval(() => { fill(); if (sel.options.length || ++n > 60) clearInterval(t); }, 1000); }
   if (!out.innerHTML) out.innerHTML = mathsIndex();
   if (mathsWired) return; mathsWired = true;
+  document.getElementById('mathspanel').addEventListener('click', e => { const b = e.target.closest('[data-mbook]'); if (b) openBook(b.dataset.mbook, +b.dataset.at || 0); });
   document.getElementById('mathsrun').onclick = async () => {
     fill(); const run = sel.value; if (!run) { out.innerHTML = `<div class="${emptyCls()}">no voyage chosen yet</div>`; return; }
     const btn = document.getElementById('mathsrun'); btn.disabled = true;
@@ -1036,8 +1037,13 @@ async function mathsBook(r) {
     draw(true); btn.disabled = false;
   };
 }
+function mathsCredit() {
+  const b = mathsData.book; if (!b) return '';
+  return `<div class="mathcredit">After <b>${esc(b.author.replace(/^De Morgan, Augustus.*$/, 'Augustus De Morgan'))}</b>, <i>${esc(b.title)}</i> (${esc(b.edition)}): each chapter follows a section of his Book I, Principles of Arithmetic, in his order; the sums are in plain words, not his. <button type="button" class="${btnCls('outline', 'bookbtn')}" data-mbook="${esc(b.id)}" data-at="0">open the book</button>${b.in_ogden ? '' : ' <span class="s">Thorp\'s Ogden ships have not read it (it is in neither Ogden v0.1 nor v0.2): what they know of sums, they learnt elsewhere</span>'}</div>`;
+}
+const mathsSource = c => c.source && c.source.section ? `<button type="button" class="${btnCls('ghost', 'srcbtn')}" data-mbook="${esc(c.source.book)}" data-at="${c.source.at ?? 0}" title="open De Morgan's ${esc(c.source.section)} in the reader">De Morgan: ${esc(c.source.section.replace(/^Book I, /, ''))} ↗</button>` : '';
 function mathsIndex() {
-  return `<div class="scroll"><table class="mathstable"><thead><tr><th>chapter</th><th>what it teaches</th><th>a sum from it</th></tr></thead><tbody>${mathsData.chapters.map(c => `<tr><td><b>${c.n}. ${esc(c.title)}</b></td><td class="s">${esc(c.about)}</td><td class="mono">${esc(c.sums[0].text)} <b>${esc(c.sums[0].hope)}</b> <span class="s">not</span> <i>${esc(c.sums[0].rival)}</i></td></tr>`).join('')}</tbody></table></div>`;
+  return `${mathsCredit()}<div class="scroll"><table class="mathstable"><thead><tr><th>chapter</th><th>what it teaches</th><th>a sum from it</th><th>from the book</th></tr></thead><tbody>${mathsData.chapters.map(c => `<tr><td><b>${c.n}. ${esc(c.title)}</b></td><td class="s">${esc(c.about)}</td><td class="mono">${esc(c.sums[0].text)} <b>${esc(c.sums[0].hope)}</b> <span class="s">not</span> <i>${esc(c.sums[0].rival)}</i></td><td>${mathsSource(c)}</td></tr>`).join('')}</tbody></table></div>`;
 }
 function mathsTable(run, res, done) {
   const mark = mathsData.mark || 6;
@@ -1050,10 +1056,10 @@ function mathsTable(run, res, done) {
     const sums = r.map(x => `<tr class="mathsum"><td></td><td class="mono">${esc(x.q.text)}</td><td>${esc(x.q.hope)} <span class="s">${x.rank ? `guess ${x.rank}` : 'not in ten'}</span></td><td>${esc(x.q.rival)} <span class="s">${x.rrank ? `guess ${x.rrank}` : 'not in ten'}</span></td>
       <td>${x.err ? '<span class="s">failed</span>' : `<span class="${pillCls(x.ok ? 'good' : chose(x.rank, x.rrank) === 'the rival' ? 'bad' : '')}">${x.ok ? 'right' : chose(x.rank, x.rrank) === 'the rival' ? 'the rival' : 'neither'}</span>`}</td>
       <td class="mono s">${(x.top || []).map(g => `${esc(g.word)} ${(100 * g.p).toFixed(0)}%`).join(' · ')}</td></tr>`).join('');
-    return `<tr class="mathchap"><td><b>${c.n}. ${esc(c.title)}</b></td><td class="s" colspan="3">${esc(c.about)}</td>
+    return `<tr class="mathchap"><td><b>${c.n}. ${esc(c.title)}</b><div>${mathsSource(c)}</div></td><td class="s" colspan="3">${esc(c.about)}</td>
       <td><span class="${pillCls(!full ? '' : n >= mark ? 'good' : 'bad')}">${n} of ${r.length}${full ? (n >= mark ? ' · learnt' : ' · not yet') : ''}</span></td><td><div class="mathbar"><span style="width:${100 * n / c.sums.length}%"></span></div></td></tr>${sums}`;
   }).join('');
-  return `${head}<div class="scroll"><table class="mathstable"><thead><tr><th>chapter</th><th>the sum</th><th>the answer</th><th>the rival</th><th>verdict</th><th>its first three guesses</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  return `${mathsCredit()}${head}<div class="scroll"><table class="mathstable"><thead><tr><th>chapter</th><th>the sum</th><th>the answer</th><th>the rival</th><th>verdict</th><th>its first three guesses</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 async function askPanel(r) {
   const who = document.getElementById('askwho'), sel = document.getElementById('askvoyage'); if (!who || !sel) return;

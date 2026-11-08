@@ -2544,7 +2544,10 @@ async function classGoals(r) {
     <span class="cnum">${c.here} here${c.inherited ? ` · ${c.inherited} inherited` : ''} · ${c.open} open of ${c.total}</span></div>`).join('')
     + `<div class="crow total"><span class="cname">the route</span>${coverageBar({ here: filled, inherited: inh, open: all - filled - inh, total: all })}<span class="cnum">${filled} here · ${inh} inherited · ${all - filled - inh} open of ${all}</span></div>`;
   document.getElementById('goalsover').innerHTML = [
-    ['the goal', 'as many tricks as it can learn, building on all the tricks below it, carried up to the next class'],
+    // the size's own primary objective (s1.sizes, its role: Justin sets it, e.g. the 300k's bigram table, the 1m's De Morgan)
+    ['the primary objective', (() => { const role = r.role || r.job || ''; const m = role.match(/^Primary objective:\s*([^.]*)\.?\s*(.*)$/i);
+      return m ? `<b class="primarygoal">${esc(m[1])}</b>${m[2] ? `<div class="s">${esc(m[2])}</div>` : ''}<div class="s">beyond it: as many tricks as it can learn, carried up to the next class</div>`
+        : `${role ? `<b class="primarygoal">${esc(role)}</b><div class="s">` : '<div>'}as many tricks as it can learn, building on all the tricks below it, carried up to the next class</div>`; })()],
     ['expected at this size', level ? `<b>${esc(level.name)}</b> (step ${wpRank(level.key) + 1} of ${wps.length})` : 'nothing from books at this size'],
     ['the expected edge', ceiling.length ? ceiling.map(t => `<a href="#/discoveries/${esc(t.key)}">${t.gate ? '◆ ' : ''}${esc(t.name)}</a>`).join(', ') + '<br><span class="s">where a ship this size is expected to stop; beyond it is pushing the envelope</span>' : '–'],
     ['filled so far', `${filled} of ${all} tricks performed here${inh ? `, ${inh} more inherited to carry up` : ''} · ${done} of the ${goals.length} the field expects`],

@@ -1,59 +1,27 @@
 ---
 /**
- * The Thorp dashboard: one page, hash-routed (#/classes, #/classes/proxy, #/ships/…, #/voyages, #/discoveries, #/leaderboard, #/shelves, #/sieves), like the Atlas shell in
- * the monorepo. Every panel is filled in the browser from server.py's JSON API and refreshed every
- * 5 s; the build is static and `thorp dash` serves it. The standards are in ../../UI.md.
+ * The harbours (home) and the ships: the ladder of sizes grouped into harbours, one size's page, one
+ * ship's page, and every run. This is the first of the multi-page routes — the expeditions, discoveries,
+ * leaderboard, governance, bet, library, sieves and foreign pages each live under their own route now.
+ * Every panel is filled in the browser from server.py's JSON API and refreshed every 5 s.
  */
-import '../styles/ui.css';
-import '../styles/global.css';
-import Header from '../components/Header.astro';
+import Layout from '../layouts/Layout.astro';
 import Ladder from '../components/Ladder.astro';
 import ModelPage from '../components/ModelPage.astro';
 import Ship from '../components/Ship.astro';
-import Voyages from '../components/Voyages.astro';
-import Discoveries from '../components/Discoveries.astro';
-import SievesGuide from '../components/SievesGuide.astro';
-import Shelves from '../components/Shelves.astro';
-import Leaderboard from '../components/Leaderboard.astro';
-import Competitor from '../components/Competitor.astro';
-import Lab from '../components/Lab.astro';
-import Governance from '../components/Governance.astro';
-import Bet from '../components/Bet.astro';
-import TableTalk from '../components/TableTalk.astro';
 import Runs from '../components/Runs.astro';
 import Reader from '../components/Reader.astro';
-import Foreign from '../components/Foreign.astro';
 ---
 
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Thorp</title>
-  </head>
-  <body>
-    <Header />
-    <main>
-      <Ladder />
-      <ModelPage />
-      <Ship />
-      <Runs />
-      <Voyages />
-      <Discoveries />
-      <Leaderboard />
-      <Competitor />
-      <Lab />
-      <Bet />
-      <Governance />
-      <Shelves />
-      <SievesGuide />
-      <TableTalk />
-      <Foreign />
-    </main>
-    <Reader />
-    <script>
-      import '../scripts/dashboard.js';
-    </script>
-  </body>
-</html>
+<Layout>
+  <main>
+    <Ladder />
+    <ModelPage />
+    <Ship />
+    <Runs />
+  </main>
+  <Reader />
+  <script>
+    import '../scripts/dashboard.ts';
+  </script>
+</Layout>

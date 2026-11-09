@@ -107,15 +107,124 @@ def passages(rng: random.Random, per_card: int) -> dict[str, list[str]]:
     return out
 
 
+
+
+MARK = {"premise": "<premise>", "sep": "<sep>", "question": "<question>", "answer": "<answer>", "end": "<end>"}
+
+
+def marked(rng: random.Random, per_card: int) -> dict[str, list[str]]:
+    """The same six families, written as marked items (9 November, v0.0.6): each passage carries the control tokens in
+    the places a chaining model needs boundaries — premises, the question, the answer, the end — so the tokens are USED
+    as well as declared, which is the only way they earn a gradient."""
+    out: dict[str, list[str]] = {}
+    seen: set[str] = set()
+
+    def take(fn, n: int) -> list[str]:
+        got = []
+        for _ in range(60 * n):
+            s = fn()
+            if s not in seen:
+                seen.add(s); got.append(s)
+            if len(got) >= n:
+                break
+        return got
+
+    def prem(t): return f"{MARK['premise']} {t}"
+
+    def mover():
+        thing, prep, place = rng.choice(THINGS), rng.choice(("on", "in", "under")), rng.choice(ROOMS + SURFACES + CONTAINERS)
+        return f"{prem( f'the {thing} is {prep} the {place}' )} {MARK['question']} where is the {thing}? {MARK['answer']} {prep} the {place} {MARK['end']}"
+
+    def bridge():
+        thing, inner, outer = rng.choice(THINGS), rng.choice(CONTAINERS), rng.choice(ROOMS + SURFACES)
+        return (f"{prem(f'the {thing} is in the {inner}')} {MARK['sep']} {prem(f'the {inner} is in the {outer}')} "
+                f"{MARK['question']} where is the {thing}? {MARK['answer']} in the {outer} {MARK['end']}")
+
+    def comparison():
+        dim = rng.choice(DIMENSIONS)
+        a, b, c = rng.sample(PEOPLE, 3)
+        return (f"{prem(f'{a} is {dim[1]} than {b}')} {MARK['sep']} {prem(f'{b} is {dim[1]} than {c}')} "
+                f"{MARK['question']} which is the {dim[2]}? {MARK['answer']} {a} {MARK['end']}")
+
+    def two_premises():
+        who = f"{rng.choice(PEOPLE)} with the {rng.choice(ADJ)} {rng.choice(THINGS)}"
+        return (f"{prem(f'{who} {rng.choice(MOVE)} to the {rng.choice(ROOMS)}')} {MARK['sep']} "
+                f"{prem(f'{who} came back')} {MARK['question']} who came back? {MARK['answer']} {who} {MARK['end']}")
+
+    def plain():
+        thing, adj = rng.choice(THINGS), rng.choice(ADJ)
+        prep, place = rng.choice((("on", SURFACES), ("in", CONTAINERS), ("under", SURFACES)))
+        return (f"{prem(f'the {adj} {thing} is {prep} the {rng.choice(place)}')} {MARK['question']} "
+                f"where is the {adj} {thing}? {MARK['answer']} {prep} the {rng.choice(place)} {MARK['end']}")
+
+    def repeat_word():
+        thing, adj = rng.choice(THINGS), rng.choice(ADJ)
+        other = rng.choice([t for t in THINGS if t != thing])
+        return (f"{prem(f'the {adj} {thing} and the {other} are {rng.choice(ADJ)}')} {MARK['question']} "
+                f"what is {adj}? {MARK['answer']} the {thing} and the {other} {MARK['end']}")
+
+    out["previous_word"] = take(plain, per_card)
+    out["duplicate_word"] = take(repeat_word, per_card)
+    out["induction"] = take(two_premises, per_card)
+    out["comparator"] = take(comparison, per_card)
+    out["mover"] = take(mover, per_card)
+    out["bridge"] = take(bridge, per_card)
+    return out
+
+
+
+
+def write_books(deck: dict, stage: str, books: int = 200, log=print) -> int:
+    """Write the deck as `local:` books and a list of refs — the only form the trainer's resolver reads (9 November: the
+    first control arms planned 0 tokens because the passages sat in the text column, so every one was looked up as a
+    Gutenberg title). One book per chunk, the passages joined by blank lines."""
+    import hashlib
+
+    from thorp import manifest, paths
+
+    d = paths.texts_dir("local")
+    d.mkdir(parents=True, exist_ok=True)
+    rows = []
+    passages = [p for ps in deck.values() for p in ps]
+    per_book = -(-len(passages) // books)
+    n = 0
+    for i in range(books):
+        chunk = passages[i * per_book : (i + 1) * per_book]
+        if not chunk:
+            break
+        bid = f"card-stage-{stage}-{i + 1:03d}"
+        text = "\n\n".join(chunk) + "\n"
+        (d / f"{bid}.txt").write_text(text, encoding="utf-8")
+        data = text.encode("utf-8")
+        manifest.upsert(manifest.Book(
+            id=bid, source="local", title=f"The card stage, {stage}, book {i + 1}",
+            author="Thorp's card stage", language="en", family="Germanic",
+            text=f"derived: card stage {stage}", chars=len(text), bytes=len(data),
+            sha1=hashlib.sha1(data).hexdigest(), fetched_at="", set="recipe",
+        ))  # fmt: skip
+        rows.append({"title": f"The card stage, {stage}, book {i + 1}", "author": "Thorp's card stage",
+                     "language": "en", "family": "Germanic", "text": f"local:{bid}"})  # fmt: skip
+        n += 1
+    f = paths.resolve("lists") / f"card-stage-{stage}-books.csv"
+    with f.open("w", newline="", encoding="utf-8") as fh:
+        w = csv.DictWriter(fh, fieldnames=["title", "author", "language", "family", "text"])
+        w.writeheader()
+        w.writerows(rows)
+    log(f"wrote {n} books and {f.name}")
+    return n
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="make_card_stage")
     p.add_argument("--stage", default="deck-v1", help="the file is lists/card-stage-<stage>.csv")
     p.add_argument("--per-card", type=int, default=12000, help="passages per card (the weights are the relative counts)")
     p.add_argument("--seed", type=int, default=1859)
     p.add_argument("--sample", type=int, default=0, help="print this many passages per card instead of writing")
+    p.add_argument("--marked", action="store_true", help="write the marked items (control tokens) instead of the plain ones")
+    p.add_argument("--books", type=int, default=0, help="also write the deck as N local books + a list of refs (what the trainer reads)")
     a = p.parse_args(argv)
     rng = random.Random(a.seed)
-    d = passages(rng, a.per_card)
+    d = marked(rng, a.per_card) if a.marked else passages(rng, a.per_card)
     if a.sample:
         for card, ss in d.items():
             print(f"--- {card} ({len(ss)})")
@@ -134,6 +243,8 @@ def main(argv: list[str] | None = None) -> int:
                 w.writerow([f"the {card} stage, {i + 1}", "Thorp's card stage", "en", "Germanic", s])
                 n += 1
     print(f"wrote {n} passages to {f} ({n * 12:,} tokens or so)")
+    if a.books:
+        write_books(d, a.stage, books=a.books)
     return 0
 
 

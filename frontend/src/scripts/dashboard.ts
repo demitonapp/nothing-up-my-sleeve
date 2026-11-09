@@ -1,33 +1,40 @@
+// @ts-nocheck
+// per-view modules (the MPA work); the shared lib in src/lib is already fully typed and checked. Removing
+// this line is the finish line for "types throughout". ~3,425 errors sit behind it (mostly implicit-any).
 // The dashboard: tabs, the run picker, every panel, refreshed every 5 s from the JSON API in
 // server.py. Shared pieces live in ../lib (formatters, charts, DataTable, the reader).
-import { Plotly, tok, C, PALETTE, layout, cfg, empty, plot } from '../lib/charts.js';
-import { guarded, starChart } from '../lib/panel.js';
-import { fmt, big, fmtBytes, esc, get, log10, mean } from '../lib/format.js';
-import { DataTable } from '../lib/datatable.js';
+import { Plotly, tok, C, PALETTE, layout, cfg, empty, plot } from '../lib/charts';
+import { guarded, starChart } from '../lib/panel';
+import { fmt, big, fmtBytes, esc, get, postJSON, log10, mean, signed, fmtParams, shortModel, periodOf } from '../lib/format';
+import { DataTable } from '../lib/datatable';
 import { pillCls, crumbCls, btnCls, fieldCls, selectCls, rangeCls, checkCls, cardCls, emptyCls, toggleCls, alertCls, hoverCardCls, tooltipCls, setTab, confirmDialog } from '../lib/ui';
 import { cn } from '../lib/utils';
-import { openBook, openEssay } from '../lib/reader.js';
-import { renderHand, miniHand } from '../lib/cards.js';
-import { drawJourney, soundingSteps } from '../lib/journey.js';
-import { deckHand, CARD_FACE } from '../lib/deck.js';
-import { fieldError, clearErrors, busy, filterBars, store } from '../lib/forms.js';
-import { stagesFor, common as commonStages, band as bandStages, stageAt } from '../lib/stages.js';
-
-// metric keys: `<prefix>/layer_3`, `<prefix>/layer_3/attn`, `<prefix>/tok`, `<prefix>/pos`
-const groupOf = (k, prefix) => k.slice(prefix.length);
-const groupOrder = g => g === 'tok' ? -2 : g === 'pos' ? -1 : +g.split('/')[0].split('_').pop();
-const groupLabel = g => g.startsWith('layer_') ? 'layer ' + g.split('/')[0].split('_').pop() : g === 'tok' ? 'token emb' : g === 'pos' ? 'position emb' : g;
-const topKeys = (m, prefix) => Object.keys(m).filter(k => k.startsWith(prefix) && !groupOf(k, prefix).includes('/')).sort((a, b) => groupOrder(groupOf(a, prefix)) - groupOrder(groupOf(b, prefix)));
-const layerOnly = (m, prefix) => topKeys(m, prefix).filter(k => groupOf(k, prefix).startsWith('layer_'));
+import { openBook, openEssay } from '../lib/reader';
+import { renderHand, miniHand } from '../lib/cards';
+import { drawJourney, soundingSteps } from '../lib/journey';
+import { deckHand, CARD_FACE } from '../lib/deck';
+import { fieldError, clearErrors, busy, filterBars, store } from '../lib/forms';
+import { stagesFor, common as commonStages, band as bandStages, stageAt } from '../lib/stages';
+import { slugOf, CLASS_ALIASES, MTABS, STABS, STAB_EL, OLD_SHIP, SECTION_NAV, ETABS, DSUBS, GVIEWS, WSUBS, SSUBS, OSUBS, route, modelHash, shipHash } from './router';
+import { groupOf, groupOrder, groupLabel, topKeys, layerOnly, firstReach, valueAt } from '../lib/metrics';
+import { KINK_MIN, KINK_FIRM, setKinkRule, ema, linfit, kink, warmEnd, kinksOf, stat, kinkSummary, interp, meanOf, rangeOf, polyfit, polyval, fitReachAt } from '../lib/analysis';
+import { info, placePop, METRIC_KEY } from '../lib/info';
+import { renderRunGrid, initRunGrid } from '../lib/rungrid';
+import { ASK_QUESTIONS, chose, COARSE_WORD, lookingFor, hopeRank, showPiece, mathsSource } from './views/ask';
+import { rungEvidence, gradeNote, coverageBar, leadNote, fillStepFilter, sizeBand, trickOnClass, starOnClass, trickChart } from './views/chains';
+import { mathsCredit, mathsIndex, mathsTable } from './views/maths';
+import { selCounts, selDeclared, triScatter, fitoutCard } from './views/fitouts';
+import { knockoutBlock, knockoutChart } from './views/knockouts';
+import { CHAIN_LABEL, CHAIN_SHORT, RUNG_CLASS, MAKER, makerOf, makerLink, NEEDED, minicards, climbBar, chainingCell, chainStrip, runLink, logicCell, testCell } from './views/leaderboard';
+import { sieveHeat } from './views/sieves';
+import { MOVE_LABEL, fmtTok, fallText, hms, TRAIT_LABEL, firstAt, lastOf, statusPill, STAR_LABEL, scaffoldBar, starHeadline, familyBar, cardBadge, ART_CARDS, artImg, cardArt, flagImg, shortAbout, causeCell } from './views/helpers';
+import { SPLIT_LABEL, LAW_COLS, ART, metricRows, runCells } from './views/scoring';
+import { SHELF_OF, SHELF_LABEL, CURATED, holeMeta, bookSeries, meanCurve, earliestKink, ruleVerdict, pairVerdict, comparePanel, lossPanel, bpbPanel, speedPanel, heat, kinkPanel, attnPanels, bookPanels, languagePanels, fallbackPanel, headline, claimPanel, ladderPanel, samplesPanel, contentPanel, matchedPanel, truthGapPanel, probePanel, runsTable, drawStageList } from './views/ship';
 
 let selected = new URLSearchParams(location.search).get('run');
 
 let currentRung = null;
-const slugOf = r => r.name.toLowerCase().replace(/^the\s+/, '').replace(/[^a-z0-9]+/g, '-');
-// classes renamed (old address name -> new; server.py CLASS_RENAMES): either name opens the size,
-// and the address is rewritten to the size's current name
-const CLASS_RENAMES = { seedling: 'pan', keel: 'pan', proxy: 'augustus', pilot: 'augustus', bettor: 'explorer', summit: 'trader' };  // 8 Nov: the 300k Pan, the 1m Augustus
-const CLASS_ALIASES = Object.fromEntries(Object.entries(CLASS_RENAMES).flatMap(([a, b]) => [[a, b], [b, a]]));
+// classes renamed (old address name -> new): the table lives in scripts/router.ts
 const rungFor = key => ladderData && ladderData.rungs.find(r => slugOf(r) === key || r.preset === key || slugOf(r) === CLASS_ALIASES[key]);
 // ---- Navigation (UI.md, "Navigation"). Three ways in, each a section of the header:
 //   #/harbours[/<harbour>]      the harbours (home): two tiles, Phaleron and Zayton; one opens to its ships
@@ -40,72 +47,21 @@ const rungFor = key => ladderData && ladderData.rungs.find(r => slugOf(r) === ke
 //   #/discoveries[/<trick>]      the tricks of the trade, and one trick; /stars and /traits beside them
 //   #/sieves[/<sailing>]         the sieves explained, and one sailing's push, move and heading
 // Older addresses (#sizes, #proxy, #rung-1m, #/models/…, #betting…, ?run=) land on the new ones.
-const MTABS = ['overview', 'fleet', 'goals', 'training', 'scoring', 'waypoints', 'fitouts', 'bet'];
-const STABS = ['betting', 'books', 'languages', 'sieves', 'attention', 'traits'];
-const STAB_EL = { betting: 'betting', books: 'books', languages: 'languages', sieves: 'sieves', attention: 'attention', traits: 'traits-section' };
-const OLD_SHIP = { betting: 'betting', books: 'books', languages: 'languages', sieves: 'sieves', attention: 'attention', 'traits-section': 'traits' };
-const SECTION_NAV = { sizes: 'ships', rung: 'ships', ship: 'ships', 'runs-section': 'ships', foreign: 'ships', voyages: 'expeditions', voyage: 'expeditions', table: 'expeditions', discoveries: 'discoveries', sievesguide: 'sieves', leaderboard: 'leaderboard', competitor: 'leaderboard', lab: 'leaderboard', governance: 'governance', bet: 'bet', shelves: 'library' };
 let discView = 'index', discTrick = null, discChain = null, discSub = 'two-facts';
 // an expedition page's tabs (UI.md, "Expeditions"): the same five for every expedition; one that doesn't apply is hidden
-const ETABS = ['overview', 'at-sea', 'findings', 'fleet', 'inside'];
 let expTab = 'overview';
 // the Discoveries subtabs: the trick in focus (chaining two facts), the road to quantum mechanics, the registry of every trick
-const DSUBS = ['two-facts', 'quantum', 'registry', 'stars', 'cards'];
 // the leaderboard and the shelves (their code is at the end; declared here, as the first route may reach them)
 let labKey = null, labDataKey = null, cpModel = null, cpThorp = null, cpKey = null, cpStarsAsked = false, lbData = null, lbKey = null, shelvesData = null, shelfOpen = null, shelvesKey = null;
 const shelfBooks = new Map();
 let vTab = 'expeditions', qView = 'glance';
 // Governance's tabs (UI.md, "Governance"): the five systems, S3 control built out, acquisition one level down
-const GVIEWS = ['control', 'acquisition'];
 let govView = 'systems';
 let page = 'sizes', modelTab = 'overview', shipKey = null, sailingKey = null, shipTab = 'betting', voyageKey = null, runsList = null, shipsData = null, foreignKey = null;
-function route(h) {
-  if (h.startsWith('/')) {
-    const [a, b, c] = h.slice(1).split('/');
-    if ((a === 'sizes' || a === 'classes') && b) { const d = h.slice(1).split('/')[3]; return { page: 'rung', rung: b, mtab: MTABS.includes(c) ? c : 'overview', wsub: WSUBS.includes(d) ? d : 'expected', ssub: SSUBS.includes(d) ? d : 'maths', osub: c === 'overview' && OSUBS.includes(d) ? d : null }; }
-    if (a === 'models' && b) return { page: 'rung', rung: b, mtab: MTABS.includes(c) ? c : 'overview' };
-    if (a === 'foreign' && b) return { page: 'foreign', foreign: decodeURIComponent(b) };
-    if (a === 'ships' && b === 'all') return { page: 'runs-section' };
-    if (a === 'ships' && b) {
-      const d = h.slice(1).split('/')[3];
-      if (STABS.includes(c)) return { page: 'ship', ship: decodeURIComponent(b), sailing: null, stab: c };
-      return { page: 'ship', ship: decodeURIComponent(b), sailing: c ? decodeURIComponent(c) : null, stab: STABS.includes(d) ? d : 'betting' };
-    }
-    if (a === 'harbours' || a === 'harbors') return { page: 'sizes', harbour: b ? decodeURIComponent(b) : null, hsub: c === 'shipbuilder' || c === 'ships' ? c : null };
-    if (a === 'ships' || a === 'classes' || a === 'sizes') return { page: 'sizes' };
-    if ((a === 'voyages' || a === 'expeditions') && b === 'queue') return { page: 'voyages', vtab: 'queue', qview: c === 'every' ? 'every' : 'glance' };
-    if (a === 'voyages' || a === 'expeditions') return { page: 'voyages', vtab: b === 'expeditions' ? 'expeditions' : 'queue', qview: c === 'every' ? 'every' : 'glance' };  // the queue is the landing view (9 November)
-    if ((a === 'voyages' || a === 'expeditions') && b && c === 'table') return { page: 'table', voyage: b };
-    if ((a === 'voyages' || a === 'expeditions') && b) return { page: 'voyage', voyage: b, etab: ETABS.includes(c) ? c : 'overview' };
-    if (a === 'voyages' || a === 'expeditions') return { page: 'voyages', vtab: 'expeditions' };
-    if (a === 'discoveries' && b === 'chains' && c) return { page: 'discoveries', dview: 'chain', chain: c };
-    if (a === 'discoveries' && (!b || DSUBS.includes(b))) return { page: 'discoveries', dview: 'index', dsub: b || 'two-facts' };
-    if (a === 'discoveries') return { page: 'discoveries', dview: b === 'traits' ? b : 'trick', trick: b !== 'traits' ? b : null };
-    if (a === 'sieves') return { page: 'sievesguide', run: b ? decodeURIComponent(b) : null };
-    if (a === 'leaderboard' && b === 'thorp' && c) return { page: 'competitor', thorp: decodeURIComponent(c) };
-    if (a === 'leaderboard' && b === 'competitor' && c) return { page: 'competitor', model: decodeURIComponent(h.slice(1).split('/').slice(2).join('/')) };
-    if (a === 'leaderboard' && b === 'lab' && c) return { page: 'lab', lab: decodeURIComponent(c) };
-    if (a === 'leaderboard') return { page: 'leaderboard' };
-    if (a === 'governance') return { page: 'governance', gview: GVIEWS.includes(b) ? b : 'systems' };
-    if (a === 'bet') return { page: 'bet' };
-    if (a === 'shelves' || a === 'library') return { page: 'shelves', shelf: b ? decodeURIComponent(b) : null };
-    return { page: 'sizes' };
-  }
-  if (h.startsWith('rung-')) return { page: 'rung', rung: h.slice(5), mtab: 'overview' };
-  if (h in OLD_SHIP) return { page: 'ship', ship: null, stab: OLD_SHIP[h] };
-  if (h === 'runs-section') return { page: 'runs-section' };
-  if (!h || h === 'sizes' || h === 'rung') return { page: 'sizes' };
-  return { page: 'rung', rung: h, mtab: 'overview' };  // an old class link: #proxy
-}
-const WSUBS = ['expected', 'envelope', 'stars'];
 let wpSub = 'expected';
-const SSUBS = ['maths', 'ask', 'language', 'shapes', 'number', 'physics', 'life', 'return', 'logic', 'versus'];
 let scSub = 'maths';
 // the Overview's sub-pages: one per relation of the logic deck (2026-11-08: "a detail page explaining each of those relation tiles")
-const OSUBS = ['order', 'cause', 'membership', 'proportion', 'counterfactual'].map(x => 'logic-' + x);
 let ovSub = null;
-const modelHash = (r, mt = 'overview', sub = null) => `/sizes/${slugOf(r)}${mt === 'overview' && !sub ? '' : '/' + mt}${mt === 'waypoints' && sub && sub !== 'expected' ? '/' + sub : ''}${mt === 'scoring' && sub && sub !== 'maths' ? '/' + sub : ''}${mt === 'overview' && sub ? '/' + sub : ''}`;
-const shipHash = (key, sailing = null, st = 'betting') => `/ships/${key}${sailing ? '/' + encodeURIComponent(sailing) : ''}${st === 'betting' ? '' : '/' + st}`;
 const ladderRun = id => ladderData && ladderData.runs.find(x => x.run_id === id || x.name === id);
 // The ship and sailing an address names. The first part is a ship key, or (an older address) a run
 // name or id, which names its ship and that sailing. A ship without a sailing named opens its latest.
@@ -125,9 +81,14 @@ function shipRun(runs) {
 // go to a run's ship and that sailing (a grid square, a training row, a discovery), or to a ship
 function goShip(id) {
   const lr = ladderRun(id);
-  location.hash = '#' + (lr && lr.ship_key ? shipHash(lr.ship_key, lr.name) : shipHash(lr ? lr.name : id));
+  location.href = (lr && lr.ship_key ? shipHash(lr.ship_key, lr.name) : shipHash(lr ? lr.name : id));
 }
-const goShipKey = key => { location.hash = '#' + shipHash(key); };
+const goShipKey = key => { location.href = shipHash(key); };
+initRunGrid(goShip);  // the run grid's hover and click, wired once (lib/rungrid.ts)
+// the route the page is on: a pasted path is moved into the hash just below, after which the hash is the
+// route and the pathname is "/" (9 November: loadLadder and astro:page-load read the pathname, so every
+// size page fell back to the harbours before it could draw)
+const routePath = () => (location.hash ? location.hash.slice(1) : location.pathname);
 function showTab(h, push = true) {
   const rt = route(h);
   let hash = null, wasShip = selected;
@@ -139,9 +100,9 @@ function showTab(h, push = true) {
       currentRung = rt.rung; modelTab = rt.mtab; wpSub = rt.wsub || 'expected'; scSub = rt.ssub || 'maths'; ovSub = rt.osub || null;
       if (r) {
         hash = modelHash(r, modelTab, modelTab === 'scoring' ? scSub : modelTab === 'overview' ? ovSub : wpSub);
-        document.querySelectorAll('#modelnav a').forEach(a => { a.href = '#' + modelHash(r, a.dataset.mtab); });
-        document.querySelectorAll('#wpnav a').forEach(a => { a.href = '#' + modelHash(r, 'waypoints', a.dataset.wsub); });
-        document.querySelectorAll('#scnav a').forEach(a => { a.href = '#' + modelHash(r, 'scoring', a.dataset.ssub); });
+        document.querySelectorAll('#modelnav a').forEach(a => { a.href = modelHash(r, a.dataset.mtab); });
+        document.querySelectorAll('#wpnav a').forEach(a => { a.href = modelHash(r, 'waypoints', a.dataset.wsub); });
+        document.querySelectorAll('#scnav a').forEach(a => { a.href = modelHash(r, 'scoring', a.dataset.ssub); });
       }
       if (ladderData) renderRung();
     }
@@ -155,13 +116,13 @@ function showTab(h, push = true) {
         if (ship) { shipKey = ship.key; sailingKey = run.name || run.run_id; } else { shipKey = run.name || run.run_id; sailingKey = null; }
         hash = shipHash(shipKey, sailingKey, shipTab);
       }
-      document.querySelectorAll('#shipnav a').forEach(a => { a.href = '#' + shipHash(shipKey, sailingKey, a.dataset.stab); });
+      document.querySelectorAll('#shipnav a').forEach(a => { a.href = shipHash(shipKey, sailingKey, a.dataset.stab); });
       shipHeader(ship, run);
     }
   }
   if (page === 'voyage') {
     voyageKey = rt.voyage; expTab = rt.etab || 'overview';
-    document.querySelectorAll('#expnav a').forEach(a => { a.href = '#/expeditions/' + voyageKey + (a.dataset.etab === 'overview' ? '' : '/' + a.dataset.etab); });
+    document.querySelectorAll('#expnav a').forEach(a => { a.href = '/expeditions/' + voyageKey + (a.dataset.etab === 'overview' ? '' : '/' + a.dataset.etab); });
     showExpTab();  // may fall back to Overview, so the address is written after it
     hash = '/expeditions/' + voyageKey + (expTab === 'overview' ? '' : '/' + expTab);
   }
@@ -190,7 +151,6 @@ function showTab(h, push = true) {
     document.querySelectorAll('#discnav a').forEach(a => setTab(a, a.dataset.dsub === discSub));
     if (discData) drawDiscoveryView();
   }
-  if (page === 'sievesguide') { sieveRun = rt.run; hash = '/sieves' + (sieveRun ? '/' + encodeURIComponent(sieveRun) : ''); }
   if (page === 'leaderboard') hash = '/leaderboard';
   if (page === 'bet') hash = '/bet';
   if (page === 'governance') {  // three tabs: the five systems, S3 control built out, acquisition one level down
@@ -213,11 +173,10 @@ function showTab(h, push = true) {
   document.querySelectorAll('#ship .shiptab').forEach(t => t.classList.toggle('active', t.id === STAB_EL[shipTab]));
   document.querySelectorAll('#shipnav a').forEach(a => setTab(a, a.dataset.stab === shipTab));
   // the address always reads the canonical way (old addresses and ?run= are rewritten, not stacked)
-  if (hash && (location.hash !== '#' + hash || location.search)) history.replaceState(null, '', location.pathname + '#' + hash);
+  if (hash && location.pathname !== hash) history.replaceState(null, '', hash);
   if (page === 'voyages' || page === 'voyage') loadVoyages();
   if (page === 'voyages') { loadWaters(); loadOverview(); loadQueue(); }
   if (page === 'discoveries') loadDiscoveries();
-  if (page === 'sievesguide') loadSieves();
   if (page === 'leaderboard') loadLeaderboard();
   if (page === 'governance') loadGovernance();
   if (page === 'bet') loadBet();
@@ -230,31 +189,24 @@ function showTab(h, push = true) {
   document.querySelectorAll(`#${page} .chart`).forEach(el => { if (el.data && el.offsetParent) Plotly.Plots.resize(el); });
 }
 // the ship page's stage list: the stages its sailing read, in order (empty: one stage, reading)
-function drawStageList(st) {
-  const p = document.getElementById('stagepanel');
-  p.hidden = !(st && st.length);
-  if (!st || !st.length) return;
-  document.querySelector('#stagetable tbody').innerHTML = st.map(s => `<tr><td>${s.index + 1}</td><td><b>${esc(s.name)}</b></td>
-    <td>${esc(String(s.recipe || '–').replace('lists/', '').replace('.csv', ''))}</td><td>${s.passes ?? '–'}</td><td>${s.first_step}–${s.last_step}</td><td>${big(s.tokens)}</td></tr>`).join('');
-}
 function shipHeader(ship, run) {
   const preset = ship ? ship.preset : run && run.preset;
   const cls = preset && ladderData && ladderData.rungs.find(x => x.preset === preset);
   const link = document.getElementById('shipclass');
   link.textContent = cls ? `${cls.preset} · ${cls.name}` : preset || '';
-  if (cls) link.href = '#' + modelHash(cls); else link.removeAttribute('href');
+  if (cls) link.href = modelHash(cls); else link.removeAttribute('href');
   document.getElementById('shipname').textContent = ship ? ship.name : run ? (run.ship || run.name || run.run_id.slice(0, 12)) : `no ship called ${shipKey}`;
   document.getElementById('shipfitout').textContent = ship ? ship.subtitle : '';
   document.getElementById('shiptags').innerHTML = ship ? (ship.archived ? `<span class="${pillCls('')}" title="fitted out before 7 November, 06:40">First Fleet · archived</span>` : `<span class="${pillCls('blue')}">in service</span>`)
-    + (ship.expedition ? ` <a class="${pillCls('accent')}" href="#/expeditions/${esc(ship.expedition)}">${esc(VOYAGE_NAME[ship.expedition] || ship.expedition)}</a>` : '') : '';
+    + (ship.expedition ? ` <a class="${pillCls('accent')}" href="/expeditions/${esc(ship.expedition)}">${esc(VOYAGE_NAME[ship.expedition] || ship.expedition)}</a>` : '') : '';
   // its sailings: one per seed; the one shown is lit
   const sails = ship ? ship.sailings : run ? [{ run_id: run.run_id, name: run.name, seed: run.seed, status: run.status }] : [];
-  document.getElementById('sailings').innerHTML = sails.map(x => `<a class="${toggleCls('sailing')}" data-state="${run && x.run_id === run.run_id ? 'on' : 'off'}" href="#${ship ? shipHash(ship.key, x.name, shipTab) : shipHash(x.name, null, shipTab)}"
+  document.getElementById('sailings').innerHTML = sails.map(x => `<a class="${toggleCls('sailing')}" data-state="${run && x.run_id === run.run_id ? 'on' : 'off'}" href="${ship ? shipHash(ship.key, x.name, shipTab) : shipHash(x.name, null, shipTab)}"
     title="${esc(x.label || x.name)}" data-rid="${esc(x.run_id || '')}">seed <b>${x.seed ?? '–'}</b> ${esc(x.name)} · ${esc((x.status || '').split(':')[0])}${x.ft_en != null ? ` · ${fmt(x.ft_en)}` : ''}</a>`).join('');
   whereBadges(sails.map(x => x.run_id).filter(Boolean), id => document.querySelector(`#sailings [data-rid="${CSS.escape(id)}"]`));
   drawAboard(run);
 }
-window.addEventListener('hashchange', () => showTab(location.hash.slice(1), false));
+document.addEventListener('astro:page-load', () => showTab(routePath(), false));
 filterBars();
 // the one store (Postgres, /api/store): when it does not answer, the page says so at the top, and nothing is shown
 // from the old files instead (DECISIONS.md, "One store: Postgres, by the viable system")
@@ -267,599 +219,38 @@ fetch('/api/store').then(r => r.json()).then(d => {
   document.body.prepend(bar);
 }).catch(() => {});
 // once the whole script has run (showTab reaches state declared further down); an old ?run= address opens that ship
+// a script error says so on the page, once, with the line (17:25): a blank tab reads as "no data" and a console error
+// is easy to miss — this makes the failure visible where the missing content would have been
+if (typeof window !== 'undefined') {
+  let told = false;
+  const tell = (what: string) => {
+    if (told) return;
+    told = true;
+    const bar = document.createElement('div');
+    bar.className = 'fbmsg bad';
+    bar.style.cssText = 'position:fixed;left:12px;right:12px;bottom:12px;z-index:9999';
+    bar.textContent = `The dashboard failed: ${what}. Nothing below is current until this is fixed.`;
+    document.body.append(bar);
+  };
+  window.addEventListener('error', (e) => tell(`${(e as ErrorEvent).message} (${(e as ErrorEvent).filename || ''}:${(e as ErrorEvent).lineno || ''})`));
+  window.addEventListener('unhandledrejection', (e) => tell(String(((e as PromiseRejectionEvent).reason as Error)?.message || (e as PromiseRejectionEvent).reason)));
+}
+
 queueMicrotask(() => {
-  const h = location.hash.slice(1);
+  // a path address (/sizes/pan/training) becomes the hash address the router reads (17:06): the SPA is hash-routed,
+  // so a URL pasted without the # landed on the default page and looked like "the training tab shows nothing"
+  if (!location.hash && location.pathname && location.pathname !== "/") {
+    history.replaceState(null, "", "/#" + location.pathname);
+  }
+  const h = location.hash ? location.hash.slice(1) : location.pathname;
   showTab(selected && !h.startsWith('/') && !(h in OLD_SHIP) ? '/ships/' + selected : (h || '/ships'), false);
 });
 
-function ema(xs, span) {
-  const a = 2 / (span + 1); let m = null;
-  return xs.map(x => (m = m == null ? x : a * x + (1 - a) * m));
-}
-
-// ---- the kink: a two-line fit to (step, log10 norm); the break is where the layer changes regime
-function linfit(x, y) {
-  const n = x.length; let sx = 0, sy = 0, sxx = 0, sxy = 0;
-  for (let i = 0; i < n; i++) { sx += x[i]; sy += y[i]; sxx += x[i] * x[i]; sxy += x[i] * y[i]; }
-  const d = n * sxx - sx * sx;
-  const b = d ? (n * sxy - sx * sy) / d : 0, a = (sy - b * sx) / n;
-  let sse = 0; for (let i = 0; i < n; i++) { const r = y[i] - (a + b * x[i]); sse += r * r; }
-  return { a, b, sse };
-}
-// the kink rule is fleet.py's (KINK_MIN_RECORDS, KINK_FIRM), read from /api/sieves when it loads
-let KINK_MIN = 10, KINK_FIRM = 0.25;
-function kink(xs, ys) {
-  const n = xs.length; if (n < 6) return null;
-  const one = linfit(xs, ys); let best = null;
-  for (let k = 3; k <= n - 3; k++) {
-    const L = linfit(xs.slice(0, k), ys.slice(0, k)), R = linfit(xs.slice(k), ys.slice(k));
-    const sse = L.sse + R.sse;
-    if (!best || sse < best.sse) best = { k, sse, L, R };
-  }
-  const strength = one.sse > 0 ? 1 - best.sse / one.sse : 0;
-  const before = best.L.b * 100, after = best.R.b * 100;
-  // which way the push went at the break: by the signs of the two slopes
-  const kind = Math.abs(after - before) < 0.02 ? 'bent'
-    : before < 0 && after >= 0 ? 'turned up' : before > 0 && after <= 0 ? 'turned down'
-    : before < 0 ? (after > before ? 'flattened' : 'steepened') : (after > before ? 'steepened' : 'eased');
-  return { step: xs[best.k], before, after, kind, strength, tentative: n < KINK_MIN || strength < KINK_FIRM, L: best.L, R: best.R, k: best.k, xs };
-}
-// the fit starts where warmup ends (the learning-rate peak): the ramp before it is the schedule's
-// shape, not the layer's, and a hump defeats a two-line fit
-function warmEnd(m) { if (!m.lr) return 0; const [x, v] = m.lr; let b = 0; v.forEach((lr, i) => { if (lr > v[b]) b = i; }); return x[b]; }
-function kinksOf(m, prefix) {
-  const out = {}, from = warmEnd(m);
-  for (const k of topKeys(m, prefix)) {
-    const [x, v] = m[k];
-    const pts = x.map((s, i) => [s, v[i]]).filter(p => p[1] > 0 && p[0] >= from);
-    const kk = kink(pts.map(p => p[0]), pts.map(p => Math.log10(p[1])));
-    if (kk) out[k] = kk;
-  }
-  return out;
-}
-
-function stat(k, v, s = '') { return `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${s}</div></div>`; }
-
-function kinkSummary(m, kinks) {
-  const prefix = 'grad_norm/';
-  const keys = layerOnly(m, prefix);
-  if (!keys.length) return ['no records yet', ''];
-  const firm = keys.filter(k => kinks[k] && !kinks[k].tentative), tent = keys.filter(k => kinks[k] && kinks[k].tentative);
-  if (!firm.length) return [tent.length ? `${tent.length} tentative, none firm` : 'none yet', `${keys.length} layers, ${m[keys[0]][0].length} records`];
-  const say = k => `${groupLabel(groupOf(k, prefix)).replace('layer ', 'L')} ${kinks[k].kind} @ ${kinks[k].step}`;
-  const earliest = firm.slice().sort((a, b) => kinks[a].step - kinks[b].step)[0];
-  return [firm.map(say).join(' · '), `${firm.length} firm, ${tent.length} tentative; earliest ${say(earliest)}`];
-}
-
-function headline(r, m, kinks) {
-  const run = r.run;
-  const wall = run.wall_minutes != null ? fmt(run.wall_minutes, 1) + ' min' : '–';
-  const [kinkLine, kinkNote] = kinkSummary(m, kinks);
-  // the shelf this run was fed: books, tokens under its own tokeniser, and bytes (tokens × bytes a token)
-  const rec = (r.recipe && r.recipe.data) || [];
-  const shelf = { books: rec.length, tokens: rec.reduce((a, b) => a + (b.tokens || 0), 0), bytes: rec.reduce((a, b) => a + (b.tokens || 0) * (b.bytes_per_token || 0), 0) };
-  document.getElementById('strip').innerHTML = [
-    stat('ship', esc(run.ship || run.name || ''), `${esc(run.name || '')} · <span class="mono">${run.run_id.slice(0, 12)}</span> <span class="${pillCls(run.status.split(':')[0])}">${esc(run.status)}</span>`),
-    stat('kinks', `<span style="font-size:15px">${esc(kinkLine)}</span>`, esc(kinkNote)),
-    stat('weights', big(r.n_params_total), `${esc(r.spec.model.preset)} · ${big(r.n_params_non_embedding)} non-embedding + ${big(r.n_params_embedding)} embedding`),
-    stat('shelf', `${shelf.books} books`, `${big(shelf.tokens)} tokens · ${fmtBytes(shelf.bytes)} · read ${r.spec.data.passes}×`),
-    stat('tokens / s', big(r.tokens_per_s), 'mean of last 50 steps'),
-    stat(run.status === 'running' ? 'eta' : 'wall time', run.status === 'running' && r.eta_minutes != null ? `${fmt(r.eta_minutes, 1)} min` : wall, run.status === 'running' ? `${big(r.tokens_seen)} of ${big(r.tokens_planned)} tokens` : (run.finished || '')),
-  ].join('');
-  const ch = r.chinchilla || {}, latest = r.hole_bpb_latest, prev = r.hole_bpb_previous;
-  document.getElementById('numbers').innerHTML = [
-    stat('preset', esc(r.spec.model.preset), `N = ${big(r.n_params_non_embedding)} non-embedding`),
-    stat('tokens seen', big(r.tokens_seen), `of ${big(r.tokens_planned)} planned`),
-    stat('hole-card bpb mean', latest ? fmt(latest.value) : '–', latest ? `step ${latest.step}` + (prev ? ` · prev ${fmt(prev.value)} @ ${prev.step}` : '') : ''),
-    stat('Chinchilla L(N,D)', fmt(ch.L_planned), `nats/token, indicative · D=${big(ch.D_planned)}; unique: ${fmt(ch.L_unique)}`),
-    stat('gap (en hole-card CE − L)', fmt(ch.gap_planned), `en CE ${fmt(r.hole_ce_mean_en)} nats`),
-  ].join('');
-  document.getElementById('title').textContent = `${run.ship ? run.ship + ' · ' : ''}${run.name} · ${run.run_id.slice(0, 12)} · ${run.hardware || ''}`;
-}
-
-// ---- the claim: the hypothesis in the order a sceptic wants it, and the ledger's reading of it
-function claimPanel(cmp) {
-  const shelves = {};
-  for (const r of cmp) {
-    if (!r.bpb.length) continue;
-    (shelves[`${r.preset} · ${r.n_books ?? '?'} books`] ||= []).push(r);
-  }
-  const finals = Object.entries(shelves).map(([key, runs]) => {
-    const done = runs.filter(r => r.status === 'finished');
-    const vals = done.map(r => r.bpb[r.bpb.length - 1]);
-    return { key, runs, seeds: new Set(done.map(r => r.seed)).size, best: vals.length ? Math.min(...vals) : null, spread: vals.length > 1 ? Math.max(...vals) - Math.min(...vals) : null };
-  });
-  const scored = finals.filter(f => f.best != null), seeded = finals.filter(f => f.spread != null);
-  let verdict, cls = 'open';
-  if (scored.length < 2) verdict = `Not testable yet: ${scored.length} finished librar${scored.length === 1 ? 'y' : 'ies'} on the ledger. Two libraries at the same size and tokens are the first comparison; a second seed of one of them is the error bar.`;
-  else {
-    const sorted = scored.slice().sort((a, b) => a.best - b.best);
-    const diff = sorted[sorted.length - 1].best - sorted[0].best;
-    const spread = seeded.length ? Math.max(...seeded.map(f => f.spread)) : null;
-    verdict = `Best library so far: ${sorted[0].key} at ${fmt(sorted[0].best, 4)} bpb; shelf-to-shelf difference ${fmt(diff, 4)}`;
-    if (spread == null) verdict += '; no library has two finished seeds yet, so the difference has no error bar.';
-    else { cls = diff > 2 * spread ? 'yes' : 'no'; verdict += `; seed-to-seed spread ${fmt(spread, 4)}.` + (cls === 'yes' ? ' The libraries differ by more than the seeds: the claim stands at this size.' : ' The seeds are as wide as the libraries: the difference is noise at this size.'); }
-    verdict += ' Compared at each voyage’s final tokens; read the chart at matched tokens before quoting it.';
-  }
-  const rows = finals.map(f => `<tr><td>${esc(f.key)}</td><td>${f.runs.length}</td><td>${f.seeds}</td><td>${fmt(f.best, 4)}</td><td>${f.spread == null ? '–' : fmt(f.spread, 4)}</td></tr>`).join('');
-  document.getElementById('claim').innerHTML = `
-    <div><div class="k">Claim</div><div class="v">Some books make the guessing better, faster. Hold the model still, change the library, and the hole-card score falls faster per token on some libraries than on others. The kind of book that buys the most fall is the finding, and the next library is built from it.</div></div>
-    <div><div class="k">Measure</div><div class="v">Guessing accuracy: bits per byte on the hole cards, books the model is never trained on. Learning speed: how far that number falls per million tokens seen. Neither is ever read from a book on the library.</div></div>
-    <div><div class="k">Prediction</div><div class="v">At the same size and the same tokens, two libraries differ by more than two seeds of the same library do, and the order of libraries holds one size up. The per-book contribution (the heart of the dice, section 13) then names the books that carried it.</div></div>
-    <div><div class="k">What would show it wrong</div><div class="v">A seed-to-seed spread as wide as the shelf-to-shelf difference; or an order of libraries at 9M that flips at 21M. Either is published as a finding, not buried.</div></div>
-    <div class="reading"><div class="k">The ledger’s reading</div><div class="${alertCls(cls)}">${verdict}</div>
-      <table class="mt"><thead><tr><th>library</th><th>voyages</th><th>finished seeds</th><th>best final bpb</th><th>seed spread</th></tr></thead><tbody>${rows || '<tr><td colspan=5 class="${emptyCls(true)}">no scored voyage yet</td></tr>'}</tbody></table></div>`;
-}
-
-function comparePanel(cmp) {
-  const data = [];
-  cmp.forEach((r, i) => {
-    if (!r.bpb.length) return;
-    const col = PALETTE[i % PALETTE.length];
-    const name = `${r.ship || r.name} · ${r.preset} · ${r.n_books ?? '?'} books · seed ${r.seed}`;
-    data.push({ x: r.tokens, y: r.bpb, name, mode: 'lines+markers', line: { color: col, width: 2 }, marker: { size: 6 },
-      hovertemplate: `${esc(name)}<br>%{x:,.0f} tokens<br>%{y:.4f} bpb<extra></extra>` });
-    if (r.bpb_en.length) data.push({ x: r.tokens.slice(0, r.bpb_en.length), y: r.bpb_en, name: name + ' (en)', mode: 'lines', line: { color: col, width: 1, dash: 'dot' }, showlegend: false,
-      hovertemplate: `${esc(name)} (en)<br>%{x:,.0f} tokens<br>%{y:.4f} bpb<extra></extra>` });
-  });
-  if (!data.length) return empty('compare', 'no scored voyage yet');
-  plot('compare', data, layout({ xaxis: { title: 'tokens seen', gridcolor: C.line }, yaxis: { title: 'hole-card bits per byte', gridcolor: C.line } }));
-}
-
-function lossPanel(m, sets) {
-  if (!m.loss) return empty('loss');
-  const [s, v] = m.loss;
-  const data = [
-    { x: s, y: v, name: 'loss', type: 'scattergl', mode: 'lines', line: { color: C.track, width: 1 } },
-    { x: s, y: ema(v, 100), name: 'EMA 100', type: 'scattergl', mode: 'lines', line: { color: C.blue, width: 2 } },
-  ];
-  const palette = [C.accent, C.good, C.bad, C.c5];
-  sets.forEach((set, i) => {
-    const k = `eval/${set}/ce_mean`;
-    if (m[k]) data.push({ x: m[k][0], y: m[k][1], name: `${set} CE mean`, mode: 'markers+lines', line: { dash: 'dot', color: palette[i % 4] }, marker: { size: 8, color: palette[i % 4] } });
-    const ken = `eval/${set}/ce_mean_en`;
-    if (m[ken]) data.push({ x: m[ken][0], y: m[ken][1], name: `${set} CE mean (en)`, mode: 'markers', marker: { size: 7, symbol: 'diamond', color: palette[(i + 1) % 4] } });
-  });
-  if (m.lr) data.push({ x: m.lr[0], y: m.lr[1], name: 'lr', yaxis: 'y2', mode: 'lines', line: { color: C.muted, width: 1, dash: 'dash' } });
-  plot('loss', data, layout({ xaxis: { title: 'step', gridcolor: C.line }, yaxis: { title: 'nats / token', gridcolor: C.line },
-    yaxis2: { overlaying: 'y', side: 'right', title: 'lr', showgrid: false, exponentformat: 'e' } }));
-}
-
-function holeMeta(r) {
-  const meta = {};
-  for (const sets of Object.values((r.eval_sets && r.eval_sets.data.sets) || {}))
-    for (const b of sets) meta[b.book_id] = b;
-  return meta;
-}
-
-function bpbPanel(evals, r) {
-  if (!evals.length) return empty('bpb');
-  const meta = holeMeta(r);
-  const by = {};
-  for (const e of evals) (by[e.book_id] ||= []).push(e);
-  const data = Object.entries(by).map(([b, rows]) => { const t = meta[b] ? `${meta[b].title} (${meta[b].language})` : b; return {
-    x: rows.map(r => r.step), y: rows.map(r => r.bpb), name: t, mode: 'lines+markers', marker: { size: 5 },
-    hovertemplate: `${esc(t)}<br>step %{x}<br>%{y:.4f} bpb<extra></extra>` }; });
-  plot('bpb', data, layout({ xaxis: { title: 'step', gridcolor: C.line }, yaxis: { title: 'bits per byte', gridcolor: C.line },
-    legend: { orientation: 'v', x: 1.02, y: 1, font: { size: 10 } }, margin: { l: 50, r: 10, t: 10, b: 36 } }));
-}
-
-function speedPanel(m) {
-  if (!m.tokens_per_s) return empty('speed');
-  const data = [{ x: m.tokens_per_s[0], y: ema(m.tokens_per_s[1], 20), name: 'tokens/s (EMA 20)', mode: 'lines', line: { color: C.good } }];
-  if (m.mem_gb) data.push({ x: m.mem_gb[0], y: m.mem_gb[1], name: 'peak memory GB', yaxis: 'y2', mode: 'lines+markers', line: { color: C.accent }, marker: { size: 4 } });
-  plot('speed', data, layout({ yaxis: { title: 'tokens / s', gridcolor: C.line }, yaxis2: { overlaying: 'y', side: 'right', title: 'GB', showgrid: false, rangemode: 'tozero' } }));
-}
-
-function heat(id, m, prefix, kinks, colorbar) {
-  const keys = topKeys(m, prefix);
-  if (!keys.length) return empty(id);
-  const x = m[keys[0]][0];
-  const data = [{ type: 'heatmap', x, y: keys.map(k => groupLabel(groupOf(k, prefix))), z: keys.map(k => m[k][1].map(log10)),
-    colorscale: 'Viridis', colorbar: { title: colorbar, thickness: 10 }, hovertemplate: 'step %{x}<br>%{y}<br>log10 %{z:.2f}<extra></extra>' }];
-  const kx = [], ky = [], kt = [];
-  for (const k of keys) { const kk = kinks[k]; if (kk) { kx.push(kk.step); ky.push(groupLabel(groupOf(k, prefix))); kt.push(`kink at ${kk.step}${kk.tentative ? ' (tentative)' : ''}`); } }
-  if (kx.length) data.push({ type: 'scatter', x: kx, y: ky, text: kt, mode: 'markers', marker: { symbol: 'diamond', size: 9, color: '#fff', line: { color: '#000', width: 1 } }, hovertemplate: '%{y}<br>%{text}<extra></extra>', showlegend: false });
-  plot(id, data, layout({ margin: { l: 80, r: 10, t: 10, b: 36 }, xaxis: { title: 'step', gridcolor: C.line } }));
-}
-
-function kinkPanel(m, kinks) {
-  const prefix = 'grad_norm/';
-  const keys = layerOnly(m, prefix);
-  if (!keys.length) { empty('kinks'); document.querySelector('#kinktable tbody').innerHTML = ''; return; }
-  const data = [];
-  keys.forEach((k, i) => {
-    const g = groupOf(k, prefix), [x, v] = m[k], col = PALETTE[i % PALETTE.length];
-    data.push({ x, y: v.map(log10), name: groupLabel(g), mode: 'lines', line: { color: col, width: 1.5 }, hovertemplate: `${groupLabel(g)}<br>step %{x}<br>log10 %{y:.2f}<extra></extra>` });
-    const kk = kinks[k];
-    if (kk) {
-      const left = kk.xs.slice(0, kk.k), right = kk.xs.slice(kk.k);
-      data.push({ x: left, y: left.map(s => kk.L.a + kk.L.b * s), mode: 'lines', line: { color: col, width: 1, dash: 'dot' }, showlegend: false, hoverinfo: 'skip' });
-      data.push({ x: right, y: right.map(s => kk.R.a + kk.R.b * s), mode: 'lines', line: { color: col, width: 1, dash: 'dot' }, showlegend: false, hoverinfo: 'skip' });
-      data.push({ x: [kk.step], y: [kk.L.a + kk.L.b * kk.step], mode: 'markers', marker: { symbol: 'diamond', size: 10, color: col, line: { color: '#fff', width: 1 } }, showlegend: false,
-        hovertemplate: `${groupLabel(g)} kink at step ${kk.step}<br>before ${fmt(kk.before, 3)} / after ${fmt(kk.after, 3)} log10 per 100 steps<extra></extra>` });
-    }
-  });
-  plot('kinks', data, layout({ xaxis: { title: 'step', gridcolor: C.line }, yaxis: { title: 'log10 gradient norm', gridcolor: C.line }, legend: { orientation: 'h', y: -0.2, font: { size: 10 } } }));
-  document.querySelector('#kinktable tbody').innerHTML = keys.map(k => {
-    const kk = kinks[k], g = groupLabel(groupOf(k, prefix));
-    if (!kk) return `<tr><td>${g}</td><td colspan=6 class="t">fewer than six records</td></tr>`;
-    return `<tr><td>${g}</td><td>${kk.step}</td><td>${kk.kind}</td><td>${fmt(kk.before, 3)}</td><td>${fmt(kk.after, 3)}</td><td>${fmt(kk.strength, 2)}</td><td class="t">${kk.tentative ? 'tentative' : ''}</td></tr>`;
-  }).join('');
-  const firm = keys.map(k => kinks[k]).filter(kk => kk && !kk.tentative);
-  document.getElementById('kinknote').textContent = 'Slopes are log10 of the norm per 100 steps. ' + (!firm.length
-    ? 'The fit starts where warmup ends. A kink is tentative until ten records (500 steps) are in and the two-line fit removes at least a quarter of the one-line fit\'s residual. Turned up: the push bottomed and is rising again (the loss plateauing while the step stays large); turned down: it peaked; flattened or steepened: still falling, slower or faster; eased: still rising, slower.'
-    : `${firm.length} of ${keys.length} layers have a firm kink; the earliest is at step ${Math.min(...firm.map(kk => kk.step))}, the latest at ${Math.max(...firm.map(kk => kk.step))}. A layer whose push flattens early has settled early; one that keeps falling is still being taught.`);
-}
-
-function attnPanels(m) {
-  for (const [id, prefix, title] of [['attnpush', 'grad_norm/', 'log10 push ratio'], ['attnmove', 'update_ratio/', 'log10 move ratio']]) {
-    const layers = layerOnly(m, prefix).map(k => groupOf(k, prefix));
-    const rows = layers.filter(g => m[`${prefix}${g}/attn`] && m[`${prefix}${g}/mlp`]);
-    if (!rows.length) { empty(id, 'no attn/mlp rows yet (written by voyages started after 2026-11-06)'); continue; }
-    const x = m[`${prefix}${rows[0]}/attn`][0];
-    const z = rows.map(g => { const a = m[`${prefix}${g}/attn`][1], b = m[`${prefix}${g}/mlp`][1]; return a.map((v, i) => v > 0 && b[i] > 0 ? Math.log10(v / b[i]) : null); });
-    plot(id, [{ type: 'heatmap', x, y: rows.map(groupLabel), z, colorscale: 'RdBu', zmid: 0, colorbar: { title, thickness: 10 }, hovertemplate: 'step %{x}<br>%{y}<br>%{z:.2f}<extra></extra>' }],
-      layout({ margin: { l: 80, r: 10, t: 10, b: 36 }, xaxis: { title: 'step', gridcolor: C.line } }));
-  }
-}
-
-function bookSeries(m, r) {
-  const rec = (r.recipe && r.recipe.data) || [];
-  const meta = {}; for (const b of rec) meta[b.book_id] = b;
-  return Object.keys(m).filter(k => k.startsWith('loss/book/')).map(k => {
-    const id = k.slice('loss/book/'.length), b = meta[id] || { title: id, family: '' };
-    return { id, title: b.title, family: b.family, x: m[k][0], y: m[k][1] };
-  });
-}
-const meanCurve = (books, steps) => steps.map(st => mean(books.map(b => { const j = b.x.indexOf(st); return j < 0 ? null : b.y[j]; }).filter(v => v != null)));
-
-function bookPanels(m, r, series, fams, famColour) {
-  const traits = r.traits || {};
-  if (!series.length) { empty('bookloss'); empty('kindloss'); empty('halflife'); return; }
-  const seen = new Set();
-  plot('bookloss', series.map(s => ({ x: s.x, y: s.y, name: s.family, legendgroup: s.family, showlegend: !seen.has(s.family) && !!seen.add(s.family), mode: 'lines', line: { color: famColour(s.family), width: 1 }, opacity: 0.8,
-    hovertemplate: `${esc(s.title)} (${esc(s.family)})<br>step %{x}<br>%{y:.3f} nats<extra></extra>` })),
-    layout({ xaxis: { title: 'step', gridcolor: C.line }, yaxis: { title: 'nats / token', gridcolor: C.line } }));
-
-  const steps = [...new Set(series.flatMap(s => s.x))].sort((a, b) => a - b);
-  const kdata = [];
-  ['fiction', 'verse', 'first_person'].forEach((t, i) => {
-    for (const val of [1, 0]) {
-      const books = series.filter(s => traits[s.id] && traits[s.id][t] === val);
-      if (!books.length) continue;
-      kdata.push({ x: steps, y: meanCurve(books, steps), name: `${t.replace('_', ' ')}${val ? '' : ': not'} (${books.length})`, mode: 'lines', line: { color: PALETTE[i], width: val ? 2.5 : 1.5, dash: val ? 'solid' : 'dot' } });
-    }
-  });
-  if (!kdata.length) empty('kindloss', 'no traits for these books (lists/traits.csv)');
-  else plot('kindloss', kdata, layout({ xaxis: { title: 'step', gridcolor: C.line }, yaxis: { title: 'nats / token, mean over books', gridcolor: C.line } }));
-
-  const hl = series.map(s => {
-    const y0 = s.y[0], ymin = Math.min(...s.y), target = y0 - (y0 - ymin) / 2;
-    const j = s.y.findIndex(v => v <= target), n = s.y.length;
-    const last = s.y[n - 1], prev = s.y[Math.max(0, n - 3)], dstep = s.x[n - 1] - s.x[Math.max(0, n - 3)];
-    return { ...s, half: j < 0 ? null : s.x[j], drop: y0 - ymin, last, slope: dstep ? (last - prev) / dstep * 100 : 0 };
-  }).filter(h => h.half != null && h.drop > 0).sort((a, b) => a.half - b.half || b.drop - a.drop);
-  if (!hl.length) return empty('halflife');
-  const kind = h => { const t = traits[h.id]; return t ? [t.fiction ? 'fiction' : 'non-fiction', t.verse ? 'verse' : null, t.first_person ? 'first person' : null].filter(Boolean).join(', ') : ''; };
-  // labels must be unique: Plotly puts bars with the same category in one slot, and two volumes of
-  // one book cut to 40 characters collide (The Gaming Table vols 1 and 2, Edith Wharton parts 1 and 2)
-  const short = hl.map(h => h.title.slice(0, 40)), count = {};
-  short.forEach(t => count[t] = (count[t] || 0) + 1);
-  const labels = hl.map((h, i) => count[short[i]] > 1 ? `${short[i].slice(0, 32)}… (${h.id})` : short[i]);
-  plot('halflife', [{ type: 'bar', x: labels, y: hl.map(h => h.half), marker: { color: hl.map(h => famColour(h.family)) },
-    text: hl.map(h => `${h.family}${kind(h) ? ' · ' + kind(h) : ''}<br>half-life step ${h.half} · drop so far ${fmt(h.drop, 2)} nats<br>latest ${fmt(h.last, 3)} · slope ${fmt(h.slope, 3)} per 100 steps`), hovertemplate: '%{x}<br>%{text}<extra></extra>' }],
-    layout({ margin: { l: 50, r: 10, t: 10, b: 140 }, xaxis: { tickangle: -60, tickfont: { size: 9 }, gridcolor: C.line }, yaxis: { title: 'half-life (step)', gridcolor: C.line } }));
-}
-
-function languagePanels(r, evals, series, fams, famColour) {
-  const rec = r.recipe && r.recipe.data;
-  if (!rec) { empty('families'); empty('familyloss'); empty('familybpb'); return; }
-  const fam = {};
-  for (const b of rec) fam[b.family] = (fam[b.family] || 0) + b.tokens;
-  const fk = Object.keys(fam).sort((a, b) => fam[b] - fam[a]);
-  plot('families', [{ type: 'bar', x: fk, y: fk.map(k => fam[k]), marker: { color: fk.map(famColour) }, hovertemplate: '%{x}<br>%{y:,} tokens<extra></extra>' }],
-    layout({ yaxis: { title: 'tokens per pass', gridcolor: C.line } }));
-  if (!series.length) empty('familyloss');
-  else {
-    const steps = [...new Set(series.flatMap(s => s.x))].sort((a, b) => a - b);
-    plot('familyloss', fams.map(f => { const books = series.filter(s => s.family === f); return { x: steps, y: meanCurve(books, steps), name: `${f} (${books.length})`, mode: 'lines', line: { color: famColour(f), width: 2 } }; }).filter(t => t.y.some(v => v != null)),
-      layout({ xaxis: { title: 'step', gridcolor: C.line }, yaxis: { title: 'nats / token, mean over books', gridcolor: C.line } }));
-  }
-  if (!evals.length) return empty('familybpb');
-  const meta = holeMeta(r), last = Math.max(...evals.map(e => e.step));
-  const byFam = {};
-  for (const e of evals.filter(e => e.step === last)) { const f = (meta[e.book_id] || {}).family || '?'; (byFam[f] ||= []).push(e.bpb); }
-  const ff = Object.keys(byFam).sort((a, b) => mean(byFam[a]) - mean(byFam[b]));
-  plot('familybpb', [{ type: 'bar', x: ff, y: ff.map(f => mean(byFam[f])), marker: { color: ff.map(famColour) }, text: ff.map(f => `${byFam[f].length} book${byFam[f].length > 1 ? 's' : ''}`), hovertemplate: '%{x}<br>%{y:.4f} bpb · %{text}<extra></extra>' }],
-    layout({ yaxis: { title: `bits per byte at step ${last}`, gridcolor: C.line } }));
-}
-
-function fallbackPanel(r) {
-  const rec = r.recipe && r.recipe.data;
-  if (!rec) return empty('fallback');
-  const stats = (r.tokeniser && r.tokeniser.stats) || {};
-  const rows = rec.map(b => ({ ...b, rate: (stats[b.book_id] || {}).byte_fallback_rate ?? b.byte_fallback_rate ?? 0 }))
-    .sort((a, b) => b.rate - a.rate).slice(0, 25);
-  plot('fallback', [{ type: 'bar', orientation: 'h', y: rows.map(b => `${b.title.slice(0, 34)} (${b.language})`).reverse(),
-    x: rows.map(b => b.rate * 100).reverse(), marker: { color: C.accent }, hovertemplate: '%{y}<br>%{x:.3f}% byte tokens<extra></extra>' }],
-    layout({ margin: { l: 230, r: 10, t: 10, b: 36 }, xaxis: { title: '% of tokens that are byte pieces (top 25)', gridcolor: C.line }, yaxis: { tickfont: { size: 10 } } }));
-}
-
 // the Traits tab reads any eval step's probes and sorts the traits by the layer they live in (with
 // that layer's kink beside it), by the step they first reached YES, by AUC, or by name
-const traitView = { sort: 'layer', step: null };
-try { traitView.sort = localStorage.getItem('thorp.traitsort') || 'layer'; } catch (e) {}
-function probePanel(r, kinks = {}) {
-  const all = r.probes_all || [];
-  const el = document.getElementById('traits');
-  const sortSel = document.getElementById('traitsort'), stepSel = document.getElementById('traitstep');
-  if (!all.length) { el.innerHTML = '<div class="${emptyCls()}">no probe rows yet: add <span class="mono">probes</span> to eval.evaluators in the spec</div>'; empty('probeheat', ''); stepSel.innerHTML = ''; return; }
-  const steps = all.map(a => a.step);
-  if (traitView.step == null || !steps.includes(traitView.step) || traitView.followLatest) { traitView.step = steps[steps.length - 1]; traitView.followLatest = true; }
-  if (stepSel.dataset.steps !== steps.join(',')) { // rebuild only when a step arrives, so an open list stays open
-    stepSel.innerHTML = steps.map(s => `<option value="${s}">${s}${s === steps[steps.length - 1] ? ' (latest)' : ''}</option>`).join('');
-    stepSel.dataset.steps = steps.join(',');
-  }
-  stepSel.value = String(traitView.step);
-  sortSel.value = traitView.sort;
-  sortSel.onchange = () => { traitView.sort = sortSel.value; try { localStorage.setItem('thorp.traitsort', sortSel.value); } catch (e) {} probePanel(r, kinks); };
-  stepSel.onchange = () => { traitView.step = +stepSel.value; traitView.followLatest = traitView.step === steps[steps.length - 1]; probePanel(r, kinks); };
-  const p = all.find(a => a.step === traitView.step).data;
-  document.getElementById('probesh').firstChild.textContent = `Traits at step ${traitView.step}: is there a direction? `;
-  // the first step at which each trait was found, over every step on the ledger
-  const first = {};
-  for (const a of all) for (const [n, t] of Object.entries(a.data.traits)) if (t.status === 'found' && first[n] == null) first[n] = a.step;
-  const best = t => t.auc ? Math.max(...t.auc) : -1;
-  const kinkAt = L => { const k = kinks['grad_norm/layer_' + L]; return k ? k : null; };
-  const byName = (a, b) => (a.includes('/') - b.includes('/')) || a.localeCompare(b);
-  const names = Object.keys(p.traits).sort((a, b) => {
-    const A = p.traits[a], B = p.traits[b];
-    if (traitView.sort === 'name') return byName(a, b);
-    if (traitView.sort === 'auc') return best(B) - best(A) || byName(a, b);
-    if (traitView.sort === 'first') return (first[a] ?? Infinity) - (first[b] ?? Infinity) || best(B) - best(A) || byName(a, b);
-    return (A.best_layer ?? Infinity) - (B.best_layer ?? Infinity) || best(B) - best(A) || byName(a, b);
-  });
-  document.getElementById('traitnote').textContent = traitView.sort === 'layer' ? 'traits grouped by the layer where the held-out AUC peaks; the kink is that layer’s, from the Sieves tab' : traitView.sort === 'first' ? 'first step found is over every eval step on the ledger, not only the one shown' : '';
-  el.innerHTML = names.map(n => {
-    const t = p.traits[n];
-    // YES is split by the floors when they exist: emergent (beats the bag of tokens and the untrained
-    // model) or in the tokens (a floor finds it too, so the model need not have built anything)
-    const hasFloors = t.floor_bow !== undefined;
-    const a = t.status === 'found' ? (hasFloors ? (t.emergent ? ['YES · emergent', 'yes'] : ['YES · in the tokens', 'na']) : ['YES', 'yes'])
-      : t.status === 'not_found' ? ['NO', 'no'] : ['n/a', 'na'];
-    const where = t.auc ? `layer ${t.best_layer}, AUC ${fmt(Math.max(...t.auc), 3)}` : t.reason;
-    const k = t.auc ? kinkAt(t.best_layer) : null;
-    const kink = k ? `<br>layer ${t.best_layer} kink @ ${k.step} (${k.kind}${k.tentative ? ', tentative' : ''})` : '';
-    const firstLine = first[n] != null ? `<br>first found @ step ${first[n]}` : '';
-    const floors = hasFloors ? `<br>floors: tokens ${fmt(t.floor_bow, 3)} · untrained ${fmt(t.floor_init, 3)}` : '';
-    return `<div class="trait"><div class="n">${esc(n.replace('_', ' '))}</div><div class="a ${a[1]}">${a[0]}</div><div class="r">${esc(where)}${kink}${firstLine}${floors}<br>library ${t.n_train[0]}/${t.n_train[1]} · held out ${t.n_test[0]}/${t.n_test[1]}</div></div>`;
-  }).join('');
-  const tested = names.filter(n => p.traits[n].auc);
-  if (!tested.length) return empty('probeheat', 'no trait has two held-out books on each side');
-  const L = p.traits[tested[0]].auc.length;
-  const rows = tested.slice().reverse(); // heatmap rows read top-down in the strip's order
-  plot('probeheat', [{ type: 'heatmap', x: [...Array(L).keys()].map(i => { const k = kinkAt(i); return `layer ${i}` + (k ? `<br>kink ${k.step}` : ''); }), y: rows.map(n => n.replace('_', ' ')), z: rows.map(n => p.traits[n].auc),
-    zmin: 0.5, zmax: 1, colorscale: 'Viridis', colorbar: { title: 'AUC', thickness: 10 }, hovertemplate: '%{y}<br>%{x}<br>held-out AUC %{z:.3f}<extra></extra>' }],
-    layout({ margin: { l: 130, r: 10, t: 10, b: 48 }, yaxis: { type: 'category', categoryorder: 'array', categoryarray: rows.map(n => n.replace('_', ' ')) } }));
-}
-
-const LADDER = [
-  [1, "knowing what it doesn't know", 'r1_calibration', 'correlation of its uncertainty with its loss'],
-  [2, 'noticing the strange', 'r2_novelty_auc', 'AUC, unseen books against library books'],
-  [3, 'learning from the page', 'r3_copy_gain', 'nats saved on a repeated span (and late minus early loss)'],
-  [4, 'knowing a question', 'r4_question_auc', 'AUC, questions against statements, punctuation removed'],
-  [5, 'expecting an answer', 'r5_expectancy', 'nats more uncertain after "?" than after "."'],
-  [6, 'asking', 'r6_asking', 'log ratio of "?" where unsure, beyond the text'],
-];
-function ladderPanel(r, m) {
-  const c = r.curiosity && r.curiosity.data, el = document.getElementById('ladder'), vd = document.getElementById('ladderverdict');
-  if (!c) { el.innerHTML = '<div class="${emptyCls()}">no ladder rows yet: add <span class="mono">curiosity</span> to eval.evaluators, or re-score with <span class="mono">thorp eval RUN --evaluators curiosity</span></div>'; vd.innerHTML = ''; empty('laddertime', ''); return; }
-  document.getElementById('ladderh').firstChild.textContent = `The curiosity ladder at step ${r.curiosity.step} `;
-  const order = c.highest === 0 ? 'No rung is present yet.' : c.in_order ? `In order: every rung up to ${c.highest} that could be tested is present, none above an absent one.` : `Out of order: rung ${c.highest} is present above an absent rung. That is a finding against the ladder at this size.`;
-  vd.innerHTML = `<div class="reading"><div class="k">The ledger’s reading</div><div class="${alertCls(c.highest === 0 ? 'open' : c.in_order ? 'yes' : 'no')}">${order}</div></div>`;
-  const floorOf = k => k === 2 ? c.floor_bow.r2 : k === 4 ? c.floor_bow.r4 : null;
-  el.innerHTML = `<table><thead><tr><th>rung</th><th>measure</th><th>trained</th><th>untrained</th><th>token floor</th><th>status</th><th>reading</th></tr></thead><tbody>${
-    LADDER.slice().reverse().map(([k, name, key, what]) => {
-      const s = c.rungs[k] || { status: 'untestable', reason: '' };
-      const cls = s.status === 'present' ? 'finished' : s.status === 'absent' ? 'failed' : 'running';
-      return `<tr><td><b>${k}</b> ${esc(name)}</td><td class="note">${esc(what)}</td><td>${fmt(c.values[key], 3)}</td><td>${fmt(c.untrained[key], 3)}</td><td>${fmt(floorOf(k), 3)}</td>
-        <td><span class="${pillCls(cls)}">${s.status}</span></td><td class="note">${esc(s.reason)}</td></tr>`;
-    }).join('')}</tbody></table>`;
-  // when each rung appears: one row per rung, a mark at every eval step, filled where present
-  const data = [];
-  for (const [k, name] of LADDER) {
-    const s = m[`curiosity/rung_${k}`];
-    if (!s) continue;
-    data.push({ x: s[0], y: s[0].map(() => k), mode: 'markers', name: `${k} ${name}`, showlegend: false,
-      marker: { size: 10, symbol: 'square', color: s[1].map(v => v ? C.good : C.muted + '59') },
-      hovertemplate: `${esc(name)}<br>step %{x}<extra></extra>` });
-  }
-  if (!data.length) return empty('laddertime', '');
-  plot('laddertime', data, layout({ xaxis: { title: 'step', gridcolor: C.line }, yaxis: { title: 'rung', dtick: 1, range: [0.5, 6.5], gridcolor: C.line } }));
-}
-
-function samplesPanel(r) {
-  const el = document.getElementById('samples');
-  if (!r.samples) { el.innerHTML = '<div class="${emptyCls()}">no samples yet</div>'; empty('top10'); return; }
-  document.getElementById('samplesh').textContent = `Samples at step ${r.samples.step}`;
-  el.innerHTML = r.samples.data.map(s => `<div><span class="p">${esc(s.prompt)}</span> <span class="t">${s.temperature ? 'T=' + s.temperature : 'greedy'}</span><pre>${esc(s.prompt)}${esc(s.text)}</pre></div>`).join('');
-  if (r.top10) {
-    document.getElementById('top10h').textContent = `Next token after “${r.top10.data.prompt}”`;
-    const t = r.top10.data.top.slice().reverse();
-    plot('top10', [{ type: 'bar', orientation: 'h', y: t.map(x => JSON.stringify(x.token.replace(/▁/g, ' '))), x: t.map(x => x.p), marker: { color: C.good },
-      hovertemplate: '%{y}<br>p = %{x:.4f}<extra></extra>' }], layout({ margin: { l: 110, r: 10, t: 10, b: 36 }, xaxis: { title: 'probability', gridcolor: C.line } }));
-  }
-}
-
 // ---- matched tokens: a run's score where its curve crosses a token count, by linear interpolation
-const MATCH_AT = [16e6, 32e6, 64e6];
-function interp(xs, ys, x) {
-  if (!xs.length || x < xs[0] || x > xs[xs.length - 1]) return null;
-  for (let i = 1; i < xs.length; i++) if (xs[i] >= x) { const t = (x - xs[i - 1]) / (xs[i] - xs[i - 1] || 1); return ys[i - 1] + t * (ys[i] - ys[i - 1]); }
-  return ys[ys.length - 1];
-}
-function earliestKink(r) {
-  const ks = kinksOf(r.push || {}, 'grad_norm/');
-  const firm = Object.entries(ks).filter(([k, v]) => k.split('/')[1].startsWith('layer_') && !v.tentative).sort((a, b) => a[1].step - b[1].step);
-  return firm.length ? `L${firm[0][0].split('_').pop()} ${firm[0][1].kind} @ ${firm[0][1].step}` : '–';
-}
-function matchedPanel(cmp) {
-  const runs = cmp.filter(r => r.bpb.length);
-  if (!runs.length) { document.getElementById('matched').innerHTML = '<div class="${emptyCls()}">no scored voyage yet</div>'; return; }
-  const rows = runs.map(r => {
-    const last = r.bpb.length - 1;
-    return `<tr><td>${esc(r.ship || r.name)}</td><td>${r.seed ?? ''}</td><td class="mono">${esc(r.set)}</td><td>${r.n_books ?? '?'}</td><td>${big(r.tokens[last])}</td>
-      ${MATCH_AT.map(x => `<td>${fmt(interp(r.tokens, r.bpb, x), 4)}</td>`).join('')}
-      <td><b>${fmt(r.bpb[last], 4)}</b></td><td>${fmt(r.bpb_en[r.bpb_en.length - 1], 4)}</td><td>${esc(earliestKink(r))}</td>
-      <td><span class="${pillCls((r.status || '').split(':')[0])}">${esc((r.status || '').split(':')[0])}</span></td></tr>`;
-  }).join('');
-  document.getElementById('matched').innerHTML = `<table><thead><tr><th>ship</th><th>seed</th><th>set</th><th>books</th><th>tokens seen</th>
-    ${MATCH_AT.map(x => `<th>bpb @ ${big(x)}</th>`).join('')}<th>final bpb</th><th>final en</th><th>earliest firm kink</th><th>status</th></tr></thead><tbody>${rows}</tbody></table>
-    <div class="note" style="margin-top:6px">Compare only rows on the same set: hole-cards (13 books) and hole-cards-v2 (20 books, without Darwin and Einstein) are different decks.</div>`;
-}
-function truthGapPanel(cmp) {
-  const lit = r => r.by_set['hole-cards-v2'] ? 'hole-cards-v2' : 'hole-cards';
-  const runs = cmp.filter(r => r.by_set && r.by_set.truths && r.by_set[lit(r)]);
-  const el = document.getElementById('truthgap');
-  if (!runs.length) { el.innerHTML = '<div class="${emptyCls()}">no voyage has been scored on the truths deck yet (lists/truths.csv): re-score a finished voyage with <span class="mono">thorp eval RUN --sets lists/hole-cards-v2.csv lists/truths.csv</span></div>'; return; }
-  const rows = runs.map(r => {
-    const T = r.by_set.truths, L = r.by_set[lit(r)];
-    const pts = T.steps.map((s, i) => [s, T.tokens[i], T.bpb[i], L.bpb[L.steps.indexOf(s)]]).filter(p => p[3] != null);
-    const first = pts[0], last = pts[pts.length - 1];
-    if (!last) return '';
-    const trend = pts.length > 1 ? fmt((last[2] - last[3]) - (first[2] - first[3]), 4) : '– (one step)';
-    return `<tr><td>${esc(r.ship || r.name)}</td><td>${r.seed ?? ''}</td><td class="mono">${lit(r)}</td><td>${big(last[1])}</td><td>${fmt(last[2], 4)}</td><td>${fmt(last[3], 4)}</td><td><b>${fmt(last[2] - last[3], 4)}</b></td><td>${trend}</td></tr>`;
-  }).join('');
-  el.innerHTML = `<table><thead><tr><th>ship</th><th>seed</th><th>against</th><th>at tokens</th><th>truths bpb</th><th>literature bpb</th><th>truth gap</th><th>change since first scored</th></tr></thead><tbody>${rows}</tbody></table>`;
-}
-
-// ---- the content experiment: the pre-registered rule applied to every outcome, from the rows
-const SHELF_OF = n => (n.match(/^content-([a-z]+)-v1/) || [])[1];
-const SHELF_LABEL = { random: 'Flotsam · random (the null)', greek: 'Paralus · Greek polis', islamic: 'Dhow · Islamic golden age', renaissance: 'Santa Maria · Renaissance', about: 'Cutty Sark · about the ages' };
-const CURATED = ['greek', 'islamic', 'renaissance', 'about'];
-const meanOf = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : null;
-const rangeOf = a => a.length > 1 ? Math.max(...a) - Math.min(...a) : null;
-function ruleVerdict(groups, unit, digits) {
-  // groups: {shelf: [values]}; the null is Flotsam's spread (S = its range); a shelf clears it when
-  // its mean lies more than 2S from Flotsam's centre
-  const F = (groups.random || []).filter(v => v != null);
-  if (F.length < 2) return { line: `waiting for the random libraries (${F.length} of 3 finished)`, cls: 'open', rows: [] };
-  const c = meanOf(F), S = rangeOf(F);
-  const rows = CURATED.map(k => {
-    const v = (groups[k] || []).filter(x => x != null);
-    if (!v.length) return { k, text: 'not yet', cls: 'open' };
-    const m = meanOf(v), d = m - c, out = Math.abs(d) > 2 * S;
-    return { k, m, d, n: v.length, spread: rangeOf(v), out, text: `${fmt(m, digits)} (${v.length} ship${v.length > 1 ? 's' : ''}), ${d >= 0 ? '+' : ''}${fmt(d, digits)} from random`, cls: out ? 'yes' : 'no' };
-  });
-  const moved = rows.filter(r => r.out);
-  const line = moved.length ? `Content has a detectable bearing: ${moved.map(r => SHELF_LABEL[r.k].split(' · ')[0]).join(', ')} ${moved.length > 1 ? 'lie' : 'lies'} more than 2S from the random libraries (centre ${fmt(c, digits)}, S ${fmt(S, digits)}${unit}).`
-    : `No detectable bearing so far: every curated library lies within 2S of the random libraries (centre ${fmt(c, digits)}, S ${fmt(S, digits)}${unit}).`;
-  return { line, cls: moved.length ? 'yes' : 'no', rows, c, S };
-}
-function pairVerdict(groups, a, b, digits) {
-  const A = (groups[a] || []).filter(v => v != null), B = (groups[b] || []).filter(v => v != null);
-  if (A.length < 2 || B.length < 2) return null;
-  const d = meanOf(A) - meanOf(B), bar = 2 * Math.max(rangeOf(A), rangeOf(B));
-  return { d, bar, out: Math.abs(d) > bar };
-}
-function contentPanel(ships) {
-  const el = document.getElementById('contentverdict'), tb = document.getElementById('contentships');
-  if (!ships.length) { el.innerHTML = '<div class="${emptyCls()}">no content ship on the ledger yet: they voyage after the night queue and the re-score (scripts/queue_content.sh)</div>'; tb.innerHTML = ''; empty('contentchart', ''); return; }
-  // matched tokens: the smallest final tokens-seen among the ships that have finished
-  const score = r => r.by_set && r.by_set.neutral;
-  const done = ships.filter(r => r.status === 'finished' && score(r));
-  const T = done.length ? Math.min(...done.map(r => score(r).tokens[score(r).tokens.length - 1])) : null;
-  const at = r => T == null || !score(r) ? null : interp(score(r).tokens, score(r).bpb, T);
-  const shelfOf = r => SHELF_OF(r.name);
-  const group = f => { const g = {}; for (const r of done) (g[shelfOf(r)] ||= []).push(f(r)); return g; };
-  const primary = ruleVerdict(group(at), ' bpb', 4);
-  // secondary outcomes, each by the same rule
-  const lastTraits = r => (r.traits.length ? r.traits[r.traits.length - 1].traits : {});
-  const traitNames = [...new Set(done.flatMap(r => Object.keys(lastTraits(r))))].filter(n => !n.startsWith('family/')).sort();
-  const kinkOf = r => { const ks = kinksOf(r.push || {}, 'grad_norm/'); const f = Object.entries(ks).filter(([k, v]) => k.split('/')[1].startsWith('layer_') && !v.tentative).map(([, v]) => v.step); return f.length ? Math.min(...f) : null; };
-  const lastQuarter = (series, steps) => { if (!series) return null; const [x, v] = series; const cut = Math.max(...x) * 0.75; const vals = v.filter((_, i) => x[i] >= cut && v[i] > 0).map(Math.log10); return meanOf(vals); };
-  const sieveOf = (r, key, src) => { const ks = Object.keys(src || {}).filter(k => k.startsWith(key)); return meanOf(ks.map(k => lastQuarter(src[k])).filter(v => v != null)); };
-  const secondary = [
-    ...traitNames.map(t => [`trait: ${t.replace('_', ' ')} (best held-out AUC)`, ruleVerdict(group(r => (lastTraits(r)[t] || {}).best ?? null), '', 3)]),
-    ['kinks: earliest firm kink (step)', ruleVerdict(group(kinkOf), ' steps', 0)],
-    ['sieves: push, last quarter (mean log10 over layers)', ruleVerdict(group(r => sieveOf(r, 'grad_norm/layer_', r.push)), '', 3)],
-    ['sieves: move, last quarter (mean log10 update ratio)', ruleVerdict(group(r => sieveOf(r, 'update_ratio/layer_', r.move)), '', 3)],
-    ['curiosity ladder: highest rung present', ruleVerdict(group(r => r.ladder.length ? r.ladder[r.ladder.length - 1][1] : null), '', 1)],
-  ];
-  const g = group(at);
-  const pairs = [['quality: Greek against Cutty Sark', 'greek', 'about'], ['quality: Islamic against Cutty Sark', 'islamic', 'about'], ['quality: Renaissance against Cutty Sark', 'renaissance', 'about'],
-    ['type: Greek against Islamic', 'greek', 'islamic'], ['type: Greek against Renaissance', 'greek', 'renaissance'], ['type: Islamic against Renaissance', 'islamic', 'renaissance']]
-    .map(([label, a, b]) => { const p = pairVerdict(g, a, b, 4); return `<tr><td>${label}</td><td>${p ? `${p.d >= 0 ? '+' : ''}${fmt(p.d, 4)} bpb` : '–'}</td><td>${p ? fmt(p.bar, 4) : '–'}</td><td>${p ? `<span class="${pillCls(p.out ? 'finished' : 'failed')}">${p.out ? 'differ' : 'within noise'}</span>` : 'needs two ships a side'}</td></tr>`; }).join('');
-  el.innerHTML = `<div class="reading"><div class="k">The ledger’s reading: guessing (neutral deck, English bits per byte at ${T ? big(T) : '–'} tokens, ${done.length} of ${ships.length} ships finished)</div><div class="${alertCls(primary.cls)}">${primary.line}</div>
-    <table class="mt"><thead><tr><th>library</th><th>against the random libraries</th></tr></thead><tbody>${primary.rows.map(r => `<tr><td>${SHELF_LABEL[r.k]}</td><td><span class="verdict ${r.cls}" style="display:inline">${esc(r.text)}</span></td></tr>`).join('')}</tbody></table>
-    <table class="mt"><thead><tr><th>quality and type</th><th>difference</th><th>twice the larger spread</th><th>reading</th></tr></thead><tbody>${pairs}</tbody></table>
-    <table class="mt"><thead><tr><th>secondary outcome</th><th>reading (same rule: more than 2S from the random libraries)</th></tr></thead><tbody>${secondary.map(([label, v]) => `<tr><td>${esc(label)}</td><td><span class="verdict ${v.cls}" style="display:inline">${esc(v.line)}</span></td></tr>`).join('')}</tbody></table></div>`;
-  tb.innerHTML = `<table style="margin-top:12px"><thead><tr><th>ship</th><th>library</th><th>its question</th><th>status</th><th>tokens</th><th>neutral bpb at T</th><th>earliest firm kink</th><th>highest rung</th></tr></thead><tbody>${
-    ships.map(r => `<tr><td><b>${esc(r.ship || r.name)}</b></td><td>${esc(SHELF_LABEL[shelfOf(r)] || '')}</td><td class="note">${esc(r.question || '')}</td><td><span class="${pillCls((r.status || '').split(':')[0])}">${esc((r.status || '').split(':')[0])}</span></td>
-      <td>${score(r) ? big(score(r).tokens[score(r).tokens.length - 1]) : '–'}</td><td>${fmt(at(r), 4)}</td><td>${kinkOf(r) ?? '–'}</td><td>${r.ladder.length ? r.ladder[r.ladder.length - 1][1] : '–'}</td></tr>`).join('')}</tbody></table>`;
-  const col = { random: C.muted, greek: C.blue, islamic: C.good, renaissance: C.accent, about: C.c5 };
-  const data = ships.filter(score).map(r => ({ x: score(r).tokens, y: score(r).bpb, name: r.ship, mode: 'lines+markers', line: { color: col[shelfOf(r)], width: 2 }, marker: { size: 5 },
-    hovertemplate: `${esc(r.ship)}<br>%{x:,.0f} tokens<br>%{y:.4f} neutral bpb<extra></extra>` }));
-  if (!data.length) return empty('contentchart', '');
-  plot('contentchart', data, layout({ xaxis: { title: 'tokens seen', gridcolor: C.line }, yaxis: { title: 'neutral-deck bits per byte', gridcolor: C.line } }));
-}
-
 // the header's run picker: every per-run panel follows it; panels marked ALL RUNS do not
-function runsTable(runs) {
-  const tb = document.querySelector('#runs tbody');
-  tb.innerHTML = runs.map(r => `<tr data-run="${r.run_id}" class="${r.run_id === selected ? 'sel' : ''}">
-    <td>${esc(r.ship || '')}</td><td>${esc(r.name || '')}</td><td class="mono">${r.run_id.slice(0, 12)}</td><td>${esc(r.preset || '')}</td><td>${r.seed ?? ''}</td>
-    <td><span class="${pillCls((r.status || '').split(':')[0])}">${esc(r.status || '')}</span></td><td>${big(r.tokens_seen)}</td>
-    <td>${fmt(r.wall_minutes, 1)}</td><td>${fmt(r.hole_bpb_mean, 4)}</td><td>${esc(r.started || '')}</td></tr>`).join('');
-  tb.querySelectorAll('tr').forEach(tr => tr.onclick = () => goShip(tr.dataset.run));
-}
-
-
 // what each speller metric means, which way is better, and why (popovers on the 9m page)
-const HELP = {
-  nevermore: ['Nevermore score', 'Higher (0.3 or more is a Nevermore)', "The strongest head's attention from a repeated word to the word that followed it last time; measured on random pieces repeated twice (the standard test) and on a real passage repeated twice. A head attending evenly would score about 0.003."],
-  copygain: ['Copy gain', 'Higher', 'How much easier the second copy is to predict than the first, in nats per token. Only a model that copies can gain.'],
-  bpb: ['Bits per byte on English held-out books', 'Lower', 'How many bits the model needs, on average, to guess each byte of books it never saw. Fewer bits means better bets on unseen text. It is the headline score every rung shares.'],
-  word_inside: ['Bits per byte inside a word', 'Lower', 'Letters after the first one in a word. Once a word has begun, how surely does the model know how it goes on? This is spelling.'],
-  word_start: ['Bits per byte at a word start', 'Lower', 'The first letter of each word: which word comes next. That depends on grammar and meaning more than spelling, so expect it to stay high at 9m.'],
-  punct: ['Bits per byte on punctuation', 'Lower', 'Commas, full stops, quotation marks, dashes. How well the model knows where punctuation goes.'],
-  space: ['Bits per byte on spaces', 'Lower', 'Knowing where a word ends. A spelling skill as much as a layout one.'],
-  newline: ['Bits per byte on line breaks', 'Lower', 'Paragraph and verse layout: where lines end.'],
-  nonword_rate: ['Non-words', 'Lower, down to the books\' own rate', 'Share of the words the model writes that never appear anywhere on its library: invented spellings. The books\' own rate (ref) is the floor, because real text also holds words the library lacks. Reaching ref means it spells like a book.'],
-  zipf: ['Zipf slope', 'Closer to the books', 'How fast word frequency falls with rank (the 10th commonest word is about a tenth as common as the 1st). Below the books: words used too evenly, as in noise. Above: too much repetition of a few common words. Real English sits near 1.'],
-  heaps: ['Heaps slope', 'Closer to the books', 'How fast new words keep appearing as text goes on. Above the books usually means inventing words; below means a small, repetitive vocabulary.'],
-  word_len: ['Mean word length', 'Closer to the books', 'Average letters per word. Real text prefers short common words (brevity law); a model that writes long strings of letters scores high here.'],
-  punct_per_100w: ['Punctuation per 100 words', 'Closer to the books', 'How much punctuation it uses at all. Too much is a common early failure: commas and quote marks sprayed everywhere.'],
-  unbalanced_per_kw: ['Unbalanced brackets and quotes per 1,000 words', 'Lower, down to the books\' own rate', 'Brackets and curly quotes closed without being opened, or left open. The books have a few because the excerpts are cut mid-passage; that is the floor.'],
-  cap_after_stop: ['Capital after a full stop', 'Higher, up to the books', 'Share of sentence ends followed by a capital letter. Books score about 0.9 (abbreviations such as "Mr." account for the rest).'],
-  word_len_js: ['Word-length divergence', 'Lower (0 is identical)', 'Jensen–Shannon divergence, in bits, between the model\'s mix of word lengths and the books\'. 0 means the same shape.'],
-  punct_js: ['Punctuation-mix divergence', 'Lower (0 is identical)', 'Divergence between which punctuation marks the model uses and which the books use: the right marks in the right proportions.'],
-  traits: ['Traits as they emerge', 'Earlier and stronger', 'Can a probe read fiction, verse or first person off the model\'s hidden state, at which layer, from which step? Shown on the Traits tab for each voyage.'],
-  ft: ['The Forgotten Tomes score', 'Lower', 'Bits per byte on 16 period books released on Gutenberg after Qwen 3.8 appeared, so no Qwen model can have trained on them. The same number for Thorp and for Qwen, whatever their tokenisers: the yardstick for the order-of-magnitude gate.'],
-  rank: ['Rank agreement with 9m', 'Higher (1 is perfect)', 'Spearman correlation between the order 9m puts the libraries in and the order 1m puts them in. At 0.8 or above the proxy is trusted to explore those kinds of questions.'],
-  modelref: ['model / ref', 'Model close to ref', 'Each law is measured on text the model writes (left) and on excerpts of the held-out books (ref, right), at the same length. The target is the books\' own value.'],
-};
-const info = k => { const h = HELP[k]; return h ? `<span class="info" tabindex="0">ⓘ<span class="pop ${hoverCardCls}"><b>${esc(h[0])}</b><br>Better: <b>${esc(h[1])}</b><br>${esc(h[2])}</span></span>` : ''; };
-// popovers sit in scrolling tables, so they are placed against the window, kept on screen
-function placePop(el) {
-  const pop = el.querySelector('.pop'), r = el.getBoundingClientRect(), w = 280;
-  pop.style.left = Math.max(8, Math.min(r.left - 8, window.innerWidth - w - 8)) + 'px';
-  pop.style.top = (r.bottom + 6) + 'px';
-}
-window.addEventListener('scroll', () => document.querySelectorAll('.info.open').forEach(x => x.classList.remove('open')), true);
-['mouseover', 'focusin'].forEach(ev => document.addEventListener(ev, e => { const el = e.target.closest && e.target.closest('.info'); if (el) placePop(el); }));
-document.addEventListener('click', e => {
-  const el = e.target.closest('.info');
-  if (el) placePop(el);
-  document.querySelectorAll('.info.open').forEach(x => { if (x !== el) x.classList.remove('open'); });
-  if (el) el.classList.toggle('open');
-});
-const METRIC_KEY = { 'inside a word': 'word_inside', 'word start': 'word_start', 'punctuation': 'punct', 'layout': 'space', 'non-words': 'nonword_rate',
-  'Zipf and Heaps': 'zipf', 'word length, punctuation mix': 'word_len_js', 'balance and capitals': 'cap_after_stop', 'traits as they emerge': 'traits',
-  'Forgotten Tomes score': 'ft', 'rank agreement with 9m': 'rank' };
-
-
 // ---- the books on a rung page: the Forgotten Tomes with every score, each run's training shelf, a reader
 let tomesData = null;
 let tomesKey = null, shelfKey = null;
@@ -908,12 +299,6 @@ const shelvesPick = document.getElementById('shelfpick'); if (shelvesPick) shelv
 const booksFilter = document.getElementById('bookfilter'); if (booksFilter) booksFilter.oninput = () => renderRung();
 
 // ---- the ladder: home cards, then one page per rung with the metrics that judge its job
-const SPLIT_LABEL = { word_inside: 'inside a word', word_start: 'word start', punct: 'punctuation', space: 'space', newline: 'newline' };
-const LAW_COLS = [
-  ['nonword_rate', 'non-words', 3], ['zipf', 'Zipf', 2], ['heaps', 'Heaps', 2], ['word_len', 'word length', 2],
-  ['punct_per_100w', 'punct /100 w', 1], ['unbalanced_per_kw', 'unbalanced /1k w', 1], ['cap_after_stop', 'capital after stop', 2],
-  ['word_len_js', 'word-length JS', 3], ['punct_js', 'punct mix JS', 3],
-];
 var classScoreHtml = {}, classScoreAsked = {};  // a class card's last scores, so a refresh does not blank them
 var ladderData = null, harbourSel = null, harbourSub = null;  // var: showTab reads it before this line runs
 let sopPick = '';  // the SOP version the training page is read at ('' = all of them)
@@ -923,12 +308,12 @@ async function loadLadder() {
   let d;
   try { [d, shipsData] = await Promise.all([get('/api/ladder'), get('/api/ships').catch(() => [])]); } catch (e) { d = { error: e.message }; }
   if (!d || !Array.isArray(d.rungs)) {  // the server failed: say so where the sizes go, keep the last good ladder
-    document.getElementById('rungcards').innerHTML = `<div class="${emptyCls()}">the ships could not be read${d && d.error ? ': ' + esc(d.error) : ''}. Restart <span class="mono">thorp dash</span> if it was just changed.</div>`;
+    const rc = document.getElementById('rungcards'); if (rc) rc.innerHTML = `<div class="${emptyCls()}">the ships could not be read${d && d.error ? ': ' + esc(d.error) : ''}. Restart <span class="mono">thorp dash</span> if it was just changed.</div>`;
     return;
   }
   ladderData = d;
-  if (!(page === 'sizes' && harbourSub === 'shipbuilder')) drawHarbours();
-  if (page === 'rung' || page === 'ship') showTab(location.hash.slice(1), false);
+  drawHarbours();  // the harbour cards, the harbour's ships, or its ship builder (which reuses itself on a refresh)
+  if (page === 'rung' || page === 'ship') showTab(routePath(), false);
 }
 // ---- Harbours (#/harbours, the Ships tab; Justin, 8 November: "on the ships pages, it's actually called harbours and then
 // when you open it, it's two tiles for the two harbours of today and then you click in the harbour to view its ships"):
@@ -944,9 +329,17 @@ function drawHarbours() {
     el.className = 'harbours';
     el.hidden = false;
     const hm0 = document.getElementById('shipbuilder'); if (hm0) { hm0.innerHTML = ''; hm0.hidden = true; }
-    const ht0 = document.getElementById('harbourtabs'); if (ht0) ht0.hidden = true;  // the tabs are for one harbour
+    // the top-level page keeps its tabs: Harbours (here) and the ship builder, which lives in Phaleron
+    const ht = document.getElementById('harbourtabs');
+    if (ht) {
+      ht.hidden = false;
+      const builder = hs.find(x => x.ship_builder);
+      const shipsTab = ht.querySelector('[data-htab="ships"]'), sbTab = ht.querySelector('[data-htab="shipbuilder"]');
+      if (shipsTab) { shipsTab.textContent = 'Harbours'; shipsTab.href = '/harbours'; setTab(shipsTab, true); }
+      if (sbTab) { sbTab.hidden = !builder; sbTab.href = builder ? `/harbours/${encodeURIComponent(builder.key)}/shipbuilder` : '/harbours'; setTab(sbTab, false); }
+    }
     el.innerHTML = hs.map(x => { const rs = sizes(x), live = rs.reduce((n, r) => n + rungRuns(r.preset).filter(v => v.status === 'running').length, 0), done = rs.reduce((n, r) => n + rungRuns(r.preset).filter(v => v.status === 'finished').length, 0);
-      return `<a class="${cardCls(true, 'card harbourcard')}" href="#/harbours/${esc(x.key)}">${artImg(x.key, 'cardart ship')}<div class="top"><span class="nm">${esc(x.name)}</span><span class="preset">${esc(x.aka)}</span></div>
+      return `<a class="${cardCls(true, 'card harbourcard')}" href="/harbours/${esc(x.key)}">${artImg(x.key, 'cardart ship')}<div class="top"><span class="nm">${esc(x.name)}</span><span class="preset">${esc(x.aka)}</span></div>
         <div class="job">${esc(x.about)}</div>
         <div class="hships">${rs.map(r => `<span class="${pillCls('')}">${esc(r.name)} <span class="s">${esc(r.preset)}</span></span>`).join(' ')}</div>
         <div class="foot"><span>${esc(x.where)}</span><span class="${pillCls(live ? ' live' : '')}">${live ? live + ' running' : 'at rest'}</span></div>
@@ -954,7 +347,7 @@ function drawHarbours() {
         <div class="foot"><span>${done} finished voyage${done === 1 ? '' : 's'}</span><span></span></div></a>`; }).join('');
     return;
   }
-  if (title) title.innerHTML = `${hs.length ? `<a class="${crumbCls('back')}" href="#/harbours">← harbours</a> ` : ''}${esc(h.name)} <span class="q">${esc(h.aka)}: ${esc(h.about)}</span>`;
+  if (title) title.innerHTML = `${hs.length ? `<a class="${crumbCls('back')}" href="/harbours">← harbours</a> ` : ''}${esc(h.name)} <span class="q">${esc(h.aka)}: ${esc(h.about)}</span>`;
   el.className = 'cards';
   const rules = !hs.length ? '' : (() => {  // the harbour's rules: its depth, and where each size's draught falls against it
     const logs = d.rungs.map(r => Math.log10(r.total)), lo = Math.min(...logs) - 0.1, hi = Math.max(...logs) + 0.1, at = n => `${(100 * (Math.log10(n) - lo) / (hi - lo)).toFixed(1)}%`;
@@ -969,14 +362,14 @@ function drawHarbours() {
       <div class="foot"><span>${esc(x.expedition || '')}</span><span class="${pillCls('')}">fitting out</span></div></div>`).join('');
   const foreign = h.key !== 'zayton' || !(d.foreign || []).length ? '' :
     `<div class="k" style="grid-column:1/-1">Foreign ships <span class="s">outside models, read on the same decks: not Thorp ships, but here so they can be spied on</span></div>` +
-    d.foreign.map(x => `<a class="${cardCls(true, 'card classcard')}" href="#/foreign/${esc(x.key)}">${artImg(x.key, 'cardart ship')}
+    d.foreign.map(x => `<a class="${cardCls(true, 'card classcard')}" href="/foreign/${esc(x.key)}">${artImg(x.key, 'cardart ship')}
       <div class="top"><span class="preset">${x.params ? big(x.params) : '–'}</span><span class="nm">${flagImg(x.flag, x.flag_name)} ${esc(x.label)}</span></div>
       <div class="job">an outside model in Zayton: read-only decks, logic, cards and held-out books</div>
       <div class="foot"><span>${x.chained ? 'chain-graded' : 'no chain grades'}</span><span class="${pillCls('accent')}">foreign</span></div></a>`).join('');
   const shipsHtml = sizes(h).map(r => {
     const runs = rungRuns(r.preset), live = runs.filter(x => x.status === 'running').length, done = runs.filter(x => x.status === 'finished').length;
     const nlive = r.metrics.filter(m => m[2] === 'live').length;
-    return `<a class="${cardCls(true, 'card classcard')}" href="#${esc(modelHash(r))}">${artImg(classSlug(r.name), 'cardart ship')}
+    return `<a class="${cardCls(true, 'card classcard')}" href="${esc(modelHash(r))}">${artImg(classSlug(r.name), 'cardart ship')}
       <div class="top"><span class="preset">${esc(r.preset)}</span><span class="nm">${esc(r.name)}</span></div>
       <div class="job">${esc(r.role || r.job)}</div>
       <div class="foot"><span>${big(r.total)} params · ${esc(r.where.split(' (')[0])}</span>
@@ -990,12 +383,14 @@ function drawHarbours() {
   let sub = harbourSub === 'shipbuilder' && h.ship_builder ? 'shipbuilder' : 'ships';
   if (sub !== harbourSub) {
     harbourSub = sub;
-    history.replaceState(null, '', '#/harbours/' + encodeURIComponent(h.key) + '/' + sub);
+    history.replaceState(null, '', '/harbours/' + encodeURIComponent(h.key) + '/' + sub);
   }
   const ht = document.getElementById('harbourtabs'); if (ht) ht.hidden = false;
+  const shipsTab = document.querySelector('#harbourtabs [data-htab="ships"]');
+  if (shipsTab) shipsTab.textContent = 'Ships';  // the top-level page calls this tab Harbours
   hs.length && document.querySelectorAll('#harbourtabs [data-htab]').forEach(a => {
     const on = a.dataset.htab === sub;
-    a.href = '#/harbours/' + encodeURIComponent(h.key) + '/' + a.dataset.htab;
+    a.href = '/harbours/' + encodeURIComponent(h.key) + '/' + a.dataset.htab;
     a.hidden = a.dataset.htab === 'shipbuilder' && !h.ship_builder;
     setTab(a, on);
   });
@@ -1077,6 +472,7 @@ async function drawShipbuilder(h) {
   const s = d.sop || {}, vs = s.versions || [], std = s.standards || {}, cur = s.current;
   const opts = vs.map(v => `<option value="${esc(v)}"${v === cur ? ' selected' : ''}>v${esc(v)}${v === cur ? ' · in force' : ''}</option>`).join('');
   el.innerHTML = `<section class="hmpanel">
+    <figure class="sbbanner">${artImg('shipbuilder', 'shipbuilderart')}<figcaption><b>The ship builder</b> <span>· the standard operating procedure (SOP): what the ship reads, what it must build, and what it is made of</span></figcaption></figure>
     <h2>Ship builder <span class="s">${esc(h.ship_builder || 'unnamed')} signs the supplies: the two legs' stages, and the SOP variables below that carry them</span></h2>
     <div class="phasenav" id="phasenav" role="tablist"></div>
     <div class="phasebody" id="phasebody"></div>
@@ -1382,7 +778,7 @@ async function drawShipbuilder(h) {
       draft.sizes_to_sail = now;
     }; });
   };
-  document.getElementById('hmsave').onclick = async () => {
+  document.getElementById('hmsave')?.addEventListener('click', async () => {
     if (!readDraft()) return;
     msg.className = 'fbmsg'; msg.textContent = 'saving…';
     try {
@@ -1399,7 +795,7 @@ async function drawShipbuilder(h) {
       showTab(active);
       drawPhase();
     } catch (e) { msg.className = 'fbmsg bad'; msg.textContent = String(e.message || e); }
-  };
+  });
 }
 
 // ---- a foreign ship (#/foreign/<key>): an outside model's spy page, read-only. It is not a Thorp size or
@@ -1470,7 +866,7 @@ async function classCards(r) {
       <div class="ctrack" title="ended at ${f2(end.value)} (the best a finished voyage ended with); peaked at ${f2(peak.value)} at step ${peak.step ?? '–'}; the line is the mark">
         <i class="cend" style="width:${at(end.value)}"></i><i class="cpeak" style="left:${at(peak.value)}"></i><i class="cmark" style="left:${at(c.threshold)}"></i></div>
       <div class="s">${c.held ? `held by ${c.held_by.length} of ${d.voyages} voyages` : c.lit ? `touched by ${c.lit_by.length}, held by none` : `no voyage reached the mark`}</div>
-      <div class="s">best: ${end.run ? `<a href="#${shipHash(end.run)}" class="mono">${esc(end.run)}</a>` : '–'}${peak.value != null && peak.value > (end.value ?? -1) + 0.005 ? ` · peak ${f2(peak.value)} at step ${peak.step}` : ''}</div>
+      <div class="s">best: ${end.run ? `<a href="${shipHash(end.run)}" class="mono">${esc(end.run)}</a>` : '–'}${peak.value != null && peak.value > (end.value ?? -1) + 0.005 ? ` · peak ${f2(peak.value)} at step ${peak.step}` : ''}</div>
       ${c.now ? `<div class="s">newest voyage ended at ${f2(c.now.value)}</div>` : ''}</div>`;
   };
   const cz = d.cause || {}, rng = cz.finished_range;
@@ -1485,43 +881,8 @@ async function classCards(r) {
 // ---- Ask the best version (the Scoring tab's head; /api/class_best, /api/table/guesses, /api/table/reply):
 // talk to the size's current best version (the leaderboard's pick) or any finished voyage of the size.
 // The rudimentary questions each carry the answer we would hope for, so "run all" reads as a test.
-const ASK_QUESTIONS = [
-  { text: 'Once upon a', hope: 'time', about: 'a stock phrase' },
-  { text: 'The cat sat on the', hope: 'mat', about: 'a nursery line' },
-  { text: 'One, two, three, four,', hope: 'five', about: 'counting' },
-  { text: 'Monday, Tuesday,', hope: 'Wednesday', about: 'a sequence' },
-  { text: 'The opposite of hot is', hope: 'cold', about: 'an opposite' },
-  { text: 'Quoth the Raven, Nevermore. Quoth the Raven,', hope: 'Nevermore', about: 'copying back (the Nevermore card)' },
-  { text: 'Mary had a little lamb, its fleece was white as', hope: 'snow', about: 'a verse it may have read' },
-  { text: 'If it rains, the ground gets wet. It rained, so the ground is', hope: 'wet', about: 'cause and effect' },
-  { text: 'The man went to the baker to buy some', hope: 'bread', about: 'common sense' },
-  { text: 'Q: What colour is the sky?\nA: The sky is', hope: 'blue', about: 'a question' },
-];
 let askWired = false, askPreset = null, askBest = null, askQuestions = ASK_QUESTIONS, askSet = 'world', classQuestions = null;
-// which of the two a ship chose on a logic chain: the premises' answer ranked above the rival among its ten
-// guesses, or the rival above it, or neither in its ten
-const chose = (rank, rrank) => rank && (!rrank || rank < rrank) ? 'the premises' : rrank && (!rank || rrank < rank) ? 'the rival' : 'neither';
 let logicQuestions = null;
-// what a ship is looking for after a line: its ten guesses' probability summed by part of speech (the server tags each
-// guess as the shapes evaluator does), the fine tags with Ogden's coarse tier beside
-const COARSE_WORD = { THING: 'a thing', QUALITY: 'a quality', OPERATION: 'an operation', MARK: 'a mark' };
-function lookingFor(g) {
-  if (!g || !g.looking_for || !g.looking_for.length) return '';
-  const fine = g.looking_for.filter(t => t.share >= 0.02).slice(0, 5).map(t => `<span class="postag" title="${esc(t.about || '')}"><b>${esc(t.tag)}</b> ${Math.round(100 * t.share)}%</span>`).join(' ');
-  const coarse = (g.looking_for_coarse || []).filter(t => t.share >= 0.02).map(t => `${esc(COARSE_WORD[t.tag] || t.tag)} ${Math.round(100 * t.share)}%`).join(' · ');
-  return `<div class="lookingfor">it is looking for: ${fine}${coarse ? ` <span class="s">· in Ogden's terms, ${coarse}</span>` : ''}</div>`;
-}
-const hopeRank = (gs, hope) => {  // where the hoped-for word is among the guesses (a whole word; a piece may start it)
-  const h = hope.toLowerCase();
-  const i = gs.findIndex(g => {
-    const w = (g.word || '').trim().toLowerCase().replace(/[^a-z' ]/g, '');
-    if (!w) return false;
-    if (g.piece === true) return h === w || (w.length >= 2 && h.startsWith(w));
-    return w === h || w.split(' ')[0] === h;
-  });
-  return i < 0 ? null : i + 1;
-};
-const showPiece = s => s === '\n' ? '⏎' : s.replace(/ /g, '·');
 // ---- the maths book (Scoring > Maths; /api/maths_book, backend/scripts/make_maths_book.py): nine chapters of a
 // Basic English arithmetic primer read against a voyage with the ask panel's ten guesses. A sum is right when its
 // answer is among the ten and above its rival; a chapter is learnt at `mark` of eight; the ship has learnt the
@@ -1559,14 +920,14 @@ async function mathsBook(r) {
   if (sopSel && !sopSel.onchange) sopSel.onchange = () => { sel.value = ''; sel.dataset.preset = ''; sel.dataset.built = ''; fill(); };
   fill();  // the ask panel finds the size's best voyage, which can take a while on a fresh dashboard: keep trying
   if (!sel.options.length) { let n = 0; const t = setInterval(() => { fill(); if (sel.options.length || ++n > 60) clearInterval(t); }, 1000); }
-  if (!out.innerHTML) out.innerHTML = mathsIndex();
+  if (!out.innerHTML) out.innerHTML = mathsIndex(mathsData);
   if (mathsWired) return; mathsWired = true;
-  document.getElementById('mathspanel').addEventListener('click', e => { const b = e.target.closest('[data-mbook]'); if (b) openBook(b.dataset.mbook, +b.dataset.at || 0); });
-  document.getElementById('mathsrun').onclick = async () => {
+  document.getElementById('mathspanel')?.addEventListener('click', e => { const b = e.target.closest('[data-mbook]'); if (b) openBook(b.dataset.mbook, +b.dataset.at || 0); });
+  document.getElementById('mathsrun')?.addEventListener('click', async () => {
     fill(); const run = sel.value; if (!run) { out.innerHTML = `<div class="${emptyCls()}">no voyage chosen yet</div>`; return; }
     const btn = document.getElementById('mathsrun'); btn.disabled = true;
     const res = {};  // chapter -> [{s, rank, rrank, ok}]
-    const draw = (done) => { out.innerHTML = mathsTable(run, res, done); };
+    const draw = (done) => { out.innerHTML = mathsTable(mathsData, run, res, done); };
     for (const c of mathsData.chapters) {
       res[c.n] = [];
       for (const q of c.sums) {
@@ -1580,31 +941,7 @@ async function mathsBook(r) {
       }
     }
     draw(true); btn.disabled = false;
-  };
-}
-function mathsCredit() {
-  const b = mathsData.book; if (!b) return '';
-  return `<div class="mathcredit">After <b>${esc((b.author || '').replace(/^De Morgan, Augustus.*$/, 'Augustus De Morgan'))}</b>, <i>${esc(b.title)}</i> (${esc(b.edition)}): each chapter follows a section of his Book I, Principles of Arithmetic, in his order; the sums are in plain words, not his. <button type="button" class="${btnCls('outline', 'bookbtn')}" data-mbook="${esc(b.id)}" data-at="0">open the book</button>${b.in_ogden ? '' : ' <span class="s">Thorp\'s Ogden ships have not read it (it is in neither Ogden v0.1 nor v0.2): what they know of sums, they learnt elsewhere</span>'}</div>`;
-}
-const mathsSource = c => c.source && c.source.section ? `<button type="button" class="${btnCls('ghost', 'srcbtn')}" data-mbook="${esc(c.source.book)}" data-at="${c.source.at ?? 0}" title="open De Morgan's ${esc(c.source.section)} in the reader">De Morgan: ${esc(c.source.section.replace(/^Book I, /, ''))} ↗</button>` : '';
-function mathsIndex() {
-  return `${mathsCredit()}<div class="scroll"><table class="mathstable"><thead><tr><th>chapter</th><th>what it teaches</th><th>a sum from it</th><th>from the book</th></tr></thead><tbody>${mathsData.chapters.map(c => `<tr><td><b>${c.n}. ${esc(c.title)}</b></td><td class="s">${esc(c.about)}</td><td class="mono">${esc(c.sums[0].text)} <b>${esc(c.sums[0].hope)}</b> <span class="s">not</span> <i>${esc(c.sums[0].rival)}</i></td><td>${mathsSource(c)}</td></tr>`).join('')}</tbody></table></div>`;
-}
-function mathsTable(run, res, done) {
-  const mark = mathsData.mark || 6;
-  let learnt = 0, open = true;
-  for (const c of mathsData.chapters) { const r = res[c.n]; if (!r || r.length < c.sums.length) break; if (open && r.filter(x => x.ok).length >= mark) learnt = c.n; else open = false; }
-  const total = Object.values(res).flat(), right = total.filter(x => x.ok).length;
-  const head = `<div class="ovq">${esc(run)} · <b>${right} of ${total.length}</b> sums right${done ? ` · <b>${learnt ? `learnt up to chapter ${learnt}, ${esc(mathsData.chapters[learnt - 1].title.toLowerCase())}` : 'not yet past chapter 1, counting on'}</b>` : ' · reading…'}</div>`;
-  const rows = mathsData.chapters.filter(c => res[c.n]).map(c => {
-    const r = res[c.n], n = r.filter(x => x.ok).length, full = r.length === c.sums.length;
-    const sums = r.map(x => `<tr class="mathsum"><td></td><td class="mono">${esc(x.q.text)}</td><td>${esc(x.q.hope)} <span class="s">${x.rank ? `guess ${x.rank}` : 'not in ten'}</span></td><td>${esc(x.q.rival)} <span class="s">${x.rrank ? `guess ${x.rrank}` : 'not in ten'}</span></td>
-      <td>${x.err ? '<span class="s">failed</span>' : `<span class="${pillCls(x.ok ? 'good' : chose(x.rank, x.rrank) === 'the rival' ? 'bad' : '')}">${x.ok ? 'right' : chose(x.rank, x.rrank) === 'the rival' ? 'the rival' : 'neither'}</span>`}</td>
-      <td class="mono s">${(x.top || []).map(g => `${esc(g.word)} ${(100 * g.p).toFixed(0)}%`).join(' · ')}</td></tr>`).join('');
-    return `<tr class="mathchap"><td><b>${c.n}. ${esc(c.title)}</b><div>${mathsSource(c)}</div></td><td class="s" colspan="3">${esc(c.about)}</td>
-      <td><span class="${pillCls(!full ? '' : n >= mark ? 'good' : 'bad')}">${n} of ${r.length}${full ? (n >= mark ? ' · learnt' : ' · not yet') : ''}</span></td><td><div class="mathbar"><span style="width:${100 * n / c.sums.length}%"></span></div></td></tr>${sums}`;
-  }).join('');
-  return `${mathsCredit()}${head}<div class="scroll"><table class="mathstable"><thead><tr><th>chapter</th><th>the sum</th><th>the answer</th><th>the rival</th><th>verdict</th><th>its first three guesses</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  });
 }
 async function askPanel(r) {
   const who = document.getElementById('askwho'), sel = document.getElementById('askvoyage'); if (!who || !sel) return;
@@ -1615,7 +952,7 @@ async function askPanel(r) {
     let d; try { d = await get(`/api/class_best?preset=${encodeURIComponent(r.preset)}`); } catch (e) { who.textContent = 'the best version could not be read'; return; }
     askBest = d.best;
     const b = d.best;
-    who.innerHTML = b ? `Talking to ${b.name && b.name !== b.ship ? `<b>${esc(b.name)}</b> · ` : ""}<a href="#${shipHash(b.ship_key)}">${b.name && b.name !== b.ship ? esc(b.ship) : `<b>${esc(b.ship)}</b>`}</a> · ${b.sailings} voyage${b.sailings === 1 ? '' : 's'}${b.objective ? ` · <b>${esc(b.objective.label)}</b> ${(100 * b.objective.value).toFixed(1)}%` : ''}${b.chaining_lift != null ? ` · chaining lift ${b.chaining_lift >= 0 ? '+' : ''}${b.chaining_lift.toFixed(3)}` : ''}<div class="s">${esc(b.why)}</div>`
+    who.innerHTML = b ? `Talking to ${b.name && b.name !== b.ship ? `<b>${esc(b.name)}</b> · ` : ""}<a href="${shipHash(b.ship_key)}">${b.name && b.name !== b.ship ? esc(b.ship) : `<b>${esc(b.ship)}</b>`}</a> · ${b.sailings} voyage${b.sailings === 1 ? '' : 's'}${b.objective ? ` · <b>${esc(b.objective.label)}</b> ${(100 * b.objective.value).toFixed(1)}%` : ''}${b.chaining_lift != null ? ` · chaining lift ${b.chaining_lift >= 0 ? '+' : ''}${b.chaining_lift.toFixed(3)}` : ''}<div class="s">${esc(b.why)}</div>`
       : `<span class="s">the leaderboard has no best ${esc(r.preset)} yet: pick a voyage</span>`;
     const best = b ? b.runs : [];
     sel.innerHTML = (best.length ? `<optgroup label="the best version">${best.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('')}</optgroup>` : '')
@@ -1658,11 +995,11 @@ async function askPanel(r) {
     try { out.innerHTML = guessTable(await guessesFor(text), hope, rival); } catch (e) { out.innerHTML = `<div class="${emptyCls()}">${esc(String(e.message || e))}</div>`; }
     busy(false);
   };
-  document.getElementById('askguess').onclick = () => { const q = askQuestions.find(x => x.text === ta.value) || {}; guess(ta.value, q.hope, q.rival); };
-  document.getElementById('askchips').onclick = e => { const b = e.target.closest('.askchip'); if (!b) return;
+  document.getElementById('askguess')?.addEventListener('click', () => { const q = askQuestions.find(x => x.text === ta.value) || {}; guess(ta.value, q.hope, q.rival); });
+  document.getElementById('askchips')?.addEventListener('click', e => { const b = e.target.closest('.askchip'); if (!b) return;
     if (b.dataset.set) { askSet = b.dataset.set; askPanel(rungFor(currentRung)); return; }
-    const q = askQuestions[+b.dataset.i]; ta.value = q.text; guess(q.text, q.hope, q.rival); };
-  document.getElementById('askanswer').onclick = async () => {
+    const q = askQuestions[+b.dataset.i]; ta.value = q.text; guess(q.text, q.hope, q.rival); });
+  document.getElementById('askanswer')?.addEventListener('click', async () => {
     const q = ta.value.trim(); if (!q || noVoyage()) return;
     busy(true); out.innerHTML = `<div class="${emptyCls()}">it is answering…</div>`;
     try {
@@ -1671,8 +1008,8 @@ async function askPanel(r) {
       out.innerHTML = `<div class="s">${esc(run())} at step ${d.step} · ${d.tokens} pieces in ${d.seconds}s · kept in its Table Talk transcript</div><div class="askanswer">${esc(d.answer) || '<span class="s">(nothing)</span>'}</div>`;
     } catch (e) { out.innerHTML = `<div class="${emptyCls()}">${esc(String(e.message || e))}</div>`; }
     busy(false);
-  };
-  document.getElementById('askall').onclick = async () => {
+  });
+  document.getElementById('askall')?.addEventListener('click', async () => {
     if (noVoyage()) return;
     busy(true); const rows = [];
     const draw = () => {
@@ -1687,19 +1024,11 @@ async function askPanel(r) {
       draw();
     }
     busy(false);
-  };
+  });
 }
 // ---- The Navigator's Wager (the Bet tab; /api/wager, POST /api/wager/{deal,bet,queue}): pull one lever on a
 // voyage, bet where the deck's 16 cards fall, queue the experiment, and read the outcome as the readings arrive.
 let wagerData = null, wagerRound = null, wagerWired = false, wagerPreset = null;
-const MOVE_LABEL = { appears: 'appears', vanishes: 'vanishes', earlier: 'earlier', later: 'later', same: 'same' };
-const fmtTok = t => t == null ? '' : t >= 1e6 ? `${Math.round(t / 1e6)}M` : `${Math.round(t / 1e3)}k`;
-const fallText = f => !f ? '<span class="s">not sailed</span>' : !f.charted ? '<span class="s">uncharted</span>'
-  : f.played ? `played at ${fmtTok(f.tokens)} tokens${f.layer != null ? `, layer ${f.layer}` : ''}` : '<span class="s">not played</span>';
-async function postJSON(url, body) {
-  const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-  const d = await res.json().catch(() => ({})); if (!res.ok || d.error) throw new Error(d.error || res.statusText); return d;
-}
 async function classWager(r, keep = true) {
   const el = document.getElementById('wagertable'); if (!el) return;
   if (wagerPreset !== r.preset) { wagerPreset = r.preset; wagerRound = null; }
@@ -1739,7 +1068,7 @@ async function classWager(r, keep = true) {
         const ctrlFall = c.control, pullFall = c.pull;
         const disabled = !card.charted ? ' disabled' : '';
         return `<div class="wcard${card.charted ? '' : ' uncharted'}${c.outcome && bet.move ? (c.points > 0 ? ' won' : ' lost') : ''}" data-card="${esc(c.card)}">
-          <div class="wart"><img src="art/${esc(c.card)}.png" alt="" loading="lazy" onerror="this.style.display='none'"><span class="wstage">${esc(card.stage)}</span><span class="wcost">${card.cost}</span>${card.scansion ? `<span class="wscan" title="${esc(scanAbout[card.scansion] || '')}">${esc(card.scansion)}</span>` : ''}</div>
+          <div class="wart"><img src="/art/${esc(c.card)}.png" alt="" loading="lazy" onerror="this.style.display='none'"><span class="wstage">${esc(card.stage)}</span><span class="wcost">${card.cost}</span>${card.scansion ? `<span class="wscan" title="${esc(scanAbout[card.scansion] || '')}">${esc(card.scansion)}</span>` : ''}</div>
           <div class="wname">${esc(card.name)}</div>
           <div class="s wability">${esc(card.ability)}</div>
           ${card.on.length ? `<div class="s">evolves from: ${card.on.map(o => esc(byKey[o].name)).join(' + ')}</div>` : ''}
@@ -1756,26 +1085,26 @@ async function classWager(r, keep = true) {
   if (wagerWired) return; wagerWired = true;
   lsel.onchange = () => { const l = wagerData.levers.find(x => x.key === lsel.value); document.getElementById('wagerleverabout').textContent = l ? l.about : ''; };
   const rr = () => rungFor(currentRung);
-  document.getElementById('wagerdealbtn').onclick = async () => {
+  document.getElementById('wagerdealbtn')?.addEventListener('click', async () => {
     try { const x = await postJSON('/api/wager/deal', { preset: wagerPreset, control: csel.value, lever: lsel.value }); wagerRound = x.key; try { localStorage.setItem('thorp.wager.' + wagerPreset, x.key); } catch (e) { /* storage blocked */ } classWager(rr()); }
     catch (e) { document.getElementById('wagerhead').innerHTML = `<div class="${emptyCls()}">${esc(String(e.message || e))}</div>`; }
-  };
-  document.getElementById('wagerrounds').onclick = e => { const b = e.target.closest('.wround'); if (!b) return; wagerRound = b.dataset.round; try { localStorage.setItem('thorp.wager.' + wagerPreset, wagerRound); } catch (err) { /* storage blocked */ } classWager(rr()); };
-  document.getElementById('wagertable').onchange = async e => {
+  });
+  document.getElementById('wagerrounds')?.addEventListener('click', e => { const b = e.target.closest('.wround'); if (!b) return; wagerRound = b.dataset.round; try { localStorage.setItem('thorp.wager.' + wagerPreset, wagerRound); } catch (err) { /* storage blocked */ } classWager(rr()); });
+  document.getElementById('wagertable')?.addEventListener('change', async e => {
     const tile = e.target.closest('.wcard'); if (!tile) return;
     const mv = tile.querySelector('.wmove').value, ly = tile.querySelector('.wlayer').value;
     try { await postJSON('/api/wager/bet', { round: wagerRound, card: tile.dataset.card, move: mv || null, layer: ly === '' ? null : +ly }); }
     catch (err) { alert(String(err.message || err)); }
     classWager(rr());
-  };
-  document.getElementById('wagerhead').onclick = async e => {
+  });
+  document.getElementById('wagerhead')?.addEventListener('click', async e => {
     if (e.target.id !== 'wagerqueue') return;
     const R = wagerData.rounds.find(x => x.key === wagerRound); if (!R) return;
     if (!(await confirmDialog(`Queue ${R.pull}? It goes at the end of the standing queue and changes what the Mac trains next.`))) return;
     try { const x = await postJSON('/api/wager/queue', { round: wagerRound }); alert(`${x.queued} is queued, position ${x.position}.`); }
     catch (err) { alert(String(err.message || err)); }
     classWager(rr());
-  };
+  });
 }
 // ---- the Scoring tab's subjects (/api/class_subjects): each discovery track's ladder of tests, this size's own
 // step first and marked, every recent voyage of the size against each test, and the own steps over tokens read
@@ -1793,7 +1122,7 @@ async function classSubject(r, key) {
   const vs = subjData.voyages;
   const cell = rd => rd.value == null ? '<td class="s">–</td>' : `<td class="${rd.passed ? 'pass' : ''}" title="score ${rd.score == null ? '–' : rd.score.toFixed(2)} at step ${rd.step}">${rd.value >= 0 ? '+' : ''}${rd.value.toFixed(2)}${rd.passed ? ' ✓' : ''}</td>`;
   const mine = tests.filter(t => t.mine);
-  const relLinks = key === 'logic' ? `<p class="lgnav">The logic deck's five relations, each in detail: ${OSUBS.map(x => `<a href="#${modelHash(r, 'overview', x)}">${x.slice(6)}</a>`).join(' · ')}</p>` : '';
+  const relLinks = key === 'logic' ? `<p class="lgnav">The logic deck's five relations, each in detail: ${OSUBS.map(x => `<a href="${modelHash(r, 'overview', x)}">${x.slice(6)}</a>`).join(' · ')}</p>` : '';
   el.innerHTML = relLinks + `<p class="s">${mine.length ? `This size's own step${mine.length > 1 ? 's' : ''} on this track: <b>${mine.map(t => esc(t.name)).join(', ')}</b>. The others are other classes' goals, shown for where it stands on the way up.` : `This size has no step of its own on this track; the readings show where it stands.`} A test passes when its lift (the true answer's share over the floor) reaches its mark; each test has only a few dozen items, so seeds differ.</p>
     <div class="scroll"><table class="subjtable"><thead><tr><th>test</th><th>whose step</th><th>mark</th>${vs.map(v => `<th class="mono" title="${esc(v)}">${esc(short(v))}</th>`).join('')}</tr></thead>
     <tbody>${tests.map(t => `<tr${t.mine ? ' class="mine"' : ''}><td title="${esc(t.about)}"><b>${esc(t.name)}</b><div class="s">${esc(t.about.slice(0, 140))}${t.about.length > 140 ? '…' : ''}</div></td>
@@ -1821,8 +1150,8 @@ async function classVersus(r) {
   const refName = n => (n || '').split('/').pop();
   document.getElementById('vspick').innerHTML = `<label class="s">voyage <select id="vsvoyage">${d.voyages.map(v => `<option value="${esc(v)}"${v === d.voyage ? ' selected' : ''}>${esc(short(v))}</option>`).join('')}</select></label>
     <label class="s">against <select id="vsref">${d.refs.map(x => `<option value="${esc(x)}"${x === d.ref ? ' selected' : ''}>${esc(refName(x))}</option>`).join('')}</select></label>`;
-  document.getElementById('vsvoyage').onchange = e => { vsVoyage = e.target.value; classVersus(r); };
-  document.getElementById('vsref').onchange = e => { vsRef = e.target.value; try { localStorage.setItem('thorp.vs.ref', vsRef); } catch (x) { /* storage blocked */ } classVersus(r); };
+  document.getElementById('vsvoyage')?.addEventListener('change', e => { vsVoyage = e.target.value; classVersus(r); });
+  document.getElementById('vsref')?.addEventListener('change', e => { vsRef = e.target.value; try { localStorage.setItem('thorp.vs.ref', vsRef); } catch (x) { /* storage blocked */ } classVersus(r); });
   if (!d.voyage) { body.innerHTML = `<div class="${emptyCls()}">no voyage of this size has read the trick tests yet</div>`; return; }
   const by = Object.fromEntries(d.rows.map(x => [x.key, x]));
   const val = (x, v) => v == null ? '–' : x.unit === 'pairs of 24' ? `${v}/24` : x.unit === 'cards' ? `${v} of 16` : v.toFixed(x.unit === 'bits a byte' ? 3 : 2);
@@ -1884,7 +1213,7 @@ async function classLogicDeck(r, el) {
   const meter = (g, cls) => g ? `<div class="lgbar ${cls}" title="${f(g.gain)} (90% band ${f(g.lo)} to ${f(g.hi)})"><i style="left:${pos(Math.min(g.lo ?? g.gain, g.gain))}%;width:${Math.max(1, pos(Math.max(g.hi ?? g.gain, g.gain)) - pos(Math.min(g.lo ?? g.gain, g.gain)))}%"></i><b style="left:${pos(g.gain)}%"></b></div>` : '<div class="s">not read</div>';
   const tiles = d.deck.map(x => {
     const b = best(x.relation), q = bar && bar.gains[x.relation];
-    return `<a class="dcard lgcard lglink" href="#${modelHash(r, 'overview', 'logic-' + x.relation)}" title="the ${esc(x.relation)} relation in detail">${artImg("logic_" + x.relation, "lgart")}<div class="dname">${esc(x.relation)} <span class="s">→ in detail</span></div><div class="s">${esc(x.about)} · ${x.items} items</div>
+    return `<a class="dcard lgcard lglink" href="${modelHash(r, 'overview', 'logic-' + x.relation)}" title="the ${esc(x.relation)} relation in detail">${artImg("logic_" + x.relation, "lgart")}<div class="dname">${esc(x.relation)} <span class="s">→ in detail</span></div><div class="s">${esc(x.about)} · ${x.items} items</div>
       ${x.example ? `<div class="lgex"><span class="s">${esc(x.example.prompt)}</span> <b>${esc(x.example.idea)}</b> <span class="s">not</span> <i>${esc(x.example.rival)}</i></div>` : ''}
       <div class="lgrow"><span class="s">this size${b ? ` (${esc(short(b.v.voyage))}, ${b.v.deck}-item)` : ''}</span>${meter(b && b.g, 'mine')}<span class="lgv">${f(b && b.g.gain)}</span></div>
       <div class="lgrow"><span class="s">${esc(refName(d.bar))}${bar ? ` (${bar.deck}-item)` : ''}</span>${meter(q, 'ref')}<span class="lgv">${f(q && q.gain)}</span></div>
@@ -1910,8 +1239,8 @@ async function classLogicRelation(r, el, rel) {
   const short = n => (n || '').replace('fu-ogden-v0-1', 'Ogden').replace('fu-ogden-v0-2', 'Ogden v0.2').replace('-pre', '');
   const refName = n => (n || '').split('/').pop().replace(/-(bf16|4bit)$/, '');
   const M = p => p == null ? '' : p >= 1e9 ? `${(p / 1e9).toFixed(1)}B` : `${Math.round(p / 1e6)}M`;
-  const back = `<a class="s" href="#${modelHash(r, 'overview')}">← the logic deck</a>`;
-  const nav = d.relations.map(x => x === rel ? `<b>${esc(x)}</b>` : `<a href="#${modelHash(r, 'overview', 'logic-' + x)}">${esc(x)}</a>`).join(' · ');
+  const back = `<a class="s" href="${modelHash(r, 'overview')}">← the logic deck</a>`;
+  const nav = d.relations.map(x => x === rel ? `<b>${esc(x)}</b>` : `<a href="${modelHash(r, 'overview', 'logic-' + x)}">${esc(x)}</a>`).join(' · ');
   const hi = (text, words) => words.filter(Boolean).reduce((t, w) => t.split(w).join(`<u>${w}</u>`), esc(text));
   const variants = d.item.map(v => `<tr><td><b>${esc(v.variant)}</b><div class="s">${esc(v.about)}</div></td><td>${hi(v.prompt, [v.bridge, v.distractor])} <b class="good">${esc(v.idea)}</b> <span class="s">not</span> <span class="bad">${esc(v.rival)}</span></td></tr>`).join('');
   const bars = (rows, label) => rows.filter(x => x.gain).map(x => {
@@ -1977,7 +1306,7 @@ async function classDeck(r) {
     const up = flippedCards.has(c.key);
     return `<div class="dcard r-${esc(c.rarity)}${up ? ' flipped' : ''}" data-card="${esc(c.key)}" role="button" tabindex="0" aria-pressed="${up}" title="click to turn the card over">
       <div class="dface dfront" aria-hidden="${up}">
-      <div class="dart"><img src="art/${esc(c.key)}.png" alt="" loading="lazy" onerror="this.style.display='none'"><span class="dstage">${esc(c.stage)}</span><span class="dcost" title="layers that must stand in order">${c.cost}</span><span class="drarity">${esc(c.rarity)}</span>${c.scansion ? `<span class="dscan" title="${esc(scanAbout[c.scansion] || '')}">${esc(c.scansion)}</span>` : ''}</div>
+      <div class="dart"><img src="/art/${esc(c.key)}.png" alt="" loading="lazy" onerror="this.style.display='none'"><span class="dstage">${esc(c.stage)}</span><span class="dcost" title="layers that must stand in order">${c.cost}</span><span class="drarity">${esc(c.rarity)}</span>${c.scansion ? `<span class="dscan" title="${esc(scanAbout[c.scansion] || '')}">${esc(c.scansion)}</span>` : ''}</div>
       <div class="dname">${esc(c.name)}</div>
       ${!c.charted ? '<div class="s">uncharted: Thorp has no reading for it yet</div>' : `
       <div class="dstat"><b>${c.played}</b> of ${c.voyages_read} voyages played it${c.voyages_read ? ` (${pct}%)` : ''}</div>
@@ -2015,24 +1344,7 @@ async function classDeck(r) {
 // ---- Watch it train (the Training tab's head; /api/watch): the size's voyage at sea, read every 30 seconds while
 // the tab is open: where it is, its stages and passes, the cards drawn and when, and the readings by tokens read
 let watchTimer = null, watchPreset = null, watchKey = null;
-const hms = s => s == null ? '–' : s >= 3600 ? `${Math.floor(s / 3600)} h ${Math.round((s % 3600) / 60)} min` : `${Math.round(s / 60)} min`;
 // the metre scaffold's phases within pretraining (thorp/train.py optim.scaffold): metre, fade, content, you are here
-function scaffoldBar(sc, tokens) {
-  if (!sc) return '';
-  const total = sc.bands[sc.bands.length - 1].to || 1;
-  // a floor (optim.scaffold.floor) holds the pull from the fade's end to the voyage's end: no stretch of language alone
-  const floor = sc.floor || 0;
-  const about = floor
-    ? { metre: 'heads pulled to the pattern', fade: `the pull eased from ${sc.weight ?? 1} to ${floor}`, content: `the pull held at ${floor} to the end: held with a light hand?` }
-    : { metre: 'heads pulled to the pattern', fade: 'the pull eased away', content: 'language alone: held by heart?' };
-  const heads = sc.heads.map(h => `${esc(h.card.replace(/_/g, '-'))} in layer ${h.layer} (head ${h.head})`).join(', ');
-  return `<div class="s" style="margin-top:8px">pretraining in phases: the metre scaffold pins ${heads}</div><div class="wstagebar">${sc.bands.map(b => {
-    const state = tokens >= b.to ? 'done' : tokens >= b.from ? 'now' : 'later';
-    const fill = state === 'done' ? 100 : state === 'now' ? Math.round(100 * (tokens - b.from) / Math.max(b.to - b.from, 1)) : 0;
-    return `<div class="wstage" style="flex:${Math.max(100 * (b.to - b.from) / total, 4)}"><div class="wsname"><b>${b.phase}</b> <span class="s">${about[b.phase]}</span></div><div class="wpasses"><div class="wpass ${state}"><i style="width:${fill}%"></i><span>${((b.to - b.from) / 1e6).toFixed(1)}M tokens</span></div></div></div>`;
-  }).join('')}</div>`;
-}
-
 async function classWatch(r) {
   const head = document.getElementById('watchhead'); if (!head) return;
   if (watchPreset !== r.preset) { watchPreset = r.preset; watchKey = null; }
@@ -2074,7 +1386,7 @@ async function classWatch(r) {
       return `<div class="wstage" style="flex:${width}"><div class="wsname"><b>${esc(s.phase)}</b>${s.name !== s.phase ? ` · ${esc(s.name)}` : ''} <span class="s">${esc((s.library || '').replace('lists/', ''))}${s.lr ? ` · lr ${s.lr}` : ''}</span></div><div class="wpasses">${cells}</div></div>`;
     }).join('')}</div>${d.post.length ? '' : '<div class="s">one stage: this voyage is pretraining only (the fitout has no post-training)</div>'}${scaffoldBar(d.scaffold, w.tokens)}`;
   // the cards drawn, in the order they came
-  document.getElementById('watchdrawn').innerHTML = d.drawn.length ? `<div class="s">cards drawn, in order (the deck's rules):</div><div class="wchips">${d.drawn.map(c => `<span class="wchip"><img src="art/${esc(c.card)}.png" alt="" onerror="this.style.display='none'"><b>${esc(c.card.replace(/_/g, ' '))}</b><span class="s">${M(c.tokens)} tokens${c.layer != null ? ` · layer ${c.layer}` : ''}</span></span>`).join('')}</div>` : '<div class="s">no card drawn yet</div>';
+  document.getElementById('watchdrawn').innerHTML = d.drawn.length ? `<div class="s">cards drawn, in order (the deck's rules):</div><div class="wchips">${d.drawn.map(c => `<span class="wchip"><img src="/art/${esc(c.card)}.png" alt="" onerror="this.style.display='none'"><b>${esc(c.card.replace(/_/g, ' '))}</b><span class="s">${M(c.tokens)} tokens${c.layer != null ? ` · layer ${c.layer}` : ''}</span></span>`).join('')}</div>` : '<div class="s">no card drawn yet</div>';
   const S = d.series, xs = p => p.map(q => q[0] / 1e6), ys = p => p.map(q => q[1]);
   const lay = (yt, extra = {}) => layout({ xaxis: { title: 'tokens read (millions)', gridcolor: C.line }, yaxis: { title: yt, gridcolor: C.line }, showlegend: true, ...extra });
   const line = (k, name, i, more = {}) => S[k] && S[k].length ? [{ type: 'scatter', mode: S[k].length > 30 ? 'lines' : 'lines+markers', name, x: xs(S[k]), y: ys(S[k]), line: { color: PALETTE[i % PALETTE.length] }, ...more }] : [];
@@ -2087,69 +1399,10 @@ async function classWatch(r) {
   document.getElementById('watchlog').textContent = d.log.join('\n');
 }
 const RECENT = 30;
-// ---- RunGrid: every run at one size as a square, like a GitHub contribution graph. Bands of 7 rows
-// x 53 columns (a "year" of 371 runs) stack downwards, so a new run only ever adds a square at the
-// end. Colour is the run's Forgotten Tomes quartile among the scored runs: deepest green is best.
-const GRID_ROWS = 7, GRID_COLS = 53;
-let gridKey = '';
-function runGrid(r, runs) {
-  const el = document.getElementById('rungrid'), sum = document.getElementById('rungridsum');
-  const key = r.preset + '|' + selected + '|' + runs.map(x => x.run_id + (x.status || '')[0] + (x.ft_en ?? '')).join(',');
-  if (key === gridKey) return;
-  gridKey = key;
-  if (!runs.length) { sum.innerHTML = ''; el.innerHTML = `<div class="${emptyCls()}">no voyages at ${esc(r.preset)} yet</div>`; return; }
-  const scored = runs.filter(x => x.ft_en != null).sort((a, b) => a.ft_en - b.ft_en);
-  const rank = new Map(scored.map((x, i) => [x.run_id, i]));
-  const level = x => !rank.has(x.run_id) ? 0 : 4 - Math.min(3, Math.floor(4 * rank.get(x.run_id) / scored.length));
-  const live = runs.filter(x => x.status === 'running').length;
-  const med = scored.length ? scored[Math.floor((scored.length - 1) / 2)].ft_en : null;
-  const latest = [...runs].reverse().find(x => x.ft_en != null);
-  sum.innerHTML = `<span><b>${runs.length}</b> voyage${runs.length === 1 ? '' : 's'}</span><span><b>${scored.length}</b> scored</span>${live ? `<span class="${pillCls('blue')}">${live} running</span>` : ''}`
-    + (scored.length ? `<span>best <b>${fmt(scored[0].ft_en)}</b> ${esc(scored[0].ship || scored[0].name)}</span><span>median <b>${fmt(med)}</b></span><span>latest <b>${fmt(latest.ft_en)}</b> ${esc(latest.ship || latest.name)}</span>` : '')
-    + `<span class="legend">worse <i class="g1"></i><i class="g2"></i><i class="g3"></i><i class="g4"></i> better · <i class="g0"></i> not scored</span>`;
-  const per = GRID_ROWS * GRID_COLS, bands = [];
-  for (let b = 0; b * per < runs.length; b++) {
-    const chunk = runs.slice(b * per, (b + 1) * per);
-    bands.push(`<div class="gridband"><div class="gridlabel">voyages ${b * per + 1}–${b * per + chunk.length}</div><div class="rungrid">${chunk.map(x => {
-      const st = (x.status || '').split(':')[0];
-      return `<i class="g${level(x)}${st === 'running' ? ' run' : ''}${st === 'failed' ? ' fail' : ''}${x.run_id === selected ? ' sel' : ''}" data-run="${esc(x.run_id)}"></i>`;
-    }).join('')}</div></div>`);
-  }
-  el.innerHTML = bands.join('');
-  el._runs = new Map(runs.map(x => [x.run_id, x])); el._rank = rank; el._n = scored.length;
-}
-(() => {
-  const el = document.getElementById('rungrid'), tip = document.createElement('div');
-  tip.className = cn('gridtip', tooltipCls); tip.hidden = true; document.body.appendChild(tip);
-  el.addEventListener('mouseover', e => {
-    const c = e.target.closest('i[data-run]'); if (!c) return;
-    const x = el._runs.get(c.dataset.run); if (!x) return;
-    const k = el._rank.get(x.run_id), st = (x.status || '').split(':')[0];
-    tip.innerHTML = `<b>${esc(x.ship || x.name)}</b> <span class="s">${esc(x.name)}</span><br>`
-      + (x.ft_en != null ? `Forgotten Tomes <b>${fmt(x.ft_en)}</b> bpb · #${k + 1} of ${el._n}` : `no Forgotten Tomes score yet`)
-      + `<br>${esc(st)}${x.passes ? ` · ${x.passes} pass${x.passes === 1 ? '' : 'es'}` : ''}${x.started ? ` · started ${esc(String(x.started).slice(0, 16).replace('T', ' '))}` : ''}`;
-    const b = c.getBoundingClientRect(); tip.hidden = false;
-    tip.style.left = Math.max(8, Math.min(b.left - 8, innerWidth - tip.offsetWidth - 8)) + 'px';
-    tip.style.top = (b.bottom + 6) + 'px';
-  });
-  el.addEventListener('mouseout', e => { if (e.target.closest('i[data-run]')) tip.hidden = true; });
-  // a square opens its run, as a row in the Runs table does
-  el.addEventListener('click', e => {
-    const c = e.target.closest('i[data-run]'); if (!c) return;
-    goShip(c.dataset.run);
-  });
-})();  // panels that draw one mark per run show the latest RECENT; the run grid shows every run
 // Scoring is in two parts. Science: how well the model predicts text it has never seen (bits per
 // byte, the split by kind of byte, ranking shelves as a bigger model does, the bets). Art: how its
 // writing compares with real books (the laws of text, non-words, grammar, voice, traits). A metric
 // not named here counts as science.
-const ART = new Set(['non-words', 'Zipf and Heaps', 'word length, punctuation mix', 'balance and capitals',
-  'traits as they emerge', 'minimal pairs', 'register probe', 'the 9m laws']);
-const metricRows = list => list.length ? list.map(m => `<tr><td><b>${esc(m[0])}</b>${info(METRIC_KEY[m[0]])}</td><td>${esc(m[1])}</td>
-    <td>${HELP[METRIC_KEY[m[0]]] ? esc(HELP[METRIC_KEY[m[0]]][1]) : '–'}</td>
-    <td><span class="${pillCls(m[2] === 'live' ? ' live' : '')}">${esc(m[2])}</span></td></tr>`).join('')
-  : '<tr><td colspan="4" class="${emptyCls(true)}">none for this model yet</td></tr>';
-const runCells = x => `<td>${esc(x.ship || '')}</td><td>${esc(x.name)}</td><td>${esc((x.status || '').split(':')[0])}</td>`;
 // The whole size page renders inside one boundary: a throw anywhere (a drawer, a chart, a missing element) shows
 // itself as a red bar with the stack, instead of a blank page that reads as "no data" (9 November, after three
 // blank tabs in one morning).
@@ -2197,7 +1450,7 @@ function _renderRung() {
 
   // ---- Overview: every run, and the Forgotten Tomes score run by run
   classDeck(r);
-  runGrid(r, allRuns);
+  renderRunGrid(r, allRuns, selected);
   ftProgress(allRuns);
 
   // ---- Training: the model, each run's setup, loss, the shelves
@@ -2219,23 +1472,25 @@ function _renderRung() {
     const last = x.sailings[x.sailings.length - 1], st = (last.status || '').split(':')[0];
     return `<tr data-ship="${esc(x.key)}"><td><b>${esc(x.name)}</b></td><td class="s">${esc(x.subtitle)}</td>
       <td data-sort="${x.sailings.length}">${x.sailings.length} <span class="s">(seed${x.sailings.length === 1 ? '' : 's'} ${x.sailings.map(y => y.seed ?? '–').join(', ')})</span></td>
-      <td>${x.expedition ? `<a href="#/expeditions/${esc(x.expedition)}">${esc(VOYAGE_NAME[x.expedition] || x.expedition)}</a>` : '–'}</td>
+      <td>${x.expedition ? `<a href="/expeditions/${esc(x.expedition)}">${esc(VOYAGE_NAME[x.expedition] || x.expedition)}</a>` : '–'}</td>
       <td><span class="${pillCls(st)}">${esc(st)}</span></td><td>${fmt(x.ft_en_mean)}</td><td>${fmt(x.ft_en_best)}</td>
       <td>${esc(String(x.latest || '–').slice(0, 16).replace('T', ' '))}</td></tr>`;
   };
   // retired ships (pruned to each size's top five, 2026-11-08) are folded away below; their voyages stay in the ledger
   const retired = fleet.filter(x => x.status === 'retired'), kept = fleet.filter(x => x.status !== 'retired');
   const live = kept.filter(x => !x.archived), old = kept.filter(x => x.archived);
-  const ftb = document.querySelector('#fleettable tbody');  // the Fleet tab was removed 9 November
-  if (!ftb) return;
-  ftb.innerHTML = live.length ? live.map(shipRow).join('')
-    : `<tr><td colspan="8" class="${emptyCls(true)}">no ship of this size in service yet${old.length ? '; the First Fleet is below' : ''}</td></tr>`;
-  document.getElementById('fleetarchivewrap').hidden = !old.length;
-  document.getElementById('fleetarchivesum').textContent = `archived: ${old.length} ship${old.length === 1 ? '' : 's'}, ${old.reduce((n, x) => n + x.sailings.length, 0)} voyages, fitted out before 7 November`;
-  document.querySelector('#fleetarchive tbody').innerHTML = old.map(shipRow).join('');
-  document.getElementById('fleetretiredwrap').hidden = !retired.length;
-  document.getElementById('fleetretiredsum').textContent = `${retired.length} ship${retired.length === 1 ? '' : 's'}, ${retired.reduce((n, x) => n + x.sailings.length, 0)} voyages, outside this size's top five by its primary objective; nothing is deleted`;
-  document.querySelector('#fleetretired tbody').innerHTML = retired.map(shipRow).join('');
+  // the Fleet tab was removed 9 November: when it is absent, skip its table but keep drawing the tabs after it
+  const ftb = document.querySelector('#fleettable tbody');
+  if (ftb) {
+    ftb.innerHTML = live.length ? live.map(shipRow).join('')
+      : `<tr><td colspan="8" class="${emptyCls(true)}">no ship of this size in service yet${old.length ? '; the First Fleet is below' : ''}</td></tr>`;
+    document.getElementById('fleetarchivewrap').hidden = !old.length;
+    document.getElementById('fleetarchivesum').textContent = `archived: ${old.length} ship${old.length === 1 ? '' : 's'}, ${old.reduce((n, x) => n + x.sailings.length, 0)} voyages, fitted out before 7 November`;
+    document.querySelector('#fleetarchive tbody').innerHTML = old.map(shipRow).join('');
+    document.getElementById('fleetretiredwrap').hidden = !retired.length;
+    document.getElementById('fleetretiredsum').textContent = `${retired.length} ship${retired.length === 1 ? '' : 's'}, ${retired.reduce((n, x) => n + x.sailings.length, 0)} voyages, outside this size's top five by its primary objective; nothing is deleted`;
+    document.querySelector('#fleetretired tbody').innerHTML = retired.map(shipRow).join('');
+  }
 
   // ---- Scoring: science, then art
   document.querySelector('#sciencemetrics tbody').innerHTML = metricRows(r.metrics.filter(m => !ART.has(m[0])));
@@ -2296,10 +1551,11 @@ const DEPTH_CARDS = [['previous_word', 'previous-word'], ['duplicate_word', 'dup
   ['comparator', 'the comparator'], ['bridge', 'the bridge'], ['mover', 'the mover']];
 async function classDepth(r) {
   const host = document.getElementById('rung'); if (!host || !r) return;
+  // the page redraws every 5 s: reuse one depth panel instead of appending a new one each time
+  let panel = document.getElementById('depthpanel');
+  if (!panel) { panel = document.createElement('section'); panel.id = 'depthpanel'; panel.className = 'panel mt'; host.appendChild(panel); }
   let d; try { d = await get(`/api/depth?preset=${encodeURIComponent(r.preset)}&sop=${encodeURIComponent(sopPick)}`); } catch (e) { return; }
-  const shapes = Object.entries(d.shapes || {}); if (!shapes.length) return;
-  const panel = document.createElement('section');
-  panel.className = 'panel mt';
+  const shapes = Object.entries(d.shapes || {}); if (!shapes.length) { panel.remove(); return; }
   panel.innerHTML = `<h2>The depth <span class="note">every shape of this size, drawn against its layers: the deck's order on the vertical axis, depth on the horizontal. A card is found where its colour is strongest; the last column is the layer it is read best in. In Qwen3 4B the copy cards sit two-thirds down; in the 300k there are only two layers to sit in</span></h2>` +
     shapes.map(([preset, s]) => {
       const layers = s.layers, all = Object.values(s.cards).flat(), max = Math.max(1, ...all);
@@ -2313,7 +1569,6 @@ async function classDepth(r) {
       return `<div class="k mt">${esc(preset)} — ${layers} layers <span class="s">(${esc(String(s.run || '').slice(0, 44))}, ${esc(s.status || '')})</span></div>
         <div class="scroll"><table class="selbooks depthgrid"><thead><tr><th></th>${Array.from({ length: layers }, (_, i) => `<th class="s">${i}</th>`).join('')}<th>found</th></tr></thead><tbody>${rows}</tbody></table></div>`;
     }).join('');
-  host.appendChild(panel);
 }
 // ---- 300k against Qwen3 4B, as a deviation per point (/api/stars_deviation): the chart read as a gap, not a level
 // ---- the ten points as two lines (/api/star_points): Qwen3 4B, which chains, against our smallest ship
@@ -2361,21 +1616,26 @@ async function starDeviations() {
 // ---- the SOP run, brief (9 November, Justin: "each ships overview page should just give a brief summary of it's SOP
 // run and what the scores are and what that means for that SOP version"): the newest voyage on the standard, its
 // scores, and a plain sentence on what they say
+// the Overview's SOP panel: the newest voyage's standard, its scores, the star chart, and the
+// results by SOP version. Rebuilt only when a reading changes: the page refreshes every 5 s, and
+// wiping the panel (and its Plotly chart) each time made it flicker and half-paint.
+let sopKey = null;
 async function sopSummary(r) {
   const el = document.getElementById('sopsummary'); if (!el || !r) return;
   let d; try { d = await get(`/api/star_points?preset=${encodeURIComponent(r.preset)}`); } catch (e) { return; }
   const runs = ((ladderData || {}).runs || []).filter(x => x.preset === r.preset && !(x.name || '').startsWith('smoke'));
   const latest = runs.sort((a, b) => String(b.started || '').localeCompare(String(a.started || '')))[0];
-  let chaining = null, suits = null;
-  try {
-    const lc = await get(`/api/ladder_chaining?sop=${encodeURIComponent(latest && latest.sop || '')}`);
-    chaining = ((lc.sizes || []).find(x => x.size === r.preset) || {}).chaining;
-  } catch (e) {}
-  try {
-    const sr = await get('/api/suit_ratings');
-    const mine = ((sr.ships || []).find(x => x.size === r.preset) || {});
-    suits = [['copying', mine.copying], ['position', mine.position], ['comparing', mine.comparing], ['carrying', mine.carrying]];
-  } catch (e) {}
+  const [lc, sr, sc] = await Promise.all([
+    get(`/api/ladder_chaining?sop=${encodeURIComponent(latest && latest.sop || '')}`).catch(() => null),
+    get('/api/suit_ratings').catch(() => null),
+    get(`/api/sop_scores?preset=${encodeURIComponent(r.preset)}`).catch(() => null),
+  ]);
+  const chaining = lc ? (((lc.sizes || []).find(x => x.size === r.preset) || {}).chaining ?? null) : null;
+  const mine = sr ? ((sr.ships || []).find(x => x.size === r.preset) || null) : null;
+  const suits = mine ? [['copying', mine.copying], ['position', mine.position], ['comparing', mine.comparing], ['carrying', mine.carrying]] : null;
+  const key = JSON.stringify([d.points, chaining, suits, sc && sc.versions, latest && latest.sop, latest && latest.name, latest && latest.status, latest && latest.started]);
+  if (key === sopKey && document.getElementById('sopchart')) return;  // nothing changed: leave the panel alone
+  sopKey = key;
   const ps = (d.points || []).filter(p => p.ours != null);
   const clears = ps.filter(p => p.ours >= 1).length;
   const qwen = 0.538;
@@ -2386,6 +1646,11 @@ async function sopSummary(r) {
     : chaining > 0.05 ? 'This run chains, but behind Qwen3 4B: the standard is building some of the circuit.'
     : 'This run chains close to zero: at this size the standard is not yet building the circuit, whatever its cards read.';
   const points = ps.map(p => `<tr><td class="s">${p.n}. ${esc(p.role)}</td><td>${p.ours.toFixed(2)}</td><td class="s">${p.qwen == null ? '–' : p.qwen.toFixed(2)}</td></tr>`).join('');
+  const versions = sc ? (sc.versions || []).map(v => {
+    const ch = v.chaining == null ? '–' : v.chaining.toFixed(3);
+    const gap = v.gap == null ? '' : `${v.gap > 0 ? '+' : ''}${v.gap.toFixed(3)}`;
+    return `<tr><td class="mono">v${esc(v.sop)}</td><td>${esc(v.status)}</td><td><b>${ch}</b></td><td>${gap}</td><td>${v.clears}/${v.of}</td></tr>`;
+  }).join('') : '';
   el.innerHTML = `<div class="libsum">
       <div class="libstats">
         <div class="libstat"><b>${esc(latest ? latest.sop ? 'v' + latest.sop : 'no SOP' : '–')}</b><span>the standard of the newest voyage</span></div>
@@ -2397,31 +1662,15 @@ async function sopSummary(r) {
       ${suits ? `<div class="k mt">The suits</div><div class="s">${suits.map(s => `${esc(s[0])} ${s[1] == null ? '–' : s[1].toFixed(2)}`).join(' · ')}</div>` : ''}
       <div class="k mt">The star chart, against Qwen3 4B</div><div class="chart" id="sopchart"></div>
       <div class="k mt">By SOP version <span class="s">the reasoning results at this size, one row a version: so a 0.0.6 run can be read beside 0.0.5 without leaving the ship</span></div>
-      <div id="sopversions" class="s">reading…</div>
+      <div id="sopversions" class="s">${sc ? `<div class="scroll"><table class="selbooks"><thead><tr><th>version</th><th>status</th><th>chaining</th><th>gap to Qwen</th><th>points cleared</th></tr></thead><tbody>${versions}</tbody></table></div>` : 'the versions could not be read'}</div>
       ${points ? `<div class="k mt">The points, against Qwen</div><div class="scroll"><table class="selbooks"><tbody>${points}</tbody></table></div>` : ''}
       <div class="s mt">${latest ? `newest voyage ${esc(latest.name)}${latest.status ? ' · ' + esc(latest.status) : ''}` : ''}</div>
     </div>`;
   // the star chart, as two lines (Qwen against this ship), on this panel
   starChart('sopchart', ps, { label: r.preset, height: 300, ticks: 9 });
-  // the reasoning results by SOP version
-  const vt = document.getElementById('sopversions');
-  if (vt) {
-    try {
-      const sc = await get(`/api/sop_scores?preset=${encodeURIComponent(r.preset)}`);
-      const rows = (sc.versions || []).map(v => {
-        const ch = v.chaining == null ? '–' : v.chaining.toFixed(3);
-        const gap = v.gap == null ? '' : `${v.gap > 0 ? '+' : ''}${v.gap.toFixed(3)}`;
-        return `<tr><td class="mono">v${esc(v.sop)}</td><td>${esc(v.status)}</td><td><b>${ch}</b></td><td>${gap}</td><td>${v.clears}/${v.of}</td></tr>`;
-      }).join('');
-      vt.innerHTML = `<div class="scroll"><table class="selbooks"><thead><tr><th>version</th><th>status</th><th>chaining</th><th>gap to Qwen</th><th>points cleared</th></tr></thead><tbody>${rows}</tbody></table></div>`;
-    } catch (e) { vt.textContent = 'the versions could not be read'; }
-  }
 }
 // ---- Waypoints: when each run passed each waypoint (server.py api_waypoints). Fetched only while
 // the tab is open; the thresholds come from the evaluators, never typed in here.
-const TRAIT_LABEL = { fiction: 'fiction', verse: 'verse', first_person: 'first person' };
-const firstAt = (sr, ok) => { if (!sr) return undefined; const i = sr.value.findIndex(ok); return i < 0 ? null : sr.step[i]; };
-const lastOf = sr => sr && sr.value.length ? sr.value[sr.value.length - 1] : null;
 let wpKey = '', wpData = null;
 // the hand panel: one run's heads as cards at one eval step; the slider walks the steps and ▶ deals
 // them in order, so a card can be watched turning over. Following the latest step unless moved.
@@ -2450,14 +1699,14 @@ function drawHand(prevIdx = null) {
   renderHand(el, hs[i], wpData.nevermore_threshold, prevIdx != null ? hs[prevIdx] : null);
 }
 function stopDeal() { clearInterval(hand.timer); hand.timer = null; document.getElementById('handplay').textContent = '▶ play'; }
-document.getElementById('handrun').onchange = e => { stopDeal(); hand.run = e.target.value; hand.idx = null; drawHand(); };
-document.getElementById('handstep').oninput = e => {
+document.getElementById('handrun')?.addEventListener('change', e => { stopDeal(); hand.run = e.target.value; hand.idx = null; drawHand(); });
+document.getElementById('handstep')?.addEventListener('input', e => {
   stopDeal();
   const run = handRuns().find(x => x.run_id === hand.run), was = hand.idx ?? run.hands.length - 1, v = +e.target.value;
   hand.idx = v >= run.hands.length - 1 ? null : v;  // back at the end: follow live again
   drawHand(v > was ? was : null);
-};
-document.getElementById('handplay').onclick = () => {
+});
+document.getElementById('handplay')?.addEventListener('click', () => {
   if (hand.timer) return stopDeal();
   const run = handRuns().find(x => x.run_id === hand.run); if (!run) return;
   hand.idx = 0; drawHand();
@@ -2467,7 +1716,7 @@ document.getElementById('handplay').onclick = () => {
     if (was >= last) { hand.idx = null; stopDeal(); return drawHand(); }
     hand.idx = was + 1; drawHand(was);
   }, 900);
-};
+});
 async function renderWaypoints(r) {
   let d;
   try { d = await get('/api/waypoints?preset=' + encodeURIComponent(r.preset) + '&limit=' + RECENT); } catch (e) { return; }
@@ -2526,7 +1775,7 @@ async function renderWaypoints(r) {
 
 // the Waypoints write-ups and the Nevermore test passage open in the reader
 document.querySelectorAll('[data-essay]').forEach(b => b.onclick = () => openEssay(b.dataset.essay));
-document.getElementById('readpassage').onclick = e => { if (e.currentTarget.dataset.book) openBook(e.currentTarget.dataset.book); };
+document.getElementById('readpassage')?.addEventListener('click', e => { if (e.currentTarget.dataset.book) openBook(e.currentTarget.dataset.book); });
 
 // a row in a class's fleet or training table, or a voyage's ships, opens that ship
 ['fleettable', 'fleetarchive', 'fleetretired', 'trainruns', 'voyageruns'].forEach(id => document.getElementById(id)?.addEventListener('click', e => {
@@ -2538,23 +1787,9 @@ document.getElementById('readpassage').onclick = e => { if (e.currentTarget.data
 // template. A panel that belongs to one voyage carries data-voyage (book_value's fit).
 const VOYAGE_NAME = {};
 let voyagesData = null, voyagesKey = '', voyageSeries = null, voyageSeriesKey = '';
-const statusPill = st => `<span class="${pillCls({ running: 'blue', done: 'good', paused: 'accent' }[st] || '')}">${esc(st || '')}</span>`;
 const classOf = preset => ladderData && ladderData.rungs.find(x => x.preset === preset);
-const classLink = preset => { const c = classOf(preset); return c ? `<a href="#${modelHash(c)}">${esc(c.preset)} · ${esc(c.name)}</a>` : esc(preset || '–'); };
-// the stars a voyage's runs have lit so far: the soonest step for each, or the best score yet
-function starHeadline(v) {
-  return Object.values(v.runs.reduce((acc, r) => {
-    r.stars.forEach(x => {
-      const a = acc[x.star] || (acc[x.star] = { star: x.star, lit: null, ship: null, shared: null, sship: null, best: null });
-      if (x.steps_to_lit != null && (a.lit == null || x.steps_to_lit < a.lit)) { a.lit = x.steps_to_lit; a.ship = r.ship_name || r.ship || r.name; }
-      if (x.shared_steps_to_lit != null && (a.shared == null || x.shared_steps_to_lit < a.shared)) { a.shared = x.shared_steps_to_lit; a.sship = r.ship_name || r.ship || r.name; }
-      if (x.best != null && (a.best == null || x.best > a.best)) a.best = x.best;
-    });
-    return acc;
-  }, {})).filter(a => a.best != null).map(a => { const n = STAR_LABEL[a.star] || a.star;
-    return a.lit != null ? `${n} lit at step ${a.lit} (${a.ship})` : a.shared != null ? `${n} lit shared at step ${a.shared} (${a.sship}), no single head yet (best ${fmt(a.best)})` : `${n} not lit yet, best ${fmt(a.best)}`; }).join('; ');
-}
-const STAR_LABEL = { previous_word: 'the Previous Word', duplicate_word: 'the Duplicate Word', nevermore: 'Nevermore' };
+const classLink = preset => { const c = classOf(preset); return c ? `<a href="${modelHash(c)}">${esc(c.preset)} · ${esc(c.name)}</a>` : esc(preset || '–'); };
+
 async function loadVoyages() {
   let d;
   try { d = await get('/api/expeditions'); } catch (e) { return; }
@@ -2565,7 +1800,7 @@ async function loadVoyages() {
   document.getElementById('voyagecards').innerHTML = d.map(v => {
     const valid = v.runs.filter(r => !r.set_aside).length;
     const headline = v.learned || starHeadline(v) || 'nothing found yet';
-    return `<a class="${cardCls(true, 'card')}" href="#/expeditions/${esc(v.key)}">
+    return `<a class="${cardCls(true, 'card')}" href="/expeditions/${esc(v.key)}">
       <div class="top"><span class="preset">${esc(v.name)}</span>${expPill(v)}</div>
       <div class="goal">${esc(v.goal)}</div>
       <div class="ov">${esc(headline)}</div>
@@ -2702,9 +1937,9 @@ async function journeyPanel(v) {
   else vb.innerHTML = '';
 }
 const currentVoyage = () => voyagesData && voyagesData.find(x => x.key === voyageKey);
-document.getElementById('journeyA').onchange = e => { journey.a = e.target.value; journey.idx = null; const v = currentVoyage(); if (v) journeyPanel(v); };
-document.getElementById('journeyB').onchange = e => { journey.b = e.target.value || null; const v = currentVoyage(); if (v) journeyPanel(v); };
-document.getElementById('journeystep').oninput = e => { const v = currentVoyage(); if (!v) return; const n = +e.target.value; journey.idx = n >= +e.target.max ? null : n; journeyPanel(v); };
+document.getElementById('journeyA')?.addEventListener('change', e => { journey.a = e.target.value; journey.idx = null; const v = currentVoyage(); if (v) journeyPanel(v); });
+document.getElementById('journeyB')?.addEventListener('change', e => { journey.b = e.target.value || null; const v = currentVoyage(); if (v) journeyPanel(v); });
+document.getElementById('journeystep')?.addEventListener('input', e => { const v = currentVoyage(); if (!v) return; const n = +e.target.value; journey.idx = n >= +e.target.max ? null : n; journeyPanel(v); });
 document.querySelectorAll('#journeymods input').forEach(x => x.onchange = () => { const v = currentVoyage(); if (v) journeyPanel(v); });
 
 // first light: each star's score against step for every run of the voyage, the threshold dotted
@@ -2741,83 +1976,12 @@ async function voyageStars(v) {
       shapes: [{ type: 'line', xref: 'paper', x0: 0, x1: 1, y0: star.threshold, y1: star.threshold, line: { color: C.accent, dash: 'dot' } }] }));
   stagesFor(rs.map(r => r.run_id)).then(m => bandStages('#voyage', commonStages(m)));
 }
-document.getElementById('voyagestar').onchange = () => { voyageSeriesKey = ''; const v = voyagesData && voyagesData.find(x => x.key === voyageKey); if (v) voyageStars(v); };
+document.getElementById('voyagestar')?.addEventListener('change', () => { voyageSeriesKey = ''; const v = voyagesData && voyagesData.find(x => x.key === voyageKey); if (v) voyageStars(v); });
 
 // ---- Sieves (#/sieves): the three sieves from fleet.SIEVES, one sailing's heatmaps, and when each
 // layer's heading settled beside the stars lit in it
-let sieveDef = null, sieveRun = null, sieveKey = '';
+let sieveDef = null;  // the sieve definitions (the cards, the stars), fetched once by drawShipSieves
 const SETTLE_AT = 0.8, SETTLE_RECORDS = 3;
-function sieveHeat(id, m, prefix, kinksByGroup, { log = true, diverging = false, msg = 'no readings for this sieve on this voyage' } = {}) {
-  const keys = topKeys(m, prefix);
-  if (!keys.length) return empty(id, msg);
-  const x = m[keys[0]][0], y = keys.map(k => groupLabel(groupOf(k, prefix)));
-  const z = keys.map(k => m[k][1].map(v => log ? log10(v) : v));
-  const data = [{ type: 'heatmap', x, y, z, hovertemplate: `step %{x}<br>%{y}<br>${log ? 'log10 ' : ''}%{z:.2f}<extra></extra>`,
-    ...(diverging ? { colorscale: [[0, C.bad], [0.5, tok('panel')], [1, C.good]], zmin: -1, zmax: 1, zmid: 0 } : { colorscale: 'Viridis' }),
-    colorbar: { title: log ? 'log10' : 'cosine', thickness: 10 } }];
-  const kx = [], ky = [], kt = [];
-  keys.forEach((k, i) => { const kk = kinksByGroup[groupOf(k, prefix)]; if (kk) { kx.push(kk.step); ky.push(y[i]); kt.push(`push kink at ${kk.step}${kk.tentative ? ' (tentative)' : ''}`); } });
-  if (kx.length) data.push({ type: 'scatter', x: kx, y: ky, text: kt, mode: 'markers', marker: { symbol: 'diamond', size: 9, color: '#fff', line: { color: '#000', width: 1 } },
-    hovertemplate: '%{y}<br>%{text}<extra></extra>', showlegend: false });
-  plot(id, data, layout({ margin: { l: 80, r: 10, t: 10, b: 36 }, xaxis: { title: 'step', gridcolor: C.line } }));
-}
-// the first step a value is reached, and the value of a companion series (the layer) at that step
-const firstReach = (m, metric, thr) => { const sr = metric && m[metric]; if (!sr) return null; const i = sr[1].findIndex(v => v >= thr); return i < 0 ? null : sr[0][i]; };
-const valueAt = (m, metric, step) => { const sr = metric && m[metric]; if (!sr) return null; const i = sr[0].indexOf(step); return i < 0 ? null : sr[1][i]; };
-async function loadSieves() {
-  if (!sieveDef) {
-    try { sieveDef = await get('/api/sieves'); } catch (e) { return; }
-    KINK_MIN = sieveDef.kink_min_records; KINK_FIRM = sieveDef.kink_firm;
-    document.getElementById('kinkrule').textContent = `${KINK_MIN} records when the two lines remove at least ${Math.round(KINK_FIRM * 100)}% of one line's error`;
-    document.getElementById('sievecards').innerHTML = sieveDef.sieves.map(v => `<div class="${cardCls(false, 'card')}"><div class="top"><span class="preset">${esc(v.name)}</span>
-      <span class="mono">${esc(v.prefix)}</span></div><div class="ov">${esc(v.about)}</div></div>`).join('');
-  }
-  const runs = (runsList || (runsList = await get('/api/runs').catch(() => []))).filter(r => r.name && !r.name.startsWith('smoke'));
-  if (!runs.length) return;
-  const pick = document.getElementById('sievepick');
-  const label = r => { const lr = ladderRun(r.run_id); return `${(lr && lr.ship_name) || r.ship || r.name} · ${r.name} (${r.preset || '–'})`; };
-  const opts = runs.map(r => r.run_id).join(',');
-  if (pick.dataset.opts !== opts) {
-    pick.innerHTML = [...runs].reverse().map(r => `<option value="${esc(r.name)}">${esc(label(r))}</option>`).join('');
-    pick.dataset.opts = opts;
-  }
-  const run = runs.find(r => r.name === sieveRun || r.run_id === sieveRun)
-    || [...runs].reverse().find(r => r.status === 'running') || runs[runs.length - 1];
-  pick.value = run.name;
-  const lr = ladderRun(run.run_id), sh = lr && lr.ship_key && shipsData && shipsData.find(x => x.key === lr.ship_key);
-  document.getElementById('sievenote').innerHTML = `${sh ? `<a href="#${shipHash(sh.key, run.name, 'sieves')}">${esc(sh.name)}</a> · ${esc(sh.subtitle)}` : esc(run.ship || run.name)} · ${esc((run.status || '').split(':')[0])}`;
-  let m;
-  try { m = await get('/api/metrics?run=' + encodeURIComponent(run.run_id)); } catch (e) { return; }
-  const key = run.run_id + '|' + Object.keys(m).filter(k => /^(grad_norm|update_ratio|heading|stars|nevermore)\//.test(k)).map(k => k + m[k][0].length).join(',');
-  if (key === sieveKey) return;
-  sieveKey = key;
-  const pk = kinksOf(m, 'grad_norm/'), byGroup = {};
-  for (const [k, v] of Object.entries(pk)) byGroup[groupOf(k, 'grad_norm/')] = v;
-  sieveHeat('sieve-push', m, 'grad_norm/', byGroup);
-  sieveHeat('sieve-move', m, 'update_ratio/', byGroup);
-  sieveHeat('sieve-heading', m, 'heading/', byGroup, { log: false, diverging: true,
-    msg: run.status === 'running' && !topKeys(m, 'heading/').length ? 'the heading sieve starts with the next ship to sail; this voyage set out before it was fitted' : 'this voyage has no heading readings: the heading sieve started with ships voyage from 08:00 on 7 November' });
-  stagesFor([run.run_id]).then(st => bandStages('#sievesguide', st[run.run_id]));
-  // settled: per layer, the first step the heading holds SETTLE_AT for SETTLE_RECORDS records running
-  const layers = layerOnly(m, 'grad_norm/').map(k => groupOf(k, 'grad_norm/'));
-  const lit = sieveDef.stars.flatMap(st => {
-    const out = [], a = firstReach(m, st.metric, st.threshold), b = firstReach(m, st.shared_metric, st.threshold);
-    if (a != null) out.push({ name: st.name, step: a, layer: valueAt(m, st.layer, a), how: 'one head' });
-    if (b != null) out.push({ name: st.name, step: b, layer: valueAt(m, st.shared_layer, b), how: 'shared' });
-    return out;
-  });
-  document.querySelector('#settledtable tbody').innerHTML = layers.length ? [...layers].reverse().map(g => {
-    const sr = m['heading/' + g], i = groupOrder(g);
-    let settled = null;
-    if (sr) for (let j = 0; j + SETTLE_RECORDS <= sr[1].length; j++) if (sr[1].slice(j, j + SETTLE_RECORDS).every(v => v >= SETTLE_AT)) { settled = sr[0][j]; break; }
-    const here = lit.filter(x => x.layer != null && Math.round(x.layer) === i);
-    const kk = byGroup[g];
-    return `<tr><td>${esc(groupLabel(g))}</td><td data-sort="${settled ?? ''}">${sr ? (settled != null ? `step ${settled}` : 'not yet') : '–'}</td>
-      <td>${sr ? fmt(sr[1][sr[1].length - 1], 2) : '–'}</td><td data-sort="${kk ? kk.step : ''}">${kk ? `step ${kk.step}${kk.tentative ? ' (tentative)' : ''}` : '–'}</td>
-      <td>${here.length ? here.map(x => `${esc(x.name)} at step ${x.step} (${x.how})`).join('; ') : '–'}</td></tr>`;
-  }).join('') : '<tr><td colspan="5" class="${emptyCls(true)}">no sieve readings on this voyage yet</td></tr>';
-}
-document.getElementById('sievepick').onchange = e => { location.hash = '#/sieves/' + encodeURIComponent(e.target.value); };
 
 // ---- the table (#/expeditions/<key>/table, components/TableTalk.astro): talk with a ship. Each question goes
 // to POST /api/table/reply with the last exchanges of the transcript as the conversation so far; the
@@ -2825,7 +1989,7 @@ document.getElementById('sievepick').onchange = e => { location.hash = '#/sieves
 let tableVoyage = 'table_talk', tableRun = null, tableLog = [], tableBusy = false;
 const TABLE_HISTORY = 8;
 async function loadTable() {
-  document.getElementById('tableback').href = '#/expeditions/' + tableVoyage;
+  document.getElementById('tableback').href = '/expeditions/' + tableVoyage;
   const sel = document.getElementById('tablerun');
   let vs = voyagesData; if (!vs) { try { vs = await get('/api/expeditions'); } catch (e) { vs = []; } }
   let runs = runsList; if (!runs) { try { runs = runsList = await get('/api/runs'); } catch (e) { runs = []; } }
@@ -2900,14 +2064,14 @@ async function ask(question) {
   tableBusy = false;
   drawTable();
 }
-document.getElementById('tableform').addEventListener('submit', e => { e.preventDefault(); ask(document.getElementById('tableq').value); });
-document.getElementById('tablerun').onchange = e => { tableRun = e.target.value; document.getElementById('tablereadings').textContent = 'ask something to see them'; loadTranscript(); };
-document.getElementById('tabletemp').oninput = e => { document.getElementById('tabletempv').textContent = (+e.target.value).toFixed(2); };
+document.getElementById('tableform')?.addEventListener('submit', e => { e.preventDefault(); ask(document.getElementById('tableq').value); });
+document.getElementById('tablerun')?.addEventListener('change', e => { tableRun = e.target.value; document.getElementById('tablereadings').textContent = 'ask something to see them'; loadTranscript(); });
+document.getElementById('tabletemp')?.addEventListener('input', e => { document.getElementById('tabletempv').textContent = (+e.target.value).toFixed(2); });
 
 // ---- Discoveries (server.py api_discoveries): the stars and the traits, across every ship
 let discKey = '';
 // a discovery names the ship, and links to the sailing that made it
-const shipLink = x => `<a href="#${x.ship_key ? shipHash(x.ship_key, x.name) : shipHash(x.name)}">${esc(x.ship_name || x.ship || x.name)}</a>`;
+const shipLink = x => `<a href="${x.ship_key ? shipHash(x.ship_key, x.name) : shipHash(x.name)}">${esc(x.ship_name || x.ship || x.name)}</a>`;
 const TRAIT_NAME = t => t.startsWith('family/') ? `${t.slice(7)} (language family)` : ({ fiction: 'Fiction', verse: 'Verse', first_person: 'First person' }[t] || t);
 async function loadDiscoveries() {
   let d;
@@ -2976,7 +2140,7 @@ function drawTricks() {
   document.getElementById('trickroute').innerHTML = wps.map((w, i) => {
     const mine = kts.filter(t => t.waypoint === w.key), gates = mine.filter(t => t.gate);
     return `<div class="step"><div class="n">${i + 1}</div><div class="nm">${esc(w.name)}</div><div class="ab">${esc(w.about)}</div>
-      <div class="gt">${gates.map(t => `<a href="#/discoveries/${esc(t.key)}">◆ ${esc(t.name)}</a>`).join('')}${mine.filter(t => t.leads_to).map(t => `<a class="ld" href="#/discoveries/${esc(t.key)}" title="leads to ${esc((kts.find(x => x.key === t.leads_to) || {}).name || t.leads_to)}">↗ ${esc(t.name)}</a>`).join('')}</div><div class="ct">${mine.length} tricks</div></div>`;
+      <div class="gt">${gates.map(t => `<a href="/discoveries/${esc(t.key)}">◆ ${esc(t.name)}</a>`).join('')}${mine.filter(t => t.leads_to).map(t => `<a class="ld" href="/discoveries/${esc(t.key)}" title="leads to ${esc((kts.find(x => x.key === t.leads_to) || {}).name || t.leads_to)}">↗ ${esc(t.name)}</a>`).join('')}</div><div class="ct">${mine.length} tricks</div></div>`;
   }).join('<div class="arrow">→</div>');
   // the size bands present, smallest first
   const bands = [...new Map(kts.map(t => [t.field_band_rank, t.field_band])).entries()].sort((a, b) => a[0] - b[0]);
@@ -2990,9 +2154,9 @@ function drawTricks() {
     <td>${t.stars.length ? esc(t.stars.map(k => heads[k] || k).join(', ')) : '<span class="s">none charted yet</span>'}</td>
     ${trickProgress(t).cell}<td data-sort="${t.target_class ? classRank(t.target_class) : 99}">${t.target_class ? classLink(t.target_class) : t.taught ? '<span class="s">a reference: taught, not read</span>' : trickProgress(t).state === 'not viable' ? '<span class="s">not viable</span>' : '<span class="s">beyond the ladder</span>'}</td></tr>`).join('');
 }
-document.getElementById('trickfamily').onchange = () => discData && drawTricks();
-document.getElementById('trickband').onchange = () => discData && drawTricks();
-document.getElementById('tricktable').addEventListener('click', e => { const tr = e.target.closest('tr[data-trick]'); if (tr && !e.target.closest('a')) location.hash = '#/discoveries/' + tr.dataset.trick; });
+document.getElementById('trickfamily')?.addEventListener('change', () => discData && drawTricks());
+document.getElementById('trickband')?.addEventListener('change', () => discData && drawTricks());
+document.getElementById('tricktable')?.addEventListener('click', e => { const tr = e.target.closest('tr[data-trick]'); if (tr && !e.target.closest('a')) location.href = '/discoveries/' + tr.dataset.trick; });
 let trickChartKey = '';
 async function drawTrickPage() {
   const t = (discData.known_tricks || []).find(x => x.key === discTrick);
@@ -3005,11 +2169,11 @@ async function drawTrickPage() {
   const wp = (discData.waypoints || []).find(w => w.key === t.waypoint), tname = Object.fromEntries((discData.known_tricks || []).map(x => [x.key, x.name]));
   document.getElementById('trickover').innerHTML = [
     ['waypoint', `${esc(wp ? wp.name : t.waypoint)}${t.gate ? ' · <b>◆ a gate</b>: performed before a ship moves on' : ' · a milestone'}`],
-    ['rests on', t.rests_on.length ? t.rests_on.map(k => `<a href="#/discoveries/${esc(k)}">${esc(tname[k] || k)}</a>`).join(', ') : '–'],
+    ['rests on', t.rests_on.length ? t.rests_on.map(k => `<a href="/discoveries/${esc(k)}">${esc(tname[k] || k)}</a>`).join(', ') : '–'],
     ...(leadNote(t, discData.known_tricks || []) ? [['leads', leadNote(t, discData.known_tricks || [])]] : []),
     ...(() => { const ch = ((discData.chain_rungs || {}).chains || []).find(c => c.includes(t.key) || c.includes(t.fleet)); if (!ch) return [];
       const end = ch[ch.length - 1], en = (discData.known_tricks || []).find(x => x.key === end || x.fleet === end);
-      return [['the climb', `${ch.indexOf(t.fleet || t.key) === ch.length - 1 ? '' : `step ${ch.indexOf(t.fleet || t.key) + 1} of ${ch.length} on `}<a href="#/discoveries/chains/${esc(end)}"><b>${esc(en ? en.name : end)}</b>: the climb, step by step</a>`]]; })(),
+      return [['the climb', `${ch.indexOf(t.fleet || t.key) === ch.length - 1 ? '' : `step ${ch.indexOf(t.fleet || t.key) + 1} of ${ch.length} on `}<a href="/discoveries/chains/${esc(end)}"><b>${esc(en ? en.name : end)}</b>: the climb, step by step</a>`]]; })(),
     ['the field shows it at', `<span class="sizeband">${esc(t.field_band)}</span> parameters · ${esc(t.field_at)} <span class="s">(${esc(t.sure)})</span>`], ['in', esc(t.field_models)], ['first shown by', `<span class="s">${esc(t.source)}</span>`],
     ["Thorp's goal class", t.target_class ? `${classLink(t.target_class)}${tgt ? ` · ${big(tgt.total)} parameters` : ''}` : t.taught ? 'none: the field shows it only when taught the task' : 'beyond the ladder: a horizon'],
     ['how Thorp measures it', ft ? `<span class="mono">${esc(ft.metric)}</span>, performed at ${ft.threshold}` : `not yet: ${esc(t.measure)}`],
@@ -3038,67 +2202,21 @@ async function drawTrickPage() {
   const key = JSON.stringify(d.runs.map(r => [r.run_id, r.value.length, r.value[r.value.length - 1]]));
   if (key === trickChartKey) return;
   trickChartKey = key;
-  trickChart('trickchart', d, t);
+  trickChart('trickchart', d, t, ladderData.rungs.map(r => r.preset));
   // the partner beside it: the bigger test a smaller one leads to, or the smaller one that leads here
   const partner = t.leads_to || ((discData.known_tricks || []).find(x => x.leads_to === t.key) || {}).key;
   const pt = partner && (discData.known_tricks || []).find(x => x.key === partner);
   document.getElementById('trickpairpanel').hidden = !pt;
   if (!pt) return;
-  document.getElementById('trickpairtitle').innerHTML = `${t.leads_to ? 'It leads to' : 'Led by'} <a href="#/discoveries/${esc(pt.key)}">${esc(pt.name)}</a> <span class="note">${t.leads_to ? 'the bigger test this one tracks, on the same evaluator and scale' : 'the smaller test that tracks this one, on the same evaluator and scale'}</span>`;
+  document.getElementById('trickpairtitle').innerHTML = `${t.leads_to ? 'It leads to' : 'Led by'} <a href="/discoveries/${esc(pt.key)}">${esc(pt.name)}</a> <span class="note">${t.leads_to ? 'the bigger test this one tracks, on the same evaluator and scale' : 'the smaller test that tracks this one, on the same evaluator and scale'}</span>`;
   const pf = pt.fleet && discTricks.find(x => x.key === pt.fleet);
   if (!pf) return empty('trickpairchart', 'not measured yet');
   if (pf.viable === false) return empty('trickpairchart', 'not viable on Gutenberg in English');
   if (!pf.evaluator) return empty('trickpairchart', `pre-registered${pf.cutoff ? ` (cutoff ${pf.cutoff})` : ''}; its evaluator is not built yet`);
-  try { trickChart('trickpairchart', await get('/api/trick?key=' + encodeURIComponent(pf.key)), pt); } catch (e) { empty('trickpairchart', 'could not load it'); }
-}
-// one measured trick, every sailing's reading by step: the threshold (amber), the floor (grey: the
-// highest untrained reading among the sailings) and outside models' readings (labelled), dotted
-function trickChart(id, d, t) {
-  if (!d.runs.length) return empty(id, 'readings start with the next ship to sail');
-  const presets = ladderData.rungs.map(r => r.preset), floors = d.runs.map(r => r.floor).filter(v => v != null);
-  const refs = Object.entries(t.reference || {}), line = (y, color, dash = 'dot') => ({ type: 'line', xref: 'paper', x0: 0, x1: 1, y0: y, y1: y, line: { color, dash } });
-  const label = (y, text, color) => ({ xref: 'paper', x: 1, xanchor: 'right', y, yanchor: 'bottom', showarrow: false, text, font: { size: 10, color } });
-  const floor = floors.length ? Math.max(...floors) : null;
-  plot(id, d.runs.map(r => ({ type: 'scatter', mode: 'lines+markers', name: `${r.ship || r.name} (${r.preset})`, legendgroup: r.preset, x: r.step, y: r.value,
-    line: { color: PALETTE[presets.indexOf(r.preset) % PALETTE.length], width: 1.4 }, marker: { size: 7 }, hovertemplate: `${esc(r.ship || r.name)}: %{y:.3f} at step %{x}<extra></extra>` })),
-    layout({ showlegend: d.runs.length <= 12, xaxis: { title: 'step', gridcolor: C.line }, yaxis: { title: esc(t.name), gridcolor: C.line, zeroline: true, zerolinecolor: C.line },
-      shapes: [line(d.threshold, C.accent), ...(floor != null ? [line(floor, C.muted)] : []), ...refs.map(([, v], i) => line(v, PALETTE[(i + 4) % PALETTE.length], 'dash'))],
-      annotations: [label(d.threshold, `performed at ${d.threshold}`, C.accent), ...(floor != null ? [label(floor, `floor ${fmt(floor)}`, C.muted)] : []),
-        ...refs.map(([n, v], i) => label(v, `${esc(n)} ${fmt(v, 2)}`, PALETTE[(i + 4) % PALETTE.length]))] }));
+  try { trickChart('trickpairchart', await get('/api/trick?key=' + encodeURIComponent(pf.key)), pt, ladderData.rungs.map(r => r.preset)); } catch (e) { empty('trickpairchart', 'could not load it'); }
 }
 // the discovery chains: each explorer test reached in rungs, one per size (leads_to from the speller's
 // tests up); rows are the chains, columns the rungs, each cell every size's best lift on that rung
-// one rung's evidence, class by size (the chains table and the chain pages): the best lift and best share of pairs
-// right, ✓ performed under the share rule, ▲ passed below its size, ⚠ while a bigger class fails it; opts.floor adds
-// the floor (the highest untrained reading)
-function rungEvidence(t, ft, rank, opts = {}) {
-  const thr = ft ? ft.threshold : 0.1;
-  let body;
-  if (!ft || (!ft.evaluator && !ft.ships.length)) body = `<div class="s">${ft && ft.viable === false ? 'not viable' : ft ? 'evaluator not built yet' : 'not measured'}</div>`;
-  else if (!ft.ships.length) body = '<div class="s">no readings yet</div>';
-  else {
-    // per size: the best lift, its best share of pairs right, and whether any sailing performed it under the
-    // share rule (lift at the threshold and share at min_score at the same reading; the server's performed_at)
-    const by = {};
-    for (const x of ft.ships) {
-      const b = by[x.preset] || (by[x.preset] = { best: -Infinity, share: null, done: false });
-      b.best = Math.max(b.best, x.best); b.done = b.done || x.performed_at != null;
-      if (x.best_share != null) b.share = Math.max(b.share ?? 0, x.best_share);
-      if (x.floor != null) b.floor = Math.max(b.floor ?? -Infinity, x.floor);
-    }
-    // a class that performs a rung set for a bigger class has passed below its size; when a bigger class was
-    // measured on it and did not perform it, the pair set wants auditing (DECISIONS.md, "The share rule")
-    const goal = rank(t.target_class);
-    const failedAbove = p => Object.entries(by).some(([q, b]) => rank(q) > rank(p) && !b.done);
-    body = Object.entries(by).sort((a, b) => rank(a[0]) - rank(b[0])).map(([p, b]) => {
-      const below = b.done && rank(p) < goal, audit = below && failedAbove(p);
-      const why = b.done ? (audit ? 'passed below its size while a bigger class fails it: audit the pairs' : below ? 'passed below its size' : 'performed')
-        : b.best >= thr ? `lift at the mark but ${b.share != null ? Math.round(100 * b.share) + '%' : 'too few'} of pairs right, under ${Math.round(100 * (ft.min_score || 0))}%` : 'not performed';
-      return `<div class="cr${b.done ? ' lit' : ''}${audit ? ' audit' : ''}" title="${esc(why)}"><span>${esc(p)}</span><b>${b.best >= 0 ? '+' : ''}${fmt(b.best, 2)}${b.share != null ? ` <i>${Math.round(100 * b.share)}%</i>` : ''}${b.done ? ' ✓' : ''}${below ? (audit ? ' ⚠' : ' ▲') : ''}</b>${opts.floor ? `<em>${b.floor != null ? `floor ${b.floor >= 0 ? '+' : ''}${fmt(b.floor, 2)}` : ''}</em>` : ''}</div>`;
-    }).join('');
-  }
-  return body;
-}
 // ---- grading (fleet.grading, the chain grades, s4.outside_readings): does a chain get harder as it climbs, judged on many models
 // at once. Graded: no model performs a rung while failing one below it, no rung is performed by more models than the
 // one below, and every rung is performed by some model. The reference ladder (Pythia 14m to 410m, Qwen3 0.6B) is
@@ -3110,17 +2228,6 @@ function chainRefToggle(id, redraw) {
   el.checked = chainRef;
   el.onchange = () => { chainRef = el.checked; try { localStorage.setItem('thorp.chainref', chainRef ? 'on' : 'off'); } catch (e) {} redraw(); };
 }
-function gradeNote(g, nameOf, full) {
-  if (!g) return `<span class="${pillCls('')}" title="no grading written yet (the chain grades, s4.outside_readings)">not graded yet</span>`;
-  if (g.graded) return `<span class="${pillCls('good')}" title="harder at every rung: no model passes a rung it fails below, fewer pass each rung, and every rung is reached">graded</span>`;
-  const bits = [];
-  if (g.inversions.length) bits.push(`${g.inversions.length} inversion${g.inversions.length > 1 ? 's' : ''}`);
-  if (g.rising.length) bits.push(`more pass ${g.rising.map(nameOf).join(', ')} than the rung below`);
-  if (g.unreached.length) bits.push(`${g.unreached.map(nameOf).join(', ')} unreached`);
-  const tip = g.inversions.map(x => `${x.model} performs ${nameOf(x.rung)} but fails ${x.fails_below.map(nameOf).join(', ')}`).join('\n');
-  return `<span class="${pillCls('bad')}" title="${esc(tip)}">not graded</span> <span class="gnote">${esc(bits.join(' · '))}</span>`
-    + (full && g.inversions.length ? `<details class="ginv"><summary>the inversions</summary><ul>${g.inversions.map(x => `<li><b>${esc(x.model)}</b> performs ${esc(nameOf(x.rung))} but fails ${esc(x.fails_below.map(nameOf).join(', '))}</li>`).join('')}</ul></details>` : '');
-}
 // the reference ladder's readings on one rung, as evidence rows; without the toggle, the one reference tricks.py names
 function refRows(key, refs, ref, sign) {
   if (chainRef && refs && refs.length) return refs.map(m => {
@@ -3130,7 +2237,6 @@ function refRows(key, refs, ref, sign) {
   }).join('');
   return ref ? `<div class="cr ref"><span>${esc(ref[0])}</span><b>${sign(ref[1])}</b></div>` : '';
 }
-const signed = v => v == null ? '–' : `${v >= 0 ? '+' : ''}${fmt(v, 2)}`;
 function drawChains() {
   const kts = discData.known_tricks || [], byKey = Object.fromEntries(kts.map(t => [t.key, t]));
   const led = new Set(kts.map(t => t.leads_to).filter(Boolean));
@@ -3153,11 +2259,11 @@ function drawChains() {
     const end = c[c.length - 1], at = Object.fromEntries(c.map(t => [t.target_class, t]));
     const chainKey = end.fleet || end.key, hasPage = (cr.chains || []).some(x => x[x.length - 1] === chainKey);
     const nameOf = k => (byKey[k] || {}).name || k;
-    return `<tr><td>${hasPage ? `<a href="#/discoveries/chains/${esc(chainKey)}"><b>${esc(end.name)}</b></a>` : `<b>${esc(end.name)}</b>`}<div class="grade">${gradeNote((cr.grades || {})[chainKey], nameOf)}</div>${hasPage ? '<div class="s">the climb, step by step →</div>' : ''}</td>${cols.map(p => at[p]).map(t => {
+    return `<tr><td>${hasPage ? `<a href="/discoveries/chains/${esc(chainKey)}"><b>${esc(end.name)}</b></a>` : `<b>${esc(end.name)}</b>`}<div class="grade">${gradeNote((cr.grades || {})[chainKey], nameOf)}</div>${hasPage ? '<div class="s">the climb, step by step →</div>' : ''}</td>${cols.map(p => at[p]).map(t => {
       if (!t) return '<td class="none"><div class="s">no rung</div></td>';
       const ft = t.fleet && discTricks.find(x => x.key === t.fleet), ref = Object.entries(t.reference || {})[0];
       const body = rungEvidence(t, ft, rank);
-      return `<td><a href="#/discoveries/${esc(t.key)}"><b>${esc(t.name)}</b></a>${body}${refRows(t.fleet || t.key, cr.reference, ref, signed)}</td>`;
+      return `<td><a href="/discoveries/${esc(t.key)}"><b>${esc(t.name)}</b></a>${body}${refRows(t.fleet || t.key, cr.reference, ref, signed)}</td>`;
     }).join('')}</tr>`;
   }).join('')
   // what a model at each rung is, according to the chains (fleet.RUNGS)
@@ -3179,7 +2285,7 @@ async function drawChainPage() {
     if (!d || !d.steps) {
       document.getElementById('chaintitle').textContent = `no chain called ${key}`;
       ['chainstrand', 'chainover'].forEach(id => { document.getElementById(id).innerHTML = ''; });
-      el.innerHTML = '<div class="${emptyCls()}">the chains are the explorer\'s four tests; <a href="#/discoveries">back to the chains table</a></div>'; return;
+      el.innerHTML = '<div class="${emptyCls()}">the chains are the explorer\'s four tests; <a href="/discoveries">back to the chains table</a></div>'; return;
     }
     chainCache.set(key, d);
   }
@@ -3220,7 +2326,7 @@ async function drawChainPage() {
       <div class="cnum">${i + 1}</div>
       <div class="cbody">
         <div class="crung">${r.preset ? classLink(r.preset) : ''}${r.title ? ` · <b>${esc(r.title)}</b>` : ''}</div>
-        <h2><a href="#/discoveries/${esc(st.key)}">${esc(st.name)}</a></h2>
+        <h2><a href="/discoveries/${esc(st.key)}">${esc(st.name)}</a></h2>
         <p class="cadds">${esc(st.adds)}</p>
         ${last && st.about ? `<p class="s">${esc(st.about)}</p>` : ''}
         <div class="row cev">
@@ -3285,7 +2391,7 @@ async function classGoals(r) {
       return m ? `<b class="primarygoal">${esc(m[1])}</b>${m[2] ? `<div class="s">${esc(m[2])}</div>` : ''}<div class="s">beyond it: as many tricks as it can learn, carried up to the next class</div>`
         : `${role ? `<b class="primarygoal">${esc(role)}</b><div class="s">` : '<div>'}as many tricks as it can learn, building on all the tricks below it, carried up to the next class</div>`; })()],
     ['expected at this size', level ? `<b>${esc(level.name)}</b> (step ${wpRank(level.key) + 1} of ${wps.length})` : 'nothing from books at this size'],
-    ['the expected edge', ceiling.length ? ceiling.map(t => `<a href="#/discoveries/${esc(t.key)}">${t.gate ? '◆ ' : ''}${esc(t.name)}</a>`).join(', ') + '<br><span class="s">where a ship this size is expected to stop; beyond it is pushing the envelope</span>' : '–'],
+    ['the expected edge', ceiling.length ? ceiling.map(t => `<a href="/discoveries/${esc(t.key)}">${t.gate ? '◆ ' : ''}${esc(t.name)}</a>`).join(', ') + '<br><span class="s">where a ship this size is expected to stop; beyond it is pushing the envelope</span>' : '–'],
     ['filled so far', `${filled} of ${all} tricks performed here${inh ? `, ${inh} more inherited to carry up` : ''} · ${done} of the ${goals.length} the field expects`],
     ['carried up', carried.length ? `${carried.length} expected of smaller classes, kept, not relearned` : 'none: the first class on the ladder; everything it learns is carried up'],
     ['next class', nextCls ? `${classLink(nextCls.preset)} takes over with ${nextGoals.length}: ${nextGoals.slice(0, 4).map(t => esc(t.name)).join(', ')}${nextGoals.length > 4 ? '…' : ''}` : 'the top of the ladder; beyond it, the horizon'],
@@ -3297,7 +2403,7 @@ async function classGoals(r) {
     return `<div class="wp${isLevel ? ' level' : ''}"><div class="wpname">${wpRank(w.key) + 1}. ${esc(w.name)}${isLevel ? ` <span class="${pillCls('accent')}">target level</span>` : ''}</div>
       <div class="chips">${ts.map(t => { const s = where(t), st = s === 'mine' || s === 'below' ? onClass(t) : null;
         const tip = `${t.name}: ${s === 'mine' ? 'a goal of this size' : s === 'below' ? `carried up from ${t.target_class}` : s === 'above' ? `a goal of ${t.target_class}` : s === 'taught' ? 'a reference, taught not read' : 'beyond the ladder'}${st ? ' · ' + st.text : ''}`;
-        return `<a class="chip ${s}${st && st.done ? ' done' : ''}" href="#/discoveries/${esc(t.key)}" title="${esc(tip)}">${t.gate ? '◆ ' : ''}${esc(t.name)}${st && st.done ? ' ✓' : ''}${s === 'above' ? ` <span class="cls">${esc(t.target_class)}</span>` : ''}</a>`; }).join('')}</div></div>`;
+        return `<a class="chip ${s}${st && st.done ? ' done' : ''}" href="/discoveries/${esc(t.key)}" title="${esc(tip)}">${t.gate ? '◆ ' : ''}${esc(t.name)}${st && st.done ? ' ✓' : ''}${s === 'above' ? ` <span class="cls">${esc(t.target_class)}</span>` : ''}</a>`; }).join('')}</div></div>`;
   }).join('');
   fillStepFilter(document.getElementById('goalfilter'), wps);
   const gf = document.getElementById('goalfilter').value, shown = goals.filter(t => !gf || t.waypoint === gf);
@@ -3326,49 +2432,13 @@ function coverage(data, preset) {
     return { key: w.key, name: w.name, total: ts.length, here, inherited, open: ts.length - here - inherited };
   });
 }
-const coverageBar = c => `<span class="cbar" title="${c.here} performed here, ${c.inherited} inherited, ${c.open} open, of ${c.total}">${
-  [['here', c.here], ['inherited', c.inherited], ['open', c.open]].map(([k, n]) => n ? `<i class="${k}" style="flex:${n}"></i>` : '').join('')}</span>`;
-// a smaller test leads to a bigger one (the speller's three to the explorer's): the note under a trick's name
-function leadNote(t, kts) {
-  const name = k => (kts.find(x => x.key === k) || {}).name || k;
-  const led = kts.filter(x => x.leads_to === t.key);
-  return (t.leads_to ? `<div class="lead">→ leads to <a href="#/discoveries/${esc(t.leads_to)}">${esc(name(t.leads_to))}</a></div>` : '')
-    + (led.length ? `<div class="lead">← led by ${led.map(x => `<a href="#/discoveries/${esc(x.key)}">${esc(x.name)}</a>`).join(', ')}</div>` : '');
-}
 
-// a select of the seven steps to quantum physics, kept as chosen
-function fillStepFilter(sel, wps) {
-  if (sel.options.length === wps.length + 1) return;
-  const was = sel.value;
-  sel.innerHTML = '<option value="">all seven</option>' + wps.map((w, i) => `<option value="${esc(w.key)}">${i + 1}. ${esc(w.name)}</option>`).join('');
-  sel.value = was;
-}
-document.getElementById('goalfilter').onchange = () => { const r = rungFor(currentRung); if (r) classGoals(r); };
+document.getElementById('goalfilter')?.addEventListener('change', () => { const r = rungFor(currentRung); if (r) classGoals(r); });
 
 // ---- Waypoints, in three steps a class proves in order (UI.md): expected (the field already shows it
 // at this size or smaller: match the field), pushing the envelope (this size's goals, and those it
 // carries up, that nobody has shown at this size), exploring the stars (bigger classes' goals: the
 // ambitious ones). "This size" is the size's order-of-magnitude band, as the trick table uses.
-const sizeBand = n => Math.min(6, Math.max(0, Math.floor(Math.log10(n)) - 5));
-function trickOnClass(t, preset, data) {
-  const ft = t.fleet && (data.tricks || []).find(x => x.key === t.fleet);
-  if (!t.fleet) return { text: 'not measured yet', measured: false, done: false, sort: 9 };
-  if (ft && ft.viable === false) return { text: 'not viable on Gutenberg in English', measured: false, done: false, sort: 10 };
-  if (ft && !ft.evaluator) return { text: `pre-registered${ft.cutoff ? ` (cutoff ${ft.cutoff})` : ''} · evaluator not built yet`, measured: false, done: false, sort: 8 };
-  const mine = ft ? ft.ships.filter(x => x.preset === preset) : [];
-  if (!mine.length) return { text: 'measured · no voyage of this size has a reading yet', measured: true, done: false, sort: 8 };
-  const done = mine.filter(x => x.performed_at != null), best = Math.max(...mine.map(x => x.best));
-  return done.length ? { text: `on ${done.length} of ${mine.length} sailings`, measured: true, done: true, sort: 0 }
-    : { text: `best ${fmt(best)} of ${ft.threshold} on ${mine.length} sailings`, measured: true, done: false, sort: 1 };
-}
-function starOnClass(h, preset, data) {
-  if (!h) return '';
-  if (!h.star) return `${esc(h.name)} <span class="s">(not measured)</span>`;
-  const st = (data.stars || []).find(x => x.key === h.star), mine = st ? st.ships.filter(x => x.preset === preset) : [];
-  if (!mine.length) return `${esc(h.name)} <span class="s">(no reading on this size)</span>`;
-  const lit = mine.filter(x => x.steps_to_lit != null).length, sh = mine.filter(x => x.shared_steps_to_lit != null).length;
-  return `${esc(h.name)} ${lit ? `<span class="${pillCls('good')}">lit ${lit}/${mine.length}</span>` : sh ? `<span class="${pillCls('accent')}">shared ${sh}/${mine.length}</span>` : `<span class="${pillCls('')}">best ${fmt(Math.max(...mine.map(x => x.best ?? 0)))}</span>`}`;
-}
 async function classSteps(r) {
   if (!reachData || Date.now() - reachAt > 30000) { try { reachData = await get('/api/discoveries'); reachAt = Date.now(); } catch (e) { return; } }
   const d = reachData, kts = d.known_tricks || [], wps = d.waypoints || [], me = classRank(r.preset), band = sizeBand(r.total);
@@ -3383,7 +2453,7 @@ async function classSteps(r) {
   document.getElementById('wpsteps').innerHTML = WSUBS.map((k, i) => {
     const ts = sets[k], st = ts.map(t => trickOnClass(t, r.preset, d)), done = st.filter(x => x.done).length, meas = st.filter(x => x.measured).length;
     const proven = ts.length && done === ts.length;
-    return `<a class="st${k === wpSub ? ' on' : ''}${proven ? ' proven' : ''}" href="#${modelHash(r, 'waypoints', k)}"><div class="t">${i + 1} · ${names[k]}</div>
+    return `<a class="st${k === wpSub ? ' on' : ''}${proven ? ' proven' : ''}" href="${modelHash(r, 'waypoints', k)}"><div class="t">${i + 1} · ${names[k]}</div>
       <div class="c">${about[k]} · ${ts.length} trick${ts.length === 1 ? '' : 's'} · ${meas} measured · ${done} performed</div></a>`;
   }).join('');
   fillStepFilter(document.getElementById('wpfilter'), wps);
@@ -3404,11 +2474,11 @@ async function classSteps(r) {
     }).join('') : `<tr><td colspan="6" class="${emptyCls(true)}">${sets[k].length ? 'none at this step' : k === 'expected' ? 'nothing: the field shows no trick at this size; everything here is pushing the envelope' : k === 'envelope' ? 'no goals at this size beyond what the field already shows' : 'nothing above this size on the ladder'}</td></tr>`;
   }
 }
-document.getElementById('wpfilter').onchange = () => { const r = rungFor(currentRung); if (r) classSteps(r); };
-['wp-expected', 'wp-envelope', 'wp-stars'].forEach(id => document.getElementById(id).addEventListener('click', e => {
-  const tr = e.target.closest('tr[data-trick]'); if (tr && !e.target.closest('a')) location.hash = '#/discoveries/' + tr.dataset.trick;
+document.getElementById('wpfilter')?.addEventListener('change', () => { const r = rungFor(currentRung); if (r) classSteps(r); });
+['wp-expected', 'wp-envelope', 'wp-stars'].forEach(id => document.getElementById(id)?.addEventListener('click', e => {
+  const tr = e.target.closest('tr[data-trick]'); if (tr && !e.target.closest('a')) location.href = '/discoveries/' + tr.dataset.trick;
 }));
-document.getElementById('goaltable').addEventListener('click', e => { const tr = e.target.closest('tr[data-trick]'); if (tr && !e.target.closest('a')) location.hash = '#/discoveries/' + tr.dataset.trick; });
+document.getElementById('goaltable')?.addEventListener('click', e => { const tr = e.target.closest('tr[data-trick]'); if (tr && !e.target.closest('a')) location.href = '/discoveries/' + tr.dataset.trick; });
 
 // a class's stars in reach: the kinds expected at or below it, with its own sailings' state
 let reachData = null, reachAt = 0;
@@ -3445,8 +2515,8 @@ function drawHeads() {
     <td data-sort="${classRank(h.expected_from)}" title="${esc(h.expected_why || '')}">${h.expected_from ? classLink(h.expected_from) : 'beyond the ladder'}</td>${firstLitIn(h)}${state(h)}
     <td class="s">${esc(h.source)}</td><td class="s">${esc(h.seen_in)}</td></tr>`).join('');
 }
-document.getElementById('headfamily').onchange = drawHeads;
-document.getElementById('traittable').addEventListener('click', e => { const tr = e.target.closest('tr[data-run]'); if (tr && !e.target.closest('a')) goShip(tr.dataset.run); });
+document.getElementById('headfamily')?.addEventListener('change', drawHeads);
+document.getElementById('traittable')?.addEventListener('click', e => { const tr = e.target.closest('tr[data-run]'); if (tr && !e.target.closest('a')) goShip(tr.dataset.run); });
 
 // Overview's second chart: every scored run's Forgotten Tomes score in start order, the best so far,
 // and the outside models as dotted lines. One trace of dots, so thousands of runs stay quick.
@@ -3508,12 +2578,51 @@ async function rungExtras(r, runs, allRuns) {
 }
 
 
-// the run overview folds away; the choice is remembered per viewer
+// the run overview folds away; the choice is remembered per viewer (the ship's page has it; the other
+// pages do not, and must not throw before their own panels are drawn)
 (() => {
   const el = document.getElementById('stripwrap');
+  if (!el) return;
   try { if (localStorage.getItem('thorp.strip') === 'closed') el.open = false; } catch (e) {}
   el.addEventListener('toggle', () => { try { localStorage.setItem('thorp.strip', el.open ? 'open' : 'closed'); } catch (e) {} });
 })();
+// The sieves that used to be the top-level Sieves tab (9 November: moved under the individual ship). The cards,
+// the heading sieve and the settled table are drawn for the voyage on show; the push/move heats and the kink
+// panels are the ship's own (views/ship.ts heat + kinkPanel), drawn just before this.
+async function drawShipSieves(m, r) {
+  const cards = document.getElementById('sievecards');
+  if (!cards) return;  // a page that has no sieves tab
+  if (!sieveDef) {
+    try { sieveDef = await get('/api/sieves'); } catch (e) { return; }
+    setKinkRule(sieveDef.kink_min_records, sieveDef.kink_firm);
+  }
+  const kr = document.getElementById('kinkrule');
+  if (kr && !kr.textContent) kr.textContent = `${KINK_MIN} records when the two lines remove at least ${Math.round(KINK_FIRM * 100)}% of one line's error`;
+  cards.innerHTML = (sieveDef.sieves || []).map(v => `<div class="${cardCls(false, 'card')}"><div class="top"><span class="preset">${esc(v.name)}</span>
+    <span class="mono">${esc(v.prefix)}</span></div><div class="ov">${esc(v.about)}</div></div>`).join('');
+  const byGroup = {};
+  for (const [k, v] of Object.entries(kinksOf(m, 'grad_norm/'))) byGroup[groupOf(k, 'grad_norm/')] = v;
+  sieveHeat('sieve-heading', m, 'heading/', byGroup, { log: false, diverging: true,
+    msg: r && r.status === 'running' && !topKeys(m, 'heading/').length ? 'the heading sieve starts with the next ship to sail; this voyage set out before it was fitted' : 'this voyage has no heading readings: the heading sieve started with ships voyage from 08:00 on 7 November' });
+  const layers = layerOnly(m, 'grad_norm/').map(k => groupOf(k, 'grad_norm/'));
+  const lit = (sieveDef.stars || []).flatMap(st => {
+    const out = [], a = firstReach(m, st.metric, st.threshold), b = firstReach(m, st.shared_metric, st.threshold);
+    if (a != null) out.push({ name: st.name, step: a, layer: valueAt(m, st.layer, a), how: 'one head' });
+    if (b != null) out.push({ name: st.name, step: b, layer: valueAt(m, st.shared_layer, b), how: 'shared' });
+    return out;
+  });
+  const tb = document.querySelector('#settledtable tbody');
+  if (tb) tb.innerHTML = layers.length ? [...layers].reverse().map(g => {
+    const sr = m['heading/' + g], i = groupOrder(g);
+    let settled = null;
+    if (sr) for (let j = 0; j + SETTLE_RECORDS <= sr[1].length; j++) if (sr[1].slice(j, j + SETTLE_RECORDS).every(v => v >= SETTLE_AT)) { settled = sr[0][j]; break; }
+    const here = lit.filter(x => x.layer != null && Math.round(x.layer) === i);
+    const kk = byGroup[g];
+    return `<tr><td>${esc(groupLabel(g))}</td><td data-sort="${settled ?? ''}">${sr ? (settled != null ? `step ${settled}` : 'not yet') : '–'}</td>
+      <td>${sr ? fmt(sr[1][sr[1].length - 1], 2) : '–'}</td><td data-sort="${kk ? kk.step : ''}">${kk ? `step ${kk.step}${kk.tentative ? ' (tentative)' : ''}` : '–'}</td>
+      <td>${here.length ? here.map(x => `${esc(x.name)} at step ${x.step} (${x.how})`).join('; ') : '–'}</td></tr>`;
+  }).join('') : '<tr><td colspan="5" class="${emptyCls(true)}">no sieve readings on this voyage yet</td></tr>';
+}
 async function refresh() {
   await loadLadder();  // a ship's address resolves through the ladder and the ships
   if (page === 'sizes' && harbourSub === 'shipbuilder') {  // do not touch the open ship builder: a rebuild resets the scroll
@@ -3524,7 +2633,6 @@ async function refresh() {
   if (page === 'voyages') { loadWaters(); loadOverview(); loadQueue(); }
   if (page === 'voyage' && currentVoyage()) journeyPanel(currentVoyage());
   if (page === 'discoveries') loadDiscoveries();
-  if (page === 'sievesguide') loadSieves();
   if (page === 'leaderboard') loadLeaderboard();
   if (page === 'governance') loadGovernance();
   if (page === 'bet') loadBet();
@@ -3535,13 +2643,13 @@ async function refresh() {
     const runs = await get('/api/runs');
     const first = !runsList;
     runsList = runs;
-    if (!runs.length) { document.getElementById('title').textContent = 'no voyages in the ledger yet'; return; }
-    runsTable(runs);
+    if (!runs.length) { const title = document.getElementById('title'); if (title) title.textContent = 'no voyages in the ledger yet'; return; }
+    runsTable(runs, selected, goShip);
     if (page !== 'ship') { document.getElementById('updated').textContent = 'updated ' + new Date().toLocaleTimeString(); return; }
-    if (first) return showTab(location.hash.slice(1), false);  // now the ship can be named
+    if (first) return showTab(routePath(), false);  // now the ship can be named
     const { ship, run } = shipRun(runs);
     if (!run) { shipHeader(null, null); return; }
-    if (run.run_id !== selected) return showTab(location.hash.slice(1), false);
+    if (run.run_id !== selected) return showTab(routePath(), false);
     shipHeader(ship, run);
     const cur = runs.find(x => x.run_id === selected);
     if (cur) document.getElementById('stripsum').textContent = `${cur.ship || cur.name} · ${(cur.status || '').split(':')[0]}`;
@@ -3565,6 +2673,7 @@ async function refresh() {
     heat('gradheat', m, 'grad_norm/', gk, 'log10');
     heat('moveheat', m, 'update_ratio/', kinksOf(m, 'update_ratio/'), 'log10');
     kinkPanel(m, gk);
+    await drawShipSieves(m, r);
     attnPanels(m);
     speedPanel(m);
     probePanel(r, gk);
@@ -3585,23 +2694,6 @@ setInterval(async () => { if (refreshing) return; refreshing = true; try { await
 // (#/leaderboard; thorp.leaderboard.payload, UI.md "Leaderboard"): the best of each size on the climb to chaining two
 // facts, the reference ladder on the same bars, and every run. A climb bar runs 0 to 5, ticked at each rung; the four-chain
 // strip has a row per chain, five cells (keel to 50m), lit cells filled and the next cell filled by its share of the mark.
-const CHAIN_LABEL = { origin_test: 'the Origin', energy_test: 'energy', mendeleev_gaps: "Mendeleev's gaps", recurrence_test: 'the eternal return' };
-const CHAIN_SHORT = { origin_test: 'Origin', energy_test: 'energy', mendeleev_gaps: 'Mendeleev', recurrence_test: 'return' };
-const RUNG_CLASS = ['pan', 'augustus', 'speller', 'stylist', '50m'];
-function climbBar(c, max = 5) {
-  if (c == null) return '<span class="s">–</span>';
-  const pct = Math.max(0, Math.min(100, 100 * c / max));
-  return `<div class="climb" title="climb ${fmt(c, 2)} of ${max}"><div class="cfill" style="width:${pct}%"></div>${Array.from({ length: max - 1 }, (_, i) => `<i style="left:${100 * (i + 1) / max}%"></i>`).join('')}<b>${fmt(c, 2)}</b></div>`;
-}
-function chainingCell(v, thr) {
-  if (v == null) return '<span class="s">not read</span>';
-  return `<span class="${v >= thr ? 'good' : Math.abs(v) <= 0.03 ? 's' : ''}" title="${v >= thr ? 'at the mark' : Math.abs(v) <= 0.03 ? 'within the noise (about 0.03 of zero)' : 'below the mark'}">${signed(v)}</span>`;
-}
-function chainStrip(chains) {
-  if (!chains) return '';
-  return `<div class="cstrip">${Object.entries(chains).map(([k, c]) => `<div class="csr" title="${esc(CHAIN_LABEL[k] || k)}: ${c.rungs} rung${c.rungs === 1 ? '' : 's'} performed${c.next ? `, next ${esc(c.next.replace(/_test$/, ''))} at ${Math.round(100 * c.partial)}% of its mark` : ', all five'}"><span>${esc(CHAIN_SHORT[k] || k)}</span>${RUNG_CLASS.map((r, i) => `<em class="${i < c.rungs ? 'on' : ''}">${i === c.rungs && c.partial ? `<u style="width:${Math.round(100 * c.partial)}%"></u>` : ''}</em>`).join('')}</div>`).join('')}</div>`;
-}
-const runLink = x => x.run ? `<a href="#${shipHash(x.run)}">${esc(x.run)}</a>` : '–';
 // The leaderboard is chaining-only (leaderboard.payload: the four chaining tests, public; the climb is internal and lives on
 // the two-fact voyage's page). Best in class is a SHIP, its sailings averaged.
 async function loadLeaderboard() {
@@ -3616,25 +2708,13 @@ async function loadLeaderboard() {
   drawLbTable();
   drawSmokingQwen();
 }
-// the logic deck's chaining gain in a cell: the proof that a pass is chaining (✓ when performed: gain at the mark and two in
-// three items right); "not read" until the deck is scored on that model
-function logicCell(l, kind) {
-  if (kind === 'forecast') return '';
-  if (!l || l.gain == null) return '<span class="s">not read yet</span>';
-  return `<span class="tc${l.performed ? ' lit' : ''}" title="chaining gain ${signed(l.gain)}${l.score != null ? `, ${Math.round(100 * l.score)}% of items right` : ''}${l.performed ? ', performed' : ''}">${signed(l.gain)} <i>${l.score != null ? Math.round(100 * l.score) + '%' : ''}</i>${l.performed ? ' ✓' : ''}</span>`;
-}
-// one chaining test's reading in a cell: lift, share right, ✓ when performed under the rule
-function testCell(t) {
-  if (!t || t.lift == null) return '<span class="s">–</span>';
-  return `<span class="tc${t.performed ? ' lit' : ''}" title="${esc(t.name || '')}: lift ${signed(t.lift)}, ${t.score != null ? Math.round(100 * t.score) + '% of pairs right' : ''}${t.performed ? ', performed' : ''}">${signed(t.lift)} <i>${t.score != null ? Math.round(100 * t.score) + '%' : ''}</i>${t.performed ? ' ✓' : ''}</span>`;
-}
 function drawLbRuns() {
   if (!lbData) return;
   const want = document.getElementById('lbclass').value, thr = lbData.threshold ?? 0.1, tests = lbData.tests || [];
   const rows = (lbData.ships || []).filter(r => !want || r.preset === want).sort((a, b) => (b.chaining_lift ?? -9) - (a.chaining_lift ?? -9));
   document.getElementById('lbcount').textContent = `${rows.length} ship${rows.length === 1 ? '' : 's'}`;
   document.querySelector('#lbruns thead').innerHTML = `<tr><th>ship</th><th>class</th><th>voyages</th><th>chaining lift</th><th>chaining gain <span class="s">logic deck</span></th><th>passed</th>${tests.map(t => `<th>${esc(t.name)}</th>`).join('')}</tr>`;
-  document.querySelector('#lbruns tbody').innerHTML = rows.map(r => `<tr><td>${r.ship_key ? `<a href="#${shipHash(r.ship_key)}">${esc(r.ship || r.run)}</a>` : esc(r.ship || r.run)}</td><td data-sort="${classRank(r.preset)}">${classLink(r.preset)}</td>
+  document.querySelector('#lbruns tbody').innerHTML = rows.map(r => `<tr><td>${r.ship_key ? `<a href="${shipHash(r.ship_key)}">${esc(r.ship || r.run)}</a>` : esc(r.ship || r.run)}</td><td data-sort="${classRank(r.preset)}">${classLink(r.preset)}</td>
     <td data-sort="${r.sailings ?? 1}">${r.sailings ?? 1}</td><td data-sort="${r.chaining_lift ?? -9}">${chainingCell(r.chaining_lift, thr)}</td><td data-sort="${r.logic && r.logic.gain != null ? r.logic.gain : -9}">${logicCell(r.logic)}</td><td data-sort="${r.passed ?? 0}">${r.passed ?? 0} of ${tests.length}</td>
     ${tests.map(t => `<td>${testCell((r.tests || {})[t.key])}</td>`).join('')}</tr>`).join('')
     || `<tr><td colspan="${6 + tests.length}" class="${emptyCls(true)}">no ships with chaining readings in this size</td></tr>`;
@@ -3658,14 +2738,8 @@ async function loadShelves() {
   const sel = document.getElementById('shelfkind'), keep = sel.value;
   sel.innerHTML = '<option value="">every kind</option>' + SHELF_KINDS.filter(k => shelvesData.some(x => x.kind === k[0])).map(k => `<option value="${k[0]}">${k[1].toLowerCase()}</option>`).join('');
   sel.value = keep; sel.onchange = drawShelves;
-  document.getElementById('shelfsearch').oninput = drawShelves;
+  document.getElementById('shelfsearch')?.addEventListener('input', drawShelves);
   drawShelves();
-}
-const FAMILY_TOK = ['blue', 'accent', 'good', 'bad', 'c5', 'c6', 'c7', 'c8', 'c9', 'c10'];
-const familyColour = (() => { const seen = {}; return f => seen[f] || (seen[f] = `var(--${FAMILY_TOK[Object.keys(seen).length % FAMILY_TOK.length]})`); })();
-function familyBar(fam) {
-  const n = Object.values(fam || {}).reduce((a, b) => a + b, 0); if (!n) return '<span class="s">–</span>';
-  return `<div class="fbar" title="${esc(Object.entries(fam).map(([f, k]) => `${f} ${k}`).join(' · '))}">${Object.entries(fam).map(([f, k]) => `<span style="width:${100 * k / n}%;background:${familyColour(f)}"></span>`).join('')}</div>`;
 }
 function drawShelves() {
   if (!shelvesData) return;
@@ -3697,7 +2771,7 @@ async function drawShelfDetail() {
   const el = document.getElementById('shelfdetail'), x = shelvesData.find(s => s.path === shelfOpen); if (!el || !x) return;
   const roleOrder = r => ['reads', 'reads first', 'tokeniser', 'scored on', 'refuses'].indexOf(r);
   const uses = [...x.uses].sort((a, b) => (a.status === 'queued') - (b.status === 'queued') || roleOrder(a.role) - roleOrder(b.role) || a.run.localeCompare(b.run));
-  const usesHtml = uses.length ? `<div class="shelfuses">${uses.map(u => `<span class="use${u.status === 'queued' ? ' queued' : ''}">${u.status === 'queued' ? esc(u.run) : `<a href="#${shipHash(u.run)}">${esc(u.run)}</a>`} <i>${esc(u.role)}</i>${u.status === 'queued' ? ' <i>queued</i>' : ''}</span>`).join('')}</div>` : '<div class="s">no voyage reads it yet</div>';
+  const usesHtml = uses.length ? `<div class="shelfuses">${uses.map(u => `<span class="use${u.status === 'queued' ? ' queued' : ''}">${u.status === 'queued' ? esc(u.run) : `<a href="${shipHash(u.run)}">${esc(u.run)}</a>`} <i>${esc(u.role)}</i>${u.status === 'queued' ? ' <i>queued</i>' : ''}</span>`).join('')}</div>` : '<div class="s">no voyage reads it yet</div>';
   el.innerHTML = `<div class="k">used by</div>${usesHtml}<div class="k mt">the books</div><div id="shelfbooks" class="s">reading the list…</div>`;
   let books = shelfBooks.get(x.path);
   if (!books) { try { books = await get('/api/library_books?path=' + encodeURIComponent(x.path)); shelfBooks.set(x.path, books); } catch (e) { books = null; } }
@@ -3743,14 +2817,6 @@ document.getElementById('voyageclimbwhat')?.addEventListener('change', () => { c
 // Thorp's classes, fitted (linear and bending, in log10 parameters, as smoking_qwen fits them) and carried to 400M, with the
 // bootstrap's 5-95% band there, Qwen3 4B's mark, the threshold, and the reference ladder in grey.
 let sqKey = null, sqData = null;
-function polyfit(xs, ys, deg) {  // least squares through (xs, ys), coefficients highest power first (numpy.polyfit's order)
-  const n = deg + 1, A = Array.from({ length: n }, () => Array(n + 1).fill(0));
-  xs.forEach((x, i) => { for (let r = 0; r < n; r++) { for (let c = 0; c < n; c++) A[r][c] += x ** (2 * deg - r - c); A[r][n] += ys[i] * x ** (deg - r); } });
-  for (let i = 0; i < n; i++) { let m = i; for (let r = i + 1; r < n; r++) if (Math.abs(A[r][i]) > Math.abs(A[m][i])) m = r; [A[i], A[m]] = [A[m], A[i]];
-    for (let r = 0; r < n; r++) if (r !== i) { const f = A[r][i] / A[i][i]; for (let c = i; c <= n; c++) A[r][c] -= f * A[i][c]; } }
-  return A.map((row, i) => row[n] / row[i]);
-}
-const polyval = (co, x) => co.reduce((a, c) => a * x + c, 0);
 async function drawSmokingQwen() {
   if (!document.getElementById('sqchart')) return;
   let d; try { d = await get('/api/smoking_qwen'); } catch (e) { return; }
@@ -3766,7 +2832,7 @@ async function drawSmokingQwen() {
        <div class="sqp"><b class="${pBend >= 0.9 ? 'accent' : ''}">${pct(pBend)}</b><span>on the bending curve (probable), the least over the range</span></div>`
     : `<div class="sqp"><b class="s">not yet forecastable</b><span>${above} of ${need} classes above the noise (a chaining lift over ${d.noise ?? 0.03}); a curve through noise extrapolates nothing, so the curves below are drawn but no probability is claimed</span></div>`;
   const claimed = d.forecastable && pLin >= 0.9, probable = d.forecastable && !claimed && pBend >= 0.9;
-  document.getElementById('sqhead').innerHTML += `<div class="sqp"><b>${claimed ? `<span class="${pillCls('good')}">claimed</span>` : probable ? `<span class="${pillCls('accent')}">probable</span>` : `<span class="${pillCls('')}">not claimed</span>`}</b><span>${rng.length ? `${scored.length} of ${rng.length} competitors scored${d.hardest ? `; the hardest, ${esc(d.hardest)}` : ''}, each to be matched at a tenth its size` : `target: ${esc(_shortModel(T.model))} at ${signed(T.chaining_lift)}, a Thorp of ${fmtParams(d.smoke_at)}`}</span></div>`;
+  document.getElementById('sqhead').innerHTML += `<div class="sqp"><b>${claimed ? `<span class="${pillCls('good')}">claimed</span>` : probable ? `<span class="${pillCls('accent')}">probable</span>` : `<span class="${pillCls('')}">not claimed</span>`}</b><span>${rng.length ? `${scored.length} of ${rng.length} competitors scored${d.hardest ? `; the hardest, ${esc(d.hardest)}` : ''}, each to be matched at a tenth its size` : `target: ${esc(shortModel(T.model))} at ${signed(T.chaining_lift)}, a Thorp of ${fmtParams(d.smoke_at)}`}</span></div>`;
   document.getElementById('sqrule').textContent = 'Claimed when forecastable (three classes above the noise) and P ≥ 0.9 on the straight line for every competitor in the range; "probable" when only the bending curve reaches 0.9.';
   const fmtBand = f => f ? `${signed(f.predicted)} <span class="s">(${signed(f.band[0])} to ${signed(f.band[1])})</span>` : '–';
   document.getElementById('sqbacktest').innerHTML = (d.backtest || []).map(b => `<div class="sqbt"><div><b>${esc(b.test)}</b> · actual ${signed(b.actual)}</div>
@@ -3802,29 +2868,17 @@ async function drawSmokingQwen() {
     { xref: 'paper', yref: 'y', x: 0, y: d.threshold ?? 0.1, xanchor: 'left', yanchor: 'bottom', showarrow: false, text: 'performed (0.1)', font: { size: 9, color: tok('accent') } },
     { xref: 'paper', yref: 'y', x: 0, y: d.noise ?? 0.03, xanchor: 'left', yanchor: 'bottom', showarrow: false, text: 'noise', font: { size: 9, color: tok('muted') } },
   ];
-  if (T.chaining_lift != null) notes.push({ xref: 'paper', yref: 'y', x: 0, y: T.chaining_lift, xanchor: 'left', yanchor: 'bottom', showarrow: false, text: `${esc(_shortModel(T.model))} ${signed(T.chaining_lift)}`, font: { size: 10, color: tok('bad') } });
+  if (T.chaining_lift != null) notes.push({ xref: 'paper', yref: 'y', x: 0, y: T.chaining_lift, xanchor: 'left', yanchor: 'bottom', showarrow: false, text: `${esc(shortModel(T.model))} ${signed(T.chaining_lift)}`, font: { size: 10, color: tok('bad') } });
   plot('sqchart', traces, layout({ xaxis: { type: 'log', title: { text: 'parameters' }, range: [5, 10] }, yaxis: { title: { text: 'chaining lift' }, zeroline: false }, shapes, annotations: notes, height: 400, legend: { orientation: 'h', y: -0.2 } }));
 }
-const _shortModel = m => (m || '').split('/').pop().replace(/-(\d+)bit$/, ' $1-bit').replace('Qwen3-', 'Qwen3 ');
 
 
 // ---- the leaderboard table: one ranking on the chaining lift. Outside models (leaderboard.reference, sized from
 // smoking_qwen's REFERENCE_PARAMS), Thorp's classes (each size's best run), and Thorp's forecasts: the two fits through
 // Thorp's class points (polynomials in log10 parameters, as smoking_qwen fits them) read at each size not yet measured
 // and at 400M. For each outside model, the size where each fit reaches its lift.
-// the labs, as thorp/labs.py LABS: a model's family, its maker, and the lab page's key (#/leaderboard/lab/<key>)
-const MAKER = [[/qwen/i, 'Qwen', 'Alibaba', 'alibaba'], [/llama/i, 'Llama', 'Meta', 'meta'], [/phi/i, 'Phi', 'Microsoft', 'microsoft'], [/pythia/i, 'Pythia', 'EleutherAI', 'eleutherai'], [/gemma/i, 'Gemma', 'Google', 'google'], [/smollm/i, 'SmolLM', 'Hugging Face', 'huggingface']];
-const makerOf = m => (MAKER.find(([re]) => re.test(m)) || [null, '', ''])[2];
-const makerLink = m => { const x = MAKER.find(([re]) => re.test(m || '')); return x ? `<a href="#/leaderboard/lab/${x[3]}" title="${esc(x[2])}: its models' best and worst">${esc(x[2])}</a>` : ''; };
-const fmtParams = n => n == null ? '–' : n >= 1e12 ? `${(n / 1e12).toFixed(n >= 1e13 ? 0 : 1)}T` : n >= 1e9 ? `${(n / 1e9).toFixed(n >= 1e10 ? 0 : 1)}B` : n >= 1e6 ? `${Math.round(n / 1e6)}M` : `${Math.round(n / 1e3)}k`;
-// where a fit (coefficients in log10 parameters) first reaches y above the largest measured size; null if never by 10^14
-function fitReachAt(co, y, from) {
-  if (!co) return null;
-  for (let x = from; x <= 14; x += 0.005) if (polyval(co, x) >= y) return 10 ** x;
-  return null;
-}
-document.getElementById('lbshowfc').onchange = () => drawLbTable();
-document.getElementById('lbshowpythia').onchange = () => drawLbTable();
+document.getElementById('lbshowfc')?.addEventListener('change', () => drawLbTable());
+document.getElementById('lbshowpythia')?.addEventListener('change', () => drawLbTable());
 document.querySelectorAll('#leaderboard details.lbfold').forEach(d => d.addEventListener('toggle', () => {
   if (d.open) d.querySelectorAll('.js-plotly-plot').forEach(el => Plotly.Plots.resize(el));
 }));
@@ -3898,9 +2952,9 @@ function drawLbTable() {
   let rank = 0;
   tb.innerHTML = rows.map(r => {
     const ranked = r.kind !== 'forecast' && !r.pending; if (ranked) rank++;
-    const name = r.kind === 'thorp' ? `<a href="#/leaderboard/thorp/${encodeURIComponent(r.ship.ship_key)}"><b>${esc(r.ship.name || `Thorp ${r.cls}`)}</b></a><div class="s">${r.ship.ship_key ? `<a href="#${shipHash(r.ship.ship_key)}">${esc(r.ship.ship)}</a>` : esc(r.ship.ship || '')} · ${r.ship.sailings ?? 1} sailing${(r.ship.sailings ?? 1) === 1 ? '' : 's'}</div>`
+    const name = r.kind === 'thorp' ? `<a href="/leaderboard/thorp/${encodeURIComponent(r.ship.ship_key)}"><b>${esc(r.ship.name || `Thorp ${r.cls}`)}</b></a><div class="s">${r.ship.ship_key ? `<a href="${shipHash(r.ship.ship_key)}">${esc(r.ship.ship)}</a>` : esc(r.ship.ship || '')} · ${r.ship.sailings ?? 1} sailing${(r.ship.sailings ?? 1) === 1 ? '' : 's'}</div>`
       : r.kind === 'forecast' ? `${r.cls ? classLink(r.cls) : `<b>${esc(r.name)}</b>`} <span class="${pillCls('accent')}">forecast</span>${r.smoke ? '<div class="s">a tenth of Qwen3 4B</div>' : ''}`
-      : `${r.model && !r.pending ? `<a href="#/leaderboard/competitor/${encodeURIComponent(r.model)}"><b>${esc(r.name)}</b></a>` : `<b>${esc(r.name)}</b>`}${r.competitor ? ` <span class="${pillCls('blue')}" title="a 2–4B competitor: Thorp must match it at a tenth its size">2–4B</span>` : ''}<div class="s">${makerLink(r.model || r.name)}</div>`;
+      : `${r.model && !r.pending ? `<a href="/leaderboard/competitor/${encodeURIComponent(r.model)}"><b>${esc(r.name)}</b></a>` : `<b>${esc(r.name)}</b>`}${r.competitor ? ` <span class="${pillCls('blue')}" title="a 2–4B competitor: Thorp must match it at a tenth its size">2–4B</span>` : ''}<div class="s">${makerLink(r.model || r.name)}</div>`;
     return `<tr class="lb-${r.kind}${r.kind === 'forecast' && !trusted ? ' untrusted' : ''}${r.pending ? ' pending' : ''}"><td>${ranked ? rank : ''}</td><td>${name}</td><td>${fmtParams(r.params)}</td>
       <td>${liftCell(r)}</td><td>${logicCell(r.logic, r.kind)}</td><td>${r.kind === 'forecast' ? '' : causeCell(r.src && r.src.cause_gain)}</td><td>${r.passed != null ? `${r.passed} of ${tests.length}` : ''}</td>${tests.map(t => `<td class="tcol">${r.tests ? testCell(r.tests[t.key]) : ''}</td>`).join('')}<td>${matchCell(r)}</td></tr>`;
   }).join('') || `<tr><td colspan="${8 + tests.length}" class="${emptyCls(true)}">no readings yet</td></tr>`;
@@ -3942,14 +2996,14 @@ async function drawTwoFacts() {
     ? `${esc(p.prompt.slice(0, p.prompt.length - p.frame.length).trimEnd())} <span class="pfsep">/</span> <span class="pframe">${esc(p.frame)}</span> …` : `${esc(p.prompt)} …`;
   document.querySelector('#tfexamples tbody').innerHTML = tests.map((t, i) => {
     const d = pulls[i], st = d && d.steps && d.steps.find(x => x.key === t.key), p = st && st.pairs && st.pairs[0];
-    return `<tr><td><a href="#/discoveries/chains/${esc(t.chain)}">${esc(d ? d.name : t.chain)}</a><div class="s"><a href="#/discoveries/${esc(t.key)}">${esc(st ? st.name : t.key)}</a></div></td>
+    return `<tr><td><a href="/discoveries/chains/${esc(t.chain)}">${esc(d ? d.name : t.chain)}</a><div class="s"><a href="/discoveries/${esc(t.key)}">${esc(st ? st.name : t.key)}</a></div></td>
       <td>${p ? passage(p) : '<span class="s">pairs not written yet</span>'}</td><td class="good">${p ? esc(p.idea) : ''}</td><td class="bad">${p ? esc(p.rival) : ''}</td></tr>`;
   }).join('');
   // each chain's grade
   const nameOf = k => ((discData.known_tricks || []).find(x => x.key === k) || {}).name || k;
   document.getElementById('tfgrades').innerHTML = chains.map(c => {
     const end = c[c.length - 1], g = (cr.grades || {})[end];
-    return `<div class="tfg"><a href="#/discoveries/chains/${esc(end)}"><b>${esc(nameOf(end))}</b></a> ${gradeNote(g, nameOf)}${g && g.counts ? `<div class="s">${Object.entries(g.counts).map(([k, n]) => n).join(' → ')} of ${(cr.graded_on || []).length || '–'} models pass each rung, keel up</div>` : ''}</div>`;
+    return `<div class="tfg"><a href="/discoveries/chains/${esc(end)}"><b>${esc(nameOf(end))}</b></a> ${gradeNote(g, nameOf)}${g && g.counts ? `<div class="s">${Object.entries(g.counts).map(([k, n]) => n).join(' → ')} of ${(cr.graded_on || []).length || '–'} models pass each rung, keel up</div>` : ''}</div>`;
   }).join('');
   // the backtest
   const fmtBand = f => `${signed(f.predicted)} <span class="s">(${signed(f.band[0])} to ${signed(f.band[1])})</span>`;
@@ -3997,7 +3051,7 @@ function drawMethod(key) {
     }
     const vb = st ? cardBadge((discData || {}).card_verdicts, st.key) : '';
     const inner = `${st ? cardArt(st.key) : ''}${vb ? `<div class="vrow">${vb}</div>` : ''}<div class="top"><span class="preset">${esc(c.card)}</span><span class="${pillCls(planned ? '' : lit ? 'good' : 'blue')}">${planned ? 'planned' : lit ? 'lit' : 'in the deck'}</span></div><div class="ov">${esc(c.operation)}</div>${foot}`;
-    return planned ? `<div class="${cardCls(false, 'card planned')}">${inner}</div>` : `<div class="${cardCls(false, `card${lit ? ' lit pulse' : ''}`)}">${inner}<div class="foot"><a href="#/discoveries/stars">${st ? esc(st.name) : 'the star chart'} on the star chart →</a></div></div>`;
+    return planned ? `<div class="${cardCls(false, 'card planned')}">${inner}</div>` : `<div class="${cardCls(false, `card${lit ? ' lit pulse' : ''}`)}">${inner}<div class="foot"><a href="/discoveries/stars">${st ? esc(st.name) : 'the star chart'} on the star chart →</a></div></div>`;
   }).join('');
 }
 
@@ -4026,13 +3080,6 @@ async function drawBridge() {
 const LOGIC_VARIANTS = [['lift_one_hop', 'one hop'], ['lift_both', 'two hops (both premises)'], ['lift_three_hop', 'three hops'], ['lift_first', 'first premise only'], ['lift_second', 'second premise only'], ['lift_swapped', 'premises swapped'], ['lift_padded', 'a third fact added']];
 // a star's about, cut to what fits on the back of a card: whole sentences up to about 170 characters, or the first
 // sentence up to its colon when that one alone is longer (the example after the colon is on the star chart)
-function shortAbout(t) {
-  if (!t) return '';
-  const sents = t.trim().split(/(?<=\.)\s+/);  // a full stop then a space ends a sentence; 0.3 does not
-  let out = '';
-  for (const x of sents) { if ((out + ' ' + x).length > 170) break; out = out ? out + ' ' + x : x; }
-  return out || sents[0].split(': ')[0].replace(/[.,;]?$/, '.');
-}
 async function loadCompetitor() {
   if (!cpModel) return;
   let d; try { d = await get(cpThorp ? '/api/thorp?ship=' + encodeURIComponent(cpThorp) : '/api/competitor?model=' + encodeURIComponent(cpModel)); } catch (e) { d = null; }
@@ -4050,8 +3097,8 @@ async function loadCompetitor() {
     const sh = d.ship || {}, crowned = c => c ? c.replace('T', ' ') : '';
     document.getElementById('cpover').innerHTML = [
       ['class', classLink(sh.preset)], ['parameters', fmtParams(d.params)],
-      ['the ship', `${sh.ship_key ? `<a href="#${shipHash(sh.ship_key)}">${esc(sh.ship || sh.ship_key)}</a>` : esc(sh.ship || '')}<div class="s">${sh.sailings ?? 0} sailing${sh.sailings === 1 ? '' : 's'}, every reading the mean of their latest</div>`],
-      ['the voyages', (sh.runs || []).map(r => `<a href="#${shipHash(r)}">${esc(r)}</a>`).join(', ') || '–'],
+      ['the ship', `${sh.ship_key ? `<a href="${shipHash(sh.ship_key)}">${esc(sh.ship || sh.ship_key)}</a>` : esc(sh.ship || '')}<div class="s">${sh.sailings ?? 0} sailing${sh.sailings === 1 ? '' : 's'}, every reading the mean of their latest</div>`],
+      ['the voyages', (sh.runs || []).map(r => `<a href="${shipHash(r)}">${esc(r)}</a>`).join(', ') || '–'],
       ['version', `${d.version ? `<b>v${d.version}</b>, crowned ${esc(crowned(d.crowned))}` : 'not crowned'}${(d.history || []).length ? `<div class="s">${d.history.map(h => `v${h.v} ${esc(h.ship)} (${signed(h.chaining_lift)}, ${esc(crowned(h.crowned))})`).join(' → ')}</div>` : ''}<div class="s">a new version is crowned only when a ship beats the last by more than the noise (0.03)</div>`],
     ].map(([k, v]) => `<div><div class="k">${k}</div><div>${v}</div></div>`).join('');
   } else document.getElementById('cpover').innerHTML = [
@@ -4064,7 +3111,7 @@ async function loadCompetitor() {
     : `<div class="tfs"><b>${mean == null ? '–' : signed(mean)}</b><span>chaining lift (mean of the four)</span></div>
        <div class="tfs"><b>${passed} of ${chainingTests.length}</b><span>chaining tests performed</span></div>
        <div class="tfs"><b class="${L && L.performed ? 'good' : ''}">${L && L.gain != null ? signed(L.gain) : 'not read'}</b><span>chaining gain on the logic deck${L && L.score != null ? `, ${Math.round(100 * L.score)}% of items right` : ''}${L && L.items_n ? `, ${L.items_n} items` : ''}${L && L.performed ? ' ✓' : ''}</span></div>`;
-  document.querySelector('#cptests tbody').innerHTML = chainingTests.map((x, i) => `<tr><td><a href="#/discoveries/${esc(x.key)}"><b>${esc(x.name)}</b></a></td><td><a href="#/discoveries/chains/${esc(d.chains[i].key)}">${esc(d.chains[i].name)}</a></td>
+  document.querySelector('#cptests tbody').innerHTML = chainingTests.map((x, i) => `<tr><td><a href="/discoveries/${esc(x.key)}"><b>${esc(x.name)}</b></a></td><td><a href="/discoveries/chains/${esc(d.chains[i].key)}">${esc(d.chains[i].name)}</a></td>
     <td class="${x.performed ? 'good' : ''}">${x.lift != null ? signed(x.lift) : '–'}</td><td>${x.score != null ? Math.round(100 * x.score) + '%' : '–'}</td><td>${x.performed ? '✓' : ''}</td></tr>`).join('');
   if (L) {
     const vs = LOGIC_VARIANTS.filter(([k]) => L[k] != null);
@@ -4089,7 +3136,7 @@ async function loadCompetitor() {
     const verdict = (d.card_verdicts || {})[key];
     const star = (discStars || []).find(st => st.key === key);
     return { key, name, held: state === 'lit', state, near: thr && best != null && isFinite(best) ? best / thr : null, x, thr, untrusted: !!verdict && verdict.valid === false,
-      about: star && shortAbout(star.about), href: '#/discoveries/stars' };
+      about: star && shortAbout(star.about), href: '/discoveries/stars' };
   });
   const rowOf = c => {
     const x = c.x || {}, v = cardBadge(d.card_verdicts, c.key);
@@ -4120,51 +3167,30 @@ async function loadCompetitor() {
   // every rung
   const width = Math.max(...d.chains.map(c => c.rungs.length - 1));
   document.querySelector('#cprungs thead').innerHTML = `<tr><th>chain</th>${d.chains[0].rungs.slice(0, width).map(r => `<th>${esc(r.rung || '')}</th>`).join('')}</tr>`;
-  document.querySelector('#cprungs tbody').innerHTML = d.chains.map(c => `<tr><td><a href="#/discoveries/chains/${esc(c.key)}"><b>${esc(c.name)}</b></a></td>${c.rungs.slice(0, width).map(r => `<td><a href="#/discoveries/${esc(r.key)}">${esc(r.name)}</a><div class="${r.performed ? 'good' : 's'}">${r.lift != null ? `${signed(r.lift)} · ${r.score != null ? Math.round(100 * r.score) + '%' : ''}${r.performed ? ' ✓' : ''}` : 'not read'}</div></td>`).join('')}</tr>`).join('');
+  document.querySelector('#cprungs tbody').innerHTML = d.chains.map(c => `<tr><td><a href="/discoveries/chains/${esc(c.key)}"><b>${esc(c.name)}</b></a></td>${c.rungs.slice(0, width).map(r => `<td><a href="/discoveries/${esc(r.key)}">${esc(r.name)}</a><div class="${r.performed ? 'good' : 's'}">${r.lift != null ? `${signed(r.lift)} · ${r.score != null ? Math.round(100 * r.score) + '%' : ''}${r.performed ? ' ✓' : ''}` : 'not read'}</div></td>`).join('')}</tr>`).join('');
 }
 
 
 // ---- the card judge (thorp.card_check verdicts): a NECESSARY card is played by every model that chains two facts; a MARKER
 // is played only by them; a card whose reading isn't trusted is "not trusted"; else it is neither
-function cardBadge(verdicts, key) {
-  const v = (verdicts || {})[key]; if (!v) return '';
-  const tip = `played by ${v.chainers_lit} of the models that chain two facts; dark in ${v.non_chainers_dark} that don't`;
-  if (v.valid === false) return `<span class="vbadge warn" title="${esc(tip)}: the reading is not trusted yet">not trusted</span>`;
-  if (v.marker) return `<span class="vbadge marker" title="${esc(tip)}: only the chainers play it">marker</span>`;
-  if (v.necessary) return `<span class="vbadge need" title="${esc(tip)}: every chainer plays it, so a ship must draw it">necessary card</span>`;
-  return `<span class="vbadge" title="${esc(tip)}">neither necessary nor a marker</span>`;
-}
-
-
 // ---- the art (thorp/dash/art/generate_art.py: Eduardo Risso style, made with fal; public/art/<key>.png): one image per size
 // of ship and one per playing card. An image that isn't there removes itself, so a card without art draws no frame.
-const ART_CARDS = new Set(['previous_word', 'nevermore', 'mover', 'comparator', 'bridge']);
 const classSlug = name => (name || '').toLowerCase().replace(/^the\s+/, '').replace(/[^a-z0-9]+/g, '-');
-function flagImg(flag, name, cls = 'flag') {
-  if (!flag) return '';
-  const label = name || flag;
-  return `<img class="${cls}" src="flags/${encodeURIComponent(flag)}.svg" alt="${esc(label)}" title="${esc(label)}" loading="lazy">`;
-}
-function artImg(key, cls = 'cardart') {
-  return key ? `<img class="${cls}" src="art/${encodeURIComponent(key)}.png" alt="" loading="lazy" onerror="this.remove()">` : '';
-}
-const cardArt = key => ART_CARDS.has(key) ? artImg(key, 'cardart face') : '';
 
 
 // ---- the APPROACHING CHAINING board (leaderboard.payload table, group "approaching"): models whose chaining lift is still in
 // the noise, ranked by the cards every chainer holds (previous-word, Nevermore, mover, comparator) and then by following one
 // premise (the logic deck's one-hop lift). Their chaining lift is shown greyed: below +0.03 it is noise.
-const NEEDED = [['previous_word', 'Previous-word'], ['nevermore', 'Nevermore'], ['mover', 'Mover'], ['comparator', 'Comparator']];
 function drawLbApproach(rows, thr) {
   const tb = document.querySelector('#lbapproach tbody'); if (!tb) return;
   const icons = r => {
     const c = r.src.cards;
     if (!c) return `<span class="miniset"><span class="s">unreadable</span></span>`;
-    return `<span class="miniset">${NEEDED.map(([k, n]) => { const f = CARD_FACE[k] || {}; return `<span class="minicard${c[k] ? ' on' : ''}" title="${esc(n)}: ${c[k] ? 'lit' : 'not lit'}"><b>${f.rank || ''}</b><i>${f.suit || ''}</i></span>`; }).join('')}</span>`;
+    return minicards(c);
   };
   tb.innerHTML = rows.map(r => {
-    const name = r.kind === 'thorp' ? `<a href="#/leaderboard/thorp/${encodeURIComponent(r.ship.ship_key)}"><b>${esc(r.ship.name)}</b></a><div class="s">${r.ship.ship_key ? `<a href="#${shipHash(r.ship.ship_key)}">${esc(r.ship.ship || '')}</a>` : esc(r.ship.ship || '')}${r.ship.sailings ? ` · ${r.ship.sailings} sailing${r.ship.sailings === 1 ? '' : 's'}` : ''}</div>`
-      : `<a href="#/leaderboard/competitor/${encodeURIComponent(r.model)}"><b>${esc(r.name)}</b></a>${r.competitor ? ` <span class="${pillCls('blue')}">2–4B</span>` : ''}<div class="s">${makerLink(r.model || r.name)}</div>`;
+    const name = r.kind === 'thorp' ? `<a href="/leaderboard/thorp/${encodeURIComponent(r.ship.ship_key)}"><b>${esc(r.ship.name)}</b></a><div class="s">${r.ship.ship_key ? `<a href="${shipHash(r.ship.ship_key)}">${esc(r.ship.ship || '')}</a>` : esc(r.ship.ship || '')}${r.ship.sailings ? ` · ${r.ship.sailings} sailing${r.ship.sailings === 1 ? '' : 's'}` : ''}</div>`
+      : `<a href="/leaderboard/competitor/${encodeURIComponent(r.model)}"><b>${esc(r.name)}</b></a>${r.competitor ? ` <span class="${pillCls('blue')}">2–4B</span>` : ''}<div class="s">${makerLink(r.model || r.name)}</div>`;
     const held = r.src.cards_held;
     const rank = r.src.tied ? `<span title="tied within the noise: one-hop lifts within 0.05 of each other">=${r.src.rank}</span><div class="s tiehint">tied within the noise</div>` : r.src.rank;
     return `<tr class="lb-${r.kind}"><td>${rank}</td><td>${name}</td><td>${fmtParams(r.params)}</td>
@@ -4211,7 +3237,7 @@ async function drawCensus() {
       const baseSt = base && i >= 0 ? base.stages[i] : null;
       const main = `<tr class="cenrow${open ? ' open' : ''}" data-cen="${esc(c.key + '|' + r.variation)}"><td><b>${esc(r.variation)}</b>${r.variation === 'fitout' ? ` <span class="${pillCls('accent')}">the fitout</span>` : ''}</td><td>${statusPill(status)}</td>
         ${st ? cards.map(k => cardCell(st, k, i, true)).join('') + causeCell2(st, baseSt) : `<td class="cen q" colspan="${cards.length + 1}">${status === 'queued' ? 'queued' : 'no reading yet'}</td>`}</tr>`;
-      const detail = open ? r.stages.map((x, j) => `<tr class="censtage"><td class="s">↳ ${esc(STAGE_NAMES[j] || 'stage ' + (j + 1))}</td><td>${x.status === 'queued' ? esc(x.run) : `<a href="#${shipHash(x.run)}">${esc(x.run)}</a>`} ${statusPill(x.status)}</td>
+      const detail = open ? r.stages.map((x, j) => `<tr class="censtage"><td class="s">↳ ${esc(STAGE_NAMES[j] || 'stage ' + (j + 1))}</td><td>${x.status === 'queued' ? esc(x.run) : `<a href="${shipHash(x.run)}">${esc(x.run)}</a>`} ${statusPill(x.status)}</td>
         ${read(x) ? cards.map(k => cardCell(x, k, j, false)).join('') + causeCell2(x, base && base.stages[j]) : `<td class="cen q" colspan="${cards.length + 1}">${x.status === 'queued' ? 'queued' : 'no reading yet'}</td>`}</tr>`).join('') : '';
       return main + detail;
     }).join('');
@@ -4228,29 +3254,6 @@ async function drawCensus() {
 // post-training stages. A card per fitout: its aim and settings, then two lanes of stage blocks sized by tokens (a block's
 // shelf opens the shelf below), then its runs.
 // one fitout as a card: its aim and settings, its two lanes of stage blocks, its runs (Shelves and the size pages)
-function fitoutCard(f) {
-  const tackOf = t => t ? `${esc(t.kind || 'tack')}${t.alpha != null ? ` ×${t.alpha}` : ''}` : '';
-  const lane = (f, phase, label, note) => {
-    const st = (f.stages || []).filter(x => x.phase === phase).sort((a, b) => a.order - b.order);
-    if (!st.length) return '';
-    const total = st.reduce((a, x) => a + (x.tokens || 0), 0);
-    return `<div class="folane"><div class="folabel">${label} <span class="s">${big(total)} tokens · ${note}</span></div><div class="foblocks">${st.map((x, i) => `
-      <div class="foblock ${phase === 'post-training' ? 'post' : 'pre'}" style="flex-grow:${Math.max(1, x.tokens || 0)}" title="${esc(x.purpose || '')}">
-        <div class="fobn"><b>${x.order}. ${esc(x.name)}</b>${i ? '<span class="s"> ← seeded from the stage before</span>'.repeat(phase === 'post-training' ? 1 : 0) : ''}</div>
-        <a class="foshelf" data-shelf="${esc(x.shelf)}" href="#/library">${esc(x.shelf_name || x.shelf)}</a>
-        <div class="s">${x.books} books · ${big(x.tokens_per_pass)} × ${x.passes} = ${big(x.tokens)}</div>
-        ${phase === 'post-training' ? `<div class="s">${x.lr != null ? `lr ${x.lr}` : ''}${x.tack ? ` · tack ${tackOf(x.tack)}` : ''}</div>` : ''}
-        <div class="fop">${esc(x.purpose || '')}</div></div>`).join('')}</div></div>`;
-  };
-  return `<div class="fitout">
-    <div class="fohead"><span class="${pillCls('')}">${esc(f.preset || '')}</span> <b>${esc(f.name)}</b></div>
-    <p class="foaim">${esc(f.aim || '')}</p>
-    <div class="s">${[f.positions ? `positions ${esc(f.positions)}` : 'learned positions', f.vocab ? `vocabulary ${big(f.vocab)}` : '', f.tack ? `tack ${tackOf(f.tack)}` : '', f.tokens ? `${big(f.tokens)} tokens in all` : ''].filter(Boolean).join(' · ')}</div>
-    ${lane(f, 'pretraining', 'Pretraining', 'its stages in order, one voyage')}
-    ${lane(f, 'post-training', 'Post-training', 'each stage seeded from the one before')}
-    <div class="foruns"><span class="s">voyages</span> ${(f.runs || []).map(r => `<span class="forun">${r.status && r.status !== 'queued' ? `<a href="#${shipHash(r.run)}">${esc(r.run)}</a>` : esc(r.run)} ${statusPill(r.status || 'queued')}</span>`).join('') || '<span class="s">none yet</span>'}</div>
-  </div>`;
-}
 // ---- Browse the library (#/library; /api/library_browse): cards for kind, date, language, collection, voice, source, and
 // Ogden-ness, each a filter. Within a card the picks are "or", across cards "and"; every card's counts are those of the
 // books the OTHER filters leave, so a card shows what a click would give. Justin, 8 November: "the library ui should be
@@ -4261,8 +3264,7 @@ const BSIZE = new Set();  // the ship sizes picked on the branches grid: a branc
 const BF = { kind: new Set(), language: new Set(), collection: new Set(), voice: new Set(), source: new Set(), period: new Set(), start: '', end: '', ogden: '', sort: 'words', more: 200, show: false };
 const BDIMS = [['kind', 'Kind', 'what the book is: the first rule that matches (hover for the rule)'], ['period', 'Date', "the writer's year: published, else birth + 40, else death - 25 (hover a card)"], ['language', 'Language', 'the language of the text'],
   ['collection', 'Collection', 'the named shelves and decks (Renaissance, the Forgotten Tomes, the nursery...) a book belongs to; a book may be in several; a dim card has none of this view\'s books'], ['voice', 'Voice', 'who speaks: read from the credit, so the Church is undercounted'], ['source', 'Source', 'the collection the text was fetched from']];
-const bPeriod = y => y == null ? 'undated' : y < 1500 ? 'before 1500' : `${Math.floor(y / 50) * 50}–${Math.floor(y / 50) * 50 + 49}`;
-const bVals = (b, dim) => dim === 'kind' ? [b[5]] : dim === 'language' ? [b[3]] : dim === 'voice' ? [b[6]] : dim === 'source' ? [b[4]] : dim === 'period' ? [bPeriod(b[7])] : (b[11].length ? b[11].map(i => BR.collections[i].name) : []);
+const bVals = (b, dim) => dim === 'kind' ? [b[5]] : dim === 'language' ? [b[3]] : dim === 'voice' ? [b[6]] : dim === 'source' ? [b[4]] : dim === 'period' ? [periodOf(b[7])] : (b[11].length ? b[11].map(i => BR.collections[i].name) : []);
 function bPass(b, skip) {
   for (const dim of ['kind', 'language', 'voice', 'source', 'period', 'collection']) {
     if (dim === skip || !BF[dim].size) continue;
@@ -4396,31 +3398,6 @@ async function loadSelection(key) {
     el.querySelectorAll('a[data-book]').forEach(a => a.onclick = e => { e.preventDefault(); openBook(a.dataset.book); });
   } catch (e) { if (seq === selSeq) el.innerHTML = `<div class="${emptyCls()}">the selection could not be read: ${esc(e.message || e)}</div>`; }
 }
-function selCounts(title, note, m, order) {
-  const ks = Object.keys(m || {}); if (!ks.length) return '';
-  if (order) ks.sort(order);
-  const max = Math.max(...ks.map(k => m[k].share), 0.001);
-  return `<div class="selcount"><div class="k">${esc(title)} <span class="s">${esc(note)}</span></div>${ks.map(k => `<div class="selrow"><span class="selkey" title="${esc(k)}">${esc(k)}</span><span class="selbar"><i style="width:${(100 * m[k].share / max).toFixed(1)}%"></i></span><span class="selnum">${(100 * m[k].share).toFixed(1)}% <span class="s">${m[k].books} books · ${big(m[k].words)} words</span></span></div>`).join('')}</div>`;
-}
-function selDeclared(c) {
-  if (!c) return '<div class="s">its library is listed by hand: no weights or filters are declared, so the counts below are of the books as listed</div>';
-  const chip = (a, b) => `<span class="selchip"><span class="s">${esc(a)}</span> ${esc(b)}</span>`;
-  const inc = (n, v) => (v.include.length || v.exclude.length) ? chip(n, [v.include.length ? 'only ' + v.include.join(', ') : '', v.exclude.length ? 'not ' + v.exclude.join(', ') : ''].filter(Boolean).join('; ')) : '';
-  const p = c.period || {};
-  return [
-    chip('languages', Object.entries(c.languages || {}).map(([k, v]) => `${k} ${v}`).join(', ')),
-    c.as_of ? chip('library as of', c.as_of) : '',
-    c.ogden && c.ogden.min != null ? chip('Ogden-ness', `at least ${Math.round(100 * c.ogden.min)}%${c.ogden.scored_by ? ' (scored by ' + c.ogden.scored_by.join(', ') + ')' : ''}`) : '',
-    (p.start != null || p.end != null) ? chip('period', `${p.start ?? '…'} to ${p.end ?? '…'}; undated ${p.undated}d`) : chip('period', 'any (the gate: no name dead after 1955)'),
-    inc('kinds', c.kinds), inc('voices', c.voices), inc('sources', c.sources), inc('shelves', c.shelves),
-    ...Object.entries(c.weights || {}).map(([k, v]) => chip('weights by ' + k, Object.entries(v).map(([a, b]) => `${a} ${b}`).join(', '))),
-    c.dedupe ? chip('one copy a title', 'keep ' + (c.dedupe.keep || 'ogden')) : '',
-    ...(c.carry || []).map(l => chip('carries', l)),
-    ...(c.strike || []).map(x => chip('strikes', `${x.title || x.book} (${x.why || ''})`)),
-    ...(c.append || []).map(x => chip('appends', `${x.list} (${x.why || ''})`)),
-    c.words ? chip('budget', big(c.words) + ' words') : '',
-  ].filter(Boolean).join(' ');
-}
 function drawSelection(el, d) {
   const rules = d.rules || {};
   const out = d.stages.map(st => {
@@ -4460,11 +3437,6 @@ function drawSelection(el, d) {
 // ---- cause and effect (leaderboard table cause_gain: the logic deck's chaining gain on its cause items): a value and a small
 // bar with the 0.1 mark dotted. Eight items: a strong reading counts, a small one is noise.
 const CAUSE_NOTE = "the logic deck's chaining gain on its cause-and-effect items (when X, then Y; Y makes Z): eight items, so a strong reading counts and a small one is noise; the mark, 0.1, dotted";
-function causeCell(v) {
-  if (v == null || !isFinite(v)) return '<span class="s">not read</span>';
-  const pos = Math.max(-0.2, Math.min(1, v)), w = 100 * (pos + 0.2) / 1.2, mark = 100 * (0.1 + 0.2) / 1.2, zero = 100 * 0.2 / 1.2;
-  return `<span class="cause${v >= 0.1 ? ' lit' : ''}" title="${esc(CAUSE_NOTE)}"><b>${signed(v)}</b><span class="cbar"><i style="left:${Math.min(w, zero)}%;width:${Math.abs(w - zero)}%"></i><u style="left:${mark}%"></u></span></span>`;
-}
 
 
 // ---- a class's Fitouts tab (#/classes/<class>/fitouts; /api/fitouts?preset=): the fitout cards for this size, then each
@@ -4483,7 +3455,7 @@ async function classFitouts(r) {
     const prog = `<div class="k mt">The cards each stage drew <span class="s">the four necessary cards' latest readings, voyage by voyage</span></div>
       <div class="scroll"><table class="decktable" data-nosort><thead><tr><th>stage</th><th>voyage</th><th></th>${NEEDED.map(([k, n]) => { const fc = CARD_FACE[k] || {}; return `<th>${fc.rank || ''}${fc.suit || ''} ${esc(n)}</th>`; }).join('')}</tr></thead><tbody>${runs.map(x => {
         const c = rc[x.run];
-        return `<tr><td>${esc(stageOf(x.run)[0])}</td><td>${c ? `<a href="#${shipHash(x.run)}">${esc(x.run)}</a>` : esc(x.run)}</td><td>${statusPill(x.status || 'queued')}</td>${NEEDED.map(([k]) => {
+        return `<tr><td>${esc(stageOf(x.run)[0])}</td><td>${c ? `<a href="${shipHash(x.run)}">${esc(x.run)}</a>` : esc(x.run)}</td><td>${statusPill(x.status || 'queued')}</td>${NEEDED.map(([k]) => {
           const v = c && c[k]; if (!v) return `<td class="s">${c ? 'no reading' : 'not sailed'}</td>`;
           const best = Math.max(v.one ?? -Infinity, v.shared ?? -Infinity), fc = CARD_FACE[k] || {};
           return `<td title="one head ${v.one != null ? v.one.toFixed(3) : '–'}${v.shared != null ? `, shared ${v.shared.toFixed(3)}` : ''}; the mark ${v.threshold}"><span class="minicard${v.lit ? ' on' : ''}"><b>${fc.rank || ''}</b><i>${fc.suit || ''}</i></span> ${isFinite(best) ? fmt(best) : '–'}</td>`;
@@ -4491,7 +3463,7 @@ async function classFitouts(r) {
       }).join('')}</tbody></table></div>`;
     return fitoutCard(f) + prog;
   }).join('');
-  el.querySelectorAll('a.foshelf').forEach(a => a.onclick = e => { e.preventDefault(); shelfOpen = a.dataset.shelf; location.hash = '#/library'; });
+  el.querySelectorAll('a.foshelf').forEach(a => a.onclick = e => { e.preventDefault(); shelfOpen = a.dataset.shelf; location.href = '/library'; });
 }
 
 
@@ -4506,7 +3478,7 @@ async function classScoreLive(r) {
   if (currentRung !== r.preset && (rungFor(currentRung) || {}).preset !== r.preset) return;
   document.getElementById('scorenowhead').innerHTML = d.version ? `now <span class="s">${esc(d.version)}</span>` : 'now';
   const cell = name => { const tr = [...tb.rows].find(x => (x.cells[0].innerText || '').trim().toLowerCase() === name); return tr && tr.cells[4]; };
-  const minis = c => `<span class="miniset">${NEEDED.map(([k, n]) => { const f = CARD_FACE[k] || {}; return `<span class="minicard${c && c[k] ? ' on' : ''}" title="${esc(n)}: ${c && c[k] ? 'lit' : 'not lit'}"><b>${f.rank || ''}</b><i>${f.suit || ''}</i></span>`; }).join('')}</span>`;
+  const minis = c => minicards(c || {});
   const census = d.census ? (d.census.written ? (d.census.held != null ? `<div class="s">best cards held in the census: ${d.census.held} of 4, by ${esc(d.census.variation)}</div>` : '<div class="s">the census has no readings yet</div>') : '<div class="s">the census around its fitout has not landed yet</div>') : '';
   const c1 = cell('cards held');
   if (c1) c1.innerHTML = d.version ? `${minis(d.cards)} <b>${d.held} of 4</b>${census}` : `<span class="s">no version yet</span>${census}`;
@@ -4514,7 +3486,7 @@ async function classScoreLive(r) {
   if (c2) c2.innerHTML = d.version ? causeCell(d.cause) : '<span class="s">no version yet</span>';
   const c3 = cell('chaining two facts');
   if (c3) c3.innerHTML = d.version ? `<span class="${d.chaining != null && d.chaining > 0.03 ? 'good' : 's'}" title="the mean lift on the four chaining tests; above 0.03 it leaves the noise">${d.chaining != null ? signed(d.chaining) : '–'}</span>${d.chaining != null && d.chaining <= 0.03 ? ' <span class="s">in the noise</span>' : ''}` : '<span class="s">no version yet</span>';
-  if (d.ship_key && c1) c1.insertAdjacentHTML('beforeend', `<div class="s"><a href="#/leaderboard/thorp/${encodeURIComponent(d.ship_key)}">${esc(d.version)}'s hand →</a></div>`);
+  if (d.ship_key && c1) c1.insertAdjacentHTML('beforeend', `<div class="s"><a href="/leaderboard/thorp/${encodeURIComponent(d.ship_key)}">${esc(d.version)}'s hand →</a></div>`);
 }
 
 
@@ -4522,53 +3494,6 @@ async function classScoreLive(r) {
 // chains, each card's 8 strongest heads silenced and the logic deck read again, beside three random draws of 8 heads. A bar
 // per card (the gain lost when silenced: cause, or order for the comparator), the random draws' bars, the rule line (a drop
 // of 0.1 and more than twice the largest random drop) and a verdict per card: NECESSARY or not shown.
-const KO_CARDS = [['previous_word', 'Previous-word'], ['nevermore', 'Nevermore'], ['mover', 'Mover'], ['comparator', 'Comparator']];
-function knockoutBlock(k, id) {
-  const base = k.baseline || {}, v = k.verdict || {}, controls = k.controls || [];
-  const drop = (cond, measure) => cond && base[measure] != null && cond[measure] != null ? base[measure] - cond[measure] : null;
-  const ctrlCause = controls.map(c => drop(c, 'cause_gain'));
-  const largest = Math.max(0, ...ctrlCause.filter(x => x != null));
-  const line = Math.max(0.1, 2 * largest);
-  const badges = KO_CARDS.map(([key, name]) => {
-    const x = v[key], f = CARD_FACE[key] || {};
-    if (!x) return `<span class="kobadge"><b>${f.rank || ''}${f.suit || ''}</b> ${esc(name)} <i>not knocked out</i></span>`;
-    return `<span class="kobadge ${x.necessary ? 'need' : ''}" title="${esc(x.measure || 'cause_gain')} dropped ${x.drop != null ? x.drop.toFixed(3) : '–'}; the largest random drop ${x.largest_random_drop != null ? x.largest_random_drop.toFixed(3) : '–'}; chaining lift dropped ${x.chaining_lift_drop != null ? x.chaining_lift_drop.toFixed(3) : '–'}"><b>${f.rank || ''}${f.suit || ''}</b> ${esc(name)} <i>${x.necessary ? 'NECESSARY' : 'not shown'}</i></span>`;
-  }).join('');
-  const rows = KO_CARDS.filter(([key]) => v[key] || k[key]).map(([key, name]) => {
-    const x = v[key] || {}, heads = (k.card_heads || {})[key] || [];
-    return `<tr><td><b>${esc(name)}</b></td><td class="s">${esc((x.measure || (key === 'comparator' ? 'order_gain' : 'cause_gain')).replace('_', ' '))}</td>
-      <td>${x.drop != null ? signed(x.drop) : '–'}</td><td>${x.largest_random_drop != null ? signed(x.largest_random_drop) : '–'}</td><td>${x.chaining_lift_drop != null ? signed(x.chaining_lift_drop) : '–'}</td>
-      <td>${x.necessary ? `<span class="${pillCls('good')}">necessary</span>` : `<span class="${pillCls('')}">not shown</span>`}</td>
-      <td class="mono kohd">${heads.map(h => `${h[0]}:${h[1]}`).join(' ')}</td></tr>`;
-  }).join('');
-  return `<div class="kobadges">${badges}</div>
-    <div class="row koro"><div class="chart" id="${id}"></div>
-    <div class="scroll"><table class="kotable" data-nosort><thead><tr><th>card</th><th>measure</th><th>lost</th><th>largest random</th><th>chaining lift lost</th><th>verdict</th><th>its ${k.k || 8} heads <span class="s">layer:head</span></th></tr></thead><tbody>${rows}</tbody></table>
-    <p class="s">baseline: cause gain ${base.cause_gain != null ? signed(base.cause_gain) : '–'} · order gain ${base.order_gain != null ? signed(base.order_gain) : '–'} · logic gain ${base.logic_gain != null ? signed(base.logic_gain) : '–'} · chaining lift ${base.chaining_lift != null ? signed(base.chaining_lift) : '–'}${k.layers ? ` · ${k.layers} layers × ${k.heads} heads` : ''}</p></div></div>`;
-}
-function knockoutChart(k, id) {
-  // grouped per card: the card's own drop and the three random draws' drops, all on that card's own measure (the comparator,
-  // order gain; the rest, cause gain), with the card's rule line at max(0.1, 2 × its largest random drop)
-  const base = k.baseline || {}, v = k.verdict || {}, controls = k.controls || [];
-  const cards = KO_CARDS.filter(([key]) => v[key]);
-  const measureOf = key => v[key].measure || (key === 'comparator' ? 'order_gain' : 'cause_gain');
-  const lost = (cond, m) => cond && base[m] != null && cond[m] != null ? base[m] - cond[m] : null;
-  const names = cards.map(([, n]) => n);
-  const traces = [{ type: 'bar', name: 'its 8 heads silenced', x: names, y: cards.map(([key]) => v[key].drop),
-    marker: { color: cards.map(([key]) => v[key].necessary ? tok('good') : tok('blue')) },
-    text: cards.map(([key, n]) => `${n}: ${measureOf(key).replace('_', ' ')} lost ${v[key].drop != null ? v[key].drop.toFixed(3) : '–'}`), textposition: 'none', hovertemplate: '%{text}<extra></extra>' }];
-  controls.forEach((c, i) => traces.push({ type: 'bar', name: `random ${i + 1}`, x: names, y: cards.map(([key]) => lost(c, measureOf(key))), marker: { color: tok('muted'), opacity: 0.5 + 0.15 * i },
-    text: cards.map(([key]) => `random draw ${i + 1}: ${measureOf(key).replace('_', ' ')} lost ${lost(c, measureOf(key)) != null ? lost(c, measureOf(key)).toFixed(3) : '–'}`), textposition: 'none', hovertemplate: '%{text}<extra></extra>', showlegend: i === 0, legendgroup: 'random' }));
-  const shapes = [], notes = [];
-  cards.forEach(([key], i) => {
-    const largest = v[key].largest_random_drop ?? Math.max(0, ...controls.map(c => lost(c, measureOf(key)) ?? 0));
-    const line = Math.max(0.1, 2 * largest);
-    shapes.push({ type: 'line', xref: 'x', yref: 'y', x0: i - 0.45, x1: i + 0.45, y0: line, y1: line, line: { color: tok('accent'), dash: 'dot', width: 1.6 } });
-    notes.push({ xref: 'x', yref: 'y', x: i, y: line, yanchor: 'bottom', showarrow: false, text: `${line.toFixed(2)}${measureOf(key) === 'order_gain' ? ' (order)' : ''}`, font: { size: 9, color: tok('accent') } });
-  });
-  plot(id, traces, layout({ barmode: 'group', height: 300, margin: { l: 50, r: 10, t: 10, b: 40 }, yaxis: { title: { text: 'gain lost when silenced' } },
-    legend: { orientation: 'h', y: -0.18 }, shapes, annotations: notes }));
-}
 let koKey = null;
 async function drawKnockouts() {
   const el = document.getElementById('knockouts'); if (!el) return;
@@ -4576,7 +3501,7 @@ async function drawKnockouts() {
   const key = JSON.stringify(d); if (key === koKey) return; koKey = key;
   const rs = d.results || [];
   if (!rs.length) { el.innerHTML = '<div class="${emptyCls()}">no knockout has finished yet: the first, Qwen3 4B, takes about an hour</div>'; return; }
-  el.innerHTML = rs.map((k, i) => `<div class="komodel"><h3><a href="#/leaderboard/competitor/${encodeURIComponent(k.model)}">${esc(k.label || k.model)}</a></h3>${knockoutBlock(k, 'kochart' + i)}</div>`).join('');
+  el.innerHTML = rs.map((k, i) => `<div class="komodel"><h3><a href="/leaderboard/competitor/${encodeURIComponent(k.model)}">${esc(k.label || k.model)}</a></h3>${knockoutBlock(k, 'kochart' + i)}</div>`).join('');
   rs.forEach((k, i) => knockoutChart(k, 'kochart' + i));
 }
 async function competitorKnockout(model) {
@@ -4608,22 +3533,10 @@ async function initBuilder(shelves) {
   drawPalette(); drawLibrary();
   if (!fbInit) {
     fbInit = true; drawBuilder(); wireLanes(); fbDraftOffer();
-    document.getElementById('fbform').addEventListener('submit', e => { e.preventDefault(); fbSave(); });
+    document.getElementById('fbform')?.addEventListener('submit', e => { e.preventDefault(); fbSave(); });
     // a field put right loses its mark as it is typed in
-    document.getElementById('fbform').addEventListener('input', e => { const t = e.target.closest('[aria-invalid="true"]'); if (t) clearErrors(t.parentElement || t); });
+    document.getElementById('fbform')?.addEventListener('input', e => { const t = e.target.closest('[aria-invalid="true"]'); if (t) clearErrors(t.parentElement || t); });
   }
-}
-function triScatter(path) {
-  const t = fbTri.get(path);
-  if (!t || !t.books || !t.books.length) return `<span class="s">${t && t.computing ? 'measuring…' : t ? 'unmeasured' : ''}</span>`;
-  const W = 120, H = 64, xs = t.books.map(b => b.variety), ys = t.books.map(b => b.repeat_rate);
-  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = 0, y1 = Math.max(...ys, 0.01);
-  const front = new Set(t.frontier || []);
-  const px = v => 4 + (W - 8) * (x1 > x0 ? (v - x0) / (x1 - x0) : 0.5), py = v => H - 4 - (H - 8) * (v - y0) / (y1 - y0);
-  return `<svg class="triscatter" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="variety against repetition">
-    <line x1="4" y1="${H - 4}" x2="${W - 4}" y2="${H - 4}" class="tsaxis"/><line x1="4" y1="4" x2="4" y2="${H - 4}" class="tsaxis"/>
-    ${t.books.map(b => `<circle cx="${px(b.variety).toFixed(1)}" cy="${py(b.repeat_rate).toFixed(1)}" r="${front.has(b.id) ? 2.8 : 1.6}" class="${front.has(b.id) ? 'tsf' : 'tsb'}"><title>${esc(b.id)}: repetition ${(100 * b.repeat_rate).toFixed(1)}%, variety ${(100 * b.variety).toFixed(0)}%${front.has(b.id) ? ' (frontier)' : ''}</title></circle>`).join('')}
-  </svg>`;
 }
 function drawPalette() {
   const el = document.getElementById('fbpalette'); if (!el) return;
@@ -4636,7 +3549,7 @@ function drawPalette() {
       <div class="fbtn"><b>${esc(x.name)}</b>${isStore(x) ? ` <span class="${pillCls('good')}">the ship's stores</span>` : x.kind !== 'training' ? ` <span class="${pillCls('')}">${esc(x.kind)}</span>` : ''}</div>
       <div class="s">${x.books} books · ${big(x.tokens_est)} tokens</div>
       <div class="s">${t && t.measured ? `repetition <b>${(100 * t.repeat_rate).toFixed(1)}%</b> · variety ${(100 * t.variety).toFixed(0)}%` : 'trigrams not measured'}</div>
-      <div class="fbsc" data-sc="${esc(x.path)}">${t && t.measured ? triScatter(x.path) : ''}</div></div>`;
+      <div class="fbsc" data-sc="${esc(x.path)}">${t && t.measured ? triScatter(fbTri.get(x.path)) : ''}</div></div>`;
   }).join('') || '<div class="${emptyCls()}">no training libraries</div>';
   el.querySelectorAll('.fbtile').forEach(tile => {
     tile.addEventListener('dragstart', e => { fbDrag = { shelf: tile.dataset.shelf }; e.dataTransfer.setData('text/plain', tile.dataset.shelf); e.dataTransfer.effectAllowed = 'copy'; });
@@ -4646,7 +3559,7 @@ function drawPalette() {
     fbTri.set(x.path, { computing: true });
     get('/api/library_trigrams?path=' + encodeURIComponent(x.path)).then(t => {
       fbTri.set(x.path, t.computing ? null : t);
-      const c = document.querySelector(`#fbpalette [data-sc="${CSS.escape(x.path)}"]`); if (c) c.innerHTML = triScatter(x.path);
+      const c = document.querySelector(`#fbpalette [data-sc="${CSS.escape(x.path)}"]`); if (c) c.innerHTML = triScatter(fbTri.get(x.path));
     }).catch(() => fbTri.delete(x.path));
   }
 }
@@ -4668,8 +3581,8 @@ function fbDraftOffer() {
   const when = new Date(d.at), n = (d.f.stages || []).length;
   fbMsg(`<span>An unsaved fitout from ${when.toTimeString().slice(0, 5)}: <b>${esc(d.f.name || 'unnamed')}</b>, ${n} stage${n === 1 ? '' : 's'}.</span>
     <button type="button" class="${btnCls()}" id="fbdraftyes">Restore it</button> <button type="button" class="${btnCls('ghost')}" id="fbdraftno">Discard</button>`, 'draft');
-  document.getElementById('fbdraftyes').onclick = () => { fbLoad(d.f, null); fb.key = d.key || null; fb.dirty = true; drawActions(); fbMsg('restored the unsaved fitout: save it to keep it'); };
-  document.getElementById('fbdraftno').onclick = () => { fbDraftClear(); fbMsg(''); };
+  document.getElementById('fbdraftyes')?.addEventListener('click', () => { fbLoad(d.f, null); fb.key = d.key || null; fb.dirty = true; drawActions(); fbMsg('restored the unsaved fitout: save it to keep it'); });
+  document.getElementById('fbdraftno')?.addEventListener('click', () => { fbDraftClear(); fbMsg(''); });
 }
 window.addEventListener('beforeunload', e => { if (fb.dirty && fb.stages.length) { e.preventDefault(); e.returnValue = ''; } });
 function drawSettings() {
@@ -4909,13 +3822,13 @@ async function loadGovernance() {
     <p class="s">A policy is switched on (enforced at the gate, S3) or left advisory by Justin, in s5.policy_switches (<code>thorp s5 switch</code>); not from here.</p>`;
   // S4 intelligence
   const s4a = A.S4 || {};
-  const s4 = `<div class="govstats"><a href="#/leaderboard" class="govstat"><b>${(s4a.competitors || []).length}</b><span>2–4B competitors</span></a><a href="#/leaderboard" class="govstat"><b>${(s4a.reference_ladder || []).length}</b><span>models on the reference ladder</span></a></div>
-    <div class="s">${(s4a.competitors || []).map(m => `<a href="#/leaderboard/competitor/${encodeURIComponent(m)}">${esc(_shortModel(m))}</a>`).join(' · ')}</div>`;
+  const s4 = `<div class="govstats"><a href="/leaderboard" class="govstat"><b>${(s4a.competitors || []).length}</b><span>2–4B competitors</span></a><a href="/leaderboard" class="govstat"><b>${(s4a.reference_ladder || []).length}</b><span>models on the reference ladder</span></a></div>
+    <div class="s">${(s4a.competitors || []).map(m => `<a href="/leaderboard/competitor/${encodeURIComponent(m)}">${esc(shortModel(m))}</a>`).join(' · ')}</div>`;
   // S3 control: each policy's breaking runs, the stores policy first and large
   const order = Object.keys(pol).sort((a, b) => (b === 'stores') - (a === 'stores') || (pol[b].queued_runs_breaking_it || 0) - (pol[a].queued_runs_breaking_it || 0));
   const s3 = `<div class="govstats">${order.map(k => { const p = pol[k], n = p.queued_runs_breaking_it || 0, x = p.queued_runs_excepted || 0; return `<div class="govstat${k === 'stores' ? ' big' : ''}${n ? ' warn' : ' ok'}"><b>${n}</b><span>queued voyage${n === 1 ? '' : 's'} breaking <b>${esc(k)}</b> ${enforcedBadge(p.enforced)}${x ? `<br><b class="govexc">${x}</b> excepted${p.exception ? `: ${esc(p.exception)}` : ''}` : ''}</span></div>`; }).join('')}
       <div class="govstat"><b>${(A.S3 || {}).runs_not_finished ?? '–'}</b><span>voyages started and not finished</span></div></div>
-    <p class="s"><a href="#/governance/control">S3 control →</a> the gate's latest decisions, the bargains and exceptions in force, the intake gate for books, and the audit (S3*)</p>
+    <p class="s"><a href="/governance/control">S3 control →</a> the gate's latest decisions, the bargains and exceptions in force, the intake gate for books, and the audit (S3*)</p>
     ${pol.stores && !pol.stores.enforced && pol.stores.queued_runs_breaking_it ? `<div class="${alertCls('open')}">The stores policy: ${pol.stores.queued_runs_breaking_it} of ${(A.S1 || {}).queued ?? '–'} queued voyages read outside the ship's stores. Whether to enforce it is the decision pending with Justin.</div>` : ''}
     ${order.filter(k => (breaking[k] || []).length).map(k => { const open = govOpen.has(k), lines = breaking[k];
       return `<div class="govbreak"><button class="${btnCls('ghost')}" data-gov="${esc(k)}">${open ? '▾' : '▸'} the voyages breaking ${esc(k)} (${pol[k].queued_runs_breaking_it}${lines.length < pol[k].queued_runs_breaking_it ? `, the first ${lines.length} shown` : ''})</button>${open ? `<div class="govlines">${lines.map(l => `<span class="mono">${esc(l)}</span>`).join('')}</div>` : ''}</div>`; }).join('')}`;
@@ -4928,8 +3841,8 @@ async function loadGovernance() {
   const present = STATES.filter(st => Object.values(vs).includes(st));
   const acq = (A.S1 || {}).acquisition || {}, last = acq.last_intake;
   const s1 = `<div class="govstats"><div class="govstat"><b>${(A.S1 || {}).queued ?? '–'}</b><span>voyages queued</span></div>${present.map(st => `<div class="govstat${st === 'awaiting orders' ? ' warn' : ''}"><b>${Object.values(vs).filter(x => x === st).length}</b><span>expeditions ${esc(st)}</span></div>`).join('')}</div>
-    <div class="govvoy">${Object.entries(vs).sort((a, b) => rank(a[1]) - rank(b[1])).map(([k, st]) => `<a href="#/expeditions/${esc(k)}">${esc(VOYAGE_NAME[k] || k)}</a> ${statePill(st)}`).join('<span class="govsep"></span>')}</div>
-    <div class="govacqline"><a href="#/governance/acquisition"><b>Acquisition →</b></a> <span class="s">the books the voyages read, a viable system of its own: ${acq.books != null ? `${acq.books.toLocaleString()} books in the library, about ${big(acq.tokens_est)} tokens` : 'not read yet'}${acq.taking_in ? ` · <b>taking books in now</b> (${esc(acq.taking_in.id || '')})` : ''} · ${last ? `last intake ${esc(String(last.started || '').replace('T', ' ').slice(5, 16))} from ${esc(last.list || '')}` : 'no intake yet'}</span></div>`;
+    <div class="govvoy">${Object.entries(vs).sort((a, b) => rank(a[1]) - rank(b[1])).map(([k, st]) => `<a href="/expeditions/${esc(k)}">${esc(VOYAGE_NAME[k] || k)}</a> ${statePill(st)}`).join('<span class="govsep"></span>')}</div>
+    <div class="govacqline"><a href="/governance/acquisition"><b>Acquisition →</b></a> <span class="s">the books the voyages read, a viable system of its own: ${acq.books != null ? `${acq.books.toLocaleString()} books in the library, about ${big(acq.tokens_est)} tokens` : 'not read yet'}${acq.taking_in ? ` · <b>taking books in now</b> (${esc(acq.taking_in.id || '')})` : ''} · ${last ? `last intake ${esc(String(last.started || '').replace('T', ' ').slice(5, 16))} from ${esc(last.list || '')}` : 'no intake yet'}</span></div>`;
   el.innerHTML = band('S5', s5) + band('S4', s4) + band('S3', s3) + band('S2', s2) + band('S1', s1);
   el.querySelectorAll('[data-gov]').forEach(b => b.onclick = () => { const k = b.dataset.gov; govOpen.has(k) ? govOpen.delete(k) : govOpen.add(k); govKey = null; loadGovernance(); });
   if (!Object.keys(VOYAGE_NAME).length) get('/api/expeditions').then(v => { v.forEach(x => { VOYAGE_NAME[x.key] = x.name; }); govKey = null; loadGovernance(); }).catch(() => {});
@@ -5000,7 +3913,7 @@ async function loadControl() {
   const refusedBy = (q.S3 || {}).refused_by_rule || {}, observedBy = (q.S3 || {}).observed_breaking || {}, libRules = ((au || {}).audit || {}).rules || {};
   const intake = `<section class="${cardCls(false, 'panel')}"><h2>The intake gate <span class="note">acquisition's S3: the rules a book passes before it enters the library. A rule that serves one of Thorp's S5 policies refuses at an intake; a proposed rule is recorded only, until Justin adopts it. Refused: by intakes; observed: books that came in by thorp fetch or a voyage's preparation, logged with the verdict the gate would have given; in the library: the audit, every registered book</span> ${(q.S3 || {}).enforced ? `<span class="${pillCls('good')}">enforced at intakes</span>` : `<span class="${pillCls('accent')}">switched off (data/policies.json)</span>`}</h2>
     <div class="scroll"><table data-nosort><thead><tr><th>rule</th><th>statement</th><th></th><th>checked</th><th>refused</th><th>observed</th><th>in the library</th></tr></thead><tbody>${(q.S5 || []).map(r => `<tr><td><b>${esc(r.key)}</b></td><td>${esc(r.statement)}</td><td>${r.adopted ? `<span class="${pillCls('good')}">serves ${esc(r.serves)}</span>` : `<span class="${pillCls('accent')}">proposed</span>`}</td><td class="s">${esc(r.when)}</td><td>${refusedBy[r.key] || 0}</td><td>${observedBy[r.key] || 0}</td><td class="${(libRules[r.key] || {}).breaking && r.adopted ? 'warn' : ''}">${libRules[r.key] ? libRules[r.key].breaking : '–'}</td></tr>`).join('')}</tbody></table></div>
-    <p class="s"><a href="#/governance/acquisition">Acquisition →</a> its intakes, the log of every book's verdict, the sources and the legal ceiling</p></section>`;
+    <p class="s"><a href="/governance/acquisition">Acquisition →</a> its intakes, the log of every book's verdict, the sources and the legal ceiling</p></section>`;
   // the audit, S3*
   const audit = `<section class="${cardCls(false, 'panel')}"><h2>The audit (S3*) <span class="note">sporadic and independent of both gates: it reads the books, not the specs. The cleaning audit reads a few books of each store; the library audit reads every registered book against the intake rules</span></h2>
     <h3 class="govsub">Cleaning</h3>${cleaningTable((A['S3*'] || {}).cleaning)}
@@ -5036,7 +3949,7 @@ async function loadAcquisition() {
   const s3a = q.S3 || {}, verdicts = s3a.verdicts || {}, refusedBy = s3a.refused_by_rule || {};
   const s3 = `<div class="govstats">${s3a.enforced ? `<div class="govstat ok"><b>on</b><span>the intake gate refuses on adopted rules</span></div>` : `<div class="govstat warn"><b>off</b><span>the intake gate only records (data/policies.json "intake")</span></div>`}${['admitted', 'refused', 'known', 'observed', 'failed', 'unresolved', 'would fetch'].filter(v => verdicts[v]).map(v => `<div class="govstat${v === 'refused' || v === 'failed' ? ' warn' : ''}"><b>${verdicts[v].toLocaleString()}</b><span>${esc(v)}</span></div>`).join('') || `<div class="govstat"><b>0</b><span>verdicts logged</span></div>`}</div>
     ${Object.keys(refusedBy).length ? `<p class="s">Refused at intakes, by rule: ${Object.entries(refusedBy).map(([k, n]) => `<b>${esc(k)}</b> ${n}`).join(' · ')}</p>` : ''}
-    <p class="s"><a href="#/governance/control">S3 control →</a> the intake gate beside the voyage gate</p>
+    <p class="s"><a href="/governance/control">S3 control →</a> the intake gate beside the voyage gate</p>
     <h3 class="govsub">The audit (S3*)</h3>${libraryAudit(au, true)}`;
   // S2: the intake lock, the helm, politeness, the caches
   const s2a = q.S2 || {}, inn = s2a.intake, h = s2a.helm;
@@ -5097,7 +4010,7 @@ async function loadQueue() {
   const tb = document.querySelector('#queuetable tbody'); if (!tb) return;
   let d; try { d = await get('/api/queue'); } catch (e) { return; }
   const key = JSON.stringify(d); if (key === queueKey) return; queueKey = key;
-  const exp = r => r.expedition ? `<a href="#/expeditions/${esc(r.expedition)}">${esc(r.expedition_name || VOYAGE_NAME[r.expedition] || r.expedition)}</a>` : '<span class="s">–</span>';
+  const exp = r => r.expedition ? `<a href="/expeditions/${esc(r.expedition)}">${esc(r.expedition_name || VOYAGE_NAME[r.expedition] || r.expedition)}</a>` : '<span class="s">–</span>';
   // the fitout a voyage was compiled from (/api/queue `fitout`): its name, the census variation if one, and the stage
   const fit = r => !r.fitout || !r.fitout.key ? `<span class="${pillCls('bad')}" title="S5 policy 'fitout': its spec names no fitout, so the S3 gate will refuse it">no fitout</span>`
     : r.fitout.named === false ? `<span class="${pillCls('bad')}" title="S5 policy 'fitout': no such fitout, so the S3 gate will refuse it">${esc(r.fitout.key)}?</span>`
@@ -5110,7 +4023,7 @@ async function loadQueue() {
       <td>${r.status === 'at sea' ? `<span class="${pillCls('running')}">at sea</span> ` : ''}${(() => {  // a ship opens its training page
         const rung = ladderData && (ladderData.rungs || []).find(x => x.preset === r.preset);
         const label = `<span class="mono">${esc(r.preset || r.name)}</span>`;
-        return rung ? `<a href="#${modelHash(rung, 'training')}" title="open ${esc(slugOf(rung))}'s training page">${label}</a>` : label;
+        return rung ? `<a href="${modelHash(rung, 'training')}" title="open ${esc(slugOf(rung))}'s training page">${label}</a>` : label;
       })()}${r.missing ? ` <span class="${pillCls('bad')}">no spec</span>` : ''}</td>
       <td>${r.sop ? `<span class="${pillCls('accent')}">v${esc(r.sop)}</span>` : '<span class="s">–</span>'}</td>
       <td class="s">${r.status === 'at sea' ? 'sailing' : sailsIn(r.starts_in_min, r.at_least)}</td></tr>`).join('')
@@ -5130,9 +4043,9 @@ function planWhat(p) {
     // expedition is Ogden's: one expedition sails both v0.1 and v0.2), size and seed, then its goal in full type
     const title = String(p.ship || p.name).replace(/^Fitout: /, '');
     const ex = p.expedition === 'ogden' && p.material && p.material.fitout ? esc(p.material.fitout)
-      : p.expedition ? `<a href="#/expeditions/${esc(p.expedition)}">${esc(p.expedition_name || p.expedition)}</a>` : '';
+      : p.expedition ? `<a href="/expeditions/${esc(p.expedition)}">${esc(p.expedition_name || p.expedition)}</a>` : '';
     const prog = p.at_sea && p.step != null && p.training && p.training.steps ? ` · step ${p.step.toLocaleString()} of ${p.training.steps.toLocaleString()} (${Math.round(100 * p.step / p.training.steps)}%)` : '';
-    return `<div class="plantitle"><a href="#${shipHash(p.name)}">${esc(title)}</a>${p.missing ? ` <span class="${pillCls('bad')}">no spec</span>` : ''}</div>
+    return `<div class="plantitle"><a href="${shipHash(p.name)}">${esc(title)}</a>${p.missing ? ` <span class="${pillCls('bad')}">no spec</span>` : ''}</div>
       <div class="s">${ex}${ex ? ' · ' : ''}${esc(p.preset || '')}${p.seed != null ? ` · seed ${p.seed}` : ''} · <span class="mono">${esc(p.name)}</span>${prog}</div>
       ${p.goal ? `<div class="plangoal" title="${esc(p.goal)}">${esc(p.goal)}</div>` : ''}
       <details class="plandet"><summary>training plan and material</summary><div class="plandetgrid"><div><div class="s"><b>training plan</b></div>${planTraining(p)}</div><div><div class="s"><b>training material</b></div>${planMaterial(p)}</div></div></details>`;
@@ -5161,9 +4074,9 @@ function planMaterial(p) {  // what the voyage reads: its fitout, each stage's l
 }
 function laneCard(lane, d) {
   const L = d.lanes[lane], sea = L.at_sea;
-  const now = sea ? `<div class="ovsea"><span class="${pillCls('running')}">at sea</span> ${sea.kind === 'spec' ? `<a href="#${shipHash(sea.name)}" class="mono">${esc(sea.name)}</a>` : `<span class="mono" title="${esc(sea.text)}">${esc(sea.name)}</span>`}
+  const now = sea ? `<div class="ovsea"><span class="${pillCls('running')}">at sea</span> ${sea.kind === 'spec' ? `<a href="${shipHash(sea.name)}" class="mono">${esc(sea.name)}</a>` : `<span class="mono" title="${esc(sea.text)}">${esc(sea.name)}</span>`}
       <div class="s">since ${esc(String(sea.since || '').slice(11, 16))}${sea.left_min != null ? ` · about ${mins(sea.left_min)} left` : sea.elapsed_min != null ? ` · ${mins(sea.elapsed_min)} so far, no time of its own yet` : ''}</div></div>` : '';
-  const ships = (L.ships || []).map(s => `<div class="ovsea"><span class="${pillCls('running')}">at sea</span> <a href="#${shipHash(s.name)}" class="mono">${esc(s.name)}</a>
+  const ships = (L.ships || []).map(s => `<div class="ovsea"><span class="${pillCls('running')}">at sea</span> <a href="${shipHash(s.name)}" class="mono">${esc(s.name)}</a>
       <div class="s">${esc(s.gpu)} at $${Number(s.dph).toFixed(3)}/h · since ${esc(String(s.since).slice(11, 16))} · $${Number(s.cost).toFixed(2)} so far of a $${Number(s.quote || 0).toFixed(2)} quote · about ${mins(s.left_min)} left${s.by_queue ? '' : ' · <i>sailed by hand, outside the queue</i>'}</div></div>`).join('');
   const idle = !sea && !ships ? `<div class="s">in port${L.queued ? '' : ': nothing queued for these waters'}</div>` : '';
   const w = L.week;
@@ -5213,13 +4126,13 @@ async function loadOverview() {
   const helm = d.helm ? `<div class="ovsea"><span class="${pillCls('good')}">at the helm</span> <b>${esc(d.helm.name || '')}</b> <span class="s">${esc(d.helm.kind || '')}${d.helm.pid ? ` · pid ${d.helm.pid}` : ''}${d.helm.since ? ` · since ${esc(String(d.helm.since).slice(11, 16))}` : ''}</span></div>`
     : `<div class="ovsea s">no helm yet: the voyage at sea was launched before the helm (S2) existed, so it shows from the ledger</div>`;
   const name = k => (ex.find(e => e.key === k) || {}).name || VOYAGE_NAME[k] || k;
-  const atSea = sea.length ? sea.map(r => `<div class="ovsea"><span class="${pillCls('running')}">at sea</span> <a href="#${shipHash(r.name)}"><b>${esc(r.name)}</b></a>
-      <div class="s">${esc(r.ship || '')}${r.expedition ? ` · <a href="#/expeditions/${esc(r.expedition)}">${esc(name(r.expedition))}</a>` : ''}${r.started ? ` · since ${esc(String(r.started).slice(11, 16))}` : ''}</div></div>`).join('') : '<div class="s">no voyage at sea</div>';
+  const atSea = sea.length ? sea.map(r => `<div class="ovsea"><span class="${pillCls('running')}">at sea</span> <a href="${shipHash(r.name)}"><b>${esc(r.name)}</b></a>
+      <div class="s">${esc(r.ship || '')}${r.expedition ? ` · <a href="/expeditions/${esc(r.expedition)}">${esc(name(r.expedition))}</a>` : ''}${r.started ? ` · since ${esc(String(r.started).slice(11, 16))}` : ''}</div></div>`).join('') : '<div class="s">no voyage at sea</div>';
   const total = ex.reduce((a, e) => a + (e.queued || 0), 0) || q.voyages || 0;
   const bar = `<div class="ovbar" title="the queue: ${q.voyages} voyages, about ${q.hours_left} hours">${ex.filter(e => e.queued).map((e, i) => `<span style="flex-grow:${e.queued};background:${PALETTE[i % PALETTE.length]}" title="${esc(e.name)}: ${e.queued} queued, next at #${e.next_in_queue}"></span>`).join('')}</div>
     <div class="ovq"><b>${q.voyages ?? '–'}</b> voyages to sail · about <b>${q.hours_left ?? '–'}</b> hours${q.voyages_without_a_time ? ` <span class="s">(${q.voyages_without_a_time} with no time yet, so more)</span>` : ''}${q.steps ? ` · ${q.steps} queue command${q.steps === 1 ? '' : 's'}` : ''}</div>
     ${(q.lints || []).length ? `<div class="${alertCls('no')}">${q.lints.map(l => esc(l)).join('<br>')}</div>` : ''}`;
-  const rows = ex.map((e, i) => `<tr><td><span class="ovsw" style="background:${e.queued ? PALETTE[ex.filter(x => x.queued).indexOf(e) % PALETTE.length] : 'transparent'}"></span> ${e.key === '(no expedition)' ? `<i>${esc(e.name)}</i>` : `<a href="#/expeditions/${esc(e.key)}"><b>${esc(e.name)}</b></a>`}</td>
+  const rows = ex.map((e, i) => `<tr><td><span class="ovsw" style="background:${e.queued ? PALETTE[ex.filter(x => x.queued).indexOf(e) % PALETTE.length] : 'transparent'}"></span> ${e.key === '(no expedition)' ? `<i>${esc(e.name)}</i>` : `<a href="/expeditions/${esc(e.key)}"><b>${esc(e.name)}</b></a>`}</td>
       <td>${statePill(e.status, e.declared)}</td><td>${e.at_sea ? `<span class="${pillCls('running')}">${e.at_sea} at sea</span>` : ''}</td>
       <td>${e.queued || '–'}</td><td>${e.next_in_queue ? `#${e.next_in_queue}` : '–'}</td><td>${e.finished || '–'}</td><td>${e.failed ? `<span class="bad">${e.failed}</span>` : '–'}</td></tr>`).join('');
   el.innerHTML = `<div class="ovtop"><div>${atSea}${helm}</div><div class="ovqueue">${bar}</div></div>
@@ -5249,11 +4162,11 @@ async function drawAboard(run) {
   const key = run.run_id + JSON.stringify(d.libraries); if (key === aboardKey) return; aboardKey = key;
   sec.hidden = false;
   el.innerHTML = `<div class="ovq">${d.where ? `<span class="${pillCls(WHERE_TONE[d.where] || '')}">${esc(d.where)}</span> ` : ''}<b>${d.books ?? '–'}</b> books · about <b>${big(d.tokens)}</b> tokens${d.recorded ? '' : ` <span class="s" title="this voyage sailed before the library aboard was recorded (16:40), so it is worked out from its spec; the lists may have changed since">(worked out from its spec)</span>`}</div>
-    <div class="scroll"><table data-nosort><thead><tr><th>library</th><th>stage</th><th>where</th><th>books</th><th>hash</th></tr></thead><tbody>${d.libraries.map(l => `<tr><td><a href="#/library" data-lib="${esc(l.path)}"><b>${esc(l.name || l.path)}</b></a><div class="s mono">${esc(l.path)}</div></td>
+    <div class="scroll"><table data-nosort><thead><tr><th>library</th><th>stage</th><th>where</th><th>books</th><th>hash</th></tr></thead><tbody>${d.libraries.map(l => `<tr><td><a href="/library" data-lib="${esc(l.path)}"><b>${esc(l.name || l.path)}</b></a><div class="s mono">${esc(l.path)}</div></td>
       <td>${esc(l.stage || '–')}</td><td><span class="${pillCls(WHERE_TONE[l.where] || '')}">${esc(l.where || '')}</span></td><td>${l.books ?? '–'}</td><td class="mono s">${esc((l.sha1 || '').slice(0, 10))}</td></tr>`).join('')}</tbody></table></div>
     ${d.opt_in ? `<div class="${alertCls('open')}">opted out of the stores: ${esc(d.opt_in)}</div>` : ''}
     ${(d.refused || []).length ? `<div class="s">refused: ${d.refused.map(r => `<span class="mono">${esc(r)}</span>`).join(', ')}</div>` : ''}`;
-  el.querySelectorAll('[data-lib]').forEach(a => a.onclick = e => { e.preventDefault(); shelfOpen = a.dataset.lib; location.hash = '#/library'; });
+  el.querySelectorAll('[data-lib]').forEach(a => a.onclick = e => { e.preventDefault(); shelfOpen = a.dataset.lib; location.href = '/library'; });
 }
 
 
@@ -5291,7 +4204,7 @@ async function drawDeck(v) {
   const ship = r => {
     const pct = r.step && r.steps_total ? Math.min(100, 100 * r.step / r.steps_total) : 0;
     return `<div class="obsship">
-      <div class="obshead"><span class="${pillCls('running')}">at sea</span> <a href="#${shipHash(r.name)}"><b>${esc(r.name)}</b></a>
+      <div class="obshead"><span class="${pillCls('running')}">at sea</span> <a href="${shipHash(r.name)}"><b>${esc(r.name)}</b></a>
         <div class="s">${esc(r.ship || '')}${r.started ? ` · cast off ${esc(String(r.started).slice(11, 16))}` : ''}</div></div>
       <div class="obsrow">
         <div class="obsprog"><div class="obsbar"><span style="width:${pct.toFixed(1)}%"></span></div>
@@ -5313,7 +4226,7 @@ async function drawDeck(v) {
   }
   const where = d.next_in_queue ? `its next voyage is <b>#${d.next_in_queue}</b> in the queue (${d.queued} of its voyages queued)` : d.state === 'home' ? 'it is home: every voyage has come back' : d.state === 'awaiting orders' ? 'it is awaiting orders: nothing of it at sea or queued' : 'nothing of it is queued';
   const other = (d.elsewhere || [])[0];
-  el.innerHTML = `<div class="${emptyCls()}">no voyage of this expedition is at sea: ${where}.${other ? ` At sea now: <a href="#${shipHash(other.name)}">${esc(other.name)}</a>${other.expedition ? `, of <a href="#/expeditions/${esc(other.expedition)}">${esc(VOYAGE_NAME[other.expedition] || other.expedition)}</a>` : ''}.` : ''}</div>`;
+  el.innerHTML = `<div class="${emptyCls()}">no voyage of this expedition is at sea: ${where}.${other ? ` At sea now: <a href="${shipHash(other.name)}">${esc(other.name)}</a>${other.expedition ? `, of <a href="/expeditions/${esc(other.expedition)}">${esc(VOYAGE_NAME[other.expedition] || other.expedition)}</a>` : ''}.` : ''}</div>`;
 }
 
 
@@ -5537,7 +4450,7 @@ document.addEventListener('input', e => {
 const expTabOk = {};
 function showExpTab() {
   const ok = expTabOk[voyageKey] || {};
-  if (ok[expTab] === false) { expTab = 'overview'; history.replaceState(null, '', location.pathname + '#/expeditions/' + voyageKey); }
+  if (ok[expTab] === false) { expTab = 'overview'; history.replaceState(null, '', '/expeditions/' + voyageKey); }
   document.querySelectorAll('#voyage .etab').forEach(t => t.classList.toggle('active', t.dataset.etab === expTab));
   document.querySelectorAll('#expnav a').forEach(a => { a.hidden = ok[a.dataset.etab] === false; setTab(a, a.dataset.etab === expTab); });
   // charts drawn while their tab was hidden have no width
@@ -5575,7 +4488,7 @@ async function drawExpReadings(v) {
   const best = outs.map(o => { const vals = runs.map(r => last(r, o.metric)).filter(x => x != null); if (!vals.length) return null; return /lower|less|smaller/.test(o.better || '') ? Math.min(...vals) : Math.max(...vals); });
   head.innerHTML = `<tr><th>voyage</th><th>ship</th>${outs.map(o => `<th title="${esc(o.metric)}; better is ${esc(o.better || '')}">${esc(o.about)}</th>`).join('')}</tr>`;
   const read = runs.filter(r => outs.some(o => last(r, o.metric) != null));
-  tb.innerHTML = read.slice().reverse().map(r => `<tr><td><a href="#${shipHash(r.name)}">${esc(r.name)}</a></td><td class="s">${esc(r.ship_name || r.ship || '')}</td>
+  tb.innerHTML = read.slice().reverse().map(r => `<tr><td><a href="${shipHash(r.name)}">${esc(r.name)}</a></td><td class="s">${esc(r.ship_name || r.ship || '')}</td>
     ${outs.map((o, i) => { const x = last(r, o.metric); return x == null ? '<td class="s">–</td>' : `<td class="${x === best[i] ? 'good' : ''}">${fmt(x)}${x === best[i] ? ' ★' : ''}</td>`; }).join('')}</tr>`).join('')
     || `<tr><td colspan="${outs.length + 2}" class="${emptyCls(true)}">none of its voyages has a reading on these measures yet</td></tr>`;
 }
@@ -5589,14 +4502,14 @@ async function loadLab() {
   if (!d || d.error || !d.key) { document.getElementById('labtitle').textContent = `no lab called ${labKey}`; return; }
   const key = JSON.stringify(d); if (key === labDataKey) return; labDataKey = key;
   document.getElementById('labtitle').textContent = d.name;
-  document.getElementById('labnav').innerHTML = d.labs.filter(x => x.key !== d.key).map(x => `<a href="#/leaderboard/lab/${x.key}">${esc(x.name)}</a>`).join(' · ');
+  document.getElementById('labnav').innerHTML = d.labs.filter(x => x.key !== d.key).map(x => `<a href="/leaderboard/lab/${x.key}">${esc(x.name)}</a>`).join(' · ');
   document.getElementById('labover').innerHTML = [
     ['lab', `<b>${esc(d.name)}</b>${d.url ? `<div class="s"><a href="${esc(d.url)}" target="_blank" rel="noopener">${esc(d.url.replace(/^https?:\/\//, ''))}</a></div>` : ''}`],
-    ['its models', d.models.map(m => `<a href="#/leaderboard/competitor/${encodeURIComponent(m.model)}">${esc(m.label)}</a> <span class="s">${fmtParams(m.params ?? null)}</span>${m.competitor ? ` <span class="${pillCls('blue')}">2–4B</span>` : ''}${m.ladder ? ` <span class="${pillCls('')}">ladder</span>` : ''}`).join('<br>') || '–'],
+    ['its models', d.models.map(m => `<a href="/leaderboard/competitor/${encodeURIComponent(m.model)}">${esc(m.label)}</a> <span class="s">${fmtParams(m.params ?? null)}</span>${m.competitor ? ` <span class="${pillCls('blue')}">2–4B</span>` : ''}${m.ladder ? ` <span class="${pillCls('')}">ladder</span>` : ''}`).join('<br>') || '–'],
     ['readings', `<b>${d.readings}</b><div class="s">every rung of the four chains, for each of its models</div>`],
   ].map(([k, v]) => `<div><div class="k">${k}</div><div>${v}</div></div>`).join('');
   const head = '<tr><th>#</th><th>model</th><th>test</th><th>rung</th><th>lift</th><th title="the median lift of the other labs\' models on this test">field median</th><th title="the other labs\' models it lifts higher than">beats</th><th title="lift less the field median, over the field\'s spread">standing</th><th>share right</th><th></th></tr>';
-  const row = (r, i) => `<tr><td>${i + 1}</td><td><a href="#/leaderboard/competitor/${encodeURIComponent(r.model)}"><b>${esc(r.label)}</b></a></td><td>${esc(r.name)}<div class="s">${esc(r.chain)}</div></td><td class="s">${esc(r.rung || '')}</td><td class="num">${signed(r.lift)}</td><td class="num s">${signed(r.field_median)}</td><td class="num s">${r.beats} of ${r.field_n}</td><td class="num"><span class="${pillCls(r.standing >= 0 ? 'good' : 'bad')}">${r.standing >= 0 ? '+' : ''}${r.standing.toFixed(2)}σ</span></td><td class="num">${r.score == null ? '–' : Math.round(100 * r.score) + '%'}</td><td>${r.performed ? '✓' : ''}</td></tr>`;
+  const row = (r, i) => `<tr><td>${i + 1}</td><td><a href="/leaderboard/competitor/${encodeURIComponent(r.model)}"><b>${esc(r.label)}</b></a></td><td>${esc(r.name)}<div class="s">${esc(r.chain)}</div></td><td class="s">${esc(r.rung || '')}</td><td class="num">${signed(r.lift)}</td><td class="num s">${signed(r.field_median)}</td><td class="num s">${r.beats} of ${r.field_n}</td><td class="num"><span class="${pillCls(r.standing >= 0 ? 'good' : 'bad')}">${r.standing >= 0 ? '+' : ''}${r.standing.toFixed(2)}σ</span></td><td class="num">${r.score == null ? '–' : Math.round(100 * r.score) + '%'}</td><td>${r.performed ? '✓' : ''}</td></tr>`;
   for (const [id, rows] of [['labbest', d.best], ['labworst', d.worst]]) {
     const t = document.getElementById(id);
     t.tHead.innerHTML = head;

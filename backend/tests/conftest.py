@@ -61,10 +61,12 @@ def _store_clean(_store_migrated):
     """Each test starts with the one store's records empty (the gate's log, S5's switches and exceptions, ...)."""
     from sqlalchemy import text
 
-    from thorp import store
+    from thorp import ledger_store, manifest_store, store
     from thorp.viable import records
 
-    tables = ", ".join(f"{t.schema}.{t.name}" for t in records.tables())  # the records only: the sizes stay seeded
+    tables = ", ".join(
+        f"{t.schema}.{t.name}" for t in (*records.tables(), *ledger_store.tables(), *manifest_store.tables())
+    )  # the records and the ledger and the library: the sizes stay seeded
     with store.session() as s:
         s.execute(text(f"truncate {tables} restart identity cascade"))
 

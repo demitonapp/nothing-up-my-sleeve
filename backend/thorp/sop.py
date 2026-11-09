@@ -206,6 +206,10 @@ def check(spec: dict) -> list[str]:
         if str((spec.get("tokeniser") or {}).get("vocab")) != str(v.get("vocab")):
             out.append(f"tokeniser vocab {(spec.get('tokeniser') or {}).get('vocab')}; SOP v{version} chooses {chosen} ({v.get('vocab')} pieces)")
     tok = spec.get("tokeniser") or {}
+    want_sym = list(((emb.get("versions") or {}).get(chosen) or {}).get("control_tokens") or [])
+    got_sym = list((spec.get("tokeniser") or {}).get("symbols") or [])
+    if sorted(got_sym) != sorted(want_sym):
+        out.append(f"tokeniser declares {len(got_sym)} control tokens; SOP v{version}'s {chosen} declares {len(want_sym)}")
     for key in ("kind", "vocab", "byte_fallback", "train_on"):
         if tok.get(key) != content["tokeniser"].get(key):
             out.append(

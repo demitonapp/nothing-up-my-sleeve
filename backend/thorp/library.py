@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import csv
 import json
+import os
 import re
 from collections import Counter
 from pathlib import Path
@@ -172,6 +173,10 @@ def _rows(path: Path) -> list[dict]:
 
 def _resolved() -> dict[str, list[str]]:
     """list path -> manifest book ids, from data/resolution.csv (the title-matched lists that have been fetched)."""
+    if os.environ.get("THORP_LIBRARY_PG") == "1":
+        from thorp import manifest_store
+
+        return manifest_store.resolved_lists()
     out: dict[str, list[str]] = {}
     p = paths.data_dir() / "resolution.csv"
     if p.exists():

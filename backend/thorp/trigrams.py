@@ -22,6 +22,7 @@ and cached in data/trigrams.csv.
 from __future__ import annotations
 
 import csv
+import os
 import re
 import sys
 from collections import deque
@@ -102,6 +103,10 @@ def measure_text(text: str) -> dict:
 def _cache() -> dict[str, dict]:
     """The cached readings; a row without the name measures (written before they existed) is
     treated as unmeasured, so it is measured again."""
+    if os.environ.get("THORP_LIBRARY_PG") == "1":
+        from thorp import manifest_store
+
+        return manifest_store.book_measures()
     p = paths.data_dir() / CACHE
     if not p.exists():
         return {}

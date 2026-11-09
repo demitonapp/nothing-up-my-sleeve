@@ -7,14 +7,14 @@ import { cardCls, checkCls, crumbCls, emptyCls, rangeCls, selectCls, tabCls, tab
 <div class="section" id="voyages">
   <h1>Expeditions <span class="q">campaigns of ships sent to find something: their goals, how they are steered, and what they found</span></h1>
   <nav class={tabsCls('line', 'subnav')} data-orientation="horizontal" data-variant="line" id="vnav">
-    <a class={tabCls('')} data-state="active" data-vtab="queue" href="#/expeditions/queue">Queue</a><a class={tabCls('')} data-state="inactive" data-vtab="expeditions" href="#/expeditions/expeditions">Expeditions</a>
+    <a class={tabCls('')} data-state="active" data-vtab="queue" href="/expeditions/queue">Queue</a><a class={tabCls('')} data-state="inactive" data-vtab="expeditions" href="/expeditions/expeditions">Expeditions</a>
   </nav>
   <div class="vtab" data-vtab="expeditions">
     <div class="cards" id="voyagecards"></div>
   </div>
   <div class="vtab" data-vtab="queue">
     <div class="qswitch" role="tablist" aria-label="how to see the queue">
-      <a role="tab" class={toggleCls()} data-state="off" data-qview="glance" href="#/expeditions/queue">At a glance</a><a role="tab" class={toggleCls()} data-state="off" data-qview="every" href="#/expeditions/queue/every">Every voyage</a>
+      <a role="tab" class={toggleCls()} data-state="off" data-qview="glance" href="/expeditions/queue">At a glance</a><a role="tab" class={toggleCls()} data-state="off" data-qview="every" href="/expeditions/queue/every">Every voyage</a>
     </div>
     <div class="qview" data-qview="glance">
   <section class={cardCls(false, 'panel')} id="waterspanel">
@@ -36,7 +36,7 @@ import { cardCls, checkCls, crumbCls, emptyCls, rangeCls, selectCls, tabCls, tab
 </div>
 
 <div class="section" id="voyage">
-  <h1><a class={crumbCls('back')} href="#/expeditions">← expeditions</a> <span id="voyagetitle"></span> <span id="voyagestatus"></span> <span class="q" id="voyagegoal"></span></h1>
+  <h1><a class={crumbCls('back')} href="/expeditions">← expeditions</a> <span id="voyagetitle"></span> <span id="voyagestatus"></span> <span class="q" id="voyagegoal"></span></h1>
   <section class={cardCls(false, 'panel')}><div class="rungover" id="voyageover"></div></section>
   <nav class={tabsCls('line', 'subnav')} data-orientation="horizontal" data-variant="line" id="expnav">
     <a class={tabCls('')} data-state="inactive" data-etab="overview">Overview</a><a class={tabCls('')} data-state="inactive" data-etab="at-sea">At sea</a><a class={tabCls('')} data-state="inactive" data-etab="findings">Findings</a><a class={tabCls('')} data-state="inactive" data-etab="fleet">Fleet</a><a class={tabCls('')} data-state="inactive" data-etab="inside">Inside</a>
@@ -46,7 +46,7 @@ import { cardCls, checkCls, crumbCls, emptyCls, rangeCls, selectCls, tabCls, tab
     <div id="voyagenextwrap" hidden><h2 class="mt">Suggested next steps</h2><ol id="voyagenext" class="nextsteps"></ol></div></section>
   <section class={cardCls(false, 'panel')} data-voyage="table_talk" hidden>
     <h2>The table <span class="note">talk with Table Talk's ships, or any finished ship: type a line and read its answer</span></h2>
-    <p><a href="#/expeditions/table_talk/table">Sit at the table →</a></p>
+    <p><a href="/expeditions/table_talk/table">Sit at the table →</a></p>
   </section>
   <div class="row">
     <section class={cardCls(false, 'panel')}><h2>What it measures <span class="note">the outcomes the expedition is judged by</span></h2><div class="scroll"><table id="voyageoutcomes"><thead><tr><th>outcome</th><th>metric</th><th>better is</th></tr></thead><tbody></tbody></table></div></section>
@@ -79,7 +79,7 @@ import { cardCls, checkCls, crumbCls, emptyCls, rangeCls, selectCls, tabCls, tab
     <div id="censusgrid"></div>
   </section>
   <section class={cardCls(false, 'panel')} data-voyage="two_facts" hidden>
-    <h2>The climb over training <span class="note">each voyage's climb toward chaining two facts at every discovery reading (0 to 5: the rungs performed from the bottom of each chain, plus the next rung's share of its mark, the mean of the four chains), one line per voyage, coloured by size; the dotted levels are the reference ladder; the <a href="#/leaderboard">leaderboard</a> holds each size's best</span></h2>
+    <h2>The climb over training <span class="note">each voyage's climb toward chaining two facts at every discovery reading (0 to 5: the rungs performed from the bottom of each chain, plus the next rung's share of its mark, the mean of the four chains), one line per voyage, coloured by size; the dotted levels are the reference ladder; the <a href="/leaderboard">leaderboard</a> holds each size's best</span></h2>
     <div class="handtools"><select class={selectCls('')} id="voyageclimbwhat"><option value="climb">the climb</option><option value="chaining_lift">the chaining lift</option><option value="logic_gain">the chaining gain (logic deck)</option></select></div>
     <div class="chart tall" id="voyageclimb"></div>
   </section>

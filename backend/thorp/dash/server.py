@@ -12,6 +12,7 @@ from __future__ import annotations
 import contextlib
 import json
 import math
+import os
 import re
 import socket
 import sqlite3
@@ -69,6 +70,13 @@ def _con() -> sqlite3.Connection:
     return connect(paths.ledger_path(), readonly=True)
 
 
+def _ledger_pg() -> bool:
+    """Whether the core ledger readers answer from Postgres (THORP_LEDGER_PG). During the cut-over this
+    flips on after the backfill; until then the readers stay on SQLite. The JSON-extracting endpoints
+    still read SQLite until they are migrated in turn."""
+    return bool(os.environ.get("THORP_LEDGER_PG"))
+
+
 def _rows(sql: str, params=()) -> list[dict]:
     con = _con()
     try:
@@ -78,6 +86,10 @@ def _rows(sql: str, params=()) -> list[dict]:
 
 
 def _metric(run: str, name: str, which: str = "last"):
+    if _ledger_pg():
+        from thorp import ledger_store
+
+        return ledger_store.metric_at(run, name, which)
     order = "desc" if which == "last" else "asc"
     r = _rows(
         f"select step, value from metrics where run_id=? and name=?"
@@ -88,10 +100,15 @@ def _metric(run: str, name: str, which: str = "last"):
 
 
 def api_runs() -> list[dict]:
-    runs = _rows(
-        "select run_id, name, ship, status, started, finished, tokens_seen, wall_minutes,"
-        ' "commit", hardware, spec_json from runs order by started desc'
-    )
+    if _ledger_pg():
+        from thorp import ledger_store
+
+        runs = ledger_store.all_runs()
+    else:
+        runs = _rows(
+            "select run_id, name, ship, status, started, finished, tokens_seen, wall_minutes,"
+            ' "commit", hardware, spec_json from runs order by started desc'
+        )
     for r in runs:
         spec = json.loads(r.pop("spec_json") or "{}")
         r["preset"] = spec.get("model", {}).get("preset")
@@ -102,6 +119,10 @@ def api_runs() -> list[dict]:
 
 
 def api_metrics(run: str) -> dict:
+    if _ledger_pg():
+        from thorp import ledger_store
+
+        return ledger_store.metrics_series(run)
     out: dict[str, list] = {}
     con = _con()
     try:
@@ -121,10 +142,18 @@ def api_metrics(run: str) -> dict:
 
 
 def api_evals(run: str) -> list[dict]:
+    if _ledger_pg():
+        from thorp import ledger_store
+
+        return ledger_store.evals(run)
     return _rows("select * from evals where run_id=? order by step, book_id", [run])
 
 
 def _artifact(run: str, kind: str, latest=True):
+    if _ledger_pg():
+        from thorp import ledger_store
+
+        return ledger_store.artifact(run, kind, latest)
     r = _rows(
         f"select step, path, sha1, text from artifacts where run_id=? and kind=?"
         f" order by step {'desc' if latest else 'asc'}, rowid desc limit 1",
@@ -133,11 +162,176 @@ def _artifact(run: str, kind: str, latest=True):
     return r[0] if r else None
 
 
+def _run_spec_json(run_id: str) -> dict:
+    """A run's spec_json as a dict, read from Postgres (THORP_LEDGER_PG) or SQLite."""
+    if _ledger_pg():
+        from thorp import ledger_store
+
+        r = ledger_store.get_run(run_id)
+        return json.loads(r["spec_json"] or "{}") if r and r.get("spec_json") else {}
+    rows = _rows("select spec_json from runs where run_id=?", [run_id])
+    return json.loads(rows[0]["spec_json"] or "{}") if rows else {}
+
+
+def _metric_rows(run_id: str, name: str) -> list[dict]:
+    """[{name, step, value}] for one named metric, ordered by step (the later row at one step stands)."""
+    if _ledger_pg():
+        from thorp import ledger_store
+
+        s = ledger_store.metric_series(run_id, name)
+        return [{"name": name, "step": st, "value": v} for st, v in zip(s[0], s[1], strict=True)]
+    return _rows("select name, step, value from metrics where run_id=? and name=? order by step", [run_id, name])
+
+
+def _metric_name_rows(run_id: str, prefix: str) -> list[dict]:
+    """[{name, step, value}] for metrics whose name starts with `prefix`, ordered by step (then id)."""
+    if _ledger_pg():
+        from thorp import ledger_store
+
+        return ledger_store.metrics_matching(run_id, prefix)
+    return _rows("select name, step, value from metrics where run_id=? and name like ? order by step, rowid", [run_id, prefix + "%"])
+
+
+def _artifact_rows(run_id: str, kind: str) -> list[dict]:
+    """Every artifact of a kind, ordered by step (then id), as [{step, path, sha1, text}]."""
+    if _ledger_pg():
+        from thorp import ledger_store
+
+        return ledger_store.artifacts_of_kind(run_id, kind)
+    return _rows("select step, path, sha1, text from artifacts where run_id=? and kind=? order by step, rowid", [run_id, kind])
+
+
+def _metric_series_gated(run_id: str, name: str) -> list[list]:
+    """[steps, values] for one named metric, the later row at one step standing (either store)."""
+    if _ledger_pg():
+        from thorp import ledger_store
+
+        return ledger_store.metric_series(run_id, name)
+    rows = _rows("select step, value from metrics where run_id=? and name=? order by step, rowid", [run_id, name])
+    steps, values = [], []
+    for r in rows:
+        if steps and steps[-1] == r["step"]:
+            values[-1] = r["value"]
+        else:
+            steps.append(r["step"])
+            values.append(r["value"])
+    return [steps, values]
+
+
+def _runs_rows() -> list[dict]:
+    """Every run, oldest first (as `select * from runs order by started`), from either store."""
+    if _ledger_pg():
+        from thorp import ledger_store
+
+        return list(reversed(ledger_store.all_runs()))
+    return _rows("select * from runs order by started")
+
+
+def _metric_at_step(run_id: str, name: str, step: int) -> float | None:
+    """The value of one metric at one step (the later row at that step stands), from either store."""
+    if _ledger_pg():
+        from thorp import ledger_store
+
+        s, v = ledger_store.metric_series(run_id, name)
+        for i in range(len(s) - 1, -1, -1):
+            if s[i] == step:
+                return v[i]
+        return None
+    row = _rows(
+        "select value from metrics where run_id=? and name=? and step=? order by rowid desc limit 1",
+        [run_id, name, step],
+    )
+    return row[0]["value"] if row else None
+
+
+def _metric_peaks(run_id: str, names: list[str]) -> dict[str, float]:
+    """{name: max value} over all rows for the given names, from either store."""
+    if _ledger_pg():
+        from thorp import ledger_store
+
+        return ledger_store.metrics_max(run_id, names)
+    if not names:
+        return {}
+    rows = _rows(
+        f"select name, max(value) as m from metrics where run_id=? and name in ({','.join('?' * len(names))}) group by name",
+        [run_id, *names],
+    )
+    return {r["name"]: r["m"] for r in rows if r["m"] is not None}
+
+
+def _metric_named_rows(run_id: str, names: set[str]) -> list[dict]:
+    """[{name, step, value}] for the exact names, value not null, ordered by step then id."""
+    if _ledger_pg():
+        from thorp import ledger_store
+
+        return ledger_store.metrics_named(run_id, names)
+    if not names:
+        return []
+    return _rows(
+        f"select name, step, value from metrics where run_id=? and name in ({','.join('?' * len(names))})"
+        " and value is not null order by step, rowid",
+        [run_id, *names],
+    )
+
+
+def _latest_evals(run_id: str, eval_set: str) -> list[dict]:
+    """A run's {book_id, bpb} at its latest step for one set, from either store."""
+    if _ledger_pg():
+        from thorp import ledger_store
+
+        return ledger_store.latest_evals(run_id, eval_set)
+    return _rows(
+        'select book_id, bpb from evals where run_id=? and "set"=?'
+        ' and step=(select max(step) from evals x where x.run_id=? and x."set"=?)',
+        [run_id, eval_set, run_id, eval_set],
+    )
+
+
+def _metric_max_ts(run_id: str, name: str) -> float | None:
+    """The latest write timestamp of one metric, from either store."""
+    if _ledger_pg():
+        from thorp import ledger_store
+
+        return ledger_store.metric_max_ts(run_id, name)
+    row = _rows("select max(ts) as m from metrics where run_id=? and name=?", [run_id, name])
+    return row[0]["m"] if row else None
+
+
+def _run_row(key: str) -> dict | None:
+    """A run's row, given an id (exact) or a name (the latest with that name)."""
+    if _ledger_pg():
+        from thorp import ledger_store
+
+        r = ledger_store.get_run(key)
+        return r if r else _run_row_by_name(key)
+    rows = _rows("select * from runs where run_id=? limit 1", [key])
+    return rows[0] if rows else _run_row_by_name(key)
+
+
+def _run_id(key: str) -> str | None:
+    """A run's id, given an id or a name."""
+    row = _run_row(key)
+    return row["run_id"] if row else None
+
+
+def _run_row_by_name(name: str) -> dict | None:
+    """The latest run with this name (the SQLite `select * from runs where name=? order by started desc limit 1`)."""
+    for r in reversed(_runs_rows()):
+        if r.get("name") == name:
+            return r
+    return None
+
+
 def api_run(run: str) -> dict:
-    meta = _rows("select * from runs where run_id=?", [run])
+    if _ledger_pg():
+        from thorp import ledger_store
+
+        meta = ledger_store.get_run(run)
+    else:
+        rows = _rows("select * from runs where run_id=?", [run])
+        meta = rows[0] if rows else None
     if not meta:
         return {}
-    meta = meta[0]
     spec = json.loads(meta.pop("spec_json") or "{}")
     sets = [Path(s).stem for s in spec.get("eval", {}).get("sets", [])]
     first = sets[0] if sets else None
@@ -157,15 +351,12 @@ def api_run(run: str) -> dict:
         tokens_per_s=None,
         eta_minutes=None,
     )
-    tps = _rows(
-        "select avg(value) v from (select value from metrics where run_id=? and"
-        " name='tokens_per_s' order by step desc limit 50)",
-        [run],
-    )
-    if tps and tps[0]["v"]:
-        out["tokens_per_s"] = tps[0]["v"]
+    tps_vals = _metric_series_gated(run, "tokens_per_s")[1][-50:]
+    tps_avg = sum(tps_vals) / len(tps_vals) if tps_vals else None
+    if tps_avg:
+        out["tokens_per_s"] = tps_avg
         if planned and meta["status"] == "running":
-            out["eta_minutes"] = (planned - seen) / tps[0]["v"] / 60
+            out["eta_minutes"] = (planned - seen) / tps_avg / 60
     if n and planned:
         out["chinchilla"] = {
             "D_planned": planned,
@@ -174,12 +365,9 @@ def api_run(run: str) -> dict:
             "L_unique": chinchilla.loss(n, unique) if unique else None,
         }
     if first:
-        hist = _rows(
-            "select step, value from metrics where run_id=? and name=? order by step desc limit 2",
-            [run, f"eval/{first}/bpb_mean"],
-        )
-        out["hole_bpb_latest"] = hist[0] if hist else None
-        out["hole_bpb_previous"] = hist[1] if len(hist) > 1 else None
+        s, v = _metric_series_gated(run, f"eval/{first}/bpb_mean")
+        out["hole_bpb_latest"] = {"step": s[-1], "value": v[-1]} if s else None
+        out["hole_bpb_previous"] = {"step": s[-2], "value": v[-2]} if len(s) > 1 else None
         ce_en = _metric(run, f"eval/{first}/ce_mean_en")
         out["hole_ce_mean_en"] = ce_en
         if ce_en is not None and out.get("chinchilla"):
@@ -193,10 +381,7 @@ def api_run(run: str) -> dict:
     # every eval step's probes, so the Traits tab can step through them and say when each trait
     # first appeared (a re-score at the same step replaces the earlier artifact: later rowid wins)
     by_step: dict[int, dict] = {}
-    for a in _rows(
-        "select step, text from artifacts where run_id=? and kind='probes' order by step, rowid",
-        [run],
-    ):
+    for a in _artifact_rows(run, "probes"):
         if a["text"]:
             by_step[a["step"]] = json.loads(a["text"])
     out["probes_all"] = [{"step": k, "data": v} for k, v in sorted(by_step.items())]
@@ -225,27 +410,18 @@ def api_compare() -> list[dict]:
         total = _metric(rid, "plan/tokens_total")
         steps = _metric(rid, "plan/total_steps")
         per_step = total / steps if total and steps else None
-        spec_sets = _rows("select spec_json from runs where run_id=?", [rid])
-        spec = json.loads(spec_sets[0]["spec_json"] or "{}") if spec_sets else {}
+        spec = _run_spec_json(rid)
         sets = [Path(s).stem for s in spec.get("eval", {}).get("sets", [])]
         if not sets or not per_step:
             continue
-        series = _rows(
-            "select step, value from metrics where run_id=? and name=? order by step",
-            [rid, f"eval/{sets[0]}/bpb_mean"],
-        )
-        en = _rows(
-            "select step, value from metrics where run_id=? and name=? order by step",
-            [rid, f"eval/{sets[0]}/bpb_mean_en"],
-        )
+        series = _metric_rows(rid, f"eval/{sets[0]}/bpb_mean")
+        en = _metric_rows(rid, f"eval/{sets[0]}/bpb_mean_en")
         # every held-out set this run has been scored on (its own, and any re-score), so the page
         # can read the truth gap and compare runs set by set
         by_set: dict[str, dict] = {}
-        for x in _rows(
-            "select name, step, value from metrics where run_id=? and name like 'eval/%/bpb_mean'"
-            " order by step, rowid",
-            [rid],
-        ):
+        for x in _metric_name_rows(rid, "eval/"):
+            if not x["name"].endswith("/bpb_mean"):
+                continue
             d = by_set.setdefault(x["name"].split("/")[1], {"steps": [], "tokens": [], "bpb": []})
             if d["steps"] and d["steps"][-1] == x["step"]:
                 d["bpb"][-1] = x["value"]
@@ -255,11 +431,8 @@ def api_compare() -> list[dict]:
             d["bpb"].append(x["value"])
         # the push per layer and the learning rate, so the page computes each run's kinks itself
         push: dict[str, list] = {}
-        for x in _rows(
-            "select name, step, value from metrics where run_id=? and"
-            " (name like 'grad_norm/layer_%' or name='lr') order by step",
-            [rid],
-        ):
+        rows = _metric_name_rows(rid, "grad_norm/layer_") + _metric_rows(rid, "lr")
+        for x in rows:
             if x["name"].count("/") > 1:
                 continue
             p = push.setdefault(x["name"], [[], []])
@@ -299,25 +472,16 @@ def api_experiment(prefix: str) -> list[dict]:
         if not (r.get("name") or "").startswith(prefix):
             continue
         rid = r["run_id"]
-        spec = json.loads(
-            _rows("select spec_json from runs where run_id=?", [rid])[0]["spec_json"] or "{}"
-        )
+        spec = _run_spec_json(rid)
         move: dict[str, list] = {}
-        for x in _rows(
-            "select name, step, value from metrics where run_id=? and name like 'update_ratio/layer_%'"
-            " order by step",
-            [rid],
-        ):
+        for x in _metric_name_rows(rid, "update_ratio/layer_"):
             if x["name"].count("/") > 1:
                 continue
             m = move.setdefault(x["name"], [[], []])
             m[0].append(x["step"])
             m[1].append(x["value"])
         traits: dict[int, dict] = {}
-        for a in _rows(
-            "select step, text from artifacts where run_id=? and kind='probes' order by step, rowid",
-            [rid],
-        ):
+        for a in _artifact_rows(rid, "probes"):
             if a["text"]:
                 t = json.loads(a["text"])["traits"]
                 traits[a["step"]] = {
@@ -329,10 +493,7 @@ def api_experiment(prefix: str) -> list[dict]:
                     }
                     for n, v in t.items()
                 }
-        ladder = _rows(
-            "select step, value from metrics where run_id=? and name='curiosity/highest' order by step",
-            [rid],
-        )
+        ladder = _metric_rows(rid, "curiosity/highest")
         out.append(
             {
                 **r,
@@ -362,24 +523,13 @@ QUEUES = ("9m-order.txt", "content-order.txt")
 
 
 def _last_scores(run_ids: list[str]) -> dict[str, dict[str, float]]:
-    """Every run's latest eval/* and laws/* values, on one connection: one indexed range read per
-    run instead of one connection per metric, so the ladder stays quick with thousands of runs."""
+    """Every run's latest eval/* and laws/* values: the last write for each name wins, as in _metric."""
     out: dict[str, dict[str, float]] = {}
-    con = _con()
-    try:
-        for run in run_ids:
-            got: dict[str, float] = {}
-            # ascending by step then rowid, so the last write for each name wins, as in _metric
-            for name, value in con.execute(
-                "select name, value from metrics where run_id=?"
-                " and ((name >= 'eval/' and name < 'eval0') or (name >= 'laws/' and name < 'laws0'))"
-                " order by step, rowid",
-                [run],
-            ):
-                got[name] = value
-            out[run] = got
-    finally:
-        con.close()
+    for run in run_ids:
+        got: dict[str, float] = {}
+        for x in _metric_name_rows(run, "eval/") + _metric_name_rows(run, "laws/"):
+            got[x["name"]] = x["value"]
+        out[run] = got
     return out
 
 
@@ -421,10 +571,7 @@ def api_ladder() -> dict:
         )
         rungs[-1]["harbour"] = harbours.harbour_for(rungs[-1]["total"])
     runs = []
-    rows = _rows(
-        "select run_id, name, ship, status, tokens_seen, started, wall_minutes, spec_json"
-        " from runs order by started"
-    )
+    rows = _runs_rows()
     ships, ship_of = _ships(rows)
     last = _last_scores([r["run_id"] for r in rows])
     voyage = _voyage_of()
@@ -628,17 +775,15 @@ def api_rung(preset: str, limit: int | str = 0) -> list[dict]:
     the latest `limit` (the proxy loop puts thousands of runs on one size)."""
     out = []
     picked = []
-    for r in _rows("select run_id, name, ship, spec_json from runs order by started"):
+    for r in _runs_rows():
         spec = json.loads(r["spec_json"] or "{}")
         if spec.get("model", {}).get("preset") == preset:
             picked.append(r)
     if int(limit or 0) > 0:
         picked = picked[-int(limit) :]
     for r in picked:
-        pts = _rows(
-            "select step, value from metrics where run_id=? and name='loss' order by step",
-            [r["run_id"]],
-        )
+        s, v = _metric_series_gated(r["run_id"], "loss")
+        pts = [{"step": st, "value": val} for st, val in zip(s, v, strict=True)]
         k = max(1, len(pts) // 300)
         out.append(
             {
@@ -658,7 +803,7 @@ def api_waypoints(preset: str, limit: int | str = 30) -> dict:
     from thorp.evaluators import nevermore, probes
 
     picked = []
-    for r in _rows("select run_id, name, ship, status, spec_json from runs order by started"):
+    for r in _runs_rows():
         spec = json.loads(r.pop("spec_json") or "{}")
         if spec.get("model", {}).get("preset") == preset and not (r["name"] or "").startswith(
             "smoke"
@@ -667,61 +812,52 @@ def api_waypoints(preset: str, limit: int | str = 30) -> dict:
     if int(limit or 0) > 0:
         picked = picked[-int(limit) :]
     out = []
-    con = _con()
-    try:
-        for r in picked:
-            series: dict[str, dict[int, float]] = {}
-            for name, step, value in con.execute(
-                "select name, step, value from metrics where run_id=?"
-                " and ((name >= 'nevermore/' and name < 'nevermore0') or (name >= 'probe/' and name < 'probe0'))"
-                " order by step, rowid",
-                [r["run_id"]],
+    for r in picked:
+        series: dict[str, dict[int, float]] = {}
+        for x in _metric_name_rows(r["run_id"], "nevermore/") + _metric_name_rows(
+            r["run_id"], "probe/"
+        ):
+            name, step, value = x["name"], x["step"], x["value"]
+            if name.startswith("probe/") and not name.endswith(
+                ("/best", "/floor_bow", "/floor_init")
             ):
-                if name.startswith("probe/") and not name.endswith(
-                    ("/best", "/floor_bow", "/floor_init")
-                ):
-                    continue  # the per-layer AUCs stay on the Traits tab
-                series.setdefault(name, {})[step] = value
-            nv = {k.split("/", 1)[1]: v for k, v in series.items() if k.startswith("nevermore/")}
-            traits: dict[str, dict] = {}
-            for k, v in series.items():
-                if k.startswith("probe/"):
-                    trait, part = k[len("probe/") :].rsplit("/", 1)
-                    traits.setdefault(trait, {})[part] = v
-            # the per-head scores, step by step: the model's hand, one card per attention head
-            hands = []
-            for step, text in con.execute(
-                "select step, text from artifacts where run_id=? and kind='nevermore'"
-                " order by step, rowid",
-                [r["run_id"]],
-            ):
-                try:
-                    a = json.loads(text)
-                except ValueError:
-                    continue
-                if hands and hands[-1]["step"] == step:
-                    hands.pop()  # a re-score of the same step replaces it
-                hands.append(
-                    {"step": step, "random": a.get("scores"), "real": a.get("natural_scores")}
-                )
-            out.append(
-                {
-                    **r,
-                    "hands": hands,
-                    "nevermore": {
-                        k: {"step": list(v), "value": list(v.values())} for k, v in nv.items()
-                    },
-                    "traits": {
-                        t: {
-                            p: {"step": list(v), "value": list(v.values())}
-                            for p, v in parts.items()
-                        }
-                        for t, parts in traits.items()
-                    },
-                }
+                continue  # the per-layer AUCs stay on the Traits tab
+            series.setdefault(name, {})[step] = value
+        nv = {k.split("/", 1)[1]: v for k, v in series.items() if k.startswith("nevermore/")}
+        traits: dict[str, dict] = {}
+        for k, v in series.items():
+            if k.startswith("probe/"):
+                trait, part = k[len("probe/") :].rsplit("/", 1)
+                traits.setdefault(trait, {})[part] = v
+        # the per-head scores, step by step: the model's hand, one card per attention head
+        hands = []
+        for a in _artifact_rows(r["run_id"], "nevermore"):
+            try:
+                art = json.loads(a["text"])
+            except ValueError:
+                continue
+            step = a["step"]
+            if hands and hands[-1]["step"] == step:
+                hands.pop()  # a re-score of the same step replaces it
+            hands.append(
+                {"step": step, "random": art.get("scores"), "real": art.get("natural_scores")}
             )
-    finally:
-        con.close()
+        out.append(
+            {
+                **r,
+                "hands": hands,
+                "nevermore": {
+                    k: {"step": list(v), "value": list(v.values())} for k, v in nv.items()
+                },
+                "traits": {
+                    t: {
+                        p: {"step": list(v), "value": list(v.values())}
+                        for p, v in parts.items()
+                    }
+                    for t, parts in traits.items()
+                },
+            }
+        )
     return {
         "runs": out,
         "nevermore_threshold": nevermore.THRESHOLD,
@@ -796,9 +932,7 @@ def _ships(rows: list[dict]) -> tuple[dict[str, dict], dict[str, str]]:
 
 def api_ships() -> list[dict]:
     """Every ship with its sailings (runs, one per seed) and how they did."""
-    rows = _rows(
-        "select run_id, name, ship, status, started, tokens_seen, wall_minutes, spec_json from runs order by started"
-    )
+    rows = _runs_rows()
     ships, _ = _ships(rows)
     by_id = {r["run_id"]: r for r in rows}
     last = _last_scores(list(by_id))
@@ -860,18 +994,12 @@ def api_voyage_series(key: str) -> dict:
 
     v = fleet.EXPEDITIONS[key]
     runs = [{**r, "role": None} for r in voyages.runs_of(v)]
-    con = _con()
 
     def series_of(run_id: str) -> dict:
         series = {}
         for sk, star in fleet.STARS.items():
-            pts = list(
-                con.execute(
-                    "select step, value from metrics where run_id=? and name=? order by step, rowid",
-                    [run_id, star.metric],
-                )
-            )
-            series[sk] = {"step": [p[0] for p in pts], "value": [p[1] for p in pts]}
+            s, vv = _metric_series_gated(run_id, star.metric)
+            series[sk] = {"step": s, "value": vv}
             # lit shared: the best layer's two strongest heads together (voyages.py works it
             # out from the 'stars' artifacts where the metric was not recorded yet)
             if getattr(star, "shared_metric", ""):
@@ -888,58 +1016,50 @@ def api_voyage_series(key: str) -> dict:
         return t if isinstance(t, dict) else None
 
     def transplant_of(run_id: str) -> dict | None:
-        row = con.execute(
-            "select text from artifacts where run_id=? and kind='transplant' order by step, rowid limit 1",
-            [run_id],
-        ).fetchone()
+        a = _artifact(run_id, "transplant")
         try:
-            return json.loads(row[0]) if row else None
+            return json.loads(a["text"]) if a and a["text"] else None
         except ValueError:
             return None
 
-    try:
-        out = []
-        for r in runs:
-            t = transplant_of(r["run_id"])
-            out.append(
-                {
-                    "run_id": r["run_id"],
-                    "name": r["name"],
-                    "ship": r["ship"],
-                    "role": "receiver" if t else "student" if teacher_of(r) else None,
-                    "transplant": t,
-                    "teacher": teacher_of(r),
-                    "series": series_of(r["run_id"]),
-                }
-            )
-        have = {r["run_id"] for r in out}
-        donors = (
-            {x["transplant"].get("from_run_id") for x in out if x["transplant"]} - have - {None}
+    out = []
+    for r in runs:
+        t = transplant_of(r["run_id"])
+        out.append(
+            {
+                "run_id": r["run_id"],
+                "name": r["name"],
+                "ship": r["ship"],
+                "role": "receiver" if t else "student" if teacher_of(r) else None,
+                "transplant": t,
+                "teacher": teacher_of(r),
+                "series": series_of(r["run_id"]),
+            }
         )
-        # a teacher (optim.teacher.run) joins its students the way a donor joins its receivers
-        teachers = {
-            str(x["teacher"]["run"]) for x in out if x.get("teacher") and x["teacher"].get("run")
-        }
-        for d, role in [(d, "donor") for d in donors] + [(t, "teacher") for t in sorted(teachers)]:
-            row = con.execute(
-                "select run_id, name, ship from runs where run_id=? or name=? limit 1", [d, d]
-            ).fetchone()
-            if row and row[0] not in have:
-                have.add(row[0])
-                out.insert(
-                    0,
-                    {
-                        "run_id": row[0],
-                        "name": row[1],
-                        "ship": row[2],
-                        "role": role,
-                        "transplant": None,
-                        "teacher": None,
-                        "series": series_of(row[0]),
-                    },
-                )
-    finally:
-        con.close()
+    have = {r["run_id"] for r in out}
+    donors = (
+        {x["transplant"].get("from_run_id") for x in out if x["transplant"]} - have - {None}
+    )
+    # a teacher (optim.teacher.run) joins its students the way a donor joins its receivers
+    teachers = {
+        str(x["teacher"]["run"]) for x in out if x.get("teacher") and x["teacher"].get("run")
+    }
+    for d, role in [(d, "donor") for d in donors] + [(t, "teacher") for t in sorted(teachers)]:
+        row = _run_row(d)
+        if row and row["run_id"] not in have:
+            have.add(row["run_id"])
+            out.insert(
+                0,
+                {
+                    "run_id": row["run_id"],
+                    "name": row["name"],
+                    "ship": row["ship"],
+                    "role": role,
+                    "transplant": None,
+                    "teacher": None,
+                    "series": series_of(row["run_id"]),
+                },
+            )
     return {
         "runs": out,
         "voyage_stars": list(getattr(v, "stars", ()) or ()),
@@ -1159,16 +1279,12 @@ def _known_tricks() -> list[dict]:
     return out
 
 
-def _floor(con, run_id: str, metric: str) -> float | None:
+def _floor(run_id: str, metric: str) -> float | None:
     """A trick's floor on one run: the untrained model's reading (tricks/<key>/floor_lift beside a
     tricks/<key>/lift), the last one recorded, or None where the trick has no floor."""
     if not metric.endswith("/lift"):
         return None
-    row = con.execute(
-        "select value from metrics where run_id=? and name=? order by step desc, rowid desc limit 1",
-        [run_id, metric[: -len("lift")] + "floor_lift"],
-    ).fetchone()
-    return row[0] if row else None
+    return _metric(run_id, metric[: -len("lift")] + "floor_lift")
 
 
 def _pairs(path: str | None) -> list[dict] | None:
@@ -1205,22 +1321,21 @@ def api_chain(key: str) -> dict:
     # the latest discovery artifact holding each test, per sailing
     latest: dict[str, dict[str, dict]] = {}
     runs = {}
-    for r in _rows(
-        "select a.run_id, a.text, r.name, r.spec_json from artifacts a join runs r using(run_id)"
-        " where a.kind='discovery' order by a.step, a.rowid"
-    ):
-        try:
-            body = json.loads(r["text"] or "{}")
-        except ValueError:
-            continue
-        runs[r["run_id"]] = {
-            "run_id": r["run_id"],
-            "name": r["name"],
-            "preset": json.loads(r["spec_json"] or "{}").get("model", {}).get("preset"),
-        }
-        for k, v in body.items():
-            if isinstance(v, dict) and "pairs" in v:
-                latest.setdefault(k, {})[r["run_id"]] = v
+    for run in _runs_rows():
+        rid = run["run_id"]
+        for a in _artifact_rows(rid, "discovery"):
+            try:
+                body = json.loads(a["text"] or "{}")
+            except ValueError:
+                continue
+            runs[rid] = {
+                "run_id": rid,
+                "name": run["name"],
+                "preset": json.loads(run["spec_json"] or "{}").get("model", {}).get("preset"),
+            }
+            for k, v in body.items():
+                if isinstance(v, dict) and "pairs" in v:
+                    latest.setdefault(k, {})[rid] = v
     steps = []
     for i, (k, text) in enumerate(ch.steps.items()):
         tr = fleet.TRICKS.get(k)
@@ -1373,41 +1488,31 @@ def api_fitouts(preset: str = "") -> dict:
         return {"fitouts": None, "computing": busy, "error": error}
     mine = [f for f in fits if not preset or f.get("preset") == preset]
     cards = [k for k in CENSUS_CARDS if k in fleet.STARS]
-    con = _con()
-    try:
-        for f in mine:
-            readings = {}
-            for r in f.get("runs", []):
-                row = con.execute(
-                    "select run_id, status from runs where name=? order by started desc limit 1",
-                    [r["run"]],
-                ).fetchone()
-                if not row:
-                    continue
-                r["status"] = row[1] or r.get("status")
-                per = {}
-                for k in cards:
-                    st = fleet.STARS[k]
-                    vals = {}
-                    for kind, metric in (
-                        ("one", st.metric),
-                        ("shared", getattr(st, "shared_metric", None)),
-                    ):
-                        if not metric:
-                            continue
-                        got = con.execute(
-                            "select value from metrics where run_id=? and name=? order by step desc, rowid desc limit 1",
-                            [row[0], metric],
-                        ).fetchone()
-                        if got and got[0] is not None:
-                            vals[kind] = got[0]
-                    if vals:
-                        best = max(vals.values())
-                        per[k] = {**vals, "lit": best >= st.threshold, "threshold": st.threshold}
-                readings[r["run"]] = per
-            f["run_cards"] = readings
-    finally:
-        con.close()
+    for f in mine:
+        readings = {}
+        for r in f.get("runs", []):
+            row = _run_row_by_name(r["run"])
+            if not row:
+                continue
+            r["status"] = row["status"] or r.get("status")
+            per = {}
+            for k in cards:
+                st = fleet.STARS[k]
+                vals = {}
+                for kind, metric in (
+                    ("one", st.metric),
+                    ("shared", getattr(st, "shared_metric", None)),
+                ):
+                    if not metric:
+                        continue
+                    got = _metric(row["run_id"], metric)
+                    if got is not None:
+                        vals[kind] = got
+                if vals:
+                    best = max(vals.values())
+                    per[k] = {**vals, "lit": best >= st.threshold, "threshold": st.threshold}
+            readings[r["run"]] = per
+        f["run_cards"] = readings
     return {"fitouts": mine, "computing": False, "error": error}
 
 
@@ -1443,32 +1548,27 @@ def _class_cards(preset: str) -> dict:
     about ±0.1). A class's voyages are those whose preset is the class's or a variant of it (300k-h4)."""
     from thorp import fleet
 
-    con = _con()
-    try:
-        runs = con.execute(
-            "select run_id, name, started, status, json_extract(spec_json,'$.model.preset') p from runs "
-            "where p = ? or p like ? order by started",
-            [preset, f"{preset}-%"],
-        ).fetchall()
-        ids = [r["run_id"] for r in runs]
-        by = {r["run_id"]: r for r in runs}
-        names = [m for pair in CLASS_CARDS.values() for m in pair if m] + ["tricks/logic_test/gain_cause"]
-        peak, last = {}, {}
-        if ids:
-            marks = ",".join("?" * len(ids))
-            for rid, name, step, v in con.execute(
-                f"select run_id, name, step, value from metrics where run_id in ({marks}) "
-                f"and name in ({','.join('?' * len(names))}) order by run_id, name, step",
-                ids + names,
-            ):
-                if v is None or v != v:
+    runs = []
+    for r in _runs_rows():
+        p = json.loads(r.get("spec_json") or "{}").get("model", {}).get("preset")
+        if p == preset or (p or "").startswith(preset + "-"):
+            runs.append({"run_id": r["run_id"], "name": r["name"], "started": r["started"], "status": r["status"], "p": p})
+    ids = [r["run_id"] for r in runs]
+    by = {r["run_id"]: r for r in runs}
+    names = [m for pair in CLASS_CARDS.values() for m in pair if m] + ["tricks/logic_test/gain_cause"]
+    peak, last = {}, {}
+    for rid in ids:
+        for name in names:
+            s, v = _metric_series_gated(rid, name)
+            best_val, best_step = None, None
+            for val, st in zip(v, s, strict=True):
+                if val is None or val != val:
                     continue
-                k = (rid, name)
-                if k not in peak or v > peak[k][0]:
-                    peak[k] = (v, step)
-                last[k] = (v, step)
-    finally:
-        con.close()
+                if best_val is None or val > best_val:
+                    best_val, best_step = val, st
+                last[(rid, name)] = (val, st)
+            if best_val is not None:
+                peak[(rid, name)] = (best_val, best_step)
     finished = [r for r in runs if r["status"] == "finished"]
     newest = finished[-1]["run_id"] if finished else None
 
@@ -1895,28 +1995,15 @@ def api_series(runs: str, metrics: str) -> dict:
     """Named metrics over steps for named runs: {run: {metric: [steps, values]}} (the last reading at a
     step wins, so a re-scored step shows its latest)."""
     out: dict = {}
-    con = _con()
-    try:
-        for run in [x for x in runs.split(",") if x][:40]:
-            row = con.execute(
-                "select run_id from runs where name=? or run_id=? order by started desc limit 1",
-                [run, run],
-            ).fetchone()
-            if not row:
-                continue
-            out[run] = {}
-            for m in [x for x in metrics.split(",") if x][:12]:
-                by_step: dict[int, float] = {}
-                for step, value in con.execute(
-                    "select step, value from metrics where run_id=? and name=? order by step, rowid",
-                    [row[0], m],
-                ):
-                    by_step[step] = value
-                if by_step:
-                    steps = sorted(by_step)
-                    out[run][m] = [steps, [by_step[k] for k in steps]]
-    finally:
-        con.close()
+    for run in [x for x in runs.split(",") if x][:40]:
+        row = _run_row(run)
+        if not row:
+            continue
+        out[run] = {}
+        for m in [x for x in metrics.split(",") if x][:12]:
+            s, v = _metric_series_gated(row["run_id"], m)
+            if s:
+                out[run][m] = [s, v]
     return out
 
 
@@ -1983,20 +2070,15 @@ def api_queue() -> dict:
     from thorp import fleet
 
     root = paths.ROUTER
-    con = _con()
-    try:
-        status = dict(con.execute("select name, status from runs"))
-        wall = dict(
-            con.execute(
-                "select json_extract(spec_json,'$.model.preset'), avg(wall_minutes) from runs "
-                "where status='finished' and wall_minutes > 0 group by 1"
-            )
-        )
-        sea = con.execute(
-            "select name, ship, started, spec_json from runs where status='running' order by started"
-        ).fetchall()
-    finally:
-        con.close()
+    all_runs = _runs_rows()
+    status = {r["name"]: r["status"] for r in all_runs}
+    wall_sums: dict[str, list] = {}
+    for r in all_runs:
+        if r.get("status") == "finished" and (r.get("wall_minutes") or 0) > 0:
+            p = json.loads(r.get("spec_json") or "{}").get("model", {}).get("preset")
+            wall_sums.setdefault(p, []).append(r["wall_minutes"])
+    wall = {p: sum(v) / len(v) for p, v in wall_sums.items()}
+    sea = [(r["name"], r["ship"], r["started"], r["spec_json"]) for r in all_runs if r["status"] == "running"]
 
     fitout_names: dict[str, str | None] = {}
 
@@ -2209,19 +2291,21 @@ def _sky() -> dict:
     }
 
 
-def _heads(con, rid: str) -> dict:
+def _heads(rid: str) -> dict:
     """Every head's score on every star, at each step the voyage read them (the layer x head matrices
     the stars, nevermore and cards evaluators keep as artifacts, every eval): for tracing a card
     through the sieves to the heads that form it. The Nevermore is read on the natural passages
     (its star's metric, nevermore/natural_max_score)."""
     from thorp import fleet
 
+    rows = []
+    for kind in ("stars", "nevermore", "cards"):
+        for a in _artifact_rows(rid, kind):
+            if a["step"] is not None:
+                rows.append((a["step"], kind, a["text"]))
+    rows.sort(key=lambda x: x[0])
     steps: dict[int, dict] = {}
-    for step, kind, text in con.execute(
-        "select step, kind, text from artifacts where run_id=? and kind in ('stars','nevermore','cards')"
-        " and step is not null order by step",
-        [rid],
-    ):
+    for step, kind, text in rows:
         try:
             rec = json.loads(text or "{}")
         except ValueError:
@@ -2245,7 +2329,7 @@ def _heads(con, rid: str) -> dict:
     }
 
 
-def _finds(con, rid: str) -> dict:
+def _finds(rid: str) -> dict:
     """A voyage's finds, in the order it made them: each star's first light (its strongest head, or
     two heads together, at its mark) and each trick's first performance (fleet.performed: its metric at
     the threshold and, for a matched-pairs test, two in three pairs right), from the ledger. Each with
@@ -2258,11 +2342,7 @@ def _finds(con, rid: str) -> dict:
     for t in fleet.TRICKS.values():
         if t.evaluator:
             names |= {t.metric, t.metric.rsplit("/", 1)[0] + "/score"}
-    rows = con.execute(
-        f"select step, name, value from metrics where run_id=? and name in ({','.join('?' * len(names))})"
-        " and value is not null order by step, rowid",
-        [rid, *names],
-    ).fetchall()
+    rows = [(x["step"], x["name"], x["value"]) for x in _metric_named_rows(rid, names)]
     seen: dict[str, float] = {}  # the readings so far, the latest of each
     found: dict[str, dict] = {}
     latest: dict[str, float] = {}
@@ -2341,40 +2421,35 @@ def _deck(run: dict) -> dict:
         [float(m.group(3)) for _, m in steps[-200:]],
     ]
     # the latest readings: the four necessary cards, the Nevermore, the logic deck
-    con = _con()
-    try:
+    def latest(name: str):
+        s, v = _metric_series_gated(rid, name)
+        if s:
+            val, st = v[-1], s[-1]
+            return (val, st) if val is not None and val == val else (None, None)
+        return (None, None)
 
-        def latest(name: str):
-            r = con.execute(
-                "select value, step from metrics where run_id=? and name=? order by step desc, rowid desc limit 1",
-                [rid, name],
-            ).fetchone()
-            return (r[0], r[1]) if r and r[0] is not None and r[0] == r[0] else (None, None)
-
-        cards = {}
-        for k in DECK_CARDS:
-            st = fleet.STARS.get(k)
-            if not st:
-                continue
-            one, at = latest(st.metric)
-            two, _ = (
-                latest(st.shared_metric) if getattr(st, "shared_metric", None) else (None, None)
-            )
-            best = max([v for v in (one, two) if v is not None], default=None)
-            cards[k] = {
-                "one": one,
-                "shared": two,
-                "threshold": st.threshold,
-                "lit": best is not None and best >= st.threshold,
-                "at": at,
-            }
-        gain, _ = latest("tricks/logic_test/gain")
-        cause, _ = latest("tricks/logic_test/gain_cause")
-        hole, _ = latest("eval/hole-cards-unseen/bpb_mean_en")
-        fx = _finds(con, rid)
-        heads = _heads(con, rid)
-    finally:
-        con.close()
+    cards = {}
+    for k in DECK_CARDS:
+        st = fleet.STARS.get(k)
+        if not st:
+            continue
+        one, at = latest(st.metric)
+        two, _ = (
+            latest(st.shared_metric) if getattr(st, "shared_metric", None) else (None, None)
+        )
+        best = max([v for v in (one, two) if v is not None], default=None)
+        cards[k] = {
+            "one": one,
+            "shared": two,
+            "threshold": st.threshold,
+            "lit": best is not None and best >= st.threshold,
+            "at": at,
+        }
+    gain, _ = latest("tricks/logic_test/gain")
+    cause, _ = latest("tricks/logic_test/gain_cause")
+    hole, _ = latest("eval/hole-cards-unseen/bpb_mean_en")
+    fx = _finds(rid)
+    heads = _heads(rid)
     return {
         **run,
         "step": step,
@@ -2479,36 +2554,28 @@ def api_bridge() -> dict:
 
     st = getattr(fleet, "STARS", {}).get("bridge")
     out = []
-    con = _con()
-    try:
-        rows = con.execute(
-            "select m.run_id, r.name, r.spec_json, m.name, m.value, m.step from metrics m join runs r using(run_id)"
-            " where m.name like 'stars/bridge/%' order by m.step, m.rowid"
-        )
-        runs: dict[str, dict] = {}
-        for rid, name, spec_json, metric, value, step in rows:
-            r = runs.setdefault(
-                rid,
-                {
-                    "run_id": rid,
-                    "name": name,
-                    "preset": json.loads(spec_json or "{}").get("model", {}).get("preset"),
-                    "layers": {},
-                },
-            )
-            key = metric.split("/")[-1]
+    for run in _runs_rows():
+        rid = run["run_id"]
+        rows = _metric_name_rows(rid, "stars/bridge/")
+        if not rows:
+            continue
+        r = {
+            "run_id": rid,
+            "name": run["name"],
+            "preset": json.loads(run["spec_json"] or "{}").get("model", {}).get("preset"),
+            "layers": {},
+        }
+        for x in rows:
+            key = x["name"].split("/")[-1]
             if key.startswith("layer_"):
-                r["layers"][int(key[6:])] = value
+                r["layers"][int(key[6:])] = x["value"]
             else:
-                r[key] = value
-            r["step"] = step
-        for r in runs.values():
-            n = max(r["layers"], default=-1) + 1
-            r["curve"] = [r["layers"].get(i) for i in range(n)]
-            del r["layers"]
-            out.append(r)
-    finally:
-        con.close()
+                r[key] = x["value"]
+            r["step"] = x["step"]
+        n = max(r["layers"], default=-1) + 1
+        r["curve"] = [r["layers"].get(i) for i in range(n)]
+        del r["layers"]
+        out.append(r)
     return {"threshold": getattr(st, "threshold", None), "runs": out}
 
 
@@ -2658,77 +2725,67 @@ def api_census() -> dict:
     stars = {k: fleet.STARS[k] for k in CENSUS_CARDS if k in fleet.STARS}
     fitouts = getattr(fleet, "FITOUTS", {})
     out = []
-    con = _con()
-    try:
 
-        def latest(run_id: str, metric: str):
-            got = con.execute(
-                "select value from metrics where run_id=? and name=? order by step desc, rowid desc limit 1",
-                [run_id, metric],
-            ).fetchone()
-            v = got[0] if got else None
-            return v if isinstance(v, (int, float)) and v == v else None
+    def latest(run_id: str, metric: str):
+        v = _metric(run_id, metric, "last")
+        return v if isinstance(v, (int, float)) and v == v else None
 
-        def reading(run: str) -> dict:
-            row = con.execute(
-                "select run_id, status from runs where name=? order by started desc limit 1", [run]
-            ).fetchone()
-            if not row:
-                return {"run": run, "status": "queued"}
-            r = {"run": run, "status": row[1] or "", "cards": {}}
-            for k, st in stars.items():
-                one = latest(row[0], st.metric)
-                two = (
-                    latest(row[0], st.shared_metric) if getattr(st, "shared_metric", None) else None
-                )
-                if one is not None or two is not None:
-                    best = max(v for v in (one, two) if v is not None)
-                    r["cards"][k] = {"one": one, "shared": two, "lit": best >= st.threshold}
-            r["cause"] = latest(row[0], "tricks/logic_test/gain_cause")
-            r["logic"] = latest(row[0], "tricks/logic_test/gain")
-            return r
+    def reading(run: str) -> dict:
+        row = _run_row_by_name(run)
+        if not row:
+            return {"run": run, "status": "queued"}
+        r = {"run": run, "status": row["status"] or "", "cards": {}}
+        for k, st in stars.items():
+            one = latest(row["run_id"], st.metric)
+            two = (
+                latest(row["run_id"], st.shared_metric) if getattr(st, "shared_metric", None) else None
+            )
+            if one is not None or two is not None:
+                best = max(v for v in (one, two) if v is not None)
+                r["cards"][k] = {"one": one, "shared": two, "lit": best >= st.threshold}
+        r["cause"] = latest(row["run_id"], "tricks/logic_test/gain_cause")
+        r["logic"] = latest(row["run_id"], "tricks/logic_test/gain")
+        return r
 
-        for f in sorted((root / "data" / "runs" / "cards").glob("fitout-census-*.json")):
-            if f.name.endswith("-readings.json"):
-                continue
-            key = f.stem[len("fitout-census-") :]
-            try:
-                plan = json.loads(f.read_text())
-            except ValueError:
-                continue
-            fo = fitouts.get(key)
-            preset = getattr(fo, "preset", None) or (
-                fo.get("preset") if isinstance(fo, dict) else None
-            )
-            name = getattr(fo, "name", None) or (fo.get("name") if isinstance(fo, dict) else key)
-            rows = []
-            for variation, runs in plan.items():
-                rows.append({"variation": variation, "stages": [reading(r) for r in runs]})
-            rows.sort(key=lambda r: r["variation"] != "fitout")
-            possible = sorted(
-                {
-                    k
-                    for r in rows
-                    for st in r["stages"]
-                    for k, v in st.get("cards", {}).items()
-                    if v["lit"]
-                },
-                key=CENSUS_CARDS.index,
-            )
-            out.append(
-                {
-                    "key": key,
-                    "name": name,
-                    "preset": preset,
-                    "rows": rows,
-                    "possible": possible,
-                    "summary": (
-                        root / "data" / "runs" / "cards" / f"fitout-census-{key}.md"
-                    ).exists(),
-                }
-            )
-    finally:
-        con.close()
+    for f in sorted((root / "data" / "runs" / "cards").glob("fitout-census-*.json")):
+        if f.name.endswith("-readings.json"):
+            continue
+        key = f.stem[len("fitout-census-") :]
+        try:
+            plan = json.loads(f.read_text())
+        except ValueError:
+            continue
+        fo = fitouts.get(key)
+        preset = getattr(fo, "preset", None) or (
+            fo.get("preset") if isinstance(fo, dict) else None
+        )
+        name = getattr(fo, "name", None) or (fo.get("name") if isinstance(fo, dict) else key)
+        rows = []
+        for variation, runs in plan.items():
+            rows.append({"variation": variation, "stages": [reading(r) for r in runs]})
+        rows.sort(key=lambda r: r["variation"] != "fitout")
+        possible = sorted(
+            {
+                k
+                for r in rows
+                for st in r["stages"]
+                for k, v in st.get("cards", {}).items()
+                if v["lit"]
+            },
+            key=CENSUS_CARDS.index,
+        )
+        out.append(
+            {
+                "key": key,
+                "name": name,
+                "preset": preset,
+                "rows": rows,
+                "possible": possible,
+                "summary": (
+                    root / "data" / "runs" / "cards" / f"fitout-census-{key}.md"
+                ).exists(),
+            }
+        )
     out.sort(key=lambda c: c["key"].startswith("pilot"))
     return {
         "cards": [
@@ -2745,48 +2802,38 @@ def api_climb(runs: str) -> dict:
 
     out = {}
     chain_keys = {k for c in fleet.chains() for k in c}
-    con = _con()
-    try:
-        for rid in [x for x in runs.split(",") if x][:60]:
-            read_here = False
-            gain = None
-            lift: dict[str, float] = {}
-            score: dict[str, float] = {}
-            steps: dict[int, None] = {}
-            series = {"step": [], "climb": [], "chaining_lift": [], "logic_gain": []}
-            rows = list(
-                con.execute(
-                    "select step, name, value from metrics where run_id=? and name like 'tricks/%'"
-                    " order by step, rowid",
-                    [rid],
-                )
-            )
-            for i, (step, name, value) in enumerate(rows):
-                parts = name.split("/")
-                if len(parts) == 3 and parts[1] in fleet.TRICKS:
-                    if parts[2] == "lift":
-                        lift[parts[1]] = value
-                    elif parts[2] == "score":
-                        score[parts[1]] = value
-                    elif parts[1] == "logic_test" and parts[2] == "gain":
-                        gain = value
-                    read_here = read_here or parts[1] in chain_keys or parts[1] == "logic_test"
-                # a point only where the chains were read (other tricks are read on their own steps)
-                last = i == len(rows) - 1 or rows[i + 1][0] != step
-                if last and not read_here:
-                    continue
-                if last:
-                    read_here = False
-                if last and step not in steps:
-                    steps[step] = None
-                    c = leaderboard.climb(lift, score)
-                    series["step"].append(step)
-                    series["climb"].append(c["climb"])
-                    series["chaining_lift"].append(c["chaining_lift"])
-                    series["logic_gain"].append(gain)
-            out[rid] = series
-    finally:
-        con.close()
+    for rid in [x for x in runs.split(",") if x][:60]:
+        read_here = False
+        gain = None
+        lift: dict[str, float] = {}
+        score: dict[str, float] = {}
+        steps: dict[int, None] = {}
+        series = {"step": [], "climb": [], "chaining_lift": [], "logic_gain": []}
+        rows = [(x["step"], x["name"], x["value"]) for x in _metric_name_rows(rid, "tricks/")]
+        for i, (step, name, value) in enumerate(rows):
+            parts = name.split("/")
+            if len(parts) == 3 and parts[1] in fleet.TRICKS:
+                if parts[2] == "lift":
+                    lift[parts[1]] = value
+                elif parts[2] == "score":
+                    score[parts[1]] = value
+                elif parts[1] == "logic_test" and parts[2] == "gain":
+                    gain = value
+                read_here = read_here or parts[1] in chain_keys or parts[1] == "logic_test"
+            # a point only where the chains were read (other tricks are read on their own steps)
+            last = i == len(rows) - 1 or rows[i + 1][0] != step
+            if last and not read_here:
+                continue
+            if last:
+                read_here = False
+            if last and step not in steps:
+                steps[step] = None
+                c = leaderboard.climb(lift, score)
+                series["step"].append(step)
+                series["climb"].append(c["climb"])
+                series["chaining_lift"].append(c["chaining_lift"])
+                series["logic_gain"].append(gain)
+        out[rid] = series
     return out
 
 
@@ -2796,32 +2843,23 @@ def api_trick_series(key: str) -> dict:
 
     tr = fleet.TRICKS[key]
     out = []
-    con = _con()
-    try:
-        for r in _rows("select run_id, name, ship, spec_json from runs order by started"):
-            if (r["name"] or "").startswith("smoke"):
-                continue
-            pts = list(
-                con.execute(
-                    "select step, value from metrics where run_id=? and name=? order by step, rowid",
-                    [r["run_id"], tr.metric],
-                )
+    for r in _runs_rows():
+        if (r["name"] or "").startswith("smoke"):
+            continue
+        s, v = _metric_series_gated(r["run_id"], tr.metric)
+        if s:
+            spec = json.loads(r["spec_json"] or "{}")
+            out.append(
+                {
+                    "run_id": r["run_id"],
+                    "name": r["name"],
+                    "ship": r["ship"],
+                    "preset": spec.get("model", {}).get("preset"),
+                    "step": s,
+                    "value": v,
+                    "floor": _floor(r["run_id"], tr.metric),
+                }
             )
-            if pts:
-                spec = json.loads(r["spec_json"] or "{}")
-                out.append(
-                    {
-                        "run_id": r["run_id"],
-                        "name": r["name"],
-                        "ship": r["ship"],
-                        "preset": spec.get("model", {}).get("preset"),
-                        "step": [p[0] for p in pts],
-                        "value": [p[1] for p in pts],
-                        "floor": _floor(con, r["run_id"], tr.metric),
-                    }
-                )
-    finally:
-        con.close()
     return {"key": key, "threshold": tr.threshold, "metric": tr.metric, "runs": out}
 
 
@@ -2832,7 +2870,7 @@ def api_discoveries() -> dict:
     from thorp import fleet
     from thorp.evaluators import probes
 
-    runs = _rows("select run_id, name, ship, status, started, spec_json from runs order by started")
+    runs = _runs_rows()
     voyage = _voyage_of()
     shipreg, ship_of = _ships(runs)
 
@@ -2874,54 +2912,48 @@ def api_discoveries() -> dict:
                 "ships": ships,
             }
         )
-    con = _con()
     traits: dict[str, list] = {}
-    try:
-        for r in runs:
-            if r["name"] and r["name"].startswith("smoke"):
+    for r in runs:
+        if r["name"] and r["name"].startswith("smoke"):
+            continue
+        spec = json.loads(r["spec_json"] or "{}")
+        series: dict[str, dict[str, dict[int, float]]] = {}
+        for x in _metric_name_rows(r["run_id"], "probe/"):
+            name, step, value = x["name"], x["step"], x["value"]
+            if not (name.endswith("/best") or name.endswith("/floor_bow") or name.endswith("/floor_init")):
                 continue
-            spec = json.loads(r["spec_json"] or "{}")
-            series: dict[str, dict[str, dict[int, float]]] = {}
-            for name, step, value in con.execute(
-                "select name, step, value from metrics where run_id=? and name >= 'probe/' and name < 'probe0'"
-                " and (name like '%/best' or name like '%/floor_bow' or name like '%/floor_init')"
-                " order by step, rowid",
-                [r["run_id"]],
-            ):
-                t, part = name[len("probe/") :].rsplit("/", 1)
-                series.setdefault(t, {}).setdefault(part, {})[step] = value
-            for t, parts in series.items():
-                best = parts.get("best", {})
-                found = next((st for st, v in best.items() if v >= probes.AUC_FOUND), None)
-                floors = [parts[k] for k in ("floor_bow", "floor_init") if k in parts]
-                learned = None
-                if floors:
-                    learned = next(
-                        (
-                            st
-                            for st, v in best.items()
-                            if v >= probes.AUC_FOUND
-                            and v - max(f.get(st, float("-inf")) for f in floors)
-                            >= probes.EMERGE_MARGIN
-                        ),
-                        None,
-                    )
-                traits.setdefault(t, []).append(
-                    {
-                        "run_id": r["run_id"],
-                        "name": r["name"],
-                        "ship": r["ship"],
-                        "preset": spec.get("model", {}).get("preset"),
-                        **named(r),
-                        "found_at": found,
-                        "learned_at": learned,
-                        "floors": bool(floors),
-                        "best": max(best.values()) if best else None,
-                        "readings": len(best),
-                    }
+            t, part = name[len("probe/") :].rsplit("/", 1)
+            series.setdefault(t, {}).setdefault(part, {})[step] = value
+        for t, parts in series.items():
+            best = parts.get("best", {})
+            found = next((st for st, v in best.items() if v >= probes.AUC_FOUND), None)
+            floors = [parts[k] for k in ("floor_bow", "floor_init") if k in parts]
+            learned = None
+            if floors:
+                learned = next(
+                    (
+                        st
+                        for st, v in best.items()
+                        if v >= probes.AUC_FOUND
+                        and v - max(f.get(st, float("-inf")) for f in floors)
+                        >= probes.EMERGE_MARGIN
+                    ),
+                    None,
                 )
-    finally:
-        con.close()
+            traits.setdefault(t, []).append(
+                {
+                    "run_id": r["run_id"],
+                    "name": r["name"],
+                    "ship": r["ship"],
+                    "preset": spec.get("model", {}).get("preset"),
+                    **named(r),
+                    "found_at": found,
+                    "learned_at": learned,
+                    "floors": bool(floors),
+                    "best": max(best.values()) if best else None,
+                    "readings": len(best),
+                }
+            )
     # tricks (fleet.TRICKS): what a sailing can do, judged by its bets from outside, beside which
     # of the stars that perform it (performed_by) lit on that same sailing
     lit_on: dict[str, set] = {}
@@ -2930,78 +2962,66 @@ def api_discoveries() -> dict:
             if x["steps_to_lit"] is not None or x.get("shared_steps_to_lit") is not None:
                 lit_on.setdefault(x["run_id"], set()).add(st["key"])
     tricks = []
-    con = _con()
-    try:
-        for tr in getattr(fleet, "TRICKS", {}).values():
-            ships = []
-            for r in runs:
-                if r["name"] and r["name"].startswith("smoke"):
-                    continue
-                pts = list(
-                    con.execute(
-                        "select step, value from metrics where run_id=? and name=? order by step, rowid",
-                        [r["run_id"], tr.metric],
-                    )
+    for tr in getattr(fleet, "TRICKS", {}).values():
+        ships = []
+        for r in runs:
+            if r["name"] and r["name"].startswith("smoke"):
+                continue
+            s, v = _metric_series_gated(r["run_id"], tr.metric)
+            if not s:
+                continue
+            pts = [(st, val) for st, val in zip(s, v, strict=True)]
+            # the share rule (fleet.performed): a matched-pairs test is performed only where its
+            # lift is at the threshold and its share of pairs right at min_score, at the same reading
+            min_score = getattr(tr, "min_score", None)
+            share = {}
+            if min_score is not None:
+                s2, v2 = _metric_series_gated(r["run_id"], tr.metric.rsplit("/", 1)[0] + "/score")
+                share = dict(zip(s2, v2, strict=True))
+            done = [
+                p[0]
+                for p in pts
+                if p[1] >= tr.threshold
+                and (
+                    min_score is None
+                    or (share.get(p[0]) is not None and share[p[0]] >= min_score)
                 )
-                if not pts:
-                    continue
-                # the share rule (fleet.performed): a matched-pairs test is performed only where its
-                # lift is at the threshold and its share of pairs right at min_score, at the same reading
-                min_score = getattr(tr, "min_score", None)
-                share = {}
-                if min_score is not None:
-                    share = dict(
-                        con.execute(
-                            "select step, value from metrics where run_id=? and name=? order by step, rowid",
-                            [r["run_id"], tr.metric.rsplit("/", 1)[0] + "/score"],
-                        )
-                    )
-                done = [
-                    p[0]
-                    for p in pts
-                    if p[1] >= tr.threshold
-                    and (
-                        min_score is None
-                        or (share.get(p[0]) is not None and share[p[0]] >= min_score)
-                    )
-                ]
-                top = max(pts, key=lambda p: p[1])
-                spec = json.loads(r["spec_json"] or "{}")
-                ships.append(
-                    {
-                        "run_id": r["run_id"],
-                        "name": r["name"],
-                        "ship": r["ship"],
-                        "preset": spec.get("model", {}).get("preset"),
-                        **named(r),
-                        "performed_at": done[0] if done else None,
-                        "best": top[1],
-                        "share_at_best": share.get(top[0]),
-                        "best_share": max(share.values()) if share else None,
-                        "latest": pts[-1][1],
-                        "readings": len(pts),
-                        "floor": _floor(con, r["run_id"], tr.metric),
-                        "stars_lit": sorted(lit_on.get(r["run_id"], set()) & set(tr.performed_by)),
-                    }
-                )
-            tricks.append(
+            ]
+            top = max(pts, key=lambda p: p[1])
+            spec = json.loads(r["spec_json"] or "{}")
+            ships.append(
                 {
-                    "key": tr.key,
-                    "name": tr.name,
-                    "metric": tr.metric,
-                    "threshold": tr.threshold,
-                    "min_score": getattr(tr, "min_score", None),
-                    "performed_by": list(tr.performed_by),
-                    "evaluator": tr.evaluator,
-                    "leads_to": getattr(tr, "leads_to", None),
-                    "cutoff": getattr(tr, "cutoff", None),
-                    "viable": getattr(tr, "viable", True),
-                    "about": tr.about,
-                    "ships": ships,
+                    "run_id": r["run_id"],
+                    "name": r["name"],
+                    "ship": r["ship"],
+                    "preset": spec.get("model", {}).get("preset"),
+                    **named(r),
+                    "performed_at": done[0] if done else None,
+                    "best": top[1],
+                    "share_at_best": share.get(top[0]),
+                    "best_share": max(share.values()) if share else None,
+                    "latest": pts[-1][1],
+                    "readings": len(pts),
+                    "floor": _floor(r["run_id"], tr.metric),
+                    "stars_lit": sorted(lit_on.get(r["run_id"], set()) & set(tr.performed_by)),
                 }
             )
-    finally:
-        con.close()
+        tricks.append(
+            {
+                "key": tr.key,
+                "name": tr.name,
+                "metric": tr.metric,
+                "threshold": tr.threshold,
+                "min_score": getattr(tr, "min_score", None),
+                "performed_by": list(tr.performed_by),
+                "evaluator": tr.evaluator,
+                "leads_to": getattr(tr, "leads_to", None),
+                "cutoff": getattr(tr, "cutoff", None),
+                "viable": getattr(tr, "viable", True),
+                "about": tr.about,
+                "ships": ships,
+            }
+        )
     return {
         "tricks": tricks,
         "stars": stars,
@@ -3026,20 +3046,13 @@ def api_stages(runs: str) -> dict:
     """Each run's training stages (artifact 'stages' at step 0: [{index, name, recipe, passes,
     first_step, last_step, tokens}]); a run without stages has an empty list (one stage, reading)."""
     out = {}
-    con = _con()
-    try:
-        for rid in [x for x in runs.split(",") if x]:
-            row = con.execute(
-                "select text from artifacts where (run_id=? or run_id in (select run_id from runs where name=?))"
-                " and kind='stages' order by step desc, rowid desc limit 1",
-                [rid, rid],
-            ).fetchone()
-            try:
-                out[rid] = json.loads(row[0]) if row else []
-            except ValueError:
-                out[rid] = []
-    finally:
-        con.close()
+    for key in [x for x in runs.split(",") if x]:
+        rid = _run_id(key)
+        a = _artifact(rid, "stages") if rid else None
+        try:
+            out[key] = json.loads(a["text"]) if a and a["text"] else []
+        except ValueError:
+            out[key] = []
     return out
 
 
@@ -3094,12 +3107,15 @@ def _class_best(preset: str) -> dict:
     the class to choose from instead. With no ship in service read on it, the leaderboard's pick (chaining lift)."""
     from thorp import leaderboard, ship_store
 
-    voyages = _rows(
-        "select name, ship, finished from runs where status='finished' and "
-        "(json_extract(spec_json,'$.model.preset') = ? or json_extract(spec_json,'$.model.preset') like ?) "
-        "order by finished desc",
-        [preset, f"{preset}-%"],
-    )
+    voyages = []
+    for r in _runs_rows():
+        if r.get("status") != "finished":
+            continue
+        spec = json.loads(r.get("spec_json") or "{}")
+        p = spec.get("model", {}).get("preset")
+        if p == preset or (p or "").startswith(preset + "-"):
+            voyages.append({"name": r["name"], "ship": r["ship"], "finished": r["finished"]})
+    voyages.sort(key=lambda x: x["finished"] or "", reverse=True)
     metric, label = _objective_metric(preset)
     best = None
     row = next((r for r in ship_store.sizes() if r["preset"] == preset.split("-")[0]), {})
@@ -3112,9 +3128,9 @@ def _class_best(preset: str) -> dict:
             runs = [v for v in ship_store.voyages(sh.key)]
             scored = []
             for v in runs:
-                r = _rows("select value from metrics where run_id=? and name=? order by step desc limit 1", [v.run_id, metric])
-                if r:
-                    scored.append((float(r[0]["value"]), v.name))
+                value = _metric(v.run_id, metric)
+                if value is not None:
+                    scored.append((float(value), v.name))
             if scored:
                 top = max(scored)
                 if best is None or top[0] > best["value"]:
@@ -3247,11 +3263,18 @@ def _slug(preset: str) -> str:
 def _class_voyages(preset: str, limit: int = 12) -> list[dict]:
     """The class's voyages to read: Ogden's first (its fitout is the one that sails), then the latest others."""
     cls = preset.split("-")[0]
-    rows = _rows(
-        """select run_id, name, status, started, json_extract(spec_json,'$.model.preset') p,
-                  json_extract(spec_json,'$.optim.batch_tokens') bt
-           from runs where status in ('finished','running') order by started desc"""
-    )
+    rows = []
+    for r in reversed(_runs_rows()):  # newest first, as `order by started desc`
+        if r.get("status") not in ("finished", "running"):
+            continue
+        spec = json.loads(r.get("spec_json") or "{}")
+        rows.append(
+            {
+                "run_id": r["run_id"], "name": r["name"], "status": r["status"], "started": r["started"],
+                "p": spec.get("model", {}).get("preset"),
+                "bt": (spec.get("optim") or {}).get("batch_tokens"),
+            }
+        )
     seen: set[str] = set()
     mine = []
     for r in rows:  # the latest sailing of each voyage (a recalled one sails again under its name)
@@ -3272,47 +3295,37 @@ def api_class_subjects(preset: str) -> dict:
     slug = _slug(preset)
     names = _class_names(preset)
     voyages = _class_voyages(preset)
-    con = _con()
-    try:
-        def last(rid, name):
-            r = con.execute(
-                "select value, step from metrics where run_id=? and name=? order by step desc limit 1", [rid, name]
-            ).fetchone()
-            return (r[0], r[1]) if r else (None, None)
 
-        def series(rid, name, bt):
-            return [
-                [s * (bt or 32768), v]
-                for s, v in con.execute(
-                    "select step, value from metrics where run_id=? and name=? order by step", [rid, name]
-                )
-                if v is not None
-            ]
+    def last(rid, name):
+        s, v = _metric_series_gated(rid, name)
+        return (v[-1], s[-1]) if s else (None, None)
 
-        out = {}
-        for key, (title, about, tests) in SUBJECTS.items():
-            rows = []
-            for k in tests:
-                tr = fleet.TRICKS.get(k)
-                if tr is None:
-                    continue
-                score_metric = tr.metric.rsplit("/", 1)[0] + "/score"
-                readings = []
-                for v in voyages:
-                    val, step = last(v["run_id"], tr.metric)
-                    sc, _ = last(v["run_id"], score_metric)
-                    readings.append({
-                        "voyage": v["name"], "status": v["status"], "value": val, "score": sc, "step": step,
-                        "passed": None if val is None else val >= tr.threshold,
-                        "series": series(v["run_id"], tr.metric, v["bt"]) if tr.goal_class in names and val is not None else None,
-                    })  # fmt: skip
-                rows.append({
-                    "key": k, "name": tr.name, "about": tr.about, "goal_class": tr.goal_class,
-                    "mine": tr.goal_class in names, "metric": tr.metric, "threshold": tr.threshold, "readings": readings,
+    def series(rid, name, bt):
+        s, v = _metric_series_gated(rid, name)
+        return [[st * (bt or 32768), val] for st, val in zip(s, v, strict=True) if val is not None]
+
+    out = {}
+    for key, (title, about, tests) in SUBJECTS.items():
+        rows = []
+        for k in tests:
+            tr = fleet.TRICKS.get(k)
+            if tr is None:
+                continue
+            score_metric = tr.metric.rsplit("/", 1)[0] + "/score"
+            readings = []
+            for v in voyages:
+                val, step = last(v["run_id"], tr.metric)
+                sc, _ = last(v["run_id"], score_metric)
+                readings.append({
+                    "voyage": v["name"], "status": v["status"], "value": val, "score": sc, "step": step,
+                    "passed": None if val is None else val >= tr.threshold,
+                    "series": series(v["run_id"], tr.metric, v["bt"]) if tr.goal_class in names and val is not None else None,
                 })  # fmt: skip
-            out[key] = {"title": title, "about": about, "tests": rows}
-    finally:
-        con.close()
+            rows.append({
+                "key": k, "name": tr.name, "about": tr.about, "goal_class": tr.goal_class,
+                "mine": tr.goal_class in names, "metric": tr.metric, "threshold": tr.threshold, "readings": readings,
+            })  # fmt: skip
+        out[key] = {"title": title, "about": about, "tests": rows}
     return {"preset": preset, "class": slug, "voyages": [v["name"] for v in voyages], "subjects": out}
 
 
@@ -3385,85 +3398,81 @@ def api_class_vs(preset: str, ref: str | None = None, voyage: str | None = None)
     refs = _vs_references()
     ref = ref if ref in refs else (VS_REFERENCE if VS_REFERENCE in refs else next(iter(refs), None))
     voyages = [v for v in _class_voyages(preset, 20)]
-    con = _con()
-    try:
-        def last(rid, name):
-            r = con.execute("select value, step from metrics where run_id=? and name=? order by step desc limit 1", [rid, name]).fetchone()  # fmt: skip
-            return (r[0], r[1]) if r else (None, None)
+    def last(rid, name):
+        s, v = _metric_series_gated(rid, name)
+        return (v[-1], s[-1]) if s else (None, None)
 
-        readable = [v for v in voyages if last(v["run_id"], "tricks/refrain_test/score")[0] is not None]
-        v = next((x for x in readable if x["name"] == voyage), None) or next(
-            (x for x in readable if x["status"] == "running"), None) or (readable[0] if readable else None)  # fmt: skip
-        if v is None or ref is None:
-            return {"preset": preset, "ref": ref, "refs": list(refs), "voyage": None, "voyages": [x["name"] for x in readable], "rows": []}
-        rid = v["run_id"]
-        R = refs[ref]
-        rows = []
+    readable = [v for v in voyages if last(v["run_id"], "tricks/refrain_test/score")[0] is not None]
+    v = next((x for x in readable if x["name"] == voyage), None) or next(
+        (x for x in readable if x["status"] == "running"), None) or (readable[0] if readable else None)  # fmt: skip
+    if v is None or ref is None:
+        return {"preset": preset, "ref": ref, "refs": list(refs), "voyage": None, "voyages": [x["name"] for x in readable], "rows": []}
+    rid = v["run_id"]
+    R = refs[ref]
+    rows = []
 
-        def add(key, group, name, about, mine, theirs, share, unit, step, note=None, noise=False, whose=None):
-            rows.append({"key": key, "group": group, "name": name, "about": about, "mine": mine, "ref": theirs,
-                         "share": share, "unit": unit, "step": step, "note": note, "noise": noise, "whose": whose})  # fmt: skip
+    def add(key, group, name, about, mine, theirs, share, unit, step, note=None, noise=False, whose=None):
+        rows.append({"key": key, "group": group, "name": name, "about": about, "mine": mine, "ref": theirs,
+                     "share": share, "unit": unit, "step": step, "note": note, "noise": noise, "whose": whose})  # fmt: skip
 
-        for k, t in R.items():
-            if not k.endswith("_test") or k == "logic_test" or not isinstance(t, dict):
-                continue
-            tr = fleet.TRICKS.get(k)
-            sc, step = last(rid, f"tricks/{k}/score")
-            lf, _ = last(rid, f"tricks/{k}/lift")
-            if sc is None:
-                continue
-            mp, rp = round(sc * VS_PAIRS), round(t["score"] * VS_PAIRS)
-            above = rp - VS_PAIRS / 2
-            share = (mp - VS_PAIRS / 2) / above if above > 2 else None
-            add(k, "trick test", tr.name if tr else k, (tr.about[:180] if tr else ""), mp, rp, share, "pairs of 24", step,
-                note=f"lift {lf:+.2f} against {t['lift']:+.2f}" if lf is not None else None, noise=abs(mp - rp) <= 2,
-                whose=tr.goal_class if tr else None)  # fmt: skip
-        lt = R.get("logic_test") or {}
-        for k, name, about in VS_LOGIC:
-            mine, step = last(rid, f"tricks/logic_test/{k}")
-            theirs = lt.get(k)
-            if mine is None or theirs is None:
-                continue
-            ranked = theirs >= VS_LIFT_FLOOR
-            add(f"logic/{k}", "logic deck", name, about, mine, theirs, mine / theirs if ranked else None, "nats", step,
-                noise=abs(mine - theirs) < 0.05, note=None if ranked else f"the reference reads under {VS_LIFT_FLOOR}: not ranked")  # fmt: skip
-        cards = R.get("cards") or {}
-        for k, name, metrics, (card, field), about in VS_CARDS:
-            theirs = (cards.get(card) or {}).get(field)
-            mine, step, used = None, None, None
-            for m in metrics:
-                mine, step = last(rid, m)
-                if mine is not None:
-                    used = m
-                    break
-            if mine is None or theirs is None:
-                continue
-            note = "one head: the two-head reading is not on the ledger for this voyage yet" if used != metrics[0] else None
-            add(f"card/{k}", "card", name, about, mine, theirs, mine / theirs if theirs > 0 else None,
-                "nats a token" if k == "copy_gain" else "attention", step, note=note)  # fmt: skip
-        dk = R.get("deck") or {}
-        for k, name, metric, ranked, about in VS_DECK:
-            theirs = (dk.get("metrics") or {}).get(metric)
-            mine, step = last(rid, metric)
-            if theirs is None or mine is None or any(x["key"] == f"card/{k}" for x in rows):
-                continue
-            add(f"card/{k}", "card", name, about, mine, theirs, mine / theirs if ranked and theirs > 0 else None,
-                "attention", step, note=None if ranked else "a class card's ratio: shown, not ranked")  # fmt: skip
-        if dk.get("played") is not None:
-            from thorp.viable.s4_intelligence import wager
+    for k, t in R.items():
+        if not k.endswith("_test") or k == "logic_test" or not isinstance(t, dict):
+            continue
+        tr = fleet.TRICKS.get(k)
+        sc, step = last(rid, f"tricks/{k}/score")
+        lf, _ = last(rid, f"tricks/{k}/lift")
+        if sc is None:
+            continue
+        mp, rp = round(sc * VS_PAIRS), round(t["score"] * VS_PAIRS)
+        above = rp - VS_PAIRS / 2
+        share = (mp - VS_PAIRS / 2) / above if above > 2 else None
+        add(k, "trick test", tr.name if tr else k, (tr.about[:180] if tr else ""), mp, rp, share, "pairs of 24", step,
+            note=f"lift {lf:+.2f} against {t['lift']:+.2f}" if lf is not None else None, noise=abs(mp - rp) <= 2,
+            whose=tr.goal_class if tr else None)  # fmt: skip
+    lt = R.get("logic_test") or {}
+    for k, name, about in VS_LOGIC:
+        mine, step = last(rid, f"tricks/logic_test/{k}")
+        theirs = lt.get(k)
+        if mine is None or theirs is None:
+            continue
+        ranked = theirs >= VS_LIFT_FLOOR
+        add(f"logic/{k}", "logic deck", name, about, mine, theirs, mine / theirs if ranked else None, "nats", step,
+            noise=abs(mine - theirs) < 0.05, note=None if ranked else f"the reference reads under {VS_LIFT_FLOOR}: not ranked")  # fmt: skip
+    cards = R.get("cards") or {}
+    for k, name, metrics, (card, field), about in VS_CARDS:
+        theirs = (cards.get(card) or {}).get(field)
+        mine, step, used = None, None, None
+        for m in metrics:
+            mine, step = last(rid, m)
+            if mine is not None:
+                used = m
+                break
+        if mine is None or theirs is None:
+            continue
+        note = "one head: the two-head reading is not on the ledger for this voyage yet" if used != metrics[0] else None
+        add(f"card/{k}", "card", name, about, mine, theirs, mine / theirs if theirs > 0 else None,
+            "nats a token" if k == "copy_gain" else "attention", step, note=note)  # fmt: skip
+    dk = R.get("deck") or {}
+    for k, name, metric, ranked, about in VS_DECK:
+        theirs = (dk.get("metrics") or {}).get(metric)
+        mine, step = last(rid, metric)
+        if theirs is None or mine is None or any(x["key"] == f"card/{k}" for x in rows):
+            continue
+        add(f"card/{k}", "card", name, about, mine, theirs, mine / theirs if ranked and theirs > 0 else None,
+            "attention", step, note=None if ranked else "a class card's ratio: shown, not ranked")  # fmt: skip
+    if dk.get("played") is not None:
+        from thorp.viable.s4_intelligence import wager
 
-            ours = [c for c, v in wager.falls(rid, int(v.get("bt") or 32768)).items() if v["played"]]
-            add("deck/played", "card", "Cards played (the deck's rules, of 16)", "every card whose look (and ability) "
-                "passes, above what it sits on", len(ours), len(dk["played"]), len(ours) / max(1, len(dk["played"])),
-                "cards", None, note=f"ours: {', '.join(sorted(ours))}; theirs: {', '.join(dk['played'])}")  # fmt: skip
-        mine, step = last(rid, "eval/hole-cards-unseen/bpb_mean")
-        if mine is not None and R.get("bpb"):
-            add("bpb", "language", "Judge-book bits per byte (lower is better)", "the 16 Forgotten Tomes, every byte",
-                mine, R["bpb"], R["bpb"] / mine, "bits a byte", step,
-                note=None if R.get("bpb_clean") else "the reference was scored on raw text; ours reads the cleaned text")  # fmt: skip
-        tot = last(rid, "plan/total_steps")[0]
-    finally:
-        con.close()
+        ours = [c for c, v in wager.falls(rid, int(v.get("bt") or 32768)).items() if v["played"]]
+        add("deck/played", "card", "Cards played (the deck's rules, of 16)", "every card whose look (and ability) "
+            "passes, above what it sits on", len(ours), len(dk["played"]), len(ours) / max(1, len(dk["played"])),
+            "cards", None, note=f"ours: {', '.join(sorted(ours))}; theirs: {', '.join(dk['played'])}")  # fmt: skip
+    mine, step = last(rid, "eval/hole-cards-unseen/bpb_mean")
+    if mine is not None and R.get("bpb"):
+        add("bpb", "language", "Judge-book bits per byte (lower is better)", "the 16 Forgotten Tomes, every byte",
+            mine, R["bpb"], R["bpb"] / mine, "bits a byte", step,
+            note=None if R.get("bpb_clean") else "the reference was scored on raw text; ours reads the cleaned text")  # fmt: skip
+    tot = last(rid, "plan/total_steps")[0]
     ranked = [r for r in rows if r["share"] is not None]
     ranked.sort(key=lambda r: r["share"])
     return {
@@ -3659,25 +3668,21 @@ def api_logic_relation(preset: str, relation: str) -> dict:
         knock = {"model": d["model"], "baseline": d["baseline"].get(relation),
                  "drops": sorted(({"condition": c, "drop": v["relation_drops"].get(relation)} for c, v in d["conditions"].items()
                                   if v.get("relation_drops", {}).get(relation) is not None), key=lambda x: -x["drop"])}  # fmt: skip
-    con = _con()
-    try:
-        per = []
-        for v in _class_voyages(preset):
-            for kind in ("logic40", "logic"):
-                r = con.execute("select step, text from artifacts where run_id=? and kind=? order by step desc, rowid desc limit 1", [v["run_id"], kind]).fetchone()  # fmt: skip
-                if r and r[1]:
-                    items = {k: x for k, x in json.loads(r[1]).items() if k.startswith(relation + "-")}
-                    if kind == "logic40":
-                        label = v["name"].replace("fu-ogden-v0-1", "Ogden").replace("fu-ogden-v0-2", "Ogden v0.2").replace("-pre", "")
-                        mark_results(label, items)
-                        readers.insert(0, label)
-                    per.append({"voyage": v["name"], "deck": "40" if kind == "logic40" else "8", "step": r[0],
-                                "items": [{"item": k, **{a: x.get(a) for a in ("both", "first", "second", "one_hop")},
-                                           "chained": bool(x["both"] > 0 and x["both"] > max(x["first"], x["second"]))}
-                                          for k, x in sorted(items.items(), key=lambda kv: int(kv[0].rsplit("-", 1)[1]))]})  # fmt: skip
-                    break
-    finally:
-        con.close()
+    per = []
+    for v in _class_voyages(preset):
+        for kind in ("logic40", "logic"):
+            a = _artifact(v["run_id"], kind)
+            if a and a["text"]:
+                items = {k: x for k, x in json.loads(a["text"]).items() if k.startswith(relation + "-")}
+                if kind == "logic40":
+                    label = v["name"].replace("fu-ogden-v0-1", "Ogden").replace("fu-ogden-v0-2", "Ogden v0.2").replace("-pre", "")
+                    mark_results(label, items)
+                    readers.insert(0, label)
+                per.append({"voyage": v["name"], "deck": "40" if kind == "logic40" else "8", "step": a["step"],
+                            "items": [{"item": k, **{a: x.get(a) for a in ("both", "first", "second", "one_hop")},
+                                       "chained": bool(x["both"] > 0 and x["both"] > max(x["first"], x["second"]))}
+                                      for k, x in sorted(items.items(), key=lambda kv: int(kv[0].rsplit("-", 1)[1]))]})  # fmt: skip
+                break
     return {"preset": preset, "relation": relation, **{k: det[k] for k in ("title", "asks", "steps", "built", "hard")},
             "items": len({r["item"] for r in rows}), "item": item, "examples": examples, "cards": cards, "knockout": knock,
             "voyages": voyages, "references": refs, "per_item": per, "mark": full["mark"], "bar": full["bar"],
@@ -3714,24 +3719,20 @@ def _class_logic(preset: str) -> dict:
         ex = next((r for r in rows if r["variant"] == "both"), None)
         deck.append({"relation": rel, "about": LOGIC_ABOUT[rel], "items": len({r["item"] for r in rows}),
                      "example": ex and {"prompt": ex["prompt"], "idea": ex["idea"], "rival": ex["rival"]}})  # fmt: skip
-    con = _con()
-    try:
-        def art(rid, kind):
-            r = con.execute("select step, text from artifacts where run_id=? and kind=? order by step desc, rowid desc limit 1", [rid, kind]).fetchone()  # fmt: skip
-            return (r[0], json.loads(r[1])) if r and r[1] else (None, None)
+    def art(rid, kind):
+        a = _artifact(rid, kind)
+        return (a["step"], json.loads(a["text"])) if a and a["text"] else (None, None)
 
-        voyages = []
-        for v in _class_voyages(preset):
-            step, items = art(v["run_id"], "logic40")
-            which = "40"
-            if items is None:
-                step, items = art(v["run_id"], "logic")
-                which = "8"
-            if items is None:
-                continue
-            voyages.append({"voyage": v["name"], "status": v["status"], "step": step, "deck": which, "gains": _logic_bands(items)})
-    finally:
-        con.close()
+    voyages = []
+    for v in _class_voyages(preset):
+        step, items = art(v["run_id"], "logic40")
+        which = "40"
+        if items is None:
+            step, items = art(v["run_id"], "logic")
+            which = "8"
+        if items is None:
+            continue
+        voyages.append({"voyage": v["name"], "status": v["status"], "step": step, "deck": which, "gains": _logic_bands(items)})
     refs = []
     graded = readings.chain_grades()
     for _, d in readings.glob("logic-*"):
@@ -3757,29 +3758,22 @@ def api_class_shapes(preset: str) -> dict:
     accuracy as a series over tokens read, and the latest share of probability on each kind of word."""
     from thorp.viable.s5_policy import taxonomy
 
-    con = _con()
-    try:
-        out = []
-        for v in _class_voyages(preset):
-            rid, bt = v["run_id"], v["bt"] or 32768
-            got = {}
-            for m in ("shapes/upos_top1", "shapes/ogden_top1", "shapes/keyed_top1"):
-                got[m] = [[s * bt, val] for s, val in con.execute(
-                    "select step, value from metrics where run_id=? and name=? order by step", [rid, m]) if val is not None]  # fmt: skip
-            if not got["shapes/upos_top1"]:
-                continue
-            last_step = got["shapes/upos_top1"][-1][0] // bt
-            mass = {t: con.execute("select value from metrics where run_id=? and name=? and step=?",
-                                   [rid, f"shapes/mass/{t}", last_step]).fetchone() for t in taxonomy.FINE}  # fmt: skip
-            truth = {t: con.execute("select value from metrics where run_id=? and name=? and step=?",
-                                    [rid, f"shapes/truth/{t}", last_step]).fetchone() for t in taxonomy.FINE}  # fmt: skip
-            out.append({
-                "voyage": v["name"], "status": v["status"], "series": got,
-                "mass": {t: (x[0] if x else None) for t, x in mass.items()},
-                "truth": {t: (x[0] if x else None) for t, x in truth.items()},
-            })  # fmt: skip
-    finally:
-        con.close()
+    out = []
+    for v in _class_voyages(preset):
+        rid, bt = v["run_id"], v["bt"] or 32768
+        got = {}
+        for m in ("shapes/upos_top1", "shapes/ogden_top1", "shapes/keyed_top1"):
+            s, vals = _metric_series_gated(rid, m)
+            got[m] = [[st * bt, val] for st, val in zip(s, vals, strict=True) if val is not None]
+        if not got["shapes/upos_top1"]:
+            continue
+        last_step = got["shapes/upos_top1"][-1][0] // bt
+        mass = {t: _metric_at_step(rid, f"shapes/mass/{t}", last_step) for t in taxonomy.FINE}
+        truth = {t: _metric_at_step(rid, f"shapes/truth/{t}", last_step) for t in taxonomy.FINE}
+        out.append({
+            "voyage": v["name"], "status": v["status"], "series": got,
+            "mass": mass, "truth": truth,
+        })  # fmt: skip
     return {"preset": preset, "fine": list(taxonomy.FINE), "about": taxonomy.ABOUT, "voyages": out}
 
 
@@ -3917,18 +3911,10 @@ def api_class_deck(preset: str) -> dict:
     if hit and time.time() - hit[0] < 300:  # five minutes: reading every voyage's falls takes seconds
         return hit[1]
     voyages = _class_voyages(preset, limit=200)
-    con = _con()
-    try:
-        names = sorted({m for c in deck.CARDS if c.look for m in c.look[0]})
-        peaks: dict[str, dict[str, float]] = {}
-        for v in voyages:
-            rows = con.execute(
-                f"select name, max(value) from metrics where run_id=? and name in ({','.join('?' * len(names))}) group by name",
-                [v["run_id"], *names],
-            ).fetchall()
-            peaks[v["run_id"]] = {n: x for n, x in rows if x is not None}
-    finally:
-        con.close()
+    names = sorted({m for c in deck.CARDS if c.look for m in c.look[0]})
+    peaks: dict[str, dict[str, float]] = {}
+    for v in voyages:
+        peaks[v["run_id"]] = _metric_peaks(v["run_id"], names)
     falls = {v["run_id"]: wager.falls(v["run_id"], v["bt"] or 32768) for v in voyages}
     read = [v for v in voyages if peaks[v["run_id"]]]
     out = []
@@ -4324,16 +4310,17 @@ def api_watch(preset: str, sop: str = "") -> dict:
     from thorp.viable.s4_intelligence import wager
 
     cls = preset.split("-")[0]
-    rows = _rows(
-        """select run_id, name, status, started, finished, spec_json from runs
-           where json_extract(spec_json,'$.model.preset') like ?
-             and (? = '' or ifnull(json_extract(spec_json,'$.sop'), '') = ?)
-           order by (status='running') desc, started desc limit 1""",
-        [f"{cls}%", sop, sop],
-    )
-    if not rows:
+    candidates = []
+    for r in reversed(_runs_rows()):  # newest first
+        spec0 = json.loads(r.get("spec_json") or "{}")
+        p = spec0.get("model", {}).get("preset")
+        if (p or "").startswith(cls) and (sop == "" or (spec0.get("sop") or "") == sop):
+            candidates.append(r)
+    if not candidates:
         return {"preset": preset, "voyage": None}
-    v = rows[0]
+    # order by (status='running') desc, started desc: the newest at sea, else the newest home
+    running = [r for r in candidates if r["status"] == "running"]
+    v = (running or candidates)[0]
     rid = v["run_id"]
     spec = json.loads(v["spec_json"] or "{}")
     f = paths.resolve("specs").rglob(f"{v['name']}.yaml")
@@ -4343,28 +4330,24 @@ def api_watch(preset: str, sop: str = "") -> dict:
 
         spec = {**spec, **(yaml.safe_load(f.read_text()) or {})}
     bt = (spec.get("optim") or {}).get("batch_tokens") or 32768
-    con = _con()
-    try:
-        def one(name):
-            r = con.execute("select value from metrics where run_id=? and name=? order by step desc limit 1", [rid, name]).fetchone()
-            return r[0] if r else None
+    def one(name):
+        return _metric(rid, name)
 
-        total_steps = one("plan/total_steps")
-        tokens_total = one("plan/tokens_total")
-        passes = one("plan/passes") or (spec.get("data") or {}).get("passes") or 1
-        last = con.execute("select max(step) from metrics where run_id=? and name='loss'", [rid]).fetchone()[0] or 0
-        seen = one("tokens_seen") or last * bt
-        series = {}
-        for key, name in WATCH_SERIES.items():
-            pts = [[s * bt, val] for s, val in con.execute(
-                "select step, value from metrics where run_id=? and name=? order by step", [rid, name]) if val is not None]  # fmt: skip
-            if key in ("loss", "lr", "tokens_per_s", "scaffold_weight", "scaffold_loss") and len(pts) > 400:  # every step: thin to 400 points
-                k = len(pts) // 400 + 1
-                pts = pts[::k] + ([pts[-1]] if pts[-1] not in pts[::k] else [])
-            series[key] = pts
-        last_t = con.execute("select max(ts) from metrics where run_id=? and name='loss'", [rid]).fetchone()[0]
-    finally:
-        con.close()
+    total_steps = one("plan/total_steps")
+    tokens_total = one("plan/tokens_total")
+    passes = one("plan/passes") or (spec.get("data") or {}).get("passes") or 1
+    loss_steps, _ = _metric_series_gated(rid, "loss")
+    last = loss_steps[-1] if loss_steps else 0
+    seen = one("tokens_seen") or last * bt
+    series = {}
+    for key, name in WATCH_SERIES.items():
+        s, vv = _metric_series_gated(rid, name)
+        pts = [[st * bt, val] for st, val in zip(s, vv, strict=True) if val is not None]
+        if key in ("loss", "lr", "tokens_per_s", "scaffold_weight", "scaffold_loss") and len(pts) > 400:  # every step: thin to 400 points
+            k = len(pts) // 400 + 1
+            pts = pts[::k] + ([pts[-1]] if pts[-1] not in pts[::k] else [])
+        series[key] = pts
+    last_t = _metric_max_ts(rid, "loss")
     started = datetime.fromisoformat(v["started"]).timestamp() if v["started"] else None
     now = time.time()
     elapsed = (now if v["status"] == "running" else (datetime.fromisoformat(v["finished"]).timestamp() if v["finished"] else now)) - (started or now)
@@ -4512,12 +4495,9 @@ def api_tomes() -> dict:
         for row, b in zip(csv.DictReader(f), ids, strict=False):
             released[b] = (row.get("text") or "").replace("released ", "")
     scores: dict[str, dict] = {}
-    for r in _rows(
-        """select r.name, r.ship, e.book_id, e.bpb from evals e join runs r using(run_id)
-           where e."set"='hole-cards-unseen'
-             and e.step=(select max(step) from evals x where x.run_id=e.run_id and x."set"='hole-cards-unseen')"""
-    ):
-        scores.setdefault(r["ship"] or r["name"], {})[r["book_id"]] = r["bpb"]
+    for run in _runs_rows():
+        for e in _latest_evals(run["run_id"], "hole-cards-unseen"):
+            scores.setdefault(run["ship"] or run["name"], {})[e["book_id"]] = e["bpb"]
     for _, x in readings.glob("*__hole-cards-unseen"):
         scores[x["model"].split("/")[-1]] = {b["book_id"]: b["bpb"] for b in x.get("books", [])}
     return {
@@ -4537,12 +4517,9 @@ def api_tomes() -> dict:
 
 def api_shelf(run: str) -> list[dict]:
     """A run's training shelf, from its step-0 recipe artifact."""
-    a = _rows(
-        "select a.text from artifacts a join runs r using(run_id) where (r.name=? or r.run_id=?)"
-        " and a.kind='recipe' order by a.rowid desc limit 1",
-        [run, run],
-    )
-    return json.loads(a[0]["text"]) if a and a[0]["text"] else []
+    rid = _run_id(run)
+    a = _artifact(rid, "recipe") if rid else None
+    return json.loads(a["text"]) if a and a["text"] else []
 
 
 def api_book(book_id: str, offset: int = 0, length: int = 20000) -> dict:
@@ -4628,6 +4605,15 @@ class Handler(BaseHTTPRequestHandler):
                 )
             if not u.path.startswith("/api/"):
                 got = _static(u.path)
+                if got is None and not u.path.endswith("/"):
+                    got = _static(u.path + "/index.html")  # Astro's per-route pages (the multi-page build)
+                # a dynamic sub-route (e.g. /discoveries/<trick>) serves its section's shell: the panel is
+                # filled client-side from the JSON API, so the shell is the same for every slug
+                if got is None:
+                    parts = [p for p in u.path.split("/") if p]
+                    while parts and got is None:
+                        parts.pop()
+                        got = _static("/".join(parts) + "/index.html") if parts else _static("index.html")
                 if got is None:
                     return self._send(404, b"not found", "text/plain")
                 # the build names its assets by content hash, so they never go stale

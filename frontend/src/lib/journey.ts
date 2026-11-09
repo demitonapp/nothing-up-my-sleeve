@@ -10,19 +10,21 @@
 // A sailing that received heads from another (opts.transplant: the Magician's Apprentice) has the
 // receiving attention half outlined and labelled, and the embeddings marked if positions came too.
 import { emptyCls } from './ui';
-import { esc } from './format.js';
+import { esc } from './format';
 
 const ROW = 74, BOX_W = 112, GAP = 10, LEFT = 118, TOP = 34, BASE = 40;
 
+type Series = number[][]; // [steps, values]
+
 // a series [steps, values] read at a step: the last value at or before it
-export function at(sr, step) {
+export function at(sr: Series | null | undefined, step: number): number | null {
   if (!sr) return null;
-  let v = null;
+  let v: number | null = null;
   for (let i = 0; i < sr[0].length && sr[0][i] <= step; i++) v = sr[1][i];
   return v;
 }
 // the number of layers a sailing's soundings (or sieves) describe
-export function layersOf(m) {
+export function layersOf(m: Record<string, Series>): number {
   let n = 0;
   for (const k of Object.keys(m)) {
     // the guesses (soundings/layer_k/bpb) run one past the last layer, so they don't count layers
@@ -32,36 +34,60 @@ export function layersOf(m) {
   return n;
 }
 // every step a sailing has soundings at
-export function soundingSteps(m) {
-  const s = new Set();
-  for (const k of Object.keys(m)) if (k.startsWith('soundings/')) m[k][0].forEach(x => s.add(x));
+export function soundingSteps(m: Record<string, Series>): number[] {
+  const s = new Set<number>();
+  for (const k of Object.keys(m)) if (k.startsWith('soundings/')) m[k][0].forEach((x) => s.add(x));
   return [...s].sort((a, b) => a - b);
 }
-const turnColour = t => t == null ? 'var(--muted)' : t < 0.5 ? 'var(--good)' : t <= 1.5 ? 'var(--blue)' : 'var(--bad)';
-const turnWord = t => t == null ? '' : t < 0.5 ? 'along' : t <= 1.5 ? 'across' : 'against';
-const f2 = v => v == null ? '–' : (Math.abs(v) >= 10 ? v.toFixed(1) : v.toFixed(2));
+const turnColour = (t: number | null | undefined): string => t == null ? 'var(--muted)' : t < 0.5 ? 'var(--good)' : t <= 1.5 ? 'var(--blue)' : 'var(--bad)';
+const turnWord = (t: number | null | undefined): string => t == null ? '' : t < 0.5 ? 'along' : t <= 1.5 ? 'across' : 'against';
+const f2 = (v: number | null | undefined): string => (v == null ? '–' : Math.abs(v) >= 10 ? v.toFixed(1) : v.toFixed(2));
 
-function arrow(cx, cy, write, turn) {
+function arrow(cx: number, cy: number, write: number | null, turn: number | null): string {
   if (write == null) return '';
   const len = 8 + 34 * Math.min(1, Math.sqrt(Math.max(0, write) / 4));
-  const a = (turn ?? 0) * Math.PI / 2;  // 0 up, π/2 right (across), π down (against)
-  const x2 = cx + len * Math.sin(a), y2 = cy - len * Math.cos(a), col = turnColour(turn);
-  const h = 5, ax = Math.atan2(y2 - cy, x2 - cx);
-  const p1 = `${x2 - h * Math.cos(ax - 0.5)},${y2 - h * Math.sin(ax - 0.5)}`, p2 = `${x2 - h * Math.cos(ax + 0.5)},${y2 - h * Math.sin(ax + 0.5)}`;
+  const a = (turn ?? 0) * Math.PI / 2; // 0 up, π/2 right (across), π down (against)
+  const x2 = cx + len * Math.sin(a);
+  const y2 = cy - len * Math.cos(a);
+  const col = turnColour(turn);
+  const h = 5;
+  const ax = Math.atan2(y2 - cy, x2 - cx);
+  const p1 = `${x2 - h * Math.cos(ax - 0.5)},${y2 - h * Math.sin(ax - 0.5)}`;
+  const p2 = `${x2 - h * Math.cos(ax + 0.5)},${y2 - h * Math.sin(ax + 0.5)}`;
   return `<g><title>writes ${f2(write)}, turn ${f2(turn)} (${turnWord(turn)})</title><line x1="${cx}" y1="${cy}" x2="${x2}" y2="${y2}" stroke="${col}" stroke-width="2.2"/>
     <polygon points="${x2},${y2} ${p1} ${p2}" fill="${col}"/></g>`;
 }
 
+interface Transplant {
+  pos?: boolean;
+  tok?: boolean;
+  layer?: string | number;
+  below?: (string | number)[];
+  star?: string;
+  heads?: (string | number)[];
+  from_run?: string;
+  ln?: boolean;
+  restored_from_log?: boolean;
+}
+interface JourneyOpts {
+  modules?: Set<string>;
+  kinks?: Record<string, { step: number; tentative?: boolean }>;
+  title?: string;
+  transplant?: Transplant;
+}
+
 // m: the sailing's metrics (/api/metrics); step: the step shown; defs: /api/sieves; opts.modules: Set of
 // 'push' 'move' 'heading' 'stars' 'kink'; opts.kinks: {layer_i: kink}; opts.title: the sailing's name
-export function drawJourney(el, m, step, defs, opts = {}) {
+export function drawJourney(el: HTMLElement, m: Record<string, Series>, step: number, defs: any, opts: JourneyOpts = {}): void {
   const L = layersOf(m);
   if (!L) { el.innerHTML = `<div class="${emptyCls()}">${esc(opts.title || 'this voyage')}: no layers on the ledger yet</div>`; return; }
-  const mods = opts.modules || new Set(), S = k => m[k];
-  const hasSound = Object.keys(m).some(k => k.startsWith('soundings/'));
-  const depthY = k => TOP + (L + 1 - k) * ROW;  // depth k = after k layers; 0 is the embeddings
-  const W = LEFT + 2 * BOX_W + GAP + 270, H = depthY(0) + BASE + 12;
-  const bpb = k => at(S(`soundings/layer_${k}/bpb`), step);
+  const mods = opts.modules || new Set<string>();
+  const S = (k: string): Series | undefined => m[k];
+  const hasSound = Object.keys(m).some((k) => k.startsWith('soundings/'));
+  const depthY = (k: number): number => TOP + (L + 1 - k) * ROW; // depth k = after k layers; 0 is the embeddings
+  const W = LEFT + 2 * BOX_W + GAP + 270;
+  const H = depthY(0) + BASE + 12;
+  const bpb = (k: number): number | null => at(S(`soundings/layer_${k}/bpb`), step);
   let svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" class="journey" role="img" aria-label="${esc(opts.title || '')} through its layers">`;
   // the output on top, the embeddings at the bottom
   const out = bpb(L);
@@ -72,25 +98,31 @@ export function drawJourney(el, m, step, defs, opts = {}) {
     + (opts.transplant && (opts.transplant.pos || opts.transplant.tok) ? `<text x="${LEFT + 2 * BOX_W + GAP + 12}" y="${depthY(0) + 16}" class="j-tp">⇄ ${[opts.transplant.tok ? 'token' : '', opts.transplant.pos ? 'position' : ''].filter(Boolean).join(' and ')} embeddings transplanted</text>` : '');
   // the guess at each depth, and the drop from the depth below
   for (let k = 0; k <= L; k++) {
-    const v = bpb(k), below = k ? bpb(k - 1) : null, d = v != null && below != null ? v - below : null;
+    const v = bpb(k);
+    const below = k ? bpb(k - 1) : null;
+    const d = v != null && below != null ? v - below : null;
     const y = k === L ? TOP + 13 : depthY(k) + (k === 0 ? 16 : -6);
     svg += `<text x="${LEFT - 10}" y="${y}" text-anchor="end" class="j-bpb"><title>the guess if the model stopped here, bits per byte</title>${v == null ? '' : f2(v)}</text>`;
     if (d != null) svg += `<text x="${LEFT - 10}" y="${y + 13}" text-anchor="end" class="${d <= 0 ? 'j-good' : 'j-bad'}">${d <= 0 ? '−' : '+'}${f2(Math.abs(d))}</text>`;
   }
   // the layers, each an attention half and a feed-forward half
   for (let i = 0; i < L; i++) {
-    const y = depthY(i + 1) + 10, h = ROW - 26;
-    const halves = [['attn', 'attention', LEFT], ['mlp', 'feed-forward', LEFT + BOX_W + GAP]];
+    const y = depthY(i + 1) + 10;
+    const h = ROW - 26;
+    const halves: [string, string, number][] = [['attn', 'attention', LEFT], ['mlp', 'feed-forward', LEFT + BOX_W + GAP]];
     svg += `<text x="${LEFT - 64}" y="${y + h / 2 + 4}" text-anchor="end" class="j-layer">layer ${i}</text>`;
     // the receiving layer, and any whole layers beneath it that came too (transplant.below)
-    const tp = opts.transplant, here = tp && Number(tp.layer) === i, whole = tp && (tp.below || []).map(Number).includes(i);
+    const tp = opts.transplant;
+    const here = !!tp && Number(tp.layer) === i;
+    const whole = !!tp && (tp.below || []).map(Number).includes(i);
     for (const [key, name, x] of halves) {
-      const w = at(S(`soundings/layer_${i}/${key}_write`), step), t = at(S(`soundings/layer_${i}/${key}_turn`), step);
+      const w = at(S(`soundings/layer_${i}/${key}_write`), step);
+      const t = at(S(`soundings/layer_${i}/${key}_turn`), step);
       svg += `<rect x="${x}" y="${y}" width="${BOX_W}" height="${h}" rx="5" class="j-box${(here && key === 'attn') || whole ? ' j-transplant' : ''}"/>
         <text x="${x + 8}" y="${y + 15}" class="j-lbl">${name}</text>`;
       if (w != null) svg += `<text x="${x + 8}" y="${y + 30}" class="j-sub">writes ${f2(w)} · ${turnWord(t)}</text>`;
       // the sieves on this half
-      const bits = [];
+      const bits: string[] = [];
       if (mods.has('push')) { const v = at(S(`grad_norm/layer_${i}/${key}`), step); if (v != null) bits.push(`push ${v.toExponential(1)}`); }
       if (mods.has('move')) { const v = at(S(`update_ratio/layer_${i}/${key}`), step); if (v != null) bits.push(`move ${v.toExponential(1)}`); }
       if (mods.has('heading')) { const v = at(S(`heading/layer_${i}/${key}`), step) ?? at(S(`heading/layer_${i}`), step); if (v != null) bits.push(`heading ${f2(v)}`); }
@@ -98,13 +130,15 @@ export function drawJourney(el, m, step, defs, opts = {}) {
       svg += arrow(x + BOX_W - 16, y, w, t);
     }
     // the stars lit in this layer by the step shown, and the layer's push kink
-    const notes = [];
-    if (here) notes.push(`⇄ ${tp.star ? tp.star.replace(/_/g, ' ') + ' ' : ''}heads ${(tp.heads || []).join(', ')} transplanted from ${tp.from_run || 'another voyage'}${tp.ln ? ', with their layer norms' : ''}${tp.restored_from_log ? ' (restored from the log)' : ''}`);
-    if (whole && !here) notes.push(`⇄ the whole layer transplanted from ${tp.from_run || 'another voyage'}`);
+    const notes: string[] = [];
+    if (here && tp) notes.push(`⇄ ${tp.star ? tp.star.replace(/_/g, ' ') + ' ' : ''}heads ${(tp.heads || []).join(', ')} transplanted from ${tp.from_run || 'another voyage'}${tp.ln ? ', with their layer norms' : ''}${tp.restored_from_log ? ' (restored from the log)' : ''}`);
+    if (whole && !here && tp) notes.push(`⇄ the whole layer transplanted from ${tp.from_run || 'another voyage'}`);
     if (mods.has('stars')) for (const st of defs.stars || []) {
-      for (const [metric, layer, how] of [[st.metric, st.layer, 'one head'], [st.shared_metric, st.shared_layer, 'shared']]) {
-        const sr = metric && S(metric); if (!sr) continue;
-        const j = sr[1].findIndex((v, n) => v >= st.threshold && sr[0][n] <= step); if (j < 0) continue;
+      for (const [metric, layer, how] of [[st.metric, st.layer, 'one head'], [st.shared_metric, st.shared_layer, 'shared']] as [string, string, string][]) {
+        const sr = metric && S(metric);
+        if (!sr) continue;
+        const j = sr[1].findIndex((v, n) => v >= st.threshold && sr[0][n] <= step);
+        if (j < 0) continue;
         const where = at(S(layer), sr[0][j]);
         if (where != null && Math.round(where) === i) notes.push(`★ ${st.name} lit at ${sr[0][j]} (${how})`);
       }

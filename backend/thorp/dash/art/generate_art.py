@@ -84,6 +84,15 @@ HARBOURS: dict[str, str] = {
     "sails furled, a camel caravan arriving down to the water, countless lamps reflected in the black harbour",
 }
 
+# The ship builder (9 November, Justin: "give me a fal image representing the shipbuilder and SOP"): the drafting
+# loft where the standard operating procedure is written, rather than a finished ship at sea. Landscape, for the
+# builder's banner.
+SHIPBUILDER: dict[str, str] = {
+    "shipbuilder": "a shipwright's drafting loft at night: through the tall window the dark ribs of a half-built ship "
+    "rise on the stocks, and on the long table below a spread of hull drawings, a heavy leather-bound book of rules "
+    "open beside them, brass dividers, a pot of ink and a single lamp throwing hard shadows across the plans",
+}
+
 # The four positions at the 1m (Justin, 8 November: "generate fal images"): Augustus has his card already (CLASSES);
 # Plato, Francis and Diderot are new. Landscape, for the ship cards in Phaleron.
 POSITIONS: dict[str, str] = {
@@ -209,8 +218,8 @@ LOGIC: dict[str, str] = {
     "with the stars seen through the porthole, a finger on the chart, trusting the paper over the sky, one lamp",
 }
 
-SIZES = {**{k: "landscape_16_9" for k in (*CLASSES, *HARBOURS, *POSITIONS, *FOREIGN)}, **{k: "portrait_4_3" for k in CARDS}, **{k: "portrait_4_3" for k in LOGIC}}
-SUBJECTS = {**CLASSES, **HARBOURS, **POSITIONS, **FOREIGN, **CARDS, **LOGIC}
+SIZES = {**{k: "landscape_16_9" for k in (*CLASSES, *HARBOURS, *SHIPBUILDER, *POSITIONS, *FOREIGN)}, **{k: "portrait_4_3" for k in CARDS}, **{k: "portrait_4_3" for k in LOGIC}}
+SUBJECTS = {**CLASSES, **HARBOURS, **SHIPBUILDER, **POSITIONS, **FOREIGN, **CARDS, **LOGIC}
 
 
 def fal_key() -> str:

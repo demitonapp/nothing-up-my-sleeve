@@ -38,7 +38,7 @@ import torch.nn.functional as F
 
 from thorp import data, paths
 from thorp import train as T
-from thorp.ledger import Ledger
+from thorp.ledger import Ledger, reader, recorder
 from thorp.models import registry
 
 # ---------------------------------------------------------------- the device
@@ -344,12 +344,10 @@ def seeded_master(spec: dict, seed: dict, master: dict, vocab: int, log) -> tupl
     from thorp import growth
     from thorp.ledger import spec_of
 
-    rows = Ledger().query(
-        "select * from runs where name=? and status='finished' order by started desc", [seed["run"]]
-    )
+    rows = reader().get_run_by_name(seed["run"], finished=True)
     if not rows:
         raise LookupError(f"seeded_from: no finished run named {seed['run']!r}")
-    src_spec, src_rid = spec_of(rows[0]), rows[0]["run_id"]
+    src_spec, src_rid = spec_of(rows), rows["run_id"]
     if src_spec.get("tokeniser", {}).get("vocab") != spec["tokeniser"]["vocab"] or src_spec[
         "tokeniser"
     ].get("train_on") != spec["tokeniser"].get("train_on"):
@@ -401,13 +399,10 @@ def load_teacher(teach: dict, spec: dict, vocab: int, log):
     """train.load_teacher: a finished run's model (either backend's checkpoint), frozen."""
     from thorp.ledger import spec_of
 
-    rows = Ledger().query(
-        "select * from runs where name=? and status='finished' order by started desc",
-        [teach["run"]],
-    )
+    rows = reader().get_run_by_name(teach["run"], finished=True)
     if not rows:
         raise LookupError(f"teacher: no finished run named {teach['run']!r}")
-    t_spec, t_rid = spec_of(rows[0]), rows[0]["run_id"]
+    t_spec, t_rid = spec_of(rows), rows["run_id"]
     if t_spec["tokeniser"].get("vocab") != spec["tokeniser"]["vocab"] or t_spec["tokeniser"].get(
         "train_on"
     ) != spec["tokeniser"].get("train_on"):
@@ -427,13 +422,10 @@ def transplant_heads(spec: dict, master: dict, log) -> tuple:
     from thorp.ledger import spec_of
 
     t = spec["transplant"]
-    rows = Ledger().query(
-        "select * from runs where name=? and status='finished' order by started desc",
-        [t["from_run"]],
-    )
+    rows = reader().get_run_by_name(t["from_run"], finished=True)
     if not rows:
         raise LookupError(f"transplant: no finished run named {t['from_run']!r}")
-    donor_spec, donor_rid = spec_of(rows[0]), rows[0]["run_id"]
+    donor_spec, donor_rid = spec_of(rows), rows["run_id"]
     if (
         donor_spec["model"]["preset"] != spec["model"]["preset"]
         or donor_spec["tokeniser"] != spec["tokeniser"]
@@ -441,11 +433,10 @@ def transplant_heads(spec: dict, master: dict, log) -> tuple:
         raise ValueError("transplant: the donor must be the same class with the same tokeniser")
     star = t.get("star", "previous_word")
     kind, key = ("nevermore", "natural_scores") if star == "nevermore" else ("stars", star)
-    art = Ledger().query(
-        "select text from artifacts where run_id=? and kind=? order by step desc, rowid desc limit 1",
-        [donor_rid, kind],
-    )
-    scores = np.array(json.loads(art[0]["text"])[key])
+    text = reader().latest_artifact_text(donor_rid, kind)
+    if text is None:
+        raise LookupError(f"transplant: no {kind!r} artifact on {t['from_run']!r}")
+    scores = np.array(json.loads(text)[key])
     layer = int(np.sort(scores, axis=1)[:, -2:].sum(axis=1).argmax())
     order = list(np.argsort(scores[layer])[::-1])
     heads = order[:1] if scores[layer][order[0]] >= STARS[star].threshold else order[:2]
@@ -500,7 +491,7 @@ def train(
 ) -> dict:
     """train.train on PyTorch: train (or resume) the run this spec describes."""
     rid = T.run_id(spec)
-    rec = rec or Ledger()
+    rec = rec or recorder()
     log = log or T.Log(paths.runs_dir() / f"{rid}.log")
     o, m = spec["optim"], spec["model"]
     precision = o.get("precision", "bf16")

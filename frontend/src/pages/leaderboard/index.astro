@@ -1,0 +1,18 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import Leaderboard from '../../components/Leaderboard.astro';
+import Competitor from '../../components/Competitor.astro';
+import Lab from '../../components/Lab.astro';
+import Reader from '../../components/Reader.astro';
+---
+<Layout>
+  <main>
+    <Leaderboard />
+    <Competitor />
+    <Lab />
+  </main>
+  <Reader />
+  <script>
+    import '../../scripts/dashboard.ts';
+  </script>
+</Layout>

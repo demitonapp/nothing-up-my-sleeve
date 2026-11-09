@@ -13,6 +13,8 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy import create_engine, pool
 
+from thorp import ledger_store  # noqa: F401  (registers the ledger tables on Base.metadata)
+from thorp import manifest_store  # noqa: F401  (registers the library's books table on Base.metadata)
 from thorp.viable import records
 from thorp.viable.s3_control import fitout_store, models
 

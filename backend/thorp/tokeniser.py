@@ -27,6 +27,9 @@ DEFAULTS = {
     "byte_fallback": True,
     "character_coverage": 0.9995,
     "clean": "raw",  # the cleaning version its books are read with (thorp/cleaning.py); raw moves no id
+    # the control tokens the tokeniser declares as single pieces (9 November: the top ten, per SOP v0.0.6). A symbol
+    # changes the tokeniser's id, so a voyage that declares them gets its own tokeniser, never a shared one.
+    "symbols": (),
 }
 NEWLINE = "\n"
 
@@ -178,7 +181,7 @@ def train_or_load(book_ids: list[str], settings: dict | None = None) -> Tokenise
         remove_extra_whitespaces=False,
         allow_whitespace_only_pieces=True,
         split_digits=True,
-        user_defined_symbols=[NEWLINE],
+        user_defined_symbols=[NEWLINE, *(settings.get("symbols") or ())],
         unk_id=0,
         bos_id=1,
         eos_id=2,

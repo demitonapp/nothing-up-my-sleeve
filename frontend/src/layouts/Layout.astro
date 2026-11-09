@@ -1,0 +1,23 @@
+---
+// The shared shell every page wraps itself in: the <head>, the global styles and the header nav
+// (UI.md, "Navigation"). The multi-page split gives each route its own page; this layout is the one
+// place the chrome lives. ClientRouter wires Astro's View Transitions so page-to-page navigation is
+// instant and animated (Astro's idiomatic multi-page navigation).
+import { ClientRouter } from 'astro:transitions';
+import '../styles/ui.css';
+import '../styles/global.css';
+import Header from '../components/Header.astro';
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Thorp</title>
+  </head>
+  <body>
+    <Header />
+    <slot />
+    <ClientRouter />
+  </body>
+</html>

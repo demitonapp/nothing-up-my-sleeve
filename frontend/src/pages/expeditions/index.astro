@@ -1,0 +1,16 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import Voyages from '../../components/Voyages.astro';
+import TableTalk from '../../components/TableTalk.astro';
+import Reader from '../../components/Reader.astro';
+---
+<Layout>
+  <main>
+    <Voyages />
+    <TableTalk />
+  </main>
+  <Reader />
+  <script>
+    import '../../scripts/dashboard.ts';
+  </script>
+</Layout>

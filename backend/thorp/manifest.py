@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import sqlite3
 from collections.abc import Iterable
 from dataclasses import asdict, dataclass
@@ -64,7 +65,17 @@ def upsert(book: Book) -> None:
         )
 
 
+def _pg() -> bool:
+    """The one store answers for the register: `THORP_LIBRARY_PG=1` (the library's cut-over phase)."""
+    return os.environ.get("THORP_LIBRARY_PG") == "1"
+
+
 def get(book_id: str) -> Book | None:
+    if _pg():
+        from thorp import manifest_store
+
+        row = manifest_store.get_book(book_id)
+        return Book(**row) if row else None
     with _connect() as con:
         r = con.execute("select * from books where id=?", (book_id,)).fetchone()
     return Book(**dict(r)) if r else None
@@ -81,5 +92,9 @@ def get_many(book_ids: Iterable[str]) -> dict[str, Book]:
 
 
 def all_books() -> list[Book]:
+    if _pg():
+        from thorp import manifest_store
+
+        return [Book(**row) for row in manifest_store.all_books()]
     with _connect() as con:
         return [Book(**dict(r)) for r in con.execute("select * from books order by id")]

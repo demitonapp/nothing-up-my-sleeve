@@ -27,7 +27,7 @@ except (
 
 from thorp import data, evaluators, manifest, paths, shards
 from thorp import tokeniser as tokmod
-from thorp.ledger import Ledger
+from thorp.ledger import Ledger, reader, recorder
 from thorp.models import registry
 from thorp.models.backend import backend_of
 
@@ -206,7 +206,7 @@ def prepare(
     from thorp import vsm
 
     if known is None:
-        known = bool(Ledger().query("select 1 from runs where run_id=? limit 1", [run_id(spec)]))
+        known = reader().get_run(run_id(spec)) is not None
     for note in vsm.gate(spec, known_run=known):
         log(f"S3 gate: {note}")
     stage_recipes = [resolver(st["recipe"]) for st in d.get("stages", [])]
@@ -333,12 +333,10 @@ def seeded_master(spec: dict, seed: dict, master, vocab: int, log) -> tuple:
     from thorp import growth
     from thorp.ledger import spec_of
 
-    rows = Ledger().query(
-        "select * from runs where name=? and status='finished' order by started desc", [seed["run"]]
-    )
+    rows = reader().get_run_by_name(seed["run"], finished=True)
     if not rows:
         raise LookupError(f"seeded_from: no finished run named {seed['run']!r}")
-    src_spec, src_rid = spec_of(rows[0]), rows[0]["run_id"]
+    src_spec, src_rid = spec_of(rows), rows["run_id"]
     if src_spec.get("tokeniser", {}).get("vocab") != spec["tokeniser"]["vocab"] or src_spec[
         "tokeniser"
     ].get("train_on") != spec["tokeniser"].get("train_on"):
@@ -382,13 +380,10 @@ def load_teacher(teach: dict, spec: dict, vocab: int, log):
     """A finished run's model, frozen, to teach from: same tokeniser, any class."""
     from thorp.ledger import spec_of
 
-    rows = Ledger().query(
-        "select * from runs where name=? and status='finished' order by started desc",
-        [teach["run"]],
-    )
+    rows = reader().get_run_by_name(teach["run"], finished=True)
     if not rows:
         raise LookupError(f"teacher: no finished run named {teach['run']!r}")
-    t_spec, t_rid = spec_of(rows[0]), rows[0]["run_id"]
+    t_spec, t_rid = spec_of(rows), rows["run_id"]
     if t_spec["tokeniser"].get("vocab") != spec["tokeniser"]["vocab"] or t_spec["tokeniser"].get(
         "train_on"
     ) != spec["tokeniser"].get("train_on"):
@@ -417,13 +412,10 @@ def transplant_heads(spec: dict, master, log) -> tuple:
     from thorp.ledger import spec_of
 
     t = spec["transplant"]
-    rows = Ledger().query(
-        "select * from runs where name=? and status='finished' order by started desc",
-        [t["from_run"]],
-    )
+    rows = reader().get_run_by_name(t["from_run"], finished=True)
     if not rows:
         raise LookupError(f"transplant: no finished run named {t['from_run']!r}")
-    donor_spec, donor_rid = spec_of(rows[0]), rows[0]["run_id"]
+    donor_spec, donor_rid = spec_of(rows), rows["run_id"]
     if (
         donor_spec["model"]["preset"] != spec["model"]["preset"]
         or donor_spec["tokeniser"] != spec["tokeniser"]
@@ -432,11 +424,10 @@ def transplant_heads(spec: dict, master, log) -> tuple:
     star = t.get("star", "previous_word")
     # the Nevermore's per-head scores live in its own artifact (real prose); the other stars in 'stars'
     kind, key = ("nevermore", "natural_scores") if star == "nevermore" else ("stars", star)
-    art = Ledger().query(
-        "select text from artifacts where run_id=? and kind=? order by step desc, rowid desc limit 1",
-        [donor_rid, kind],
-    )
-    scores = np.array(json.loads(art[0]["text"])[key])  # layers x heads
+    text = reader().latest_artifact_text(donor_rid, kind)
+    if text is None:
+        raise LookupError(f"transplant: no {kind!r} artifact on {t['from_run']!r}")
+    scores = np.array(json.loads(text)[key])  # layers x heads
     layer = int(np.sort(scores, axis=1)[:, -2:].sum(axis=1).argmax())
     order = list(np.argsort(scores[layer])[::-1])
     heads = order[:1] if scores[layer][order[0]] >= STARS[star].threshold else order[:2]
@@ -895,7 +886,7 @@ def train(
 
         return train_torch.train(spec, prep, rec, stop_after=stop_after, log=log)
     rid = run_id(spec)
-    rec = rec or Ledger()
+    rec = rec or recorder()
     log = log or Log(paths.runs_dir() / f"{rid}.log")
     o, m = spec["optim"], spec["model"]
     precision = o.get("precision", "bf16")
@@ -1382,14 +1373,12 @@ def rescore(
     """
     from thorp.ledger import spec_of
 
-    rec = rec or Ledger()
+    rec = rec or recorder()
     # a run id, a unique prefix of one, or a run name (2026-11-07: queue lines are written by name)
-    rows = rec.query("select * from runs where name = ? order by started desc", [run]) or rec.query(
-        "select * from runs where run_id like ? order by started desc", [run + "%"]
-    )
-    if not rows:
+    row = reader().find_run(run)
+    if not row:
         raise LookupError(f"no run {run}")
-    spec, rid = spec_of(rows[0]), rows[0]["run_id"]
+    spec, rid = spec_of(row), row["run_id"]
     ckpt = latest_checkpoint(rid)
     if ckpt is None:
         raise LookupError(f"run {rid} has no checkpoint")
@@ -1424,7 +1413,7 @@ def run(spec_path: str | Path, rec: Ledger | None = None) -> dict:
 def _run(spec_path: str | Path, rec: Ledger | None = None) -> dict:
     spec = load_spec(spec_path)
     rid = run_id(spec)
-    rec = rec or Ledger()
+    rec = rec or recorder()
     existing = rec.get_run(rid)
     if existing and existing["status"] == "finished":
         print(json.dumps({k: v for k, v in existing.items() if k != "spec_json"}, indent=1))

@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
+import sys
 import time
 from collections.abc import Iterable
 from pathlib import Path
@@ -54,6 +56,9 @@ class Recorder(Protocol):
     def artifact(
         self, run_id: str, step: int, kind: str, path: str = "", sha1: str = "", text: str = ""
     ) -> None: ...
+    def truncate_after(self, run_id: str, step: int) -> None: ...
+    def clear_step(self, run_id: str, step: int, tables: tuple[str, ...] = ("evals",), sets=None) -> None: ...
+    def close(self) -> None: ...
 
 
 def connect(path: Path | None = None, readonly: bool = False) -> sqlite3.Connection:
@@ -137,6 +142,32 @@ class Ledger:
     def query(self, sql: str, params: Iterable = ()) -> list[dict]:
         return [dict(r) for r in self.con.execute(sql, list(params))]
 
+    def get_run_by_name(self, name: str, finished: bool | None = None) -> dict | None:
+        sql = "select * from runs where name=?"
+        params: list = [name]
+        if finished:
+            sql += " and status='finished'"
+        sql += " order by started desc limit 1"
+        r = self.con.execute(sql, params).fetchone()
+        return dict(r) if r else None
+
+    def find_run(self, arg: str) -> dict | None:
+        """A run by name, or by a unique prefix of its run_id, newest started first."""
+        r = self.get_run_by_name(arg)
+        if r:
+            return r
+        r = self.con.execute(
+            "select * from runs where run_id like ? order by started desc limit 1", (arg + "%",)
+        ).fetchone()
+        return dict(r) if r else None
+
+    def latest_artifact_text(self, run_id: str, kind: str) -> str | None:
+        r = self.con.execute(
+            "select text from artifacts where run_id=? and kind=? order by step desc, rowid desc limit 1",
+            (run_id, kind),
+        ).fetchone()
+        return r[0] if r else None
+
     def checkpoint_wal(self) -> None:
         self.con.execute("pragma wal_checkpoint(truncate)")
 
@@ -146,3 +177,81 @@ class Ledger:
 
 def spec_of(run: dict) -> dict:
     return json.loads(run["spec_json"])
+
+
+class DualRecorder:
+    """Writes both the SQLite ledger and Postgres. Until the cut-over SQLite is authoritative, so a Postgres
+    failure is logged and the run goes on (the backfill catches the store up); after the cut-over the PgLedger
+    is the one writer and raises. A hired box never gets one: it sails under papers and writes its SQLite log."""
+
+    def __init__(self, sqlite: Ledger, pg):
+        self.sqlite = sqlite
+        self.pg = pg
+
+    def __getattr__(self, name):
+        """Everything DualRecorder does not override reads through to the SQLite ledger (17:11: train._run calls
+        rec.get_run, which the wrapper did not carry — a voyage died at step zero on the cut-over switch)."""
+        return getattr(self.sqlite, name)
+
+    def _pg(self, fn, what: str) -> None:
+        try:
+            fn()
+        except Exception as e:  # noqa: BLE001  (best-effort: SQLite is still the ledger of record)
+            print(f"ledger: {what} not written to Postgres (sqlite is still authoritative): {e}", file=sys.stderr)
+
+    def run(self, row: dict) -> None:
+        self.sqlite.run(row)
+        self._pg(lambda: self.pg.run(row), "run")
+
+    def metrics(self, run_id: str, step: int, values: dict[str, float]) -> None:
+        self.sqlite.metrics(run_id, step, values)
+        self._pg(lambda: self.pg.metrics(run_id, step, values), f"metrics at step {step}")
+
+    def evals(self, rows: Iterable[dict]) -> None:
+        rows = list(rows)
+        self.sqlite.evals(rows)
+        self._pg(lambda: self.pg.evals(rows), "evals")
+
+    def artifact(self, run_id: str, step: int, kind: str, path: str = "", sha1: str = "", text: str = "") -> None:
+        self.sqlite.artifact(run_id, step, kind, path, sha1, text)
+        self._pg(lambda: self.pg.artifact(run_id, step, kind, path, sha1, text), f"artifact {kind}")
+
+    def truncate_after(self, run_id: str, step: int) -> None:
+        self.sqlite.truncate_after(run_id, step)
+        self._pg(lambda: self.pg.truncate_after(run_id, step), f"truncate after {step}")
+
+    def clear_step(self, run_id: str, step: int, tables: tuple[str, ...] = ("evals",), sets=None) -> None:
+        self.sqlite.clear_step(run_id, step, tables=tables, sets=sets)
+        self._pg(lambda: self.pg.clear_step(run_id, step, tables=tables, sets=sets), "clear step")
+
+    def checkpoint_wal(self) -> None:
+        self.sqlite.checkpoint_wal()
+
+    def close(self) -> None:
+        self.sqlite.close()
+        self.pg.close()
+
+
+def recorder() -> Ledger | DualRecorder:
+    """The recorder a new run writes to. SQLite only, until the dual-write switch (THORP_LEDGER_DUAL) is set from
+    the next in-port restart; then both. With THORP_LEDGER_PG, Postgres is the one store and the recorder writes it
+    alone. A hired box keeps the plain Ledger (its ship's log, folded in at docking)."""
+    if os.environ.get("THORP_LEDGER_PG"):
+        from thorp.ledger_store import PgLedger
+
+        return PgLedger()
+    if os.environ.get("THORP_LEDGER_DUAL"):
+        from thorp.ledger_store import PgLedger
+
+        return DualRecorder(Ledger(), PgLedger())
+    return Ledger()
+
+
+def reader() -> Ledger:
+    """The ledger the readers answer from: Postgres when THORP_LEDGER_PG is set (the cut-over is on), else SQLite.
+    A hired box never sets the flag, so it reads its own SQLite log."""
+    if os.environ.get("THORP_LEDGER_PG"):
+        from thorp.ledger_store import PgLedger
+
+        return PgLedger()
+    return Ledger()

@@ -12,7 +12,7 @@ import { btnCls, cardCls, checkCls, crumbCls, selectCls, tabCls, tabsCls } from 
   <!-- ============================== the tricks of the trade -->
   <div class="dview" data-dview="index">
     <h1>Tricks of the trade</h1>
-    <nav class={tabsCls('line', 'subnav')} data-orientation="horizontal" data-variant="line" id="discnav"><a class={tabCls('')} data-state="inactive" data-dsub="two-facts" href="#/discoveries">Chaining two facts</a><a class={tabCls('')} data-state="inactive" data-dsub="quantum" href="#/discoveries/quantum">Quantum mechanics</a><a class={tabCls('')} data-state="inactive" data-dsub="registry" href="#/discoveries/registry">Registry of tricks</a><a class={tabCls('')} data-state="inactive" data-dsub="stars" href="#/discoveries/stars">Stars</a><a class={tabCls('')} data-state="inactive" data-dsub="cards" href="#/discoveries/cards">Cards</a></nav>
+    <nav class={tabsCls('line', 'subnav')} data-orientation="horizontal" data-variant="line" id="discnav"><a class={tabCls('')} data-state="inactive" data-dsub="two-facts" href="/discoveries">Chaining two facts</a><a class={tabCls('')} data-state="inactive" data-dsub="quantum" href="/discoveries/quantum">Quantum mechanics</a><a class={tabCls('')} data-state="inactive" data-dsub="registry" href="/discoveries/registry">Registry of tricks</a><a class={tabCls('')} data-state="inactive" data-dsub="stars" href="/discoveries/stars">Stars</a><a class={tabCls('')} data-state="inactive" data-dsub="cards" href="/discoveries/cards">Cards</a></nav>
 
     <!-- the trick in focus: how Thorp proves a model chains two facts (the heart of the leaderboard, and of the claim) -->
     <div class="dsub" data-dsub="two-facts">
@@ -82,7 +82,7 @@ import { btnCls, cardCls, checkCls, crumbCls, selectCls, tabCls, tabsCls } from 
       <section class={cardCls(false, 'panel tfstep')}>
         <div class="tfn">5</div><div class="tfb">
         <h2>The score: the chaining lift</h2>
-        <p>A model's <b>chaining lift</b> is its mean lift on the four chaining tests. It is the one number <a href="#/leaderboard">the leaderboard</a> ranks every model on, outside and Thorp alike, read on the same 96 pairs. Below the 50m, where a size is not yet expected to chain, its progress is its <b>climb</b>: on each chain the rungs performed from the bottom, plus the next rung's share of its mark, the mean of the four (0 to 5).</p>
+        <p>A model's <b>chaining lift</b> is its mean lift on the four chaining tests. It is the one number <a href="/leaderboard">the leaderboard</a> ranks every model on, outside and Thorp alike, read on the same 96 pairs. Below the 50m, where a size is not yet expected to chain, its progress is its <b>climb</b>: on each chain the rungs performed from the bottom, plus the next rung's share of its mark, the mean of the four (0 to 5).</p>
         </div>
       </section>
 
@@ -158,14 +158,14 @@ import { btnCls, cardCls, checkCls, crumbCls, selectCls, tabCls, tabsCls } from 
       <h2>The tricks <span class="note">a trick is what a model can do, judged from outside by its bets; open one for the stars that do it and Thorp's progress, size by size. "The field shows it at" is the size band (one order of magnitude, in parameters) where the trick is documented in standard models, not a proven smallest size; hover a band for the detail. "Thorp's goal size" is the size expected to reach it, about an order of magnitude smaller than the field where the depth it needs allows; ◆ marks a gate, performed before a ship moves on to the next waypoint</span></h2>
       <div class="handtools" data-filters><label class="note" for="trickfamily">waypoint</label><select class={selectCls('')} id="trickfamily" data-remember><option value="">all</option></select><label class="note" for="trickband">the field shows it at</label><select class={selectCls('')} id="trickband" data-remember><option value="">any size</option></select><span class="note" id="trickcount"></span></div>
       <div class="scroll"><table id="tricktable" class="clickable"><thead><tr><th>waypoint</th><th>trick</th><th>what it does</th><th>the field shows it at</th><th>how sure</th><th>stars needed</th><th>Thorp so far</th><th>Thorp's goal size</th></tr></thead><tbody></tbody></table></div>
-      <p class="note mt">Also: <a href="#/discoveries/stars">every kind of head (the star chart)</a> · <a href="#/discoveries/traits">traits</a></p>
+      <p class="note mt">Also: <a href="/discoveries/stars">every kind of head (the star chart)</a> · <a href="/discoveries/traits">traits</a></p>
     </section>
     </div>
   </div>
 
   <!-- ============================== one trick -->
   <div class="dview" data-dview="trick">
-    <h1><a class={crumbCls('back')} href="#/discoveries">← discoveries</a> <span id="tricktitle"></span> <span id="trickstate"></span> <span class="q" id="trickdoes"></span></h1>
+    <h1><a class={crumbCls('back')} href="/discoveries">← discoveries</a> <span id="tricktitle"></span> <span id="trickstate"></span> <span class="q" id="trickdoes"></span></h1>
     <section class={cardCls(false, 'panel')}><div class="rungover" id="trickover"></div></section>
     <section class={cardCls(false, 'panel')}>
       <h2>The stars needed to learn it <span class="note">the mechanisms inside thought to do this trick, each with where it is expected and its state in Thorp</span></h2>
@@ -189,7 +189,7 @@ import { btnCls, cardCls, checkCls, crumbCls, selectCls, tabCls, tabsCls } from 
 
   <!-- ============================== one chain: a explorer's test told as a climb, keel to explorer (fleet.CHAINS) -->
   <div class="dview" data-dview="chain">
-    <h1><a class={crumbCls('back')} href="#/discoveries">← discoveries</a> <span id="chaintitle"></span> <span id="chainstrand"></span></h1>
+    <h1><a class={crumbCls('back')} href="/discoveries">← discoveries</a> <span id="chaintitle"></span> <span id="chainstrand"></span></h1>
     <section class={cardCls(false, 'panel')}><div class="rungover" id="chainover"></div></section>
     <div class="handtools"><label><input class={checkCls('')} type="checkbox" id="chainrefpage"> show the reference ladder <span class="note">(Pythia 14m to 410m and Qwen3 0.6B to 4B beside each step's evidence)</span></label></div>
     <div id="chainsteps"></div>
@@ -198,7 +198,7 @@ import { btnCls, cardCls, checkCls, crumbCls, selectCls, tabCls, tabsCls } from 
   <!-- ============================== the stars -->
   <!-- ============================== the traits -->
   <div class="dview" data-dview="traits">
-    <h1><a class={crumbCls('back')} href="#/discoveries">← discoveries</a> Traits <span class="q">can a ship's hidden state tell fiction, verse, first person or a language family apart on books it has never read; found at the threshold, learned when it also clears the floors</span></h1>
+    <h1><a class={crumbCls('back')} href="/discoveries">← discoveries</a> Traits <span class="q">can a ship's hidden state tell fiction, verse, first person or a language family apart on books it has never read; found at the threshold, learned when it also clears the floors</span></h1>
     <div class="handtools"><button class={btnCls('outline', '')} data-essay="traits">Read: how traits are found</button></div>
     <section class={cardCls(false, 'panel')}><div class="scroll"><table id="traittable" class="clickable"><thead></thead><tbody></tbody></table></div></section>
   </div>

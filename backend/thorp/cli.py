@@ -173,13 +173,21 @@ def cmd_charter(a) -> int:
 
 
 def cmd_store(a) -> int:
-    """The one store (Postgres): is it up, and bring data/'s files into it (thorp/store_import.py)."""
+    """The one store (Postgres): is it up, bring data/'s files into it, or backfill the ledger (thorp/store_import.py)."""
     from thorp import store
 
     if a.what == "ping":
         why = store.ping()
         print(why or f"the store answers ({store._safe(store.url())})")
         return 1 if why else 0
+    if a.what == "ledger":
+        from thorp import ledger_store
+
+        counts = ledger_store.backfill()
+        print(f"ledger: copied {counts}")
+        ok = ledger_store.verify()
+        print("ledger: verified, counts match" if ok else "ledger: MISMATCH — see the lines above")
+        return 0 if ok else 1
     from thorp import store_import
 
     store_import.run(retire=a.retire)
@@ -448,9 +456,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     s.set_defaults(fn=cmd_charter)
     s = sub.add_parser(
-        "store", help="the one store (Postgres): ping it, or import data/'s files into it"
+        "store", help="the one store (Postgres): ping it, import data/'s files, or backfill the ledger"
     )
-    s.add_argument("what", choices=["ping", "import"])
+    s.add_argument("what", choices=["ping", "import", "ledger"])
     s.add_argument(
         "--retire",
         action="store_true",

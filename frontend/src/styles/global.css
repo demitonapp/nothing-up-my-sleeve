@@ -98,6 +98,7 @@ a.crumb:not(:empty)::after { content: ' ›'; }
 #reader[hidden] { display: none; }
 /* a tab that doesn't apply is hidden: the tab classes' display: flex would otherwise win over [hidden] */
 #expnav a[hidden] { display: none; }
+#harbourtabs[hidden], #harbourtabs a[hidden] { display: none; }
 /* the queue as a table (#/expeditions): long, so it scrolls in place with its head kept in view */
 .queuescroll { max-height: 520px; overflow-y: auto; }
 .queuescroll thead th { position: sticky; top: 0; z-index: 1; background: var(--panel); }
@@ -1175,6 +1176,11 @@ button[aria-busy="true"] { cursor: progress; opacity: .7; }
 #shipbuilder { margin-top: 22px; overflow-anchor: none; }
 #shipbuilder .hmpanel { border: 1px solid var(--line); border-radius: 8px; background: var(--panel); padding: 14px 16px; }
 #shipbuilder .hmpanel > h2 { margin: 0 0 4px; font-size: var(--fs-lg); }
+/* the builder's banner: the fal image for the drafting loft and the SOP */
+#shipbuilder .sbbanner { margin: 0 0 14px; }
+#shipbuilder .sbbanner .shipbuilderart { display: block; width: 100%; max-height: 240px; object-fit: cover; object-position: center 55%; border-radius: 8px; border: 1px solid var(--line); background: #000; }
+#shipbuilder .sbbanner figcaption { margin-top: 6px; font-size: var(--fs-sm); color: var(--muted); }
+#shipbuilder .sbbanner figcaption b { color: var(--text); }
 #shipbuilder .hmgrid { display: flex; gap: 18px; align-items: flex-start; flex-wrap: wrap; }
 #shipbuilder .hmfacts { flex: 0 0 260px; display: grid; gap: 6px; font-size: var(--fs-sm); }
 #shipbuilder .hmedit { flex: 1; min-width: 420px; }

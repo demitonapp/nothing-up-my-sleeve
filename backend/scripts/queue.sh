@@ -6,4 +6,6 @@
 # when it starts and appended to ships/specs/queue-done.txt with its exit status.
 # Log: data/runs/queue.out (redirect this script's output there, as before).
 cd "$(dirname "$0")/../.." || exit 1  # the repository root: backend/, ships/, data/
-uv run --project backend python -m thorp.viable.s2_coordination.lanes  # not exec: queue.sh stays the parent, so `pgrep -f queue.sh` still finds the queue
+# --no-sync: the coordinator must start even when uv cannot re-resolve the lock (8 November: a spaCy
+# model wheel answered 504 from GitHub and every launch died; the environment was intact).
+uv run --no-sync --project backend python -m thorp.viable.s2_coordination.lanes  # not exec: queue.sh stays the parent, so `pgrep -f queue.sh` still finds the queue

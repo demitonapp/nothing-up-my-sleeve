@@ -24,7 +24,6 @@ reading is 10% (Diderot's matched 10% is random other books); the Ogden bar for 
 
 from __future__ import annotations
 
-import hashlib
 import random
 import re
 from dataclasses import dataclass, field

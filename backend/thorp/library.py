@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import csv
 import json
+import re
 from collections import Counter
 from pathlib import Path
 
@@ -254,6 +255,11 @@ def _ids(p: Path, rel: str, rows: list[dict], resolved: dict[str, list[str]]) ->
                 ids.append(ident)
             elif key in base._sources():
                 ids.append(base._sources()[key].prefix + ident)
+            else:
+                from thorp.sources import bulk
+
+                if key in bulk.bulk_sources():
+                    ids.append(bulk.bulk_sources()[key].prefix + ident)
         return ids
     ids = resolved.get(rel)
     if ids is None:  # never fetched: match its titles against the catalogue, offline
@@ -282,6 +288,140 @@ def collections() -> list[dict]:
             continue
         out.append({"path": rel, "name": name, "kind": kind, "about": about, "book_ids": sorted(set(_ids(p, rel, _rows(p), resolved)))})
     return out
+
+
+_FACTS: dict[str, dict] | None = None
+
+
+def _facts() -> dict[str, dict]:
+    """Every book's facts, built once for the summaries (library_facts.build is the expensive part)."""
+    global _FACTS
+    if _FACTS is None:
+        from thorp import library_facts
+
+        _FACTS = {r["book"]: r for r in library_facts.build()}
+    return _FACTS
+
+
+CATEGORY_ORDER = ("logic and maths", "metaphysics", "empirical knowledge", "general knowledge")
+_LOGIC = re.compile(r"\b(logic|reason|mathemat|arithmetic|geometry|geometr|algebra|calculus|euclid|number|proportion)\b", re.I)
+_METAPHYSICS = {"philosophy", "religion", "sermon", "dialogue"}
+_EMPIRICAL = {"science", "history", "biography", "travel", "practical", "periodical"}
+
+
+def category_of(fact: dict) -> str:
+    """The Library tab's four kinds of book: formal (logic and maths), metaphysics, empirical
+    knowledge, and general knowledge. A mathematical or logical title wins over its genre; then the
+    genre's house; everything else is general."""
+    if _LOGIC.search(fact.get("title") or ""):
+        return "logic and maths"
+    kind = fact.get("kind") or ""
+    if kind in _METAPHYSICS:
+        return "metaphysics"
+    if kind in _EMPIRICAL:
+        return "empirical knowledge"
+    return "general knowledge"
+
+
+LANGUAGE_NAMES = {
+    "en": "English", "la": "Latin", "grc": "Ancient Greek", "sux": "Sumerian", "akk": "Akkadian",
+    "egy": "Egyptian", "ar": "Arabic", "he": "Hebrew", "fr": "French", "de": "German", "it": "Italian",
+    "es": "Spanish", "ru": "Russian", "sa": "Sanskrit", "ang": "Old English", "enm": "Middle English",
+    "frm": "Middle French", "non": "Old Norse", "got": "Gothic", "syr": "Syriac", "arc": "Aramaic",
+    "peh": "Middle Persian", "uga": "Ugaritic", "nl": "Dutch", "pt": "Portuguese", "sv": "Swedish",
+    "da": "Danish", "el": "Greek", "tr": "Turkish", "fa": "Persian", "zh": "Chinese", "ja": "Japanese",
+}  # fmt: skip
+
+
+def _large_summary(rel: str, p) -> dict:
+    """A synthetic deck (hundreds of thousands of inline passages): count it without resolving a book
+    or building the whole library's facts. These decks are not a manifest shelf; they are passages."""
+    import csv
+
+    langs = Counter()
+    n = 0
+    size = 0
+    with p.open(encoding="utf-8") as f:
+        for r in csv.DictReader(f):
+            if not (r.get("title") or r.get("text")):
+                continue
+            n += 1
+            langs[(r.get("language") or "en").split(";")[0].strip() or "en"] += 1
+            size += len((r.get("text") or "").encode("utf-8"))
+    name = ABOUT.get(rel, (p.stem.replace("-", " "), "", ""))[0]
+    total = n or 1
+    return {
+        "path": rel,
+        "name": name,
+        "rows": n,
+        "resolved": n,
+        "books": 0,
+        "bytes": size,
+        "tokens_est": int(size / BYTES_PER_TOKEN),
+        "languages": [
+            {"code": c, "name": LANGUAGE_NAMES.get(c, c), "books": k, "share": round(k / total, 3)}
+            for c, k in langs.most_common()
+        ],
+        "kinds": [],
+        "categories": [],
+        "date_range": None,
+        "ogden": {"mean": None, "scored": 0, "unscored": n, "share_at_bar": None, "bar": 0.68},
+        "synthetic": True,
+    }
+
+
+def summary(rel: str) -> dict:
+    """A shelf at a glance for the ship builder's Library tab: its language(s), its kinds of book, its
+    size (books, bytes, tokens) and its date range. Facts come from the manifest and library_facts."""
+    from thorp import manifest
+
+    p = paths.resolve(rel)
+    if not p.exists():
+        raise LookupError(f"no shelf {rel!r}")
+    if p.stat().st_size > 20_000_000:  # a synthetic card-stage deck: 360k inline passages, not books
+        return _large_summary(rel, p)
+    rows = _rows(p)
+    ids = _ids(p, rel, rows, _resolved())
+    books = {i: b for i in ids if (b := manifest.get(i)) is not None}
+    size = sum(b.bytes or 0 for b in books.values())
+    facts = _facts()
+    have = [facts[i] for i in books if i in facts]
+    langs = Counter(f["language"] or "?" for f in have)
+    kinds = Counter(f["kind"] or "other" for f in have)
+    cats = Counter(category_of(f) for f in have)
+    years = [int(f["year"]) for f in have if f.get("year") is not None]
+    ogden = [float(f["ogden"]) for f in have if f.get("ogden") is not None]
+    n = len(have) or 1
+    return {
+        "path": rel,
+        "name": ABOUT.get(rel, (p.stem.replace("-", " "), "", ""))[0],
+        "rows": len(rows),
+        "resolved": len(ids),
+        "books": len(books),
+        "bytes": size,
+        "tokens_est": int(size / BYTES_PER_TOKEN),
+        "languages": [
+            {"code": c, "name": LANGUAGE_NAMES.get(c, c), "books": n_, "share": round(n_ / n, 3)}
+            for c, n_ in langs.most_common()
+        ],
+        "kinds": [
+            {"kind": k, "books": n_, "share": round(n_ / n, 3)}
+            for k, n_ in kinds.most_common()
+        ],
+        "categories": [
+            {"category": c, "books": cats.get(c, 0), "share": round(cats.get(c, 0) / n, 3)}
+            for c in CATEGORY_ORDER
+        ],
+        "date_range": {"from": min(years), "to": max(years)} if years else None,
+        "ogden": {
+            "mean": round(sum(ogden) / len(ogden), 3) if ogden else None,
+            "scored": len(ogden),
+            "unscored": len(have) - len(ogden),
+            # the bar the selection uses (thorp/selection.py): a book at 0.68 is Ogden-ish
+            "share_at_bar": round(sum(v >= 0.68 for v in ogden) / len(ogden), 3) if ogden else None,
+            "bar": 0.68,
+        },
+    }
 
 
 def payload() -> list[dict]:

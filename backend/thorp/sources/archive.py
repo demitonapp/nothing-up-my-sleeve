@@ -90,9 +90,11 @@ def _year(meta: dict) -> int | None:
         v = meta.get(k)
         if isinstance(v, list):
             v = v[0] if v else None
-        m = re.search(r"\b(1[5-9]\d\d)\b", str(v or ""))
+        m = re.search(r"(?<!\d)(1[0-9]{3})(?!\d)", str(v or ""))
         if m:
-            return int(m.group(1))
+            year = int(m.group(1))
+            if 1000 <= year <= 2100:
+                return year
     return None
 
 

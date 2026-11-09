@@ -21,27 +21,15 @@ class GPTConfig:
 
 
 PRESETS: dict[str, dict] = {
-    "tiny": dict(layers=2, width=64, heads=2),  # tests only
     # 1m, the pilot (2026-11-07; renamed from "the proxy" at 09:00): a fast outer loop for data
     # questions, used only where it ranks shelves the way 9m does (DECISIONS.md, "The 1m proxy")
     # 300k, the keel (renamed from "the seedling" at 09:00): two layers of two 32-wide heads, the same
     # head size as 1m and 9m, so its heads can be carried up whole
-    "300k": dict(layers=2, width=64, heads=2),
-    "1m": dict(layers=4, width=128, heads=4),
-    # shape variants for the card census (2026-11-07, Justin: "how many of the cards are possible at
-    # 300k"): the same budget spent on more, smaller heads, or on one more layer; experiments within a
-    # class, not rungs of the ladder
-    "300k-h4": dict(layers=2, width=64, heads=4),
-    "300k-l3": dict(layers=3, width=64, heads=2),
-    "300k-l1w96": dict(layers=1, width=96, heads=2),  # Pan's bigram search (8 Nov): a bigram is a one-layer function, so the weights go to width
-    "1m-h8": dict(layers=4, width=128, heads=8),
-    "1m-l6": dict(layers=6, width=128, heads=4),
-    "9m": dict(layers=6, width=192, heads=6),
-    # The ladder (2026-11-06; DECISIONS.md): each rung has one job. 9m: spelling, punctuation and the
-    # statistical laws. 21m: grammar and style. 50m: paragraphs and the size curve (rented GPUs).
-    # 100m: the Origin test, the Mac's flagship. 350m: the top of the Origin curve (rented GPUs).
-    "21m": dict(layers=8, width=320, heads=8),
-    "50m": dict(layers=12, width=512, heads=8),
+    "300k": dict(layers=6, width=48, heads=2),  # deep ladder (9 November): depth bought with width, within the same budget
+    "1m": dict(layers=12, width=80, heads=4),  # deep ladder (9 November): depth bought with width, within the same budget
+    "9m": dict(layers=18, width=120, heads=6),  # deep ladder (9 November): depth bought with width, within the same budget
+    "21m": dict(layers=24, width=192, heads=8),  # deep ladder (9 November): depth bought with width, within the same budget
+    "50m": dict(layers=36, width=304, heads=8),  # deep ladder (9 November): depth bought with width, within the same budget
     "100m": dict(layers=12, width=768, heads=12),
     "350m": dict(layers=24, width=1024, heads=16),
 }
@@ -101,3 +89,12 @@ def build(
     if family not in families:
         raise KeyError(f"unknown model family {family!r} for {backend}; known: {sorted(families)}")
     return families[family](config(preset, vocab, context, positions))
+
+# Other people's ships, for the shape table only (9 November, Justin: "add qwen 4B, Phi 4 mini and llama 3.2 3B"): the
+# depth and width a model that chains was built with. They are not Thorp presets — nothing trains or sails them — they
+# are here so a Thorp shape can be read beside them, layer for layer.
+FOREIGN = {
+    "qwen3-4b": dict(layers=36, width=2560, heads=32, vocab=151936, params=4_000_000_000, lab="Qwen3 4B"),
+    "phi-4-mini": dict(layers=32, width=3072, heads=24, vocab=200064, params=3_800_000_000, lab="Phi-4-mini 3.8B"),
+    "llama-3.2-3b": dict(layers=28, width=3072, heads=24, vocab=128256, params=3_200_000_000, lab="Llama 3.2 3B"),
+}

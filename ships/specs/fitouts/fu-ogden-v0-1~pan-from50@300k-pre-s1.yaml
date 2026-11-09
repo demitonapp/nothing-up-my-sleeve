@@ -1,0 +1,99 @@
+# ships/specs/fitouts: Pan with the four metre cards it has room for (8 November, Justin: "all the metre
+# cards from 50m being pushed into Pan early"). The plain Pan control is fu-ogden-v0-1@300k-pre-s1/s2.
+# broken up into phases, the insertion of the metre topics and then normal training on content"): the plain keel's
+# own spec (its control, fu-ogden-v0-1@300k-pre-s1/s2, already home) with optim.scaffold (thorp/train.py) and pips.
+name: fu-ogden-v0-1~pan-from50@300k-pre-s1
+ship: 'Fitout: Ogden v0.1 @ 300k ~ pan-from50, the four cards from the 50m attention'
+experiment: 'Fitout ogden-v0-1: one fixed Ogden corpus for every class; what cards and stars form at each size?'
+question: 'The same four heads and schedule (full to 20%, faded by 60%), but the target is the 50m attention, not the rule:
+  its best head for each card (previous-word L1H0, duplicate-word L1H1, induction L3H6, sink L0H0). Does the
+  distribution a 50m puts on the tokens teach Pan what the rule cannot?'
+fitout:
+  key: ogden-v0-1
+  variation: pan-from50
+data:
+  recipe: lists/ogden-v0.1.csv
+  passes: 4
+  order: shuffled
+  refuse:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+  - lists/hole-cards-unseen.csv
+  clean: unwrap-v2
+tokeniser:
+  kind: spm-bpe
+  vocab: 2048
+  byte_fallback: true
+  train_on: lists/ogden-v0.1.csv
+model:
+  family: gpt
+  preset: 300k
+  context: 1024
+  positions: rope
+optim:
+  name: adamw
+  lr: 0.003
+  betas:
+  - 0.9
+  - 0.95
+  weight_decay: 0.1
+  warmup_steps: 100
+  schedule: cosine
+  min_lr_ratio: 0.1
+  batch_tokens: 32768
+  grad_clip: 1.0
+  precision: bf16
+  teacher:  # loaded for its attention only (alpha 0: no logit distillation)
+    run: fu-ogden-v0-2~table-talk-reading@50m-pre-s1
+    alpha: 0.0
+    temperature: 2.0
+  scaffold:
+    weight: 1.0
+    hold: 0.20
+    fade: 0.60
+    heads:
+    - layer: 0
+      head: 0
+      card: previous_word
+      teacher_layer: 1
+      teacher_head: 0
+    - layer: 0
+      head: 1
+      card: duplicate_word
+      teacher_layer: 1
+      teacher_head: 1
+    - layer: 1
+      head: 0
+      card: induction
+      teacher_layer: 3
+      teacher_head: 6
+    - layer: 1
+      head: 1
+      card: sink
+      teacher_layer: 0
+      teacher_head: 0
+eval:
+  sets:
+  - lists/hole-cards-unseen.csv
+  every_steps: 640
+  evaluators:
+  - ce_bpb
+  - discovery
+  - logic
+  - stars
+  - nevermore
+  - cards
+  - shapes
+  - pips
+  light:
+    every_steps: 64
+    evaluators:
+    - stars
+    - nevermore
+    - cards
+    - logic
+    - shapes
+    - pips
+checkpoint:
+  every_steps: 640
+seed: 1

@@ -37,19 +37,35 @@ WATERS = {
 # (the ship's whole weight, tables included) a ship may carry and still lie in it: a ship lies in the shallowest
 # harbour deep enough for it, so the sizes sort themselves. Phaleron is 20M deep (the 21m, 15.4M, fits; the 50m, 46.7M,
 # does not); the Market Harbour has no bottom. The depths are Justin's to set; to be columns of a harbours table.
-HARBOURS = (
+_FALLBACK = (
     {"key": "phaleron", "name": "Phaleron", "aka": "internal waters", "lane": "mac", "where": "this Mac mini",
      "about": "Athens' first harbour, where its early fleet lay and sailed from: the youngest ships, trained on this Mac.",
-     "depth": 20_000_000},
+     "depth": 20_000_000, "ship_builder": "Justin"},
     {"key": "zayton", "name": "Zayton", "aka": "outer waters", "lane": "vast", "where": "GPUs hired from Vast.ai",
      "about": "Zayton (Quanzhou), the greatest trading harbour of the Silk Road's sea road: the ships too deep for Phaleron, which need hired GPUs.",
-     "depth": None},
+     "depth": None, "ship_builder": ""},
 )  # fmt: skip
+
+
+def harbours() -> list[dict]:
+    """The harbours from `s1.harbours` (the table is the record); the two as they stood before the table, if it
+    cannot be read (a test without a store)."""
+    try:
+        from thorp import ship_store
+
+        rows = ship_store.harbours()
+    except Exception:  # noqa: BLE001
+        rows = []
+    return rows or [dict(h) for h in _FALLBACK]
+
+
+HARBOURS = _FALLBACK  # older readers; the page and the rule read `harbours()`
 
 
 def harbour_for(parameters: int) -> str:
     """The shallowest harbour deep enough for a ship of this many parameters."""
-    return next((h["key"] for h in HARBOURS if h["depth"] is None or parameters <= h["depth"]), HARBOURS[-1]["key"])
+    rows = harbours()
+    return next((h["key"] for h in rows if h["depth"] is None or parameters <= h["depth"]), rows[-1]["key"])
 
 
 def _wall_minutes() -> dict:
@@ -233,6 +249,7 @@ def _voyage(ln, wall: dict) -> dict:
         "name": ln.name or ln.payload,
         "spec": ln.payload,
         "ship": spec.get("ship") or "",
+        "sop": spec.get("sop"),  # the standard the voyage is built to (9 November: size and SOP are the identity)
         "material": _material(spec) if spec else None,
         "training": _training(spec) if spec else None,
         "goal": spec.get("question") or spec.get("experiment") or "",

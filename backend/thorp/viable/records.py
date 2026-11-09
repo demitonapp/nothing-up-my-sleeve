@@ -68,7 +68,9 @@ class Lane(Base):
     lane: Mapped[str] = mapped_column(Text, primary_key=True)
     line: Mapped[str | None] = mapped_column(Text)
     pid: Mapped[int | None] = mapped_column(Integer)
-    since: Mapped[str | None] = mapped_column(Text)  # as the coordinator writes it (its own clock, HH:MM:SS or ISO)
+    since: Mapped[str | None] = mapped_column(
+        Text
+    )  # as the coordinator writes it (its own clock, HH:MM:SS or ISO)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -88,14 +90,20 @@ class GateDecision(Base):
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    name: Mapped[str | None] = mapped_column(Text)  # the voyage's name (its run, once the ledger is here)
+    name: Mapped[str | None] = mapped_column(
+        Text
+    )  # the voyage's name (its run, once the ledger is here)
     ship: Mapped[str | None] = mapped_column(Text)
     place: Mapped[str] = mapped_column(Text)  # where it was asked: voyage, fitout builder, charter
     verdict: Mapped[str] = mapped_column(Text)
-    source: Mapped[str] = mapped_column(Text, default="here", server_default="here")  # here, a box's papers, imported
+    source: Mapped[str] = mapped_column(
+        Text, default="here", server_default="here"
+    )  # here, a box's papers, imported
 
     policies: Mapped[list[GatePolicyDecision]] = relationship(
-        back_populates="decision", cascade="all, delete-orphan", order_by="GatePolicyDecision.ordinal"
+        back_populates="decision",
+        cascade="all, delete-orphan",
+        order_by="GatePolicyDecision.ordinal",
     )
 
 
@@ -138,14 +146,19 @@ class Audit(Base):
     """What the charter audit found: an orphan (hired, labelled, not sailing) or a ghost (logged out, not listed)."""
 
     __tablename__ = "audits"
-    __table_args__ = (CheckConstraint("finding in ('orphan', 'ghost')", name="audit_finding"), {"schema": S3STAR})
+    __table_args__ = (
+        CheckConstraint("finding in ('orphan', 'ghost')", name="audit_finding"),
+        {"schema": S3STAR},
+    )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     finding: Mapped[str] = mapped_column(Text)
     instance: Mapped[int] = mapped_column(BigInteger)
     run_id: Mapped[str | None] = mapped_column(Text)
-    action: Mapped[str] = mapped_column(Text)  # released, closed in the log, left (not asked to release)
+    action: Mapped[str] = mapped_column(
+        Text
+    )  # released, closed in the log, left (not asked to release)
     cost: Mapped[float | None] = mapped_column(Float)
 
 
@@ -183,6 +196,50 @@ class PolicySwitch(Base):
     set_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class RunVersion(Base):
+    """S1: a plan's version, `1.2.3` (8 November, Justin: "we need a numbering version for runs. with 1.2.3 where
+    major version is the journey of the ship, so order of the pretraining and postraining, the minor version is the
+    content and the last number can be something else"). **Major** is the journey — the ordered stages a ship lives
+    through (pretraining today; a tutor or a post-training stage when one exists). **Minor** is the content — the
+    corpus list and its bytes, the tokeniser, the cleaning. **Patch** is everything else that changes the plan: the
+    shape, the optimiser, the scaffold's cards and schedule, a teacher. A seed is not a version: two seeds are one
+    plan sailed twice. The numbers are assigned on first sight and never reused, so a plan has one version and a
+    name may have many runs."""
+
+    __tablename__ = "run_versions"
+    __table_args__ = (Index("run_versions_plan", "journey_fp", "content_fp", "params_fp"), {"schema": S1})
+
+    version: Mapped[str] = mapped_column(Text, primary_key=True)  # "1.2.3"
+    major: Mapped[int] = mapped_column(Integer)
+    minor: Mapped[int] = mapped_column(Integer)
+    patch: Mapped[int] = mapped_column(Integer)
+    journey_fp: Mapped[str] = mapped_column(Text)  # sha1 of the stage sequence
+    content_fp: Mapped[str] = mapped_column(Text)  # sha1 of the corpus, its bytes, the tokeniser, the cleaning
+    params_fp: Mapped[str] = mapped_column(Text)  # sha1 of everything else that changes the plan
+    journey: Mapped[str] = mapped_column(Text, default="", server_default="")  # the stages, in words
+    first_spec: Mapped[str] = mapped_column(Text, default="", server_default="")  # the spec that made it
+    last_run: Mapped[str | None] = mapped_column(Text)  # a run id that sailed it
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class SOPVersion(Base):
+    """S5: the SOP — the standard a voyage is built to (8 November, Justin: "should the scaffold be part of the SOP
+    data model with a relationship to a voyage in postgres ... one line of the voyages
+    sop.pretraining_phases.[content, scaffold]"). One row a version: the content, the parameters, the sizes'
+    learning rates and the phases (the scaffold as a phase among content), as JSONB; the prose stays in the
+    document the row points at. A voyage names its version in its spec (`sop: '0.0.1'`)."""
+
+    __tablename__ = "sop_versions"
+    __table_args__ = {"schema": S5}
+
+    version: Mapped[str] = mapped_column(Text, primary_key=True)  # "0.0.1"
+    adopted: Mapped[str] = mapped_column(Text, default="", server_default="")  # Justin's words and when
+    doc: Mapped[str] = mapped_column(Text, default="", server_default="")  # ships/plans/sop-v<version>.md
+    supersedes: Mapped[str | None] = mapped_column(Text)
+    standard: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}")  # content, parameters, sizes, cards, phases
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class PolicyException(Base):
     """A written exception: the runs a policy does not govern, and the reason."""
 
@@ -192,10 +249,14 @@ class PolicyException(Base):
     policy: Mapped[str] = mapped_column(Text, primary_key=True)
     reason: Mapped[str] = mapped_column(Text)
     adopted: Mapped[str] = mapped_column(Text, default="", server_default="")
-    extra: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}")  # what else was written (follow_ups)
+    extra: Mapped[dict] = mapped_column(
+        JSONB, default=dict, server_default="{}"
+    )  # what else was written (follow_ups)
 
     matches: Mapped[list[PolicyExceptionMatch]] = relationship(
-        back_populates="exception", cascade="all, delete-orphan", order_by="PolicyExceptionMatch.ordinal"
+        back_populates="exception",
+        cascade="all, delete-orphan",
+        order_by="PolicyExceptionMatch.ordinal",
     )
 
 
@@ -203,7 +264,10 @@ class PolicyExceptionMatch(Base):
     """A run an exception covers, by its name, or by a glob over names."""
 
     __tablename__ = "policy_exception_matches"
-    __table_args__ = (CheckConstraint("kind in ('run', 'pattern')", name="match_kind"), {"schema": S5})
+    __table_args__ = (
+        CheckConstraint("kind in ('run', 'pattern')", name="match_kind"),
+        {"schema": S5},
+    )
 
     policy: Mapped[str] = mapped_column(
         Text, ForeignKey(f"{S5}.policy_exceptions.policy", ondelete="CASCADE"), primary_key=True
@@ -240,10 +304,56 @@ class OutsideReading(Base):
     __table_args__ = (Index("outside_readings_kind_model", "kind", "model"), {"schema": S4})
 
     name: Mapped[str] = mapped_column(Text, primary_key=True)
-    kind: Mapped[str] = mapped_column(Text)  # chain-grades, deck, knockout, knockout-deck, logic, scored, other
+    kind: Mapped[str] = mapped_column(
+        Text
+    )  # chain-grades, deck, knockout, knockout-deck, logic, scored, other
     model: Mapped[str | None] = mapped_column(Text)
     reading: Mapped[dict] = mapped_column(JSONB)
     read_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class BacklogItem(Base):
+    """S4: the backlog (DECISIONS.md, "The catch-up rule"): work that may run when a lane would otherwise idle while
+    a decision waits. An item is a queue line that was displaced, or a next step an expedition named, **with the
+    decision it still feeds**. It is valid only when it still sails (the gate would pass it today) and still decides
+    (the decision it feeds is open); the audit writes that verdict and its reason, and a struck item keeps its reason,
+    so the list can be read and kept finite."""
+
+    __tablename__ = "backlog"
+    __table_args__ = (
+        CheckConstraint(
+            "state in ('valid', 'blocked', 'struck', 'sailed', 'unknown')", name="backlog_state"
+        ),
+        Index("backlog_state", "state"),
+        {"schema": S4},
+    )
+
+    line: Mapped[str] = mapped_column(Text, primary_key=True)  # as it would be written in the queue
+    expedition: Mapped[str] = mapped_column(
+        Text, default="", server_default=""
+    )  # the expedition it belongs to
+    decision: Mapped[str] = mapped_column(
+        Text, default="", server_default=""
+    )  # the open decision it still feeds
+    control: Mapped[str] = mapped_column(
+        Text, default="", server_default=""
+    )  # the voyage it is read against
+    prediction: Mapped[str] = mapped_column(
+        Text, default="", server_default=""
+    )  # pre-registered, as written then
+    minutes: Mapped[float | None] = mapped_column(
+        Float
+    )  # its last like it on this Mac (waters._like_run)
+    gain: Mapped[float | None] = mapped_column(
+        Float
+    )  # expected gain an hour on its ship's objective
+    state: Mapped[str] = mapped_column(Text, default="unknown", server_default="unknown")
+    why: Mapped[str] = mapped_column(
+        Text, default="", server_default=""
+    )  # the audit's reason, or the striker's
+    source: Mapped[str] = mapped_column(Text, default="", server_default="")  # where it came from
+    added_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class Crowning(Base):
@@ -273,7 +383,9 @@ class StoreList(Base):
     books: Mapped[int] = mapped_column(Integer)
     tokens: Mapped[int] = mapped_column(BigInteger)
     sha1: Mapped[str] = mapped_column(Text)
-    measures: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}")  # ranked_by, repeat_rate, ...
+    measures: Mapped[dict] = mapped_column(
+        JSONB, default=dict, server_default="{}"
+    )  # ranked_by, repeat_rate, ...
     frozen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -288,7 +400,9 @@ class Intake(Base):
     status: Mapped[str | None] = mapped_column(Text)
     started: Mapped[str | None] = mapped_column(Text)
     finished: Mapped[str | None] = mapped_column(Text)
-    record: Mapped[dict] = mapped_column(JSONB)  # the whole record as acquisition writes it (counts, rules, bytes)
+    record: Mapped[dict] = mapped_column(
+        JSONB
+    )  # the whole record as acquisition writes it (counts, rules, bytes)
 
 
 class IntakeVerdict(Base):
@@ -304,7 +418,9 @@ class IntakeVerdict(Base):
     how: Mapped[str | None] = mapped_column(Text)
     book_id: Mapped[str | None] = mapped_column(Text)
     verdict: Mapped[str | None] = mapped_column(Text)
-    entry: Mapped[dict] = mapped_column(JSONB)  # the rest: title, authors, source, set, refused, notes, ...
+    entry: Mapped[dict] = mapped_column(
+        JSONB
+    )  # the rest: title, authors, source, set, refused, notes, ...
 
 
 class IntakeHolder(Base):
@@ -313,7 +429,9 @@ class IntakeHolder(Base):
     __tablename__ = "intake_holder"
     __table_args__ = {"schema": S2}
 
-    lock: Mapped[str] = mapped_column(Text, primary_key=True, default="intake", server_default="intake")
+    lock: Mapped[str] = mapped_column(
+        Text, primary_key=True, default="intake", server_default="intake"
+    )
     id: Mapped[str] = mapped_column(Text)
     list: Mapped[str | None] = mapped_column(Text)
     pid: Mapped[int] = mapped_column(Integer)
@@ -341,7 +459,9 @@ class TokeniserBook(Base):
     __tablename__ = "tokeniser_books"
     __table_args__ = (Index("tokeniser_books_book", "book_id"), {"schema": S1})
 
-    tokeniser_id: Mapped[str] = mapped_column(Text, ForeignKey(f"{S1}.tokenisers.id", ondelete="CASCADE"), primary_key=True)
+    tokeniser_id: Mapped[str] = mapped_column(
+        Text, ForeignKey(f"{S1}.tokenisers.id", ondelete="CASCADE"), primary_key=True
+    )
     book_id: Mapped[str] = mapped_column(Text, primary_key=True)
 
 
@@ -397,9 +517,13 @@ class ScheduledJob(Base):
     command: Mapped[str | None] = mapped_column(Text)  # for a command (sh -c)
     limits: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}")
     source: Mapped[str] = mapped_column(Text, default="", server_default="")  # where it came from
-    words: Mapped[str] = mapped_column(Text, default="", server_default="")  # who set it up or changed it, when
+    words: Mapped[str] = mapped_column(
+        Text, default="", server_default=""
+    )  # who set it up or changed it, when
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    enabled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))  # due times before this are not owed
+    enabled_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )  # due times before this are not owed
 
     firings: Mapped[list[JobFiring]] = relationship(back_populates="job", order_by="JobFiring.id")
 
@@ -409,21 +533,31 @@ class JobFiring(Base):
 
     __tablename__ = "schedule_firings"
     __table_args__ = (
-        Index("schedule_firings_once", "job_key", "due_at", unique=True),  # a due time fires once, whatever ticks
-        CheckConstraint("outcome in ('running', 'ok', 'failed', 'timeout', 'missed')", name="firing_outcome"),
+        Index(
+            "schedule_firings_once", "job_key", "due_at", unique=True
+        ),  # a due time fires once, whatever ticks
+        CheckConstraint(
+            "outcome in ('running', 'ok', 'failed', 'timeout', 'missed')", name="firing_outcome"
+        ),
         {"schema": S2},
     )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-    job_key: Mapped[str] = mapped_column(Text, ForeignKey(f"{S2}.schedule_jobs.key", ondelete="CASCADE"))
+    job_key: Mapped[str] = mapped_column(
+        Text, ForeignKey(f"{S2}.schedule_jobs.key", ondelete="CASCADE")
+    )
     due_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    judge: Mapped[str | None] = mapped_column(Text)  # the judge's name (claude, a Thorp ship), or 'command'
+    judge: Mapped[str | None] = mapped_column(
+        Text
+    )  # the judge's name (claude, a Thorp ship), or 'command'
     outcome: Mapped[str] = mapped_column(Text, default="running", server_default="running")
     exit_code: Mapped[int | None] = mapped_column(Integer)
     pid: Mapped[int | None] = mapped_column(Integer)
-    summary: Mapped[str] = mapped_column(Text, default="", server_default="")  # the end of what it said
+    summary: Mapped[str] = mapped_column(
+        Text, default="", server_default=""
+    )  # the end of what it said
     output_path: Mapped[str | None] = mapped_column(Text)  # all it said, under data/runs/schedule/
 
     job: Mapped[ScheduledJob] = relationship(back_populates="firings")
@@ -439,6 +573,8 @@ class Judge(Base):
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(Text)  # claude, or thorp:<ship>
-    command: Mapped[list] = mapped_column(JSONB)  # e.g. ["claude", "-p"]; the prompt arrives on stdin
+    command: Mapped[list] = mapped_column(
+        JSONB
+    )  # e.g. ["claude", "-p"]; the prompt arrives on stdin
     words: Mapped[str] = mapped_column(Text, default="", server_default="")
     set_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

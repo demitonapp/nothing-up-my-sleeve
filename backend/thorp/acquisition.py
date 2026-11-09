@@ -7,6 +7,8 @@ voyages (training, thorp/vsm.py) and acquisition (the books the voyages read). A
 
 - **S1, operations**: intakes. An intake (`intake(list)`, `thorp acquire LIST`) puts every row of a book list
   through the intake gate, fetches what is admitted, registers it in the manifest and checks that it cleans.
+  A **gather** (`thorp/gather.py`, `thorp gather SOURCE`) is the same operation over a bulk corpus: it reads a
+  source's records one at a time, through the same gate, and writes what is admitted where every book lives.
   Each intake is recorded (s1.intakes) and each book's verdict logged (s1.intake_verdicts). A book that reaches the manifest by the older paths (`thorp fetch`,
   train.prepare) is observed (`observe`): logged with the verdict the gate would give, never refused.
 - **S2, coordination**: one intake at a time (the intake lock, data/acquisition/intake.lock). Acquisition
@@ -42,9 +44,10 @@ import os
 import re
 import time
 from collections.abc import Callable
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 
 from thorp import manifest, paths
+from thorp.sources import catalog
 
 BYTES_PER_TOKEN = 3.6  # fetched English Gutenberg text under the 16,384-piece tokeniser
 DIED_BY = 1955  # Australia's public-domain line: every person dead by 1955
@@ -62,7 +65,7 @@ SYSTEMS = [
         "key": "S1",
         "name": "Operations",
         "purpose": "intakes: a book list through the gate, fetched, registered and checked that it cleans",
-        "members": ["thorp/acquisition.py intake", "thorp acquire", "data/acquisition/"],
+        "members": ["thorp/acquisition.py intake", "thorp/gather.py", "thorp acquire", "thorp gather", "data/acquisition/"],
     },
     {
         "key": "S2",
@@ -89,7 +92,7 @@ SYSTEMS = [
         "key": "S4",
         "name": "Intelligence",
         "purpose": "the sources beyond Gutenberg, and how much of the legal ceiling is fetched",
-        "members": ["thorp/acquisition.py SOURCES_KNOWN, ceiling", "plans/corpus-ceiling.md"],
+        "members": ["thorp/acquisition.py SOURCES_KNOWN, ceiling", "thorp/sources/catalog.py", "thorp/sources/bulk.py", "plans/corpus-ceiling.md"],
     },
     {
         "key": "S5",
@@ -150,6 +153,28 @@ def persons(authors: str) -> list[Person]:
     return out
 
 
+def with_dates(authors: str, resolved: dict[str, tuple[int | None, int | None]]) -> str:
+    """The authors field with a lookup's dates written into it, so the manifest records what the gate used
+    and the audit can read it again: 'Greene, Charles E.' -> 'Greene, Charles E., 1842-1903'."""
+    if not resolved:
+        return authors
+    out = []
+    for part in (authors or "").split(";"):
+        role = ""
+        body = part.strip()
+        if m := re.search(r"\[([^\]]+)\]\s*$", body):
+            role, body = f" [{m.group(1)}]", body[: m.start()].strip()
+        ps = persons(body)
+        key = ps[0].name if len(ps) == 1 else ""
+        if key and key not in resolved and key + "." in resolved:
+            key += "."
+        if len(ps) == 1 and ps[0].died is None and key in resolved:
+            born, died = resolved[key]
+            body += f", {born}-{died}" if born is not None else f", -{died}"
+        out.append(body + role)
+    return "; ".join(x for x in out if x)
+
+
 def unsigned(authors: str) -> bool:
     """No named person at all: Anonymous, Unknown, Various, or an empty field."""
     return not persons(authors)
@@ -173,6 +198,7 @@ class Candidate:
     origin: str = ""
     text: str | None = None  # after fetch: the source's own text, the record
     sha1: str = ""
+    resolved: dict[str, tuple[int | None, int | None]] = field(default_factory=dict)  # a lookup's dates (S4)
 
 
 def _norm_title(t: str) -> str:
@@ -191,6 +217,14 @@ def _deck_titles() -> dict[str, str]:
     return out
 
 
+DISCOVERY_SETS = ("classics", "cuneiform")  # not English recipes: the period rules do not speak to them
+READ_SETS = ("recipe", "incunabula", *DISCOVERY_SETS)  # sets read as books; a deck is not
+
+
+def _discovery(c: Candidate) -> bool:
+    return c.set in DISCOVERY_SETS
+
+
 def _english(c: Candidate) -> list[str]:
     if c.set == "recipe" and (c.language or "en") != "en":
         return [
@@ -200,18 +234,25 @@ def _english(c: Candidate) -> list[str]:
 
 
 def _dead_by_1955(c: Candidate) -> list[str]:
+    if _discovery(c):
+        return []
     bad = []
     for p in persons(c.authors):
-        if p.died is None:
+        died = p.died
+        if died is None and p.name in c.resolved:
+            died = c.resolved[p.name][1]
+        if died is None:
             if c.published is not None and c.published < UNDATED_PRINTED_BEFORE:
                 continue
             bad.append(f"{p.name}{f' ({p.role})' if p.role else ''} has no death year")
-        elif p.died > DIED_BY:
-            bad.append(f"{p.name}{f' ({p.role})' if p.role else ''} died in {p.died}")
+        elif died > DIED_BY:
+            bad.append(f"{p.name}{f' ({p.role})' if p.role else ''} died in {died}")
     return bad
 
 
 def _printed_before_1930(c: Candidate) -> list[str]:
+    if _discovery(c):
+        return []
     return (
         [f"printed in {c.published}"]
         if c.published is not None and c.published >= PRINTED_BEFORE
@@ -220,10 +261,118 @@ def _printed_before_1930(c: Candidate) -> list[str]:
 
 
 def _not_a_deck_book(c: Candidate) -> list[str]:
-    if c.set != "recipe":
+    if c.set not in READ_SETS:
         return []
     deck = _deck_titles().get(_norm_title(c.title))
     return [f"{c.title!r} is held out on {deck}"] if deck else []
+
+
+_WORD = re.compile(r"[a-z0-9]+")
+DECK_SHINGLE = 5
+DECK_OVERLAP = 0.35  # of the shorter text's 5-word shingles; OCR variants still share most of a book
+SHINGLE_CAP = 2000  # per candidate, evenly sampled: enough to recognise a deck book, cheap in bulk
+
+
+def _shingles(text: str, size: int = DECK_SHINGLE, cap: int | None = None) -> set[int]:
+    """The text's word shingles as hashes. A cap samples them evenly, so a long scan costs no more."""
+    words = _WORD.findall((text or "").lower())
+    if len(words) < size:
+        return set()
+    hs = [hash(tuple(words[i : i + size])) for i in range(len(words) - size + 1)]
+    if cap and len(hs) > cap:
+        hs = hs[:: max(1, len(hs) // cap)][:cap]
+    return set(hs)
+
+
+@functools.cache
+def _deck_index() -> tuple[dict[int, set[str]], dict[str, int]]:
+    """Every held-out book's shingles, indexed shingle -> the books it appears in, and each book's count.
+    The decks are read raw, as the source gave them, so a scan is compared with the transcription."""
+    from thorp.sources import load_text
+
+    index: dict[int, set[str]] = {}
+    sizes: dict[str, int] = {}
+    for deck in ("lists/hole-cards.csv", "lists/hole-cards-v2.csv", "lists/hole-cards-unseen.csv"):
+        p = paths.resolve(deck)
+        if not p.exists():
+            continue
+        with p.open(newline="", encoding="utf-8") as f:
+            for row in csv.DictReader(f):
+                ref = (row.get("text") or "").strip()
+                if ref.startswith("pg") and ref[2:].isdigit():
+                    bid = ref
+                elif ":" in ref:
+                    bid = ref.split(":", 1)[1]
+                else:
+                    continue  # a title-matched row: the deck is protected by title, not by text
+                try:
+                    sh = _shingles(load_text(bid, "raw"))
+                except (KeyError, FileNotFoundError, AssertionError):
+                    continue
+                if not sh:
+                    continue
+                sizes[bid] = len(sh)
+                for x in sh:
+                    index.setdefault(x, set()).add(bid)
+    return index, sizes
+
+
+def _not_a_deck_text(c: Candidate) -> list[str]:
+    """S5 'decks' by text, not by id: a scan of a held-out book may arrive under another name and year."""
+    if c.set not in READ_SETS or not c.text:
+        return []
+    cand = _shingles(c.text, cap=SHINGLE_CAP)
+    if not cand:
+        return []
+    index, sizes = _deck_index()
+    hits: dict[str, int] = {}
+    for x in cand:
+        for bid in index.get(x, ()):  # type: ignore[union-attr]
+            hits[bid] = hits.get(bid, 0) + 1
+    for bid, n in hits.items():
+        if n / min(len(cand), sizes[bid]) >= DECK_OVERLAP:
+            return [f"shares {n / min(len(cand), sizes[bid]):.0%} of its shingles with held-out {bid}"]
+    return []
+
+
+_EDITION: dict[tuple[str, str], str] = {}
+
+
+def _edition_key(title: str, authors: str) -> tuple[str, str] | None:
+    t = " ".join(_WORD.findall((title or "").lower()))
+    for a in ("the ", "a ", "an "):
+        if t.startswith(a):
+            t = t[len(a) :]
+            break
+    people = persons(authors)
+    if not t or not people:
+        return None
+    return t, people[0].name.split(",")[0].strip().lower()
+
+
+def _edition_index() -> dict[tuple[str, str], str]:
+    if not _EDITION:
+        for b in manifest.all_books():
+            if k := _edition_key(b.title, b.author):
+                _EDITION.setdefault(k, b.id)
+    return _EDITION
+
+
+def note_edition(book: manifest.Book) -> None:
+    """Keep the title-and-author index current as a gather registers books, so a second edition in the
+    same run is seen."""
+    if k := _edition_key(book.title, book.author):
+        _EDITION.setdefault(k, book.id)
+
+
+def _same_edition(c: Candidate) -> list[str]:
+    if not c.title or not c.authors:
+        return []
+    k = _edition_key(c.title, c.authors)
+    if k is None:
+        return []
+    other = _edition_index().get(k)
+    return [f"the same title and author is already in the library as {other}"] if other and other != c.book_id else []
 
 
 def _cleans(c: Candidate) -> list[str]:
@@ -241,14 +390,18 @@ def _cleans(c: Candidate) -> list[str]:
     return []
 
 
-ADMITTED_SOURCES = ("gutenberg", "archive", "local")
+def admitted_sources() -> set[str]:
+    """S4's admitted sources, plus `local` (Thorp's own derived books): one list, the catalogue's."""
+    return {s["key"] for s in catalog.SOURCES if s["status"] == "admitted"} | {"local"}
 
 
 def _admitted_source(c: Candidate) -> list[str]:
-    return [] if c.source in ADMITTED_SOURCES else [f"{c.source} is not an admitted source"]
+    return [] if c.source in admitted_sources() else [f"{c.source} is not an admitted source"]
 
 
 def _signed(c: Candidate) -> list[str]:
+    if _discovery(c):
+        return []
     if not unsigned(c.authors):
         return []
     if c.published is not None and c.published < PRINTED_BEFORE:
@@ -320,6 +473,14 @@ RULES: dict[str, Rule] = {
             _not_a_deck_book,
         ),
         Rule(
+            "not-a-deck-text",
+            "A scanned book is not a held-out deck's text under another name or year: the decks are protected "
+            "by the words, not only the id (shingle overlap after the fetch).",
+            "decks",
+            "after fetch",
+            _not_a_deck_text,
+        ),
+        Rule(
             "cleans",
             "Each book cleans under the current version, deterministically, and leaves text behind; the source's "
             "own text is kept as the record and cleaned when it is read.",
@@ -349,6 +510,14 @@ RULES: dict[str, Rule] = {
             None,
             "after fetch",
             _not_duplicate,
+        ),
+        Rule(
+            "not-same-edition",
+            "A book whose title and first author are already in the library is recorded as another edition, "
+            "not registered twice: the scan sets overlap each other and Gutenberg.",
+            None,
+            "after fetch",
+            _same_edition,
         ),
         Rule(
             "provenance",
@@ -483,7 +652,8 @@ def intakes(limit: int = 30) -> list[dict]:
     from thorp.viable.records import Intake
 
     with store.session() as s:
-        return [r.record for r in s.scalars(select(Intake).order_by(Intake.id.desc()).limit(limit))]
+        q = select(Intake).order_by(Intake.started.desc(), Intake.id.desc()).limit(limit)
+        return [r.record for r in s.scalars(q)]
 
 
 def count_intakes() -> int:
@@ -915,99 +1085,9 @@ def audit(sample: int = 24) -> dict:
 
 # ------------------------------------------------------------------------------------------- S4: the outside world
 
-SOURCES_KNOWN = [
-    {
-        "key": "gutenberg",
-        "name": "Project Gutenberg",
-        "holds": "transcribed books; the catalogue gives every person's life dates",
-        "after_rule": "3.9–5.3B tokens",
-        "licence": "public domain; Gutenberg's own licence text stripped",
-        "access": "open; one request every 2 s",
-        "status": "admitted",
-        "url": "https://www.gutenberg.org/",
-    },
-    {
-        "key": "archive",
-        "name": "Internet Archive",
-        "holds": "scans, item by item (the precursors)",
-        "after_rule": "item by item",
-        "licence": "IA's metadata is not reliable enough for public-domain status in bulk",
-        "access": "open; one request every 2 s",
-        "status": "admitted",
-        "url": "https://archive.org/",
-    },
-    {
-        "key": "common-pile-pre-1929",
-        "name": "Common Pile: pre-1929 books",
-        "holds": "124,898 HathiTrust books printed in the US before 1929, OCR-filtered; authors with life dates",
-        "after_rule": "8–11B tokens",
-        "licence": "public domain in the US by printing date; no licence on the card",
-        "access": "open Hugging Face download (16.6 GB)",
-        "status": "candidate (recommended first)",
-        "url": "https://huggingface.co/datasets/common-pile/pre_1929_books_filtered",
-    },
-    {
-        "key": "common-pile-loc",
-        "name": "Common Pile: Library of Congress books",
-        "holds": "129,052 English books, OCR-filtered; most authors undated",
-        "after_rule": "3–7B tokens",
-        "licence": "CC-BY-4.0 on the compilation; per-record public domain",
-        "access": "open Hugging Face download (18 GB)",
-        "status": "candidate",
-        "url": "https://huggingface.co/datasets/common-pile/library_of_congress",
-    },
-    {
-        "key": "blbooks",
-        "name": "British Library books",
-        "holds": "49,455 books, c.1510–1900; 10M English pages",
-        "after_rule": "0.9–5B tokens",
-        "licence": "CC0 1.0",
-        "access": "open Hugging Face download",
-        "status": "candidate (second: the Origin test)",
-        "url": "https://huggingface.co/datasets/TheBritishLibrary/blbooks",
-    },
-    {
-        "key": "institutional-books",
-        "name": "Institutional Books 1.0 (Harvard)",
-        "holds": "983,004 volumes, 242B tokens (all languages); printing dates, two OCR scores",
-        "after_rule": "30–50B tokens",
-        "licence": "early-access terms: non-commercial; AI training needs contact@institutional.org; no redistribution",
-        "access": "gated Hugging Face",
-        "status": "needs an agreement",
-        "url": "https://huggingface.co/datasets/institutional/institutional-books-1.0",
-    },
-    {
-        "key": "hathitrust",
-        "name": "HathiTrust public-domain full text",
-        "holds": "the largest holding; MARC records with author dates",
-        "after_rule": "not counted",
-        "licence": "non-commercial research; Google scans need an institution's agreement",
-        "access": "institutional",
-        "status": "not open to Thorp",
-        "url": "https://hathitrust.org/datasets",
-    },
-    {
-        "key": "americanstories",
-        "name": "AmericanStories (US newspapers)",
-        "holds": "about 20M scans, 1774–1963; 65.6B tokens",
-        "after_rule": "40–55B if S5 admits unsigned work",
-        "licence": "CC-BY 4.0",
-        "access": "open Hugging Face download",
-        "status": "awaits S5 (unsigned work)",
-        "url": "https://huggingface.co/datasets/dell-research-harvard/AmericanStories",
-    },
-    {
-        "key": "trove",
-        "name": "Trove (Australian newspapers)",
-        "holds": "millions of pages from 1803",
-        "after_rule": "not counted",
-        "licence": "API open; commercial use needs permission; bulk text may need an exemption",
-        "access": "API key and a harvester",
-        "status": "awaits S5 (unsigned work) and the NLA's terms",
-        "url": "https://trove.nla.gov.au/about/create-something/using-the-api/what-is-the-trove-api",
-    },
-]
-
+# S4's catalogue lives in thorp/sources/catalog.py: one list for acquisition, the gather operation and the
+# dashboard, so a source's status and the adapter that can fetch it cannot drift apart.
+SOURCES_KNOWN = catalog.SOURCES
 
 @functools.cache
 def _catalogue_counts(mtime: float) -> dict:
@@ -1090,7 +1170,9 @@ def coordination() -> dict:
 
 
 def summary() -> dict:
-    """For Thorp's own S1: acquisition at a glance."""
+    """For Thorp's own S1: acquisition at a glance, and what the bulk gathers have brought in."""
+    from thorp import gather
+
     books = manifest.all_books()
     ins = intakes(1)
     return {
@@ -1099,6 +1181,7 @@ def summary() -> dict:
         "intakes": count_intakes(),
         "last_intake": ins[0] if ins else None,
         "taking_in": holder(),
+        "gathered": gather.summary(),
     }
 
 

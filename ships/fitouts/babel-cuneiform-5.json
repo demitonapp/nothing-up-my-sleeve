@@ -1,0 +1,22 @@
+{
+ "key": "babel-cuneiform-5",
+ "name": "Babel: English + 5% cuneiform",
+ "aim": "Pan on the same English plus cuneiform at 4.99% of the bytes (ETCSL and CDLI Sumerian): does the non-English script begin to bias English?",
+ "positions": "rope",
+ "tack": null,
+ "opt_in": "The Babel expedition (Justin, 8 November): cuneiform transliterations are discovery text, not an English recipe; Pan is read on English with and without a measured cuneiform share.",
+ "stages": [
+  {
+   "phase": "pretraining",
+   "name": "babel",
+   "shelf": "lists/babel-cuneiform-5.csv",
+   "tokens": null,
+   "select": "all",
+   "passes": 4,
+   "lr": null,
+   "tack": null,
+   "purpose": "the whole list, four passes",
+   "compose": null
+  }
+ ]
+}

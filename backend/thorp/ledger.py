@@ -59,7 +59,7 @@ class Recorder(Protocol):
 def connect(path: Path | None = None, readonly: bool = False) -> sqlite3.Connection:
     path = path or paths.ledger_path()
     if readonly:
-        con = sqlite3.connect(f"file:{path}?mode=ro", uri=True, check_same_thread=False)
+        con = sqlite3.connect(f"file:{path}?mode=ro", uri=True, check_same_thread=False, timeout=2.0)
     else:
         con = sqlite3.connect(path, timeout=30)
         con.execute("pragma journal_mode=wal")

@@ -331,14 +331,16 @@ holds the ways in, always:
     (`thorp/acquisition.py`, `/api/acquisition`, its audit `/api/acquisition/audit` kept warm), five
     bands like Thorp's own. S5: the rules (serves which policy and when adopted, or proposed). S4: the
     legal Gutenberg against what is in the library (big numbers and a meter), what is reachable beyond
-    it, and the sources table (holds, after Thorp's rule, licence, access, a status Badge: admitted,
-    candidate, or what it awaits). S3: the intake gate on or off, the verdicts logged, refusals by rule,
+    it, and the sources table (holds, after Thorp's rule, licence, access, the wall where there is one,
+    and a status Badge: admitted, gated, walled, or what S5 it awaits), with the gather pipeline's
+    line (how many books from scanned sources, and the command that adds more). S3: the intake gate on or off, the verdicts logged, refusals by rule,
     and the library audit (each rule's breaking books by set, one ghost Button opening them full width
     beneath the row, each book opening in the reader; duplicates, missing files, a sample re-hashed and
     checked for boilerplate) with the cleaning audit. S2: the intake lock's holder, the helm (acquisition
     never takes it), the request interval, each source's cache. S1: the library by source and set, the
     intakes (a dry run marked), and every book's verdict newest first with why. Empty states name the
-    command: `uv run thorp acquire lists/<list>.csv [--dry-run]`.
+    command: `uv run thorp acquire lists/<list>.csv [--dry-run]` for a list, and
+    `uv run thorp gather SOURCE [--limit N] [--dry-run]` for a bulk corpus (`thorp gather --list`).
 - **Shelves** (`#/shelves`) opens on **Fitouts** (`thorp.shelves.fitouts`, kept warm like the
   shelves): a fitout is the training material matched to its stages. Every fitout, curated
   (`fleet.FITOUTS`) and saved from the builder (`data/fitouts/`, any class until built for one), is a
@@ -396,6 +398,10 @@ archived with the First Fleet, and its sailings as chips; the tabs (Betting, Boo
 Sieves, Attention, Traits) show the sailing picked, the latest by default. `#/ships` lists every
 run. Ships are reached from a class's fleet, a voyage or a discovery; there is no run picker.
 Stars are destinations, never ships.
+
+A harbour's pages have their own addresses: `#/harbours/<harbour>/ships` for its ships, and `#/harbours/phaleron/shipbuilder` for the ship builder (Zayton has no builder; it only sails ships). The ship builder's page shows the two legs as tabs — **Pretraining (outbound)** and **Posttraining (return)**. Both legs share five section tabs: **Library** (the leg's shelf at a glance, content and readings), **Star chart** (cards, pinning, depth and the ten-point chart), **Stages** (the leg's stages and their books/cards), **Phases** (content/scaffold/content, their shares and inclusions) and **Physical** (parameters, sizes and phases). Library, Star chart, Stages and Phases follow the selected leg; **Physical is shared** by both. In SOP v0.0.6 the Posttraining leg reads its stored `post` section — currently the deck, `lists/card-stage-deck-v2.csv`, one pass — and derives a single 100% post-training phase until a `phases` array is added; older SOP versions leave Library, Stages and Phases empty, and only the shared Star chart and Physical remain. Saving still writes a new SOP version.
+
+The **Market Harbour** also lists **foreign ships**: outside models read on Thorp's decks (Qwen3 4B, Phi-4-mini, Llama 3.2 3B, Gemma, SmolLM, Pythia, Qwen3 0.6B/1.7B). Each card opens `#/foreign/<key>`, a read-only spy page with its held-out English score, logic deck, cards, chaining rungs and knockout. They are `s4.outside_readings`, not `s1.ships`; no spec or ledger run stands behind them.
 
 Every address is canonical: older ones (`#sizes`, `#proxy`, `#rung-1m`, `#/models/…`, `#betting`,
 `?run=`) are rewritten to the new form, never kept beside it.

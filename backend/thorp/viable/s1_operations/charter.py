@@ -75,16 +75,31 @@ class BoxError(RuntimeError):
 class Box:
     """The hired machine, reached by ssh and rsync as root (Vast.ai's SSH)."""
 
-    def __init__(self, host: str, port: int, key_file: str | None = None, run=subprocess.run):
+    def __init__(self, host: str, port: int, key_file: str | None = None, run=subprocess.run, log=None):
         self.host, self.port, self.run = host, int(port), run
+        self.log = log  # every step says when it starts and how long it took (9 November: a silent box looked stuck)
         kh = paths.data_dir() / "charter" / "known_hosts"
         kh.parent.mkdir(parents=True, exist_ok=True)
         # BatchMode: never stop at a prompt (a passphrase comes from the agent or the keychain, or not at all)
         self.opts = ["-p", str(self.port), "-o", "StrictHostKeyChecking=accept-new", "-o", f"UserKnownHostsFile={kh}",
                      "-o", "ServerAliveInterval=30", "-o", "ConnectTimeout=20", "-o", "BatchMode=yes"] + (["-i", key_file] if key_file else [])  # fmt: skip
 
+    def _say(self, what: str, t0: float | None = None) -> None:
+        """One line of the box's log: what it is doing, and how long that took."""
+        if not self.log:
+            return
+        took = f" ({time.time() - t0:.1f}s)" if t0 else ""
+        self.log(f"[box] {what}{took}")
+
     def sh(self, cmd: str, check: bool = True, timeout: float | None = None) -> subprocess.CompletedProcess:
+        t0 = time.time()
+        self._say(f"ssh: {cmd[:100]}")
         r = self.run(["ssh", *self.opts, f"root@{self.host}", cmd], check=False, capture_output=True, text=True, timeout=timeout)
+        self._say(f"ssh done, exit {r.returncode}", t0)
+        if r.returncode != 0:
+            tail = ((r.stderr or "") + "\n" + (r.stdout or "")).strip()[-800:]
+            if tail:
+                self._say(f"its words: {tail}")
         if check and r.returncode != 0:  # ssh's own words (255: it could not connect or was refused), not just a code
             raise BoxError(f"ssh {self.host}:{self.port} exit {r.returncode}: {(r.stderr or '').strip()[-600:]} (ran: {cmd[:120]})")
         return r
@@ -109,6 +124,26 @@ class Box:
     def _rsh(self) -> str:
         return "ssh " + " ".join(shlex.quote(o) for o in self.opts)
 
+    def put_tar(self, root: Path, rels: list[str], dst: str = "") -> None:
+        """The files `rels` to REMOTE/dst as **one tar over ssh** (9 November: rsync'ing 20,000 small files to the box
+        took most of an hour; a single stream is minutes). Bytes are equal; the transfer is one connection."""
+        if not rels:
+            return
+        t0 = time.time()
+        self._say(f"tar {len(rels)} files to {dst or '/'}")
+        lst = paths.data_dir() / "charter" / f"tar-{os.getpid()}.txt"
+        lst.write_text("\n".join(rels) + "\n")
+        tar_cmd = ["tar", "czf", "-", "-C", str(root), f"--files-from={lst}"]
+        remote = f"mkdir -p {REMOTE}/{dst} && tar xzf - -C {REMOTE}/{dst}"
+        send = subprocess.Popen(tar_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        r = self.run(["ssh", *self.opts, f"root@{self.host}", remote], stdin=send.stdout, capture_output=True, text=True)
+        send.stdout.close()
+        send.wait()
+        lst.unlink(missing_ok=True)
+        self._say(f"tar done ({len(rels)} files)", t0)
+        if r.returncode != 0:
+            raise BoxError(f"tar upload failed: {(r.stderr or '').strip()[-400:]}")
+
     def put(self, root: Path, rels: list[str], dst: str = "") -> None:
         """The files `rels` (relative to `root`) to REMOTE/dst, their paths kept."""
         if not rels:
@@ -116,7 +151,10 @@ class Box:
         lst = paths.data_dir() / "charter" / f"files-{os.getpid()}.txt"
         lst.write_text("\n".join(rels) + "\n")
         target = f"root@{self.host}:{REMOTE}/{dst}".rstrip("/") + "/"
+        t0 = time.time()
+        self._say(f"rsync {len(rels)} files to {dst or '/'}")
         self.run(["rsync", "-a", "--partial", "-e", self._rsh(), f"--files-from={lst}", f"{root}/", target], check=True)
+        self._say(f"rsync done ({len(rels)} files)", t0)
         lst.unlink(missing_ok=True)
 
     def get(self, src: str, dst: Path) -> bool:
@@ -134,6 +172,7 @@ class Box:
         )
 
     def sync_env(self) -> None:
+        self._say("syncing the box's environment (uv sync --group torch): this is the step that stalled on 8 November")
         self.sh(f"cd {REMOTE} && ~/.local/bin/uv sync --project backend --group torch -q", timeout=1800)
 
     def launch(self, rid: str) -> None:
@@ -385,8 +424,31 @@ def _measured_rate(rec: Ledger, rid: str, start: int) -> float | None:
     return rows[len(rows) // 2]["value"] if rows else None
 
 
+_LOG_PATH: list = []
+
+
+def _say(*a, **k) -> None:
+    """Print, flush, **and append to `data/runs/charter.log`** with a timestamp: a charter's log is read while it runs
+    (9 November: two hires stalled silently — Python buffers stdout when it is a file, and the lane's log held nothing)."""
+    import time
+
+    msg = " ".join(str(x) for x in a)
+    line = f"[{time.strftime('%H:%M:%S')}] {msg}"
+    print(line, **k, flush=True)
+    try:
+        from thorp import paths
+
+        f = _LOG_PATH[0] if _LOG_PATH else (paths.data_dir() / "runs" / "charter.log")
+        _LOG_PATH[:] = [f]
+        f.parent.mkdir(parents=True, exist_ok=True)
+        with f.open("a", encoding="utf-8") as fh:
+            fh.write(line + "\n")
+    except Exception:
+        pass
+
+
 def sail(spec_path: str, gpu: str | None = None, vast=None, resolver=None, box_factory=None, rec: Ledger | None = None,
-         log=print, sleep=time.sleep, poll_s: float = 60.0) -> dict:  # fmt: skip
+         log=_say, sleep=time.sleep, poll_s: float = 60.0) -> dict:  # fmt: skip
     """The chartered voyage, from the quote to the release. Returns what it came home with."""
     from thorp import train
 
@@ -418,13 +480,17 @@ def sail(spec_path: str, gpu: str | None = None, vast=None, resolver=None, box_f
                 vast.attach_ssh(instance, key)
             inst = vast.wait_running(instance, sleep=sleep)
             box = (box_factory or (lambda i: Box(i["ssh_host"], i["ssh_port"])))(inst)
+            try:
+                box.log = log
+            except Exception:
+                pass
             log(f"charter: instance {instance} is up ({inst.get('ssh_host')}:{inst.get('ssh_port')}); waiting for its ssh")
             tries = box.wait_ssh(sleep=sleep, on_denied=(lambda: vast.attach_ssh(instance, key)) if key else None)
             log(f"charter: ssh answered (try {tries}); fitting out")
             box.bootstrap()
             code = subprocess.run(["git", "ls-files", "backend", "ships"], cwd=paths.ROOT, capture_output=True, text=True, check=True).stdout.split()
-            box.put(paths.ROOT, code)
-            box.put(paths.data_dir(), carried_data(q0["prep"].tokeniser.id, voyage_books(q0["prep"])) + checkpoints_carried(rid, spec, rec), "data")
+            box.put_tar(paths.ROOT, code)  # one stream: rsync'ing 20k small files took most of an hour on 9 November
+            box.put_tar(paths.data_dir(), carried_data(q0["prep"].tokeniser.id, voyage_books(q0["prep"])) + checkpoints_carried(rid, spec, rec), "data")  # the data too, as one stream (8,907 files took 16 min by rsync)
             st = stage(rid)
             s2.papers(st / "ledger.sqlite", spec, rid, rec)
             box.put(st, sorted(f.name for f in st.glob("*.sqlite") if f.name != "ledger.sqlite"), "data")

@@ -2,8 +2,11 @@
 // Harbours: the home page (Justin, 8 November). Two tiles, one per harbour (Phaleron, the Market Harbour); a harbour opens to its ships: one card per ship (its role, its voyages, its current version's scores); a card
 // opens the ship, where its fitouts are. (The coverage table and tonight's queue were taken off, Justin 2026-11-07;
 // the queue lives on #/expeditions.)
+import { tabCls, tabsCls } from '../lib/ui';
 ---
 <div class="section" id="sizes">
   <h1>Harbours <span class="q">two harbours today: open one to see the ships that lie in it</span></h1>
+  <nav class={tabsCls('line', 'subnav')} data-orientation="horizontal" data-variant="line" id="harbourtabs"><a class={tabCls('')} data-state="active" data-htab="ships">Ships</a><a class={tabCls('')} data-state="inactive" data-htab="shipbuilder">Ship builder</a></nav>
   <div class="cards" id="rungcards"></div>
+  <div id="shipbuilder"></div>
 </div>

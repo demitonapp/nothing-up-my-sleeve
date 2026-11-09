@@ -9,9 +9,11 @@ and /api/compare (every run's hole-card score against tokens seen: the experimen
 
 from __future__ import annotations
 
+import contextlib
 import json
 import math
 import re
+import socket
 import sqlite3
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -437,6 +439,7 @@ def api_ladder() -> dict:
             "vocab": spec.get("tokeniser", {}).get("vocab"),
             "context": spec.get("model", {}).get("context"),
             "seed": spec.get("seed"),
+            "sop": spec.get("sop"),
             "experiment": spec.get("experiment"),
             "recipe": spec.get("data", {}).get("recipe"),
             "passes": spec.get("data", {}).get("passes"),
@@ -489,13 +492,135 @@ def api_ladder() -> dict:
                 ],
             }
         )
-    sizes_in = {h["key"]: [r["preset"] for r in rungs if r["harbour"] == h["key"]] for h in harbours.HARBOURS}
+    sizes_in = {h["key"]: [r["preset"] for r in rungs if r["harbour"] == h["key"]] for h in harbours.harbours()}
     fitting = _fitting_out()
+    from thorp import foreign
+
     return {
         "rungs": rungs, "runs": runs, "queue": queue, "external": external,
         "harbours": [{**h, "sizes": sizes_in[h["key"]], "fitting_out": [x for x in fitting if x["size"] in sizes_in[h["key"]]]}
-                     for h in harbours.HARBOURS],
+                     for h in harbours.harbours()],
+        "foreign": foreign.models(),
     }  # fmt: skip
+
+
+def api_library_summary(path: str) -> dict:
+    """A shelf at a glance for the ship builder's Library tab: language, kinds, size, date range."""
+    from thorp import library
+
+    return library.summary(path)
+
+
+def _model_params(preset: str) -> int:
+    """A preset's parameter count, built once and kept: the shape table and the embedding tab both need it."""
+    cache = globals().setdefault("_PARAMS_CACHE", {})
+    if preset not in cache:
+        from mlx.utils import tree_flatten
+
+        from thorp.models.gpt_mlx import GPT
+        from thorp.models.registry import config
+
+        try:
+            cache[preset] = sum(int(x.size) for _, x in tree_flatten(GPT(config(preset, 2048, 1024)).parameters()))
+        except Exception:
+            cache[preset] = 0
+    return cache[preset]
+
+
+def api_shipbuilder(harbour: str = "phaleron") -> dict:
+    """The ship builder's page: the harbour and every SOP version, so the variables can be read and edited."""
+    from thorp import ship_store, sop, starchart
+
+    h = ship_store.harbour(harbour)
+    if h is None:
+        raise LookupError(f"no harbour {harbour!r}")
+    if not h.get("ship_builder"):
+        raise LookupError(f"{h['name']} has no ship builder: ships are built at Phaleron, Zayton only sails them")
+    vs = sop.versions()
+    standards = {v: sop.standard(v) for v in vs}
+    return {
+        "harbour": h,
+        "sop": {
+            "current": sop.CURRENT,
+            "versions": vs,
+            "standards": standards,
+        },
+        "embeddings": {k: {"vocab": 2048, "width": c["width"], "params": 2048 * c["width"],
+                           "total": _model_params(k), "share": (2048 * c["width"]) / max(1, _model_params(k)),
+                           "thorp": True}
+                        for k, c in __import__("thorp.models.registry", fromlist=["PRESETS"]).PRESETS.items()}
+                      | {k: {"vocab": c["vocab"], "width": c["width"], "params": c["vocab"] * c["width"],
+                             "total": c["params"], "share": (c["vocab"] * c["width"]) / max(1, c["params"]),
+                             "thorp": False, "lab": c["lab"]}
+                         for k, c in __import__("thorp.models.registry", fromlist=["FOREIGN"]).FOREIGN.items()},
+        "shapes": {k: {"layers": c["layers"], "width": c["width"], "heads": c["heads"], "thorp": True}
+                   for k, c in __import__("thorp.models.registry", fromlist=["PRESETS"]).PRESETS.items()}
+                  | {k: {"layers": c["layers"], "width": c["width"], "heads": c["heads"], "thorp": False,
+                         "lab": c["lab"], "params": c["params"]}
+                     for k, c in __import__("thorp.models.registry", fromlist=["FOREIGN"]).FOREIGN.items()},
+        "journey": ship_store.journey("invention-return"),
+        "chart": {
+            "points": list(starchart.POINTS),
+            "depths": {v: starchart.depths(std) for v, std in standards.items()},
+        },
+    }
+
+
+def api_shipbuilder_save(body: dict) -> dict:
+    """Define a new SOP version from the ship builder's edited variables. A saved version is never
+    overwritten; it is not in force until a voyage names it."""
+    from datetime import datetime
+
+    from thorp import ship_store, sop
+
+    key = body.get("harbour") or "phaleron"
+    h = ship_store.harbour(key)
+    if h is None:
+        raise LookupError(f"no harbour {key!r}")
+    if not h.get("ship_builder"):
+        raise LookupError(f"{h['name']} has no ship builder: ships are built at Phaleron, Zayton only sails them")
+    standard = body.get("standard")
+    if not isinstance(standard, dict):
+        raise ValueError("standard is a JSON object")
+    adopted = (body.get("adopted") or "").strip() or (
+        f"defined at {h['name']} by {h.get('ship_builder') or 'the ship builder'}, "
+        f"{datetime.now().astimezone().strftime('%Y-%m-%d %H:%M')}"
+    )
+    v = sop.save(
+        standard,
+        adopted=adopted,
+        doc=body.get("doc") or "",
+        version=body.get("version") or None,
+        supersedes=body.get("supersedes") or None,
+    )
+    from thorp import starchart
+
+    std = sop.standard(v)
+    return {"version": v, "standard": std, "versions": sop.versions(),
+            "chart": {"depths": starchart.depths(std)}}
+
+
+def api_foreign(key: str = "qwen3-4b") -> dict:
+    """One outside model's readings, for its foreign-ship page (a spyglass, not a Thorp ship)."""
+    from thorp import foreign
+
+    p = foreign.payload(key)
+    if p is None:
+        raise LookupError(f"no foreign ship {key!r}")
+    return p
+
+
+def api_journeys() -> dict:
+    """Every journey as its nested plan (`pretraining.stage[]` outbound, `posttraining.stage[]` the return)."""
+    from thorp import ship_store
+
+    return {"journeys": ship_store.journeys()}
+
+
+def api_journey(key: str) -> dict:
+    from thorp import ship_store
+
+    return {"journey": ship_store.journey(key)}
 
 
 def api_rung(preset: str, limit: int | str = 0) -> list[dict]:
@@ -865,7 +990,7 @@ def api_sieves() -> dict:
 
 # classes renamed (old address name -> new), so old addresses and names keep working (7 Nov, Justin)
 # 8 Nov (Justin): the 300k is Pan and the 1m Augustus; every older name maps straight to the current one
-CLASS_RENAMES = {"seedling": "pan", "keel": "pan", "proxy": "augustus", "pilot": "augustus", "bettor": "explorer", "summit": "trader"}
+CLASS_RENAMES = {"seedling": "pan", "keel": "pan", "proxy": "augustus", "pilot": "augustus", "bettor": "explorer", "explorer": "invention", "summit": "trader"}
 
 
 def _class_names(preset: str) -> set[str]:
@@ -1539,6 +1664,45 @@ def api_fitout_builder() -> dict:
     }
 
 
+def _sizes_all() -> list[dict]:
+    """Every size of ship on the ladder, in order: the presets and the names they sail under (Pan, Augustus, ...),
+    for the Library page's size filter (Justin, 8 November: "a filter ... so that we can filter branches by which
+    ships size they can work on")."""
+    from thorp import ship_store
+
+    try:
+        return [{"preset": r["preset"], "name": r["name"]} for r in ship_store.sizes()]
+    except Exception:  # noqa: BLE001  the store is down: the page shows no size filter rather than no page
+        return []
+
+
+def _sizes_by_list() -> dict[str, set[str]]:
+    """Which sizes have read each list: the presets of the voyages whose reading (or whose first stage) is that list.
+    Evidence, not intent: a variation no voyage has read has no sizes, and the page says so rather than guessing."""
+    from thorp import ship_store
+    from thorp.ledger import Ledger
+
+    out: dict[str, set[str]] = {}
+    try:
+        rows = Ledger().query(
+            "select json_extract(spec_json,'$.model.preset') p, json_extract(spec_json,'$.data.recipe') r"
+            " from runs where p is not null and r is not null"
+            " union all"
+            " select json_extract(spec_json,'$.model.preset'), json_extract(st.value,'$.recipe')"
+            " from runs, json_each(coalesce(json_extract(spec_json,'$.data.stages'),'[]')) st"
+            " where json_extract(st.value,'$.recipe') is not null"
+        )
+        for r in rows:
+            try:
+                size = ship_store.size_of(r["p"])  # a variant is cut from a rung: 300k-l1w96 -> 300k
+            except KeyError:
+                continue
+            out.setdefault(r["r"], set()).add(size)
+    except Exception:  # noqa: BLE001  no ledger, no evidence: every variation simply has no sizes
+        return {}
+    return out
+
+
 def _browse_build() -> dict:
     from thorp import library, selection
     from thorp import library_facts as lf
@@ -1569,6 +1733,8 @@ def _browse_build() -> dict:
     for f in saved_fitouts.saved():
         for st in f.get("stages") or []:
             read_by.setdefault(st["shelf"], []).append(f["key"])
+    sizes_by_list = _sizes_by_list()  # list path -> the sizes that have read it (the ledger's evidence)
+    size_rank = {r["preset"]: i for i, r in enumerate(_sizes_all())}
     branches = []
     for b in brs:
         vs = []
@@ -1576,10 +1742,14 @@ def _browse_build() -> dict:
             ids = library_branches.variation_ids(v, facts_all)
             vs.append({"key": v["key"], "name": v["name"], "about": v.get("about", ""), "draft": bool(v.get("draft")),
                        "derived_from": v.get("derived_from"), "kind": "list" if v.get("list") else "selection" if v.get("spec") else "all",
-                       "spec": v.get("spec"), "list": v.get("list"), "fitouts": read_by.get(v.get("list") or "", []), "books": sorted(index[i] for i in ids if i in index)})
-        branches.append({"key": b["key"], "name": b["name"], "purpose": b["purpose"], "variations": vs})
+                       "spec": v.get("spec"), "list": v.get("list"), "fitouts": read_by.get(v.get("list") or "", []),
+                       "sizes": sorted(sizes_by_list.get(v.get("list") or "", set()), key=lambda p: size_rank.get(p, 99)),
+                       "books": sorted(index[i] for i in ids if i in index)})
+        sizes = sorted({p for v in vs for p in v["sizes"]}, key=lambda p: size_rank.get(p, 99))
+        branches.append({"key": b["key"], "name": b["name"], "purpose": b["purpose"], "variations": vs, "sizes": sizes})
     return {
         "branches": branches, "branches_stored": stored,
+        "sizes": _sizes_all(),
         "books": books,
         "fields": ["book", "title", "author", "language", "source", "kind", "voice", "year", "year_basis", "ogden", "words",
                    "collections", "kind_rule", "voice_rule"],
@@ -1867,6 +2037,7 @@ def api_queue() -> dict:
             "goal": spec.get("question") or spec.get("experiment") or "",
             "experiment": spec.get("experiment") or "",
             "fitout": fitout_of_voyage(name, spec),
+            "sop": spec.get("sop"),  # the standard the voyage is built to (9 November: the fitout is retired)
             "expedition": ex,
             "expedition_name": fleet.EXPEDITIONS[ex].name if ex in fleet.EXPEDITIONS else None,
             "preset": m.get("preset"),
@@ -3812,7 +3983,337 @@ WATCH_SERIES = {  # what the Watch panel draws, by tokens read
 }  # fmt: skip
 
 
-def api_watch(preset: str) -> dict:
+def _depth_of(run_id: str) -> dict:
+    """How each card is found, layer by layer: the per-layer reading, max over heads, from the run's own artifacts
+    (the `stars` matrices and the `cards` curve). This is the star chart's depth axis."""
+    import json
+
+    from thorp.ledger import Ledger
+
+    rec = Ledger()
+    out: dict = {"layers": 0, "cards": {}}
+    for kind in ("stars", "cards"):
+        rows = rec.query(
+            "select text from artifacts where run_id=? and kind=? order by step desc limit 1", [run_id, kind]
+        )
+        if not rows:
+            continue
+        with contextlib.suppress(Exception):
+            d = json.loads(rows[0]["text"])
+        for card, m in (d or {}).items():
+            if not isinstance(m, list) or not m:
+                continue
+            with contextlib.suppress(Exception):
+                if isinstance(m[0], list):  # layer x head
+                    out["cards"][card] = [round(float(max(row)), 3) for row in m]
+                    out["layers"] = max(out["layers"], len(m))
+                elif isinstance(m[0], (int, float)):  # a layer curve (the bridge)
+                    out["cards"][card] = [round(float(v), 3) for v in m]
+                    out["layers"] = max(out["layers"], len(m))
+    return out
+
+
+def api_suit_ratings(preset: str = "") -> dict:
+    """Each ship's four suits — copying, position, comparing, carrying (9 November, Justin: "a rating for each ship
+    against the 16 cards suit ... how good is each ship at copying, position, comparing and carrying"): the mean of a
+    suit's cards, each card divided by its own mark, so 1.00 is "every card in the suit is lit"."""
+    from thorp.ledger import Ledger
+    from thorp.viable.s4_intelligence import readings
+    from thorp.viable.s5_policy import deck
+
+    def rating(metrics_of) -> dict:
+        out = {}
+        for suit in ("copying", "position", "comparing", "carrying"):
+            vals = []
+            for c in deck.CARDS:
+                if c.constellation != suit:
+                    continue
+                metric = c.look[0][0] if c.look else (c.ability[0] if c.ability else None)
+                mark = c.look[1] if c.look and len(c.look) > 1 and isinstance(c.look[1], float) else None
+                v = metrics_of(metric, c.key)
+                if v is None:
+                    continue
+                vals.append(float(v) / (mark or 1.0) if mark else float(v))
+            out[suit] = round(sum(vals) / len(vals), 2) if vals else None
+        return out
+
+    rec = Ledger()
+    ships = []
+    for size in ("300k", "1m", "9m", "21m", "50m"):
+        if preset and preset != size:
+            continue
+        rows = rec.query(
+            "select r.run_id, r.name from runs r where json_extract(r.spec_json,'$.model.preset') = ?"
+            " and json_extract(r.spec_json,'$.sop') is not null order by r.started desc limit 1",
+            [size],
+        )
+        if not rows:
+            continue
+        rid = rows[0]["run_id"]
+
+        def get(metric, key, rid=rid):
+            if not metric:
+                return None
+            m = rec.query(
+                "select value from metrics where run_id=? and name=? order by step desc limit 1", [rid, metric]
+            )
+            return m[0]["value"] if m else None
+
+        ships.append({"size": size, "run": rows[0]["name"], **rating(get)})
+    for key, model in (("qwen3-4b", "deck-mlx-community--Qwen3-4B-4bit"),
+                       ("phi-4-mini", "deck-mlx-community--Phi-4-mini-instruct-4bit"),
+                       ("llama-3.2-3b", "deck-mlx-community--Llama-3.2-3B-bf16")):
+        m = (readings.get(model) or {}).get("metrics") or {}
+        if m:
+            ships.append({"size": key, "run": key, **rating(lambda metric, card, m=m: m.get(metric) if metric else None)})
+    return {"ships": ships}
+
+
+def api_sop_scores(preset: str = "") -> dict:
+    """The reasoning results **by SOP version** at one size (9 November, Justin: the overview "should also show the
+    reasoning results by SOP version, so when we run 0.0.6 we can compare"): for every version this size has sailed,
+    its newest voyage, its chaining lift, and how many of the chart's ten points clear their mark."""
+    from thorp.ledger import Ledger
+    from thorp.viable.s5_policy import deck
+
+    QWEN = 0.538
+    rec = Ledger()
+    rows = rec.query(
+        "select json_extract(spec_json,'$.sop') sop, max(started) last from runs"
+        " where json_extract(spec_json,'$.model.preset') = ? group by sop order by sop",
+        [preset],
+    )
+    out = []
+    for r in rows:
+        sop = r["sop"]
+        if not sop:
+            continue
+        run = rec.query(
+            "select run_id, name, status from runs where json_extract(spec_json,'$.model.preset') = ?"
+            " and json_extract(spec_json,'$.sop') = ? order by started desc limit 1",
+            [preset, sop],
+        )
+        if not run:
+            continue
+        rid = run[0]["run_id"]
+        lifts = []
+        for t in ("nature", "mill", "between", "pigeonhole"):
+            m = rec.query(
+                "select value from metrics where run_id=? and name=? order by step desc limit 1",
+                [rid, f"tricks/{t}_test/lift"],
+            )
+            if m:
+                lifts.append(float(m[0]["value"]))
+        ch = sum(lifts) / len(lifts) if lifts else None
+        # the ten points: how many clear their mark in this voyage
+        clears = 0
+        for p in (("previous_word", "stars/previous_word/max_score"), ("delimiter", "stars/delimiter/max_score"),
+                  ("induction", "nevermore/natural_max_score"), ("comparator", "stars/comparator/max_score"),
+                  ("duplicate_word", "stars/duplicate_word/max_score")):  # fmt: skip
+            m = rec.query(
+                "select value from metrics where run_id=? and name=? order by step desc limit 1", [rid, p[1]]
+            )
+            card = next((c for c in deck.CARDS if c.key == p[0]), None)
+            mark = card.look[1] if card and card.look and len(card.look) > 1 and isinstance(card.look[1], float) else None
+            if m and mark and float(m[0]["value"]) >= mark:
+                clears += 1
+        out.append({"sop": sop, "run": run[0]["name"], "status": run[0]["status"],
+                    "chaining": None if ch is None else round(ch, 3),
+                    "gap": None if ch is None else round(ch - QWEN, 3), "clears": clears, "of": 5})
+    return {"preset": preset, "qwen": QWEN, "versions": out}
+
+
+def api_ladder_chaining(sop: str = "") -> dict:
+    """The ladder's chaining, size by size, against Qwen3 4B (9 November, Justin: "add all the chaining comparisons to
+    the shipbuilder tab. Simple for now, just the 0.0.5 results for 300k, 1m, 9m, 21m and 50m when they're in"): each
+    size's newest voyage on the standard, its chaining lift at its last step, and how far it stands from 0.538."""
+    from thorp.ledger import Ledger
+
+    QWEN = 0.538
+    sizes = ("300k", "1m", "9m", "21m", "50m")
+    rec = Ledger()
+    out = []
+    for size in sizes:
+        rows = rec.query(
+            "select run_id, name, status, round(wall_minutes,1) m from runs"
+            " where json_extract(spec_json,'$.model.preset') = ? and (? = '' or json_extract(spec_json,'$.sop') = ?)"
+            " order by started desc limit 1",
+            [size, sop, sop],
+        )
+        if not rows:
+            out.append({"size": size, "status": "not sailed", "chaining": None, "gap": None})
+            continue
+        r = rows[0]
+        lifts = []
+        for t in ("nature", "mill", "between", "pigeonhole"):
+            m = rec.query(
+                "select value from metrics where run_id=? and name=? order by step desc limit 1",
+                [r["run_id"], f"tricks/{t}_test/lift"],
+            )
+            if m:
+                lifts.append(float(m[0]["value"]))
+        ch = sum(lifts) / len(lifts) if lifts else None
+        out.append({"size": size, "run": r["name"], "status": r["status"], "minutes": r["m"],
+                    "chaining": None if ch is None else round(ch, 3),
+                    "gap": None if ch is None else round(ch - QWEN, 3), "qwen": QWEN})
+    return {"sop": sop or "all", "qwen": QWEN, "sizes": out}
+
+
+def api_star_points(preset: str = "300k") -> dict:
+    """The ten-point star chart as a journey: for each point, how far the model that chains (Qwen3 4B) and our
+    smallest ship (the 300k at v0.0.5) get toward that point's mark, so the two can be drawn as lines (9 November:
+    "a line representing Qwen 4b hitting the 10 marks in the star chart and at what point and then overlayed against
+    that the 300k at 0.0.5")."""
+    from thorp import sop
+    from thorp.ledger import Ledger
+    from thorp.viable.s4_intelligence import readings
+    from thorp.viable.s5_policy import deck
+
+    std = sop.standard("0.0.6") or {}
+    points = ((std.get("chart") or {}).get("points") or [])[:10]
+    qw = (readings.get("deck-mlx-community--Qwen3-4B-4bit") or {}).get("metrics") or {}
+    by_key = {c.key: c for c in deck.CARDS}
+    rec = Ledger()
+    out = []
+    for pt in points:
+        card = str(pt.get("card") or "").replace("the ", "").replace("-", "_").strip().lower()
+        c = by_key.get(card) or by_key.get(card.replace("nevermore", "nevermore"))
+        if c is None:
+            continue
+        metric = c.look[0][0] if c.look else (c.ability[0] if c.ability else None)
+        if not metric:
+            continue
+        mark = c.look[1] if c.look and len(c.look) > 1 and isinstance(c.look[1], float) else None
+        # the size's newest voyage and its last reading: a running ship is tracked as it trains, not by its best
+        rows = rec.query(
+            "select m.value from runs r join metrics m on m.run_id = r.run_id"
+            " where r.run_id = (select run_id from runs where json_extract(spec_json,'$.model.preset') = ?"
+            "   order by started desc limit 1) and m.name = ? and m.value is not null"
+            " order by m.step desc limit 1",
+            [preset, metric],
+        )
+        ours = rows[0]["value"] if rows else None
+        q = qw.get(metric)
+        scale = mark or max(abs(q or 0), abs(ours or 0), 1e-6)
+        out.append({
+            "n": int(pt.get("n") or len(out) + 1), "role": pt.get("role") or "", "card": c.key,
+            "ours": None if ours is None else round(float(ours) / scale, 2),
+            "qwen": None if q is None else round(float(q) / scale, 2),
+            "mark": mark, "tier": deck.retention(c.key)["tier"],
+        })
+    return {"points": out}
+
+
+def api_client_log(q: dict) -> dict:
+    """A browser-side error, written where the harness can read it (9 November: a blank tab showed nothing, and the
+    console was on the far side of the screen). The page posts here from its render boundary."""
+    from datetime import datetime
+
+    from thorp import paths
+
+    msg = (q.get("msg") or "")[:4000]
+    f = paths.data_dir() / "runs" / "ui-errors.log"
+    f.parent.mkdir(parents=True, exist_ok=True)
+    with f.open("a", encoding="utf-8") as fh:
+        fh.write(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}\n")
+    return {"ok": True}
+
+
+def api_card_deck() -> dict:
+    """The sixteen cards, card by card: suit, mark, retention tier, the best Thorp reading and Qwen3 4B's own — the
+    deck as a table for the Discoveries Cards tab (9 November: "the cards should be moved to a tab under discoveries")."""
+    from thorp.ledger import Ledger
+    from thorp.viable.s4_intelligence import readings
+    from thorp.viable.s5_policy import deck
+
+    qw = (readings.get("deck-mlx-community--Qwen3-4B-4bit") or {}).get("metrics") or {}
+    rec = Ledger()
+    out = []
+    for c in deck.CARDS:
+        metric = c.look[0][0] if c.look else (c.ability[0] if c.ability else None)
+        mark = c.look[1] if c.look and len(c.look) > 1 and isinstance(c.look[1], float) else None
+        ours = None
+        if metric:
+            rows = rec.query(
+                "select value from metrics where name=? and value is not null order by value desc limit 1", [metric]
+            )
+            ours = float(rows[0]["value"]) if rows else None
+        out.append({"card": c.key, "suit": c.constellation, "mark": mark,
+                    "tier": deck.retention(c.key)["tier"], "ours": ours,
+                    "qwen": None if not metric else qw.get(metric)})
+    return {"cards": out}
+
+
+def api_stars_deviation() -> dict:
+    """300k against Qwen3 4B, point by point: each card's reading in our smallest ship against the same card read in
+    a model that chains, as a deviation from the card's own mark (9 November, Justin: "this page should show the star
+    chart for 300k vs qwen 4b as deviations between the points")."""
+    from thorp.ledger import Ledger
+    from thorp.viable.s4_intelligence import readings
+    from thorp.viable.s5_policy import deck
+
+    qw = (readings.get("deck-mlx-community--Qwen3-4B-4bit") or {}).get("metrics") or {}
+    rec = Ledger()
+    ours: dict = {}
+    for c in deck.CARDS:
+        metric = c.look[0][0] if c.look else (c.ability[0] if c.ability else None)
+        if not metric:
+            continue
+        rows = rec.query(
+            "select r.run_id, m.value from runs r join metrics m on m.run_id = r.run_id"
+            " where json_extract(r.spec_json,'$.model.preset') = '300k' and m.name = ? and m.value is not null"
+            " order by m.value desc limit 1",
+            [metric],
+        )
+        if rows:
+            ours[c.key] = {"metric": metric, "value": rows[0]["value"]}
+    out = []
+    for c in deck.CARDS:
+        metric = c.look[0][0] if c.look else (c.ability[0] if c.ability else None)
+        mark = c.look[1] if c.look and len(c.look) > 1 and isinstance(c.look[1], float) else None
+        o = (ours.get(c.key) or {}).get("value")
+        q = qw.get(metric) if metric else None
+        if o is None or q is None:
+            continue
+        scale = mark or max(abs(o), abs(q), 1e-6)
+        out.append({
+            "card": c.key, "name": c.name, "suit": c.constellation, "stage": c.stage,
+            "ours": round(float(o), 4), "qwen": round(float(q), 4),
+            "dev": round(float(o - q) / scale, 3),
+            "tier": deck.retention(c.key)["tier"],
+        })
+    out.sort(key=lambda r: r["dev"])
+    return {"cards": out}
+
+
+def api_depth(preset: str, sop: str = "") -> dict:
+    """The depth of every shape of a size: the same size's variants (300k, 300k-l3, 300k-l28) side by side, each
+    with its layers and every card's reading at each layer (the star chart's order, drawn against depth)."""
+    import json
+
+    from thorp.ledger import Ledger
+
+    rec = Ledger()
+    shapes: dict = {}
+    for r in rec.query(
+        "select run_id, name, status, started, spec_json from runs where"
+        " json_extract(spec_json,'$.model.preset') like ? order by started desc",
+        [f"{preset}%"],
+    ):
+        spec = json.loads(r["spec_json"])
+        if sop and str(spec.get("sop") or "") != sop:
+            continue
+        p = (spec.get("model") or {}).get("preset")
+        if not p or p in shapes:
+            continue
+        d = _depth_of(r["run_id"])
+        if not d["layers"]:
+            continue
+        shapes[p] = {"run": r["name"], "status": r["status"], **d}
+    return {"preset": preset, "shapes": shapes}
+
+
+def api_watch(preset: str, sop: str = "") -> dict:
     """Watch a class train (Justin, 22:25: "so I can watch thorp 21m training to see what's happening ... show the
     stages"): the class's voyage at sea (else its latest home), where it is (step, tokens, pass, stage, speed, time
     left), its fitout's stage plan with the voyage's place on it, the cards it has drawn and when (the deck's
@@ -3825,8 +4326,10 @@ def api_watch(preset: str) -> dict:
     cls = preset.split("-")[0]
     rows = _rows(
         """select run_id, name, status, started, finished, spec_json from runs
-           where json_extract(spec_json,'$.model.preset') like ? order by (status='running') desc, started desc limit 1""",
-        [f"{cls}%"],
+           where json_extract(spec_json,'$.model.preset') like ?
+             and (? = '' or ifnull(json_extract(spec_json,'$.sop'), '') = ?)
+           order by (status='running') desc, started desc limit 1""",
+        [f"{cls}%", sop, sop],
     )
     if not rows:
         return {"preset": preset, "voyage": None}
@@ -4087,6 +4590,7 @@ class Handler(BaseHTTPRequestHandler):
         posts = {
             "/api/table/reply": api_table_reply,
             "/api/fitouts/save": api_fitout_save,
+            "/api/shipbuilder/save": api_shipbuilder_save,
             "/api/fitouts/queue": api_fitout_queue,
             "/api/wager/deal": api_wager_deal,
             "/api/wager/bet": api_wager_bet,
@@ -4142,6 +4646,11 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/run": lambda: api_run(q["run"]),
                 "/api/compare": lambda: api_compare(),
                 "/api/ladder": lambda: api_ladder(),
+                "/api/journeys": api_journeys,
+                "/api/foreign": lambda: api_foreign(q.get("key", "qwen3-4b")),
+                "/api/shipbuilder": lambda: api_shipbuilder(q.get("harbour", "phaleron")),
+                "/api/library_summary": lambda: api_library_summary(q["path"]),
+                "/api/journey": lambda: api_journey(q["key"]),
                 "/api/rung": lambda: api_rung(q["preset"], q.get("limit", 0)),
                 "/api/tomes": lambda: api_tomes(),
                 "/api/waypoints": lambda: api_waypoints(q["preset"], q.get("limit", 30)),
@@ -4181,7 +4690,15 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/class_cards": lambda: api_class_cards(q["preset"]),
                 "/api/class_best": lambda: api_class_best(q["preset"]),
                 "/api/wager": lambda: api_wager(q["preset"]),
-                "/api/watch": lambda: api_watch(q["preset"]),
+                "/api/watch": lambda: api_watch(q["preset"], q.get("sop", "")),
+                "/api/depth": lambda: api_depth(q.get("preset", ""), q.get("sop", "")),
+                "/api/stars_deviation": api_stars_deviation,
+                "/api/card_deck": api_card_deck,
+                "/api/client_log": lambda: api_client_log(q),
+                "/api/star_points": lambda: api_star_points(q.get("preset", "300k")),
+                "/api/ladder_chaining": lambda: api_ladder_chaining(q.get("sop", "")),
+                "/api/sop_scores": lambda: api_sop_scores(q.get("preset", "")),
+                "/api/suit_ratings": lambda: api_suit_ratings(q.get("preset", "")),
                 "/api/class_deck": lambda: api_class_deck(q["preset"]),
                 "/api/ask_questions": lambda: api_ask_questions(q["preset"]),
                 "/api/maths_book": lambda: api_maths_book(),
@@ -4219,20 +4736,30 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(503, json.dumps({"error": str(e)}).encode(), "application/json")
         except StoreDown as e:  # the one store is down: said, never answered from the old files
             return self._send(503, json.dumps({"error": str(e), "store": "down"}).encode(), "application/json")
+        except LookupError as e:  # no such harbour, ship, journey or foreign model
+            return self._send(404, json.dumps({"error": str(e.args[0] if e.args else e)}).encode(), "application/json")
         except Exception as e:  # noqa: BLE001
             return self._send(500, json.dumps({"error": repr(e)}).encode(), "application/json")
 
 
-def serve(port: int = 8787) -> None:
-    srv = ThreadingHTTPServer(("127.0.0.1", port), Handler)
-    try:  # start warming the slow payloads now, so the first visit finds them ready
-        from thorp import library as shelves
+class _DualStack(ThreadingHTTPServer):
+    """Listen on both IPv4 and IPv6 (9 November: the page failed with ERR_CONNECTION_REFUSED because the server bound
+    127.0.0.1 only and the browser resolves `localhost` to ::1 first — half the requests never reached a socket)."""
 
-        _warm("shelves", shelves.payload)
-        if hasattr(shelves, "fitouts"):
-            _warm("fitouts", shelves.fitouts)
-    except Exception:  # noqa: BLE001
-        pass
+    address_family = socket.AF_INET6
+
+    def server_bind(self):
+        try:
+            self.socket.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
+        except Exception:
+            pass
+        super().server_bind()
+
+
+def serve(port: int = 8787) -> None:
+    srv = _DualStack(("::", port), Handler)  # :: with V6ONLY=0 covers both ::1 and 127.0.0.1
+    # the warm threads are started on the first visit, not here: a cold server must answer the
+    # leaderboard before the shelves' long read begins
     print(f"thorp dash on http://localhost:{port}  (ledger {paths.ledger_path()})", flush=True)
     try:
         srv.serve_forever()

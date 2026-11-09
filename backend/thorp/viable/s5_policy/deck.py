@@ -139,3 +139,32 @@ assert len(CARDS) == 16 and all(sum(c.constellation == k for c in CARDS) == 4 fo
 def charted(card: Card) -> bool:
     """Whether Thorp can tell this card is played: its look is read, or (a Face) its ability is."""
     return card.look is not None or card.ability is not None
+
+# ---- what teaching each card achieves, and what it keeps (9 November): measured on every voyage that pinned the card,
+# matched peak against final. A KEEPER holds at the end of a voyage with the pull at zero; a DECAYER reads high under the
+# pull and falls when it stops; an UNTESTED card has never been pinned in any voyage. This is the chart's third axis:
+# not where a card reads, but whether it survives being taught.
+RETENTION: dict[str, dict] = {
+    "previous_word": {"kind": "promoter", "tier": "keeper", "peak": 1.00, "final": 0.99, "runs": 19},
+    "delimiter": {"kind": "promoter", "tier": "keeper", "peak": 10.17, "final": 9.54, "runs": 10},
+    "induction": {"kind": "promoter", "tier": "keeper", "peak": 0.58, "final": 0.37, "runs": 19},
+    "sink": {"kind": "suppressor", "tier": "keeper", "peak": 0.69, "final": 0.36, "runs": 6},
+    "words_back": {"kind": "promoter", "tier": "keeper", "peak": 1.00, "final": 1.00, "runs": 3},
+    "rare_word": {"kind": "promoter", "tier": "keeper", "peak": 0.74, "final": 0.73, "runs": 3},
+    "number_spotter": {"kind": "promoter", "tier": "keeper", "peak": 98.26, "final": 98.26, "runs": 3},
+    "order_word": {"kind": "promoter", "tier": "keeper", "peak": 108.58, "final": 108.58, "runs": 3},
+    "premise_marker": {"kind": "promoter", "tier": "keeper", "peak": 105.77, "final": 105.75, "runs": 3},
+    "comparator": {"kind": "promoter", "tier": "decayer", "peak": 1.00, "final": 0.63, "runs": 6,
+                   "note": "median 0.63, but the chart arm read 1.00 under the pull and 0.04 after the fade"},
+    "duplicate_word": {"kind": "promoter", "tier": "decayer", "peak": 0.68, "final": 0.31, "runs": 12},
+    "bridge": {"kind": "promoter", "tier": "decayer", "peak": 1.86, "final": 0.11, "runs": 3},
+    "nevermore": {"kind": "promoter", "tier": "untested", "peak": None, "final": None, "runs": 0},
+    "counter": {"kind": "promoter", "tier": "untested", "peak": None, "final": None, "runs": 0},
+    "scales": {"kind": "promoter", "tier": "untested", "peak": None, "final": None, "runs": 0},
+    "mover": {"kind": "promoter", "tier": "untested", "peak": None, "final": None, "runs": 0},
+}
+
+
+def retention(key: str) -> dict:
+    """What teaching a card achieves and keeps: keeper, decayer or untested (see RETENTION)."""
+    return RETENTION.get(key) or {"tier": "untested", "peak": None, "final": None, "runs": 0}

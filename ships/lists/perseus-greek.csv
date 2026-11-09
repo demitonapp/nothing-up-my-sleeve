@@ -1,0 +1,801 @@
+title,author,language,family,text
+Argonautica,Apollonius Rhodius,grc,Classical,perseus-greek:tlg0001.tlg001.perseus-grc2
+Ἱστορίαι,Thucydides,grc,Classical,perseus-greek:tlg0003.tlg001.perseus-grc2
+Βίοι καὶ γνῶμαι τῶν ἐν φιλοσοφίᾳ εὐδοκιμησάντων,Diogenes Laertius,grc,Classical,perseus-greek:tlg0004.tlg001.perseus-grc2
+Εἰδύλλια,Theocritus,grc,Classical,perseus-greek:tlg0005.tlg001.perseus-grc2
+Ἐπιγράμματα,Theocritus,grc,Classical,perseus-greek:tlg0005.tlg002.perseus-grc2
+Κύκλωψ,Euripides,grc,Classical,perseus-greek:tlg0006.tlg001.perseus-grc2
+Ἄλκηστις,Euripides,grc,Classical,perseus-greek:tlg0006.tlg002.perseus-grc2
+Μήδεια,Euripides,grc,Classical,perseus-greek:tlg0006.tlg003.perseus-grc2
+Ἡρακλεῖδαι,Euripides,grc,Classical,perseus-greek:tlg0006.tlg004.perseus-grc2
+Ἱππόλυτος,Euripides,grc,Classical,perseus-greek:tlg0006.tlg005.perseus-grc2
+Ἀνδρομάχη,Euripides,grc,Classical,perseus-greek:tlg0006.tlg006.perseus-grc2
+Ἑκάβη,Euripides,grc,Classical,perseus-greek:tlg0006.tlg007.perseus-grc2
+Ἱκέτιδες,Euripides,grc,Classical,perseus-greek:tlg0006.tlg008.perseus-grc2
+Ἡρακλῆς,Euripides,grc,Classical,perseus-greek:tlg0006.tlg009.perseus-grc2
+Ἴων,Euripides,grc,Classical,perseus-greek:tlg0006.tlg010.perseus-grc2
+Τρῳάδες,Euripides,grc,Classical,perseus-greek:tlg0006.tlg011.perseus-grc2
+Ἠλέκτρα,Euripides,grc,Classical,perseus-greek:tlg0006.tlg012.perseus-grc2
+Ἰφιγένεια ἐν Ταύροις,Euripides,grc,Classical,perseus-greek:tlg0006.tlg013.perseus-grc2
+Ἑλένη,Euripides,grc,Classical,perseus-greek:tlg0006.tlg014.perseus-grc2
+Φοίνισσαι,Euripides,grc,Classical,perseus-greek:tlg0006.tlg015.perseus-grc2
+Ὀρέστης,Euripides,grc,Classical,perseus-greek:tlg0006.tlg016.perseus-grc2
+Βάκχαι,Euripides,grc,Classical,perseus-greek:tlg0006.tlg017.perseus-grc2
+Ἰφιγένεια ἐν Αὐλίδι,Euripides,grc,Classical,perseus-greek:tlg0006.tlg018.perseus-grc2
+Ῥῆσος,Euripides,grc,Classical,perseus-greek:tlg0006.tlg019.perseus-grc2
+Θησεύς,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg001.perseus-grc2
+Ῥωμύλος,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg002.perseus-grc2
+Θησέως καὶ Ῥωμύλου σύγκρισις,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg003.perseus-grc2
+Λυκοῦργος,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg004.perseus-grc2
+Νομᾶς,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg005.perseus-grc2
+Λυκούργου καὶ Νομᾶ σύγκρισις,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg006.perseus-grc2
+Σόλων,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg007.perseus-grc2
+Ποπλικόλας,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg008.perseus-grc2
+Σόλωνος καὶ Ποπλικόλα σύγκρισις,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg009.perseus-grc2
+Θεμιστοκλῆς,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg010.perseus-grc2
+Κάμιλλος,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg011.perseus-grc2
+Περικλῆς,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg012.perseus-grc2
+Φάβιος Μάξιμος,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg013.perseus-grc2
+Περικλέους καὶ Φαβίου σύγκρισις,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg014.perseus-grc2
+Ἀλκιβιάδης,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg015.perseus-grc2
+Γάϊος Μάρκιος,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg016.perseus-grc2
+Ἀλκιβιάδου καὶ Κοριολὰνου σύγκρισις,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg017.perseus-grc2
+Τιμολέων,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg018.perseus-grc2
+Αἰμίλιος Παῦλλος,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg019.perseus-grc2
+Σύγκρισις Τιμολέοντος καὶ Αἰμιλίου,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg020.perseus-grc2
+Πελοπίδας,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg021.perseus-grc2
+Μάρκελλος,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg022.perseus-grc2
+Πελοπίδου καὶ Μαρκέλλου σύγκρισις,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg023.perseus-grc2
+Ἀριστείδης,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg024.perseus-grc2
+Μάρκος Κάτων,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg025.perseus-grc2
+Ἀριστείδου καὶ Κάτωνος σύγκρισις,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg026.perseus-grc2
+Φιλοποίμην,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg027.perseus-grc2
+Τίτος,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg028.perseus-grc2
+Φιλοποίμενος καὶ Τίτου σύγκρισις,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg029.perseus-grc2
+Πύρρος,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg030.perseus-grc2
+Γάιος Μάριος,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg031.perseus-grc2
+Λύσανδρος,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg032.perseus-grc2
+Σύλλας,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg033.perseus-grc2
+Σύγκρισις Λυσάνδρου καὶ Σύλλα,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg034.perseus-grc2
+Κίμων,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg035.perseus-grc2
+Λούκουλλος,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg036.perseus-grc2
+Κίμωνος καὶ Λουκούλλος σύγκρισις,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg037.perseus-grc2
+Νικίας,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg038.perseus-grc2
+Κράσσος,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg039.perseus-grc2
+Νικίου καὶ Κράσσου σύγκρισις,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg040.perseus-grc2
+Εὐμένης,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg041.perseus-grc2
+Σερτώριος,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg042.perseus-grc2
+Σύγκρισις Σερτωρίου καὶ Εὐμένους,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg043.perseus-grc2
+Ἀγησίλαος,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg044.perseus-grc2
+Πομπήϊος,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg045.perseus-grc2
+Ἀγησιλάου καὶ Πομπηΐου σύγκρισις,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg046.perseus-grc2
+Ἀλέξανδρος,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg047.perseus-grc2
+Καῖσαρ,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg048.perseus-grc2
+Φωκίων,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg049.perseus-grc2
+Κάτων,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg050.perseus-grc2
+Ἄγις καὶ Κλεομένης,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg051.perseus-grc1
+Tιβέριος καὶ Γάιος Γράκχοι,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg052.perseus-grc1
+Σύγκρισις Ἄγιδος καὶ Κλεομένους καὶ τῶν Γράκχων,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg053.perseus-grc2
+Δημοσθένης,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg054.perseus-grc2
+Cicero,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg055.perseus-grc2
+Σύγκρισις Δημοσθένους καὶ Κικέρωνος,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg056.perseus-grc2
+Δημήτριος,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg057.perseus-grc2
+Ἀντώνιος,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg058.perseus-grc2
+Σύγκρισις Δημητρίου καὶ Ἀντωνίου,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg059.perseus-grc2
+Δίων,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg060.perseus-grc2
+Βροῦτος,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg061.perseus-grc2
+Σύγκρισις Δίωνος καὶ Βρούτου,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg062.perseus-grc2
+Ἄρατος,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg063.perseus-grc2
+Ἀρταξέρξης,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg064.perseus-grc2
+Γάλβας,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg065.perseus-grc2
+Ὄθων,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg066.perseus-grc2
+Περὶ παίδων ἀγωγῆς,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg067.perseus-grc2
+Πῶς δεῖ τὸν νέον ποιημάτων ἀκούειν.,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg068.perseus-grc2
+Περὶ τοῦ ἀκούειν,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg069.perseus-grc2
+Πῶς ἄν τις διακρίνειε τὸν κόλακα τοῦ φίλου,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg070.perseus-grc2
+Πῶς ἄν τις αἴσθοιτο ἑαυτοῦ προκόπτοντος ἐπʼ ἀρετή,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg071.perseus-grc2
+Πῶς ἄν τις ἀπ’ ἐχθρῶν ὠφελοῖτο,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg072.perseus-grc2
+Περί πολυφιλίας,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg073.perseus-grc2
+Περὶ τύχης,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg074.perseus-grc2
+Περὶ ἀρετῆς καὶ κακιάς,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg075.perseus-grc2
+Πραμυθητικὸς πρὸς Ἀπολλώνιον,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg076.perseus-grc2
+Ὑγιεινὰ παραγγέλματα,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg077.perseus-grc2
+Γαμικὰ παραγγέλματα,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg078.perseus-grc2
+Τῶν ἑπτὰ σοφῶν συμπόσιον,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg079.perseus-grc2
+Περὶ δεισιδαιμονίας,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg080.perseus-grc2
+Ἀποφθέγματα βασιλέων καὶ στρατηγῶν,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg081.perseus-grc3
+Ἀποφθέγματα βασιλέων καὶ στρατηγῶν,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg081.perseus-grc4
+Ἀποφθέγματα Λακωνικά,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg082.perseus-grc3
+Ἀποφθέγματα Λακωνικά,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg082.perseus-grc4
+Τὰ παλαιὰ τῶν Λακεδαινίων ἐπιτηδεύματα,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg082a.perseus-grc3
+Τὰ παλαιὰ τῶν Λακεδαιμονίων ἐπιτηδεύματα,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg082a.perseus-grc4
+Λακαινῶν ἀποφθάγματα,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg082b.perseus-grc3
+Λακαινῶν ἀποφθέγματα,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg082b.perseus-grc4
+Γυναικῶν ἀρεταί,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg083.perseus-grc3
+Γυναικῶν ἀρεταί,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg083.perseus-grc4
+Ἀίτια Ῥωμαϊκά,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg084a.perseus-grc3
+Κεφαλαίων καταγραφή Ῥωμαϊκά,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg084a.perseus-grc4
+Αἴτια Ἑλληνικά,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg084b.perseus-grc3
+Κεφαλαίων καταγραφή Ἑλληνικά,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg084b.perseus-grc4
+Συναγωγὴ ἱστοριῶν παραλλήλων Ἑλληνικῶν καὶ Ῥωμαϊκῶν,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg085.perseus-grc3
+Συναγωγὴ ἱστοριῶν παραλλήλων Ἑλληνικῶν καὶ Ῥωμαϊκῶν,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg085.perseus-grc4
+Περὶ τῆς Ῥωμαίων τύχης,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg086.perseus-grc3
+Περὶ τῆς Ῥωμαίων τύχης,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg086.perseus-grc4
+"Περὶ τῆς Ἀλεξάνδρου τύχης ἢ ἀρετῆς λόγος Α, λόγος Β",Plutarch,grc,Classical,perseus-greek:tlg0007.tlg087.perseus-grc3
+"Περὶ τῆς Ἀλεξάνδρου τύχης ἢ ἀρετῆς λόγος Α, λόγος Β",Plutarch,grc,Classical,perseus-greek:tlg0007.tlg087.perseus-grc4
+Πότερον Ἀθηναῖοι κατὰ πόλεμον ἢ κατὰ σοφίαν ἐνδοξότεροι,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg088.perseus-grc3
+Πότερον Ἀθηναῖοι κατὰ πόλεμον ἢ κατὰ σοφίαν ἐνδοξότεροι,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg088.perseus-grc4
+Περὶ Ἴσιδος και Ὀσίριδος,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg089.perseus-grc2
+Περὶ τοῦ Ε τοῦ ἐν Δελφοῖς,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg090.perseus-grc2
+Περὶ τοῦ μὴ χρᾶν ἔμμετρα νῦν τὴν Πυθίαν,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg091.perseus-grc2
+Περὶ τῶν ἐκλελοιπότων,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg092.perseus-grc2
+Εἰ διδακτὸν ἡ ἀρετή,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg093.perseus-grc2
+Περὶ τῆς ἠθικῆς ἀρετῆς,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg094.perseus-grc2
+Περὶ ἀοπγησίας,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg095.perseus-grc2
+Περὶ εὐθυμίας,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg096.perseus-grc2
+Περὶ φιλαδελφίας,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg097.perseus-grc2
+Περὶ τῆς εἰς τὰ ἔκγονα φιλοστοργίας,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg098.perseus-grc2
+Εἰ αὐτάρκης ἡ κακία πρὸς κακοδαιμονίαν,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg099.perseus-grc2
+Ποτερον τὰ τῆς ψυχῆς ἢ τὰ τοῦ σώματος πάθη χείρονα,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg100.perseus-grc2
+Περὶ ἀδολεσχίας,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg101.perseus-grc2
+Περὶ πολυπραγμοσύνης,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg102.perseus-grc2
+Περὶ φιλοπλουτίας,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg103.perseus-grc2
+Περὶ δυσωπίας,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg104.perseus-grc2
+Περὶ φθόνου καὶ μίσους,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg105.perseus-grc2
+Περὶ τοῦ ἑαυτὸν ἐπαινεῖν ἀνεπιφθόνως,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg106.perseus-grc2
+Περὶ τῶν ὑπὸ τοῦ θείου βραδέως τιμωρουμένων,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg107.perseus-grc2
+Περὶ εἱμαρμένης,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg108.perseus-grc2
+Περὶ τοῦ Σωκράτους δαιμονίου,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg109.perseus-grc2
+Περὶ φυγῆς,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg110.perseus-grc2
+Παραμυθητικός εἰς τὴν γυναῖκα τὴν αὑτου,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg111.perseus-grc2
+Συμποσιακῶν προβλημάτων βιβλία,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg112.perseus-grc2
+Ἐρωτικός,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg113.perseus-grc2
+Ἐρωτικαὶ διηγήσεις,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg114.perseus-grc2
+Περὶ τοῦ ὅτι μάλιστα τοῖς ἡγεμόσι δεῖ τὸν φιλοσοφόν διαλέγεσθαι,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg115.perseus-grc2
+Πρὸς ἡγεμόνα ἀπαίδευτον,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg116.perseus-grc2
+Εἰ πρεσβυτέρῳ πολιτευτέον,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg117.perseus-grc2
+Πολιτικὰ παραγγέλματα,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg118.perseus-grc2
+Περὶ μοναρχίας καὶ δημοκρατίας καὶ ὀλιγαρχίας,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg119.perseus-grc2
+Περὶ τοῦ μὴ δεῖν δανείζεσθαι,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg120.perseus-grc2
+Vitae decem oratorum,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg121.perseus-grc2
+Συγκρίσεως Ἀριστοφάνους καὶ Μενάνδρου ἐπιτομή,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg122.perseus-grc2
+Περὶ τῆς Ἡροδότου κακοηθείας,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg123.perseus-grc2
+Αἴτια φυσικά,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg125.perseus-grc2
+Περὶ τοῦ ἐμφαινομένου προσώπου τῷ κύκλῳ τῆς σελήνης,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg126.perseus-grc2
+Περὶ τοῦ πρώτως ψυχροῦ,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg127.perseus-grc3
+Περὶ τοῦ πότερον ὕδωρ ἢ πῦρ χρησιμώτερον,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg128.perseus-grc2
+Πότερα τῶν ζῴων φρονιμώτερα τὰ χερσαῖα ἢ τὰ ἔνυδρα,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg129.perseus-grc2
+Περὶ τοῦ τὰ ἄλογα λόγῳ χρῆσθαι,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg130.perseus-grc2
+Περὶ σαρκοφαγίας λόγος α′,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg131.perseus-grc2
+Περὶ σαρκοφαγίας λόγος β′,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg132.perseus-grc2
+Πλατωνικὰ ζητήματα,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg133.perseus-grc2
+Περὶ τῆς ἐν Τιμαίῳ ψυχογονίας,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg134.perseus-grc2
+Ἐπιτομὴ τοῦ περὶ τῆς ἐν τῷ Τιμαίῳ ψυχογονίας,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg135.perseus-grc2
+Περὶ Στωικῶν ἐνιγμάτων,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg136.perseus-grc2
+Σύνοψις τοῦ ὅτι παραδοξότερα οἱ Στωικοὶ τῶν ποιητῶν λέγουσι,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg137.perseus-grc2
+Περὶ τῶν κοινῶν ἐννοιῶν πρὸς τοὺς Στωικοὺς,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg138.perseus-grc2
+Ὅτι οὐδ' ἡδέως ζῆν ἔστι κατ' Ἐπίκουρον,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg139.perseus-grc2
+Πρὸς Κωλώτην,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg140.perseus-grc2
+Εἰ καλῶς εἴρηται τὸ λάθε βιώτας,Plutarch,grc,Classical,perseus-greek:tlg0007.tlg141.perseus-grc2
+Δειπνοσοφισταί,Athenaeus,grc,Classical,perseus-greek:tlg0008.tlg001.perseus-grc3
+Δειπνοσοφισταί,Athenaeus,grc,Classical,perseus-greek:tlg0008.tlg001.perseus-grc4
+Πρὸς Εὐθύνους ἀμάρτυρος,Isocrates,grc,Classical,perseus-greek:tlg0010.tlg001.perseus-grc2
+Παραγραφή πρὸς Καλλίμαχον,Isocrates,grc,Classical,perseus-greek:tlg0010.tlg002.perseus-grc2
+Κατὰ Λοχίτου,Isocrates,grc,Classical,perseus-greek:tlg0010.tlg003.perseus-grc2
+Περὶ τοῦ ζεύγους,Isocrates,grc,Classical,perseus-greek:tlg0010.tlg004.perseus-grc2
+Τραπεζιτικός,Isocrates,grc,Classical,perseus-greek:tlg0010.tlg005.perseus-grc2
+Αἰγητικὸς,Isocrates,grc,Classical,perseus-greek:tlg0010.tlg006.perseus-grc2
+Πρὸς Δημόνικον,Isocrates,grc,Classical,perseus-greek:tlg0010.tlg007.perseus-grc2
+Κατὰ τῶν σοφιστῶν,Isocrates,grc,Classical,perseus-greek:tlg0010.tlg008.perseus-grc2
+Ἑλένη,Isocrates,grc,Classical,perseus-greek:tlg0010.tlg009.perseus-grc2
+Βούσιρις,Isocrates,grc,Classical,perseus-greek:tlg0010.tlg010.perseus-grc2
+Πανηγυρικός,Isocrates,grc,Classical,perseus-greek:tlg0010.tlg011.perseus-grc2
+Πλαταικός,Isocrates,grc,Classical,perseus-greek:tlg0010.tlg012.perseus-grc2
+Πρὸς Νικόκλεα,Isocrates,grc,Classical,perseus-greek:tlg0010.tlg013.perseus-grc2
+Νικόκλης ἢ Κύπριοι,Isocrates,grc,Classical,perseus-greek:tlg0010.tlg014.perseus-grc2
+Εὐαγόρας,Isocrates,grc,Classical,perseus-greek:tlg0010.tlg015.perseus-grc2
+Ἀρχίδαμος,Isocrates,grc,Classical,perseus-greek:tlg0010.tlg016.perseus-grc2
+Περὶ εἰρήνης,Isocrates,grc,Classical,perseus-greek:tlg0010.tlg017.perseus-grc2
+Ἀρεοπαγιτικός,Isocrates,grc,Classical,perseus-greek:tlg0010.tlg018.perseus-grc2
+Περὶ ἀντιδόσεως,Isocrates,grc,Classical,perseus-greek:tlg0010.tlg019.perseus-grc2
+Φίλιππος,Isocrates,grc,Classical,perseus-greek:tlg0010.tlg020.perseus-grc2
+Παναθηναικός,Isocrates,grc,Classical,perseus-greek:tlg0010.tlg021.perseus-grc2
+Ἐπιστολαὶ αʹ Διονύσιῳ,Isocrates,grc,Classical,perseus-greek:tlg0010.tlg022.perseus-grc2
+Ἐπιστολαὶ ςʹ Τοῖς Ἰάσονος παισίν,Isocrates,grc,Classical,perseus-greek:tlg0010.tlg023.perseus-grc2
+Ἐπιστολαὶ θʹ Ἀρχιδάμῳ,Isocrates,grc,Classical,perseus-greek:tlg0010.tlg024.perseus-grc2
+Ἐπιστολαὶ ηʹ Τοῖς Μυτιληναίων ἄρχουσιν,Isocrates,grc,Classical,perseus-greek:tlg0010.tlg025.perseus-grc2
+Ἐπιστολαὶ ζʹ Τιμοθέῳ,Isocrates,grc,Classical,perseus-greek:tlg0010.tlg026.perseus-grc3
+Ἐπιστολαὶ βʹ Φιλίππῳ α΄,Isocrates,grc,Classical,perseus-greek:tlg0010.tlg027.perseus-grc2
+Ἐπιστολαὶ εʹ Ἀλεξάνδρῳ,Isocrates,grc,Classical,perseus-greek:tlg0010.tlg028.perseus-grc2
+Ἐπιστολαὶ δʹ Ἀντιπάτρῳ,Isocrates,grc,Classical,perseus-greek:tlg0010.tlg029.perseus-grc2
+Ἐπιστολαὶ γʹ Φιλίππῳ β΄,Isocrates,grc,Classical,perseus-greek:tlg0010.tlg030.perseus-grc2
+Τραχίνιαι,Sophocles,grc,Classical,perseus-greek:tlg0011.tlg001.perseus-grc2
+Ἀντιγόνη,Sophocles,grc,Classical,perseus-greek:tlg0011.tlg002.perseus-grc2
+Αἴας,Sophocles,grc,Classical,perseus-greek:tlg0011.tlg003.perseus-grc2
+Οἰδίπους Τύραννος,Sophocles,grc,Classical,perseus-greek:tlg0011.tlg004.perseus-grc2
+Ἠλέκτρα,Sophocles,grc,Classical,perseus-greek:tlg0011.tlg005.perseus-grc2
+Φιλοκτήτης,Sophocles,grc,Classical,perseus-greek:tlg0011.tlg006.perseus-grc2
+Οἰδίπους ἐπὶ Κολωνῷ,Sophocles,grc,Classical,perseus-greek:tlg0011.tlg007.perseus-grc2
+Ichneutae,Sophocles,grc,Classical,perseus-greek:tlg0011.tlg008.perseus-grc2
+Ἰλιάς,Homer,grc,Classical,perseus-greek:tlg0012.tlg001.perseus-grc2
+Ὀδύσσεια,Homer,grc,Classical,perseus-greek:tlg0012.tlg002.perseus-grc2
+Ἐπιγράμματα,Homer,grc,Classical,perseus-greek:tlg0012.tlg003.perseus-grc1
+Hymn 1 To Dionysus,Anonymous,grc,Classical,perseus-greek:tlg0013.tlg001.perseus-grc2
+Hymn 2 To Demeter,Anonymous,grc,Classical,perseus-greek:tlg0013.tlg002.perseus-grc2
+Hymn 3 To Apollo,Anonymous,grc,Classical,perseus-greek:tlg0013.tlg003.perseus-grc2
+Hymn 4 To Hermes,Anonymous,grc,Classical,perseus-greek:tlg0013.tlg004.perseus-grc2
+Hymn 5 To Aphrodite,Anonymous,grc,Classical,perseus-greek:tlg0013.tlg005.perseus-grc2
+Hymn 6 To Aphrodite,Anonymous,grc,Classical,perseus-greek:tlg0013.tlg006.perseus-grc2
+Hymn 7 To Dionysus,Anonymous,grc,Classical,perseus-greek:tlg0013.tlg007.perseus-grc2
+Hymn 8 To Ares,Anonymous,grc,Classical,perseus-greek:tlg0013.tlg008.perseus-grc2
+Hymn 18 To Hermes,Anonymous,grc,Classical,perseus-greek:tlg0013.tlg018.perseus-grc2
+Hymn 19 to Pan,Anonymous,grc,Classical,perseus-greek:tlg0013.tlg019.perseus-grc2
+Hymn 26 To Dionysus,Anonymous,grc,Classical,perseus-greek:tlg0013.tlg026.perseus-grc2
+Hymn 27 To Artemis,Anonymous,grc,Classical,perseus-greek:tlg0013.tlg027.perseus-grc2
+Hymn 28 To Athena,Anonymous,grc,Classical,perseus-greek:tlg0013.tlg028.perseus-grc2
+Hymn 29 To Hestia,Anonymous,grc,Classical,perseus-greek:tlg0013.tlg029.perseus-grc2
+Hymn 30 To Earth,Anonymous,grc,Classical,perseus-greek:tlg0013.tlg030.perseus-grc2
+Hymn 31 To Helios,Anonymous,grc,Classical,perseus-greek:tlg0013.tlg031.perseus-grc2
+Hymn 32 To Selene,Anonymous,grc,Classical,perseus-greek:tlg0013.tlg032.perseus-grc2
+Hymn 33 To the Dioscuri,Anonymous,grc,Classical,perseus-greek:tlg0013.tlg033.perseus-grc2
+Ὀλυνθιακὸς α΄,Demosthenes,grc,Classical,perseus-greek:tlg0014.tlg001.perseus-grc2
+Ὀλυνθιακὸς β΄,Demosthenes,grc,Classical,perseus-greek:tlg0014.tlg002.perseus-grc2
+Ὀλυνθιακὸς γ΄,Demosthenes,grc,Classical,perseus-greek:tlg0014.tlg003.perseus-grc2
+κατὰ Φιλίππου α΄,Demosthenes,grc,Classical,perseus-greek:tlg0014.tlg004.perseus-grc2
+περὶ τῆς εἰρήνης,Demosthenes,grc,Classical,perseus-greek:tlg0014.tlg005.perseus-grc2
+κατὰ Φιλίππου β΄,Demosthenes,grc,Classical,perseus-greek:tlg0014.tlg006.perseus-grc2
+περὶ Ἀλοννήσου,Demosthenes,grc,Classical,perseus-greek:tlg0014.tlg007.perseus-grc2
+περὶ τῶν ἐν Χερρονήσῳ,Demosthenes,grc,Classical,perseus-greek:tlg0014.tlg008.perseus-grc2
+κατὰ Φιλίππου γ΄,Demosthenes,grc,Classical,perseus-greek:tlg0014.tlg009.perseus-grc2
+κατὰ Φιλίππου δ΄,Demosthenes,grc,Classical,perseus-greek:tlg0014.tlg010.perseus-grc2
+πρὸς τὴν ἐπιστολήν τὴν Φιλίππου,Demosthenes,grc,Classical,perseus-greek:tlg0014.tlg011.perseus-grc2
+ἐπιστολή [Φιλίππου],Demosthenes,grc,Classical,perseus-greek:tlg0014.tlg012.perseus-grc2
+περὶ συντάξεως,Demosthenes,grc,Classical,perseus-greek:tlg0014.tlg013.perseus-grc2
+περὶ τῶν συμμοριῶν,Demosthenes,grc,Classical,perseus-greek:tlg0014.tlg014.perseus-grc2
+ὑπὲρ τῆς Ῥοδίων ἐλευθερίας,Demosthenes,grc,Classical,perseus-greek:tlg0014.tlg015.perseus-grc2
+ὑπὲρ Μεγαλοπολιτῶν,Demosthenes,grc,Classical,perseus-greek:tlg0014.tlg016.perseus-grc2
+περὶ τῶν πρὸς Ἀλέξανδρον συνθηκῶν,Demosthenes,grc,Classical,perseus-greek:tlg0014.tlg017.perseus-grc2
+ὑπὲρ Κτησιφῶντος περὶ τοῦ στεφάνου,Demosthenes,grc,Classical,perseus-greek:tlg0014.tlg018.perseus-grc2
+περὶ τῆς παραπρεσβείας,Demosthenes,grc,Classical,perseus-greek:tlg0014.tlg019.perseus-grc2
+περὶ τῆς Ἀτελείας πρὸς Λεπτίνην,Demosthenes,grc,Classical,perseus-greek:tlg0014.tlg020.perseus-grc2
+κατὰ Μειδίου περὶ τοῦ Κονδύλου,Demosthenes,grc,Classical,perseus-greek:tlg0014.tlg021.perseus-grc2
+κατὰ Ἀνδροτίωνος παρανόμων,Demosthenes,grc,Classical,perseus-greek:tlg0014.tlg022.perseus-grc2
+κατὰ Ἀριστοκράτους,Demosthenes,grc,Classical,perseus-greek:tlg0014.tlg023.perseus-grc2
+κατὰ Τιμοκράτους,Demosthenes,grc,Classical,perseus-greek:tlg0014.tlg024.perseus-grc2
+κατὰ Ἀριστογείτονος α΄,Demosthenes,grc,Classical,perseus-greek:tlg0014.tlg025.perseus-grc2
+κατὰ Ἀριστογείτονος β΄,Demosthenes,grc,Classical,perseus-greek:tlg0014.tlg026.perseus-grc2
+κατὰ Ἀφόβου ἐπιτροπῆς α΄,Demosthenes,grc,Classical,perseus-greek:tlg0014.tlg027.perseus-grc2
+κατὰ Ἀφόβου β΄,Demosthenes,grc,Classical,perseus-greek:tlg0014.tlg028.perseus-grc2
+πρὸς Ἄφοβον ὑπὲρ Φάνου ψευδομαρτυριῶν γ΄,Demosthenes,grc,Classical,perseus-greek:tlg0014.tlg029.perseus-grc2
+πρὸς Ὀνήτορα ἐξούλης α΄,Demosthenes,grc,Classical,perseus-greek:tlg0014.tlg030.perseus-grc2
+πρὸς Ὀνήτορα ἐξούλης β΄,Demosthenes,grc,Classical,perseus-greek:tlg0014.tlg031.perseus-grc2
+πρὸς Ζηνόθεμιν παραγραφή,Demosthenes,grc,Classical,perseus-greek:tlg0014.tlg032.perseus-grc2
+πρὸς Ἀπατούριον παραγραφή,Demosthenes,grc,Classical,perseus-greek:tlg0014.tlg033.perseus-grc2
+πρὸς Φορμίωνα ὑπὲρ δανείου,Demosthenes,grc,Classical,perseus-greek:tlg0014.tlg034.perseus-grc2
+πρὸς τὴν Λάκριτον παραγραφὴν,Demosthenes,grc,Classical,perseus-greek:tlg0014.tlg035.perseus-grc2
+παραγραφὴ ὑπὲρ Φορμίωνος,Demosthenes,grc,Classical,perseus-greek:tlg0014.tlg036.perseus-grc2
+παραγραφὴ πρὸς Πανταίνετον,Demosthenes,grc,Classical,perseus-greek:tlg0014.tlg037.perseus-grc2
+παραγραφὴ πρὸς Ναυσίμακον καὶ Ξενοπείθην,Demosthenes,grc,Classical,perseus-greek:tlg0014.tlg038.perseus-grc2
+πρὸς Βοιωτὸν περὶ τοῦ Ὀνόματος,Demosthenes,grc,Classical,perseus-greek:tlg0014.tlg039.perseus-grc2
+πρὸς Βοιωτὸν περὶ προικὸς μητρῴας,Demosthenes,grc,Classical,perseus-greek:tlg0014.tlg040.perseus-grc2
+πρὸς Σπουδίαν ὑπὲρ προικός,Demosthenes,grc,Classical,perseus-greek:tlg0014.tlg041.perseus-grc2
+πρὸς Φαίνιππον περὶ ἀντιδόσεως,Demosthenes,grc,Classical,perseus-greek:tlg0014.tlg042.perseus-grc2
+πρὸς Μακάρτατον περὶ Ἁγνίου κλήρου,Demosthenes,grc,Classical,perseus-greek:tlg0014.tlg043.perseus-grc2
+πρὸς Λεωκάρη περὶ τοῦ Ἀρχιάδου κλήρου,Demosthenes,grc,Classical,perseus-greek:tlg0014.tlg044.perseus-grc2
+κατὰ Στεφάνου ψευδομαρτυριῶν α΄,Demosthenes,grc,Classical,perseus-greek:tlg0014.tlg045.perseus-grc2
+κατὰ Στεφάνου ψευδομαρτυριῶν β΄,Demosthenes,grc,Classical,perseus-greek:tlg0014.tlg046.perseus-grc2
+κατὰ Εὐέργου καὶ Μνησιβούλου ψευδομαρτυριῶν,Demosthenes,grc,Classical,perseus-greek:tlg0014.tlg047.perseus-grc2
+κατὰ Ὀλυμπιοδώρου βλάβης,Demosthenes,grc,Classical,perseus-greek:tlg0014.tlg048.perseus-grc2
+πρὸς Τιμόθεον ὑπὲρ χρέως,Demosthenes,grc,Classical,perseus-greek:tlg0014.tlg049.perseus-grc2
+πρὸς Πολυκλέα περὶ τοῦ ἐπιτριηραρχήματος,Demosthenes,grc,Classical,perseus-greek:tlg0014.tlg050.perseus-grc2
+περὶ τοῦ Στεφάνου τῆς τριηραρκίας,Demosthenes,grc,Classical,perseus-greek:tlg0014.tlg051.perseus-grc2
+πρὸς Κάλλιππον,Demosthenes,grc,Classical,perseus-greek:tlg0014.tlg052.perseus-grc2
+πρὸς Νικόστρατον περὶ ἀνδραπόδων ἀπογραφῆς Ἀρεθουσίου,Demosthenes,grc,Classical,perseus-greek:tlg0014.tlg053.perseus-grc2
+κατὰ Κόνωνος αἰκείας,Demosthenes,grc,Classical,perseus-greek:tlg0014.tlg054.perseus-grc2
+πρὸς Καλλικλέα περὶ χωρίου βλάβης,Demosthenes,grc,Classical,perseus-greek:tlg0014.tlg055.perseus-grc2
+κατὰ Διονυσοδώρου βλάβης,Demosthenes,grc,Classical,perseus-greek:tlg0014.tlg056.perseus-grc2
+ἔφεσις πρὸς Εὐβουλίδην,Demosthenes,grc,Classical,perseus-greek:tlg0014.tlg057.perseus-grc2
+ἔνδειξις κατὰ Θεοκρίνου,Demosthenes,grc,Classical,perseus-greek:tlg0014.tlg058.perseus-grc2
+κατὰ Νεαίρας,Demosthenes,grc,Classical,perseus-greek:tlg0014.tlg059.perseus-grc2
+ἐπιτάφιος,Demosthenes,grc,Classical,perseus-greek:tlg0014.tlg060.perseus-grc2
+ἐρωτικὸς,Demosthenes,grc,Classical,perseus-greek:tlg0014.tlg061.perseus-grc2
+προοίμια δημηγορικά,Demosthenes,grc,Classical,perseus-greek:tlg0014.tlg062.perseus-grc2
+Δημοσθένους ἐπιστολαὶ,Demosthenes,grc,Classical,perseus-greek:tlg0014.tlg063.perseus-grc2
+Ἱστορίαι,Herodotus,grc,Classical,perseus-greek:tlg0016.tlg001.perseus-grc2
+Περὶ τοῦ Κλεωνύμου κλήρου,Isaeus,grc,Classical,perseus-greek:tlg0017.tlg001.perseus-grc2
+Περὶ τοῦ Μενεκλέους κλήρου,Isaeus,grc,Classical,perseus-greek:tlg0017.tlg002.perseus-grc2
+Περὶ τοῦ Πύρρου κλήρου,Isaeus,grc,Classical,perseus-greek:tlg0017.tlg003.perseus-grc2
+Περὶ τοῦ Νικοστράτου κλήρου (ἐπίλογος),Isaeus,grc,Classical,perseus-greek:tlg0017.tlg004.perseus-grc2
+Περὶ τοῦ Δικαιογένους κλήρου,Isaeus,grc,Classical,perseus-greek:tlg0017.tlg005.perseus-grc2
+Περὶ τοῦ Φιλοκτήμονος κλήρου,Isaeus,grc,Classical,perseus-greek:tlg0017.tlg006.perseus-grc2
+Περὶ τοῦ Απολλοδώρου κλήρου,Isaeus,grc,Classical,perseus-greek:tlg0017.tlg007.perseus-grc2
+Περὶ τοῦ Κίρωνος κλήρου,Isaeus,grc,Classical,perseus-greek:tlg0017.tlg008.perseus-grc2
+Περὶ τοῦ Ἀστυφίλου κλήρου,Isaeus,grc,Classical,perseus-greek:tlg0017.tlg009.perseus-grc2
+Πρὸς Ξεναίνετον περὶ τοῦ Ἀριστάρχου κλήρου,Isaeus,grc,Classical,perseus-greek:tlg0017.tlg010.perseus-grc2
+Περὶ τοῦ Ἁγνίου κλήρου,Isaeus,grc,Classical,perseus-greek:tlg0017.tlg011.perseus-grc2
+Υπὲρ Εὐφιλήτου,Isaeus,grc,Classical,perseus-greek:tlg0017.tlg012.perseus-grc2
+Ἀχαρνῆς,Aristophanes,grc,Classical,perseus-greek:tlg0019.tlg001.perseus-grc2
+Ἱππῆς,Aristophanes,grc,Classical,perseus-greek:tlg0019.tlg002.perseus-grc2
+Νεφέλαι,Aristophanes,grc,Classical,perseus-greek:tlg0019.tlg003.perseus-grc2
+Σφῆκες,Aristophanes,grc,Classical,perseus-greek:tlg0019.tlg004.perseus-grc2
+Εἰρήνη,Aristophanes,grc,Classical,perseus-greek:tlg0019.tlg005.perseus-grc2
+Ὄρνιθες,Aristophanes,grc,Classical,perseus-greek:tlg0019.tlg006.perseus-grc2
+Λυσιστράτη,Aristophanes,grc,Classical,perseus-greek:tlg0019.tlg007.perseus-grc2
+Θεσμοφοριάζουσαι,Aristophanes,grc,Classical,perseus-greek:tlg0019.tlg008.perseus-grc2
+Βάτραχοι,Aristophanes,grc,Classical,perseus-greek:tlg0019.tlg009.perseus-grc2
+Ἐκκλησιάζουσαι,Aristophanes,grc,Classical,perseus-greek:tlg0019.tlg010.perseus-grc2
+Πλοῦτος,Aristophanes,grc,Classical,perseus-greek:tlg0019.tlg011.perseus-grc2
+Θεογονία,Hesiod,grc,Classical,perseus-greek:tlg0020.tlg001.perseus-grc2
+Ἔργα καὶ Ἡμέραι,Hesiod,grc,Classical,perseus-greek:tlg0020.tlg002.perseus-grc2
+Ἀσπὶς Ἡρακλέους,Hesiod,grc,Classical,perseus-greek:tlg0020.tlg003.perseus-grc2
+Ἁλιευτικά,Oppian,grc,Classical,perseus-greek:tlg0023.tlg001.perseus-grc2
+Κυνηγετικά,Oppian of Apamea,grc,Classical,perseus-greek:tlg0024.tlg001.perseus-grc2
+Κατὰ Τιμάρχου,Aeschines,grc,Classical,perseus-greek:tlg0026.tlg001.perseus-grc2
+Περὶ τῆς παραπρεσβείας,Aeschines,grc,Classical,perseus-greek:tlg0026.tlg002.perseus-grc2
+Κατά Κτησιφώντος,Aeschines,grc,Classical,perseus-greek:tlg0026.tlg003.perseus-grc2
+Περὶ τῶν μυστηρίων,Andocides,grc,Classical,perseus-greek:tlg0027.tlg001.perseus-grc2
+Περὶ τῆς ἑαυτοῦ καθόδου,Andocides,grc,Classical,perseus-greek:tlg0027.tlg002.perseus-grc2
+Περὶ τῆς πρὸς Λακεδαιμονίους εἰρήνης,Andocides,grc,Classical,perseus-greek:tlg0027.tlg003.perseus-grc2
+Κατὰ Ἀλκιβιάδου,Andocides,grc,Classical,perseus-greek:tlg0027.tlg004.perseus-grc2
+Φαρμακείας κατὰ τῆς μητρυιᾶς,Antiphon,grc,Classical,perseus-greek:tlg0028.tlg001.perseus-grc2
+Τετραλογία Α΄,Antiphon,grc,Classical,perseus-greek:tlg0028.tlg002.perseus-grc2
+Τετραλογία Β΄,Antiphon,grc,Classical,perseus-greek:tlg0028.tlg003.perseus-grc2
+Τετραλογία Γ΄,Antiphon,grc,Classical,perseus-greek:tlg0028.tlg004.perseus-grc2
+Περὶ τοῦ Ἡρῷδου φόνου,Antiphon,grc,Classical,perseus-greek:tlg0028.tlg005.perseus-grc2
+Περὶ τοῦ χορευτοῦ,Antiphon,grc,Classical,perseus-greek:tlg0028.tlg006.perseus-grc2
+Κατὰ Δημοσθένους,Dinarchus,grc,Classical,perseus-greek:tlg0029.tlg004.perseus-grc2
+Κατὰ Ἀριστογείτονος,Dinarchus,grc,Classical,perseus-greek:tlg0029.tlg005.perseus-grc2
+Κατὰ Φιλοκλέους,Dinarchus,grc,Classical,perseus-greek:tlg0029.tlg006.perseus-grc2
+Ἀπολογία ὑπὲρ Λυκόφρονος,Hyperides,grc,Classical,perseus-greek:tlg0030.tlg001.perseus-grc2
+Κατὰ Φιλιππίδου,Hyperides,grc,Classical,perseus-greek:tlg0030.tlg002.perseus-grc2
+Κατ᾽ Ἀθηνογένους,Hyperides,grc,Classical,perseus-greek:tlg0030.tlg003.perseus-grc2
+Ὑπὲρ Εὐξενίππου ἐισαγγελίας ἀπολογία πρὸς Πολύευκτον,Hyperides,grc,Classical,perseus-greek:tlg0030.tlg004.perseus-grc2
+Κατὰ Δημοσθένους ὑπὲρ τῶν Ἁρπαλείων,Hyperides,grc,Classical,perseus-greek:tlg0030.tlg005.perseus-grc2
+Ἐπιτάφιος,Hyperides,grc,Classical,perseus-greek:tlg0030.tlg006.perseus-grc2
+Ματθαίος,New Testament,grc,Classical,perseus-greek:tlg0031.tlg001.perseus-grc2
+Μάρκον,New Testament,grc,Classical,perseus-greek:tlg0031.tlg002.perseus-grc2
+Λουκᾶν,New Testament,grc,Classical,perseus-greek:tlg0031.tlg003.perseus-grc2
+Ἰωάννην,New Testament,grc,Classical,perseus-greek:tlg0031.tlg004.perseus-grc2
+Πράξεις,New Testament,grc,Classical,perseus-greek:tlg0031.tlg005.perseus-grc2
+Ρωμαίους,New Testament,grc,Classical,perseus-greek:tlg0031.tlg006.perseus-grc2
+Κορίνθιους Α′,New Testament,grc,Classical,perseus-greek:tlg0031.tlg007.perseus-grc2
+Κορίνθιους Β′,New Testament,grc,Classical,perseus-greek:tlg0031.tlg008.perseus-grc2
+Γαλάτας,New Testament,grc,Classical,perseus-greek:tlg0031.tlg009.perseus-grc2
+Ἐφεσίους,New Testament,grc,Classical,perseus-greek:tlg0031.tlg010.perseus-grc2
+Φιλιππηνίους,New Testament,grc,Classical,perseus-greek:tlg0031.tlg011.perseus-grc2
+Κολασσαείς,New Testament,grc,Classical,perseus-greek:tlg0031.tlg012.perseus-grc2
+Θεσσαλονικείς Α′,New Testament,grc,Classical,perseus-greek:tlg0031.tlg013.perseus-grc2
+Θεσσαλονικείς Β′,New Testament,grc,Classical,perseus-greek:tlg0031.tlg014.perseus-grc2
+Τιμόθεον Α′,New Testament,grc,Classical,perseus-greek:tlg0031.tlg015.perseus-grc2
+Τιμόθεον B′,New Testament,grc,Classical,perseus-greek:tlg0031.tlg016.perseus-grc2
+Τίτον,New Testament,grc,Classical,perseus-greek:tlg0031.tlg017.perseus-grc2
+Φιλήμονα,New Testament,grc,Classical,perseus-greek:tlg0031.tlg018.perseus-grc2
+Ἑβραίους,New Testament,grc,Classical,perseus-greek:tlg0031.tlg019.perseus-grc2
+Ἰακώβου,New Testament,grc,Classical,perseus-greek:tlg0031.tlg020.perseus-grc2
+Πέτρου Α′,New Testament,grc,Classical,perseus-greek:tlg0031.tlg021.perseus-grc2
+Πέτρου B′,New Testament,grc,Classical,perseus-greek:tlg0031.tlg022.perseus-grc2
+Ἰωάννου Α′,New Testament,grc,Classical,perseus-greek:tlg0031.tlg023.perseus-grc2
+Ἰωάννου Β′,New Testament,grc,Classical,perseus-greek:tlg0031.tlg024.perseus-grc2
+Ἰωάννου Γ′,New Testament,grc,Classical,perseus-greek:tlg0031.tlg025.perseus-grc2
+Ἰούδου,New Testament,grc,Classical,perseus-greek:tlg0031.tlg026.perseus-grc2
+Ἀποκάλυψις,New Testament,grc,Classical,perseus-greek:tlg0031.tlg027.perseus-grc2
+Ἑλληνικά,Xenophon,grc,Classical,perseus-greek:tlg0032.tlg001.perseus-grc2
+Ἀπομνημονεύματα,Xenophon,grc,Classical,perseus-greek:tlg0032.tlg002.perseus-grc2
+Οἰκονομικός,Xenophon,grc,Classical,perseus-greek:tlg0032.tlg003.perseus-grc2
+Συμπόσιον,Xenophon,grc,Classical,perseus-greek:tlg0032.tlg004.perseus-grc2
+Ἀπολογία Σωκράτους,Xenophon,grc,Classical,perseus-greek:tlg0032.tlg005.perseus-grc2
+Ἀνάβασις,Xenophon,grc,Classical,perseus-greek:tlg0032.tlg006.perseus-grc2
+Κύρου παιδεία,Xenophon,grc,Classical,perseus-greek:tlg0032.tlg007.perseus-grc2
+Ἱέρων,Xenophon,grc,Classical,perseus-greek:tlg0032.tlg008.perseus-grc2
+Ἀγησίλαος,Xenophon,grc,Classical,perseus-greek:tlg0032.tlg009.perseus-grc2
+Λακεδαιμονίων Πολιτεία,Xenophon,grc,Classical,perseus-greek:tlg0032.tlg010.perseus-grc2
+Πόροι ἢ περὶ προσόδων,Xenophon,grc,Classical,perseus-greek:tlg0032.tlg011.perseus-grc2
+Ἱππαρχικός,Xenophon,grc,Classical,perseus-greek:tlg0032.tlg012.perseus-grc2
+Περὶ ἱππικῆς,Xenophon,grc,Classical,perseus-greek:tlg0032.tlg013.perseus-grc2
+Κυνηγετικός,Xenophon,grc,Classical,perseus-greek:tlg0032.tlg014.perseus-grc2
+Ὀλυμπιονῖκαι,Pindar,grc,Classical,perseus-greek:tlg0033.tlg001.perseus-grc2
+Πυθιονῖκαι,Pindar,grc,Classical,perseus-greek:tlg0033.tlg002.perseus-grc2
+Νεμεονῖκαι,Pindar,grc,Classical,perseus-greek:tlg0033.tlg003.perseus-grc2
+Ἰσθμιονῖκαι,Pindar,grc,Classical,perseus-greek:tlg0033.tlg004.perseus-grc2
+Κατὰ Λεωκράτους,Lycurgus,grc,Classical,perseus-greek:tlg0034.tlg001.perseus-grc2
+Ἔρως δραπέτης,Moschus,grc,Classical,perseus-greek:tlg0035.tlg001.perseus-grc2
+Εὐρώπη,Moschus,grc,Classical,perseus-greek:tlg0035.tlg002.perseus-grc2
+Ἐπιτάφιος Βίωνος,Moschus,grc,Classical,perseus-greek:tlg0035.tlg003.perseus-grc2
+Μεγάρα,Moschus,grc,Classical,perseus-greek:tlg0035.tlg004.perseus-grc2
+Fragmenta,Moschus,grc,Classical,perseus-greek:tlg0035.tlg005.perseus-grc2
+Αδώνιδος επιτάφιος,Bion of Phlossa,grc,Classical,perseus-greek:tlg0036.tlg001.perseus-grc2
+Μύρσων καὶ Λυκίδας,Bion of Phlossa,grc,Classical,perseus-greek:tlg0036.tlg002.perseus-grc2
+Fragmenta,Bion of Phlossa,grc,Classical,perseus-greek:tlg0036.tlg003.perseus-grc2
+Περί φυσικῶν δυνάμεων,Galen,grc,Classical,perseus-greek:tlg0057.tlg010.perseus-grc2
+Περὶ τοῦ πῶς χρὴ πολιορκουμένους ἀντέχειν,Aeneas Tacticus,grc,Classical,perseus-greek:tlg0058.tlg001.perseus-grc2
+Εὐθύφρων,Plato,grc,Classical,perseus-greek:tlg0059.tlg001.perseus-grc1
+Ἀπολογία Σωκράτους,Plato,grc,Classical,perseus-greek:tlg0059.tlg002.perseus-grc2
+Κρίτων,Plato,grc,Classical,perseus-greek:tlg0059.tlg003.perseus-grc2
+Φαίδων,Plato,grc,Classical,perseus-greek:tlg0059.tlg004.perseus-grc2
+Κρατύλος,Plato,grc,Classical,perseus-greek:tlg0059.tlg005.perseus-grc2
+Θεαίτητος,Plato,grc,Classical,perseus-greek:tlg0059.tlg006.perseus-grc2
+Σοφιστής,Plato,grc,Classical,perseus-greek:tlg0059.tlg007.perseus-grc2
+Πολιτικός,Plato,grc,Classical,perseus-greek:tlg0059.tlg008.perseus-grc2
+Παρμενίδης,Plato,grc,Classical,perseus-greek:tlg0059.tlg009.perseus-grc2
+Φίληβος,Plato,grc,Classical,perseus-greek:tlg0059.tlg010.perseus-grc2
+Συμπόσιον,Plato,grc,Classical,perseus-greek:tlg0059.tlg011.perseus-grc2
+Φαῖδρος,Plato,grc,Classical,perseus-greek:tlg0059.tlg012.perseus-grc2
+Ἀλκιβιάδης αʹ,Plato,grc,Classical,perseus-greek:tlg0059.tlg013.perseus-grc2
+Ἀλκιβιάδης βʹ,Plato,grc,Classical,perseus-greek:tlg0059.tlg014.perseus-grc2
+Ἵππαρχος,Plato,grc,Classical,perseus-greek:tlg0059.tlg015.perseus-grc2
+Ἐρασταί,Plato,grc,Classical,perseus-greek:tlg0059.tlg016.perseus-grc2
+Θεάγης,Plato,grc,Classical,perseus-greek:tlg0059.tlg017.perseus-grc2
+Χαρμίδης,Plato,grc,Classical,perseus-greek:tlg0059.tlg018.perseus-grc2
+Λάχης,Plato,grc,Classical,perseus-greek:tlg0059.tlg019.perseus-grc2
+Λύσις,Plato,grc,Classical,perseus-greek:tlg0059.tlg020.perseus-grc2
+Εὐθύδημος,Plato,grc,Classical,perseus-greek:tlg0059.tlg021.perseus-grc2
+Πρωταγόρας,Plato,grc,Classical,perseus-greek:tlg0059.tlg022.perseus-grc2
+Γοργίας,Plato,grc,Classical,perseus-greek:tlg0059.tlg023.perseus-grc2
+Μένων,Plato,grc,Classical,perseus-greek:tlg0059.tlg024.perseus-grc2
+Ἱππίας μείζων,Plato,grc,Classical,perseus-greek:tlg0059.tlg025.perseus-grc2
+Ἱππίας ἐλάττων,Plato,grc,Classical,perseus-greek:tlg0059.tlg026.perseus-grc2
+Ἴων,Plato,grc,Classical,perseus-greek:tlg0059.tlg027.perseus-grc2
+Μενέξενος,Plato,grc,Classical,perseus-greek:tlg0059.tlg028.perseus-grc2
+Κλειτοφῶν,Plato,grc,Classical,perseus-greek:tlg0059.tlg029.perseus-grc2
+Πολιτεία,Plato,grc,Classical,perseus-greek:tlg0059.tlg030.perseus-grc2
+Τίμαιος,Plato,grc,Classical,perseus-greek:tlg0059.tlg031.perseus-grc2
+Κριτίας,Plato,grc,Classical,perseus-greek:tlg0059.tlg032.perseus-grc2
+Μίνως,Plato,grc,Classical,perseus-greek:tlg0059.tlg033.perseus-grc2
+Νόμοι,Plato,grc,Classical,perseus-greek:tlg0059.tlg034.perseus-grc2
+Ἐπινομίς,Plato,grc,Classical,perseus-greek:tlg0059.tlg035.perseus-grc2
+Ἐπιστολαί,Plato,grc,Classical,perseus-greek:tlg0059.tlg036.perseus-grc2
+Βιβλιοθήκη Ἱστορική (Books 11-17),Diodorus Siculus,grc,Classical,perseus-greek:tlg0060.tlg001.perseus-grc4
+Βιβλιοθήκη Ἱστορική (Books 1-5),Diodorus Siculus,grc,Classical,perseus-greek:tlg0060.tlg001.perseus-grc5
+Βιβλιοθήκη Ἱστορική (Books 18-20),Diodorus Siculus,grc,Classical,perseus-greek:tlg0060.tlg001.perseus-grc6
+Φάλαρις,Lucian of Samosata,grc,Classical,perseus-greek:tlg0062.tlg001.perseus-grc2
+Ἱππίας ἢ Βαλανεῖον,Lucian,grc,Classical,perseus-greek:tlg0062.tlg002.perseus-grc2
+Προλαλιά. Διόνυσος,Lucian,grc,Classical,perseus-greek:tlg0062.tlg003.perseus-grc2
+Προλαλιά. Ἡρακλῆς,Lucian,grc,Classical,perseus-greek:tlg0062.tlg004.perseus-grc2
+Περὶ τοῦ Ἡλέκτρου ἢ Κύκνων,Lucian,grc,Classical,perseus-greek:tlg0062.tlg005.perseus-grc2
+Μυίας Ἐγκώμιον,Lucian,grc,Classical,perseus-greek:tlg0062.tlg006.perseus-grc2
+Νιγρίνου Φιλοσοφία,Lucian,grc,Classical,perseus-greek:tlg0062.tlg007.perseus-grc2
+Δημώνακτος Βίος,Lucian,grc,Classical,perseus-greek:tlg0062.tlg008.perseus-grc2
+Περὶ τοῦ Οἴκου,Lucian,grc,Classical,perseus-greek:tlg0062.tlg009.perseus-grc2
+Πατρίδος Ἐγκώμιον,Lucian,grc,Classical,perseus-greek:tlg0062.tlg010.perseus-grc2
+Μακρόβιοι,Lucian,grc,Classical,perseus-greek:tlg0062.tlg011.perseus-grc2
+Ἀληθῶν Διηγημάτων,Lucian,grc,Classical,perseus-greek:tlg0062.tlg012.perseus-grc2
+Περὶ τοῦ μὴ ῥᾳδίως πιστεύειν Διαβολῇ,Lucian,grc,Classical,perseus-greek:tlg0062.tlg013.perseus-grc2
+Δίκη Συμφώνων,Lucian,grc,Classical,perseus-greek:tlg0062.tlg014.perseus-grc2
+Συμπόσιον ἢ Λαπίθαι,Lucian,grc,Classical,perseus-greek:tlg0062.tlg015.perseus-grc2
+Κατάπλους ἢ Τύραννος,Lucian,grc,Classical,perseus-greek:tlg0062.tlg016.perseus-grc2
+Ζεὺς ἐλεγχόμενος,Lucian,grc,Classical,perseus-greek:tlg0062.tlg017.perseus-grc2
+Ζεὺς Τραγῳδός,Lucian,grc,Classical,perseus-greek:tlg0062.tlg018.perseus-grc2
+Ὄνειρος ἢ Ἀλεκτρυών,Lucian,grc,Classical,perseus-greek:tlg0062.tlg019.perseus-grc2
+Προμηθεύς,Lucian,grc,Classical,perseus-greek:tlg0062.tlg020.perseus-grc2
+Ἰκαρομένιππος ἢ Ὑπερνέφελος,Lucian,grc,Classical,perseus-greek:tlg0062.tlg021.perseus-grc2
+Τίμων,Lucian,grc,Classical,perseus-greek:tlg0062.tlg022.perseus-grc2
+Χάρων ἢ Ἐπισκοποῦντες,Lucian,grc,Classical,perseus-greek:tlg0062.tlg023.perseus-grc2
+Βίων Πρᾶσις,Lucian,grc,Classical,perseus-greek:tlg0062.tlg024.perseus-grc2
+Ἀναβιοῦντες ἢ Ἁλιεύς,Lucian,grc,Classical,perseus-greek:tlg0062.tlg025.perseus-grc2
+Δὶς κατηγορούμενος,Lucian,grc,Classical,perseus-greek:tlg0062.tlg026.perseus-grc2
+Περὶ Θυσιῶν,Lucian,grc,Classical,perseus-greek:tlg0062.tlg027.perseus-grc2
+Πρὸς τὸν ἀπαίδευτον καὶ πολλὰ βιβλία ὠνούμενον,Lucian,grc,Classical,perseus-greek:tlg0062.tlg028.perseus-grc2
+Περὶ τοῦ Ἐνυπνίου ἤτοι Βίος Λουκιανοῦ,Lucian,grc,Classical,perseus-greek:tlg0062.tlg029.perseus-grc2
+Περὶ τοῦ Παρασίτου ὅτι Τέχνη ἡ Παρασιτική,Lucian,grc,Classical,perseus-greek:tlg0062.tlg030.perseus-grc2
+Φιλοψευδὴς ἢ Ἀπιστῶν,Lucian,grc,Classical,perseus-greek:tlg0062.tlg031.perseus-grc2
+Θεῶν Κρίσις,Lucian,grc,Classical,perseus-greek:tlg0062.tlg032.perseus-grc2
+Περὶ τῶν ἐν Μισθῷ συνόντων,Lucian,grc,Classical,perseus-greek:tlg0062.tlg033.perseus-grc2
+Ἀνάχαρσις ἢ Περὶ Γυμνασίων,Lucian,grc,Classical,perseus-greek:tlg0062.tlg034.perseus-grc2
+Μένιππος ἢ Νεκυομαντεία,Lucian,grc,Classical,perseus-greek:tlg0062.tlg035.perseus-grc2
+Περὶ Πένθους,Lucian,grc,Classical,perseus-greek:tlg0062.tlg036.perseus-grc2
+Ῥητόρων Διδάσκαλος,Lucian,grc,Classical,perseus-greek:tlg0062.tlg037.perseus-grc2
+Ἀλέξανδρος ἢ Ψευδόμαντις,Lucian,grc,Classical,perseus-greek:tlg0062.tlg038.perseus-grc2
+Εἰκόνες,Lucian,grc,Classical,perseus-greek:tlg0062.tlg039.perseus-grc2
+Ὑπὲρ τῶν Εἰκόνων,Lucian,grc,Classical,perseus-greek:tlg0062.tlg040.perseus-grc2
+Περὶ τῆς Συρίης Θεοῦ,Lucian,grc,Classical,perseus-greek:tlg0062.tlg041.perseus-grc2
+Περὶ τῆς Περεγρίνου Τελευτῆς,Lucian,grc,Classical,perseus-greek:tlg0062.tlg042.perseus-grc2
+Δραπέται,Lucian,grc,Classical,perseus-greek:tlg0062.tlg043.perseus-grc2
+Τόξαρις ἢ Φιλία,Lucian,grc,Classical,perseus-greek:tlg0062.tlg044.perseus-grc2
+Περὶ Ὀρχήσεως,Lucian,grc,Classical,perseus-greek:tlg0062.tlg045.perseus-grc2
+Λεξιφάνης,Lucian,grc,Classical,perseus-greek:tlg0062.tlg046.perseus-grc2
+Εὐνοῦχος,Lucian,grc,Classical,perseus-greek:tlg0062.tlg047.perseus-grc2
+Περὶ τῆς Ἀστρολογίας,Lucian,grc,Classical,perseus-greek:tlg0062.tlg048.perseus-grc2
+Ψευδολογιστής,Lucian,grc,Classical,perseus-greek:tlg0062.tlg049.perseus-grc2
+Θεῶν Ἐκκλησία,Lucian,grc,Classical,perseus-greek:tlg0062.tlg050.perseus-grc2
+Τυραννοκτόνος,Lucian,grc,Classical,perseus-greek:tlg0062.tlg051.perseus-grc2
+Ἀποκηρυττόμενος,Lucian,grc,Classical,perseus-greek:tlg0062.tlg052.perseus-grc2
+Πῶς δεῖ Ἱστορίαν συγγράφειν,Lucian,grc,Classical,perseus-greek:tlg0062.tlg053.perseus-grc2
+Πῶς δεῖ ἱστορίαν συγγράφειν,Lucian of Samosata,grc,Classical,perseus-greek:tlg0062.tlg053.perseus-grc3
+Περὶ τῶν Διψάδων,Lucian,grc,Classical,perseus-greek:tlg0062.tlg054.perseus-grc2
+Περὶ τῶν διψάδων,Lucian of Samosata,grc,Classical,perseus-greek:tlg0062.tlg054.perseus-grc3
+Τὰ πρὸς Κρόνον,Lucian,grc,Classical,perseus-greek:tlg0062.tlg055.perseus-grc2
+Τὰ πρὸς Κρόνον,Lucian of Samosata,grc,Classical,perseus-greek:tlg0062.tlg055.perseus-grc3
+Ἡρόδοτος ἢ Ἀετίων,Lucian,grc,Classical,perseus-greek:tlg0062.tlg056.perseus-grc2
+Ἡρόδοτος ἢ Ἀετίων,Lucian of Samosata,grc,Classical,perseus-greek:tlg0062.tlg056.perseus-grc3
+Ζεύξις ἢ Ἀντίοχος,Lucian,grc,Classical,perseus-greek:tlg0062.tlg057.perseus-grc2
+Ζεῦξις ἢ Ἀντίοχος,Lucian of Samosata,grc,Classical,perseus-greek:tlg0062.tlg057.perseus-grc3
+Ὑπὲρ τοῦ ἐν τῇ Προσαγορεύσει Πταίσματος,Lucian,grc,Classical,perseus-greek:tlg0062.tlg058.perseus-grc2
+Ὑπέρ τοῦ ἐν τῇ προσαγορεύσει πταισμάτως,Lucian of Samosata,grc,Classical,perseus-greek:tlg0062.tlg058.perseus-grc3
+Ἀπολογία,Lucian,grc,Classical,perseus-greek:tlg0062.tlg059.perseus-grc2
+Ἀπολογία,Lucian of Samosata,grc,Classical,perseus-greek:tlg0062.tlg059.perseus-grc3
+Ἁρμονίδης,Lucian,grc,Classical,perseus-greek:tlg0062.tlg060.perseus-grc2
+Ἀπολογία,Lucian of Samosata,grc,Classical,perseus-greek:tlg0062.tlg060.perseus-grc3
+Διάλογος πρὸς Ἡσίοδον,Lucian,grc,Classical,perseus-greek:tlg0062.tlg061.perseus-grc2
+Διάλογος πρὸς Ἡσίοδον,Lucian of Samosata,grc,Classical,perseus-greek:tlg0062.tlg061.perseus-grc3
+Σκύθης ἢ Πρόξενος,Lucian,grc,Classical,perseus-greek:tlg0062.tlg062.perseus-grc2
+Σκύθης ἢ πρόξενος,Lucian of Samosata,grc,Classical,perseus-greek:tlg0062.tlg062.perseus-grc3
+Ἑρμότιμος ἢ Περὶ Αἱρέσεων,Lucian,grc,Classical,perseus-greek:tlg0062.tlg063.perseus-grc2
+Σκύθης ἢ πρόξενος,Lucian of Samosata,grc,Classical,perseus-greek:tlg0062.tlg063.perseus-grc3
+Πρὸς τὸν εἰπόντα Προμηθεὺς εἶ ἐν λόγοις,Lucian,grc,Classical,perseus-greek:tlg0062.tlg064.perseus-grc2
+"Πρὸς τὸν εἰπόντα, Προμηθεὺς εἴ εἶ ἐν λόγοις",Lucian of Samosata,grc,Classical,perseus-greek:tlg0062.tlg064.perseus-grc3
+Πλοῖον ἢ Εὐχαί,Lucian,grc,Classical,perseus-greek:tlg0062.tlg065.perseus-grc2
+Πλοῖον ἢΕυχαί,Lucian of Samosata,grc,Classical,perseus-greek:tlg0062.tlg065.perseus-grc3
+Νεκρικοὶ Διάλογοι,Lucian,grc,Classical,perseus-greek:tlg0062.tlg066.perseus-grc2
+Νεκρικοὶ διάλογοι,Lucian of Samosata,grc,Classical,perseus-greek:tlg0062.tlg066.perseus-grc3
+Ἐνάλιοι Διάλογοι,Lucian,grc,Classical,perseus-greek:tlg0062.tlg067.perseus-grc2
+Ἐνάλιοι διάλογοι,Lucian of Samosata,grc,Classical,perseus-greek:tlg0062.tlg067.perseus-grc3
+Θεῶν Διάλογοι,Lucian,grc,Classical,perseus-greek:tlg0062.tlg068.perseus-grc2
+Θεῶν διάλογοι,Lucian of Samosata,grc,Classical,perseus-greek:tlg0062.tlg068.perseus-grc3
+Ἑταιρικοὶ Διάλογοι,Lucian,grc,Classical,perseus-greek:tlg0062.tlg069.perseus-grc2
+Ἑταιρικοὶ διάλογοι,Lucian of Samosata,grc,Classical,perseus-greek:tlg0062.tlg069.perseus-grc3
+Ψευδοσοφιστής ἢ Σολοικιστής,Lucian,grc,Classical,perseus-greek:tlg0062.tlg070.perseus-grc2
+Ποδάγρα,Lucian,grc,Classical,perseus-greek:tlg0062.tlg071.perseus-grc2
+Ἀλεξάνδρου Ἀνάβασις,Arrian,grc,Classical,perseus-greek:tlg0074.tlg001.perseus-grc2
+Ἰνδική,Arrian,grc,Classical,perseus-greek:tlg0074.tlg002.perseus-grc2
+Κυνηγετικός,Arrian,grc,Classical,perseus-greek:tlg0074.tlg003.perseus-grc2
+Περίπλους τοῦ Εὐξείνου Πόντου,Arrian,grc,Classical,perseus-greek:tlg0074.tlg004.perseus-grc2
+Τέχνη τακτική,Arrian,grc,Classical,perseus-greek:tlg0074.tlg005.perseus-grc2
+Acies Contra Alanos,Arrian,grc,Classical,perseus-greek:tlg0074.tlg006.perseus-grc2
+Ῥωμαϊκὴ Ἀρχαιολογία,Dionysius of Halicarnassus,grc,Classical,perseus-greek:tlg0081.tlg001.perseus-grc2
+Περὶ τῶν ἀρχαίων ῥητόρων,Dionysius of Halicarnassus,grc,Classical,perseus-greek:tlg0081.tlg002.perseus-grc2
+Λυσίας συρακούσιος πατρόθεν,Dionysius of Halicarnassus,grc,Classical,perseus-greek:tlg0081.tlg003.perseus-grc2
+Ἰσοκρατης Ἀθηναῖος,Dionysius of Halicarnassus,grc,Classical,perseus-greek:tlg0081.tlg004.perseus-grc2
+Ἰσαῖος Ἀθηναῖος,Dionysius of Halicarnassus,grc,Classical,perseus-greek:tlg0081.tlg005.perseus-grc2
+Περί της Δημοσθένους λέξεως,Dionysius of Halicarnassus,grc,Classical,perseus-greek:tlg0081.tlg006.perseus-grc2
+Libri secundi de antiquis oratoribus reliquiae,Dionysius of Halicarnassus,grc,Classical,perseus-greek:tlg0081.tlg007.perseus-grc2
+Ἐπιστολὴ πρὸς Ἀμμαῖον,Dionysius of Halicarnassus,grc,Classical,perseus-greek:tlg0081.tlg008.perseus-grc2
+Περὶ Δεινάρχου,Dionysius of Halicarnassus,grc,Classical,perseus-greek:tlg0081.tlg009.perseus-grc2
+Περὶ Θουκιδίδου,Dionysius of Halicarnassus,grc,Classical,perseus-greek:tlg0081.tlg010.perseus-grc2
+Περὶ τῶν Θουκιδίδου ἰδιωμάτων πρὸς Ἀμμαῖον,Dionysius of Halicarnassus,grc,Classical,perseus-greek:tlg0081.tlg011.perseus-grc2
+Περὶ συνθέσεως ὀνομάτων,Dionysius of Halicarnassus,grc,Classical,perseus-greek:tlg0081.tlg012.perseus-grc2
+Ἐπιστολὴ πρὸς Πομπήιον,Dionysius of Halicarnassus,grc,Classical,perseus-greek:tlg0081.tlg015.perseus-grc2
+Ἱκέτιδες,Aeschylus,grc,Classical,perseus-greek:tlg0085.tlg001.perseus-grc2
+Πέρσαι,Aeschylus,grc,Classical,perseus-greek:tlg0085.tlg002.perseus-grc2
+Προμηθεὺς δεσμώτης,Aeschylus,grc,Classical,perseus-greek:tlg0085.tlg003.perseus-grc2
+Ἑπτὰ ἐπὶ Θήβας,Aeschylus,grc,Classical,perseus-greek:tlg0085.tlg004.perseus-grc2
+Ἀγαμέμνων,Aeschylus,grc,Classical,perseus-greek:tlg0085.tlg005.perseus-grc2
+Χοηφóρoι,Aeschylus,grc,Classical,perseus-greek:tlg0085.tlg006.perseus-grc2
+Εὐμενίδες,Aeschylus,grc,Classical,perseus-greek:tlg0085.tlg007.perseus-grc2
+Ἀθηναίων πολιτεία,Aristotle,grc,Classical,perseus-greek:tlg0086.tlg003.perseus-grc2
+Ἠθικὰ Εὐδήμεια,Aristotle,grc,Classical,perseus-greek:tlg0086.tlg009.perseus-grc2
+Ἠθικὰ Νικομάχεια,Aristotle,grc,Classical,perseus-greek:tlg0086.tlg010.perseus-grc2
+τὰ Μετὰ τὰ Φυσικά,Aristotle,grc,Classical,perseus-greek:tlg0086.tlg025.perseus-grc2
+Οἰκονομικά,Aristotle,grc,Classical,perseus-greek:tlg0086.tlg029.perseus-grc2
+Περὶ ποιητικῆς,Aristotle,grc,Classical,perseus-greek:tlg0086.tlg034.digicorpus-grc2
+Περὶ ποιητικῆς,Aristotle,grc,Classical,perseus-greek:tlg0086.tlg034.perseus-grc2
+Πολιτικά,Aristotle,grc,Classical,perseus-greek:tlg0086.tlg035.perseus-grc2
+Ῥητορική,Aristotle,grc,Classical,perseus-greek:tlg0086.tlg038.perseus-grc2
+περὶ Ἀρετῶν καὶ Κακιῶν,Aristotle,grc,Classical,perseus-greek:tlg0086.tlg045.perseus-grc2
+Geographiae Informatio,Agathemerus,grc,Classical,perseus-greek:tlg0090.tlg001.opp-grc1
+Χαρακτῆρες,Theophrastus,grc,Classical,perseus-greek:tlg0093.tlg009.perseus-grc2
+περὶ Μουσικῆς,Pseudo-Plutarch,grc,Classical,perseus-greek:tlg0094.tlg002.perseus-grc2
+Περὶ τῶν ἀρεσκόντων τοῖς φιλοσόφοις φυσικῶν δογμάτων,Pseudo-Plutarch,grc,Classical,perseus-greek:tlg0094.tlg003.perseus-grc2
+Γεωγραφικά,Strabo,grc,Classical,perseus-greek:tlg0099.tlg001.perseus-grc2
+Ἐπίνικοι,Bacchylides,grc,Classical,perseus-greek:tlg0199.tlg001.perseus-grc2
+Διθύραμβοι,Bacchylides,grc,Classical,perseus-greek:tlg0199.tlg002.perseus-grc2
+Εἰς Δία,Aelius Aristides,grc,Classical,perseus-greek:tlg0284.tlg001.perseus-grc2
+Ἀθηνᾶ,Aelius Aristides,grc,Classical,perseus-greek:tlg0284.tlg002.perseus-grc2
+Ἰσθμικὸς εἰς Ποσειδῶνα,Aelius Aristides,grc,Classical,perseus-greek:tlg0284.tlg003.perseus-grc2
+Διόνυσος,Aelius Aristides,grc,Classical,perseus-greek:tlg0284.tlg004.perseus-grc2
+Ἡρακλῆς,Aelius Aristides,grc,Classical,perseus-greek:tlg0284.tlg005.perseus-grc2
+Λαλιὰ εἰς Ἀσκληπιόν,Aelius Aristides,grc,Classical,perseus-greek:tlg0284.tlg006.perseus-grc2
+Ἀσκληπιάδαι,Aelius Aristides,grc,Classical,perseus-greek:tlg0284.tlg007.perseus-grc2
+Εἰς τὸν Σάραπιν,Aelius Aristides,grc,Classical,perseus-greek:tlg0284.tlg008.perseus-grc2
+Εἰς βασιλέα [sp.],Aelius Aristides,grc,Classical,perseus-greek:tlg0284.tlg009.perseus-grc2
+Ἀπελλᾶ γενεθλιακός,Aelius Aristides,grc,Classical,perseus-greek:tlg0284.tlg010.perseus-grc2
+εἰς Ἐτεωνέα ἐπικήδειος,Aelius Aristides,grc,Classical,perseus-greek:tlg0284.tlg011.perseus-grc2
+Ἐπὶ Ἀλεξάνδρῳ ἐπιτάφιος,Aelius Aristides,grc,Classical,perseus-greek:tlg0284.tlg012.perseus-grc2
+Παναθηναϊκός,Aelius Aristides,grc,Classical,perseus-greek:tlg0284.tlg013.perseus-grc2
+Ῥώμης ἐγκώμιον,Aelius Aristides,grc,Classical,perseus-greek:tlg0284.tlg014.perseus-grc2
+Σμυρναϊκὸς πολιτικός,Aelius Aristides,grc,Classical,perseus-greek:tlg0284.tlg015.perseus-grc2
+Πανηγυρικὸς ἐν Κυζίκῳ περὶ τοῦ ναοῦ,Aelius Aristides,grc,Classical,perseus-greek:tlg0284.tlg016.perseus-grc2
+Εἰς τὸ Αἰγαῖον πέλαγος,Aelius Aristides,grc,Classical,perseus-greek:tlg0284.tlg017.perseus-grc2
+Εἰς τὸ φρέαρ τοῦ Ἀσκληπιοῦ,Aelius Aristides,grc,Classical,perseus-greek:tlg0284.tlg018.perseus-grc2
+Ἐλευσίνιος,Aelius Aristides,grc,Classical,perseus-greek:tlg0284.tlg019.perseus-grc2
+Μονῳδία ἐπὶ Σμύρνῃ,Aelius Aristides,grc,Classical,perseus-greek:tlg0284.tlg020.perseus-grc2
+Παλινῳδία ἐπὶ Σμύρνῃ καὶ τῷ ταύτης ἀνοικισμῷ,Aelius Aristides,grc,Classical,perseus-greek:tlg0284.tlg021.perseus-grc2
+Προσφωνητικός Σμυρναϊκός,Aelius Aristides,grc,Classical,perseus-greek:tlg0284.tlg022.perseus-grc2
+Ἱεροὶ λόγοι πρῶτος,Aelius Aristides,grc,Classical,perseus-greek:tlg0284.tlg023.perseus-grc2
+Ἱεροὶ λόγοι δεύτερος,Aelius Aristides,grc,Classical,perseus-greek:tlg0284.tlg024.perseus-grc2
+Ἱεροὶ λόγοι τρίτος,Aelius Aristides,grc,Classical,perseus-greek:tlg0284.tlg025.perseus-grc2
+Ἱεροὶ λόγοι τέταρτος,Aelius Aristides,grc,Classical,perseus-greek:tlg0284.tlg026.perseus-grc2
+Ἱεροὶ λόγοι πέμπτος,Aelius Aristides,grc,Classical,perseus-greek:tlg0284.tlg027.perseus-grc2
+Ἱεροὶ λόγοι ἕκτος,Aelius Aristides,grc,Classical,perseus-greek:tlg0284.tlg028.perseus-grc2
+Περὶ τοῦ πέμπειν βοήθειαν τοῖς ἐν Σικελίᾳ,Aelius Aristides,grc,Classical,perseus-greek:tlg0284.tlg029.perseus-grc2
+Εἰς τὸ ἐναντίον,Aelius Aristides,grc,Classical,perseus-greek:tlg0284.tlg030.perseus-grc2
+Ὑπὲρ τῆς πρὸς Λακεδαιμονίους εἰρήνης,Aelius Aristides,grc,Classical,perseus-greek:tlg0284.tlg031.perseus-grc2
+Ὑπὲρ τῆς πρὸς Ἀθηναίους εἰρήνης,Aelius Aristides,grc,Classical,perseus-greek:tlg0284.tlg032.perseus-grc2
+Λευκτρικὸς Α. (ὑπὲρ Λακεδαιμονίων πρῶτος),Aelius Aristides,grc,Classical,perseus-greek:tlg0284.tlg033.perseus-grc2
+Λευκτρικὸς Β. (ὑπὲρ Θηβαίων πρῶτος),Aelius Aristides,grc,Classical,perseus-greek:tlg0284.tlg034.perseus-grc2
+Λευκτρικὸς Γ. (ὑπὲρ Λακεδαιμονίων δεύτερος),Aelius Aristides,grc,Classical,perseus-greek:tlg0284.tlg035.perseus-grc2
+Λευκτρικὸς Δ. (ὑπὲρ Θηβαίων δεύτερος),Aelius Aristides,grc,Classical,perseus-greek:tlg0284.tlg036.perseus-grc2
+Λευκτρικὸς Ε. (ὑπὲρ μηδετέροις βοηθεῖν),Aelius Aristides,grc,Classical,perseus-greek:tlg0284.tlg037.perseus-grc2
+Συμμαχικὸς Α.,Aelius Aristides,grc,Classical,perseus-greek:tlg0284.tlg038.perseus-grc2
+Συμμαχικὸς Β. (πρὸς Θηβαίους περὶ τῆς συμμαχίας),Aelius Aristides,grc,Classical,perseus-greek:tlg0284.tlg039.perseus-grc2
+Συμβουλευτικὸς περὶ τοῦ μὴ δεῖν κωμῳδεῖν,Aelius Aristides,grc,Classical,perseus-greek:tlg0284.tlg040.perseus-grc2
+Ἐπιστολὴ περὶ Σμύρνης,Aelius Aristides,grc,Classical,perseus-greek:tlg0284.tlg041.perseus-grc2
+Περὶ ὁμονοίας ταῖς πόλεσιν,Aelius Aristides,grc,Classical,perseus-greek:tlg0284.tlg042.perseus-grc2
+Ῥοδιακός [sp.],Aelius Aristides,grc,Classical,perseus-greek:tlg0284.tlg043.perseus-grc2
+Ῥοδίοις περὶ ὁμονοίας,Aelius Aristides,grc,Classical,perseus-greek:tlg0284.tlg044.perseus-grc2
+Πρὸς Πλάτωνα περὶ ῥητορικῆς,Aelius Aristides,grc,Classical,perseus-greek:tlg0284.tlg045.perseus-grc2
+Πρὸς Πλάτωνα ὑπὲρ τῶν τεττάρων,Aelius Aristides,grc,Classical,perseus-greek:tlg0284.tlg046.perseus-grc2
+Πρὸς Καπίτωνα,Aelius Aristides,grc,Classical,perseus-greek:tlg0284.tlg047.perseus-grc2
+Αἰγύπτιος,Aelius Aristides,grc,Classical,perseus-greek:tlg0284.tlg048.perseus-grc2
+Περὶ τοῦ παραφθέγματος,Aelius Aristides,grc,Classical,perseus-greek:tlg0284.tlg049.perseus-grc2
+Κατὰ τῶν ἐξορχουμένων,Aelius Aristides,grc,Classical,perseus-greek:tlg0284.tlg050.perseus-grc2
+Πρὸς τοὺς αἰτιωμένους ὅτι μὴ μελετῴη,Aelius Aristides,grc,Classical,perseus-greek:tlg0284.tlg051.perseus-grc2
+Πρεσβευτικὸς πρὸς Ἀχιλλέα,Aelius Aristides,grc,Classical,perseus-greek:tlg0284.tlg052.perseus-grc2
+Πρὸς Δημοσθένη περὶ ἀτελείας,Aelius Aristides,grc,Classical,perseus-greek:tlg0284.tlg053.perseus-grc2
+Πρὸς Λεπτίνην ὑπὲρ ἀτελείας,Aelius Aristides,grc,Classical,perseus-greek:tlg0284.tlg054.perseus-grc2
+Πανηγυρικὸς ἐπὶ τῷ ὕδατι ἐν Περγάμῳ,Aelius Aristides,grc,Classical,perseus-greek:tlg0284.tlg055.perseus-grc2
+Περὶ πολιτικοῦ λόγου,Aelius Aristides,grc,Classical,perseus-greek:tlg0284.tlg056.perseus-grc2
+Ἀλεξάνδρα,Lycophron,grc,Classical,perseus-greek:tlg0341.tlg002.perseus-grc2
+Τετράβιβλος,Claudius Ptolemy,grc,Classical,perseus-greek:tlg0363.tlg007.perseus-grc2
+Ῥωμαϊκὴ Ἱστορία (Books 36-55),Cassius Dio Cocceianus,grc,Classical,perseus-greek:tlg0385.tlg001.perseus-grc2
+Ἑλλάδος Περιηγήσεως,Pausanias,grc,Classical,perseus-greek:tlg0525.tlg001.perseus-grc2
+Ἰουδαϊκὴ ἀρχαιολογία,Flavius Josephus,grc,Classical,perseus-greek:tlg0526.tlg001.perseus-grc2
+Ἰωσήπου βίος,Flavius Josephus,grc,Classical,perseus-greek:tlg0526.tlg002.perseus-grc2
+περὶ ἀρχαιότητος Ἰουδαίων,Flavius Josephus,grc,Classical,perseus-greek:tlg0526.tlg003.perseus-grc2
+Ἰουδαϊκοῦ πολέμου πρὸς Ῥωμαίους,Flavius Josephus,grc,Classical,perseus-greek:tlg0526.tlg004.perseus-grc2
+τὰ κατὰ Λευκίππην καὶ Kλειτoφῶντα,Achilles Tatius,grc,Classical,perseus-greek:tlg0532.tlg001.perseus-grc2
+Ἐπιγράμματα,Callimachus,grc,Classical,perseus-greek:tlg0533.tlg003.perseus-grc2
+Ἐπιγράμματα,Callimachus,grc,Classical,perseus-greek:tlg0533.tlg004.perseus-grc2
+εἰς Δία,Callimachus,grc,Classical,perseus-greek:tlg0533.tlg015.perseus-grc3
+εἰς Δία,Callimachus,grc,Classical,perseus-greek:tlg0533.tlg015.perseus-grc4
+εἰς Απόλλωνα,Callimachus,grc,Classical,perseus-greek:tlg0533.tlg016.perseus-grc3
+εἰς Απόλλωνα,Callimachus,grc,Classical,perseus-greek:tlg0533.tlg016.perseus-grc4
+εἰς Ἄρτεμιν,Callimachus,grc,Classical,perseus-greek:tlg0533.tlg017.perseus-grc3
+εἰς Ἄρτεμιν,Callimachus,grc,Classical,perseus-greek:tlg0533.tlg017.perseus-grc4
+εἰς Δῆλον,Callimachus,grc,Classical,perseus-greek:tlg0533.tlg018.perseus-grc3
+εἰς Δῆλον,Callimachus,grc,Classical,perseus-greek:tlg0533.tlg018.perseus-grc4
+εἰς Λουτρά τῆς Παλλάδος,Callimachus,grc,Classical,perseus-greek:tlg0533.tlg019.perseus-grc3
+εἰς Λουτρά τῆς Παλλάδος,Callimachus,grc,Classical,perseus-greek:tlg0533.tlg019.perseus-grc4
+εἰς Δήμητρα,Callimachus,grc,Classical,perseus-greek:tlg0533.tlg020.perseus-grc3
+εἰς Δήμητρα,Callimachus,grc,Classical,perseus-greek:tlg0533.tlg020.perseus-grc4
+Ὑπὲρ τῆς δωδεκαετίας,Demades,grc,Classical,perseus-greek:tlg0535.tlg001.perseus-grc2
+ὑπὲρ τοῦ Ἐρατοσθένους φόνου ἀπολογία,Lysias,grc,Classical,perseus-greek:tlg0540.tlg001.perseus-grc2
+Ἐπιτάφιος τοῖς Κορινθίων βοηθοῖς,Lysias,grc,Classical,perseus-greek:tlg0540.tlg002.perseus-grc2
+πρὸς Σίμωνα ἀπολογία,Lysias,grc,Classical,perseus-greek:tlg0540.tlg003.perseus-grc2
+"περὶ τραύματος ἐκ προνοίας, ὑπὲρ οὗ καὶ πρὸς ὃν ἄδηλον",Lysias,grc,Classical,perseus-greek:tlg0540.tlg004.perseus-grc2
+ὑπὲρ Καλλίου ἱεροσυλίας ἀπολογία,Lysias,grc,Classical,perseus-greek:tlg0540.tlg005.perseus-grc2
+κατ᾽ Ἀνδοκίδου ἀσεβείας,Lysias,grc,Classical,perseus-greek:tlg0540.tlg006.perseus-grc2
+Ἀρεοπαγιτικὸς περὶ τοῦ σηκοῦ ἀπολογία,Lysias,grc,Classical,perseus-greek:tlg0540.tlg007.perseus-grc2
+κατηγορία πρὸς τοὺς συνουσιαστὰς κακολογιῶν,Lysias,grc,Classical,perseus-greek:tlg0540.tlg008.perseus-grc2
+ὑπὲρ τοῦ στρατιωτοῦ,Lysias,grc,Classical,perseus-greek:tlg0540.tlg009.perseus-grc2
+"κατὰ θεομνήστου, Α",Lysias,grc,Classical,perseus-greek:tlg0540.tlg010.perseus-grc2
+"κατὰ θεομν́ηστου, Β",Lysias,grc,Classical,perseus-greek:tlg0540.tlg011.perseus-grc2
+"κατὰ Ερατοσθένους τοῦ γενομένου τῶν τριάκοντα, ὃν αὐτὸς εἶπε Λυσίας",Lysias,grc,Classical,perseus-greek:tlg0540.tlg012.perseus-grc2
+κατὰ Ἀγοράτου ἐνδείξεως,Lysias,grc,Classical,perseus-greek:tlg0540.tlg013.perseus-grc2
+κατὰ Ἀλκιβιάδου λιποταξίου,Lysias,grc,Classical,perseus-greek:tlg0540.tlg014.perseus-grc2
+κατὰ Ἀλκιβιάδου ἀστρατείας,Lysias,grc,Classical,perseus-greek:tlg0540.tlg015.perseus-grc2
+ἐν βουλῇ Μαντιθέῳ δοκιμαζομένῳ ἀπολογία,Lysias,grc,Classical,perseus-greek:tlg0540.tlg016.perseus-grc2
+περὶ τῶν Ἐράτωνος χρημάτων: πρὸς τὸ δημόσιον,Lysias,grc,Classical,perseus-greek:tlg0540.tlg017.perseus-grc2
+περὶ τῆς δημεύσεως τῶν τοῦ Νικίου ἀδέλφου ἐπίλογος,Lysias,grc,Classical,perseus-greek:tlg0540.tlg018.perseus-grc2
+"ὑπὲρ τῶν Ἀριστοφάνους χρημάτων, πρὸς τὸ δημόσιον",Lysias,grc,Classical,perseus-greek:tlg0540.tlg019.perseus-grc2
+ὑπὲρ Πολυστράτου,Lysias,grc,Classical,perseus-greek:tlg0540.tlg020.perseus-grc2
+ἀπολογία δωροδοκίας ἀπαράσημος,Lysias,grc,Classical,perseus-greek:tlg0540.tlg021.perseus-grc2
+κατὰ τῶν σιτοπωλῶν,Lysias,grc,Classical,perseus-greek:tlg0540.tlg022.perseus-grc2
+κατὰ Παγκλέωνος ὅτι οὐκ ἦν Πλαταιεύς,Lysias,grc,Classical,perseus-greek:tlg0540.tlg023.perseus-grc2
+Πρὸς τὴν εἰσαγγελίαν περὶ τοῦ μὴ δίδοσθαι τῷ ἀδυνάτῳ ἀργύριον,Lysias,grc,Classical,perseus-greek:tlg0540.tlg024.perseus-grc2
+δήμου καταλύσεως ἀπολογία,Lysias,grc,Classical,perseus-greek:tlg0540.tlg025.perseus-grc2
+περὶ τῆς Εὐάνδρου δοκιμασίας,Lysias,grc,Classical,perseus-greek:tlg0540.tlg026.perseus-grc2
+κατὰ Ἐπικράτους καὶ τῶν συμπρεσβευτῶν ἐπίλογος ὡς Θεόδωρος,Lysias,grc,Classical,perseus-greek:tlg0540.tlg027.perseus-grc2
+κατὰ Ἐργοκλέους ἐπίλογος,Lysias,grc,Classical,perseus-greek:tlg0540.tlg028.perseus-grc2
+κατὰ Φιλοκράτους ἐπίλογος,Lysias,grc,Classical,perseus-greek:tlg0540.tlg029.perseus-grc2
+κατὰ Νικομάχου γραμματέως εὐθυνῶν κατηγορία,Lysias,grc,Classical,perseus-greek:tlg0540.tlg030.perseus-grc2
+κατὰ Φίλωνος δοκιμασίας,Lysias,grc,Classical,perseus-greek:tlg0540.tlg031.perseus-grc2
+κατὰ Διογείτονος,Lysias,grc,Classical,perseus-greek:tlg0540.tlg032.perseus-grc2
+Ολυμπιακός,Lysias,grc,Classical,perseus-greek:tlg0540.tlg033.perseus-grc2
+περὶ τοῦ μὴ καταλῦσαι τὴν πάτριον πολιτείαν Αθήνησι,Lysias,grc,Classical,perseus-greek:tlg0540.tlg034.perseus-grc2
+Ἱστορίαι,Polybius,grc,Classical,perseus-greek:tlg0543.tlg001.perseus-grc2
+Περὶ ζῴων ἰδιότητος,Aelian,grc,Classical,perseus-greek:tlg0545.tlg001.perseus-grc2
+Ποικίλη ἱστορία,Aelian,grc,Classical,perseus-greek:tlg0545.tlg002.perseus-grc2
+ἐκ τῶν Αἰλιανοῦ ἀγροικικῶν ἐπιστολῶν,Aelian,grc,Classical,perseus-greek:tlg0545.tlg003.perseus-grc2
+Βιβλιοθήκη,Apollodorus,grc,Classical,perseus-greek:tlg0548.tlg001.perseus-grc2
+Ἐπιτομὴ,Apollodorus,grc,Classical,perseus-greek:tlg0548.tlg002.perseus-grc2
+ἐκ τῆς βασιλικῆς,Appian of Alexandria,grc,Classical,perseus-greek:tlg0551.tlg002.perseus-grc2
+ἐκ τῆς Ἰταλικῆς,Appian of Alexandria,grc,Classical,perseus-greek:tlg0551.tlg003.perseus-grc2
+ἐκ τῆς Σαυνιτικῆς,Appian of Alexandria,grc,Classical,perseus-greek:tlg0551.tlg004.perseus-grc2
+ἐκ τῆς Κελτῖκης,Appian of Alexandria,grc,Classical,perseus-greek:tlg0551.tlg005.perseus-grc2
+ἐκ τῆς Σικελῖκης καὶ νησιωτικής,Appian of Alexandria,grc,Classical,perseus-greek:tlg0551.tlg006.perseus-grc2
+Ἰβηρική,Appian of Alexandria,grc,Classical,perseus-greek:tlg0551.tlg007.perseus-grc2
+Ἀννιβαϊκή,Appian of Alexandria,grc,Classical,perseus-greek:tlg0551.tlg008.perseus-grc2
+Λιβυκή,Appian of Alexandria,grc,Classical,perseus-greek:tlg0551.tlg009.perseus-grc2
+ἐκ τῆς Νομαδικῆς,Appian of Alexandria,grc,Classical,perseus-greek:tlg0551.tlg010.perseus-grc2
+ἐκ τῆς Μακεδονικῆς,Appian of Alexandria,grc,Classical,perseus-greek:tlg0551.tlg011.perseus-grc2
+Ἰλλυρική,Appian of Alexandria,grc,Classical,perseus-greek:tlg0551.tlg012.perseus-grc2
+Συριακή,Appian of Alexandria,grc,Classical,perseus-greek:tlg0551.tlg013.perseus-grc2
+Μιθριδάτειος,Appian of Alexandria,grc,Classical,perseus-greek:tlg0551.tlg014.perseus-grc2
+Ἐμφυλίων Πρώτη,Appian of Alexandria,grc,Classical,perseus-greek:tlg0551.tlg017.perseus-grc2
+De Chaerea et Callirhoe,Chariton,grc,Classical,perseus-greek:tlg0554.tlg001.perseus-grc1
+Προτρεπτικὸς πρὸς Ἕλληνας,Clement of Alexandria,grc,Classical,perseus-greek:tlg0555.tlg001.perseus-grc2
+Στρώματα,Clement of Alexandria,grc,Classical,perseus-greek:tlg0555.tlg004.perseus-grc2
+τίς ὁ σωζόμενος πλούσιος,Clement of Alexandria,grc,Classical,perseus-greek:tlg0555.tlg006.perseus-grc2
+ὁ Προτρεπτικὸς εἰς ὑπομονὴν ἢ πρὸς τοὺς νεωστὶ βεβαπτισμένους,Clement of Alexandria,grc,Classical,perseus-greek:tlg0555.tlg008.perseus-grc2
+Τέχνη τακτική,Asclepiodotus,grc,Classical,perseus-greek:tlg0556.tlg001.perseus-grc2
+Ἀρριανοῦ τῶν Ἐπικτήτου Διατριβῶν,Epictetus,grc,Classical,perseus-greek:tlg0557.tlg001.perseus-grc2
+Ἐγχειρίδιον,Epictetus,grc,Classical,perseus-greek:tlg0557.tlg002.perseus-grc2
+"Dissertationum Epictetearum sive ab Arriano sive ab aliis
+                    digestarum fragmenta",Epictetus,grc,Classical,perseus-greek:tlg0557.tlg003.perseus-grc2
+Gnomologium Epicteteum (e Stobaei libris 1-2),Epictetus,grc,Classical,perseus-greek:tlg0557.tlg004.perseus-grc2
+Gnomologium Epicteteum (e Stobaei libris 3-4),Epictetus,grc,Classical,perseus-greek:tlg0557.tlg005.perseus-grc2
+Περὶ ὕψους,Longinus,grc,Classical,perseus-greek:tlg0560.tlg001.perseus-grc2
+Δάφνις καὶ Χλόη,Longus,grc,Classical,perseus-greek:tlg0561.tlg001.perseus-grc2
+Ad Se Ipsum,Marcus Aurelius,grc,Classical,perseus-greek:tlg0562.tlg001.perseus-grc2
+Orationes,Dio Chrysostom,grc,Classical,perseus-greek:tlg0612.tlg001.perseus-grc2
+Περὶ ἑρμηνείας,Demetrius of Phaleron,grc,Classical,perseus-greek:tlg0613.tlg001.perseus-grc2
+Περὶ ἀρχαίας ἰατρικῆς,Hippocrates,grc,Classical,perseus-greek:tlg0627.tlg001.perseus-grc2
+"Περὶ ἀέρων, ὑδάτων, τόπων",Hippocrates,grc,Classical,perseus-greek:tlg0627.tlg002.perseus-grc2
+Προγνωστικόν,Hippocrates,grc,Classical,perseus-greek:tlg0627.tlg003.perseus-grc2
+Περὶ διαίτης ὀξέων,Hippocrates,grc,Classical,perseus-greek:tlg0627.tlg004.perseus-grc2
+Περὶ διαίτης ὀξέων. Νόθα,Hippocrates,grc,Classical,perseus-greek:tlg0627.tlg005.perseus-grc2
+Ἐπιδημίων,Hippocrates,grc,Classical,perseus-greek:tlg0627.tlg006.perseus-grc2
+Περὶ τῶν ἐν κεφαλῇ τρωμάτων,Hippocrates,grc,Classical,perseus-greek:tlg0627.tlg007.perseus-grc2
+Κατ’ ἰητρεῖον,Hippocrates,grc,Classical,perseus-greek:tlg0627.tlg008.perseus-grc2
+Περὶ ἀγμῶν,Hippocrates,grc,Classical,perseus-greek:tlg0627.tlg009.perseus-grc2
+Περὶ ἄρθρων,Hippocrates,grc,Classical,perseus-greek:tlg0627.tlg010.perseus-grc2
+Μοχλικός,Hippocrates,grc,Classical,perseus-greek:tlg0627.tlg011.perseus-grc2
+Ἀφορισμοί,Hippocrates,grc,Classical,perseus-greek:tlg0627.tlg012.perseus-grc2
+Ὅρκος,Hippocrates,grc,Classical,perseus-greek:tlg0627.tlg013.perseus-grc2
+Περὶ ἱερῆς νούσου,Hippocrates,grc,Classical,perseus-greek:tlg0627.tlg027.perseus-grc2
+Περὶ ἑλκῶν,Hippocrates,grc,Classical,perseus-greek:tlg0627.tlg028.perseus-grc2
+Περὶ αἱμοῤῥοίδων,Hippocrates,grc,Classical,perseus-greek:tlg0627.tlg029.perseus-grc2
+Περὶ συρίγγων,Hippocrates,grc,Classical,perseus-greek:tlg0627.tlg030.perseus-grc2
+Περὶ τροφῆς,Hippocrates,grc,Classical,perseus-greek:tlg0627.tlg046.perseus-grc2
+Παραγγελίαι,Hippocrates,grc,Classical,perseus-greek:tlg0627.tlg051.perseus-grc2
+Τὰ ἐς τὸν Τυανέα Ἀπολλώνιον,Philostratus the Athenian,grc,Classical,perseus-greek:tlg0638.tlg001.perseus-grc2
+Βίοι Σοφιστῶν,Philostratus the Athenian,grc,Classical,perseus-greek:tlg0638.tlg003.perseus-grc2
+Ἡρωικός,Philostratus the Athenian,grc,Classical,perseus-greek:tlg0638.tlg004.perseus-grc2
+Νέρων,Philostratus the Athenian,grc,Classical,perseus-greek:tlg0638.tlg005.perseus-grc2
+Ἐπιστολαί. Διαλέξεις.,Philostratus the Athenian,grc,Classical,perseus-greek:tlg0638.tlg006.perseus-grc2
+Γυμναστικός,Philostratus the Athenian,grc,Classical,perseus-greek:tlg0638.tlg007.perseus-grc2
+Τὰ κατὰ Ἀνθίαν καὶ Ἁβροκόμην,Xenophon of Ephesus,grc,Classical,perseus-greek:tlg0641.tlg001.perseus-grc2
+Ἅλωσις Ἰλίου,Tryphiodorus,grc,Classical,perseus-greek:tlg0647.tlg001.perseus-grc2
+Στρατηγικός,Onasander,grc,Classical,perseus-greek:tlg0648.tlg001.perseus-grc2
+Εἰκόνες,Philostratus Minor,grc,Classical,perseus-greek:tlg0652.tlg001.perseus-grc2
+Φαινόμενα,Aratus Solensis,grc,Classical,perseus-greek:tlg0653.tlg001.perseus-grc2
+Ἐρωτικὰ Παθήματα,Parthenius,grc,Classical,perseus-greek:tlg0655.tlg001.perseus-grc2
+Περὶ αἰτίων καὶ σημείων ὀξέων παθών,Aretaeus of Cappadocia,grc,Classical,perseus-greek:tlg0719.tlg001.perseus-grc2
+Περὶ αἰτίων καὶ σημείων χρονίων παθῶν,Aretaeus of Cappadocia,grc,Classical,perseus-greek:tlg0719.tlg002.perseus-grc2
+Ὀξέων νούσων θεραπευτικόν,Aretaeus of Cappadocia,grc,Classical,perseus-greek:tlg0719.tlg003.perseus-grc2
+Χρονίων νούσων θεραπευτικών,Aretaeus of Cappadocia,grc,Classical,perseus-greek:tlg0719.tlg004.perseus-grc2
+Βαρνάβα ἐπιστολή,Barnabas,grc,Classical,perseus-greek:tlg1216.tlg001.perseus-grc2
+Lexicon in decem oratores Atticos,"Harpocration, Valerius",grc,Classical,perseus-greek:tlg1389.tlg001.perseus-grc2
+Εἰκόνες,Philostratus Sophista,grc,Classical,perseus-greek:tlg1600.tlg001.perseus-grc2
+Στοιχεῖα,Euclid,grc,Classical,perseus-greek:tlg1799.tlg001.perseus-grc2
+Ἐγκώμιον εἰς τὸν αὐτοκράτορα Κωνστάντιον,Julian the Emperor,grc,Classical,perseus-greek:tlg2003.tlg001.perseus-grc2
+Εὐσεβίας τῆς βασιλίδος ἐγκώμιον,Julian the Emperor,grc,Classical,perseus-greek:tlg2003.tlg002.perseus-grc2
+Περὶ τῶν τοῦ αὐτοκράτορος πράξεων ἢ περὶ βασιλείας,Julian the Emperor,grc,Classical,perseus-greek:tlg2003.tlg003.perseus-grc2
+Ἐπὶ τῇ ἐξόδῳ τοῦ ἀγαθωτάτου Σαλουστίου παραμυθητικὸς εἰς ἑαυτόν,Julian the Emperor,grc,Classical,perseus-greek:tlg2003.tlg004.perseus-grc2
+Ἀθηναίων τῇ βουλῇ καὶ τῷ δήμῳ,Julian the Emperor,grc,Classical,perseus-greek:tlg2003.tlg005.perseus-grc2
+Θεμιστίῳ φιλοσόφῳ,Julian the Emperor,grc,Classical,perseus-greek:tlg2003.tlg006.perseus-grc2
+Πρὸς Ἡράκλειον κυνικὸν περὶ τοῦ πῶς κυνιστέον καὶ εἰ πρέπει τῷ κυνὶ μύθους πλάττειν,Julian the Emperor,grc,Classical,perseus-greek:tlg2003.tlg007.perseus-grc2
+Εἰς τὴν μητέρα τῶν θεῶν,Julian the Emperor,grc,Classical,perseus-greek:tlg2003.tlg008.perseus-grc2
+Εἰς τοὺς ἀπαιδεύτους κύνας,Julian the Emperor,grc,Classical,perseus-greek:tlg2003.tlg009.perseus-grc2
+Συμπόσιον ἢ Κρόνια,Julian the Emperor,grc,Classical,perseus-greek:tlg2003.tlg010.perseus-grc2
+Εἰς τὸν βασιλέα Ἥλιον πρὸς Σαλούστιον,Julian the Emperor,grc,Classical,perseus-greek:tlg2003.tlg011.perseus-grc2
+Μισοπώγων,Julian the Emperor,grc,Classical,perseus-greek:tlg2003.tlg012.perseus-grc2
+Epistulae,Julian the Emperor,grc,Classical,perseus-greek:tlg2003.tlg013.perseus-grc2
+Κατὰ Γαλιλαίων,Julian the Emperor,grc,Classical,perseus-greek:tlg2003.tlg017.perseus-grc2
+Ἐκκλησιαστικὴ ἱστορία,Eusebius of Caesarea,grc,Classical,perseus-greek:tlg2018.tlg002.perseus-grc2
+"Πρὸς τοὺς νέους, ὅπως ἂν ἐξ Ἑλληνικῶν ὠφελοῖντο λόγων","Basil, Saint, Bishop of Caesarea",grc,Classical,perseus-greek:tlg2040.tlg002.perseus-grc2
+Epistulae,"Basil, Saint, Bishop of Caesarea",grc,Classical,perseus-greek:tlg2040.tlg004.perseus-grc2
+Διονυσιακά,Nonnus of Panopolis,grc,Classical,perseus-greek:tlg2045.tlg001.perseus-grc2
+τὰ μεθ᾿ Ὅμηρον,Quintus Smyrnaeus,grc,Classical,perseus-greek:tlg2046.tlg001.perseus-grc2
+Βαρλαάμ καί Ἰωάσαφ,John of Damascus,grc,Classical,perseus-greek:tlg2934.tlg066.perseus-grc2
+Ἐπιτομὴ Ἱστοριῶν (Vol. 1),Joannes Zonaras,grc,Classical,perseus-greek:tlg3135.tlg001.opp-grc3
+Ὑπὲρ τῶν Πολέμων Λόγοι,Procopius,grc,Classical,perseus-greek:tlg4029.tlg001.perseus-grc2
+Ἀπόκρυφη Ἱστορία,Procopius,grc,Classical,perseus-greek:tlg4029.tlg002.perseus-grc2
+Chrestomathy,Proclus,grc,Classical,perseus-greek:tlg4036.tlg023.cypria-grc1
+Ἁρπαγὴ Ἑλένης,Colluthus,grc,Classical,perseus-greek:tlg4081.tlg001.perseus-grc2
+Ἐκφράσεις,Callistratus,grc,Classical,perseus-greek:tlg4091.tlg001.perseus-grc2
+"Ἀνθολογία, Volume V",Anonymous,grc,Classical,perseus-greek:tlg7000.tlg001.perseus-grc10
+"Ἀνθολογία, Volume I",Anonymous,grc,Classical,perseus-greek:tlg7000.tlg001.perseus-grc6
+"Ἀνθολογία, Volume II",Anonymous,grc,Classical,perseus-greek:tlg7000.tlg001.perseus-grc7
+"Ἀνθολογία, Volume III",Anonymous,grc,Classical,perseus-greek:tlg7000.tlg001.perseus-grc8
+"Ἀνθολογία, Volume IV",Anonymous,grc,Classical,perseus-greek:tlg7000.tlg001.perseus-grc9

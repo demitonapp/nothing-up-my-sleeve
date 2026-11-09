@@ -13,34 +13,15 @@ import { btnCls, cardCls, crumbCls, emptyCls, fieldCls, rangeCls, selectCls, tab
 <div class="section" id="rung">
   <h1><a class={crumbCls('back')} href="#/harbours">← harbours</a> <span id="rungtitle"></span> <span class="q" id="rungjob"></span></h1>
   <nav class={tabsCls('line', 'subnav')} data-orientation="horizontal" data-variant="line" id="modelnav">
-    <a class={tabCls('')} data-state="inactive" data-mtab="overview">Overview</a><a class={tabCls('')} data-state="inactive" data-mtab="fleet">Fleet</a><a class={tabCls('')} data-state="inactive" data-mtab="goals">Goals</a><a class={tabCls('')} data-state="inactive" data-mtab="training">Training</a><a class={tabCls('')} data-state="inactive" data-mtab="scoring">Scoring</a><a class={tabCls('')} data-state="inactive" data-mtab="waypoints">Waypoints</a><a class={tabCls('')} data-state="inactive" data-mtab="fitouts">Fitouts</a><a class={tabCls('')} data-state="inactive" data-mtab="bet">Bet</a>
+    <a class={tabCls('')} data-state="inactive" data-mtab="overview">Overview</a><a class={tabCls('')} data-state="inactive" data-mtab="goals">Goals</a><a class={tabCls('')} data-state="inactive" data-mtab="training">Training</a><a class={tabCls('')} data-state="inactive" data-mtab="scoring">Scoring</a><a class={tabCls('')} data-state="inactive" data-mtab="waypoints">Waypoints</a><a class={tabCls('')} data-state="inactive" data-mtab="fitouts">Fitouts</a><a class={tabCls('')} data-state="inactive" data-mtab="bet">Bet</a>
   </nav>
 
   <!-- ============================== Fleet: the ships of this size -->
-  <div class="mtab" data-mtab="fleet">
-    <section class={cardCls(false, 'panel')}>
-      <h2>The fleet <span class="note">every ship of this size: a ship is the size fitted out one way (its training material and settings), and its voyages are its runs, one per seed; open one to see it sail</span></h2>
-      <div class="scroll"><table id="fleettable" class="clickable"><thead><tr><th>ship</th><th>fitout</th><th>voyages</th><th>expedition</th><th>status</th>
-        <th>Forgotten Tomes (mean)</th><th>best</th><th>last sailed</th></tr></thead><tbody></tbody></table></div>
-      <details class="archive" id="fleetarchivewrap"><summary>The First Fleet <span class="note" id="fleetarchivesum"></span></summary>
-        <div class="scroll"><table id="fleetarchive" class="clickable"><thead><tr><th>ship</th><th>fitout</th><th>voyages</th><th>expedition</th><th>status</th>
-          <th>Forgotten Tomes (mean)</th><th>best</th><th>last sailed</th></tr></thead><tbody></tbody></table></div></details>
-      <details class="archive" id="fleetretiredwrap"><summary>Retired ships <span class="note" id="fleetretiredsum"></span></summary>
-        <div class="scroll"><table id="fleetretired" class="clickable"><thead><tr><th>ship</th><th>fitout</th><th>voyages</th><th>expedition</th><th>status</th>
-          <th>Forgotten Tomes (mean)</th><th>best</th><th>last sailed</th></tr></thead><tbody></tbody></table></div></details>
-    </section>
-  </div>
-
-  <!-- ============================== Goals: this size on the route to quantum physics -->
   <div class="mtab" data-mtab="goals">
     <section class={cardCls(false, 'panel')}><div class="rungover" id="goalsover"></div></section>
     <section class={cardCls(false, 'panel')}>
       <h2>Filling the seven steps <span class="note">the goal: as many tricks as this ship can learn, building on everything below it, so the route fills as fast as it can. Green is performed by this size, outlined is inherited from a smaller size (carried up, still to show here), grey is open</span></h2>
       <div class="coverage" id="goalcoverage"></div>
-    </section>
-    <section class={cardCls(false, 'panel')}>
-      <h2>On the route to quantum physics <span class="note">the seven waypoints, bottom to top; the tricks the field expects of this size are lit, those it carries up from smaller sizes are marked, and those the field expects only of bigger sizes are faded: still worth taking. ◆ is a gate: performed before a ship moves on to the next waypoint. Open a trick for its stars and progress</span></h2>
-      <div class="goalroute" id="goalroute"></div>
     </section>
     <section class={cardCls(false, 'panel')}>
       <h2>What the field expects of this size <span class="note">the minimum, not the limit: the tricks the field would expect a ship this size to reach, and how its voyages are doing on each; every trick above them is worth taking too. Sort by any column, filter by step</span></h2>
@@ -51,14 +32,11 @@ import { btnCls, cardCls, crumbCls, emptyCls, fieldCls, rangeCls, selectCls, tab
 
   <!-- ============================== Overview -->
   <div class="mtab" data-mtab="overview">
-    <section class={cardCls(false, 'panel')} id="deckpanel">
-      <h2>The deck at this size <span class="note">two decks, chosen below: <b>the 16 cards</b> (thorp/viable/s5_policy/deck.py), each read across this size's voyages, every fitout, with its Ogden voyages apart: how many played it under the deck's rules (a Stage 1 above its Basic, a Face traded in), when it first came (the median tokens read), in which layer, and the best its reading has reached against its mark (rarity is this size's); and <b>the logic deck</b> (lists/tricks/logic-40.csv), the chaining gain on its five relations against the reference models</span></h2>
-      <div id="deckclass" class="deckclass"><div class={emptyCls()}>reading the deck…</div></div>
+    <section class={cardCls(false, 'panel')} id="sopsummarypanel">
+      <h2>The SOP run, and what it means <span class="note">this ship's newest voyage: the standard it was built to, its scores, and what those numbers say about that standard — a reading, not a verdict on the ship alone</span></h2>
+      <div id="sopsummary"><div class={emptyCls()}>reading the voyage…</div></div>
     </section>
-    <section class={cardCls(false, 'panel')} id="cardstrippanel">
-      <h2>The four cards <span class="note">what a model must hold before it can chain (every model that chains holds all four): each card's best reading by a voyage of this size against its mark, held when a voyage ended lit, touched when one only passed it; beside them, whether it chains cause and effect</span></h2>
-      <div id="cardstrip" class="cardstrip"><div class={emptyCls()}>reading the cards…</div></div>
-    </section>
+    
     <section class={cardCls(false, 'panel')} id="gridpanel">
       <h2>Every voyage at this size <span class="note">one square per voyage in the order they started; the brighter the green, the better (lower) its Forgotten Tomes bits per byte, by quartile of the voyages scored so far; an outlined square is running</span></h2>
       <div id="rungridsum" class="gridsum"></div>
@@ -72,6 +50,13 @@ import { btnCls, cardCls, crumbCls, emptyCls, fieldCls, rangeCls, selectCls, tab
 
   <!-- ============================== Training -->
   <div class="mtab" data-mtab="training">
+    <section class={cardCls(false, 'panel')}>
+      <h2>The star chart, against Qwen3 4B <span class="note">the ten points of the chart, each reading divided by its own mark: Qwen3 4B (which chains) against this ship's newest voyage, read live while it trains. Above the dotted line a point clears its mark; the gap between the lines is how far the ship is behind on that point, and where its line is above, it is ahead</span></h2>
+      <div class="chart" id="sizejourney"></div>
+    </section>
+    <section class={cardCls(false, 'panel')}>
+      <div class="handtools" style="border:0;padding:0;margin:0"><label class="note" for="soppick">SOP version</label><select class={selectCls('')} id="soppick" data-remember></select><span class="note" id="sopnote">every run, chart and reading below is built to this version (or to all of them)</span></div>
+    </section>
     <section class={cardCls(false, 'panel')} id="watchpanel">
       <h2>Watch it train <span class="note">this size's voyage at sea (else its latest home), read every 30 seconds: where it is in its stages and passes, the cards it has drawn and when, and the readings that matter, by tokens read</span></h2>
       <div id="watchhead" class="watchhead"><div class={emptyCls()}>looking for a voyage…</div></div>
@@ -88,23 +73,22 @@ import { btnCls, cardCls, crumbCls, emptyCls, fieldCls, rangeCls, selectCls, tab
     </section>
     <section class={cardCls(false, 'panel')}><div class="rungover" id="rungover"></div></section>
     <section class={cardCls(false, 'panel')}>
-      <h2>The voyages <span class="note">each voyage's library, passes and settings, and how far it got <b class="recentnote"></b></span></h2>
-      <div class="scroll"><table id="trainruns" class="clickable"><thead><tr><th>ship</th><th>name</th><th>status</th><th>library</th><th>passes</th><th>seed</th>
-        <th>vocab</th><th>context</th><th>tokens seen</th><th>minutes</th><th>started</th></tr></thead><tbody></tbody></table></div>
-    </section>
-    <section class={cardCls(false, 'panel')}>
       <h2>Training loss <span class="note">nats per token on the training library, the latest 12 voyages at this size</span></h2>
       <div class="chart" id="losschart"></div>
-    </section>
-    <section class={cardCls(false, 'panel')}>
-      <h2>The training libraries <span class="note">every book a voyage read; click one to read it, the same stripped text Thorp trains on</span></h2>
-      <div class="booktabs"><select class={selectCls('')} id="shelfpick" title="the voyage whose library is shown"></select><input class={fieldCls('')} id="bookfilter" placeholder="filter by title or family"></div>
-      <div class="scroll bookswrap"><table id="shelftable" class="clickable"><thead></thead><tbody></tbody></table></div>
     </section>
   </div>
 
   <!-- ============================== Scoring -->
   <div class="mtab" data-mtab="scoring">
+    <section class={cardCls(false, 'panel')} id="cardstrippanel">
+      <h2>The four cards <span class="note">what a model must hold before it can chain (every model that chains holds all four): each card's best reading by a voyage of this size against its mark, held when a voyage ended lit, touched when one only passed it; beside them, whether it chains cause and effect</span></h2>
+      <div id="cardstrip" class="cardstrip"><div class={emptyCls()}>reading the cards…</div></div>
+    </section>
+    <section class={cardCls(false, 'panel')}>
+      <h2>On the route to quantum physics <span class="note">the seven waypoints, bottom to top; the tricks the field expects of this size are lit, those it carries up from smaller sizes are marked, and those the field expects only of bigger sizes are faded: still worth taking. ◆ is a gate: performed before a ship moves on to the next waypoint. Open a trick for its stars and progress</span></h2>
+      <div class="goalroute" id="goalroute"></div>
+    </section>
+
     <nav class={tabsCls('line', 'subnav')} data-orientation="horizontal" data-variant="line" id="scnav"><a class={tabCls('')} data-state="inactive" data-ssub="maths">Maths</a><a class={tabCls('')} data-state="inactive" data-ssub="ask">Ask</a><a class={tabCls('')} data-state="inactive" data-ssub="language">Language</a><a class={tabCls('')} data-state="inactive" data-ssub="shapes">Shapes</a><a class={tabCls('')} data-state="inactive" data-ssub="number">Number</a><a class={tabCls('')} data-state="inactive" data-ssub="physics">Physics</a><a class={tabCls('')} data-state="inactive" data-ssub="life">Life</a><a class={tabCls('')} data-state="inactive" data-ssub="return">Return</a><a class={tabCls('')} data-state="inactive" data-ssub="logic">Logic</a><a class={tabCls('')} data-state="inactive" data-ssub="versus">Versus</a></nav>
     <div class="ssub" data-ssub="ask">
     <section class={cardCls(false, 'panel')} id="askpanel">
@@ -130,6 +114,7 @@ import { btnCls, cardCls, crumbCls, emptyCls, fieldCls, rangeCls, selectCls, tab
     <section class={cardCls(false, 'panel')} id="mathspanel">
       <h2>The maths book <span class="note">nine chapters after Augustus De Morgan's <i>Elements of Arithmetic</i>, his sections in his order, eight sums each in plain words ("Two and three make"); each chapter opens its section of the book in the reader; each sum's answer against its rival, the answer of the mistake a learner makes at that chapter. A sum is right when the answer is among the ship's ten guesses and above the rival; a chapter is learnt at six of eight; the ship has learnt the book up to the first chapter it has not</span></h2>
       <div class="askrow">
+        <select class={selectCls()} id="mathssop" aria-label="the SOP version to read the book from" title="the SOP version: only voyages built to it are offered"></select>
         <select class={selectCls()} id="mathsvoyage" aria-label="the voyage to read the book with"></select>
         <button class={btnCls('default')} id="mathsrun" type="button">Read the book</button>
       </div>

@@ -1,6 +1,7 @@
 // The dashboard: tabs, the run picker, every panel, refreshed every 5 s from the JSON API in
 // server.py. Shared pieces live in ../lib (formatters, charts, DataTable, the reader).
 import { Plotly, tok, C, PALETTE, layout, cfg, empty, plot } from '../lib/charts.js';
+import { guarded, starChart } from '../lib/panel.js';
 import { fmt, big, fmtBytes, esc, get, log10, mean } from '../lib/format.js';
 import { DataTable } from '../lib/datatable.js';
 import { pillCls, crumbCls, btnCls, fieldCls, selectCls, rangeCls, checkCls, cardCls, emptyCls, toggleCls, alertCls, hoverCardCls, tooltipCls, setTab, confirmDialog } from '../lib/ui';
@@ -43,13 +44,13 @@ const MTABS = ['overview', 'fleet', 'goals', 'training', 'scoring', 'waypoints',
 const STABS = ['betting', 'books', 'languages', 'sieves', 'attention', 'traits'];
 const STAB_EL = { betting: 'betting', books: 'books', languages: 'languages', sieves: 'sieves', attention: 'attention', traits: 'traits-section' };
 const OLD_SHIP = { betting: 'betting', books: 'books', languages: 'languages', sieves: 'sieves', attention: 'attention', 'traits-section': 'traits' };
-const SECTION_NAV = { sizes: 'ships', rung: 'ships', ship: 'ships', 'runs-section': 'ships', voyages: 'expeditions', voyage: 'expeditions', table: 'expeditions', discoveries: 'discoveries', sievesguide: 'sieves', leaderboard: 'leaderboard', competitor: 'leaderboard', lab: 'leaderboard', governance: 'governance', bet: 'bet', shelves: 'library' };
+const SECTION_NAV = { sizes: 'ships', rung: 'ships', ship: 'ships', 'runs-section': 'ships', foreign: 'ships', voyages: 'expeditions', voyage: 'expeditions', table: 'expeditions', discoveries: 'discoveries', sievesguide: 'sieves', leaderboard: 'leaderboard', competitor: 'leaderboard', lab: 'leaderboard', governance: 'governance', bet: 'bet', shelves: 'library' };
 let discView = 'index', discTrick = null, discChain = null, discSub = 'two-facts';
 // an expedition page's tabs (UI.md, "Expeditions"): the same five for every expedition; one that doesn't apply is hidden
 const ETABS = ['overview', 'at-sea', 'findings', 'fleet', 'inside'];
 let expTab = 'overview';
 // the Discoveries subtabs: the trick in focus (chaining two facts), the road to quantum mechanics, the registry of every trick
-const DSUBS = ['two-facts', 'quantum', 'registry', 'stars'];
+const DSUBS = ['two-facts', 'quantum', 'registry', 'stars', 'cards'];
 // the leaderboard and the shelves (their code is at the end; declared here, as the first route may reach them)
 let labKey = null, labDataKey = null, cpModel = null, cpThorp = null, cpKey = null, cpStarsAsked = false, lbData = null, lbKey = null, shelvesData = null, shelfOpen = null, shelvesKey = null;
 const shelfBooks = new Map();
@@ -57,21 +58,23 @@ let vTab = 'expeditions', qView = 'glance';
 // Governance's tabs (UI.md, "Governance"): the five systems, S3 control built out, acquisition one level down
 const GVIEWS = ['control', 'acquisition'];
 let govView = 'systems';
-let page = 'sizes', modelTab = 'overview', shipKey = null, sailingKey = null, shipTab = 'betting', voyageKey = null, runsList = null, shipsData = null;
+let page = 'sizes', modelTab = 'overview', shipKey = null, sailingKey = null, shipTab = 'betting', voyageKey = null, runsList = null, shipsData = null, foreignKey = null;
 function route(h) {
   if (h.startsWith('/')) {
     const [a, b, c] = h.slice(1).split('/');
     if ((a === 'sizes' || a === 'classes') && b) { const d = h.slice(1).split('/')[3]; return { page: 'rung', rung: b, mtab: MTABS.includes(c) ? c : 'overview', wsub: WSUBS.includes(d) ? d : 'expected', ssub: SSUBS.includes(d) ? d : 'maths', osub: c === 'overview' && OSUBS.includes(d) ? d : null }; }
     if (a === 'models' && b) return { page: 'rung', rung: b, mtab: MTABS.includes(c) ? c : 'overview' };
+    if (a === 'foreign' && b) return { page: 'foreign', foreign: decodeURIComponent(b) };
     if (a === 'ships' && b === 'all') return { page: 'runs-section' };
     if (a === 'ships' && b) {
       const d = h.slice(1).split('/')[3];
       if (STABS.includes(c)) return { page: 'ship', ship: decodeURIComponent(b), sailing: null, stab: c };
       return { page: 'ship', ship: decodeURIComponent(b), sailing: c ? decodeURIComponent(c) : null, stab: STABS.includes(d) ? d : 'betting' };
     }
-    if (a === 'harbours' || a === 'harbors') return { page: 'sizes', harbour: b ? decodeURIComponent(b) : null };
+    if (a === 'harbours' || a === 'harbors') return { page: 'sizes', harbour: b ? decodeURIComponent(b) : null, hsub: c === 'shipbuilder' || c === 'ships' ? c : null };
     if (a === 'ships' || a === 'classes' || a === 'sizes') return { page: 'sizes' };
     if ((a === 'voyages' || a === 'expeditions') && b === 'queue') return { page: 'voyages', vtab: 'queue', qview: c === 'every' ? 'every' : 'glance' };
+    if (a === 'voyages' || a === 'expeditions') return { page: 'voyages', vtab: b === 'expeditions' ? 'expeditions' : 'queue', qview: c === 'every' ? 'every' : 'glance' };  // the queue is the landing view (9 November)
     if ((a === 'voyages' || a === 'expeditions') && b && c === 'table') return { page: 'table', voyage: b };
     if ((a === 'voyages' || a === 'expeditions') && b) return { page: 'voyage', voyage: b, etab: ETABS.includes(c) ? c : 'overview' };
     if (a === 'voyages' || a === 'expeditions') return { page: 'voyages', vtab: 'expeditions' };
@@ -163,13 +166,18 @@ function showTab(h, push = true) {
     hash = '/expeditions/' + voyageKey + (expTab === 'overview' ? '' : '/' + expTab);
   }
   if (page === 'table') { tableVoyage = rt.voyage; hash = '/expeditions/' + tableVoyage + '/table'; loadTable(); }
-  if (page === 'sizes') { harbourSel = rt.harbour || null; hash = '/harbours' + (harbourSel ? '/' + encodeURIComponent(harbourSel) : ''); if (ladderData) drawHarbours(); }
+  if (page === 'foreign') { foreignKey = rt.foreign; hash = '/foreign/' + encodeURIComponent(foreignKey); }
+  if (page === 'sizes') { harbourSel = rt.harbour || null; harbourSub = rt.hsub || (harbourSel ? 'ships' : null); hash = '/harbours' + (harbourSel ? '/' + encodeURIComponent(harbourSel) + '/' + harbourSub : ''); if (ladderData) drawHarbours(); }
   if (page === 'runs-section') hash = '/ships/all';
   if (page === 'voyages') {  // two subtabs: the expeditions, and the queue (at a glance, or every voyage)
-    vTab = rt.vtab || 'expeditions'; qView = rt.qview || 'glance';
+    vTab = rt.vtab || 'queue'; qView = rt.qview || 'glance';  // the queue first: it is the working surface
     hash = vTab === 'queue' ? '/expeditions/queue' + (qView === 'every' ? '/every' : '') : '/expeditions';
     document.querySelectorAll('#voyages .vtab').forEach(t => t.classList.toggle('active', t.dataset.vtab === vTab));
     document.querySelectorAll('#vnav a').forEach(a => setTab(a, a.dataset.vtab === vTab));
+    const vh = document.querySelector('#voyages h1');  // the page says what it is showing: the queue is the surface
+    if (vh) vh.innerHTML = vTab === 'queue'
+      ? `The queue <span class="q">what sails next, in order, as the S2 coordinator takes it from the Mac lane; open a ship to follow its training</span>`
+      : `Expeditions <span class="q">campaigns of ships sent to find something: their goals, how they are steered, and what they found</span>`;
     document.querySelectorAll('#voyages .qview').forEach(v => v.classList.toggle('active', v.dataset.qview === qView));
     document.querySelectorAll('#voyages .qswitch a').forEach(a => { a.dataset.state = a.dataset.qview === qView ? 'on' : 'off'; a.setAttribute('aria-selected', String(a.dataset.qview === qView)); });
   }
@@ -216,6 +224,7 @@ function showTab(h, push = true) {
   if (page === 'competitor') loadCompetitor();
   if (page === 'lab') loadLab();
   if (page === 'shelves') loadShelves();
+  if (page === 'foreign') loadForeign();
   if (page === 'ship' && (selected !== wasShip || !runsList)) refresh();
   // charts drawn while hidden have no width; size the ones now showing
   document.querySelectorAll(`#${page} .chart`).forEach(el => { if (el.data && el.offsetParent) Plotly.Plots.resize(el); });
@@ -874,6 +883,7 @@ async function renderTomes(r, allRuns) {
 // one run's training shelf, every book on it
 async function renderShelf(r, runs) {
   const pick = document.getElementById('shelfpick'), filt = document.getElementById('bookfilter');
+  if (!pick || !document.getElementById('shelftable')) return;  // the section was taken off the page (9 November)
   const head = document.querySelector('#shelftable thead'), body = document.querySelector('#shelftable tbody');
   const names = runs.map(x => x.name);
   if (!names.length) { head.innerHTML = ''; body.innerHTML = '<tr><td class="${emptyCls(true)}">no voyages at this size yet</td></tr>'; shelfKey = null; return; }
@@ -894,8 +904,8 @@ async function renderShelf(r, runs) {
   body.innerHTML = rows.map(b => `<tr data-book="${b.book_id}"><td>${esc(b.title)}</td><td>${esc(b.family)}</td><td>${esc(b.language)}</td>
     <td>${big(b.tokens)}</td><td>${fmt(b.bytes_per_token, 2)}</td></tr>`).join('') + `<tr><td colspan="5" class="note">${rows.length} of ${shelf.length} books</td></tr>`;
 }
-document.getElementById('shelfpick').onchange = () => renderRung();
-document.getElementById('bookfilter').oninput = () => renderRung();
+const shelvesPick = document.getElementById('shelfpick'); if (shelvesPick) shelvesPick.onchange = () => renderRung();
+const booksFilter = document.getElementById('bookfilter'); if (booksFilter) booksFilter.oninput = () => renderRung();
 
 // ---- the ladder: home cards, then one page per rung with the metrics that judge its job
 const SPLIT_LABEL = { word_inside: 'inside a word', word_start: 'word start', punct: 'punctuation', space: 'space', newline: 'newline' };
@@ -905,8 +915,10 @@ const LAW_COLS = [
   ['word_len_js', 'word-length JS', 3], ['punct_js', 'punct mix JS', 3],
 ];
 var classScoreHtml = {}, classScoreAsked = {};  // a class card's last scores, so a refresh does not blank them
-var ladderData = null, harbourSel = null;  // var: showTab reads it before this line runs
-const rungRuns = p => ladderData.runs.filter(r => r.preset === p && !(r.name || '').startsWith('smoke'));
+var ladderData = null, harbourSel = null, harbourSub = null;  // var: showTab reads it before this line runs
+let sopPick = '';  // the SOP version the training page is read at ('' = all of them)
+const rungRuns = p => ladderData.runs.filter(r => r.preset === p && !(r.name || '').startsWith('smoke')
+  && (!sopPick || String(r.sop || '') === sopPick));
 async function loadLadder() {
   let d;
   try { [d, shipsData] = await Promise.all([get('/api/ladder'), get('/api/ships').catch(() => [])]); } catch (e) { d = { error: e.message }; }
@@ -915,7 +927,7 @@ async function loadLadder() {
     return;
   }
   ladderData = d;
-  drawHarbours();
+  if (!(page === 'sizes' && harbourSub === 'shipbuilder')) drawHarbours();
   if (page === 'rung' || page === 'ship') showTab(location.hash.slice(1), false);
 }
 // ---- Harbours (#/harbours, the Ships tab; Justin, 8 November: "on the ships pages, it's actually called harbours and then
@@ -930,6 +942,9 @@ function drawHarbours() {
   if (!h) {
     if (title) title.innerHTML = 'Harbours <span class="q">two harbours today: open one to see the ships that lie in it</span>';
     el.className = 'harbours';
+    el.hidden = false;
+    const hm0 = document.getElementById('shipbuilder'); if (hm0) { hm0.innerHTML = ''; hm0.hidden = true; }
+    const ht0 = document.getElementById('harbourtabs'); if (ht0) ht0.hidden = true;  // the tabs are for one harbour
     el.innerHTML = hs.map(x => { const rs = sizes(x), live = rs.reduce((n, r) => n + rungRuns(r.preset).filter(v => v.status === 'running').length, 0), done = rs.reduce((n, r) => n + rungRuns(r.preset).filter(v => v.status === 'finished').length, 0);
       return `<a class="${cardCls(true, 'card harbourcard')}" href="#/harbours/${esc(x.key)}">${artImg(x.key, 'cardart ship')}<div class="top"><span class="nm">${esc(x.name)}</span><span class="preset">${esc(x.aka)}</span></div>
         <div class="job">${esc(x.about)}</div>
@@ -952,7 +967,13 @@ function drawHarbours() {
       <div class="top"><span class="preset">${esc(x.size)}</span><span class="nm">${esc(x.name)}</span></div>
       <div class="job">${esc((x.subtitle || '').replace(/^[^·]*· /, ''))}</div>
       <div class="foot"><span>${esc(x.expedition || '')}</span><span class="${pillCls('')}">fitting out</span></div></div>`).join('');
-  el.innerHTML = rules + sizes(h).map(r => {
+  const foreign = h.key !== 'zayton' || !(d.foreign || []).length ? '' :
+    `<div class="k" style="grid-column:1/-1">Foreign ships <span class="s">outside models, read on the same decks: not Thorp ships, but here so they can be spied on</span></div>` +
+    d.foreign.map(x => `<a class="${cardCls(true, 'card classcard')}" href="#/foreign/${esc(x.key)}">${artImg(x.key, 'cardart ship')}
+      <div class="top"><span class="preset">${x.params ? big(x.params) : '–'}</span><span class="nm">${flagImg(x.flag, x.flag_name)} ${esc(x.label)}</span></div>
+      <div class="job">an outside model in Zayton: read-only decks, logic, cards and held-out books</div>
+      <div class="foot"><span>${x.chained ? 'chain-graded' : 'no chain grades'}</span><span class="${pillCls('accent')}">foreign</span></div></a>`).join('');
+  const shipsHtml = sizes(h).map(r => {
     const runs = rungRuns(r.preset), live = runs.filter(x => x.status === 'running').length, done = runs.filter(x => x.status === 'finished').length;
     const nlive = r.metrics.filter(m => m[2] === 'live').length;
     return `<a class="${cardCls(true, 'card classcard')}" href="#${esc(modelHash(r))}">${artImg(classSlug(r.name), 'cardart ship')}
@@ -961,8 +982,38 @@ function drawHarbours() {
       <div class="foot"><span>${big(r.total)} params · ${esc(r.where.split(' (')[0])}</span>
       <span class="${pillCls(live ? ' live' : '')}">${live ? live + ' running' : esc(r.status)}</span></div>
       <div class="foot"><span>${done} finished voyage${done === 1 ? '' : 's'}</span><span>${nlive} of ${r.metrics.length} metrics live</span></div>
-      <div class="foot cscore" data-preset="${esc(r.preset)}">${classScoreHtml[r.preset] || '<span>Face Cards –</span><span>Logic –</span>'}</div></a>`;
-  }).join('') + fit;
+      <div class="foot cscore" data-preset="${esc(r.preset)}">${classScoreHtml[r.preset] || '<span>Chaining –</span><span>Qwen 0.54</span>'}</div></a>`;
+  }).join('');
+  // the harbour's two pages have their own addresses: /harbours/<harbour>/ships and .../shipbuilder
+  // (9 November, Justin: "the ships should have their own page in their own url and same thing for
+  // the shipbuilder"). A tab is a link, not a hidden div; the address is the state.
+  let sub = harbourSub === 'shipbuilder' && h.ship_builder ? 'shipbuilder' : 'ships';
+  if (sub !== harbourSub) {
+    harbourSub = sub;
+    history.replaceState(null, '', '#/harbours/' + encodeURIComponent(h.key) + '/' + sub);
+  }
+  const ht = document.getElementById('harbourtabs'); if (ht) ht.hidden = false;
+  hs.length && document.querySelectorAll('#harbourtabs [data-htab]').forEach(a => {
+    const on = a.dataset.htab === sub;
+    a.href = '#/harbours/' + encodeURIComponent(h.key) + '/' + a.dataset.htab;
+    a.hidden = a.dataset.htab === 'shipbuilder' && !h.ship_builder;
+    setTab(a, on);
+  });
+  el.hidden = sub !== 'ships';
+  const sb = document.getElementById('shipbuilder'); if (sb) sb.hidden = sub !== 'shipbuilder';
+  if (sub === 'ships') {
+    el.innerHTML = rules + shipsHtml + fit + foreign;
+    if (sb) { sb.innerHTML = ''; sb.dataset.built = ''; }
+  } else {
+    el.innerHTML = '';
+    // the dashboard refreshes every 5 s: do not rebuild an open ship builder under the reader, or
+    // replacing the panel resets the page scroll. It is rebuilt when the harbour changes, or when the
+    // reader leaves the builder and comes back (the ships branch above clears it).
+    if (!sb || sb.dataset.built !== h.key) {
+      if (sb) sb.dataset.built = h.key;
+      drawShipbuilder(h);
+    }
+  }
   // the current version's scores (the leaderboard's best of the size; /api/class_score), filled as they arrive
   document.querySelectorAll('#rungcards .cscore').forEach(async el => {
     const pr = el.dataset.preset, now = Date.now();  // at most once a minute a size, and never two at once
@@ -970,12 +1021,434 @@ function drawHarbours() {
     classScoreAsked[pr] = now;
     let s; try { s = await get('/api/class_score?preset=' + encodeURIComponent(pr)); } catch (e) { classScoreAsked[pr] = 0; return; }
     el = document.querySelector(`#rungcards .cscore[data-preset="${CSS.escape(pr)}"]`) || el;
-    if (!s || !s.version) { el.innerHTML = '<span>Face Cards –</span><span>Logic –</span>'; return; }
+    if (!s || !s.version) { el.innerHTML = '<span>Chaining –</span><span>Qwen 0.54</span>'; return; }
     const c = s.cause == null ? null : Math.round(s.cause * 100) / 100 || 0;
-    el.title = `scores of ${s.version}${s.ship ? ' (' + s.ship + ')' : ''}: Face Cards held, and the logic deck's cause gain (above +0.10 clears the noise)`;
-    el.innerHTML = classScoreHtml[el.dataset.preset] = `<span>Face Cards <b>${s.held ?? '–'} of 4</b></span><span>Logic <b>${c == null ? '–' : (c > 0 ? '+' : '') + c.toFixed(2)}</b></span>`;
+    // the goal leads: chaining against Qwen3 4B (Justin, 9 November: "the goal of our current fleet is to get chaining
+    // equal to Qwen3 4B"), the goal's distance in the second line. Cards held and the logic gain stay in the tooltip.
+    const QWEN = 0.538;
+    const ch = s.chaining;
+    el.title = `the goal: chaining lift against Qwen3 4B's ${QWEN.toFixed(2)}. ${s.version}${s.ship ? ' (' + s.ship + ')' : ''}: ${ch == null ? 'no chaining reading yet' : ch.toFixed(3)}`;
+    el.innerHTML = classScoreHtml[el.dataset.preset] = `<span>Chaining <b>${ch == null ? '–' : ch.toFixed(2)}</b></span><span>Qwen 0.54 · ${s.held ?? '–'} of 4 cards</span>`;
   });
 }
+// ---- the ship builder (#/harbours/phaleron/shipbuilder): who signs the supplies, and the SOP's variables
+// in three tabs: what the ship reads (Library), what it must build (Depth), and the model's physical
+// parameters (Physical). Saving writes a new SOP version; the current one stays in force until a voyage
+// names the new one (S5: defining is not adopting).
+const LIB_SUMMARY = {};
+let shipbuilderPhase = 'pretraining', shipbuilderActive = 'training';  // survives the dashboard's refresh
+// the ship builder's two levels (9 November, Justin: "shipbuilding should have two subtabs training which then splits
+// into the pretraining and post training. and then parts and physical and embeddings move under the parts tab"):
+// **Training** — what the ship does, split into pretraining and post-training; **Parts** — what it is made of, split
+// into physical (the shape and the training physics) and embeddings (the table every token starts in).
+const SOP_CATS = [
+  { key: 'library', name: 'Library', keys: ['content', 'readings'],
+    note: 'what the ship reads: the content (recipe, cleaning, passes, order, refusals, tokeniser) and the readings it is judged by' },
+  { key: 'depth', name: 'Star chart', keys: ['cards', 'pinning', 'chart'],
+    note: 'depth is how the stars are followed: the cards, the pinning table (which card sits in which layer for each size), and the ten-point star chart' },
+  { key: 'training', name: 'Training', keys: ['content', 'readings', 'cards', 'pinning', 'chart', 'phases', 'post'],
+    note: 'what the ship does: what it reads and what it must build, the phases it sails, and the post-training stage' },
+  { key: 'scoring', name: 'Scoring', keys: [],
+    note: 'how the ships score: the ladder\'s chaining against Qwen3 4B, and each ship rated on the four suits' },
+  { key: 'parts', name: 'Parts', keys: ['parameters', 'sizes', 'embeddings'],
+    note: 'what the ship is made of: the shape and the training physics, and the embedding table every token starts in' },
+];
+// two subtabs under Ship builder (9 November, Justin: "shipbuilding is tab, then under that sits two subtabs. Training
+// and Parts and then under those sit their relevant subtabs. Training has pre and post and parts has physical and
+// embeddings"). Library and Star chart are not a level of their own: they are what training reads and what it must
+// build, so they sit at the foot of the Training tab.
+const SOP_TABS = [
+  { key: 'training', name: 'Training', sub: [['pretraining', 'Pretraining'], ['posttraining', 'Post-training']] },
+  { key: 'parts', name: 'Parts', sub: [['physical', 'Physical'], ['embeddings', 'Embeddings']] },
+  { key: 'scoring', name: 'Scoring' },
+];
+const SOP_EDIT = new Set(['training', 'parts']);
+function sopTab() {
+  return SOP_CATS;
+}
+
+async function drawShipbuilder(h) {
+  const el = document.getElementById('shipbuilder'); if (!el) return;
+  if (!h || !h.key || h.key !== 'phaleron' || !h.ship_builder) { el.innerHTML = ''; return; }
+  el.innerHTML = `<div class="s">reading the ship builder…</div>`;
+  let d; try { d = await get('/api/shipbuilder?harbour=' + encodeURIComponent(h.key)); } catch (e) {
+    el.innerHTML = `<div class="${emptyCls()}">the ship builder could not be read: ${esc(String(e.message || e))} (restart <span class="mono">thorp dash</span> if this server predates the panel)</div>`; return;
+  }
+  const s = d.sop || {}, vs = s.versions || [], std = s.standards || {}, cur = s.current;
+  const opts = vs.map(v => `<option value="${esc(v)}"${v === cur ? ' selected' : ''}>v${esc(v)}${v === cur ? ' · in force' : ''}</option>`).join('');
+  el.innerHTML = `<section class="hmpanel">
+    <h2>Ship builder <span class="s">${esc(h.ship_builder || 'unnamed')} signs the supplies: the two legs' stages, and the SOP variables below that carry them</span></h2>
+    <div class="phasenav" id="phasenav" role="tablist"></div>
+    <div class="phasebody" id="phasebody"></div>
+    <div class="hmgrid">
+      <div class="hmfacts">
+        <div><span class="k">Harbour</span> <b>${esc(h.name)}</b></div>
+        <div><span class="k">Depth</span> ${h.depth ? big(h.depth) + ' parameters' : 'no bottom'}</div>
+        <div><span class="k">Lane</span> ${esc(h.lane === 'mac' ? 'the Mac lane (MLX)' : 'the Vast lane (torch on CUDA)')}</div>
+        <div><span class="k">Ship builder</span> ${esc(h.ship_builder || '–')}</div>
+        <label class="k" for="hmversion">SOP version</label>
+        <select id="hmversion">${opts}</select>
+        <div class="hmvars">The standard in tabs: <b>Library</b> (what it reads), <b>Star chart</b> (how the stars are followed), <b>Physical</b> (the model and its training). Saving writes a <b>new</b> version; the current one stays in force until a voyage names it.</div>
+        <div class="hmvars" id="hmabout"></div>
+      </div>
+      <div class="hmedit">
+        <div class="fbrow"><label class="s" for="hmadopted">adopted</label><input type="text" id="hmadopted" size="62" value="${esc('defined at ' + h.name + ' by ' + (h.ship_builder || 'the ship builder'))}"></div>
+        <div class="sopnav" id="sopnav" role="tablist"></div>
+        <div class="sopnav subsop" id="sopsub" role="tablist"></div>
+        <div class="sopnote" id="sopnote"></div>
+        <div class="handtools" id="hmchoices" style="border:0;padding:0;margin:0 0 6px">
+          <label class="note" for="hmembed">embedding</label><select class="sel" id="hmembed" title="the locked embedding version this standard chooses"></select>
+          <span class="note">sizes to sail</span><span id="hmsizes" class="s"></span>
+        </div>
+        <div id="soplib" class="libsum" hidden></div>
+        <div id="sopdepth" class="depthsum" hidden></div>
+        <div id="sopstage" class="depthsum" hidden></div>
+        <div id="sopphases" class="depthsum" hidden></div>
+        <div id="sopshape" class="libsum" hidden></div>
+        <div id="sopembed" class="libsum" hidden></div>
+        <div id="sopladder" class="libsum" hidden></div>
+        <div id="sopsuits" class="libsum" hidden></div>
+        <textarea id="hmsop" spellcheck="false" aria-label="the SOP variables in this tab"></textarea>
+        <div class="fbactions"><button id="hmsave">Save as a new SOP version</button><span id="hmmsg" class="fbmsg"></span></div>
+      </div>
+    </div></section>`;
+  const ta = document.getElementById('hmsop'), sel = document.getElementById('hmversion'), msg = document.getElementById('hmmsg');
+  let draft = {}, active = shipbuilderActive, cats = SOP_CATS, phase = shipbuilderPhase;
+  let shipbuilderSub = 'pretraining';
+  const journey = d.journey || null;
+  const drawPhase = () => {
+    const nav = document.getElementById('phasenav'), body = document.getElementById('phasebody');
+    if (!nav || !body) return;
+    const tabs = [['pretraining', 'Pretraining', 'outbound'], ['posttraining', 'Posttraining', 'return']];
+    nav.innerHTML = tabs.map(([k, name, leg]) => `<button type="button" class="phasebtn${phase === k ? ' active' : ''}" data-phase="${k}" role="tab" aria-selected="${phase === k}">${name} <span class="s">${leg}</span></button>`).join('');
+    nav.querySelectorAll('.phasebtn').forEach(b => { b.onclick = () => { phase = b.dataset.phase; shipbuilderPhase = phase; drawPhase(); showTab(active); }; });
+    if (!journey) { body.innerHTML = '<div class="s">no journey is recorded for this harbour yet</div>'; return; }
+    const leg = journey[phase] || {}, stages = leg.stage || [];
+    const post = phase === 'posttraining' ? postOf() : null;
+    body.innerHTML = `<div class="phasehead"><span class="k">${phase}</span> <span class="s">${esc(leg.leg || '')} · ${esc(journey.aim || '')}</span></div>
+      <div class="s">${phase === 'posttraining'
+        ? post ? `${stages.length} stage${stages.length === 1 ? '' : 's'} · ${esc(post.name || 'posttraining')}; the Star chart and Physical attributes are shared.` : 'Posttraining is not in this SOP version: Library, Stages and Phases are empty. The Star chart and Physical attributes are shared.'
+        : `${stages.length} stage${stages.length === 1 ? '' : 's'} · the tabs below apply to this leg; physical stays shared.`}</div>`;
+  };
+  const catOf = key => cats.find(c => c.key === key) || cats[0];
+  const readDraft = () => {  // assign the open tab's keys back into the version draft
+    if (!SOP_EDIT.has(active)) return true;
+    const c = catOf(active); let got;
+    try { got = JSON.parse(ta.value); } catch (e) { msg.className = 'fbmsg bad'; msg.textContent = 'not JSON: ' + e.message; return false; }
+    if (!got || typeof got !== 'object' || Array.isArray(got)) { msg.className = 'fbmsg bad'; msg.textContent = 'this tab is a JSON object'; return false; }
+    for (const k of c.keys) { if (k in got) draft[k] = got[k]; else delete draft[k]; }
+    return true;
+  };
+  const showTab = key => {
+    active = key; shipbuilderActive = key;
+    const c = catOf(key);
+    const editor = SOP_EDIT.has(key);
+    document.querySelectorAll('#sopnav .sopbtn').forEach(b => { const on = b.dataset.sop === key; b.classList.toggle('active', on); b.setAttribute('aria-selected', String(on)); });
+    const sub = (SOP_TABS.find(t => t.key === key) || {}).sub || [];
+    if (sub.length && !sub.some(([k]) => k === shipbuilderSub)) shipbuilderSub = sub[0][0];
+    const note = key === 'training' ? (shipbuilderSub === 'posttraining'
+        ? 'the post-training stage: what the ship reads after the four pretraining passes, with no pull'
+        : 'the pretraining phases: the content first, the fade, and the content by heart')
+      : key === 'scoring' ? 'how the ships score: the ladder against Qwen3 4B, and each ship on the four suits — copying, position, comparing, carrying'
+      : key === 'parts' ? (shipbuilderSub === 'embeddings'
+        ? 'the embedding table every token starts in: vocabulary x width, tied to the output'
+        : 'the physical attributes are shared by both legs: one model, one set of parameters and sizes')
+      : c.note;
+    document.getElementById('sopnote').textContent = note;
+    if (editor) ta.value = JSON.stringify(Object.fromEntries(c.keys.filter(k => k in draft).map(k => [k, draft[k]])), null, 1);
+    ta.hidden = !editor;
+    const save = document.getElementById('hmsave'); if (save) save.hidden = !editor;
+    drawLibSummary(key === 'training' ? stageLibrary() : '');
+    drawStarChart(key === 'training');
+    drawStages(false);
+    drawPhases(key === 'training' && shipbuilderSub === 'pretraining');
+    drawPhysical(key === 'parts' && shipbuilderSub === 'physical');
+    drawEmbeddings(key === 'parts' && shipbuilderSub === 'embeddings');
+    drawLadderChaining(key === 'scoring');  // a tab of its own (9 November: "under a new tab")
+    drawSuits(key === 'scoring');
+    const subnav = document.getElementById('sopsub');
+    if (subnav) {
+      subnav.hidden = !sub.length;
+      subnav.innerHTML = sub.map(([k, n]) => `<button type="button" class="sopbtn sub${k === shipbuilderSub ? ' active' : ''}" data-sub="${esc(k)}" role="tab" aria-selected="${k === shipbuilderSub}">${esc(n)}</button>`).join('');
+      subnav.querySelectorAll('.sopbtn').forEach(b => { b.onclick = () => {
+        shipbuilderSub = b.dataset.sub;
+        if (key === 'training') { phase = shipbuilderSub; try { drawPhase(); } catch (e) {} }  // the legs drive the phase nav
+        showTab(key);
+      }; });
+    }
+  };
+  // each ship's four suits (9 November: "how good is each ship at copying, position, comparing and carrying"): the
+  // mean of a suit's four cards, each card over its own mark, so 1.00 means every card in the suit is lit
+  const drawSuits = async on => {
+    const box = document.getElementById('sopsuits'); if (!box) return;
+    box.hidden = !on; if (!on) return;
+    let d2; try { d2 = await get('/api/suit_ratings'); } catch (e) { return; }
+    const rows = (d2.ships || []).map(x => {
+      const cell = v => v == null ? '<span class="s">–</span>' : `<b>${v.toFixed(2)}</b>`;
+      const label = x.run && x.run.startsWith('deck-') ? `<span class="mono">${esc(x.size)}</span> <span class="s">foreign</span>` : `<span class="mono">${esc(x.size)}</span>`;
+      return `<tr><td>${label}</td><td>${cell(x.copying)}</td><td>${cell(x.position)}</td><td>${cell(x.comparing)}</td><td>${cell(x.carrying)}</td></tr>`;
+    }).join('');
+    box.innerHTML = `<div class="k">The four suits <span class="s">how good each ship is at each suit: the mean of its four cards, each card divided by its mark. 1.00 means every card in that suit is lit; the foreign ships are read on the same deck</span></div>
+      <div class="scroll"><table class="selbooks"><thead><tr><th>ship</th><th>copying</th><th>position</th><th>comparing</th><th>carrying</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  };
+  // the ladder's chaining against Qwen3 4B, size by size, on the standard in force (9 November: "add all the chaining
+  // comparisons to the shipbuilder tab ... the 0.0.5 results for 300k, 1m, 9m, 21m and 50m when they're in")
+  const drawLadderChaining = async on => {
+    const box = document.getElementById('sopladder'); if (!box) return;
+    box.hidden = !on; if (!on) return;
+    const version = (sel && sel.value) || (d.sop && d.sop.current) || '';
+    let r; try { r = await get(`/api/ladder_chaining?sop=${encodeURIComponent(version)}`); } catch (e) { return; }
+    const rows = (r.sizes || []).map(x => {
+      const ch = x.chaining == null ? '–' : x.chaining.toFixed(3);
+      const gap = x.gap == null ? '' : `${x.gap > 0 ? '+' : ''}${x.gap.toFixed(3)}`;
+      const pill = x.status === 'running' ? 'running' : x.status === 'finished' ? '' : 'bad';
+      return `<tr><td class="mono">${esc(x.size)}</td><td>${x.status === 'not sailed' ? '<span class="s">not yet</span>' : `<span class="${pillCls(pill)}">${esc(x.status)}</span>`}</td><td><b>${ch}</b></td><td>${(r.qwen || 0.538).toFixed(3)}</td><td>${gap}</td></tr>`;
+    }).join('');
+    box.innerHTML = `<div class="k">The ladder against Qwen3 4B <span class="s">every rung on v${esc(version)}, its chaining lift at its last step, and the distance to the model that chains (0.538). A rung fills in as it finishes</span></div>
+      <div class="scroll"><table class="selbooks"><thead><tr><th>size</th><th>status</th><th>chaining</th><th>qwen</th><th>gap</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  };
+  const drawPhysical = on => {
+    const box = document.getElementById('sopshape'); if (!box) return;
+    box.hidden = !on; if (!on) return;
+    const shapes = d.shapes || {};
+    const order = ['300k', '1m', '9m', '21m', '50m', '100m', '350m'];
+    const thorpKeys = [...order.filter(k => shapes[k]), ...Object.keys(shapes).filter(k => !order.includes(k) && shapes[k].thorp).sort()];
+    const foreignKeys = Object.keys(shapes).filter(k => !shapes[k].thorp).sort();
+    const keys = [...thorpKeys, ...foreignKeys];
+    box.innerHTML = `<div class="k">The shapes of the ladder <span class="s">depth and width for each class: the deep ladder of 9 November puts the width into layers, so the copy cards can sit in the second half of the model</span></div>
+      <div class="scroll"><table class="selbooks"><thead><tr><th>class</th><th>layers</th><th>width</th><th>heads</th><th>head dim</th></tr></thead><tbody>${
+        keys.map(k => { const sh = shapes[k]; const hd = sh.heads ? (sh.width / sh.heads) : null;
+          const name = sh.thorp ? `<span class="mono">${esc(k)}</span>` : `<span class="mono">${esc(sh.lab || k)}</span> <span class="s">foreign${sh.params ? ' · ' + big(sh.params) : ''}</span>`;
+          return `<tr><td>${name}</td><td>${sh.layers}</td><td>${sh.width}</td><td>${sh.heads}</td><td>${hd == null ? '–' : Math.round(hd * 10) / 10}</td></tr>`; }).join('')
+      }</tbody></table></div>`;
+  };
+  const drawEmbeddings = on => {
+    const box = document.getElementById('sopembed'); if (!box) return;
+    box.hidden = !on; if (!on) return;
+    const emb = d.embeddings || {};
+    const order = ['300k', '1m', '9m', '21m', '50m', '100m', '350m'];
+    const keys = [...order.filter(k => emb[k]), ...Object.keys(emb).filter(k => !order.includes(k) && !emb[k].thorp).sort()];
+    const embs = (d.sop && ((d.sop.standards || {})[sel.value] || {}).embeddings) || {};
+    const vers = embs.versions || {}, chosen = embs.chosen;
+    const verRows = Object.entries(vers).map(([k, v]) =>
+      `<tr><td class="mono">${esc(k)}</td><td>${v.vocab}</td><td>${k === chosen ? '<b>chosen by this standard</b>' : `<span class="s">available</span>`}</td><td class="s">${esc(v.note || '')}</td></tr>`).join('');
+    box.innerHTML = `<div class="k">The embedding versions <span class="s">three locked sets of pieces the SOP may choose between (9 November): a version is never edited, only added, and readings from different versions are never compared — the tokeniser sets the bits-per-byte scale</span></div>
+      <div class="scroll"><table class="selbooks"><thead><tr><th>version</th><th>pieces</th><th></th><th>what it is for</th></tr></thead><tbody>${verRows}</tbody></table></div>
+      <div class="k mt">The embedding <span class="s">the lookup table every token starts in: vocabulary × width. It is the same table at every phase, so it sits with the model's physics, not with a phase</span></div>
+      <div class="scroll"><table class="selbooks"><thead><tr><th>class</th><th>vocab</th><th>width</th><th>embedding params</th><th>of the ship</th></tr></thead><tbody>${
+        keys.map(k => { const e = emb[k];
+          const name = e.thorp ? `<span class="mono">${esc(k)}</span>` : `<span class="mono">${esc(e.lab || k)}</span> <span class="s">foreign</span>`;
+          return `<tr><td>${name}</td><td>${big(e.vocab)}</td><td>${e.width}</td><td>${big(e.params)}</td><td>${(e.share * 100).toFixed(1)}%</td></tr>`; }).join('')
+      }</tbody></table></div>
+      <div class="s" style="margin-top:6px">the table is tied: the same matrix reads a token and predicts the next, so a wider table is both a bigger first layer and a bigger last one</div>`;
+  };
+  const postOf = () => { const s = std[sel.value] || {}; return s.posttraining || s.post || null; };
+  const postStages = () => { const p = postOf(); return p ? (p.stages || (p.stage ? [p.stage] : [])) : []; };
+  const postStage = () => postStages()[0] || {};
+  const stageLibrary = () => {
+    if (phase === 'posttraining') { const st = postStage(); return st.library || st.recipe || ''; }
+    return (((journey && journey[phase] || {}).stage || [])[0] || {}).library || '';
+  };
+  const drawLibSummary = async path => {
+    const box = document.getElementById('soplib'); if (!box) return;
+    box.hidden = active !== 'training';
+    if (active !== 'training') return;
+    if (phase === 'posttraining' && !postOf()) { box.innerHTML = '<div class="s">posttraining is not in this SOP version: Library is empty. The Star chart and Physical attributes are shared.</div>'; return; }
+    if (!path) { box.innerHTML = '<div class="s">no library is chosen for this leg yet</div>'; return; }
+    box.innerHTML = '<div class="s">reading the shelf…</div>';
+    let lib = LIB_SUMMARY[path];
+    if (!lib) {
+      try { lib = await get('/api/library_summary?path=' + encodeURIComponent(path)); LIB_SUMMARY[path] = lib; }
+      catch (e) { if (active === 'library') box.innerHTML = `<div class="s">the shelf could not be read: ${esc(String(e.message || e))}</div>`; return; }
+    }
+    if (active !== 'library' || stageLibrary() !== path) return;
+    const langs = lib.languages || [], kinds = lib.categories || [];
+    const langText = langs.length ? langs.slice(0, 3).map(l => `${esc(l.name)} ${Math.round((l.share || 0) * 100)}%`).join(' · ') : '–';
+    const langName = langs.length ? (langs[0].share >= 0.999 ? esc(langs[0].name) : `${esc(langs[0].name)} +${langs.length - 1}`) : '–';
+    const mb = b => b == null ? '–' : b >= 1e9 ? (b / 1e9).toFixed(2) + ' GB' : Math.round(b / 1e6) + ' MB';
+    const dates = lib.date_range ? `${lib.date_range.from}–${lib.date_range.to}` : '–';
+    const og = lib.ogden || {};
+    box.innerHTML = `<div class="libhead"><div class="k">The library at a glance <span class="s">${esc(path)} · what this version reads, before its settings</span></div></div>
+      <div class="libstats">
+        <div class="libstat"><b>${langName}</b><span>language${langs.length > 1 ? ' · ' + langText : ''}</span></div>
+        <div class="libstat"><b>${lib.books || lib.rows ? big(lib.books || lib.rows) : '–'}</b><span>${lib.synthetic ? 'passages' : 'books'}${lib.resolved != null && !lib.synthetic ? ' · ' + big(lib.resolved) + ' resolved' : ''}</span></div>
+        <div class="libstat"><b>${lib.tokens_est == null ? '–' : big(lib.tokens_est)}</b><span>tokens (estimated)${lib.bytes ? ' · ' + mb(lib.bytes) : ''}</span></div>
+        <div class="libstat"><b>${dates}</b><span>date range</span></div>
+        <div class="libstat"><b>${og.mean == null ? '–' : og.mean.toFixed(2)}</b><span>Ogdenish mean${og.share_at_bar == null ? '' : ' · ' + Math.round(og.share_at_bar * 100) + '% at ' + og.bar}</span></div>
+      </div>
+      <div class="libkinds"><span class="k">Kinds of book</span>${kinds.length ? kinds.map(k => `<span class="libkind"><b>${esc(k.category)}</b> ${Math.round((k.share || 0) * 100)}% <span class="s">${big(k.books)}</span></span>`).join('') : lib.synthetic ? '<span class="s">synthetic card-stage passages; there are no book categories to count</span>' : '<span class="s">no categories read for these books</span>'}</div>`;
+  };
+  const drawStarChart = on => {
+    const box = document.getElementById('sopdepth'); if (!box) return;
+    box.hidden = !on; if (!on) return;
+    const layers = ((d.chart || {}).depths || {})[sel.value] || [];
+    const focus = layers.find(l => l.size === '300k-l28') || layers.find(l => l.size === '300k') || layers[0];
+    const points = (d.chart || {}).points || [];
+    box.innerHTML = `<div class="depthhead"><div class="k">The star chart <span class="s">depth is how the stars are followed: the model depth the standard includes, and the card placements that reach it</span></div>
+        ${focus ? `<div class="depthbig"><b>${focus.layers}</b> layers at <span class="mono">${esc(focus.size)}</span> <span class="s">· ${focus.pinned} cards pinned, deepest at L${focus.deepest_pinned}</span></div>` : '<div class="s">no pinning table in this version</div>'}
+        <div class="depthpills">${layers.map(l => `<span class="depthpill"><b>${l.layers}</b> <span class="s">${esc(l.size)}</span></span>`).join('')}</div></div>
+      <div class="depthchart"><div class="k">The ten-point star chart <span class="s">the chart we are building towards: ten places chaining might live, what Qwen3 4B's heads say, the deck card each point is read as, and how a four-slot 300k tests it</span></div>
+      <div class="scroll"><table class="depthtable"><thead><tr><th>#</th><th>point — the role</th><th>Qwen 4B evidence</th><th>deck card</th><th>how the 300k tests it</th></tr></thead><tbody>
+      ${points.map(p => `<tr><td class="mono">${p.n}</td><td><b>${esc(p.role)}</b></td><td>${esc(p.qwen)}</td><td class="mono">${esc(p.card)}</td><td>${esc(p.test)}</td></tr>`).join('')}
+      </tbody></table></div></div>`;
+  };
+  const drawStages = on => {
+    const box = document.getElementById('sopstage'); if (!box) return;
+    box.hidden = !on; if (!on) return;
+    const post = phase === 'posttraining' ? postOf() : null;
+    const stages = phase === 'posttraining' ? postStages() : (((journey || {})[phase] || {}).stage || []);
+    if (phase === 'posttraining' && !post) { box.innerHTML = '<div class="s">posttraining is not in this SOP version: Stages is empty. The Star chart and Physical attributes are shared.</div>'; return; }
+    box.innerHTML = `<div class="k">Stages of ${phase} <span class="s">the ships and books of this leg</span></div>` +
+      (stages.length ? stages.map(st => `<div class="phasestage">
+        <div class="psname">${esc(st.name)} <span class="s">${esc(st.purpose || (phase === 'posttraining' ? (postOf() || {}).what : '') || '')}</span></div>
+        <div class="psmeta"><span>library <b>${esc(st.library || st.recipe || 'not chosen')}</b></span><span>${st.passes ?? 1} pass${st.passes === 1 ? '' : 'es'}</span><span>${st.tokens ? big(st.tokens) + ' tokens' : 'tokens not set'}</span><span>${(st.cards || []).length} cards</span></div>
+        ${(st.cards || []).length ? `<div class="pscards">${st.cards.map(c => `<span class="${pillCls('')}" title="level ${c.level}: ${esc(c.about || '')}">${esc(c.name || c.key)} <span class="s">L${c.level}</span></span>`).join('')}</div>` : '<div class="s">no cards recorded for this stage</div>'}
+      </div>`).join('') : '<div class="s">no stages in this leg</div>');
+  };
+  const drawPhases = async on => {
+    const box = document.getElementById('sopphases'); if (!box) return;
+    box.hidden = !on; if (!on) return;
+    const post = phase === 'posttraining' ? postOf() : null;
+    if (phase === 'posttraining' && !post) {
+      box.innerHTML = '<div class="s">posttraining is not in this SOP version: Phases is empty. The Star chart and Physical attributes are shared.</div>'; return;
+    }
+    const phases = phase === 'posttraining'
+      ? (post.phases || (post.stage ? [{ kind: 'post-training', share: 1, about: post.what || post.about || '', cards: post.cards || post.stage.cards || [] }] : (post.mixture || [])))
+      : (draft.phases || []);
+    const cards = phase === 'posttraining' ? (post.cards || (post.stage || {}).cards || []) : (draft.cards || []);
+    const stage = phase === 'posttraining' ? postStage() : ((((journey || {})[phase] || {}).stage || [])[0] || {});
+    const phaseAt = phase;
+    const passes = Number(stage.passes) || 1;
+    let perPass = null;
+    const stagePath = stage.library || stage.recipe || '';
+    if (stagePath) {
+      let lib = LIB_SUMMARY[stagePath];
+      if (!lib) {
+        try { lib = await get('/api/library_summary?path=' + encodeURIComponent(stagePath)); LIB_SUMMARY[stagePath] = lib; }
+        catch (e) { lib = null; }
+      }
+      if (lib && lib.tokens_est) perPass = lib.tokens_est;
+    }
+    if (active !== 'phases' || phase !== phaseAt) return;
+    const total = Number(stage.tokens) || (perPass ? perPass * passes : null);
+    const totalText = total ? `${big(total)} tokens planned${perPass ? ` (${passes} × ${big(perPass)} per pass)` : ''}` : 'tokens not planned';
+    const order = phases.map((p, i) => `<span><b>${i + 1}</b> ${esc(p.kind || 'phase')} ${Math.round((Number(p.share) || 0) * 100)}%</span>`).join('<span class="s"> → </span>');
+    box.innerHTML = `<div class="k">Phases of ${phase} <span class="s">in order: ${esc(totalText)}</span></div>
+      <div class="phaseorder">${order}</div>
+      <div class="phaseplan">${phases.length ? phases.map((p, i) => {
+        const share = Number(p.share) || 0, pct = Math.round(share * 100);
+        const tokens = total ? Math.round(total * share) : null;
+        const scaffold = p.kind === 'scaffold';
+        const pulled = Array.isArray(p.cards) && p.cards.length ? p.cards : (scaffold ? cards : []);
+        return `<div class="planphase ${scaffold ? 'scaffold' : 'content'}">
+          <div class="pphead"><b>${i + 1}. ${esc(p.kind || 'phase')}</b><span>${pct}%${tokens != null ? ` · ${big(tokens)} tokens` : ''}</span></div>
+          <div class="s">${esc(p.about || '')}</div>
+          ${scaffold ? `<div class="ppmeta">${p.weight != null ? `weight ${p.weight}` : ''}${p.hold != null ? ` · hold ${p.hold}` : ''}${p.fade != null ? ` · fade ${p.fade}` : ''}${p.floor != null ? ` · floor ${p.floor}` : ''}</div>
+            <div class="ppcards"><span class="k">cards scaffolded</span>${pulled.length ? pulled.map(c => `<span class="ppcard">${esc(c)}</span>`).join('') : '<span class="s">none listed in this version</span>'}</div>` : '<div class="ppmeta">content: no cards pulled</div>'}
+        </div>`;
+      }).join('') : '<div class="s">no phases in this version of the SOP</div>'}</div>
+      <div class="s">${phases.length} phases, ${Math.round(phases.reduce((a, p) => a + (Number(p.share) || 0), 0) * 100)}% of the voyage; the scaffold is the only phase that pulls cards.${total ? ' The token split is the stage\'s planned tokens divided by the SOP shares.' : ' Choose the stage library to plan its tokens.'}</div>`;
+  };
+  const load = v => {
+    draft = { ...(std[v] || {}) };
+    cats = sopTab();
+    paintChoices();
+  const about = document.getElementById('hmabout'); if (about) about.textContent = String((std[v] || {}).about || '');
+    if (!SOP_TABS.some(c => c.key === active)) active = 'library';
+    document.getElementById('sopnav').innerHTML = SOP_TABS.map(c => `<button type="button" class="sopbtn${c.key === active ? ' active' : ''}" data-sop="${esc(c.key)}" role="tab" aria-selected="${c.key === active}">${esc(c.name)}</button>`).join('');
+    document.querySelectorAll('#sopnav .sopbtn').forEach(b => { b.onclick = () => { if (!readDraft()) return; showTab(b.dataset.sop); }; });
+    showTab(active);
+    drawPhase();
+  };
+  load(sel.value);
+  sel.onchange = () => { if (!readDraft()) { sel.value = sel.dataset.v || sel.value; return; } sel.dataset.v = sel.value; active = 'library'; load(sel.value); paintChoices(); };
+  sel.dataset.v = sel.value;
+  // the choices a standard makes explicit (9 November, Justin: "if I create a new SOP 0.0.7 i can choose which sizes to
+  // sail as well as embeddings and other variables"): the embedding version and the sizes, beside the JSON variables
+  function paintChoices() {  // hoisted: it is called while the builder loads, before this line is reached
+    const es = document.getElementById('hmembed'), ss = document.getElementById('hmsizes');
+    if (!es || !ss) return;
+    const cur = std[sel.value] || {};
+    const fallback = ((std[cur && cur.supersedes ? cur.supersedes : '0.0.5'] || {}).embeddings) || {};
+    const vers = ((cur.embeddings || {}).versions) || fallback.versions || {};  // a version made before the block existed still offers the locked three
+    const chosen = (cur.embeddings || {}).chosen || fallback.chosen || '';
+    es.innerHTML = Object.entries(vers).map(([k, v]) => `<option value="${esc(k)}"${k === chosen ? ' selected' : ''}>${esc(k)} · ${v.vocab} pieces</option>`).join('') || `<option value="">${esc(chosen || 'none')}</option>`;
+    es.onchange = () => { draft.embeddings = { ...(draft.embeddings || {}), chosen: es.value }; };
+    const sizes = ['300k', '1m', '9m', '21m', '50m', '100m', '350m'];
+    const on = new Set(cur.sizes_to_sail || sizes);
+    ss.innerHTML = sizes.map(k => `<label class="s" style="margin-right:8px"><input type="checkbox" data-size="${k}"${on.has(k) ? ' checked' : ''}> ${k}</label>`).join('');
+    ss.querySelectorAll('input[data-size]').forEach(b => { b.onchange = () => {
+      const now = [...ss.querySelectorAll('input[data-size]:checked')].map(x => x.dataset.size);
+      draft.sizes_to_sail = now;
+    }; });
+  };
+  document.getElementById('hmsave').onclick = async () => {
+    if (!readDraft()) return;
+    msg.className = 'fbmsg'; msg.textContent = 'saving…';
+    try {
+      const r = await postJSON('/api/shipbuilder/save', { harbour: h.key, standard: draft, adopted: document.getElementById('hmadopted').value });
+      std[r.version] = r.standard;
+      if (r.chart && r.chart.depths) { d.chart = { ...(d.chart || {}), depths: { ...((d.chart || {}).depths || {}), [r.version]: r.chart.depths } }; }
+      msg.className = 'fbmsg good'; msg.textContent = 'saved v' + r.version + ' (not in force until a voyage names it)';
+      sel.innerHTML = (r.versions || []).map(v => `<option value="${esc(v)}"${v === r.version ? ' selected' : ''}>v${esc(v)}${v === cur ? ' · in force' : ''}</option>`).join('');
+      sel.dataset.v = r.version; draft = { ...(r.standard || {}) }; cats = sopTab(); active = SOP_TABS.some(c => c.key === active) ? active : 'library';
+      const about = document.getElementById('hmabout'); if (about) about.textContent = String((r.standard || {}).about || '');
+      document.getElementById('sopnav').innerHTML = SOP_TABS.map(c => `<button type="button" class="sopbtn${c.key === active ? ' active' : ''}" data-sop="${esc(c.key)}" role="tab" aria-selected="${c.key === active}">${esc(c.name)}</button>`).join('');
+      document.querySelectorAll('#sopnav .sopbtn').forEach(b => { b.onclick = () => { if (!readDraft()) return; showTab(b.dataset.sop); }; });
+      paintChoices();
+      showTab(active);
+      drawPhase();
+    } catch (e) { msg.className = 'fbmsg bad'; msg.textContent = String(e.message || e); }
+  };
+}
+
+// ---- a foreign ship (#/foreign/<key>): an outside model's spy page, read-only. It is not a Thorp size or
+// ship: the readings are s4.outside_readings, not the ledger.
+async function loadForeign() {
+  const el = document.getElementById('foreignbody'); if (!el) return;
+  const title = document.getElementById('foreigntitle'), sub = document.getElementById('foreignsub');
+  if (title) title.textContent = foreignKey || 'foreign ship';
+  if (sub) sub.textContent = '';
+  let d; try { d = await get('/api/foreign?key=' + encodeURIComponent(foreignKey || '')); } catch (e) {
+    el.innerHTML = `<div class="${emptyCls()}">this foreign ship could not be read: ${esc(String(e.message || e))} (restart <span class="mono">thorp dash</span> if this server predates it)</div>`; return;
+  }
+  if (title) title.textContent = d.label || d.key;
+  if (sub) sub.innerHTML = `${flagImg(d.flag, d.flag_name)} ${esc(d.model)} · ${d.params ? big(d.params) + ' parameters' : 'parameters unknown'} · a foreign ship in Zayton`;
+  const f2 = v => v == null ? '–' : (+v).toFixed(2);
+  const lg = d.logic || {}, lg40 = d.logic40 || {};
+  const stat = (k, v, s) => `<div class="govstat"><b>${v}</b><span>${esc(k)}${s ? ` · ${esc(s)}` : ''}</span></div>`;
+  const relations = ["gain", "lift", "score", "gain_cause", "gain_order", "gain_membership", "gain_proportion", "gain_counterfactual"];
+  const rows = relations.map(k => `<tr><td class="mono">${esc(k)}</td><td>${f2(lg[k])}</td><td>${f2(lg40[k])}</td></tr>`).join('');
+  const ch = d.chaining || {};
+  const chrows = Object.entries(ch).slice(0, 12).map(([k, v]) => `<tr><td class="mono">${esc(k)}</td><td>${f2(v)}</td></tr>`).join('');
+  const played = (d.deck && d.deck.played) || [], falls = (d.deck && d.deck.falls) || {};
+  el.innerHTML = `${artImg(d.key, 'foreignart')}
+    <div class="harbourrules"><div class="k">A spyglass, not a ship of ours <span class="s">${esc(d.label)} is an outside model. Its readings are kept in s4.outside_readings; it has no spec, no ledger run and no weights here. Read-only.</span></div></div>
+    <div class="govstats">
+      ${stat('held-out English', d.hole_cards ? f2(d.hole_cards.bpb) : '–', d.hole_cards ? d.hole_cards.books + ' books, bpb' : 'not read')}
+      ${stat('logic gain', f2(lg.gain), '8-item')}
+      ${stat('logic lift', f2(lg.lift), '8-item')}
+      ${stat('logic score', f2(lg.score), '8-item')}
+      ${stat('chaining lift', f2(d.chaining_lift), 'four rungs')}
+    </div>
+    <div class="fbwrap">
+      <div class="fbmain">
+        <div class="fblabel">The logic deck <span class="s">8-item and 40-item readings</span></div>
+        <div class="scroll"><table class="lbtable"><thead><tr><th>metric</th><th>8-item</th><th>40-item</th></tr></thead><tbody>${rows}</tbody></table></div>
+        <div class="fblabel">Cards it plays <span class="s">from its deck reading</span></div>
+        <div class="s">${played.length ? played.map(x => `<span class="${pillCls('good')}">${esc(x)}</span>`).join(' ') : 'no deck reading'}</div>
+        <div class="fblabel">Falls <span class="s">cards it does not reach</span></div>
+        <div class="s">${Object.entries(falls).slice(0, 20).map(([k, v]) => `${esc(k)} ${v}`).join(' · ') || '–'}</div>
+      </div>
+      <div class="fbpalette">
+        <div class="fblabel">Chained two facts <span class="s">the four rungs' grades</span></div>
+        <div class="scroll"><table class="lbtable"><tbody>${chrows || '<tr><td class="s">no chain grades</td></tr>'}</tbody></table></div>
+        <div class="fblabel">Knockout</div>
+        <div class="s">${d.knockout ? `${Object.keys(d.knockout.verdict || {}).length} cards checked; ${d.knockout.layers || '–'} layers` : 'not read'}</div>
+      </div>
+    </div>`;
+}
+
 // ---- the four cards (the Overview's head; /api/class_cards): the one thing that says the most about a class:
 // each necessary card's best reading by any of its voyages against its mark (held: a voyage ended lit; touched:
 // one only passed it), and whether it chains cause and effect (judged where voyages end, eight items, ±0.1 noise)
@@ -1057,7 +1530,33 @@ let mathsData = null, mathsWired = false;
 async function mathsBook(r) {
   const sel = document.getElementById('mathsvoyage'), out = document.getElementById('mathsout'); if (!sel || !out) return;
   if (!mathsData) { try { mathsData = await get('/api/maths_book'); } catch (e) { out.innerHTML = `<div class="${emptyCls()}">the maths book could not be read (a dashboard started before it existed has to be restarted)</div>`; return; } }
-  const fill = () => { const a = document.getElementById('askvoyage'); if (a && a.options.length && sel.dataset.preset !== r.preset) { sel.innerHTML = a.innerHTML; sel.value = a.value; sel.dataset.preset = r.preset; } };
+  // the SOP version picks the voyages the book can be read from (9 November, Justin: "maths needs to be able to select
+  // the sop version"): the version's runs at this size, otherwise the ask panel's own list
+  const sopSel = document.getElementById('mathssop');
+  const fill = () => {
+    const runs = ((ladderData || {}).runs || []).filter(x => x.preset === r.preset && !(x.name || '').startsWith('smoke'));
+    const vers = [...new Set(runs.map(x => x.sop).filter(Boolean))].sort();
+    if (sopSel) {
+      const keep = sopSel.value;
+      sopSel.innerHTML = `<option value="">all versions</option>` + vers.map(v => `<option value="${esc(v)}">v${esc(v)}</option>`).join('');
+      sopSel.value = vers.includes(keep) ? keep : '';
+    }
+    const want = sopSel ? sopSel.value : '';
+    const sig = `${r.preset}|${want}`;
+    if (sel.dataset.built === sig && sel.options.length) return;  // options already built for this size and version: keep the choice
+    const mine = runs.filter(x => !want || String(x.sop || '') === want);
+    if (mine.length) {
+      const was = sel.value;
+      sel.innerHTML = mine.map(x => `<option value="${esc(x.name)}">${esc(x.name)}${x.status === 'running' ? ' · at sea' : ''}</option>`).join('');
+      if (mine.some(x => x.name === was)) sel.value = was;
+      sel.dataset.preset = r.preset;
+      sel.dataset.built = sig;
+      return;
+    }
+    const a = document.getElementById('askvoyage');
+    if (a && a.options.length && sel.dataset.preset !== r.preset) { sel.innerHTML = a.innerHTML; sel.value = a.value; sel.dataset.preset = r.preset; }
+  };
+  if (sopSel && !sopSel.onchange) sopSel.onchange = () => { sel.value = ''; sel.dataset.preset = ''; sel.dataset.built = ''; fill(); };
   fill();  // the ask panel finds the size's best voyage, which can take a while on a fresh dashboard: keep trying
   if (!sel.options.length) { let n = 0; const t = setInterval(() => { fill(); if (sel.options.length || ++n > 60) clearInterval(t); }, 1000); }
   if (!out.innerHTML) out.innerHTML = mathsIndex();
@@ -1538,10 +2037,12 @@ async function classWatch(r) {
   const head = document.getElementById('watchhead'); if (!head) return;
   if (watchPreset !== r.preset) { watchPreset = r.preset; watchKey = null; }
   clearTimeout(watchTimer);
-  let d; try { d = await get(`/api/watch?preset=${encodeURIComponent(r.preset)}`); } catch (e) { head.innerHTML = `<div class="${emptyCls()}">the voyage could not be read (a dashboard server started before the Watch panel has to be restarted)</div>`; return; }
+  let d; try { d = await get(`/api/watch?preset=${encodeURIComponent(r.preset)}&sop=${encodeURIComponent(sopPick)}`); } catch (e) { head.innerHTML = `<div class="${emptyCls()}">the voyage could not be read (a dashboard server started before the Watch panel has to be restarted)</div>`; return; }
   const again = () => { if (page === 'rung' && modelTab === 'training' && currentRung && rungFor(currentRung) && rungFor(currentRung).preset === r.preset) classWatch(r); };
   if (d.voyage && d.voyage.status === 'at sea') watchTimer = setTimeout(again, 30000);
-  const key = JSON.stringify([d.where, d.drawn.length, d.log.slice(-1)]); if (key === watchKey) return; watchKey = key;
+  // never skip the draw on a cache hit: the key was set before the render, so one throw left the panel saying
+  // "looking for a voyage…" forever (9 November). The panel redraws every 30 s anyway.
+  watchKey = JSON.stringify([d.where, (d.drawn || []).length, (d.log || []).slice(-1)]);
   if (!d.voyage) { head.innerHTML = `<div class="${emptyCls()}">no voyage of this size on the ledger yet</div>`; return; }
   const v = d.voyage, w = d.where, M = x => x == null ? '–' : `${(x / 1e6).toFixed(x < 1e8 ? 1 : 0)}M`;
   const pct = w.total_steps ? Math.min(100, 100 * w.step / w.total_steps) : 0;
@@ -1556,7 +2057,7 @@ async function classWatch(r) {
     <div class="wprog"><i style="width:${pct}%"></i></div>
     <div class="s">${w.last_reading_s_ago != null && v.status === 'at sea' ? `last reading ${Math.round(w.last_reading_s_ago)} s ago · the panel reads again every 30 s` : ''}</div>`;
   // the stage plan: each stage as a band, its passes marked; you are here
-  const all = [...d.stages, ...d.post];
+  const all = [...(d.stages || []), ...(d.post || [])];  // a payload without one of them must not throw
   const passes = all.reduce((a, s) => a + (s.passes || 1), 0) || 1;
   let done = 0;
   const herePass = (w.pass || 1) - 1 + ((w.tokens_total ? (w.tokens % (w.tokens_total / w.passes)) / (w.tokens_total / w.passes) : 0));
@@ -1649,19 +2150,52 @@ const metricRows = list => list.length ? list.map(m => `<tr><td><b>${esc(m[0])}<
     <td><span class="${pillCls(m[2] === 'live' ? ' live' : '')}">${esc(m[2])}</span></td></tr>`).join('')
   : '<tr><td colspan="4" class="${emptyCls(true)}">none for this model yet</td></tr>';
 const runCells = x => `<td>${esc(x.ship || '')}</td><td>${esc(x.name)}</td><td>${esc((x.status || '').split(':')[0])}</td>`;
+// The whole size page renders inside one boundary: a throw anywhere (a drawer, a chart, a missing element) shows
+// itself as a red bar with the stack, instead of a blank page that reads as "no data" (9 November, after three
+// blank tabs in one morning).
+let _rungBusy = false;
 function renderRung() {
+  if (_rungBusy) return;
+  _rungBusy = true;
+  try {
+    _renderRung();
+  } catch (e) {
+    console.error('renderRung failed', e);
+    try { fetch(`/api/client_log?msg=${encodeURIComponent('renderRung: ' + String((e && e.stack) || e))}`, ); } catch (_) {}
+    const host = document.getElementById('rung');
+    if (host) {
+      const bar = document.createElement('div');
+      bar.className = 'fbmsg bad panel-error';
+      bar.textContent = `the page failed to render: ${String((e && e.message) || e)}`;
+      bar.title = String((e && e.stack) || '');
+      host.prepend(bar);
+    }
+  } finally {
+    _rungBusy = false;
+  }
+}
+
+function _renderRung() {
   const r = rungFor(currentRung) || ladderData.rungs[0];
   // the template's own slot: panels marked data-kind show only on that kind of model
   document.querySelectorAll('#rung [data-kind]').forEach(el => { el.hidden = !el.dataset.kind.split(' ').includes(r.kind || slugOf(r)); });
   document.getElementById('rungtitle').textContent = `${r.preset} · ${r.name}`;
   document.getElementById('rungjob').textContent = r.job;
+  // the SOP versions this size has sailed: pick one and every panel below narrows to it
+  const sopSel = document.getElementById('soppick');
+  if (sopSel) {
+    const vers = [...new Set(ladderData.runs.filter(x => x.preset === r.preset).map(x => x.sop).filter(Boolean))].sort();
+    if (!vers.includes(sopPick) && sopPick) sopPick = '';
+    sopSel.innerHTML = `<option value="">all versions</option>` + vers.map(v => `<option value="${esc(v)}">v${esc(v)}</option>`).join('');
+    sopSel.value = sopPick;
+    if (!sopSel.onchange) sopSel.onchange = () => { sopPick = sopSel.value; renderRung(); };
+  }
   const allRuns = rungRuns(r.preset), runs = allRuns.slice(-RECENT), capped = allRuns.length > runs.length;
   const more = (n) => capped ? `<tr><td colspan="${n}" class="note">the latest ${runs.length} of ${allRuns.length} voyages at ${esc(r.preset)}; the Overview grid has every one</td></tr>` : '';
   const none = (n) => `<tr><td colspan="${n}" class="${emptyCls(true)}">no voyages at ${esc(r.preset)} yet</td></tr>`;
   document.querySelectorAll('#rung .recentnote').forEach(el => { el.textContent = capped ? `(the latest ${runs.length} of ${allRuns.length} runs)` : ''; });
 
   // ---- Overview: every run, and the Forgotten Tomes score run by run
-  classCards(r);
   classDeck(r);
   runGrid(r, allRuns);
   ftProgress(allRuns);
@@ -1673,7 +2207,8 @@ function renderRung() {
     ['judged by', r.scored], ['status', r.status],
   ].map(([k, v]) => `<div><div class="k">${k}</div><div>${esc(v)}</div></div>`).join('');
   const shelfName = x => esc((x.recipe || '–').replace('lists/', '').replace('.csv', ''));
-  document.querySelector('#trainruns tbody').innerHTML = runs.length ? runs.map(x => `<tr data-run="${esc(x.run_id)}">${runCells(x)}<td>${shelfName(x)}</td>
+  const trainBody = document.querySelector('#trainruns tbody');  // the table was taken off the page (9 November)
+  if (trainBody) trainBody.innerHTML = runs.length ? runs.map(x => `<tr data-run="${esc(x.run_id)}">${runCells(x)}<td>${shelfName(x)}</td>
     <td>${x.passes ?? '–'}</td><td>${x.seed ?? '–'}</td><td>${x.vocab ?? '–'}</td><td>${x.context ?? '–'}</td><td>${big(x.tokens_seen)}</td>
     <td>${fmt(x.wall_minutes, 1)}</td><td>${esc(String(x.started || '–').slice(0, 16).replace('T', ' '))}</td></tr>`).join('') + more(11) : none(11);
   renderShelf(r, runs);
@@ -1691,7 +2226,9 @@ function renderRung() {
   // retired ships (pruned to each size's top five, 2026-11-08) are folded away below; their voyages stay in the ledger
   const retired = fleet.filter(x => x.status === 'retired'), kept = fleet.filter(x => x.status !== 'retired');
   const live = kept.filter(x => !x.archived), old = kept.filter(x => x.archived);
-  document.querySelector('#fleettable tbody').innerHTML = live.length ? live.map(shipRow).join('')
+  const ftb = document.querySelector('#fleettable tbody');  // the Fleet tab was removed 9 November
+  if (!ftb) return;
+  ftb.innerHTML = live.length ? live.map(shipRow).join('')
     : `<tr><td colspan="8" class="${emptyCls(true)}">no ship of this size in service yet${old.length ? '; the First Fleet is below' : ''}</td></tr>`;
   document.getElementById('fleetarchivewrap').hidden = !old.length;
   document.getElementById('fleetarchivesum').textContent = `archived: ${old.length} ship${old.length === 1 ? '' : 's'}, ${old.reduce((n, x) => n + x.sailings.length, 0)} voyages, fitted out before 7 November`;
@@ -1727,12 +2264,158 @@ function renderRung() {
   renderTomes(r, allRuns);
   rungExtras(r, runs, allRuns);
   if (modelTab === 'waypoints') { renderWaypoints(r); starsInReach(r); classSteps(r); }
-  if (modelTab === 'goals') classGoals(r);
+  // each tab's drawer is isolated: one throwing must not blank the tab (9 November: a broken drawer left the Goals
+  // page empty with no message, which reads as "the page does not load")
+  const safe = (fn, ...args) => {
+    try { return fn(...args); } catch (e) {
+      console.error(`${fn.name} failed`, e);
+      // say it on the page: a blank tab reads as "no data" when the truth is a broken drawer
+      const host = document.getElementById('rung');
+      if (host) {
+        const bar = document.createElement('div');
+        bar.className = 'fbmsg bad';
+        bar.textContent = `${fn.name} failed: ${String(e && e.message || e)}`;
+        host.prepend(bar);
+      }
+    }
+  };
+  if (modelTab === 'goals' || modelTab === 'scoring') guarded(classGoals, r);  // the route lives on Scoring now
+  if (modelTab === 'scoring') guarded(classCards, r);  // the four cards live on Scoring now
   if (modelTab === 'fitouts') classFitouts(r);
   if (modelTab === 'scoring') { askPanel(r); if (scSub === 'shapes') classShapes(r); else if (scSub === 'versus') classVersus(r); else if (scSub === 'maths') mathsBook(r); else if (!['ask', 'language'].includes(scSub)) classSubject(r, scSub); }
   if (modelTab === 'bet') classWager(r);
-  if (modelTab === 'training') classWatch(r);
+  if (modelTab === 'overview') guarded(sopSummary, r);
+  if (modelTab === 'training') { guarded(classWatch, r); guarded(classDepth, r); guarded(sizeJourney, r); }
   document.querySelectorAll('#rung .chart').forEach(el => { if (el.data && el.offsetParent) Plotly.Plots.resize(el); });
+}
+// ---- The depth (the Training tab): every shape of a size, drawn against its layers (/api/depth). The star
+// chart's order on the vertical axis, depth on the horizontal: where each card is found, and how late.
+const DEPTH_CARDS = [['previous_word', 'previous-word'], ['duplicate_word', 'duplicate-word'], ['induction', 'induction'],
+  ['natural_book', 'the Nevermore'], ['attention_sink', 'the sink'], ['delimiter', 'the delimiter'],
+  ['offset_2', 'words back'], ['rare_word', 'the rare word'], ['premise_marker', 'premise-marker'],
+  ['comparator', 'the comparator'], ['bridge', 'the bridge'], ['mover', 'the mover']];
+async function classDepth(r) {
+  const host = document.getElementById('rung'); if (!host || !r) return;
+  let d; try { d = await get(`/api/depth?preset=${encodeURIComponent(r.preset)}&sop=${encodeURIComponent(sopPick)}`); } catch (e) { return; }
+  const shapes = Object.entries(d.shapes || {}); if (!shapes.length) return;
+  const panel = document.createElement('section');
+  panel.className = 'panel mt';
+  panel.innerHTML = `<h2>The depth <span class="note">every shape of this size, drawn against its layers: the deck's order on the vertical axis, depth on the horizontal. A card is found where its colour is strongest; the last column is the layer it is read best in. In Qwen3 4B the copy cards sit two-thirds down; in the 300k there are only two layers to sit in</span></h2>` +
+    shapes.map(([preset, s]) => {
+      const layers = s.layers, all = Object.values(s.cards).flat(), max = Math.max(1, ...all);
+      const rows = DEPTH_CARDS.filter(([k]) => s.cards[k]).map(([k, label]) => {
+        const vals = s.cards[k], best = vals.indexOf(Math.max(...vals));
+        return `<tr><td class="s">${esc(label)}</td>` + Array.from({ length: layers }, (_, i) => {
+          const v = vals[i] ?? 0, a = Math.max(0, v / max);
+          return `<td title="${esc(label)} at layer ${i}: ${v}" style="background:color-mix(in srgb, var(--accent) ${Math.round(a * 85)}%, transparent)"></td>`;
+        }).join('') + `<td class="s">L${best}</td></tr>`;
+      }).join('');
+      return `<div class="k mt">${esc(preset)} — ${layers} layers <span class="s">(${esc(String(s.run || '').slice(0, 44))}, ${esc(s.status || '')})</span></div>
+        <div class="scroll"><table class="selbooks depthgrid"><thead><tr><th></th>${Array.from({ length: layers }, (_, i) => `<th class="s">${i}</th>`).join('')}<th>found</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    }).join('');
+  host.appendChild(panel);
+}
+// ---- 300k against Qwen3 4B, as a deviation per point (/api/stars_deviation): the chart read as a gap, not a level
+// ---- the ten points as two lines (/api/star_points): Qwen3 4B, which chains, against our smallest ship
+// the same ten points, for one size's newest voyage, live on its Training tab (9 November: "that chart should also
+// appear during training ... so i can track augustus star chart against qwen3 4b")
+async function sizeJourney(r) {
+  const el = document.getElementById('sizejourney'); if (!el || !r) return;
+  let d; try { d = await get(`/api/star_points?preset=${encodeURIComponent(r.preset)}`); } catch (e) { return; }
+  starChart(el, d.points, { label: r.preset, height: 380 });
+}
+async function starJourney() {
+  const el = document.getElementById('starjourney'); if (!el) return;
+  let d; try { d = await get('/api/star_points'); } catch (e) { return; }
+  starChart(el, d.points, { label: 'the 300k', height: 380 });
+}
+// ---- the sixteen cards, card by card (/api/card_deck), on the Discoveries Cards tab
+async function drawCardDeck() {
+  const tb = document.querySelector('#discCards tbody'); if (!tb) return;
+  let d; try { d = await get('/api/card_deck'); } catch (e) { return; }
+  const tier = { keeper: '=', decayer: '~', untested: '?' };
+  tb.innerHTML = (d.cards || []).map(c => `<tr><td class="mono">${esc(c.card)}</td><td>${esc(c.suit)}</td>
+    <td>${c.mark == null ? '–' : c.mark}</td><td title="keeper: holds after the fade; decayer: reads under the pull and falls; untested: never pinned">${tier[c.tier] || '?'}</td>
+    <td>${c.ours == null ? '<span class="s">–</span>' : `<b>${c.ours.toFixed(2)}</b>`}</td>
+    <td>${c.qwen == null ? '<span class="s">–</span>' : c.qwen.toFixed(2)}</td></tr>`).join('');
+}
+async function starDeviations() {
+  const el = document.getElementById('stardev'); if (!el) return;
+  let d; try { d = await get('/api/stars_deviation'); } catch (e) { el.innerHTML = `<div class="${emptyCls()}">could not read the deviation</div>`; return; }
+  const cs = (d.cards || []).filter(c => Math.abs(c.dev) > 0.02);
+  if (!cs.length) { el.innerHTML = `<div class="${emptyCls()}">no point reads in both a 300k and Qwen3 4B yet</div>`; return; }
+  const cs2 = [...cs].sort((a, b) => a.dev - b.dev);
+  const mark = { keeper: '=', decayer: '~', untested: '?' };
+  const tone = v => v >= 0 ? (C.good || '#5aa07a') : (C.bad || '#c0563f');
+  el.innerHTML = '';
+  Plotly.react(el, [{
+    type: 'bar', orientation: 'h',
+    y: cs2.map(c => `${mark[c.tier] || '?'} ${c.name}`),
+    x: cs2.map(c => c.dev),
+    marker: { color: cs2.map(c => tone(c.dev)) },
+    text: cs2.map(c => `${c.ours.toFixed(2)} vs ${c.qwen.toFixed(2)}`),
+    textposition: 'auto', hovertemplate: '%{y}<br>ours %{text}<br>deviation %{x:+.2f} of the mark<extra></extra>',
+  }], { ...LAYOUT, margin: { l: 190, r: 24, t: 10, b: 40 }, xaxis: { title: 'deviation from Qwen3 4B (× the card\'s mark)', gridcolor: C.line, zeroline: true, zerolinecolor: C.line },
+    yaxis: { automargin: true, tickfont: { size: 11 } }, showlegend: false, height: Math.max(320, 26 * cs2.length) });
+}
+// ---- the SOP run, brief (9 November, Justin: "each ships overview page should just give a brief summary of it's SOP
+// run and what the scores are and what that means for that SOP version"): the newest voyage on the standard, its
+// scores, and a plain sentence on what they say
+async function sopSummary(r) {
+  const el = document.getElementById('sopsummary'); if (!el || !r) return;
+  let d; try { d = await get(`/api/star_points?preset=${encodeURIComponent(r.preset)}`); } catch (e) { return; }
+  const runs = ((ladderData || {}).runs || []).filter(x => x.preset === r.preset && !(x.name || '').startsWith('smoke'));
+  const latest = runs.sort((a, b) => String(b.started || '').localeCompare(String(a.started || '')))[0];
+  let chaining = null, suits = null;
+  try {
+    const lc = await get(`/api/ladder_chaining?sop=${encodeURIComponent(latest && latest.sop || '')}`);
+    chaining = ((lc.sizes || []).find(x => x.size === r.preset) || {}).chaining;
+  } catch (e) {}
+  try {
+    const sr = await get('/api/suit_ratings');
+    const mine = ((sr.ships || []).find(x => x.size === r.preset) || {});
+    suits = [['copying', mine.copying], ['position', mine.position], ['comparing', mine.comparing], ['carrying', mine.carrying]];
+  } catch (e) {}
+  const ps = (d.points || []).filter(p => p.ours != null);
+  const clears = ps.filter(p => p.ours >= 1).length;
+  const qwen = 0.538;
+  const gapTxt = chaining == null ? 'no chaining reading yet' : `${chaining.toFixed(3)} against Qwen's ${qwen.toFixed(3)}`;
+  const verdict = chaining == null
+    ? 'The voyage has not been read on the chaining deck yet, so the standard is unjudged.'
+    : chaining >= qwen ? 'This run matches or beats Qwen3 4B on chaining — the standard is working at this size.'
+    : chaining > 0.05 ? 'This run chains, but behind Qwen3 4B: the standard is building some of the circuit.'
+    : 'This run chains close to zero: at this size the standard is not yet building the circuit, whatever its cards read.';
+  const points = ps.map(p => `<tr><td class="s">${p.n}. ${esc(p.role)}</td><td>${p.ours.toFixed(2)}</td><td class="s">${p.qwen == null ? '–' : p.qwen.toFixed(2)}</td></tr>`).join('');
+  el.innerHTML = `<div class="libsum">
+      <div class="libstats">
+        <div class="libstat"><b>${esc(latest ? latest.sop ? 'v' + latest.sop : 'no SOP' : '–')}</b><span>the standard of the newest voyage</span></div>
+        <div class="libstat"><b>${chaining == null ? '–' : chaining.toFixed(3)}</b><span>chaining (Qwen 0.538)</span></div>
+        <div class="libstat"><b>${clears}/${ps.length}</b><span>chart points clearing their mark</span></div>
+        <div class="libstat"><b>${suits ? suits.filter(s => s[1] != null && s[1] >= 1).length + '/4' : '–'}</b><span>suits at or above their marks</span></div>
+      </div>
+      <div class="k">What it means</div><div>${esc(verdict)} ${esc(gapTxt)}.</div>
+      ${suits ? `<div class="k mt">The suits</div><div class="s">${suits.map(s => `${esc(s[0])} ${s[1] == null ? '–' : s[1].toFixed(2)}`).join(' · ')}</div>` : ''}
+      <div class="k mt">The star chart, against Qwen3 4B</div><div class="chart" id="sopchart"></div>
+      <div class="k mt">By SOP version <span class="s">the reasoning results at this size, one row a version: so a 0.0.6 run can be read beside 0.0.5 without leaving the ship</span></div>
+      <div id="sopversions" class="s">reading…</div>
+      ${points ? `<div class="k mt">The points, against Qwen</div><div class="scroll"><table class="selbooks"><tbody>${points}</tbody></table></div>` : ''}
+      <div class="s mt">${latest ? `newest voyage ${esc(latest.name)}${latest.status ? ' · ' + esc(latest.status) : ''}` : ''}</div>
+    </div>`;
+  // the star chart, as two lines (Qwen against this ship), on this panel
+  starChart('sopchart', ps, { label: r.preset, height: 300, ticks: 9 });
+  // the reasoning results by SOP version
+  const vt = document.getElementById('sopversions');
+  if (vt) {
+    try {
+      const sc = await get(`/api/sop_scores?preset=${encodeURIComponent(r.preset)}`);
+      const rows = (sc.versions || []).map(v => {
+        const ch = v.chaining == null ? '–' : v.chaining.toFixed(3);
+        const gap = v.gap == null ? '' : `${v.gap > 0 ? '+' : ''}${v.gap.toFixed(3)}`;
+        return `<tr><td class="mono">v${esc(v.sop)}</td><td>${esc(v.status)}</td><td><b>${ch}</b></td><td>${gap}</td><td>${v.clears}/${v.of}</td></tr>`;
+      }).join('');
+      vt.innerHTML = `<div class="scroll"><table class="selbooks"><thead><tr><th>version</th><th>status</th><th>chaining</th><th>gap to Qwen</th><th>points cleared</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    } catch (e) { vt.textContent = 'the versions could not be read'; }
+  }
 }
 // ---- Waypoints: when each run passed each waypoint (server.py api_waypoints). Fetched only while
 // the tab is open; the thresholds come from the evaluators, never typed in here.
@@ -1846,7 +2529,7 @@ document.querySelectorAll('[data-essay]').forEach(b => b.onclick = () => openEss
 document.getElementById('readpassage').onclick = e => { if (e.currentTarget.dataset.book) openBook(e.currentTarget.dataset.book); };
 
 // a row in a class's fleet or training table, or a voyage's ships, opens that ship
-['fleettable', 'fleetarchive', 'fleetretired', 'trainruns', 'voyageruns'].forEach(id => document.getElementById(id).addEventListener('click', e => {
+['fleettable', 'fleetarchive', 'fleetretired', 'trainruns', 'voyageruns'].forEach(id => document.getElementById(id)?.addEventListener('click', e => {
   const tr = e.target.closest('tr[data-run], tr[data-ship]'); if (!tr || e.target.closest('.info') || e.target.closest('a')) return;
   if (tr.dataset.ship) goShipKey(tr.dataset.ship); else goShip(tr.dataset.run);
 }));
@@ -2591,10 +3274,12 @@ async function classGoals(r) {
   const nextCls = ladderData.rungs[me + 1], nextGoals = nextCls ? kts.filter(t => t.target_class === nextCls.preset) : [];
   const done = goals.filter(t => onClass(t).done).length;
   const cov = coverage(reachData, r.preset), filled = cov.reduce((n, c) => n + c.here, 0), inh = cov.reduce((n, c) => n + c.inherited, 0), all = cov.reduce((n, c) => n + c.total, 0);
-  document.getElementById('goalcoverage').innerHTML = cov.map((c, i) => `<div class="crow"><span class="cname">${i + 1}. ${esc(c.name)}</span>${coverageBar(c)}
+  const covEl = document.getElementById('goalcoverage');
+  if (covEl) covEl.innerHTML = cov.map((c, i) => `<div class="crow"><span class="cname">${i + 1}. ${esc(c.name)}</span>${coverageBar(c)}
     <span class="cnum">${c.here} here${c.inherited ? ` · ${c.inherited} inherited` : ''} · ${c.open} open of ${c.total}</span></div>`).join('')
     + `<div class="crow total"><span class="cname">the route</span>${coverageBar({ here: filled, inherited: inh, open: all - filled - inh, total: all })}<span class="cnum">${filled} here · ${inh} inherited · ${all - filled - inh} open of ${all}</span></div>`;
-  document.getElementById('goalsover').innerHTML = [
+  const overEl = document.getElementById('goalsover');
+  if (overEl) overEl.innerHTML = [
     // the size's own primary objective (s1.sizes, its role: Justin sets it, e.g. the 300k's bigram table, the 1m's De Morgan)
     ['the primary objective', (() => { const role = r.role || r.job || ''; const m = role.match(/^Primary objective:\s*([^.]*)\.?\s*(.*)$/i);
       return m ? `<b class="primarygoal">${esc(m[1])}</b>${m[2] ? `<div class="s">${esc(m[2])}</div>` : ''}<div class="s">beyond it: as many tricks as it can learn, carried up to the next class</div>`
@@ -2831,6 +3516,10 @@ async function rungExtras(r, runs, allRuns) {
 })();
 async function refresh() {
   await loadLadder();  // a ship's address resolves through the ladder and the ships
+  if (page === 'sizes' && harbourSub === 'shipbuilder') {  // do not touch the open ship builder: a rebuild resets the scroll
+    document.getElementById('updated').textContent = 'updated ' + new Date().toLocaleTimeString();
+    return;
+  }
   if (page === 'voyages' || page === 'voyage') loadVoyages();
   if (page === 'voyages') { loadWaters(); loadOverview(); loadQueue(); }
   if (page === 'voyage' && currentVoyage()) journeyPanel(currentVoyage());
@@ -3451,6 +4140,11 @@ function cardBadge(verdicts, key) {
 // of ship and one per playing card. An image that isn't there removes itself, so a card without art draws no frame.
 const ART_CARDS = new Set(['previous_word', 'nevermore', 'mover', 'comparator', 'bridge']);
 const classSlug = name => (name || '').toLowerCase().replace(/^the\s+/, '').replace(/[^a-z0-9]+/g, '-');
+function flagImg(flag, name, cls = 'flag') {
+  if (!flag) return '';
+  const label = name || flag;
+  return `<img class="${cls}" src="flags/${encodeURIComponent(flag)}.svg" alt="${esc(label)}" title="${esc(label)}" loading="lazy">`;
+}
 function artImg(key, cls = 'cardart') {
   return key ? `<img class="${cls}" src="art/${encodeURIComponent(key)}.png" alt="" loading="lazy" onerror="this.remove()">` : '';
 }
@@ -3563,6 +4257,7 @@ function fitoutCard(f) {
 // structured by filters and cards for all the kind/date/language/collection (things like renaissance and mayflower collections)".
 let BR = null, BRANCH = null;
 const BVARS = new Set();  // the variations picked in the open branch: none is all of them
+const BSIZE = new Set();  // the ship sizes picked on the branches grid: a branch is worked at a size when one of its variations has been read at it
 const BF = { kind: new Set(), language: new Set(), collection: new Set(), voice: new Set(), source: new Set(), period: new Set(), start: '', end: '', ogden: '', sort: 'words', more: 200, show: false };
 const BDIMS = [['kind', 'Kind', 'what the book is: the first rule that matches (hover for the rule)'], ['period', 'Date', "the writer's year: published, else birth + 40, else death - 25 (hover a card)"], ['language', 'Language', 'the language of the text'],
   ['collection', 'Collection', 'the named shelves and decks (Renaissance, the Forgotten Tomes, the nursery...) a book belongs to; a book may be in several; a dim card has none of this view\'s books'], ['voice', 'Voice', 'who speaks: read from the credit, so the Church is undercounted'], ['source', 'Source', 'the collection the text was fetched from']];
@@ -3594,14 +4289,27 @@ function bScope(br) {  // the open branch's books: the picked variations' union,
   const vs = br.variations.filter(v => !BVARS.size || BVARS.has(v.key)), ix = new Set(vs.flatMap(v => v.books));
   return [...ix].sort((a, b) => a - b).map(i => BR.books[i]);
 }
+function bSizeName(preset) { const s = (BR.sizes || []).find(x => x.preset === preset); return s ? s.name : preset; }
 function drawBranches(el) {
   const unique = br => new Set(br.variations.flatMap(v => v.books));
+  // the size filter (Justin, 8 November: "filter branches by which ships size they can work on"): a branch is
+  // worked at a size when any of its variations' books have been read at that size; nothing picked shows every
+  // branch, and a branch no size has read yet says so rather than vanishing
+  const worked = br => !BSIZE.size || (br.sizes || []).some(p => BSIZE.has(p));
+  const chips = (BR.sizes || []).map(s => `<button type="button" class="selchip bsize${BSIZE.has(s.preset) ? ' on' : ''}" data-size="${esc(s.preset)}" title="${esc(s.preset)}">${esc(s.name)}</button>`).join(' ');
   el.innerHTML = `<div class="k">Branches <span class="s">a branch is a purpose the books are gathered for; open one to see its variations and explore what is in it</span></div>
+    <div class="bhand"><span class="k">Ships that work it</span> ${chips}${BSIZE.size ? ' <button type="button" class="selchip bclear-size">clear ×</button>' : ''} <span class="s">${BSIZE.size ? 'the branches that size cannot work on are dimmed' : 'the size that has read a branch of the library; pick one or more to filter'}</span></div>
     <div class="bbranches">${BR.branches.map(br => { const ix = [...unique(br)], t = bSum(ix.map(i => BR.books[i]));
-      return `<button type="button" class="bbranch" data-branch="${esc(br.key)}"><span class="bbname">${esc(br.name)}</span><span class="bbpurpose">${esc(br.purpose)}</span><span class="bbnum"><b>${br.variations.length}</b> variation${br.variations.length === 1 ? '' : 's'} · <b>${t.n.toLocaleString()}</b> books · ${big(t.w)} words</span><span class="bbvars">${br.variations.slice(0, 6).map(v => `<span class="selchip">${esc(v.name)}</span>`).join(' ')}${br.variations.length > 6 ? ` <span class="s">+${br.variations.length - 6} more</span>` : ''}</span></button>`; }).join('')}</div>
+      const sizes = (br.sizes || []).map(bSizeName).join(', ') || 'no size has read it yet';
+      return `<button type="button" class="bbranch${worked(br) ? '' : ' none'}" data-branch="${esc(br.key)}"><span class="bbname">${esc(br.name)}</span><span class="bbpurpose">${esc(br.purpose)}</span><span class="bbnum"><b>${br.variations.length}</b> variation${br.variations.length === 1 ? '' : 's'} · <b>${t.n.toLocaleString()}</b> books · ${big(t.w)} words</span><span class="bbnum s bbwork">ships: ${esc(sizes)}</span><span class="bbvars">${br.variations.slice(0, 6).map(v => `<span class="selchip">${esc(v.name)}</span>`).join(' ')}${br.variations.length > 6 ? ` <span class="s">+${br.variations.length - 6} more</span>` : ''}</span></button>`; }).join('')}</div>
     ${BR.branches_stored ? '' : `<div class="s mt">these are the default branches, not yet stored: <span class="mono">thorp select branches</span> writes them to Postgres, where they can be changed</div>`}
-    <div class="s mt">Library facts ${esc(BR.fingerprint)}: ${BR.books.length.toLocaleString()} books in all, derived texts included.</div>`;
-  el.onclick = e => { const b = e.target.closest('[data-branch]'); if (b) { BRANCH = b.dataset.branch; BVARS.clear(); for (const [d] of BDIMS) BF[d].clear(); BF.start = BF.end = BF.ogden = ''; BF.more = 200; drawBrowse(); } };
+    <div class="s mt">Library facts ${esc(BR.fingerprint)}: ${BR.books.length.toLocaleString()} books in all, derived texts included. A branch's ships are the sizes that have read its variations' lists (its voyages on the ledger); a variation that has never sailed has none, and a branch of selections has none until one is read.</div>`;
+  el.onclick = e => {
+    const s = e.target.closest('[data-size]');
+    if (s) { BSIZE.has(s.dataset.size) ? BSIZE.delete(s.dataset.size) : BSIZE.add(s.dataset.size); return drawBranches(el); }
+    if (e.target.closest('.bclear-size')) { BSIZE.clear(); return drawBranches(el); }
+    const b = e.target.closest('[data-branch]'); if (b) { BRANCH = b.dataset.branch; BVARS.clear(); for (const [d] of BDIMS) BF[d].clear(); BF.start = BF.end = BF.ogden = ''; BF.more = 200; drawBrowse(); }
+  };
   el.onchange = null;
 }
 function bBranchHeader(br) {
@@ -3609,8 +4317,8 @@ function bBranchHeader(br) {
   const delta = v => { const p = byKey[v.derived_from]; if (!p) return ''; const a = new Set(p.books), b = new Set(v.books); const add = v.books.filter(i => !a.has(i)).length, gone = p.books.filter(i => !b.has(i)).length; return `<span class="s">from ${esc(p.name)}: +${add} −${gone}</span>`; };
   return `<div class="bcrumb"><button type="button" class="selchip" data-back="1">Library</button> <span class="s">›</span> <b>${esc(br.name)}</b></div>
     <p class="foaim">${esc(br.purpose)}</p>
-    <div class="k">Variations <span class="s">pick one or more to look at just those; none picked is all of them together</span></div>
-    <div class="bcards bvars">${br.variations.map(v => { const t = bSum(v.books.map(i => BR.books[i])); return `<button type="button" class="bcard bvar${BVARS.has(v.key) ? ' on' : ''}" data-var="${esc(v.key)}" title="${esc(v.about)}"><span class="bname">${esc(v.name)}${v.draft ? ' <span class="s">draft</span>' : ''}</span><span class="bnum">${t.n.toLocaleString()}<span class="s"> books · ${big(t.w)}</span></span><span class="s">${v.kind === 'selection' ? 'a selection, not a list' : v.kind === 'all' ? 'the whole library' : esc(v.list)}</span>${delta(v)}</button>`; }).join('')}</div>
+    <div class="k">Variations <span class="s">pick one or more to look at just those; none picked is all of them together${BSIZE.size ? `; dimmed: not read at ${[...BSIZE].map(bSizeName).join(' or ')}` : ''}</span></div>
+    <div class="bcards bvars">${br.variations.map(v => { const t = bSum(v.books.map(i => BR.books[i])); const worked = !BSIZE.size || (v.sizes || []).some(p => BSIZE.has(p)); const sz = (v.sizes || []).map(bSizeName).join(', ') || 'not sailed yet'; return `<button type="button" class="bcard bvar${BVARS.has(v.key) ? ' on' : ''}${worked ? '' : ' none'}" data-var="${esc(v.key)}" title="${esc(v.about)}"><span class="bname">${esc(v.name)}${v.draft ? ' <span class="s">draft</span>' : ''}</span><span class="bnum">${t.n.toLocaleString()}<span class="s"> books · ${big(t.w)}</span></span><span class="s">${v.kind === 'selection' ? 'a selection, not a list' : v.kind === 'all' ? 'the whole library' : esc(v.list)}</span><span class="s">ships: ${esc(sz)}</span>${delta(v)}</button>`; }).join('')}</div>
     <div class="k mt">What is in ${BVARS.size ? [...BVARS].map(k => esc(byKey[k].name)).join(' + ') : 'the branch'}</div>`;
 }
 function drawBrowse() {
@@ -4352,6 +5060,9 @@ async function loadAcquisition() {
 // reading against the star's mark, green where a sailing lit it (one head, or two together), shaded toward the mark where
 // none has; the card judge's verdict beside the star.
 function drawStarGrid() {
+  starDeviations();
+  drawCardDeck();
+  starJourney();
   const tb = document.querySelector('#starclassgrid tbody'); if (!tb || !discStars) return;
   const presets = [...new Set(discStars.flatMap(s => s.ships.map(x => x.preset)).filter(Boolean))].sort((a, b) => classRank(a) - classRank(b));
   document.querySelector('#starclassgrid thead').innerHTML = `<tr><th>star</th><th>the mark</th>${presets.map(p => `<th>${classLink(p)}</th>`).join('')}<th>the judge</th></tr>`;
@@ -4391,14 +5102,19 @@ async function loadQueue() {
   const fit = r => !r.fitout || !r.fitout.key ? `<span class="${pillCls('bad')}" title="S5 policy 'fitout': its spec names no fitout, so the S3 gate will refuse it">no fitout</span>`
     : r.fitout.named === false ? `<span class="${pillCls('bad')}" title="S5 policy 'fitout': no such fitout, so the S3 gate will refuse it">${esc(r.fitout.key)}?</span>`
     : `<span title="${esc(r.fitout.key)}">${esc(r.fitout.name)}</span>${r.fitout.variation ? ` <span class="${pillCls('')}" title="the census variation: the fitout with one piece removed or changed">~ ${esc(r.fitout.variation)}</span>` : ''}${r.fitout.stage ? `<div class="s">${esc(r.fitout.stage)}</div>` : ''}`;
+  // the queue shows the ship's size and the SOP version, nothing else for now (9 November, Justin: "for the queue the
+  // only thing i want to see is the ship size and the SOP version")
   tb.innerHTML = d.rows.map(r => r.kind === 'step'
-    ? `<tr class="qstep"><td class="s">${r.n}</td><td colspan="7" class="s" title="${esc(r.cmd)}">↳ then a step: <span class="mono">${esc(r.name)}</span></td></tr>`
+    ? `<tr class="qstep"><td class="s">${r.n}</td><td colspan="3" class="s" title="${esc(r.cmd)}">↳ then a step: <span class="mono">${esc(r.name)}</span></td></tr>`
     : `<tr${r.status === 'at sea' ? ' class="sel"' : ''}><td class="s">${r.n ?? ''}</td>
-      <td>${r.status === 'at sea' ? `<span class="${pillCls('running')}">at sea</span> ` : ''}${r.status !== 'queued' ? `<a href="#${shipHash(r.name)}" class="mono">${esc(r.name)}</a>` : `<span class="mono">${esc(r.name)}</span>`}${r.missing ? ` <span class="${pillCls('bad')}" title="specs/${esc(r.spec)}.yaml is missing: the queue will skip it">no spec</span>` : ''}</td>
-      <td class="qgoal" title="${esc(r.experiment || '')}">${esc(r.goal) || '<span class="s">no question in its spec</span>'}</td>
-      <td class="qfit">${fit(r)}</td><td>${exp(r)}</td><td>${esc(r.preset || '')}</td><td>${r.seed ?? ''}</td>
+      <td>${r.status === 'at sea' ? `<span class="${pillCls('running')}">at sea</span> ` : ''}${(() => {  // a ship opens its training page
+        const rung = ladderData && (ladderData.rungs || []).find(x => x.preset === r.preset);
+        const label = `<span class="mono">${esc(r.preset || r.name)}</span>`;
+        return rung ? `<a href="#${modelHash(rung, 'training')}" title="open ${esc(slugOf(rung))}'s training page">${label}</a>` : label;
+      })()}${r.missing ? ` <span class="${pillCls('bad')}">no spec</span>` : ''}</td>
+      <td>${r.sop ? `<span class="${pillCls('accent')}">v${esc(r.sop)}</span>` : '<span class="s">–</span>'}</td>
       <td class="s">${r.status === 'at sea' ? 'sailing' : sailsIn(r.starts_in_min, r.at_least)}</td></tr>`).join('')
-    || `<tr><td colspan="8" class="${emptyCls(true)}">the queue is empty</td></tr>`;
+    || `<tr><td colspan="4" class="${emptyCls(true)}">the queue is empty</td></tr>`;
 }
 
 // ---- the plan, and the waters each ship sails in (top of #/expeditions/queue; thorp/dash/waters.py, /api/waters):
@@ -4462,17 +5178,26 @@ async function loadWaters() {
   const el = document.getElementById('waters'); if (!el) return;
   let d; try { d = await get('/api/waters'); } catch (e) { return; }
   const key = JSON.stringify(d); if (key === watersKey) return; watersKey = key;
-  const when = p => p.at_sea ? `<span class="${pillCls('running')}">at sea</span><div class="s">since ${esc(String(p.since || '').slice(11, 16))}${p.left_min != null ? `, about ${mins(p.left_min)} left` : ''}</div>`
+  const finishAt = p => {  // when a queued line should dock: its start (now if at sea) plus its like-voyage time
+  if (p.kind !== 'spec') return '';
+  const start = p.at_sea ? new Date() : new Date(Date.now() + (p.starts_in_min ?? 0) * 60000);
+  if (p.est_min == null) return p.at_sea ? '' : 'no time yet';
+  const done = new Date(start.getTime() + p.est_min * 60000);
+  return `${String(done.getHours()).padStart(2, '0')}:${String(done.getMinutes()).padStart(2, '0')}`;
+};
+const when = p => p.at_sea ? `<span class="${pillCls('running')}">at sea</span><div class="s">since ${esc(String(p.since || '').slice(11, 16))}${p.left_min != null ? `, about ${mins(p.left_min)} left` : ''}</div>`
     : `${p.at_least ? '≥ ' : '≈ '}${esc(p.starts_at)}<div class="s">${p.est_min != null ? (p.est_is_max ? `up to ${mins(p.est_min)}` : mins(p.est_min)) : 'no time yet'}</div>`;
   const ships = d.plan.filter(p => p.kind === 'spec').length;
   const rows = d.plan.map(p => `<tr class="plan-${p.kind}${p.at_sea ? ' atsea' : ''}${p.waits_for ? ' waiting' : ''}"><td class="s">${p.n ?? ''}</td>
       <td class="plantime">${when(p)}</td><td>${laneChip(p.lane, d)}</td>
-      <td class="planwhat">${planWhat(p)}</td>
+      <td class="planwhat">${p.kind === 'spec' ? `<span class="mono">${esc(p.preset || p.name || '')}</span>` : ``}</td>
+      <td class="s">${finishAt(p)}</td>
+      <td>${p.kind === 'spec' && p.sop ? `<span class="${pillCls('accent')}">v${esc(p.sop)}</span>` : '<span class="s">–</span>'}</td>
       <td class="s">${p.waits_for ? `<span class="${pillCls('accent')}">waits</span> ${esc(p.waits_for)}` : ''}</td></tr>`).join('')
-    || `<tr><td colspan="5" class="${emptyCls(true)}">the queue is empty</td></tr>`;
+    || `<tr><td colspan="6" class="${emptyCls(true)}">the queue is empty</td></tr>`;
   el.innerHTML = `<div class="waters">${laneCard('mac', d)}${laneCard('vast', d)}</div>
     <div class="ovq"><b>${ships}</b> ship${ships === 1 ? '' : 's'} in the plan, at sea first, then the queue in its order; open a ship's <i>training plan and material</i> for how it trains and what it reads</div>
-    <div class="scroll"><table data-nosort class="plantable"><thead><tr><th>#</th><th title="about when it sails (≥ where a line ahead of it in its waters has no time yet), and for how long">sails</th><th>waters</th><th>ship and its goal</th><th>waits for</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="scroll"><table data-nosort class="plantable"><thead><tr><th>#</th><th title="about when it sails (≥ where a line ahead of it in its waters has no time yet), and for how long">sails</th><th>waters</th><th>ship</th><th title="the SOP version the voyage is built to">SOP</th><th title="when it is expected to dock: the line's start plus how long a voyage like it takes on this Mac">finishes</th><th>waits for</th></tr></thead><tbody>${rows}</tbody></table></div>
     <div class="s">as of ${esc(d.now)}</div>`;
 }
 

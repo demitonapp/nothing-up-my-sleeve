@@ -1,0 +1,22 @@
+{
+ "key": "babel-english",
+ "name": "Babel: English only",
+ "aim": "Pan on Ogden v0.1's English alone: the control for the cuneiform share.",
+ "positions": "rope",
+ "tack": null,
+ "opt_in": "The Babel expedition (Justin, 8 November): cuneiform transliterations are discovery text, not an English recipe; Pan is read on English with and without a measured cuneiform share.",
+ "stages": [
+  {
+   "phase": "pretraining",
+   "name": "babel",
+   "shelf": "lists/babel-english.csv",
+   "tokens": null,
+   "select": "all",
+   "passes": 4,
+   "lr": null,
+   "tack": null,
+   "purpose": "the whole list, four passes",
+   "compose": null
+  }
+ ]
+}

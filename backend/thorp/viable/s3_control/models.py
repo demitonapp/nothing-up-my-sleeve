@@ -90,6 +90,62 @@ class Stage(Base):
     fitout: Mapped[Fitout] = relationship(back_populates="stages")
 
 
+class Journey(Base):
+    """A ship's journey: what it goes out to do (pretraining) and what it brings home (posttraining).
+
+    A journey is a plan, not a run: its `pretraining` leg goes out from its harbour, its `posttraining`
+    leg returns to it. The stages of each leg are `JourneyStage` rows, in ordinal order.
+    """
+
+    __tablename__ = "journeys"
+    __table_args__ = {"schema": SCHEMA}
+
+    key: Mapped[str] = mapped_column(Text, primary_key=True)
+    name: Mapped[str] = mapped_column(Text)
+    ship_key: Mapped[str | None] = mapped_column(Text)  # the ship, when one is named; a plan may precede it
+    harbour_key: Mapped[str | None] = mapped_column(
+        Text, ForeignKey("s1.harbours.key", ondelete="SET NULL")
+    )
+    aim: Mapped[str] = mapped_column(Text, default="", server_default="")
+    status: Mapped[str] = mapped_column(Text, default="draft", server_default="draft")
+    signed_by: Mapped[str | None] = mapped_column(Text)  # the harbourmaster's name
+    signed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    manifest_sha1: Mapped[str | None] = mapped_column(Text)  # the supplies this signature covers
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    stages: Mapped[list[JourneyStage]] = relationship(
+        back_populates="journey", cascade="all, delete-orphan", order_by="JourneyStage.phase, JourneyStage.ordinal"
+    )
+
+
+class JourneyStage(Base):
+    """One leg-stop of a journey: a pretraining or posttraining stage, with its purpose and supplies."""
+
+    __tablename__ = "journey_stages"
+    __table_args__ = (
+        CheckConstraint("phase in ('pretraining', 'posttraining')", name="journey_stage_phase"),
+        {"schema": SCHEMA},
+    )
+
+    journey_key: Mapped[str] = mapped_column(
+        Text, ForeignKey(f"{SCHEMA}.journeys.key", ondelete="CASCADE"), primary_key=True
+    )
+    phase: Mapped[str] = mapped_column(Text, primary_key=True)
+    ordinal: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(Text)
+    purpose: Mapped[str] = mapped_column(Text, default="", server_default="")
+    library: Mapped[str | None] = mapped_column(Text)  # a list in lists/, or None (not yet chosen)
+    tokens: Mapped[int | None] = mapped_column(BigInteger)
+    passes: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+    lr: Mapped[float | None] = mapped_column(Float)
+    compose: Mapped[dict | None] = mapped_column(JSONB)
+    # the cards this stage carries, with their characteristics as they stood when the journey was planned:
+    # [{"key","name","level","kind","metric","threshold","evaluator","shared_metric","about"}, ...]
+    cards: Mapped[list | None] = mapped_column(JSONB)
+
+    journey: Mapped[Journey] = relationship(back_populates="stages")
+
+
 class PrecheckItem(Base):
     __tablename__ = "precheck_items"
     __table_args__ = (
@@ -294,6 +350,23 @@ class WagerBet(Base):
 # "these things shouldn't be hardcoded, we have postgres for a reason"; "a ship has characteristics: size,
 # training content, training methodology, voyages, discoveries"). Read through thorp/ship_store.py.
 SHIP_SCHEMA = "s1"  # S1 operations (was `ship`)
+
+
+class Harbour(Base):
+    """A harbour: where ships lie, how deep it is, and who signs for the supplies that enter it."""
+
+    __tablename__ = "harbours"
+    __table_args__ = {"schema": SHIP_SCHEMA}
+
+    key: Mapped[str] = mapped_column(Text, primary_key=True)  # phaleron, zayton
+    ordinal: Mapped[int] = mapped_column(Integer, unique=True)
+    name: Mapped[str] = mapped_column(Text, unique=True)
+    aka: Mapped[str] = mapped_column(Text, default="", server_default="")
+    lane: Mapped[str] = mapped_column(Text)  # mac or vast
+    location: Mapped[str] = mapped_column(Text, default="", server_default="")
+    about: Mapped[str] = mapped_column(Text, default="", server_default="")
+    depth: Mapped[int | None] = mapped_column(BigInteger)  # the most parameters that may lie here; None: no bottom
+    ship_builder: Mapped[str] = mapped_column(Text, default="", server_default="")  # who builds and signs the supplies
 
 
 class Size(Base):

@@ -60,6 +60,7 @@ SYSTEMS: dict[str, System] = {
                 "thorp/train.py",
                 "thorp/train_torch.py",
                 "thorp/acquisition.py",
+                "thorp/gather.py",
                 "thorp/viable/s1_operations/charter.py",
                 "thorp/viable/s1_operations/vast.py",
             ),
@@ -95,6 +96,8 @@ SYSTEMS: dict[str, System] = {
             "the outside world and the future: competitors, forecasts, research",
             (
                 "thorp/fleet.py COMPETITORS, REFERENCE_LADDER",
+                "thorp/sources/catalog.py",
+                "thorp/sources/bulk.py",
                 "s4.outside_readings",
                 "thorp/leaderboard.py",
                 "thorp/smoking_qwen.py",
@@ -211,6 +214,13 @@ def _stores(spec: dict) -> list[str]:
     return []
 
 
+def _sop_names_a_standard(spec: dict) -> list[str]:
+    """S5 'sop': a voyage that names an SOP version is held to that version (thorp/sop.py)."""
+    from thorp import sop
+
+    return sop.check(spec)
+
+
 def _pre_registered(spec: dict) -> list[str]:
     """An operation's voyages belong to an expedition written up in DECISIONS.md before they sail."""
     from thorp import fleet
@@ -235,15 +245,47 @@ def _cleaned(spec: dict) -> list[str]:
     return []
 
 
+def _needs_a_standard(spec: dict) -> list[str]:
+    """Every voyage names an SOP version (9 November, Justin: "does it hold that any voyage needs to have a SOP version?
+    and a ship size?"). The size is the model preset, which the trainer cannot sail without; the SOP names everything
+    else — content, tokeniser, parameters, phases and depth. A voyage queued before the rule was made is in
+    `specs/pre-sop.txt` and sails as it was queued (the cutover Justin set: "all voyages prior to the next one queued
+    sailed without SOP"). Nothing new may be added to that list: a voyage without a standard is an experiment, not a
+    ship's voyage."""
+    if not (spec.get("model") or {}).get("preset"):
+        return ["names no model preset: a voyage must name the ship's size"]
+    version = spec.get("sop")
+    if version:
+        from thorp import sop as _sop
+
+        if _sop.standard(str(version)) is None:
+            return [f"names SOP v{version}, which does not exist (have: {', '.join(_sop.versions())})"]
+        return []
+    from thorp import paths
+
+    f = paths.resolve("specs/pre-sop.txt")
+    grandfathered = {x.strip() for x in f.read_text().splitlines() if x.strip() and not x.startswith("#")} if f.exists() else set()
+    if str(spec.get("name") or "") in grandfathered:
+        return []
+    return ["names no SOP version: every voyage is built to a standard (sop: '0.0.5')"]
+
+
 def _named_fitout(spec: dict) -> list[str]:
-    """Every voyage names the fitout it is a variation of (`fitout: {key, variation}` in its spec), and
-    that fitout exists (fleet.FITOUTS or data/fitouts/). Named in the spec, never inferred at the gate."""
-    from thorp import fleet
+    """Every voyage names the fitout it is a variation of (`fitout: {key, variation}` in its spec), and that fitout
+    exists (fleet.FITOUTS or data/fitouts/). Named in the spec, never inferred at the gate.
+
+    **The fitout is retired in favour of the SOP** (9 November, Justin: "fitout is retired in favour of SOP's"). A
+    voyage that names an SOP version names its content, tokeniser, parameters and phases there, so the SOP version is
+    what the gate checks; the fitout is only a legacy label and is not required when an SOP is named."""
+    from thorp import fleet, sop
 
     f = spec.get("fitout")
     key = f.get("key") if isinstance(f, dict) else None
+    version = spec.get("sop")
     if not key:
-        return ["names no fitout (fitout: {key, variation}; fleet.with_fitout writes one)"]
+        if version and sop.standard(str(version)) is not None:
+            return []  # the SOP names the content: the fitout is not needed
+        return ["names no fitout and no SOP version (fitout: {key, variation}, or sop: '0.0.6')"]
     if fleet.named_fitout(key) is None:
         return [f"names the fitout {key!r}, which does not exist"]
     return []
@@ -253,12 +295,21 @@ OGDEN = "ogden"  # the Ogden fitout and its versions (ogden, ogden-v0-1, ...): t
 
 
 def _ogden_only(spec: dict) -> list[str]:
-    """Only the Ogden fitout sails (Justin, 2026-11-07 19:30): a voyage's named fitout is Ogden or a version of it."""
+    """Only Ogden reads sail (Justin, 2026-11-07 19:30; from 9 November the SOP names the content): a voyage's fitout
+    is Ogden or a version of it, or the SOP version it names reads Ogden's list."""
+    from thorp import sop as sopmod
+
     f = spec.get("fitout")
     key = (f.get("key") if isinstance(f, dict) else None) or ""
     if key == OGDEN or key.startswith(OGDEN + "-"):
         return []
-    return [f"sails on the fitout {key!r}" if key else "names no fitout", "only the Ogden fitout sails"]
+    std = sopmod.standard(str(spec.get("sop"))) if spec.get("sop") else None
+    if std and str((std.get("content") or {}).get("recipe", "")).endswith("ogden-v0.1.csv"):
+        return []
+    return [
+        f"sails on the fitout {key!r}" if key else "names no fitout",
+        "only the Ogden fitout sails",
+    ]
 
 
 def _prechecked(spec: dict) -> list[str]:
@@ -271,6 +322,10 @@ def _prechecked(spec: dict) -> list[str]:
     f = spec.get("fitout")
     key = f.get("key") if isinstance(f, dict) else None
     if not key:
+        from thorp import sop as _sop
+
+        if spec.get("sop") and _sop.standard(str(spec["sop"])) is not None:
+            return []  # the SOP's own check judges the content: the fitout's prechecks are not needed
         return ["names no fitout to check"]
     try:
         from thorp.viable.s3_control import fitout_store
@@ -278,11 +333,17 @@ def _prechecked(spec: dict) -> list[str]:
         r = fitout_store.readiness(key)
         rows = fitout_store.fitouts()
     except Exception as e:  # noqa: BLE001
-        return [f"the fitout store cannot be read ({e.__class__.__name__}): its prechecks are unknown"]
+        return [
+            f"the fitout store cannot be read ({e.__class__.__name__}): its prechecks are unknown"
+        ]
     if not r:
-        return [f"the fitout {key!r} has no prechecks (python -m thorp.viable.s1_operations.prechecks {key})"]
+        return [
+            f"the fitout {key!r} has no prechecks (python -m thorp.viable.s1_operations.prechecks {key})"
+        ]
     if not r.get("ready"):
-        return [f"the fitout {key!r} is not ready: {r.get('outstanding')} of {r.get('required')} prechecks outstanding"]
+        return [
+            f"the fitout {key!r} is not ready: {r.get('outstanding')} of {r.get('required')} prechecks outstanding"
+        ]
     checked = next((x["clean"] for x in rows if x["key"] == key), None)
     if checked and checked != cleaning.version_of(spec):
         return [f"reads {cleaning.version_of(spec)} text, but its fitout was checked on {checked}"]
@@ -299,6 +360,15 @@ def _chartered(spec: dict) -> list[str]:
 POLICIES: dict[str, Policy] = {
     p.key: p
     for p in (
+        Policy(
+            "standard",
+            "Every voyage is built to an SOP version and names the ship's size: the size is the shape, the "
+            "standard is everything else. A voyage queued before the rule was made is in specs/pre-sop.txt and "
+            "sails as it was queued; nothing new may be added to that list.",
+            "2026-11-09, Justin",
+            True,
+            _needs_a_standard,
+        ),
         Policy(
             "decks",
             "Every run refuses the held-out decks (the hole cards and the Forgotten Tomes), so no "
@@ -349,6 +419,15 @@ POLICIES: dict[str, Policy] = {
             "2026-11-07 18:10, Justin",
             True,
             _named_fitout,
+        ),
+        Policy(
+            "sop",
+            "A voyage is built to the SOP version it names: the same content, tokeniser and size parameters, and "
+            "the standard's cards in the standard's order. A declared departure is recorded, not refused; a voyage "
+            "that names no version is not stopped by this policy (the cutover is Justin's to set).",
+            "2026-11-08 20:20, Justin",
+            False,
+            _sop_names_a_standard,
         ),
         Policy(
             "ogden",
@@ -416,6 +495,37 @@ def enforced(key: str) -> bool:
     return bool(_enforcement().get(key, POLICIES[key].enforced))
 
 
+def except_policy(
+    policy: str,
+    *,
+    reason: str,
+    adopted: str,
+    runs: tuple[str, ...] = (),
+    patterns: tuple[str, ...] = (),
+    extra: dict | None = None,
+) -> int:
+    """S5 writes an exception: the runs a policy does not govern, by name or by glob, and why (s5.policy_exceptions;
+    was the exceptions in policies.json). The reason and the adoption are kept, so a reader can see whose word let
+    the run through. Returns how many runs and patterns the exception now covers."""
+    from thorp import store
+    from thorp.viable.records import PolicyException, PolicyExceptionMatch
+
+    if policy not in POLICIES and policy != "intake":
+        raise KeyError(f"no policy {policy!r}; the policies: {sorted(POLICIES)}")
+    want = [("run", x) for x in runs] + [("pattern", x) for x in patterns]
+    with store.session() as s:
+        r = s.get(PolicyException, policy)
+        if r is None:
+            r = PolicyException(policy=policy)
+            s.add(r)
+        r.reason, r.adopted, r.extra = reason, adopted, extra or {}
+        r.matches = [
+            PolicyExceptionMatch(kind=k, value=v, ordinal=i)
+            for i, (k, v) in enumerate(dict.fromkeys(want))
+        ]
+    return len(want)
+
+
 def _exceptions() -> dict:
     """S5's written exceptions ({key: {"reason", "adopted", "runs": [names], "patterns": [globs]}}, from
     s5.policy_exceptions and its matches): the runs a policy does not govern, by name, with the reason. A hired box
@@ -472,12 +582,38 @@ def gate(spec: dict, known_run: bool = False, *, where: str = "voyage") -> list[
             _record_gate(spec, where, "refused", decisions)
             raise GateRefused(f"S3 gate, policy '{key}' ({pol.statement}): {'; '.join(found)}")
         bargain = pol.opt_in and bool(opt_in)
-        notes.append(f"policy '{key}'" + (f" opted out: {opt_in}" if bargain else f": {'; '.join(found)}"))
+        notes.append(
+            f"policy '{key}'" + (f" opted out: {opt_in}" if bargain else f": {'; '.join(found)}")
+        )
         decisions.append(
-            {"policy": key, "how": "bargain" if bargain else "advisory", "why": opt_in if bargain else "; ".join(found)}
+            {
+                "policy": key,
+                "how": "bargain" if bargain else "advisory",
+                "why": opt_in if bargain else "; ".join(found),
+            }
         )
     _record_gate(spec, where, "passed", decisions)
     return notes
+
+
+def gate_refusals(spec: dict) -> list[str]:
+    """S3's verdict on a spec, without recording it and without raising (gate's twin, read-only). For a question
+    asked away from the helm — S4's backlog audit — which must not write gate-log rows for voyages that never
+    sail. Returns the refusals `gate` would raise on; an advisory is not one (a policy that is switched off, or
+    admits a written opt-in, does not stop a voyage)."""
+    refusals = []
+    opt_in = (spec.get("data", {}).get("opt_in") or "").strip()
+    for key, pol in POLICIES.items():
+        try:
+            found = pol.check(spec)
+        except Exception as e:  # noqa: BLE001 — a check that cannot be read refuses, never passes
+            refusals.append(f"policy '{key}' could not be read: {e}")
+            continue
+        if not found or excepted(key, spec):
+            continue
+        if enforced(key) and not (pol.opt_in and opt_in):
+            refusals.append(f"policy '{key}' refused: {'; '.join(found)}")
+    return refusals
 
 
 def gate_one(key: str, spec: dict, *, where: str) -> list[str]:
@@ -493,13 +629,19 @@ def gate_one(key: str, spec: dict, *, where: str) -> list[str]:
         _record_gate(spec, where, "passed", [{"policy": key, "how": "excepted", "why": why}])
         return [f"policy '{key}' does not govern this run: {why}"]
     if enforced(key):
-        _record_gate(spec, where, "refused", [{"policy": key, "how": "refused", "why": "; ".join(found)}])
+        _record_gate(
+            spec, where, "refused", [{"policy": key, "how": "refused", "why": "; ".join(found)}]
+        )
         raise GateRefused(f"S3 gate, policy '{key}' ({pol.statement}): {'; '.join(found)}")
-    _record_gate(spec, where, "passed", [{"policy": key, "how": "advisory", "why": "; ".join(found)}])
+    _record_gate(
+        spec, where, "passed", [{"policy": key, "how": "advisory", "why": "; ".join(found)}]
+    )
     return [f"policy '{key}': {'; '.join(found)}"]
 
 
-GATE_TIME = "%Y-%m-%dT%H:%M:%S"  # the gate's clock, this Mac's local time, as the log has always been read
+GATE_TIME = (
+    "%Y-%m-%dT%H:%M:%S"  # the gate's clock, this Mac's local time, as the log has always been read
+)
 
 
 def _record_gate(spec: dict, where: str, verdict: str, decisions: list[dict]) -> None:
@@ -552,7 +694,9 @@ def insert_gate_decision(line: dict, *, source: str = "here", once: bool = False
         d = GateDecision(at=at, name=line.get("name"), ship=line.get("ship"), place=line.get("where", "voyage"),
                          verdict=line["verdict"], source=source)  # fmt: skip
         d.policies = [
-            GatePolicyDecision(ordinal=i, policy=x.get("policy", ""), how=x.get("how", ""), why=x.get("why"))
+            GatePolicyDecision(
+                ordinal=i, policy=x.get("policy", ""), how=x.get("how", ""), why=x.get("why")
+            )
             for i, x in enumerate(line.get("decisions") or [])
         ]
         s.add(d)
@@ -580,7 +724,11 @@ def gate_log(limit: int = 60) -> list[dict]:
                 "where": r.place,
                 "verdict": r.verdict,
                 "decisions": [
-                    {"policy": p.policy, "how": p.how, **({"why": p.why} if p.why is not None else {})}
+                    {
+                        "policy": p.policy,
+                        "how": p.how,
+                        **({"why": p.why} if p.why is not None else {}),
+                    }
                     for p in r.policies
                 ],
             }
@@ -596,7 +744,10 @@ def gate_log(limit: int = 60) -> list[dict]:
 
 def _helm_paths():
     d = paths.data_dir()
-    return d / "helm.lock", d / "helm.json"  # helm.json only on a hired box (its papers); at home, s2.helm
+    return (
+        d / "helm.lock",
+        d / "helm.json",
+    )  # helm.json only on a hired box (its papers); at home, s2.helm
 
 
 def _helm_write(rec: dict | None, pid: int, who) -> None:
@@ -634,7 +785,16 @@ def _helm_read(who) -> dict | None:
 
     with store.session() as s:
         r = s.get(Helm, "mac")
-        return {"name": r.name, "kind": r.kind, "pid": r.pid, "since": r.since.astimezone().strftime(GATE_TIME)} if r else None
+        return (
+            {
+                "name": r.name,
+                "kind": r.kind,
+                "pid": r.pid,
+                "since": r.since.astimezone().strftime(GATE_TIME),
+            }
+            if r
+            else None
+        )
 
 
 @contextlib.contextmanager
@@ -655,7 +815,9 @@ def at_sea(name: str, kind: str = "voyage", log=print):
             )
             fcntl.flock(f, fcntl.LOCK_EX)
         _helm_write(
-            {"name": name, "kind": kind, "pid": os.getpid(), "since": time.strftime(GATE_TIME)}, os.getpid(), who
+            {"name": name, "kind": kind, "pid": os.getpid(), "since": time.strftime(GATE_TIME)},
+            os.getpid(),
+            who,
         )
         yield
     finally:
@@ -740,7 +902,9 @@ def _sailing_without_helm(name: str) -> bool:
     out = subprocess.run(["pgrep", "-f", f"thorp run .*{name}"], capture_output=True, text=True)
     if out.stdout.strip():
         return True
-    with contextlib.suppress(Exception):  # at sea on a hired GPU (the charter): it never takes this Mac's helm
+    with contextlib.suppress(
+        Exception
+    ):  # at sea on a hired GPU (the charter): it never takes this Mac's helm
         from thorp.viable.s3_control import charter as s3
 
         return any(h.get("name") == name for h in s3.out_now())
@@ -798,7 +962,10 @@ def clean_audit(per_library: int = 6) -> dict:
         out["libraries"][lib] = {
             "books": len(ids),
             "words_per_break": [round(raw_w / max(1, raw_b), 1), round(raw_w / max(1, cl_b), 1)],
-            "inside_paragraph_share": [round(raw_in / max(1, raw_b), 3), round(cl_in / max(1, cl_b), 3)],
+            "inside_paragraph_share": [
+                round(raw_in / max(1, raw_b), 3),
+                round(cl_in / max(1, cl_b), 3),
+            ],
             "deterministic": stable,
         }
     return out
@@ -828,8 +995,10 @@ def lint_queue() -> list[str]:
         else ""
     )
     for i, ln in enumerate(lines):
-        if ln.startswith("vast:"):  # the Vast lane (s2_coordination.lanes): the same spec, sailed on a hired GPU
-            ln = ln[len("vast:"):].strip()
+        if ln.startswith(
+            "vast:"
+        ):  # the Vast lane (s2_coordination.lanes): the same spec, sailed on a hired GPU
+            ln = ln[len("vast:") :].strip()
         if ln.startswith(("cmd:", "wait:")):
             continue
         p = paths.resolve(f"specs/{ln}.yaml")
@@ -841,7 +1010,9 @@ def lint_queue() -> list[str]:
             found.append(f"{ln}: its log folder {folder} does not exist")
         spec = yaml.safe_load(p.read_text())
         specs_by_name[spec.get("name")] = spec
-        for why in _named_fitout(spec):  # S5 'fitout': the gate would refuse it when it reached the helm
+        for why in _named_fitout(
+            spec
+        ):  # S5 'fitout': the gate would refuse it when it reached the helm
             found.append(f"{ln}: {why}; the S3 gate will refuse it")
         rid = train.run_id(spec)
         if rid in seen:
@@ -854,7 +1025,9 @@ def lint_queue() -> list[str]:
 
             mine, theirs = cleaning.version_of(spec), _clean_of(src, specs_by_name)
             if theirs is not None and theirs != mine:
-                found.append(f"{ln}: reads {mine} text but is seeded from {src}, which read {theirs}")
+                found.append(
+                    f"{ln}: reads {mine} text but is seeded from {src}, which read {theirs}"
+                )
         if src and src in order:
             continue
         if (

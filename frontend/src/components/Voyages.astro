@@ -7,7 +7,7 @@ import { cardCls, checkCls, crumbCls, emptyCls, rangeCls, selectCls, tabCls, tab
 <div class="section" id="voyages">
   <h1>Expeditions <span class="q">campaigns of ships sent to find something: their goals, how they are steered, and what they found</span></h1>
   <nav class={tabsCls('line', 'subnav')} data-orientation="horizontal" data-variant="line" id="vnav">
-    <a class={tabCls('')} data-state="inactive" data-vtab="expeditions" href="#/expeditions">Expeditions</a><a class={tabCls('')} data-state="inactive" data-vtab="queue" href="#/expeditions/queue">Queue</a>
+    <a class={tabCls('')} data-state="active" data-vtab="queue" href="#/expeditions/queue">Queue</a><a class={tabCls('')} data-state="inactive" data-vtab="expeditions" href="#/expeditions/expeditions">Expeditions</a>
   </nav>
   <div class="vtab" data-vtab="expeditions">
     <div class="cards" id="voyagecards"></div>
@@ -29,7 +29,7 @@ import { cardCls, checkCls, crumbCls, emptyCls, rangeCls, selectCls, tabCls, tab
     <div class="qview" data-qview="every">
   <section class={cardCls(false, 'panel')} id="queuepanel">
     <h2>The queue <span class="note">every voyage still to sail, in the order it sails (specs/queue.txt), with its goal: the question its spec asks, or its experiment's where it asks none, and the fitout it was compiled from (its census variation and stage); the voyage at sea first</span></h2>
-    <div class="scroll queuescroll"><table id="queuetable" data-nosort><thead><tr><th>#</th><th>voyage</th><th>goal</th><th title="the fitout the voyage was compiled from (scripts/make_fitout.py, the Fitouts tab): its census variation, if one, and its stage">fitout</th><th>expedition</th><th>size</th><th>seed</th><th title="about when it sails: each voyage ahead of it at its size's mean time; ≥ where one ahead has no time yet">sails in</th></tr></thead><tbody><tr><td colspan="8" class={emptyCls(true)}>reading the queue…</td></tr></tbody></table></div>
+    <div class="scroll queuescroll"><table id="queuetable" data-nosort><thead><tr><th>#</th><th>ship</th><th title="the SOP version the voyage is built to: its content, tokeniser, parameters, phases and depth">SOP</th><th title="about when it sails: each voyage ahead of it at its size's mean time; ≥ where one ahead has no time yet">sails in</th></tr></thead><tbody><tr><td colspan="8" class={emptyCls(true)}>reading the queue…</td></tr></tbody></table></div>
   </section>
     </div>
   </div>

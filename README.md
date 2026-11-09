@@ -68,6 +68,12 @@ uv run --project backend ruff check backend
 uv run --project backend pytest backend/tests
 uv run --project backend alembic -c backend/alembic.ini upgrade head   # the Postgres fitout store
 uv run --project backend thorp fetch lists/hole-cards.csv
+uv run --project backend thorp gather --list                  # the sources beyond Gutenberg, and their walls
+uv run --project backend thorp gather common-pile-pre-1929 --limit 500   # a bulk corpus through the intake gate
+uv run --project backend thorp gather incunabula --set incunabula --allow-unsigned   # the first printed books, pre-1501
+uv run --project backend thorp gather perseus-latin --set classics                   # Perseus Latin TEI
+uv run --project backend thorp gather perseus-greek --set classics                   # Perseus Greek TEI
+uv run --project backend thorp gather etcsl --set cuneiform --allow-unsigned         # Sumerian transliterations
 uv run --project backend thorp run ships/specs/fitouts/fu-ogden-v0-1@300k-pre-s1.yaml
 uv run --project backend python -m thorp.viable.s1_operations.prechecks ogden-v0-1   # a fitout's prechecks
 sh backend/scripts/queue.sh                                  # the standing queue: ships/specs/queue.txt
@@ -85,7 +91,7 @@ The dashboard is an Astro app in `frontend/`. It builds to `backend/thorp/dash/s
 
 ## Layout
 
-- `backend/thorp/`: the harness (see `DECISIONS.md` for every choice the brief left open); `backend/thorp/viable/` the code laid out by VSM system (S1 to S5) with the Postgres fitout store; `backend/migrations/` and `backend/alembic.ini` its Alembic migrations.
+- `backend/thorp/`: the harness (see `DECISIONS.md` for every choice the brief left open); `backend/thorp/viable/` the code laid out by VSM system (S1 to S5) with the Postgres fitout store; `backend/migrations/` and `backend/alembic.ini` its Alembic migrations. `backend/thorp/gather.py` is acquisition's S1 over a bulk corpus, `backend/thorp/sources/catalog.py` and `bulk.py` its S4 (the sources, their walls and their adapters).
 - `backend/scripts/`: the spec writers (`make_*.py`), the pool and shelf cutters, and the queues (`queue.sh`, the standing queue).
 - `backend/tests/`: the test suite.
 - `frontend/`: the dashboard page (Astro): `src/pages/index.astro` the shell, `src/components/` one per tab, `src/scripts/dashboard.js` the panels, `src/lib/` the shared pieces (DataTable, charts, formatters, the book reader), `src/styles/global.css` the tokens.

@@ -20,7 +20,9 @@ try:
     import mlx.nn as nn
     import mlx.optimizers as optim
     from mlx.utils import tree_flatten, tree_map, tree_unflatten
-except ImportError:  # a CUDA box without MLX: a torch voyage (thorp/train_torch.py) needs none of it
+except (
+    ImportError
+):  # a CUDA box without MLX: a torch voyage (thorp/train_torch.py) needs none of it
     mx = nn = optim = tree_flatten = tree_map = tree_unflatten = None
 
 from thorp import data, evaluators, manifest, paths, shards
@@ -193,12 +195,18 @@ def check_refusals(recipe: list[str], refused: dict[str, list[str]]) -> None:
         raise RefusedBook(f"recipe contains refused books: {clash}")
 
 
-def prepare(spec: dict, resolver: ListResolver = gutenberg_resolver, log=print) -> Prepared:
+def prepare(
+    spec: dict, resolver: ListResolver = gutenberg_resolver, log=print, known: bool | None = None
+) -> Prepared:
     d = spec["data"]
-    # S3, the gate (thorp/vsm.py): every enforced S5 policy applied to a new run, before it reads a page
+    # S3, the gate (thorp/vsm.py): every enforced S5 policy applied to a new run, before it reads a page. A rescore
+    # re-runs prepare with the spec's eval sets changed, which changes run_id(spec): the run is known by definition,
+    # so the reader passes `known=True` rather than letting the gate mistake it for a new voyage (8 November: three
+    # eval commands refused for a fitout their run already sailed under).
     from thorp import vsm
 
-    known = bool(Ledger().query("select 1 from runs where run_id=? limit 1", [run_id(spec)]))
+    if known is None:
+        known = bool(Ledger().query("select 1 from runs where run_id=? limit 1", [run_id(spec)]))
     for note in vsm.gate(spec, known_run=known):
         log(f"S3 gate: {note}")
     stage_recipes = [resolver(st["recipe"]) for st in d.get("stages", [])]
@@ -229,7 +237,9 @@ def prepare(spec: dict, resolver: ListResolver = gutenberg_resolver, log=print) 
     settings = {"kind": t["kind"], "vocab": t["vocab"], "byte_fallback": t["byte_fallback"]}
     from thorp import cleaning
 
-    clean = cleaning.version_of(spec)  # data.clean: the text as read, training and held-out decks alike
+    clean = cleaning.version_of(
+        spec
+    )  # data.clean: the text as read, training and held-out decks alike
     if clean != "raw":  # a raw voyage keeps its old tokeniser id
         settings["clean"] = clean
     log(f"cleaning: {clean}")
@@ -496,12 +506,22 @@ def shaped_like(loaded, template):
                 out[k] = v
             else:
                 raise KeyError(f"the checkpoint has no {k!r}")
-        for k, v in src.items():  # what the checkpoint holds beyond the template (the step, the learning rate)
+        for (
+            k,
+            v,
+        ) in (
+            src.items()
+        ):  # what the checkpoint holds beyond the template (the step, the learning rate)
             out.setdefault(k, v)
         return out
     if isinstance(template, (list, tuple)):
         src = loaded if isinstance(loaded, (list, tuple)) else []
-        out = [shaped_like(src[i], v) if i < len(src) else (v if not tree_flatten(v) else shaped_like(None, v)) for i, v in enumerate(template)]
+        out = [
+            shaped_like(src[i], v)
+            if i < len(src)
+            else (v if not tree_flatten(v) else shaped_like(None, v))
+            for i, v in enumerate(template)
+        ]
         return type(template)(out) if isinstance(template, tuple) else out
     return template if loaded is None else loaded
 
@@ -594,8 +614,16 @@ METRE_PATTERNS = (
     "previous_word", "induction", "duplicate_word", "sink", "delimiter", "words_back",
     "number_spotter", "order_word", "premise_marker", "rare_word",
 )  # fmt: skip
-RIDDLES = ("comparator", "bridge")  # the riddle cards the scaffold can pull on composed items (thorp/riddles.py)
-KEYED = ("delimiter", "number_spotter", "order_word", "premise_marker")  # a class of pieces, read off the vocabulary
+RIDDLES = (
+    "comparator",
+    "bridge",
+)  # the riddle cards the scaffold can pull on composed items (thorp/riddles.py)
+KEYED = (
+    "delimiter",
+    "number_spotter",
+    "order_word",
+    "premise_marker",
+)  # a class of pieces, read off the vocabulary
 
 
 def metre_flags(tok, recipe: list[str]) -> dict:
@@ -630,7 +658,9 @@ def metre_target(x, card: str, flags: dict | None = None):
         hit = mx.broadcast_to(mx.eye(T, k=-2, dtype=mx.bool_)[None], (B, T, T))
     elif card == "induction":
         eq = x[:, :, None] == x[:, None, :]  # (t, p): the same piece
-        shifted = mx.concatenate([mx.zeros((B, T, 1), dtype=mx.bool_), eq[:, :, :-1]], axis=2)  # (t, p + 1)
+        shifted = mx.concatenate(
+            [mx.zeros((B, T, 1), dtype=mx.bool_), eq[:, :, :-1]], axis=2
+        )  # (t, p + 1)
         hit = shifted & mx.tril(mx.ones((T, T), dtype=mx.bool_), k=0)[None]
     elif card == "duplicate_word":
         hit = (x[:, :, None] == x[:, None, :]) & before
@@ -657,7 +687,9 @@ def scaffold_weight(step: int, total: int, sc: dict) -> float:
     """The scaffold's weight at this step: full to hold x total, then linearly down to its floor (0 unless set) at
     fade x total, and the floor after."""
     w = float(sc.get("weight", 1.0))
-    rel = sc.get("release")  # the release stage (2026-11-08, the 21m): the pull off from this share of the voyage
+    rel = sc.get(
+        "release"
+    )  # the release stage (2026-11-08, the 21m): the pull off from this share of the voyage
     if rel is not None and step >= float(rel) * total:
         return 0.0
     fade = sc.get("fade")
@@ -693,10 +725,14 @@ def scaffold_on(step: int, total: int, sc: dict) -> list[float]:
     order, then the comparator and the bridge."""
     on = [1.0 if step >= float(h.get("from", 0.0)) * total else 0.0 for h in sc.get("heads") or []]
     rid = sc.get("riddles") or {}
-    return on + [1.0 if k in rid and step >= float(rid[k].get("from", 0.0)) * total else 0.0 for k in RIDDLES]
+    return on + [
+        1.0 if k in rid and step >= float(rid[k].get("from", 0.0)) * total else 0.0 for k in RIDDLES
+    ]
 
 
-def scaffold_loss(pats: dict, x, sc: dict, targets: dict | None = None, flags: dict | None = None, on=None):
+def scaffold_loss(
+    pats: dict, x, sc: dict, targets: dict | None = None, flags: dict | None = None, on=None
+):
     """The mean, over the scaffolded heads (those started, when `on` is given), of the cross-entropy from the card's
     pattern to the head's attention (over the queries that have a target). Its floor is the target's own entropy
     (0 for previous-word)."""
@@ -716,18 +752,24 @@ def scaffold_loss(pats: dict, x, sc: dict, targets: dict | None = None, flags: d
 def check_scaffold(sc: dict, layers: int, heads: int) -> None:
     for h in sc.get("heads") or []:
         if h.get("card") not in METRE_PATTERNS:
-            raise ValueError(f"scaffold card {h.get('card')!r}: only metre cards with a rule ({', '.join(METRE_PATTERNS)})")
+            raise ValueError(
+                f"scaffold card {h.get('card')!r}: only metre cards with a rule ({', '.join(METRE_PATTERNS)})"
+            )
         if not (0 <= int(h["layer"]) < layers and 0 <= int(h["head"]) < heads):
             raise ValueError(f"scaffold head {h} is not in a {layers} x {heads} model")
     for x in [*(sc.get("heads") or []), *(sc.get("riddles") or {}).values()]:
         if not 0.0 <= float(x.get("from", 0.0)) < 1.0:
-            raise ValueError(f"scaffold start {x}: `from` is a share of the voyage, from 0 to under 1")
+            raise ValueError(
+                f"scaffold start {x}: `from` is a share of the voyage, from 0 to under 1"
+            )
     if not sc.get("heads") and not sc.get("riddles"):
         raise ValueError("scaffold names no heads")
     if sc.get("release") is not None:
         rel = float(sc["release"])
         if not float(sc.get("fade") or 0.0) <= rel < 1.0:
-            raise ValueError(f"scaffold release {rel}: a share of the voyage at or after the fade's end, under 1")
+            raise ValueError(
+                f"scaffold release {rel}: a share of the voyage at or after the fade's end, under 1"
+            )
     for key, r in (sc.get("riddles") or {}).items():
         if key not in RIDDLES:
             raise ValueError(f"scaffold riddle {key!r}: the riddles are {', '.join(RIDDLES)}")
@@ -846,7 +888,9 @@ def train(
     spec: dict, prep: Prepared, rec: Ledger | None = None, stop_after: int | None = None, log=None
 ) -> dict:
     """Train (or resume) the run this spec describes. stop_after simulates an interruption."""
-    if backend_of(spec) == "torch":  # the same loop on PyTorch, for NVIDIA GPUs (thorp/train_torch.py)
+    if (
+        backend_of(spec) == "torch"
+    ):  # the same loop on PyTorch, for NVIDIA GPUs (thorp/train_torch.py)
         from thorp import train_torch
 
         return train_torch.train(spec, prep, rec, stop_after=stop_after, log=log)
@@ -915,7 +959,9 @@ def train(
         # leg 1b: KeyError 'rope' at its first step after the Postgres switch)
         master = shaped_like(load_master(ckpt), master)
         opt.init(master)
-        opt.state = shaped_like(tree_unflatten(list(mx.load(str(ckpt / "optimizer.safetensors")).items())), opt.state)
+        opt.state = shaped_like(
+            tree_unflatten(list(mx.load(str(ckpt / "optimizer.safetensors")).items())), opt.state
+        )
         rec.truncate_after(rid, start)
         log(f"resuming {rid[:12]} from {ckpt.name}")
     model.update(to_compute(master, precision))
@@ -960,28 +1006,45 @@ def train(
     )  # learning from a teacher run's predictions (2026-11-07): {run, alpha, temperature}
     teacher = load_teacher(teach, spec, tok.vocab_size, log) if teach else None
 
-    sc = o.get("scaffold")  # the metre scaffold (2026-11-07): {weight, hold, fade, floor, heads, sample, riddles}
+    sc = o.get(
+        "scaffold"
+    )  # the metre scaffold (2026-11-07): {weight, hold, fade, floor, heads, sample, riddles}
     picks, flags, sample, riddle_cfg, pools = None, None, None, {}, {}
     if sc:
         check_scaffold(sc, model.cfg.layers, model.cfg.heads)
         picks = scaffold_picks(sc) if sc.get("heads") else None
         if any(h["card"] in KEYED or h["card"] == "rare_word" for h in sc.get("heads") or []):
             flags = metre_flags(tok, list(prep.recipe))
-        sample = sc.get("sample")  # {windows, length}: the metre pull read on part of the batch (the full deck)
+        sample = sc.get(
+            "sample"
+        )  # {windows, length}: the metre pull read on part of the batch (the full deck)
         riddle_cfg = sc.get("riddles") or {}
         if riddle_cfg:
             from thorp import riddles
 
             makers = {"comparator": riddles.comparator_items, "bridge": riddles.bridge_items}
 
-            def maker(k, r):  # the Bridge in all four relations, by `kinds: all` (2026-11-08, after leg 0)
-                return riddles.bridge_items_all if k == "bridge" and r.get("kinds") == "all" else makers[k]
+            def maker(
+                k, r
+            ):  # the Bridge in all four relations, by `kinds: all` (2026-11-08, after leg 0)
+                return (
+                    riddles.bridge_items_all
+                    if k == "bridge" and r.get("kinds") == "all"
+                    else makers[k]
+                )
 
-            pools = {k: maker(k, r)(tok, int(r.get("pool", 2048)), seed=int(r.get("seed", 1))) for k, r in riddle_cfg.items()}
+            pools = {
+                k: maker(k, r)(tok, int(r.get("pool", 2048)), seed=int(r.get("seed", 1)))
+                for k, r in riddle_cfg.items()
+            }
             for k, pool in pools.items():
                 if pool["tokens"].shape[1] > m["context"]:
-                    raise ValueError(f"the {k} riddle's items run to {pool['tokens'].shape[1]} pieces, past the context ({m['context']})")
-        where = ", ".join(f"{h['card']} on layer {h['layer']} head {h['head']}" for h in sc.get("heads") or [])
+                    raise ValueError(
+                        f"the {k} riddle's items run to {pool['tokens'].shape[1]} pieces, past the context ({m['context']})"
+                    )
+        where = ", ".join(
+            f"{h['card']} on layer {h['layer']} head {h['head']}" for h in sc.get("heads") or []
+        )
         until = f"faded out by {sc['fade']}" if sc.get("fade") is not None else "never released"
         if sc.get("floor"):
             until += f" to a floor of {sc['floor']}"
@@ -1007,31 +1070,70 @@ def train(
                 li, hi = int(r["layer"]), int(r["head"])
                 _, pats = mdl.forward_attending(t, {li: [hi]})
                 p = pats[(li, hi)]
-                row = mx.take_along_axis(p, mx.broadcast_to(q[:, None, None], (p.shape[0], 1, p.shape[2])), axis=1)[:, 0, :]
+                row = mx.take_along_axis(
+                    p, mx.broadcast_to(q[:, None, None], (p.shape[0], 1, p.shape[2])), axis=1
+                )[:, 0, :]
                 out.append(w * (-(m * mx.log(row + 1e-9)).sum(axis=-1)).mean())
             else:
                 t, q, bb, dd = rb["bridge"]
                 h = mdl.hidden(t)[int(r["layer"])]
-                hq = mx.take_along_axis(h, mx.broadcast_to(q[:, None, None], (h.shape[0], 1, h.shape[2])), axis=1)[:, 0, :]
+                hq = mx.take_along_axis(
+                    h, mx.broadcast_to(q[:, None, None], (h.shape[0], 1, h.shape[2])), axis=1
+                )[:, 0, :]
                 lg = mdl.tok.as_linear(mdl.ln_f(hq)).astype(mx.float32)
                 lp = lg - mx.logsumexp(lg, axis=-1, keepdims=True)
-                diff = mx.take_along_axis(lp, bb[:, None], axis=1)[:, 0] - mx.take_along_axis(lp, dd[:, None], axis=1)[:, 0]
+                diff = (
+                    mx.take_along_axis(lp, bb[:, None], axis=1)[:, 0]
+                    - mx.take_along_axis(lp, dd[:, None], axis=1)[:, 0]
+                )
                 out.append(w * mx.logaddexp(mx.array(0.0), -diff).mean())
         return out
 
-    staged = bool(sc) and (any("from" in h for h in sc.get("heads") or []) or any("from" in r for r in riddle_cfg.values()))
+    staged = bool(sc) and (
+        any("from" in h for h in sc.get("heads") or [])
+        or any("from" in r for r in riddle_cfg.values())
+    )
+
+    def scaffold_targets(x):
+        """The teacher's own heads as the scaffold's target (the third way to push a bigger ship's cards into a
+        smaller one, 8 November: "all the metre cards from 50m being pushed into Pan early"). The heads themselves
+        cannot be copied across classes (the 50m is 12x8x64, Pan 2x2x32), so what transfers is the distribution the
+        donating head puts on the same tokens — what the card does, not the weights that do it. A head with no
+        `teacher_head` falls back to its card's rule, so one arm may mix the two."""
+        if teacher is None:
+            return None
+        t_picks: dict[int, list[int]] = {}
+        for h in sc.get("heads") or []:
+            if h.get("teacher_head") is not None:
+                t_picks.setdefault(int(h["teacher_layer"]), []).append(int(h["teacher_head"]))
+        if not t_picks:
+            return None
+        _, tp = teacher.forward_attending(x, t_picks)
+        out = {}
+        for h in sc["heads"]:
+            if h.get("teacher_head") is None:
+                continue
+            a = mx.stop_gradient(
+                tp[(int(h["teacher_layer"]), int(h["teacher_head"]))].astype(mx.float32)
+            )
+            out[h["card"]] = (a, mx.ones(a.shape[:-1], dtype=mx.float32))
+        return out
 
     def loss_fn(mdl, x, y, sw, rb, on):
         # (batch, time) -> the mean per window, so the loss can be attributed to the window's book;
         # every window is the same length, so the mean of the window means is the batch mean.
         if picks and not sample:
             logits, pats = mdl.forward_attending(x, picks)
-            sl = scaffold_loss(pats, x, sc, flags=flags, on=on if staged else None)
+            sl = scaffold_loss(
+                pats, x, sc, targets=scaffold_targets(x), flags=flags, on=on if staged else None
+            )
         elif picks:  # the pull read on part of the batch: a second, smaller forward pass
             logits = mdl(x)
             xs = x[: int(sample["windows"]), : int(sample["length"])]
             _, pats = mdl.forward_attending(xs, picks)
-            sl = scaffold_loss(pats, xs, sc, flags=flags, on=on if staged else None)
+            sl = scaffold_loss(
+                pats, xs, sc, targets=scaffold_targets(xs), flags=flags, on=on if staged else None
+            )
         else:
             logits, sl = mdl(x), mx.array(0.0)
         riddle = riddle_losses(mdl, rb) if riddle_cfg else [mx.array(0.0), mx.array(0.0)]
@@ -1040,7 +1142,7 @@ def train(
         parts = [sl] + riddle
         ce = nn.losses.cross_entropy(logits.astype(mx.float32), y, reduction="none")
         per_window = ce.mean(axis=1)
-        if teacher is not None:
+        if teacher is not None and float(teach.get("alpha", 0.5)) > 0:
             # distillation: the student's loss is (1 - alpha) x its own cross-entropy plus alpha x
             # the KL divergence from the teacher's softened bets to its own (times T^2, so the
             # gradient's size does not shrink with the temperature)
@@ -1064,9 +1166,14 @@ def train(
 
     value_and_grad = nn.value_and_grad(model, loss_fn)
     step_fn = mx.compile(
-        lambda x, y, sw, rb, on: value_and_grad(model, x, y, sw, rb, on), inputs=model.state, outputs=model.state
+        lambda x, y, sw, rb, on: value_and_grad(model, x, y, sw, rb, on),
+        inputs=model.state,
+        outputs=model.state,
     )
-    no_riddles = {"comparator": (mx.zeros((1, 2), dtype=mx.int32),) * 3, "bridge": (mx.zeros((1, 2), dtype=mx.int32),) * 4}
+    no_riddles = {
+        "comparator": (mx.zeros((1, 2), dtype=mx.int32),) * 3,
+        "bridge": (mx.zeros((1, 2), dtype=mx.int32),) * 4,
+    }
 
     def riddle_batch(step: int) -> dict:
         if not riddle_cfg:
@@ -1079,7 +1186,12 @@ def train(
             if key == "comparator":
                 out[key] = (mx.array(d["tokens"]), mx.array(d["q"]), mx.array(d["target"]))
             else:
-                out[key] = (mx.array(d["tokens"]), mx.array(d["q"]), mx.array(d["b"]), mx.array(d["d"]))
+                out[key] = (
+                    mx.array(d["tokens"]),
+                    mx.array(d["q"]),
+                    mx.array(d["b"]),
+                    mx.array(d["d"]),
+                )
         return out
 
     groups = model.param_groups()
@@ -1102,7 +1214,10 @@ def train(
         tokens = mx.array(batch.tokens)
         sw = scaffold_weight(step, total, sc) if sc else 0.0
         (loss, per_window, sl), grads = step_fn(
-            tokens[:, :-1], tokens[:, 1:], mx.array(sw, dtype=mx.float32), riddle_batch(step),
+            tokens[:, :-1],
+            tokens[:, 1:],
+            mx.array(sw, dtype=mx.float32),
+            riddle_batch(step),
             mx.array(scaffold_on(step, total, sc) if staged else [1.0], dtype=mx.float32),
         )
         grads = tree_map(lambda g: g.astype(mx.float32), grads)
@@ -1120,7 +1235,9 @@ def train(
             book_n[bi] = book_n.get(bi, 0) + 1
         tokens_seen += stream.tokens_per_step
         dt = time.time() - t0
-        loss_v = per_window.mean().item() if (cw and cw.get("alpha")) or teach or sc else loss.item()
+        loss_v = (
+            per_window.mean().item() if (cw and cw.get("alpha")) or teach or sc else loss.item()
+        )
         if not math.isfinite(loss_v):
             raise FloatingPointError(f"loss is {loss_v} at step {step}")
         vals = {
@@ -1139,7 +1256,9 @@ def train(
             for key, v in zip(("comparator", "bridge"), parts[1:], strict=True):
                 if key in riddle_cfg:
                     vals[f"scaffold/riddle/{key}"] = v
-            vals["scaffold/phase"] = float(("metre", "fade", "content", "release").index(scaffold_phase(step - 1, total, sc)))
+            vals["scaffold/phase"] = float(
+                ("metre", "fade", "content", "release").index(scaffold_phase(step - 1, total, sc))
+            )
         if step % METRICS_EVERY == 0 or step == 1:
             flat = dict(tree_flatten(grads))
             vals["grad_norm"] = gnorm.item()
@@ -1278,7 +1397,7 @@ def rescore(
         spec["eval"] = {**spec["eval"], "sets": list(sets)}
     if evaluators:
         spec["eval"] = {**spec["eval"], "evaluators": list(evaluators)}
-    prep = prepare(spec, resolver=resolver, log=log)
+    prep = prepare(spec, resolver=resolver, log=log, known=True)
     step = json.loads((ckpt / "state.json").read_text())["step"]
     if backend_of(spec) == "torch":  # either backend's checkpoint loads in the torch model
         from thorp import train_torch
@@ -1312,6 +1431,12 @@ def _run(spec_path: str | Path, rec: Ledger | None = None) -> dict:
         return existing
     log = Log(paths.runs_dir() / f"{rid}.log")
     log(f"spec {spec_path} -> run id {rid}")
+    try:  # the plan's version, 1.2.3 (thorp/versioning.py): a numbering that never blocks a run
+        from thorp import versioning
+
+        log(f"version {versioning.assign(spec, run_id=rid, spec_path=str(spec_path))}")
+    except Exception as e:  # noqa: BLE001
+        log(f"version: not assigned ({e})")
     try:  # every run sails on a ship: a class and a fitout (thorp/fleet.py); never blocks a run
         from thorp import fleet
 

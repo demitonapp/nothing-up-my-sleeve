@@ -46,10 +46,10 @@ BATCH_TOKENS = 32_768  # every Ogden class, so step k is the same tokens read in
 # a market median of $4.20): an hourly rate band, and achieved bf16 TFLOPS by class (a 350m fills
 # about 40% of the 989 peak; smaller models less). Estimates, not measurements.
 H100_RATE = (2.22, 3.00, 4.20)
-H100_TFLOPS = {"paragraph": (190.0, 250.0, 310.0), "explorer": (220.0, 300.0, 380.0), "trader": (300.0, 400.0, 500.0)}
+H100_TFLOPS = {"paragraph": (190.0, 250.0, 310.0), "invention": (220.0, 300.0, 380.0), "trader": (300.0, 400.0, 500.0)}
 # This Mac (Mac mini, Apple M6, 32 GB): achieved bf16 TFLOPS where no voyage of the class has sailed.
 # The ledger measures 1.3 (300k), 1.9 (1m) and 2.3 to 2.5 (9m), rising with size; these continue it.
-MAC_TFLOPS_EST = {"stylist": 3.5, "paragraph": 4.5, "explorer": 5.5, "trader": 6.6}
+MAC_TFLOPS_EST = {"stylist": 3.5, "paragraph": 4.5, "invention": 5.5, "trader": 6.6}
 
 # Plan for the H100 sitting (hours that are not a training run)
 SETUP_HOURS = 0.5  # start the pod, sync code and shards
@@ -100,7 +100,7 @@ LADDER: list[dict] = [
         shelf="English before 1872",
     ),
     dict(
-        cls="explorer",
+        cls="invention",
         goal="The classical discoveries",
         test="The Origin test, the energy test and Mendeleev's gaps, each with its precursor ablation.",
         carries="Betting with what the books know: the spectroscopists' bright lines and Balmer's "
@@ -163,7 +163,7 @@ QUANTUM = dict(
              "ring, the ring has one length, so only certain waves fit."),
         dict(cls="paragraph", name="The eternal return", about="The first eureka, and the same move: only so many "
              "states explain what is seen."),
-        dict(cls="explorer", name="The spectroscopists", about="What the precursors wrote: the bright lines, "
+        dict(cls="invention", name="The spectroscopists", about="What the precursors wrote: the bright lines, "
              "Balmer's and Rydberg's formulas, Planck's quanta, Thomson's atom."),
         dict(cls="trader", name="The discrete atom", about="The bet."),
     ],

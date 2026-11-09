@@ -185,3 +185,78 @@
 2026-11-08T09:49:23 cmd: uv run --project backend --group compare python -m thorp.outside_deck EleutherAI/pythia-14m EleutherAI/pythia-31m EleutherAI/pythia-70m EleutherAI/pythia-160m Qwen/Qwen3-0.6B >> data/runs/outside-deck.out 2>&1 0
 2026-11-08T09:49:23 cmd: n=0; until uv run --project backend python -c "import sys; from thorp.viable.s3_control import fitout_store as f; sys.exit(0 if (f.readiness('ogden-v0-2') or {}).get('ready') else 1)" >/dev/null 2>&1 || [ $n -ge 240 ]; do sleep 60; n=$((n+1)); done 0
 2026-11-08T13:20:47 fitouts/fu-ogden-v0-2~staged@9m-pre-s1 0
+2026-11-08T13:58:31 cmd: uv run --project backend --group compare python backend/scripts/read_logic.py mlx-community/Qwen3.8-27B-4bit mlx-community/Qwen3-4B-4bit >> data/runs/read-logic.out 2>&1 lost (the queue stopped under it; requeued 13:59)
+2026-11-08T14:22:34 cmd: uv run --project backend --group compare python backend/scripts/read_logic.py mlx-community/Qwen3.8-27B-4bit mlx-community/Qwen3-4B-4bit >> data/runs/read-logic.out 2>&1 0
+2026-11-08T14:35:15 cmd: uv run --project backend --group compare python backend/scripts/read_logic.py mlx-community/gemma-3-270m-bf16 HuggingFaceTB/SmolLM2-360M >> data/runs/read-logic.out 2>&1; uv run --project backend --group compare python -m thorp.outside_deck mlx-community/gemma-3-270m-bf16 HuggingFaceTB/SmolLM2-360M >> data/runs/outside-deck.out 2>&1 0
+2026-11-08T14:35:45 cmd: for v in 'fu-ogden-v0-1@21m-pre-s1' 'fu-ogden-v0-1~metre@21m-pre-s1' 'fu-ogden-v0-1@9m-pre-s1' 'fu-ogden-v0-1~metre@9m-pre-s1' 'fu-ogden-v0-1~deck@9m-pre-s1' 'fu-ogden-v0-2~staged@9m-pre-s1'; do uv run --project backend python backend/scripts/score_checkpoints.py --last "$v" crowns; done >> data/runs/score-crowns.out 2>&1 0
+2026-11-08T14:56:16 cmd: uv run --project backend --group compare python -m thorp.outside_deck mlx-community/Qwen3-4B-4bit >> data/runs/outside-deck.out 2>&1; uv run --project backend --group compare python backend/scripts/score_external.py mlx-community/Qwen3-4B-4bit lists/hole-cards-unseen.csv --clean unwrap-v2 >> data/runs/score-external.out 2>&1 0
+2026-11-08T14:57:16 cmd: for v in 'fu-ogden-v0-1@21m-pre-s1' 'fu-ogden-v0-1~metre@21m-pre-s1' 'fu-ogden-v0-1@9m-pre-s1' 'fu-ogden-v0-1~metre@9m-pre-s1' 'fu-ogden-v0-1~deck@9m-pre-s1' 'fu-ogden-v0-2~staged@9m-pre-s1' 'fu-ogden-v0-1@1m-pre-s1' 'fu-ogden-v0-1@300k-pre-s1' 'fu-ogden-v0-1~metre@300k-pre-s1' 'fu-ogden-v0-1~metre-held@300k-pre-s1' 'fu-ogden-v0-1~l3-copy@300k-l3-pre-s1'; do uv run --project backend python backend/scripts/score_checkpoints.py --last "$v" logic40; done >> data/runs/score-logic40.out 2>&1 0
+2026-11-08T15:55:42 fitouts/fu-ogden-v0-2~staged-all@9m-pre-s1 paused at step 5632 for the Postgres switch (Justin); resumes from step-5120
+2026-11-08T16:03:55 fitouts/fu-ogden-v0-2~staged-all@9m-pre-s1 1
+2026-11-08T16:07:17 fitouts/fu-ogden-v0-2~staged-all@9m-pre-s1 failed to resume (KeyError 'rope', fixed in train.py); requeued to resume after the 9m second seed
+2026-11-08T17:28:31 fitouts/fu-ogden-v0-1@9m-pre-s2 0
+2026-11-08T17:45:31 fitouts/fu-ogden-v0-1~pan-lr6@300k-pre-s1 0
+2026-11-08T18:01:02 fitouts/fu-ogden-v0-1~pan-lr15@300k-pre-s1 0
+2026-11-08T18:11:32 fitouts/fu-ogden-v0-1~pan-ctx128@300k-pre-s1 0
+2026-11-08T18:23:33 fitouts/fu-ogden-v0-1~pan-l1w96@300k-pre-s1 0
+2026-11-08T18:55:34 fitouts/fu-ogden-v0-1~pan-p8@300k-pre-s1 0
+2026-11-08T18:56:04 fitouts/fu-ogden-v0-2~pan-v02@300k-pre-s1 2
+2026-11-08T20:01:32 fitouts/fu-ogden-v0-1~pan-teach5@300k-pre-s1 0
+2026-11-08T20:02:02 fitouts/fu-babel-english@300k-pre-s1 2
+2026-11-08T20:02:33 fitouts/fu-babel-cuneiform-2@300k-pre-s1 2
+2026-11-08T20:03:03 fitouts/fu-babel-cuneiform-5@300k-pre-s1 2
+2026-11-08T20:03:33 fitouts/fu-ogden-v0-2~pan-v02@300k-pre-s1 2
+2026-11-08T20:04:03 fitouts/fu-ogden-v0-1@1m-pre-s2 2
+2026-11-08T20:04:34 fitouts/fu-ogden-v0-1-maths5@1m-pre-s1 2
+2026-11-08T20:05:04 fitouts/fu-babel-cuneiform-2@300k-pre-s1 2
+2026-11-08T20:05:34 fitouts/fu-babel-cuneiform-5@300k-pre-s1 2
+2026-11-08T20:06:04 fitouts/fu-ogden-v0-1-maths10@1m-pre-s1 2
+2026-11-08T20:06:35 fitouts/fu-ogden-v0-1-maths2@1m-pre-s1 2
+2026-11-08T20:07:05 fitouts/fu-ogden-v0-1-maths20@1m-pre-s1 2
+2026-11-08T20:07:35 fitouts/fu-ogden-v0-1~pan-scaffold4@300k-pre-s1 2
+2026-11-08T20:08:05 fitouts/fu-ogden-v0-1~pan-scaffold4@300k-pre-s2 2
+2026-11-08T20:12:45 fitouts/fu-ogden-v0-1~pan-teach50@300k-pre-s1 143
+2026-11-08T20:33:04 vast: fitouts/fu-ogden-v0-1~sop001@50m-pre-s1 2
+2026-11-08T21:09:12 fitouts/fu-ogden-v0-1~sop001@300k-pre-s1 0
+2026-11-08T21:30:21 vast: fitouts/fu-ogden-v0-1~sop001@50m-pre-s1 143
+2026-11-08T21:59:33 fitouts/fu-ogden-v0-1~sop001@1m-pre-s1 0
+2026-11-08T23:28:08 fitouts/fu-ogden-v0-1~sop001@9m-pre-s1 0
+2026-11-09T02:16:53 fitouts/fu-ogden-v0-1~sop001@21m-pre-s1 0
+2026-11-09T02:28:57 cmd: backend/.venv/bin/python -m thorp.cli run ships/specs/fitouts/fu-babel-cuneiform-2@300k-pre-s1.yaml 0
+2026-11-09T02:41:32 cmd: backend/.venv/bin/python -m thorp.cli run ships/specs/fitouts/fu-babel-cuneiform-5@300k-pre-s1.yaml 0
+2026-11-09T02:42:02 cmd: backend/.venv/bin/python -m thorp.cli eval 02096884c9202b00251d36c9145123c7cae1a1d3 --evaluators shapes 1
+2026-11-09T02:42:32 cmd: backend/.venv/bin/python -m thorp.cli eval 2518601cb93e4519f02aa4dd10685d12e9350ed7 --evaluators shapes 1
+2026-11-09T02:43:03 cmd: backend/.venv/bin/python -m thorp.cli eval 4b86c6391f73c821d2ea048dfaabef90be63a3c3 --evaluators ce_bpb script samples 1
+2026-11-09T03:09:12 fitouts/fu-ogden-v0-1~pan-scaffold4@300k-pre-s2 0
+2026-11-09T03:43:56 fitouts/fu-ogden-v0-1~pan-from50@300k-pre-s1 0
+2026-11-09T03:44:26 cmd: backend/.venv/bin/python -m thorp.cli eval 2518601cb93e4519f02aa4dd10685d12e9350ed7 --evaluators shapes 0
+2026-11-09T03:44:56 cmd: backend/.venv/bin/python -m thorp.cli eval 4b86c6391f73c821d2ea048dfaabef90be63a3c3 --evaluators ce_bpb script samples 0
+2026-11-09T04:34:45 fitouts/fu-ogden-v0-1~pan-teach50@300k-pre-s1 0
+2026-11-09T05:09:58 fitouts/fu-ogden-v0-1@1m-pre-s2 0
+2026-11-09T05:59:47 fitouts/fu-ogden-v0-1~pan-teach50a9@300k-pre-s1 0
+2026-11-09T06:38:31 fitouts/fu-ogden-v0-1-maths5@1m-pre-s1 0
+2026-11-09T07:21:17 fitouts/fu-ogden-v0-1-maths10@1m-pre-s1 0
+2026-11-09T07:32:53 cmd: backend/.venv/bin/python -m thorp.knockout_deck mlx-community/Qwen3-4B-4bit >> data/runs/knockout-deck.out 2>&1 -15
+2026-11-09T08:11:07 fitouts/fu-ogden-v0-1~sop003@300k-l28-pre-s1 143
+2026-11-09T08:11:38 cmd: backend/.venv/bin/python -m thorp.chain_probe mlx-community/Qwen3-4B-4bit >> data/runs/chain-probe.out 2>&1 1
+2026-11-09T08:13:08 cmd: backend/.venv/bin/python -m thorp.knockout_deck mlx-community/Qwen3-4B-4bit >> data/runs/knockout-deck.out 2>&1 -15
+2026-11-09T08:13:38 cmd: backend/.venv/bin/python -m thorp.chain_probe mlx-community/Qwen3-4B-4bit >> data/runs/chain-probe.out 2>&1 1
+2026-11-09T08:15:09 fitouts/fu-ogden-v0-1~sop003@300k-l3-pre-s1 143
+2026-11-09T08:15:39 cmd: backend/.venv/bin/python -m thorp.chain_probe mlx-community/Qwen3-4B-4bit >> data/runs/chain-probe.out 2>&1 1
+2026-11-09T08:27:14 fitouts/fu-ogden-v0-1~sop003@300k-l3-pre-s1 143
+2026-11-09T08:46:23 cmd: backend/.venv/bin/python -m thorp.head_causal mlx-community/Qwen3-4B-4bit >> data/runs/head-causal.out 2>&1 0
+2026-11-09T08:57:57 fitouts/fu-ogden-v0-1~sop003@300k-l3-pre-s1 143
+2026-11-09T09:22:06 fitouts/fu-ogden-v0-1~sop005@300k-chart-pre-s1 0
+2026-11-09T09:30:10 fitouts/fu-ogden-v0-1~sop003@300k-l3-pre-s1 143
+2026-11-09T09:56:52 fitouts/300k@v0.0.5 0
+2026-11-09T10:10:28 fitouts/1m@v0.0.5 143
+2026-11-09T10:10:59 fitouts/300k@v0.0.5 1
+2026-11-09T10:15:29 fitouts/1m@v0.0.5 143
+2026-11-09T10:20:59 fitouts/300k@v0.0.5 143
+2026-11-09T10:26:59 fitouts/1m@v0.0.5 143
+2026-11-09T10:27:59 fitouts/9m@v0.0.5 143
+2026-11-09T11:08:00 fitouts/300k@v0.0.5 0
+2026-11-09T12:05:32 vast: fitouts/50m@v0.0.5 143
+2026-11-09T12:40:33 vast: fitouts/50m@v0.0.5 143
+2026-11-09T12:53:04 fitouts/1m@v0.0.5 0
+2026-11-09T13:04:34 vast: fitouts/50m@v0.0.5 143

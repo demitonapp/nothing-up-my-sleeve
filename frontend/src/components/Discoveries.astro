@@ -12,7 +12,7 @@ import { btnCls, cardCls, checkCls, crumbCls, selectCls, tabCls, tabsCls } from 
   <!-- ============================== the tricks of the trade -->
   <div class="dview" data-dview="index">
     <h1>Tricks of the trade</h1>
-    <nav class={tabsCls('line', 'subnav')} data-orientation="horizontal" data-variant="line" id="discnav"><a class={tabCls('')} data-state="inactive" data-dsub="two-facts" href="#/discoveries">Chaining two facts</a><a class={tabCls('')} data-state="inactive" data-dsub="quantum" href="#/discoveries/quantum">Quantum mechanics</a><a class={tabCls('')} data-state="inactive" data-dsub="registry" href="#/discoveries/registry">Registry of tricks</a><a class={tabCls('')} data-state="inactive" data-dsub="stars" href="#/discoveries/stars">Stars</a></nav>
+    <nav class={tabsCls('line', 'subnav')} data-orientation="horizontal" data-variant="line" id="discnav"><a class={tabCls('')} data-state="inactive" data-dsub="two-facts" href="#/discoveries">Chaining two facts</a><a class={tabCls('')} data-state="inactive" data-dsub="quantum" href="#/discoveries/quantum">Quantum mechanics</a><a class={tabCls('')} data-state="inactive" data-dsub="registry" href="#/discoveries/registry">Registry of tricks</a><a class={tabCls('')} data-state="inactive" data-dsub="stars" href="#/discoveries/stars">Stars</a><a class={tabCls('')} data-state="inactive" data-dsub="cards" href="#/discoveries/cards">Cards</a></nav>
 
     <!-- the trick in focus: how Thorp proves a model chains two facts (the heart of the leaderboard, and of the claim) -->
     <div class="dsub" data-dsub="two-facts">
@@ -116,12 +116,29 @@ import { btnCls, cardCls, checkCls, crumbCls, selectCls, tabCls, tabsCls } from 
     </section>
     </div>
 
+    <!-- the cards: the sixteen-card deck, one row a card, read on the fleet (9 November: "the cards should be moved to a
+         tab under discoveries") -->
+    <div class="dsub" data-dsub="cards">
+      <p class="q dsubintro">The sixteen cards, the goal's unit: the deck a ship is built from, each card with its mark, its suit, whether teaching it keeps, and how the fleet's best ship at each size reads it — against Qwen3 4B.</p>
+      <section class={cardCls(false, 'panel')}>
+        <h2>The deck, card by card <span class="note">each card: its suit, its mark (what counts as lit), whether teaching it keeps (keeper, decayer, or never tested), and the best reading any Thorp ship has reached against Qwen3 4B's own</span></h2>
+        <div class="scroll"><table id="discCards" class="selbooks"><thead><tr><th>card</th><th>suit</th><th>mark</th><th>keeps</th><th>best Thorp</th><th>Qwen 4B</th></tr></thead><tbody><tr><td colspan="6" class="s">reading the deck…</td></tr></tbody></table></div>
+      </section>
+    </div>
     <!-- the stars: the attention heads that do the tricks, each a card -->
     <div class="dsub" data-dsub="stars">
       <p class="q dsubintro">What inside does it? Attention heads that do one recognisable job. A star is lit when one head reaches its mark, and lit shared when the best layer's two strongest heads reach it together; some rest on others. Five of them are the cards every model that chains two facts plays.</p>
       <section class={cardCls(false, 'panel')}>
         <h2>Lit by size <span class="note">every star Thorp measures, by size of ship: a cell is the size's best reading against the star's mark, green where a voyage has lit it (the first voyage and step on hover), shaded by how close it came where none has; the card judge's verdict beside each</span></h2>
         <div class="scroll"><table id="starclassgrid" data-nosort><thead></thead><tbody></tbody></table></div>
+      </section>
+      <section class={cardCls(false, 'panel')}>
+        <h2>The ten points, as two lines <span class="note">each of the chart's ten points on the horizontal axis, its reading divided by that point's own mark on the vertical: Qwen3 4B, the model that chains, against our smallest ship (the 300k). Above the dotted line a point clears its mark. The gap between the lines is how far we are behind on that point — and where our line is above, we are ahead</span></h2>
+        <div class="chart" id="starjourney"></div>
+      </section>
+      <section class={cardCls(false, 'panel')}>
+        <h2>300k against Qwen3 4B <span class="note">the chart as a deviation: each point's reading in our smallest ship less the same reading in a model that chains, divided by the card's own mark. Right of zero is a point we hold better than a 4B; left is a point it holds and we do not. The tier on each row says whether the card is a keeper, a decayer, or one no voyage has ever tested</span></h2>
+        <div class="chart" id="stardev"></div>
       </section>
     <div class="handtools"><button class={btnCls('outline', '')} data-essay="nevermore">Read: what a Nevermore is</button></div>
       <div class="cards" id="starcards"></div>

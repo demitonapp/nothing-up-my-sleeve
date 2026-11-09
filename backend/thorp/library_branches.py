@@ -41,6 +41,47 @@ DEFAULTS: list[dict] = [
                         "about": "Every book in the manifest that is not one of Thorp's own derived texts."}],
     },
     {
+        "key": "scanned", "name": "The scanned corpus",
+        "purpose": "Beyond Gutenberg: the scans of the original editions (Common Pile's HathiTrust and Library of "
+                   "Congress books, the British Library's books, the newspapers). A branch of its own, with its own "
+                   "vocabulary and OCR noise, so lifting Ogden's plain-English rule for it never changes what Ogden reads.",
+        "variations": [
+            {"key": "scanned-all", "name": "Every scanned book", "spec": {"languages": {"en": 1.0},
+             "sources": {"include": ["common-pile-pre-1929", "common-pile-loc", "blbooks", "incunabula", "americanstories", "archive"]}},
+             "about": "Every English scanned volume the gather pipeline admitted, through the same gate."},
+            {"key": "scanned-before-1858", "name": "Before 1858 (the Origin shelf)", "spec": {"languages": {"en": 1.0},
+             "period": {"end": 1857, "undated": "exclude"},
+             "sources": {"include": ["common-pile-pre-1929", "common-pile-loc", "blbooks"]}},
+             "about": "Scans whose printing year is before 1858: the Origin test's shelf, dated by the imprint rather than by a death year."},
+            {"key": "scanned-blbooks", "name": "The British Library", "spec": {"languages": {"en": 1.0},
+             "sources": {"include": ["blbooks"]}}, "about": "CC0, c.1510–1900, the longest reach back in English print."},
+            {"key": "scanned-incunabula", "name": "Incunabula (pre-1501)", "list": "lists/incunabula.csv",
+             "about": "The first printed books, 1450–1500, from the Boston Public Library's open incunabula set: mostly Latin, six English."},
+            {"key": "scanned-common-pile", "name": "Common Pile books", "spec": {"languages": {"en": 1.0},
+             "sources": {"include": ["common-pile-pre-1929", "common-pile-loc"]}},
+             "about": "HathiTrust pre-1929 and the Library of Congress's Selected Digitized Books."},
+            {"key": "scanned-newspapers", "name": "Newspapers", "spec": {"languages": {"en": 1.0},
+             "sources": {"include": ["americanstories"]}},
+             "about": "Chronicling America pages, unsigned: the S5 question the 'signed' rule would settle."},
+        ],
+    },
+    {
+        "key": "ancient", "name": "The ancient world",
+        "purpose": "Greek, Latin and Sumerian texts as a discovery branch of their own: not English recipes, and not "
+                   "ranked by Ogden-ness. Perseus's TEI editions and ETCSL's transliterations, kept for the day a ship "
+                   "wants to read them.",
+        "variations": [
+            {"key": "ancient-latin", "name": "Perseus Latin", "list": "lists/perseus-latin.csv",
+             "about": "344 Latin editions from the Perseus Digital Library, CC BY-SA 4.0."},
+            {"key": "ancient-greek", "name": "Perseus Greek", "list": "lists/perseus-greek.csv",
+             "about": "799 Ancient Greek editions from the Perseus Digital Library, CC BY-SA 4.0."},
+            {"key": "ancient-cuneiform", "name": "ETCSL (Sumerian)", "list": "lists/etcsl.csv",
+             "about": "Sumerian literary compositions with transliteration and English translation, from ETCSL."},
+            {"key": "ancient-cdli", "name": "CDLI (cuneiform)", "list": "lists/cdli-sux.csv",
+             "about": "CDLI's Sumerian transliterations, grouped into three volumes of 2M characters."},
+        ],
+    },
+    {
         "key": "decks", "name": "Decks and yardsticks",
         "purpose": "Books ships are scored on and never read: the hole cards, the Forgotten Tomes, the truths, the held-out content books.",
         "variations": [

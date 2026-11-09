@@ -98,7 +98,65 @@ POSITIONS: dict[str, str] = {
     "every kind of book rising into the dark, a single lamp",
 }
 
-# The playing cards: the stars that do the trick (fleet.STARS / fleet.METHODS["chaining"] cards). Portrait,
+# Foreign ships (9 November, Justin: "fal images for the foreign ships like qwen and ms phi"; then "the
+# ships from alibaba vs microsoft vs google vs independent labs need to share some characteristics within
+# their fal images"). Each house has a shared look, so the ships read as a fleet from one yard:
+#   Alibaba/Qwen  red battened sails, jade-green trim, a gold circular medallion, red stern lanterns
+#   Microsoft/Phi slate-blue hull, a square sail divided into four pale panes, a silver pennant
+#   Google/Gemma  sails in four coloured panels (blue, red, yellow, green), a brass compass rose at the bow
+#   independent   patched cream canvas, a dark tarred hull, one hand-painted white star; no house colours
+LAB_LOOK = {
+    "alibaba": "her battened sails are deep red, her hull is trimmed in jade green, a gold circular medallion is "
+    "nailed to the stern, and red paper lanterns hang from the stern rail",
+    "microsoft": "her square sail is pale and divided into four panes by dark seams, her hull is slate blue, and a "
+    "small silver pennant flies from the masthead",
+    "google": "her sails are divided into four broad coloured panels, deep blue, red, yellow and green, and a brass "
+    "compass rose is mounted on the bow",
+    "independent": "her canvas sails are patched cream, her hull is dark tarred wood, and a single white star is "
+    "hand-painted on the main sail; she carries no house colours",
+}
+
+FOREIGN: dict[str, str] = {
+    "qwen3-4b": "a vast four-masted Chinese treasure ship with a high stern castle, riding at anchor in a crowded "
+    "lantern-lit trading harbour at night, junks and dhows around her, merchants on the quay unloading bales of "
+    "silk, the largest and deepest ship in the harbour; " + LAB_LOOK["alibaba"],
+    "qwen3-1-7b": "a two-masted Chinese ocean-going junk under full sail on a dark sea, a low moon behind cloud, "
+    "her crew small on the deck, a larger treasure ship faint on the horizon; " + LAB_LOOK["alibaba"],
+    "qwen3-0-6b": "a small single-masted coastal junk slipping out of a narrow harbour mouth at dusk, one red "
+    "lantern lit at her stern, fishing boats drawn up on the mud behind her; " + LAB_LOOK["alibaba"],
+    "qwen3-8-27b": "an enormous four-masted Chinese treasure flagship at anchor in a wide night harbour, her red "
+    "sails furled but still the tallest thing on the water, hundreds of lanterns reflected around her, smaller "
+    "junks dwarfed alongside; " + LAB_LOOK["alibaba"],
+    "phi-2": "a lean two-masted Byzantine dromon with a bronze ram at the bow, gliding out of a dark harbour mouth "
+    "under a low moon, oars lifting in a row, a lone lantern at the stern; " + LAB_LOOK["microsoft"],
+    "phi-4-mini": "a compact four-oared pinnace with a low black hull, tied at a dark stone quay beside much larger "
+    "ships, a single hooded figure stepping aboard with a lantern, the little boat dwarfed by the foreign hulls "
+    "around it; " + LAB_LOOK["microsoft"],
+    "gemma-3-4b": "a four-masted Venetian carrack under full sail on a dark open sea, her high stern and broad "
+    "beam cutting through the swell, moonlight catching the coloured panels of her sails; " + LAB_LOOK["google"],
+    "gemma-2-2b": "a two-masted caravel heeling in a night wind, her four-coloured sails filled, a navigator at the "
+    "stern with a lantern and a brass compass, a dark coast behind her; " + LAB_LOOK["google"],
+    "gemma-3-270m": "a small ketch with a single mast and a tiny crew, crossing a black harbour basin at night, her "
+    "four-coloured sail the brightest thing on the water, a brass compass glinting at her bow; " + LAB_LOOK["google"],
+    "llama-3-2-3b": "a three-masted barque on a long night passage, patched cream canvas bellied in the wind, a "
+    "lone figure at the wheel in a long coat, dark water and a low moon; " + LAB_LOOK["independent"],
+    "smollm3-3b": "a three-masted coastal lugger running before a night wind, her patched cream sails full, a "
+    "lantern swinging at the mast, a dark headland behind her; " + LAB_LOOK["independent"],
+    "smollm2-360m": "a small single-masted sloop nosing out of a rocky cove at night, one patched cream sail, a "
+    "single white star painted on it, a lantern at the bow; " + LAB_LOOK["independent"],
+    "pythia-14m": "a tiny one-masted dinghy tied to a dark jetty at night, a patched cream sail furled on its boom, "
+    "a single white star painted on the canvas, a lantern on the boards; " + LAB_LOOK["independent"],
+    "pythia-31m": "a small two-masted cutter at anchor in a black harbour, patched cream sails furled, a white star "
+    "on the main sail, a single lamp on the quay; " + LAB_LOOK["independent"],
+    "pythia-70m": "a two-masted lugger under a low moon, patched cream canvas drawing, a white star on the main "
+    "sail, dark water and a far shore; " + LAB_LOOK["independent"],
+    "pythia-160m": "a three-masted barquentine on a night sea, patched cream sails filled, a white star painted on "
+    "the main canvas, a lantern at the stern; " + LAB_LOOK["independent"],
+    "pythia-410m": "a large three-masted barque cresting a dark swell under a low moon, patched cream sails full, a "
+    "white star on the main sail, a single lantern burning at the stern; " + LAB_LOOK["independent"],
+}
+
+# The playing cards: the stars that do the trick# The playing cards: the stars that do the trick (fleet.STARS / fleet.METHODS["chaining"] cards). Portrait,
 # for the card faces.
 CARDS: dict[str, str] = {
     "previous_word": "a figure in a long coat walking along a dark street, glancing back over their shoulder "
@@ -151,8 +209,8 @@ LOGIC: dict[str, str] = {
     "with the stars seen through the porthole, a finger on the chart, trusting the paper over the sky, one lamp",
 }
 
-SIZES = {**{k: "landscape_16_9" for k in (*CLASSES, *HARBOURS, *POSITIONS)}, **{k: "portrait_4_3" for k in CARDS}, **{k: "portrait_4_3" for k in LOGIC}}
-SUBJECTS = {**CLASSES, **HARBOURS, **POSITIONS, **CARDS, **LOGIC}
+SIZES = {**{k: "landscape_16_9" for k in (*CLASSES, *HARBOURS, *POSITIONS, *FOREIGN)}, **{k: "portrait_4_3" for k in CARDS}, **{k: "portrait_4_3" for k in LOGIC}}
+SUBJECTS = {**CLASSES, **HARBOURS, **POSITIONS, **FOREIGN, **CARDS, **LOGIC}
 
 
 def fal_key() -> str:

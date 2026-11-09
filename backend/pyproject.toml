@@ -14,11 +14,19 @@ dependencies = [
     "sqlalchemy>=2.0",
     "alembic>=1.13",
     "spacy==3.8.7",
-    "en-core-web-sm",
     "click>=8.1",
+    "huggingface-hub>=2.4.0",
+    "pyarrow>=26.0.1",
 ]
 
 [dependency-groups]
+# The tagger's English model is a wheel hosted on GitHub, and it is only needed to *build* a shapes lexicon
+# (thorp/viable/s2_coordination/tagger.py), never to sail or score a voyage. It sat in the base dependencies until
+# 9 November, where it made every `uv sync` on a hired box fetch from GitHub: a 504 there held the box's set-up for
+# half an hour and left a GPU idle. In its own group, `uv sync --group torch` never touches it.
+tagger = [
+    "en-core-web-sm",
+]
 compare = [
     "mlx-lm>=0.32.2",
 ]

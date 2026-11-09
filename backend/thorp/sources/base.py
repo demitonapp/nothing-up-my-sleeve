@@ -83,7 +83,7 @@ def register_source(src: Source) -> Source:
 
 def _sources() -> dict[str, Source]:
     # importing the modules registers them
-    from thorp.sources import archive, gutenberg  # noqa: F401
+    from thorp.sources import archive, gutenberg, incunabula  # noqa: F401
 
     return SOURCES
 
@@ -122,7 +122,29 @@ def register_fetched(
     library is observed by acquisition's S1 (thorp/acquisition.py: logged with the verdict its gate would
     give, never refused) unless an intake, which has already passed it through the gate, registers it."""
     src = _sources()[key]
-    book_id = f"{src.prefix}{ident}"
+    return register_text(
+        key,
+        f"{src.prefix}{ident}",
+        f,
+        family=family,
+        set_name=set_name,
+        observe=observe,
+        how="fetch_ref",
+    )
+
+
+def register_text(
+    key: str,
+    book_id: str,
+    f: Fetched,
+    family: str = "",
+    set_name: str = "recipe",
+    observe: bool = True,
+    how: str = "thorp fetch",
+) -> manifest.Book:
+    """The one writer of a fetched book: its text in data/texts/<source>/, its row in the manifest.
+    `register_fetched` is this for an item fetcher; a bulk source (thorp/sources/bulk.py) names its own
+    book id because its identifier is not a `<source>:<identifier>` ref."""
     new = manifest.get(book_id) is None
     path = paths.texts_dir(key) / f"{book_id}.txt"
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -147,7 +169,7 @@ def register_fetched(
         try:
             from thorp import acquisition
 
-            acquisition.observe(book, "fetch_ref")
+            acquisition.observe(book, how)
         except Exception:  # noqa: BLE001  (the record must never cost a fetch)
             pass
     return book

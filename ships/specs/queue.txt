@@ -1,54 +1,5 @@
-# The standing queue (scripts/queue.sh). From 2026-11-07 19:30 (Justin: "everything going forward only runs the
-# ogden fitout"), only voyages on an Ogden fitout sail: S5 policy 'ogden' (thorp/vsm.py), enforced at the gate.
-# The 159 lines removed then (every voyage and command not on the Ogden fitout) are kept in
-# specs/queue-removed-2026-11-07.txt.
-
-# Ogden v0.1 (Justin, 19:20): one fixed corpus, 300k, 1m and 9m, two seeds each; the expedition "ogden"
-# HELD (Claude, 19:35, for Justin: "before ogden sets sail ... we need a plan to smooth out that outlier"): the step below waits while specs/ogden.hold exists
-# HELD for the repository split (Justin, 20:05: "yes, at the next gap"): waits while specs/split.hold exists
-
-# Ogden v0.1 re-sails with the shapes taxonomy at every reading (Justin, 20:20: "call the ships back and send them out with that included")
-# Ogden v0.1 at 21m, to the top of the queue (Justin, 21:45)
-# The metre scaffold on the keel, right after the 21m (Justin, 23:15: "schedule it after the 21m run"): pretraining in
-# three phases (metre, fade, content; thorp/train.py optim.scaffold). Fade against held; the plain keel is home
-# THE NIGHT (Justin, 23:30: "once 21m finishes, run the 300k metre run and then take those learnings to the 9m run and if
-# the 9m can drastically compete with the 21m then roll out the lessons from the 9m to the 21m"): seed 1 of each keel arm,
-# then a hold while Claude reads them and writes the 9m with metre (released by deleting specs/night-9m.hold, or after
-# 45 minutes on its own), the 9m, a hold for the 21m v0.2's decision, the 21m v0.2; the rest after
-# the 21m v0.1's shared induction score on every checkpoint, while the GPU waits on the 9m's hold (for the leaderboard and the night's comparisons)
-# the 9m with metre (01:25): the keel's fade arm kept previous-word but not induction (0.14 at the end); the held arm kept both
-# (0.60, copy gain 1.04): by the rule, the longer pull (full to 10%, faded by 60%)
-# the 21m v0.2 (02:45): the 9m with metre competes, two of three (copy gain 0.737 against 0.639; Versus median 0.500 against
-# 0.598, within 10 points; bpb 1.547 against 1.397, not within 0.08): the 9m's schedule (full to 10%, out by 60%), the 21m's layout
-# after the night's line: the plain 9m (the 9m's control), the keel arms' second seeds, the re-scores, the rest
-# The shared induction score (two heads of a layer together; Justin, 23:45: "do it") on every checkpoint of the 21m and the
-# Ogden keels that sailed before it; only the new reading is recorded
-# Score the four new cards (pips) on every checkpoint of the voyages that sailed before them: the 21m first (Justin, 22:20: "yes, score them"), then the Ogden keels
-# the full deck on the 9m (Justin, 2026-11-08 07:50): every metre and riddle card, next after the 1m at sea
-# A 100m to score against (Justin, 08:45: "do it"): Pythia-70m and -160m on the judge books in bits per byte, on the text the
-# voyages read (unwrap-v2), and Qwen3 0.6B again on it (it was scored raw); then the whole deck read on Pythia 14m to 160m and
-# Qwen3 0.6B (thorp/outside_deck.py). Scored on the Versus tab
-# The Smallest Bridge, leg 1 (Justin, 08:25: "yes, pre-register it"): waits until Ogden v0.2's prechecks pass (its lexicon is being
-# tagged), up to 4 hours; then the staged 9m on v0.2 and v0.2's plain 9m (its control)
-# The Scales above 4B (Justin, 12:15: "read a model higher than qwen 4b to see where the scales starts settling down"): the logic
-# deck, with a band on each relation's gain, on Qwen3.8 27B (4-bit, the biggest model on this Mac); next after leg 1
-# Qwen3 4B measured (Justin, 12:30: "measure qwen3 4B, then the 21m run and then final signoff from me before launching our first 50m"):
-# all 16 cards (thorp/outside_deck.py) and the judge books on cleaned text; the bar the first 50m is to beat on 15 of the 16 cards
-cmd: uv run --project backend --group compare python -m thorp.outside_deck mlx-community/Qwen3-4B-4bit >> data/runs/outside-deck.out 2>&1; uv run --project backend --group compare python backend/scripts/score_external.py mlx-community/Qwen3-4B-4bit lists/hole-cards-unseen.csv --clean unwrap-v2 >> data/runs/score-external.out 2>&1
-# The logic deck on the Overview (Justin, 13:00: "select which deck to view"): the 40-item deck read at the last checkpoint of the
-# finished Ogden voyages, so each class's page shows it (score_checkpoints --last); after the Qwen readings
-cmd: for v in 'fu-ogden-v0-1@21m-pre-s1' 'fu-ogden-v0-1~metre@21m-pre-s1' 'fu-ogden-v0-1@9m-pre-s1' 'fu-ogden-v0-1~metre@9m-pre-s1' 'fu-ogden-v0-1~deck@9m-pre-s1' 'fu-ogden-v0-2~staged@9m-pre-s1' 'fu-ogden-v0-1@1m-pre-s1' 'fu-ogden-v0-1@300k-pre-s1' 'fu-ogden-v0-1~metre@300k-pre-s1' 'fu-ogden-v0-1~metre-held@300k-pre-s1' 'fu-ogden-v0-1~l3-copy@300k-l3-pre-s1'; do uv run --project backend python backend/scripts/score_checkpoints.py --last "$v" logic40; done >> data/runs/score-logic40.out 2>&1
-# leg 1b (09:50): leg 1 with the Bridge composed in all four relations (leg 0's order-only Bridge rose and fell)
-fitouts/fu-ogden-v0-2~staged-all@9m-pre-s1
-# the 21m with the full deck before the first 50m (Justin, 12:35: agreed): it sails next, ahead of v0.2's control and the second seeds;
-# the queue waits here (up to 3 hours) until its spec is written, pre-registered and queued above this line
-cmd: n=0; while [ -e ships/specs/deck-21m.hold ] && [ $n -lt 360 ]; do sleep 30; n=$((n+1)); done
-# Spying on Qwen's weights (Justin, 12:40: "let's go spy on qwens weights to see how the deck impacts it's chaining gains"): every
-# card's 16 strongest heads, each suit's, and the Bridge's layer silenced in Qwen3 4B, the chaining gain read on the 40-item deck
-# against random heads (thorp/knockout_deck.py); then the 40-item deck on the other reference models: where the gain, and the
-# Scales, begin. After the 21m, overnight
-cmd: uv run --project backend --group compare python -m thorp.knockout_deck mlx-community/Qwen3-4B-4bit >> data/runs/knockout-deck.out 2>&1
-cmd: uv run --project backend --group compare python backend/scripts/read_logic.py EleutherAI/pythia-160m EleutherAI/pythia-410m mlx-community/Qwen3-0.6B-bf16 mlx-community/Qwen3-1.7B-4bit mlx-community/Llama-3.2-3B-bf16 mlx-community/Phi-4-mini-instruct-4bit mlx-community/gemma-3-text-4b-pt-4bit mlx-community/SmolLM3-3B-Base-4bit >> data/runs/read-logic.out 2>&1
-fitouts/fu-ogden-v0-2@9m-pre-s1
-fitouts/fu-ogden-v0-1@1m-pre-s2
-fitouts/fu-ogden-v0-1@9m-pre-s2
+# The deep ladder (v0.0.5), single-recipe data, in size order
+fitouts/21m@v0.0.5
+# read the deck on Phi and Llama so the scoreboard can rate them (9 November)
+cmd: PYTHONPATH=backend backend/.venv/bin/python -c "from thorp.outside_deck import read; read('mlx-community/Phi-4-mini-instruct-4bit')" >> data/runs/deck-phi.out 2>&1
+cmd: PYTHONPATH=backend backend/.venv/bin/python -c "from thorp.outside_deck import read; read('mlx-community/Llama-3.2-3B-bf16')" >> data/runs/deck-llama.out 2>&1

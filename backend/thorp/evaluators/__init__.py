@@ -66,6 +66,8 @@ def get(name: str) -> Evaluator:
         from thorp.evaluators.shapes import evaluate
     elif name == "pips":
         from thorp.evaluators.pips import evaluate
+    elif name == "script":  # the Babel probe: cuneiform mass on English contexts (2026-11-08)
+        from thorp.evaluators.script import evaluate
     elif name == "maths":  # the maths book, De Morgan's (2026-11-08: Augustus's objective)
         from thorp.evaluators.maths import evaluate
     elif name == "plato":  # Plato's primer, metaphysics (2026-11-08: the four positions at the 1m)

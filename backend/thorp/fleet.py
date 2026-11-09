@@ -2385,6 +2385,29 @@ EXPEDITIONS: dict[str, Expedition] = {
 }
 
 
+EXPEDITIONS["two_bets"] = Expedition(
+    key="two_bets",
+    name="The two bets",
+    goal="Pan's word bet against its type bet on the same held-out points (Justin, 8 November: 'Pan must be the "
+    "best at betting. so its current bet is the next word in a two word sequence. But the other bet should be "
+    "about betting the type of the word too. and then we'd compare those scores'): the same model, two ways of "
+    "reading its distribution, the next keyed word and the next word's type.",
+    ship="Pan",
+    fleet="Star Fleet",
+    preset=NURSERY,
+    outcomes=(
+        Outcome("shapes/keyed_top1", "higher", "the word bet: the next keyed word"),
+        Outcome("shapes/type_top1_keyed", "higher", "the type bet on the same points"),
+    ),
+    levers=(Lever("bet", choices=("word", "type"), about="the same checkpoint, two bets"),),
+    stop=StopRule(2, "Pan's two seeds, both bets read from the same checkpoints"),
+    runner="thorp/evaluators/shapes.py",
+    results="data/runs/",
+    status="planned",
+    ships=("Pan",),
+)
+
+
 # The names before 2026-11-07 16:20 (Justin: "the voyages should become expeditions and a ship's runs
 # should become voyages"), kept as aliases until every reader has moved.
 Voyage = Expedition

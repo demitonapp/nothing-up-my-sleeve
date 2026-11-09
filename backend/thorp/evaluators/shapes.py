@@ -123,27 +123,32 @@ def evaluate(ctx: EvalContext) -> EvalResult:
                 total = sum(m.values()) or 1.0
                 for t, v in m.items():
                     mass_sum[t] += v / total
+                rows[-1]["type_guess"] = max(m, key=m.get) if m else "OTHER"
     if not rows:
         return out
     guess_tags = tagger.last_tag(guess_texts)
     confusion = collections.Counter()
-    fine_hit = coarse_hit = keyed_hit = keyed_n = 0
+    fine_hit = coarse_hit = keyed_hit = keyed_n = type_hit = type_keyed_hit = 0
     for r, g in zip(rows, guess_tags, strict=True):
         piece = r["guess_piece"]
         g = "BREAK" if "\n" in piece else (g or "OTHER")
         confusion[(r["truth"], g)] += 1
         fine_hit += g == r["truth"]
         coarse_hit += taxonomy.coarse(g) == taxonomy.coarse(r["truth"])
+        type_hit += r["type_guess"] == r["truth"]
         kt = _keyed(r["word"], r["truth"])
         if kt is not None:
             keyed_n += 1
             keyed_hit += kt == _keyed(piece.strip(), g)
+            type_keyed_hit += r["type_guess"] == r["truth"]
     n = len(rows)
     out.metrics["shapes/points"] = float(n)
     out.metrics["shapes/upos_top1"] = fine_hit / n
     out.metrics["shapes/ogden_top1"] = coarse_hit / n
+    out.metrics["shapes/type_top1"] = type_hit / n
     if keyed_n:
         out.metrics["shapes/keyed_top1"] = keyed_hit / keyed_n
+        out.metrics["shapes/type_top1_keyed"] = type_keyed_hit / keyed_n
     truth = collections.Counter(r["truth"] for r in rows)
     for t in taxonomy.FINE:
         out.metrics[f"shapes/mass/{t}"] = mass_sum.get(t, 0.0) / n

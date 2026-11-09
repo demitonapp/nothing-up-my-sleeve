@@ -14,7 +14,13 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 
 from thorp.viable.s3_control.fitout_store import session
-from thorp.viable.s3_control.models import ShipRecord, Size, VoyageRecord
+from thorp.viable.s3_control.models import (
+    Harbour,
+    Journey,
+    ShipRecord,
+    Size,
+    VoyageRecord,
+)
 
 
 @functools.cache
@@ -71,7 +77,7 @@ def reload() -> None:
     _sizes.cache_clear()
 
 
-def set_goals(preset: str, *, name: str | None = None, role: str | None = None, scored: str | None = None, metrics: list | None = None) -> dict:
+def set_goals(preset: str, *, name: str | None = None, role: str | None = None, overview: str | None = None, scored: str | None = None, metrics: list | None = None) -> dict:
     """A size's goals changed in `s1.sizes` (Justin decides them; DECISIONS.md records each change): what it is for,
     how it is judged and the metrics that judge it ([[name, what it measures, "live" | "to come"], ...]). Returns
     the row as it now stands."""
@@ -84,6 +90,8 @@ def set_goals(preset: str, *, name: str | None = None, role: str | None = None, 
             row.name = name
         if role is not None:
             row.role = role
+        if overview is not None:
+            row.overview = overview
         if scored is not None:
             row.scored = scored
         if metrics is not None:
@@ -91,6 +99,130 @@ def set_goals(preset: str, *, name: str | None = None, role: str | None = None, 
         s.commit()
     reload()
     return next(r for r in sizes() if r["preset"] == preset)
+
+
+@functools.cache
+def _harbours() -> tuple[dict, ...]:
+    from thorp import store
+
+    if store.papers():
+        return tuple(dict(r) for r in store.read_papers().get("harbours") or ())
+    with session() as s:
+        rows = s.scalars(select(Harbour).order_by(Harbour.ordinal)).all()
+        return tuple(
+            {
+                "key": h.key,
+                "ordinal": h.ordinal,
+                "name": h.name,
+                "aka": h.aka,
+                "lane": h.lane,
+                "where": h.location,
+                "about": h.about,
+                "depth": h.depth,
+                "ship_builder": h.ship_builder,
+            }
+            for h in rows
+        )
+
+
+def harbours() -> list[dict]:
+    """Every harbour, shallowest first, as the dashboard and `waters.harbour_for` read it."""
+    return [dict(h) for h in _harbours()]
+
+
+def harbour(key: str) -> dict | None:
+    return next((dict(h) for h in _harbours() if h["key"] == key), None)
+
+
+def journeys() -> list[dict]:
+    """Every journey as its nested plan: `pretraining` (outbound) and `posttraining` (the return)."""
+    with session() as s:
+        return [_journey_payload(j) for j in s.scalars(select(Journey).order_by(Journey.created_at))]
+
+
+def journey(key: str) -> dict | None:
+    with session() as s:
+        j = s.get(Journey, key)
+        return _journey_payload(j) if j else None
+
+
+def _journey_payload(j: Journey) -> dict:
+    legs = {"pretraining": {"leg": "outbound", "stage": []}, "posttraining": {"leg": "return", "stage": []}}
+    for st in sorted(j.stages, key=lambda x: (x.phase, x.ordinal)):
+        legs.setdefault(st.phase, {"leg": st.phase, "stage": []})["stage"].append(
+            {
+                "ordinal": st.ordinal,
+                "name": st.name,
+                "purpose": st.purpose,
+                "library": st.library,
+                "tokens": st.tokens,
+                "passes": st.passes,
+                "lr": st.lr,
+                "compose": st.compose,
+                "cards": st.cards or [],
+            }
+        )
+    return {
+        "key": j.key,
+        "name": j.name,
+        "ship_key": j.ship_key,
+        "harbour_key": j.harbour_key,
+        "aim": j.aim,
+        "status": j.status,
+        "signed_by": j.signed_by,
+        "signed_at": j.signed_at.isoformat() if j.signed_at else None,
+        "manifest_sha1": j.manifest_sha1,
+        **legs,
+    }
+
+
+def card_snapshot(levels: tuple[int, ...] = (0,)) -> list[dict]:
+    """The cards at these levels, with their characteristics: the basic cards (level 0) are always put in;
+    stage 1 (comparator, Nevermore) is a bigger model's choice."""
+    from thorp import fleet
+
+    return [
+        {
+            "key": s.key,
+            "name": s.name,
+            "level": s.level,
+            "kind": "star",
+            "metric": s.metric,
+            "shared_metric": s.shared_metric,
+            "evaluator": s.evaluator,
+            "threshold": s.threshold,
+            "about": s.about,
+        }
+        for s in fleet.STARS.values()
+        if s.level in levels
+    ]
+
+
+def set_stage_cards(
+    journey_key: str, phase: str, ordinal: int, levels: tuple[int, ...] = (0,)
+) -> list[dict]:
+    """Set a stage's cards by level (0 basic, 1 stage 1, ...), snapshotted with their characteristics."""
+    from thorp.viable.s3_control.models import JourneyStage
+
+    cards = card_snapshot(levels)
+    with session() as s, s.begin():
+        st = s.get(JourneyStage, (journey_key, phase, ordinal))
+        if st is None:
+            raise KeyError(f"no stage {journey_key}/{phase}/{ordinal}")
+        st.cards = cards
+    return cards
+
+
+def sign_journey(key: str, signed_by: str, manifest_sha1: str | None = None) -> dict:
+    """The ship_builder's sign-off on a journey's supplies (the manifest's hash, once it is built)."""
+    from datetime import datetime
+
+    with session() as s, s.begin():
+        j = s.get(Journey, key)
+        if j is None:
+            raise KeyError(f"no journey {key!r}")
+        j.signed_by, j.signed_at, j.manifest_sha1 = signed_by, datetime.now().astimezone(), manifest_sha1
+    return journey(key) or {}
 
 
 def ships() -> list[ShipRecord]:

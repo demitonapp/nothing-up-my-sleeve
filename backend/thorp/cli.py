@@ -188,6 +188,14 @@ def cmd_store(a) -> int:
         ok = ledger_store.verify()
         print("ledger: verified, counts match" if ok else "ledger: MISMATCH — see the lines above")
         return 0 if ok else 1
+    if a.what == "queue":
+        from thorp.viable.s2_coordination import queue_store
+
+        counts = queue_store.backfill()
+        print(f"queue: copied {counts}")
+        ok = queue_store.verify()
+        print("queue: verified, counts match" if ok else "queue: MISMATCH — see the lines above")
+        return 0 if ok else 1
     from thorp import store_import
 
     store_import.run(retire=a.retire)
@@ -458,7 +466,7 @@ def main(argv: list[str] | None = None) -> int:
     s = sub.add_parser(
         "store", help="the one store (Postgres): ping it, import data/'s files, or backfill the ledger"
     )
-    s.add_argument("what", choices=["ping", "import", "ledger"])
+    s.add_argument("what", choices=["ping", "import", "ledger", "queue"])
     s.add_argument(
         "--retire",
         action="store_true",

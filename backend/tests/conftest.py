@@ -63,10 +63,12 @@ def _store_clean(_store_migrated):
 
     from thorp import ledger_store, manifest_store, store
     from thorp.viable import records
+    from thorp.viable.s2_coordination import queue_store
 
     tables = ", ".join(
-        f"{t.schema}.{t.name}" for t in (*records.tables(), *ledger_store.tables(), *manifest_store.tables())
-    )  # the records and the ledger and the library: the sizes stay seeded
+        f"{t.schema}.{t.name}"
+        for t in (*records.tables(), *ledger_store.tables(), *manifest_store.tables(), *queue_store.tables())
+    )  # the records and the ledger and the library and the queue: the sizes stay seeded
     with store.session() as s:
         s.execute(text(f"truncate {tables} restart identity cascade"))
 

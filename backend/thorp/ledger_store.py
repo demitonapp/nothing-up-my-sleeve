@@ -354,6 +354,12 @@ class PgLedger:
     def latest_artifact_text(self, run_id: str, kind: str) -> str | None:
         return latest_artifact_text(run_id, kind)
 
+    def metric_at(self, run_id: str, name: str, which: str = "last") -> float | None:
+        return metric_at(run_id, name, which)
+
+    def runs_by_ship(self, ship: str) -> list[dict]:
+        return runs_by_ship(ship)
+
     def checkpoint_wal(self) -> None:
         pass  # no WAL to checkpoint in Postgres
 
@@ -417,6 +423,17 @@ def all_runs() -> list[dict]:
 
     with store.session() as s:
         rows = s.scalars(select(Run).order_by(Run.started.desc().nullslast()))
+        return [{c: getattr(r, c) for c in _RUN_COLUMNS} for r in rows]
+
+
+def runs_by_ship(ship: str) -> list[dict]:
+    """A ship's finished voyages, newest first (its sailings)."""
+    from thorp import store
+
+    with store.session() as s:
+        rows = s.scalars(
+            select(Run).where(Run.ship == ship, Run.status == "finished").order_by(Run.started.desc().nullslast())
+        )
         return [{c: getattr(r, c) for c in _RUN_COLUMNS} for r in rows]
 
 

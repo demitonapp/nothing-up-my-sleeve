@@ -32,15 +32,12 @@ _models: dict[str, tuple] = {}
 
 
 def _run_row(run: str) -> dict:
-    from thorp.ledger import Ledger
+    from thorp.ledger import reader
 
-    rec = Ledger()
-    rows = rec.query("select * from runs where name = ? order by started desc", [run]) or rec.query(
-        "select * from runs where run_id like ? order by started desc", [run + "%"]
-    )
-    if not rows:
+    row = reader().find_run(run)
+    if not row:
         raise LookupError(f"no run named or numbered {run!r}")
-    return rows[0]
+    return row
 
 
 def _load(run: str):
@@ -92,16 +89,12 @@ def keep_talk(voyage: str, line: dict, run_id: str | None = None, step: int | No
 
 def _readings(run_id: str) -> dict:
     from thorp import fleet
-    from thorp.ledger import Ledger
+    from thorp.ledger import reader
 
-    rec = Ledger()
+    rec = reader()
 
     def last(metric: str):
-        r = rec.query(
-            "select value from metrics where run_id=? and name=? order by step desc, rowid desc limit 1",
-            [run_id, metric],
-        )
-        return r[0]["value"] if r else None
+        return rec.metric_at(run_id, metric, "last")
 
     return {
         "stars": {k: last(s.metric) for k, s in fleet.STARS.items()},

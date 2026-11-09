@@ -90,15 +90,12 @@ def _reference_points() -> dict[str, dict]:
 
 
 def _pairs_of(run_id: str) -> list[list[float]] | None:
-    from thorp.ledger import Ledger
+    from thorp.ledger import reader
 
-    rows = Ledger().query(
-        "select text from artifacts where run_id=? and kind='discovery' order by step desc, rowid desc limit 1",
-        [run_id],
-    )
-    if not rows:
+    text = reader().latest_artifact_text(run_id, "discovery")
+    if text is None:
         return None
-    rec = json.loads(rows[0]["text"])
+    rec = json.loads(text)
     if not all(k in rec for k in chaining_rungs()):
         return None
     return [rec[k]["pairs"] for k in chaining_rungs()]
@@ -106,18 +103,19 @@ def _pairs_of(run_id: str) -> list[list[float]] | None:
 
 def _thorp_points() -> dict[str, dict]:
     """Each class's best ship (by the leaderboard), all of its sailings as seeds."""
-    from thorp.ledger import Ledger
+    from thorp.ledger import reader
 
     board = leaderboard.payload()["board"]
-    rec = Ledger()
+    rec = reader()
     out = {}
     for row in board:
         b = row["best"]
         if not b:
             continue
-        sails = rec.query(
-            "select run_id, spec_json from runs where ship=? and status='finished'", [b["ship"]]
-        ) or rec.query("select run_id, spec_json from runs where run_id=?", [b["run_id"]])
+        sails = rec.runs_by_ship(b["ship"])
+        if not sails:
+            one = rec.get_run(b["run_id"])
+            sails = [one] if one else []
         seeds = [s for r in sails if (s := _pairs_of(r["run_id"]))]
         if seeds:
             out[row["class"]] = {

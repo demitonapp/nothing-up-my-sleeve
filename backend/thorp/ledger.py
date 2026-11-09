@@ -168,6 +168,23 @@ class Ledger:
         ).fetchone()
         return r[0] if r else None
 
+    def metric_at(self, run_id: str, name: str, which: str = "last") -> float | None:
+        order = "step desc, rowid desc" if which == "last" else "step asc, rowid asc"
+        r = self.con.execute(
+            f"select value from metrics where run_id=? and name=? order by {order} limit 1",
+            (run_id, name),
+        ).fetchone()
+        return r[0] if r else None
+
+    def runs_by_ship(self, ship: str) -> list[dict]:
+        """A ship's finished voyages, newest first (its sailings, for the smoking-Qwen comparison)."""
+        return [
+            dict(r)
+            for r in self.con.execute(
+                "select * from runs where ship=? and status='finished' order by started desc", (ship,)
+            )
+        ]
+
     def checkpoint_wal(self) -> None:
         self.con.execute("pragma wal_checkpoint(truncate)")
 

@@ -633,27 +633,21 @@ def aboard(run_id: str) -> dict:
     """The library aboard a voyage: its libraries as recorded when it sailed (the 'library' artifact),
     or, for voyages that sailed before 2026-11-07 16:30, worked out from its spec (marked so: the lists
     may have changed since), with the books it read and their tokens (the 'recipe' artifact)."""
-    from thorp.ledger import Ledger
+    from thorp.ledger import reader
 
-    rec = Ledger()
-    run = rec.query("select name, ship, spec_json from runs where run_id=?", [run_id])
+    rec = reader()
+    run = rec.get_run(run_id)
     if not run:
         raise KeyError(run_id)
-    spec = json.loads(run[0]["spec_json"] or "{}")
-    got = rec.query(
-        "select text from artifacts where run_id=? and kind='library' order by rowid desc limit 1",
-        [run_id],
-    )
-    recipe = rec.query(
-        "select text from artifacts where run_id=? and kind='recipe' order by rowid desc limit 1",
-        [run_id],
-    )
-    books = json.loads(recipe[0]["text"]) if recipe else []
+    spec = json.loads(run["spec_json"] or "{}")
+    got = rec.latest_artifact_text(run_id, "library")
+    recipe = rec.latest_artifact_text(run_id, "recipe")
+    books = json.loads(recipe) if recipe else []
     return {
-        "voyage": run[0]["name"],
-        "ship": run[0]["ship"],
-        "libraries": json.loads(got[0]["text"]) if got else carried(spec),
-        "recorded": bool(got),
+        "voyage": run["name"],
+        "ship": run["ship"],
+        "libraries": json.loads(got) if got else carried(spec),
+        "recorded": got is not None,
         "opt_in": (spec.get("data", {}).get("opt_in") or "").strip(),
         "refused": spec.get("data", {}).get("refuse") or [],
         "books": len(books),

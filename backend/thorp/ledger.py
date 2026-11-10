@@ -64,7 +64,7 @@ class Recorder(Protocol):
 def connect(path: Path | None = None, readonly: bool = False) -> sqlite3.Connection:
     path = path or paths.ledger_path()
     if readonly:
-        con = sqlite3.connect(f"file:{path}?mode=ro", uri=True, check_same_thread=False, timeout=2.0)
+        con = sqlite3.connect(f"file:{path}?mode=ro", uri=True, check_same_thread=False, timeout=15.0)
     else:
         con = sqlite3.connect(path, timeout=30)
         con.execute("pragma journal_mode=wal")
@@ -264,11 +264,19 @@ def recorder() -> Ledger | DualRecorder:
     return Ledger()
 
 
+_READERS = __import__("threading").local()
+
+
 def reader() -> Ledger:
     """The ledger the readers answer from: Postgres when THORP_LEDGER_PG is set (the cut-over is on), else SQLite.
-    A hired box never sets the flag, so it reads its own SQLite log."""
+    A hired box never sets the flag, so it reads its own SQLite log. The Postgres reader is per thread and reused,
+    so a page's many small queries share one session and connection (SQLAlchemy's session is not thread-safe)."""
     if os.environ.get("THORP_LEDGER_PG"):
         from thorp.ledger_store import PgLedger
 
-        return PgLedger()
+        r = getattr(_READERS, "pg", None)
+        if r is None:
+            r = PgLedger()
+            _READERS.pg = r
+        return r
     return Ledger()

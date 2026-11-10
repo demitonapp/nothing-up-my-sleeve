@@ -42,6 +42,9 @@ def _sizes() -> tuple[dict, ...]:
                 "vocab": r.vocab,
                 "where": r.trains_where,
                 "status": r.status,
+                "layers": r.layers,
+                "width": r.width,
+                "heads": r.heads,
                 "scored": r.scored,
                 "metrics": r.metrics,
             }

@@ -76,6 +76,3 @@ eval:
 checkpoint:
   every_steps: 1000000
 seed: 2
-fitout:
-  key: keel-cards-cause
-  variation: clean

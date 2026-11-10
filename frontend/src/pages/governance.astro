@@ -1,12 +1,13 @@
 ---
+// Governance, rendered by its own React island: the five systems, S3 control and acquisition. The
+// reader is here because the audit's book links open a book.
 import Layout from '../layouts/Layout.astro';
-import Governance from '../components/Governance.astro';
+import Governance from '../components/islands/Governance';
+import Reader from '../components/Reader.astro';
 ---
 <Layout>
   <main>
-    <Governance />
+    <Governance client:load />
   </main>
-  <script>
-    import '../scripts/dashboard.ts';
-  </script>
+  <Reader />
 </Layout>

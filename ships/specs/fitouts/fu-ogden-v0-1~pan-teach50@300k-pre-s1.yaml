@@ -5,9 +5,6 @@ experiment: 'Fitout ogden-v0-1: one fixed Ogden corpus for every class; what car
 question: 'The 50m as Pan''s teacher, on the outputs only (alpha 0.5, temperature 2, no scaffold): what a 167x bigger ship
   says about the next word at the same tokeniser. Does it move the cards Pan has never lit (duplicate-word 0.00,
   sink 0.05), and the bigram table (the plain Pan 0.208 and 0.200, the table 0.303)?'
-fitout:
-  key: ogden-v0-1
-  variation: pan-teach50
 data:
   recipe: lists/ogden-v0.1.csv
   passes: 4

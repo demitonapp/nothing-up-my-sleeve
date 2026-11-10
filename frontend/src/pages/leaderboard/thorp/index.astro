@@ -1,0 +1,8 @@
+---
+// A Thorp ship version's page, rendered by the same React island; it answers /leaderboard/thorp/<ship>.
+import Layout from '../../../layouts/Layout.astro';
+import Competitor from '../../../components/islands/Competitor';
+---
+<Layout>
+  <main><Competitor client:load /></main>
+</Layout>

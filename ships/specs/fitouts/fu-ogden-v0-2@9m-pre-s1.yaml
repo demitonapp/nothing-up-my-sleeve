@@ -4,9 +4,6 @@ ship: 'Fitout: Ogden v0.2 @ 9m, pretraining'
 experiment: 'Fitout ogden-v0-2: v0.1''s rule over the whole library, and the logic tutor''s passages at 7.5%'
 question: 'The plain 9m on Ogden v0.2: the control every v0.2 9m is read against, and against the plain 9m on v0.1
   (what the text alone buys).'
-fitout:
-  key: ogden-v0-2
-  variation: null
 data:
   recipe: lists/ogden-v0.2.csv
   passes: 4

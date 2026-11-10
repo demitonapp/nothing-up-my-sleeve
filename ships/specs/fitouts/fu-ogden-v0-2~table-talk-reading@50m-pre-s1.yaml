@@ -9,9 +9,6 @@ question: 'The first 50m (Table Talk), its reading stage: the 21m''s recipe (the
   times on a hired GPU. Its last checkpoint is the reading-only twin the dialogue stage is judged against (no worse
   on the Forgotten Tomes by more than 0.05 bits per byte). Recorded beside it: the 16 cards and the logic decks
   against Qwen3 4B.'
-fitout:
-  key: ogden-v0-2
-  variation: table-talk-reading
 data:
   recipe: lists/ogden-v0.2.csv
   passes: 4

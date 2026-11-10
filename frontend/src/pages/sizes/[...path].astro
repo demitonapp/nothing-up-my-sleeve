@@ -1,0 +1,23 @@
+---
+// The rungs live on the ships page now (9 November, Justin: "the rungs needs to be consolidated into the
+// ships page"). Every old /sizes address forwards to its /ships one, path and tabs preserved.
+export function getStaticPaths() {
+  // the class slugs the pages are linked by, and the presets as aliases
+  const presets = ['pan', 'augustus', 'speller', 'stylist', 'paragraph', 'invention', 'trader',
+    '300k', '1m', '9m', '21m', '50m', '100m', '350m'];
+  const tabs = ['overview', 'goals', 'training', 'scoring', 'waypoints', 'fitouts', 'bet'];
+  const subs = ['maths', 'ask', 'language', 'shapes', 'number', 'physics', 'life', 'return', 'logic', 'versus'];
+  const ovs = ['logic-order', 'logic-cause', 'logic-membership', 'logic-proportion', 'logic-counterfactual'];
+  const paths: string[] = [];
+  for (const p of presets) {
+    paths.push(p);
+    for (const t of tabs) paths.push(`${p}/${t}`);
+    for (const s of subs) paths.push(`${p}/scoring/${s}`);
+    for (const o of ovs) paths.push(`${p}/overview/${o}`);
+  }
+  return paths.map((path) => ({ params: { path } }));
+}
+
+const { path } = Astro.params;
+return Astro.redirect(`/ships/${path}`, 301);
+---

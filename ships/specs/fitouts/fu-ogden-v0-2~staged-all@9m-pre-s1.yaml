@@ -6,9 +6,6 @@ question: 'The Smallest Bridge, leg 1b (amended 09:50, before leg 1 sails, on le
   the Bridge''s composed items changed, from order alone to all four relations of the logic deck''s padded rows
   (order, cause, membership, proportion), from the logic tutor''s skeletons. Does the Bridge stay played to the
   end, where leg 0''s order-only Bridge rose to 1.37 and fell to 0.12?'
-fitout:
-  key: ogden-v0-2
-  variation: staged-all
 data:
   recipe: lists/ogden-v0.2.csv
   passes: 4

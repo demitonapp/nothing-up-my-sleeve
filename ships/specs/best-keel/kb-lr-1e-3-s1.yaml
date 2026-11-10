@@ -51,6 +51,3 @@ checkpoint:
   every_steps: 1000000
 seed: 1
 # S5 policy 'fitout' (2026-11-07 18:10): the named fitout this voyage is a variation of
-fitout:
-  key: keel-cards-cause
-  variation: kb-lr-1e-3

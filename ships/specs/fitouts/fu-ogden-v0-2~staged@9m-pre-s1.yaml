@@ -8,9 +8,6 @@ question: 'The Smallest Bridge, leg 1 (Justin, 2026-11-08 08:20): on Ogden v0.2,
   among them) pinned from the first step; the Stage 1 cards (induction, words back) and the two riddles (the comparator,
   the Bridge) from 5% of the voyage; full weight to 10%, down to a floor of 0.2 by 60%; the Faces earned. Does the
   9m play the Bridge, and do the Mover, the Counter and the Nevermore follow?'
-fitout:
-  key: ogden-v0-2
-  variation: staged
 data:
   recipe: lists/ogden-v0.2.csv
   passes: 4

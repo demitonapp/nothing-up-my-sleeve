@@ -260,3 +260,41 @@
 2026-11-09T12:40:33 vast: fitouts/50m@v0.0.5 143
 2026-11-09T12:53:04 fitouts/1m@v0.0.5 0
 2026-11-09T13:04:34 vast: fitouts/50m@v0.0.5 143
+2026-11-09T13:15:35 vast: fitouts/50m@v0.0.5 143
+2026-11-09T15:08:39 vast: fitouts/50m@v0.0.5 1
+2026-11-09T16:33:13 fitouts/9m@v0.0.5 0
+2026-11-09T16:33:43 fitouts/300k@v0.0.7 1
+2026-11-09T16:34:13 fitouts/300k@v0.0.8 1
+2026-11-09T16:37:14 cmd: PYTHONPATH=backend backend/.venv/bin/python -c "from thorp.outside_deck import read; read('mlx-community/Phi-4-mini-instruct-4bit')" >> data/runs/deck-phi.out 2>&1 0
+2026-11-09T16:43:44 fitouts/300k@v0.0.7 0
+2026-11-09T17:00:44 fitouts/300k@v0.0.8 0
+2026-11-09T17:05:16 fitouts/300k@v0.0.8 1
+2026-11-09T17:22:14 fitouts/300k@v0.0.8 0
+2026-11-09T19:59:39 fitouts/21m@v0.0.5 143
+2026-11-09T21:57:28 cmd: n=0; while [ -e ships/specs/ifeval-ready.hold ] && [ $n -lt 1440 ]; do sleep 30; n=$((n+1)); done -15
+2026-11-09T21:57:28 wait: 21m@v0.0.5 0
+2026-11-09T21:58:28 cmd: PYTHONPATH=backend backend/.venv/bin/python backend/scripts/head_census.py mlx-community/Qwen3-4B-4bit >> data/runs/head-census.out 2>&1 1
+2026-11-09T21:58:58 cmd: n=0; while [ -e ships/specs/ifeval-ready.hold ] && [ $n -lt 1440 ]; do sleep 30; n=$((n+1)); done -15
+2026-11-09T21:58:58 wait: 21m@v0.0.5 0
+2026-11-10T03:25:13 cmd: n=0; while [ -e ships/specs/ifeval-ready.hold ] && [ $n -lt 1440 ]; do sleep 30; n=$((n+1)); done -15
+2026-11-10T07:23:51 wait: 21m@v0.0.5 0
+2026-11-10T07:24:22 fitouts/9m@v0.0.6 2
+2026-11-10T07:24:22 fitouts/9m@v0.0.6-gqa 2
+2026-11-10T07:24:22 fitouts/9m@v0.0.6-pins 2
+2026-11-10T07:24:52 fitouts/9m@v0.0.6-control 2
+2026-11-10T07:24:52 fitouts/9m@v0.0.6-marks 2
+2026-11-10T07:24:52 fitouts/1m@v0.0.6 2
+2026-11-10T07:29:47 fitouts/9m@v0.0.6 -15
+2026-11-10T07:29:47 fitouts/9m@v0.0.6-gqa -15
+2026-11-10T07:29:47 fitouts/9m@v0.0.6-pins -15
+2026-11-10T07:30:17 fitouts/9m@v0.0.6-marks 1
+2026-11-10T07:44:52 fitouts/9m@v0.0.6-gqa -15
+2026-11-10T07:44:52 fitouts/9m@v0.0.6-pins -15
+2026-11-10T07:45:22 cmd: PYTHONPATH=backend backend/.venv/bin/python backend/scripts/head_audit.py --stage 1 --layers 2 --probes 2 --out data/runs/qwen-audit-smoke.json >> data/runs/qwen-audit.out 2>&1 0
+2026-11-10T07:45:22 cmd: PYTHONPATH=backend backend/.venv/bin/python backend/scripts/head_audit.py --stage 1 --probes 24 >> data/runs/qwen-audit.out 2>&1 0
+2026-11-10T08:00:39 fitouts/300k@v0.0.6-marks 1
+2026-11-10T08:04:09 fitouts/300k@v0.0.6-marks 1
+2026-11-10T09:08:47 fitouts/300k@v0.0.6 -15
+2026-11-10T09:08:47 fitouts/300k@v0.0.6-control -15
+2026-11-10T09:54:50 fitouts/300k@v0.0.6-gqa -2
+2026-11-10T09:54:50 fitouts/300k@v0.0.6-pins -2

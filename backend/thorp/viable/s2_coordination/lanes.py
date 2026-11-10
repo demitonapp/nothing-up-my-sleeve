@@ -39,6 +39,17 @@ from thorp import paths, store
 LANES = ("mac", "vast")
 
 
+def slots_of(lane: str) -> int:
+    """How many lines this lane may have at sea at once: THORP_MAC_SLOTS for the Mac (one by default),
+    always one on a hired box (the charter terms count voyages, not seats)."""
+    if lane != "mac":
+        return 1
+    try:
+        return max(1, int(os.environ.get("THORP_MAC_SLOTS", "1")))
+    except ValueError:
+        return 1
+
+
 @dataclass
 class Line:
     text: str  # the line as written in the queue
@@ -213,14 +224,22 @@ def _is_child_of_mine(pid: str) -> bool:
     return False
 
 
-def blocked(ln: Line, above: list[Line], at_sea: dict[str, Line | None]) -> str | None:
+def blocked(ln: Line, above: list[Line], at_sea: list[Line]) -> str | None:
     """Why this line cannot start yet (None when it can): a run it reads from queued above it or at sea, the same
     run at sea in the other lane, or (for `wait:`) the voyage waited for still queued or at sea."""
-    sailing = [x for x in at_sea.values() if x is not None]
+    sailing = list(at_sea)
     if ln.kind == "wait":
         name = ln.payload
         if any(x.name == name or x.payload == name for x in above + sailing):
             return f"waiting for {name} to dock"
+        # a voyage launched outside the queue holds the helm but no lane, so `sailing` is empty and
+        # the wait would call it docked (9 November: the 21m, started by hand, was declared docked
+        # while it was still training). The helm is the authority.
+        with contextlib.suppress(Exception):
+            from thorp import vsm
+
+            if (vsm.helm() or {}).get("name") == name:
+                return f"waiting for {name} to dock"
         return None
     if ln.kind != "spec":
         return None
@@ -235,7 +254,7 @@ def blocked(ln: Line, above: list[Line], at_sea: dict[str, Line | None]) -> str 
 
 
 def next_for(
-    lane: str, lines: list[Line], at_sea: dict[str, Line | None], key: bool
+    lane: str, lines: list[Line], at_sea: list[Line], key: bool
 ) -> tuple[Line | None, str | None]:
     """The line this lane would start now, or (None, why not). A lane waits at its first line: nothing jumps it."""
     if lane == "vast" and not key:
@@ -269,6 +288,10 @@ def command(ln: Line) -> list[str] | str:
         ]
     # --no-sync: a launch must never depend on uv re-resolving the lock. On 8 November a spaCy model wheel
     # answered 504 from GitHub and every voyage died in 30 seconds; the environment was intact all along.
+    # THORP_LAUNCH=local runs the venv's python directly, for a host where uv cannot write its cache
+    # (9 November: every spec launch died with exit 2 until this was set).
+    if os.environ.get("THORP_LAUNCH") == "local":
+        return [sys.executable, "-m", "thorp.train", spec]
     return ["uv", "run", "--no-sync", "--project", "backend", "thorp", "run", spec]
 
 
@@ -278,9 +301,11 @@ def _write_state(running: dict) -> None:
     from thorp.viable.records import Lane
 
     with store.session() as s:
-        for lane, r in running.items():
-            s.merge(Lane(lane=lane, line=r["line"].text if r else None, pid=r["proc"].pid if r else None,
-                         since=r["since"] if r else None))  # fmt: skip
+        for lane, seats in running.items():
+            first = seats[0] if seats else None
+            line = " + ".join(x["line"].text for x in seats) if seats else None
+            s.merge(Lane(lane=lane, line=line, pid=first["proc"].pid if first else None,
+                         since=first["since"] if first else None, seats=slots_of(lane)))  # fmt: skip
 
 
 def state() -> dict:
@@ -319,7 +344,7 @@ def run(queue: Path | None = None, done: Path | None = None, root: Path | None =
         line = f"[{time.strftime('%H:%M:%S')}] {msg}"
         (log or (lambda m: print(m, flush=True)))(line)
 
-    def default_launch(ln: Line):
+    def default_launch(ln: Line, slot: int = 0):
         out = None
         if ln.kind == "spec":
             out_path = root / "data" / "runs" / f"{ln.payload}.out"
@@ -328,68 +353,75 @@ def run(queue: Path | None = None, done: Path | None = None, root: Path | None =
             )  # a voyage's log folder is made here, never forgotten
             out = open(out_path, "w")  # noqa: SIM115
         cmd = command(ln)
+        env = {**os.environ, "THORP_HELM_SLOT": str(slot), "THORP_HELM_SLOTS": str(slots_of("mac"))}
         p = subprocess.Popen(
             cmd,
             cwd=root,
             shell=isinstance(cmd, str),
             stdout=out or None,
             stderr=subprocess.STDOUT if out else None,
+            env=env,
         )  # noqa: S602
         if out:
             out.close()
         return p
 
+    custom = launch is not None
     launch = launch or default_launch
-    running: dict[str, dict | None] = {lane: None for lane in LANES}
+    running: dict[str, list[dict]] = {lane: [] for lane in LANES}
     told: dict[str, str | None] = {lane: None for lane in LANES}
     while True:
-        # the lines that ended
-        for lane, r in running.items():
-            if r and r["proc"].poll() is not None:
-                code = r["proc"].returncode
-                say(f"[{lane}] {r['line'].text} exited {code}")
-                with done.open("a", encoding="utf-8") as f:
-                    f.write(f"{time.strftime('%Y-%m-%dT%H:%M:%S')} {r['line'].text} {code}\n")
-                _children.discard(r["proc"].pid)
-                running[lane] = None
+        # the seats that ended (a lane may hold several now)
+        for lane, seats in running.items():
+            for seat in list(seats):
+                if seat["proc"].poll() is not None:
+                    code = seat["proc"].returncode
+                    say(f"[{lane}] {seat['line'].text} exited {code}")
+                    with done.open("a", encoding="utf-8") as f:
+                        f.write(f"{time.strftime('%Y-%m-%dT%H:%M:%S')} {seat['line'].text} {code}\n")
+                    _children.discard(seat["proc"].pid)
+                    seats.remove(seat)
         lines = [parse(t, specs) for t in pending(queue)]
-        at_sea = {lane: (r["line"] if r else None) for lane, r in running.items()}
         have_key = key()
         for lane in LANES:
-            if running[lane] is not None:
-                continue
-            ln, why = next_for(lane, lines, at_sea, have_key)
-            if ln is None:
-                if why and why != told[lane]:
-                    say(f"[{lane}] in port: {why}")
-                told[lane] = why
-                continue
-            if lane == "mac" and ln.kind != "wait" and outside():
-                if told[lane] != "outside":
-                    say("[mac] in port: a voyage started outside the queue is at sea")
-                told[lane] = "outside"
-                continue
-            if not take(queue, ln.text):
-                continue  # edited away meanwhile: read the queue again next time
-            told[lane] = None
-            if ln.kind == "wait":
-                say(f"[{lane}] {ln.text}: docked, going on")
-                with done.open("a", encoding="utf-8") as f:
-                    f.write(f"{time.strftime('%Y-%m-%dT%H:%M:%S')} {ln.text} 0\n")
-                continue
-            say(f"[{lane}] starting {ln.text}")
-            p = launch(ln)
-            _children.add(p.pid)
-            running[lane] = {"line": ln, "proc": p, "since": time.strftime("%Y-%m-%dT%H:%M:%S")}
-            at_sea[lane] = ln
-            lines = [x for x in lines if x is not ln]
+            capacity = slots_of(lane)
+            while len(running[lane]) < capacity:
+                at_sea = [seat["line"] for seats in running.values() for seat in seats]
+                ln, why = next_for(lane, lines, at_sea, have_key)
+                if ln is None:
+                    if why and why != told[lane]:
+                        say(f"[{lane}] in port: {why}")
+                    told[lane] = why
+                    break
+                if lane == "mac" and ln.kind != "wait" and outside():
+                    if told[lane] != "outside":
+                        say("[mac] in port: a voyage started outside the queue is at sea")
+                    told[lane] = "outside"
+                    break
+                if not take(queue, ln.text):
+                    break  # edited away meanwhile: read the queue again next time
+                told[lane] = None
+                if ln.kind == "wait":
+                    say(f"[{lane}] {ln.text}: docked, going on")
+                    with done.open("a", encoding="utf-8") as f:
+                        f.write(f"{time.strftime('%Y-%m-%dT%H:%M:%S')} {ln.text} 0\n")
+                    lines = [x for x in lines if x is not ln]
+                    continue
+                say(f"[{lane}] starting {ln.text}")
+                seat_no = len(running[lane])
+                p = launch(ln) if custom else launch(ln, seat_no)
+                _children.add(p.pid)
+                running[lane].append(
+                    {"line": ln, "proc": p, "since": time.strftime("%Y-%m-%dT%H:%M:%S"), "slot": seat_no}
+                )
+                lines = [x for x in lines if x is not ln]
         try:
             _write_state(running)
         except (
             store.StoreDown
         ) as e:  # said in the queue's log, every pass, until the store is back; the lanes sail on
             say(f"S2: what is out could not be recorded: {e}")
-        idle = all(r is None for r in running.values())
+        idle = all(len(seats) == 0 for seats in running.values())
         left = [x for x in (parse(t, specs) for t in pending(queue)) if x.lane == "mac" or have_key]
         if until_empty and idle and not left:
             say(

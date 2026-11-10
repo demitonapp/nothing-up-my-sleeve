@@ -1,14 +1,14 @@
 ---
+// Discoveries, rendered by its own React island: the index with its five subtabs, one trick, one chain
+// and the traits. The island reads the route itself (the server falls back to this page for every
+// discoveries address). The reader is here because the essays and book links open in it.
 import Layout from '../../layouts/Layout.astro';
-import Discoveries from '../../components/Discoveries.astro';
+import Discoveries from '../../components/islands/Discoveries';
 import Reader from '../../components/Reader.astro';
 ---
 <Layout>
   <main>
-    <Discoveries />
+    <Discoveries client:load />
   </main>
   <Reader />
-  <script>
-    import '../../scripts/dashboard.ts';
-  </script>
 </Layout>

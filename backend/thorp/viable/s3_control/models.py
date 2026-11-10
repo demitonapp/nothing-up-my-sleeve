@@ -110,6 +110,7 @@ class Journey(Base):
     status: Mapped[str] = mapped_column(Text, default="draft", server_default="draft")
     signed_by: Mapped[str | None] = mapped_column(Text)  # the harbourmaster's name
     signed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    sop_version: Mapped[str | None] = mapped_column(Text)  # FK s5.sop_versions(version), h9d2e5f7a1c3
     manifest_sha1: Mapped[str | None] = mapped_column(Text)  # the supplies this signature covers
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
@@ -384,6 +385,11 @@ class Size(Base):
     kind: Mapped[str | None] = mapped_column(Text)  # nursery, proxy, or none
     vocab: Mapped[int | None] = mapped_column(Integer)
     trains_where: Mapped[str] = mapped_column(Text, default="", server_default="")
+    # the hull: its shape, set here rather than in code (9 November, Justin: "each model's layers, width,
+    # heads, head dim and set ... they need to be able to set in the postgres db"). head_dim is derived.
+    layers: Mapped[int | None] = mapped_column(Integer)
+    width: Mapped[int | None] = mapped_column(Integer)
+    heads: Mapped[int | None] = mapped_column(Integer)
     status: Mapped[str] = mapped_column(Text, default="planned", server_default="planned")
     scored: Mapped[str] = mapped_column(Text, default="", server_default="")
     # [[name, what it measures, "live" | "to come"], ...]

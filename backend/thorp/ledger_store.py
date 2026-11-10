@@ -38,7 +38,8 @@ RUN_COLUMNS = (
     "status",
     "tokens_seen",
     "wall_minutes",
-)
+
+    "sop_version",)
 EVAL_COLUMNS = ("run_id", "step", "set", "book_id", "ce_nats", "bpb", "tokens", "bytes")
 
 
@@ -66,6 +67,7 @@ class Run(Base):
     name: Mapped[str | None] = mapped_column(Text)
     ship: Mapped[str | None] = mapped_column(Text)
     spec_json: Mapped[str | None] = mapped_column(Text)
+    sop_version: Mapped[str | None] = mapped_column(Text)  # FK s5.sop_versions(version), h9d2e5f7a1c3
     commit: Mapped[str | None] = mapped_column(Text)
     hardware: Mapped[str | None] = mapped_column(Text)
     started: Mapped[str | None] = mapped_column(Text)
@@ -303,6 +305,19 @@ class PgLedger:
 
     def _commit(self) -> None:
         self._s.commit()
+
+    def query(self, sql: str, params: Iterable = ()) -> list[dict]:
+        """The readers' raw SQL against s1: `?` becomes `%s`, SQLite's rowid becomes the explicit id,
+        and the json_extract calls become Postgres's jsonb path operator."""
+        q = sql.replace("?", "%s").replace("rowid", "id")
+        for k in ("model.preset", "data.recipe", "model.backend"):
+            col = "{" + k.replace(".", ",") + "}"
+            q = q.replace(f"json_extract(spec_json,'$.{k}')", f"(spec_json::jsonb #>> '{col}')")
+        conn = self._s.connection()
+        conn.exec_driver_sql("set search_path to s1, public")
+        res = conn.exec_driver_sql(q, tuple(params))
+        cols = list(res.keys())
+        return [dict(zip(cols, r)) for r in res]
 
     def run(self, row: dict) -> None:
         put_run(self._s, row)

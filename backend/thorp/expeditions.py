@@ -20,12 +20,9 @@ FT = "eval/hole-cards-unseen/bpb_mean_en"
 
 
 def _rows(sql: str, params=()) -> list[dict]:
-    con = connect(readonly=True)
-    con.row_factory = __import__("sqlite3").Row
-    try:
-        return [dict(r) for r in con.execute(sql, list(params))]
-    finally:
-        con.close()
+    from thorp.ledger import reader
+
+    return reader().query(sql, params)
 
 
 def runs_of(voyage: fleet.Expedition) -> list[dict]:
@@ -179,6 +176,83 @@ def ships_of(runs: list[dict]) -> list[dict]:
     return out
 
 
+def _seats() -> set[str]:
+    """The runs that hold a helm seat now (S2): the authority on what is actually at sea. A run killed
+    with a signal never writes a finish, so the ledger can say running for a voyage that stopped hours ago."""
+    try:
+        from thorp import store, vsm
+        from thorp.viable.records import Lane
+
+        with store.session() as s:
+            row = s.get(Lane, "mac")
+            n = (row.seats if row else 1) or 1
+        return {str(h.get("name")) for h in vsm.helms(n) if h.get("name")}
+    except Exception:  # noqa: BLE001
+        return set()
+
+
+def _queued() -> set[str]:
+    """The voyage names in specs/queue.txt: a run still in the queue is queued, not running."""
+    import yaml
+
+    out: set[str] = set()
+    q = paths.resolve("specs/queue.txt")
+    if not q.exists():
+        return out
+    for ln in q.read_text(encoding="utf-8").splitlines():
+        ln = ln.strip()
+        if not ln or ln.startswith("#") or ln.startswith("cmd:"):
+            continue
+        p = paths.resolve(f"specs/{ln}.yaml")
+        if not p.exists():
+            continue
+        try:
+            spec = yaml.safe_load(p.read_text(encoding="utf-8")) or {}
+        except Exception:  # noqa: BLE001
+            continue
+        if spec.get("name"):
+            out.add(str(spec["name"]))
+    return out
+
+
+_STATUS_CTX: dict = {"at": 0.0, "seats": set(), "queued": set()}
+
+
+def _status_ctx() -> tuple[set[str], set[str]]:
+    """The seats and the queue, read once per ten seconds across the sixteen expeditions."""
+    import time
+
+    now = time.time()
+    if now - _STATUS_CTX["at"] > 10.0:
+        _STATUS_CTX.update(at=now, seats=_seats(), queued=_queued())
+    return _STATUS_CTX["seats"], _STATUS_CTX["queued"]
+
+
+def _mark_status(runs: list[dict]) -> None:
+    """A ledger 'running' without a seat is not at sea: it is queued if it is in the queue, otherwise
+    stopped (a killed arm). Only the seat holder stays running."""
+    if not any(r.get("status") == "running" for r in runs):
+        return
+    seats, queued = _status_ctx()
+    # a name can have several ledger rows (three dead control arms): only the newest running row per
+    # name is the seat holder; the rest stopped. runs_of is in started order, so the last one wins.
+    newest: dict[str, dict] = {}
+    for r in runs:
+        if r.get("status") == "running" and r.get("name") in seats:
+            newest[str(r.get("name"))] = r
+    for r in runs:
+        if r.get("status") != "running":
+            continue
+        # a run still in the queue is queued whatever a stale helm record says; only the seat
+        # holder that is no longer queued is actually at sea
+        if r.get("name") in queued:
+            r["status"] = "queued"
+        elif r.get("name") not in seats:
+            r["status"] = "stopped"
+        elif newest.get(str(r.get("name"))) is not r:
+            r["status"] = "stopped"
+
+
 def summary(key: str) -> dict:
     v = fleet.EXPEDITIONS[key]
     out = {
@@ -194,9 +268,18 @@ def summary(key: str) -> dict:
         "stop": v.stop.__dict__,
         "learned": v.learned,
         "next_steps": list(v.next_steps),
+        "plan": list(getattr(v, "plan", ())),
         "runs": [run_summary(r, v) for r in runs_of(v)],
         "stars": list(v.stars),
     }
+    _mark_status(out["runs"])
+    # an expedition has exactly one SOP (9 November, Justin: "An expedition can only have one SOP and
+    # Kipling has 0.0.6"): read it from the standards that name this expedition
+    from thorp import sop as _sop
+
+    out["sop"] = next(
+        (ver for ver in _sop.versions() if ((_sop.standard(ver) or {}).get("expedition") == key)), None
+    )
     if key == "book_value":
         f = paths.data_dir() / "loop/fit.json"
         out["fit"] = json.loads(f.read_text()) if f.exists() else None
@@ -307,7 +390,60 @@ def overview() -> dict:
             }
         )
     exps.sort(key=lambda x: (-x["at_sea"], x["next_in_queue"] or 10**9, x["key"]))
+    # the expeditions page's subject is the SOP itself: each version's aim, its art, and whether it is the
+    # one at sea (9 November, Justin: "this page should only contain the running SOP which is 0.0.5 ... And
+    # then 0.0.6's goals"). Only versions that state an aim appear; the fleet's older groupings stay in
+    # `expeditions` for the other tabs.
+    from thorp import sop
+
+    sops = []
+    for v in sop.versions():
+        std = sop.standard(v) or {}
+        if not (std.get("goals") or std.get("art")):
+            continue
+        sops.append(
+            {
+                "version": v,
+                "name": f"SOP v{v}",
+                "art": std.get("art"),
+                "goals": std.get("goals") or [],
+                "at_sea": sum(1 for r in at_sea if (r.get("sop") if isinstance(r, dict) else None) == v),
+                "queued": 0,
+                "finished": 0,
+            }
+        )
+    runs_by_sop = collections.Counter()
+    # the Mac lane's runs live in SQLite, where the version is still inside the spec
+    import json as _json
+
+    # and which expedition each SOP's voyages belong to: the card opens that expedition's page, not the
+    # at-sea tab of nothing (9 November, Justin: clicking a card "should open the SOP card, which is
+    # actually the expedition page")
+    exp_of_sop: dict[str, collections.Counter] = {}
+    for r in _rows("select name, ship, status, spec_json from runs where spec_json is not null"):
+        try:
+            v = _json.loads(r["spec_json"]).get("sop")
+        except Exception:
+            v = None
+        if not v:
+            continue
+        v = str(v)
+        runs_by_sop[(v, r["status"])] += 1
+        k = fleet.expedition_of_label(r["name"], r["ship"])
+        if k:
+            exp_of_sop.setdefault(v, collections.Counter())[k] += 1
+    for e in sops:
+        e["at_sea"] = runs_by_sop[(e["version"], "running")]
+        e["finished"] = runs_by_sop[(e["version"], "finished")]
+        c = exp_of_sop.get(e["version"])
+        std = sop.standard(e["version"]) or {}
+        e["expedition"] = (c.most_common(1)[0][0] if c else None) or std.get("expedition")
+        exp = fleet.EXPEDITIONS.get(e["expedition"]) if e["expedition"] else None
+        e["expedition_name"] = exp.name if exp else None
+        e["role"] = exp.plan[0]["kind"] if (exp and exp.plan) else None
+    sops.sort(key=lambda e: (-e["at_sea"], e["version"]), reverse=False)
     return {
+        "sops": sops,
         "at_sea": [
             {**r, "expedition": fleet.expedition_of_label(r["name"], r["ship"])} for r in at_sea
         ],

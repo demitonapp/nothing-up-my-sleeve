@@ -375,16 +375,87 @@ def _large_summary(rel: str, p) -> dict:
     }
 
 
+def _summary_pg(rel: str) -> dict | None:
+    """A shelf's summary from Postgres: `list_rows` -> `books` -> `s3.library_facts`, with no CSV read
+    and no library-facts build. Returns None when the shelf is not fully named there (a partially named
+    shelf falls back to the resolver, which can still find the rest)."""
+    try:
+        from sqlalchemy import text
+
+        from thorp import store
+
+        with store.session() as s:
+            rows = s.execute(text("""
+                select r.title, r.language as list_language, r.book,
+                       b.language as book_language, b.bytes,
+                       f.title as fact_title, f.language as fact_language, f.kind, f.year, f.ogden
+                from s1.list_rows r
+                left join s1.books b on b.id = r.book
+                left join s3.library_facts f on f.book = r.book
+                where r.list = :rel
+                order by r.ordinal
+            """), {"rel": rel}).mappings().all()
+    except Exception:  # noqa: BLE001  no list_rows table or no library_facts: the CSV path still works
+        return None
+    if not rows:
+        return None
+    have = [r for r in rows if r["book"] and r["bytes"] is not None]
+    if len(have) != len(rows):
+        return None  # some rows are not books (yet): the resolver can name them
+    n = len(have) or 1
+    langs = Counter((r["fact_language"] or r["book_language"] or r["list_language"] or "?") for r in have)
+    kinds = Counter((r["kind"] or "other") for r in have)
+    cats = Counter(category_of({"title": r["fact_title"] or r["title"], "kind": r["kind"]}) for r in have)
+    years = [int(r["year"]) for r in have if r["year"] is not None]
+    ogden = [float(r["ogden"]) for r in have if r["ogden"] is not None]
+    size = sum(int(r["bytes"] or 0) for r in have)
+    stem = rel.rsplit("/", 1)[-1].rsplit(".", 1)[0].replace("-", " ")
+    name = ABOUT.get(rel, (stem, "", ""))[0]
+    return {
+        "path": rel,
+        "name": name,
+        "rows": len(rows),
+        "resolved": len(rows),
+        "books": len(have),
+        "bytes": size,
+        "tokens_est": int(size / BYTES_PER_TOKEN),
+        "languages": [
+            {"code": c, "name": LANGUAGE_NAMES.get(c, c), "books": k, "share": round(k / n, 3)}
+            for c, k in langs.most_common()
+        ],
+        "kinds": [
+            {"kind": k, "books": k_, "share": round(k_ / n, 3)}
+            for k, k_ in kinds.most_common()
+        ],
+        "categories": [
+            {"category": c, "books": cats.get(c, 0), "share": round(cats.get(c, 0) / n, 3)}
+            for c in CATEGORY_ORDER
+        ],
+        "date_range": {"from": min(years), "to": max(years)} if years else None,
+        "ogden": {
+            "mean": round(sum(ogden) / len(ogden), 3) if ogden else None,
+            "scored": len(ogden),
+            "unscored": len(have) - len(ogden),
+            "share_at_bar": round(sum(v >= 0.68 for v in ogden) / len(ogden), 3) if ogden else None,
+            "bar": 0.68,
+        },
+    }
+
+
 def summary(rel: str) -> dict:
     """A shelf at a glance for the ship builder's Library tab: its language(s), its kinds of book, its
     size (books, bytes, tokens) and its date range. Facts come from the manifest and library_facts."""
     from thorp import manifest
 
     p = paths.resolve(rel)
+    if p.exists() and p.stat().st_size > 20_000_000:  # a synthetic card-stage deck: 360k inline passages, not books
+        return _large_summary(rel, p)
+    if os.environ.get("THORP_LIBRARY_PG") == "1":
+        got = _summary_pg(rel)
+        if got is not None:
+            return got
     if not p.exists():
         raise LookupError(f"no shelf {rel!r}")
-    if p.stat().st_size > 20_000_000:  # a synthetic card-stage deck: 360k inline passages, not books
-        return _large_summary(rel, p)
     rows = _rows(p)
     ids = _ids(p, rel, rows, _resolved())
     books = {i: b for i in ids if (b := manifest.get(i)) is not None}

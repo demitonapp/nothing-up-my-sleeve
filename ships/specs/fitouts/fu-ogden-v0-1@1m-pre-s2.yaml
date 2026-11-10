@@ -3,9 +3,6 @@ name: fu-ogden-v0-1@1m-pre-s2
 ship: 'Fitout: Ogden v0.1 @ 1m, pretraining'
 experiment: 'Fitout ogden-v0-1: one fixed Ogden corpus for every class; what cards and stars form at each size?'
 question: Which cards and stars does the 1m form on Ogden v0.1, and when (by tokens read)?
-fitout:
-  key: ogden-v0-1
-  variation: null
 data:
   recipe: lists/ogden-v0.1.csv
   passes: 4

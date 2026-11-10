@@ -1,0 +1,15 @@
+---
+// The three shipyard sections as real routes (dev has no server fallback; production falls back to
+// shipyard/index.html). The island opens the SOP at the matching tab.
+import Layout from '../../layouts/Layout.astro';
+import Harbours from '../../components/islands/Harbours';
+import Reader from '../../components/Reader.astro';
+
+export function getStaticPaths() {
+  return ['training', 'fitting', 'raiding'].map((path) => ({ params: { path } }));
+}
+---
+<Layout>
+  <main><Harbours client:load /></main>
+  <Reader />
+</Layout>

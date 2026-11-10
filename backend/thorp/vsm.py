@@ -742,15 +742,26 @@ def gate_log(limit: int = 60) -> list[dict]:
 # voyages queued); only one voyage is at sea.
 
 
-def _helm_paths():
+def helm_slots() -> int:
+    """How many seats the helm has (9 November, Justin: "run the first 3 concurrently"). One unless the
+    lane sets THORP_HELM_SLOTS; every seat is its own lock, its own record, its own s2.helm row."""
+    try:
+        return max(1, int(os.environ.get("THORP_HELM_SLOTS", "1")))
+    except ValueError:
+        return 1
+
+
+def _helm_paths(slot: int = 0):
     d = paths.data_dir()
+    if slot:
+        return d / f"helm-{slot}.lock", d / f"helm-{slot}.json"
     return (
         d / "helm.lock",
         d / "helm.json",
     )  # helm.json only on a hired box (its papers); at home, s2.helm
 
 
-def _helm_write(rec: dict | None, pid: int, who) -> None:
+def _helm_write(rec: dict | None, pid: int, who, slot: int = 0) -> None:
     """Who holds the helm, recorded (s2.helm at home; beside the lock on a box); `rec` None releases our record."""
     from thorp import store
 
@@ -768,15 +779,16 @@ def _helm_write(rec: dict | None, pid: int, who) -> None:
 
     from thorp.viable.records import Helm
 
+    key = "mac" if slot == 0 else f"mac:{slot}"
     with store.session() as s:
         if rec is None:
-            s.execute(delete(Helm).where(Helm.helm == "mac", Helm.pid == pid))
+            s.execute(delete(Helm).where(Helm.helm == key, Helm.pid == pid))
         else:
-            s.merge(Helm(helm="mac", name=rec["name"], kind=rec["kind"], pid=rec["pid"],
+            s.merge(Helm(helm=key, name=rec["name"], kind=rec["kind"], pid=rec["pid"],
                          since=datetime.strptime(rec["since"], GATE_TIME).astimezone()))  # fmt: skip
 
 
-def _helm_read(who) -> dict | None:
+def _helm_read(who, slot: int = 0) -> dict | None:
     from thorp import store
 
     if store.papers():
@@ -784,7 +796,7 @@ def _helm_read(who) -> dict | None:
     from thorp.viable.records import Helm
 
     with store.session() as s:
-        r = s.get(Helm, "mac")
+        r = s.get(Helm, "mac" if slot == 0 else f"mac:{slot}")
         return (
             {
                 "name": r.name,
@@ -802,7 +814,8 @@ def at_sea(name: str, kind: str = "voyage", log=print):
     """Take the helm for `name` (blocking until it is free), hold it while the body runs."""
     import fcntl
 
-    lock, who = _helm_paths()
+    slot = int(os.environ.get("THORP_HELM_SLOT", "0") or 0)
+    lock, who = _helm_paths(slot)
     lock.parent.mkdir(parents=True, exist_ok=True)
     f = open(lock, "a+")
     try:
@@ -818,36 +831,60 @@ def at_sea(name: str, kind: str = "voyage", log=print):
             {"name": name, "kind": kind, "pid": os.getpid(), "since": time.strftime(GATE_TIME)},
             os.getpid(),
             who,
+            slot,
         )
         yield
     finally:
         try:
-            _helm_write(None, os.getpid(), who)
+            _helm_write(None, os.getpid(), who, slot)
         finally:
             f.close()  # releases the lock, even if the record could not be cleared
 
 
-def helm() -> dict | None:
-    """Who is at sea now: the holder of the helm, or None when it is free."""
+def helms(seats: int | None = None) -> list[dict]:
+    """Every seat at sea now, in slot order. `seats` overrides the environment: the dashboard reads the
+    lane's count from Postgres, which the coordinator wrote (9 November)."""
     import fcntl
 
-    lock, who = _helm_paths()
-    if not lock.exists():
-        return None
-    with open(lock, "a+") as f:
-        try:
-            fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError:
-            from thorp import store
-
+    out = []
+    for slot in range(seats or helm_slots()):
+        lock, who = _helm_paths(slot)
+        if not lock.exists():
+            continue
+        with open(lock, "a+") as f:
             try:
-                return _helm_read(who) or {"name": "(unknown)", "kind": "?", "since": None}
-            except store.StoreDown:
-                raise
-            except Exception:  # noqa: BLE001  (a box's helm.json half-written)
-                return {"name": "(unknown)", "kind": "?", "since": None}
-        fcntl.flock(f, fcntl.LOCK_UN)
-    return None
+                fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                from thorp import store
+
+                try:
+                    rec = _helm_read(who, slot)
+                except store.StoreDown:
+                    raise
+                except Exception:  # noqa: BLE001  (a box's helm.json half-written)
+                    rec = None
+                rec = {**(rec or {"name": "(unknown)", "kind": "?", "since": None}), "slot": slot}
+                # a seat whose process is gone is stale: a killed run leaves its lock behind, and the
+                # dashboard was listing dead voyages as at sea (9 November)
+                pid = rec.get("pid")
+                alive = False
+                if pid:
+                    try:
+                        os.kill(int(pid), 0)
+                        alive = True
+                    except Exception:  # noqa: BLE001
+                        alive = False
+                if alive or not pid:
+                    out.append(rec)
+            else:
+                fcntl.flock(f, fcntl.LOCK_UN)
+    return out
+
+
+def helm() -> dict | None:
+    """Who is at sea now: the first seat holding the helm, or None when every seat is free."""
+    seats = helms()
+    return seats[0] if seats else None
 
 
 def expedition_states() -> dict[str, str]:

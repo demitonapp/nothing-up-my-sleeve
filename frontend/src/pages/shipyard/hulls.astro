@@ -1,0 +1,14 @@
+---
+// The hull dimensions, one level down from the shipyard's hull card: every rung's layers, width, heads and
+// head width, editable, written to s1.sizes (9 November).
+import Layout from '../../layouts/Layout.astro';
+import Hulls from '../../components/HullTable.astro';
+import Reader from '../../components/Reader.astro';
+---
+<Layout>
+  <main>
+    <p class="crumbs"><a href="/shipyard">← shipyard</a></p>
+    <Hulls />
+  </main>
+  <Reader />
+</Layout>

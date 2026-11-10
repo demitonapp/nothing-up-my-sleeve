@@ -1,0 +1,109 @@
+checkpoint:
+  every_steps: 640
+data:
+  clean: unwrap-v2
+  order: shuffled
+  passes: 4
+  recipe: lists/ogden-v0.1.csv
+  refuse:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+  - lists/hole-cards-unseen.csv
+eval:
+  evaluators:
+  - ce_bpb
+  - discovery
+  - logic
+  - stars
+  - nevermore
+  - cards
+  - shapes
+  - pips
+  every_steps: 640
+  light:
+    evaluators:
+    - stars
+    - nevermore
+    - cards
+    - logic
+    - shapes
+    - pips
+    every_steps: 64
+  sets:
+  - lists/hole-cards-unseen.csv
+experiment: 'Fitout ogden-v0-1: one fixed Ogden corpus for every class; what cards
+  and stars form at each size?'
+model:
+  context: 1024
+  family: gpt
+  positions: rope
+  preset: 300k
+  kv_heads: 1
+name: 300k@v0.0.6-gqa-p10
+optim:
+  batch_tokens: 32768
+  betas:
+  - 0.9
+  - 0.95
+  grad_clip: 1.0
+  lr: 0.003
+  min_lr_ratio: 0.1
+  name: adamw
+  precision: bf16
+  scaffold:
+    fade: 1.0
+    heads:
+    - layer: 0
+      head: 0
+      card: previous_word
+    - layer: 0
+      head: 1
+      card: delimiter
+    - layer: 4
+      head: 0
+      card: induction
+    - layer: 4
+      head: 1
+      card: duplicate_word
+    - layer: 1
+      head: 0
+      card: sink
+    - layer: 1
+      head: 1
+      card: rare_word
+    - layer: 2
+      head: 0
+      card: premise_marker
+    - layer: 2
+      head: 1
+      card: words_back
+    - layer: 3
+      head: 0
+      card: number_spotter
+    - layer: 3
+      head: 1
+      card: order_word
+    hold: 0.25
+    riddles:
+      comparator:
+        head: 1
+        items: 16
+        layer: 2
+        pool: 2048
+    weight: 1.0
+  schedule: cosine
+  warmup_steps: 100
+  weight_decay: 0.1
+question: 'GQA with ten cards: does grouping rescue the case where ten pins crushed
+  induction at 0.068?'
+seed: 1
+ship: SOP v0.0.6 at 300k (6 layers)
+sop: 0.0.6
+tokeniser:
+  byte_fallback: true
+  kind: spm-bpe
+  train_on: lists/ogden-v0.1.csv
+  vocab: 2048
+departures:
+- field: scaffold
+  why: 10 cards pinned at their expected layers, not the five the standard names

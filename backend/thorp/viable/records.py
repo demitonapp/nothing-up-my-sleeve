@@ -71,6 +71,9 @@ class Lane(Base):
     since: Mapped[str | None] = mapped_column(
         Text
     )  # as the coordinator writes it (its own clock, HH:MM:SS or ISO)
+    # how many seats the lane is running with (9 November: "all this should be stored in postgres"), so the
+    # dashboard reads the coordinator's concurrency rather than guessing it from its own environment
+    seats: Mapped[int | None] = mapped_column(Integer, default=1)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -238,6 +241,35 @@ class SOPVersion(Base):
     supersedes: Mapped[str | None] = mapped_column(Text)
     standard: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}")  # content, parameters, sizes, cards, phases
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class ControlTokenClass(Base):
+    """S5: a class of control tokens (boundary, separator, argument, dialogue). The taxonomy is data so the
+    ship builder can offer classes rather than a raw symbol list; `is_special` marks the model's own specials
+    (SentencePiece `<s>`, `</s>`, `<pad>`, `<unk>`), which are selected for use but are not user-defined pieces."""
+
+    __tablename__ = "control_token_classes"
+    __table_args__ = {"schema": S5}
+
+    key: Mapped[str] = mapped_column(Text, primary_key=True)
+    name: Mapped[str] = mapped_column(Text)
+    about: Mapped[str] = mapped_column(Text, default="", server_default="")
+    ordinal: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    is_special: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+
+
+class ControlToken(Base):
+    """S5: one control token in the taxonomy, its class and its symbol. The names follow the open-source
+    `<|...|>` convention for content controls; the boundary class uses SentencePiece's specials."""
+
+    __tablename__ = "control_tokens"
+    __table_args__ = (Index("control_tokens_class", "class_key"), {"schema": S5})
+
+    key: Mapped[str] = mapped_column(Text, primary_key=True)
+    symbol: Mapped[str] = mapped_column(Text)
+    class_key: Mapped[str] = mapped_column(Text, ForeignKey(f"{S5}.control_token_classes.key", ondelete="CASCADE"))
+    about: Mapped[str] = mapped_column(Text, default="", server_default="")
+    ordinal: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
 
 
 class PolicyException(Base):

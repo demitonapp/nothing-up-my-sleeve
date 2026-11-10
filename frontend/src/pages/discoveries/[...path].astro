@@ -1,0 +1,20 @@
+---
+// Direct discoveries routes for dev (production falls back). The island reads the path.
+import Layout from '../../layouts/Layout.astro';
+import Discoveries from '../../components/islands/Discoveries';
+import Reader from '../../components/Reader.astro';
+
+export function getStaticPaths() {
+  const tricks = ['copying', 'successor', 'kin_test', 'pedigree_test', 'fire_test', 'workshop_test', 'counting_test',
+    'period_test', 'breeders_test', 'smiths_test', 'gap_test', 'nature_test', 'mill_test', 'between_test', 'malthus_test',
+    'rumford_test', 'triads_test', 'again_test', 'refrain_test', 'seasons_test', 'pigeonhole_test', 'lucretius_test',
+    'recurrence_test', 'logic_test', 'crowns_test', 'origin_test', 'energy_test', 'mendeleev_gaps', 'geometry_test'];
+  const chains = ['origin_test', 'energy_test', 'mendeleev_gaps', 'recurrence_test'];
+  const paths = ['quantum', 'registry', 'stars', 'traits', ...tricks, ...chains.map((k) => `chains/${k}`)];
+  return paths.map((path) => ({ params: { path } }));
+}
+---
+<Layout>
+  <main><Discoveries client:load /></main>
+  <Reader />
+</Layout>

@@ -64,6 +64,3 @@ eval:
 checkpoint:
   every_steps: 1000000
 seed: 1
-fitout:
-  key: babel-cuneiform-5
-  variation: null

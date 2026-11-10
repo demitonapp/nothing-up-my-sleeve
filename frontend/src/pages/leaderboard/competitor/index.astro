@@ -1,0 +1,8 @@
+---
+// One outside model's page, rendered by its own React island; it answers /leaderboard/competitor/<model>.
+import Layout from '../../../layouts/Layout.astro';
+import Competitor from '../../../components/islands/Competitor';
+---
+<Layout>
+  <main><Competitor client:load /></main>
+</Layout>

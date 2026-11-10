@@ -1,0 +1,120 @@
+# ships/specs/fitouts: the first voyage built to SOP v0.0.1 (8 November): the same corpus, the same phases
+# and the same cards as every other size, differing in shape and learning rate alone.
+# broken up into phases, the insertion of the metre topics and then normal training on content"): the plain keel's
+# own spec (its control, fu-ogden-v0-1@300k-pre-s1/s2, already home) with optim.scaffold (thorp/train.py) and pips.
+name: 1m@v0.0.6-marks
+ship: 'SOP v0.0.6 at 1m (Ogden v0.1.1: control tokens in the text)'
+experiment: 'Fitout ogden-v0-1: one fixed Ogden corpus for every class; what cards and stars form at each size?'
+question: 'Ogden v0.1.1, the control-tokenised library: the same 592 books, each wrapped <bos> ... <eos>, and
+  the catechisms turn-marked <question>/<answer>. Does marking what kind of utterance follows move the
+  scores at 1m, or does it only add tokens the model never learns to use? A lever of its own, read against
+  1m@v0.0.6 on the same seed and ladder. Original: SOP v0.0.6 launch, at 1m: Ogden v0.1, the shared tokeniser, four passes, the same four metre
+  cards pinned in the same layers and, where the size has room, the comparator as a riddle; full weight to 10%
+  of the voyage, faded to zero by 60%, then content alone. Which of the five cards is held by heart, and what
+  does it cost the language?'
+data:
+  recipe: lists/ogden-v0.1.csv
+  passes: 4
+  opt_in: "the post-training stage: one pass on the card-linked corpus with no pull (v0.0.6)"
+  stages:
+  - name: ogden
+    recipe: lists/ogden-v0.1.csv
+    passes: 4
+  - name: the deck
+    recipe: lists/card-stage-deck-v2.csv
+    passes: 1
+  order: shuffled
+  refuse:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+  - lists/hole-cards-unseen.csv
+  clean: marks-v1
+tokeniser:
+  kind: spm-bpe
+  vocab: 2048
+  byte_fallback: true
+  train_on: lists/ogden-v0.1.csv
+  symbols:
+  - "<bos>"
+  - "<eos>"
+  - "<pad>"
+  - "<unk>"
+  - "<sep>"
+  - "<premise>"
+  - "<conclusion>"
+  - "<question>"
+  - "<answer>"
+  - "<end>"
+model:
+  family: gpt
+  preset: 1m
+  context: 1024
+  positions: rope
+optim:
+  name: adamw
+  lr: 0.002
+  betas:
+  - 0.9
+  - 0.95
+  weight_decay: 0.1
+  warmup_steps: 100
+  schedule: cosine
+  min_lr_ratio: 0.1
+  batch_tokens: 32768
+  grad_clip: 1.0
+  precision: bf16
+  scaffold:
+    weight: 1.0
+    hold: 0.10
+    fade: 0.60
+    heads:
+    - layer: 0
+      head: 0
+      card: previous_word
+    - layer: 0
+      head: 1
+      card: delimiter
+    - layer: 8
+      head: 2
+      card: induction
+    - layer: 8
+      head: 3
+      card: duplicate_word
+    riddles:
+      comparator:
+        layer: 4
+        head: 2
+        items: 16
+        pool: 2048
+eval:
+  sets:
+  - lists/hole-cards-unseen.csv
+  every_steps: 640
+  evaluators:
+  - ce_bpb
+  - discovery
+  - logic
+  - stars
+  - nevermore
+  - cards
+  - shapes
+  - pips
+  light:
+    every_steps: 64
+    evaluators:
+    - stars
+    - nevermore
+    - cards
+    - logic
+    - shapes
+    - pips
+checkpoint:
+  every_steps: 640
+sop: '0.0.6'
+departures:
+- "the post-training SOP: the deck stage read after the four pretraining passes, with the pull off"
+- field: content
+  why: reads Ogden v0.1.1, the control-tokenised library (marks-v1), not the plain v0.1
+- field: tokeniser
+  why: declares the ten control tokens as single pieces (pieces-2048+control10)
+seed: 1

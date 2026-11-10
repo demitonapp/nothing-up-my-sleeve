@@ -1,16 +1,15 @@
 ---
+// The Expeditions routes, rendered by one React island: the queue landing (the waters plan, the queue
+// at a glance and every voyage), the expedition cards, one expedition's five tabs, and the table. The
+// island reads the route itself, so the server's fallback answers every /expeditions/... address with
+// this page. The reader is here because a panel's book links open a book.
 import Layout from '../../layouts/Layout.astro';
-import Voyages from '../../components/Voyages.astro';
-import TableTalk from '../../components/TableTalk.astro';
+import Expeditions from '../../components/islands/Expeditions';
 import Reader from '../../components/Reader.astro';
 ---
 <Layout>
   <main>
-    <Voyages />
-    <TableTalk />
+    <Expeditions client:load />
   </main>
   <Reader />
-  <script>
-    import '../../scripts/dashboard.ts';
-  </script>
 </Layout>

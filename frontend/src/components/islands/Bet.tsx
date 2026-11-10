@@ -159,11 +159,21 @@ export default function Bet() {
       <div className="row">
         <section className="panel">
           <h2>Gates before the H100 <span className="note">what must be true before the $100 is spent</span></h2>
-          <ul className="betlist">{(d.gates || []).map((g: string, i: number) => <li key={i}>{g}</li>)}</ul>
+          <ul className="betlist">
+            {(d.gates || []).map((g: any, i: number) => (
+              <li key={g.key || i}>
+                <span className={pillCls(g.state === 'passed' ? 'good' : 'accent')}>{g.state}</span>{' '}
+                <b>{g.name}</b> <span>{g.test}</span>
+                {g.progress ? <div className="s">{g.progress}</div> : null}
+              </li>
+            ))}
+          </ul>
         </section>
         <section className="panel">
           <h2>What could break it <span className="note">the bet&apos;s known risks</span></h2>
-          <ul className="betlist">{(d.risks || []).map((r: string, i: number) => <li key={i}>{r}</li>)}</ul>
+          <ul className="betlist">
+            {(d.risks || []).map((r: any, i: number) => <li key={i}><b>{r.lead}</b> <span>{r.text}</span></li>)}
+          </ul>
         </section>
       </div>
     </div>

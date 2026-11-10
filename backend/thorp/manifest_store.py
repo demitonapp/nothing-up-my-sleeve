@@ -105,6 +105,24 @@ class ListResolution(Base):
     candidates: Mapped[str | None] = mapped_column(Text)
 
 
+class ListRow(Base):
+    """One row of a hand-written shelf (`ships/lists/*.csv`): its title, and the book when the list
+    names one. The resolutions for the fitout lists live in `list_resolutions`; these are the shelf's
+    own rows, so a shelf summary can be a join rather than a CSV read and a title resolver."""
+
+    __tablename__ = "list_rows"
+    __table_args__ = (Index("list_rows_list", "list"), {"schema": SCHEMA})
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    list: Mapped[str] = mapped_column(Text)
+    ordinal: Mapped[int] = mapped_column(Integer)
+    title: Mapped[str | None] = mapped_column(Text)
+    author: Mapped[str | None] = mapped_column(Text)
+    language: Mapped[str | None] = mapped_column(Text)
+    family: Mapped[str | None] = mapped_column(Text)
+    book: Mapped[str | None] = mapped_column(Text)  # a manifest book id, when the list names its text
+
+
 def tables() -> list:
     """The tables this module defines, for the test fixtures' truncate."""
     return [m.local_table for m in Base.registry.mappers if m.class_.__module__ == __name__]
@@ -255,6 +273,56 @@ def verify(source: Path | None = None, log=print) -> bool:
     ok = got == want
     log(f"library: {got} vs {want}: {'ok' if ok else 'MISMATCH'}")
     return ok
+
+
+def _shelf_book(text: str | None) -> str | None:
+    """The book a shelf row names: `local:pg10557` is the manifest's `pg10557`; a bare `pg…` is itself."""
+    t = (text or "").strip()
+    if not t:
+        return None
+    if ":" in t:
+        prefix, rest = t.split(":", 1)
+        return rest if prefix in ("local", "gutenberg", "pg") and rest else None
+    return t if t.startswith("pg") else None
+
+
+def backfill_shelves(log=print) -> dict:
+    """Copy every hand-written shelf (`ships/lists/*.csv`, `stores/*.csv`) into `s1.list_rows`.
+
+    Idempotent: each shelf's rows are replaced. The book id comes from the list's `text` column
+    (`local:pg10557`), so the shelf summary is a join to `books` and `library_facts`, with no CSV read
+    and no title resolution at read time.
+    """
+    import csv
+
+    from thorp import paths, store
+
+    ListRow.__table__.create(store.engine(), checkfirst=True)
+    base = paths.resolve("lists")
+    files = sorted(base.glob("*.csv")) + sorted((base / "stores").glob("*.csv"))
+    counts = {"lists": 0, "rows": 0, "resolved": 0}
+    with store.session() as s:
+        for p in files:
+            if p.stat().st_size > 20_000_000:  # a synthetic deck, not a shelf of books
+                continue
+            rel = "lists/" + str(p.relative_to(base))
+            s.execute(delete(ListRow).where(ListRow.list == rel))
+            rows: list[ListRow] = []
+            with p.open(encoding="utf-8") as f:
+                for i, r in enumerate(csv.DictReader(f)):
+                    if not any((v or "").strip() for v in r.values()):
+                        continue
+                    rows.append(ListRow(
+                        list=rel, ordinal=i, title=(r.get("title") or None), author=(r.get("author") or None),
+                        language=(r.get("language") or None), family=(r.get("family") or None),
+                        book=_shelf_book(r.get("text")),
+                    ))
+            s.add_all(rows)
+            counts["lists"] += 1
+            counts["rows"] += len(rows)
+            counts["resolved"] += sum(1 for r in rows if r.book)
+    log(f"shelves: {counts['lists']} lists, {counts['rows']} rows, {counts['resolved']} with a book")
+    return counts
 
 
 # ---------------------------------------------------------------- the readers (for the cut-over)

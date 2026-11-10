@@ -5,9 +5,6 @@ experiment: 'Fitout ogden-v0-1-maths2: Ogden v0.1 with 2% of the reading De Morg
   pass the maths book?'
 question: Does the 1m read De Morgan's maths book (maths/right, maths/chapters) with 2% of its reading
   in the tutor's lessons?
-fitout:
-  key: ogden-v0-1-maths2
-  variation: null
 data:
   recipe: lists/ogden-v0.1-maths2.csv
   passes: 4

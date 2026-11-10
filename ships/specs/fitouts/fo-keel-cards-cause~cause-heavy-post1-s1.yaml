@@ -67,6 +67,3 @@ seeded_from:
   run: fo-keel-cards-cause~cause-heavy-pre-s1
   mode: free
 # S5 policy 'fitout' (2026-11-07 18:10): the named fitout this voyage is a variation of
-fitout:
-  key: keel-cards-cause
-  variation: cause-heavy

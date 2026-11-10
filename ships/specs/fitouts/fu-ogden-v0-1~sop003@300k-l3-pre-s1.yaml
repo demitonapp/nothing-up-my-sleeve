@@ -9,9 +9,6 @@ question: 'The depth test, at the smallest class: the same corpus, tokeniser, pa
   layers instead of two and the copy cards (induction, duplicate-word) pinned at layer 2 -- 67% depth, as Qwen3 4B
   resolves them at 60% -- rather than at layer 1. Does the depth carry chaining, or does the card read the same
   wherever it sits? The 300k held 1 of 4 cards and chained 0.034.'
-fitout:
-  key: ogden-v0-1
-  variation: sop-v0.0.3-depth
 data:
   recipe: lists/ogden-v0.1.csv
   passes: 4

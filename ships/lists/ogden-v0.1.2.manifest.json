@@ -1,0 +1,12 @@
+{
+ "version": "ogden-v0.1.2",
+ "from": "ogden-v0.1.1",
+ "transform": "marks",
+ "about": "v0.1.1 with every book wrapped <bos> ... <eos>",
+ "generator": "backend/scripts/make_ogden_versions.py via thorp.cleaning",
+ "cleaning": "marks-v1 (turn tokens stripped)",
+ "books": 592,
+ "marked": 0,
+ "bytes": 202886748,
+ "sha1": "0ea689893f8038a651ad77fd34960009577c0786"
+}

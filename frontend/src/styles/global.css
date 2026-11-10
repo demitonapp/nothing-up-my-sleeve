@@ -823,8 +823,8 @@ main a.pc2-more:hover { color: #000; }
 .skyctl { display: inline-flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .skyrange { width: 180px; accent-color: var(--accent); }
 .skycap { font-size: var(--fs-sm); min-height: 18px; }
-.skywrap { overflow-x: auto; }
-.skysvg { display: block; width: 100%; min-width: 860px; height: auto; }
+.skywrap { overflow-x: hidden; min-width: 0; }
+.skysvg { display: block; width: 100%; max-width: 100%; min-width: 0; height: auto; }
 .skyhead { fill: var(--muted); font-size: 10px; letter-spacing: .14em; }
 .skyhead tspan { letter-spacing: 0; font-style: italic; }
 .skyline { stroke: var(--track); stroke-width: 1; opacity: .5; }
@@ -1266,3 +1266,203 @@ button[aria-busy="true"] { cursor: progress; opacity: .7; }
 .sopnav.subsop { margin-top: -4px; padding-left: 10px; }
 .sopnav.subsop .sopbtn { font-size: var(--fs-xs); opacity: .85; }
 .sopnav.subsop .sopbtn.active { opacity: 1; }
+
+
+/* the shipyard's three cards (Training / Fitting Out / Raiding): large, with their own art, filling the page */
+.cards.shipyardgrid, .harbours.shipyardgrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; align-items: stretch; }
+.shipyardgrid .shipyardcard { min-height: 58vh; padding: 22px 24px; align-content: start; }
+.shipyardgrid .shipyardcard .cardart.ship { width: calc(100% + 48px); margin: -22px -24px 14px; aspect-ratio: 16 / 9; }
+.shipyardgrid .shipyardcard .nm { font-size: clamp(1.5rem, 2.2vw, 2.2rem); }
+.shipyardgrid .shipyardcard .job { font-size: var(--fs-md); line-height: 1.55; }
+@media (max-width: 1000px) {
+  .cards.shipyardgrid, .harbours.shipyardgrid { grid-template-columns: 1fr; }
+  .shipyardgrid .shipyardcard { min-height: 0; }
+}
+
+/* the expeditions page's SOP cards (9 November): the standard's aim, its art, and its goals.
+   The running one is marked; a version without art still gets its goals. */
+.sopcards { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 18px; margin: 14px 0 20px; }
+.sopcard { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--panel, transparent); }
+.sopcard.atsea { border-color: var(--good); box-shadow: 0 0 0 1px var(--good) inset; }
+.sopart { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; display: block; background: var(--line); }
+.sopbody { padding: 12px 14px 14px; }
+.sophead { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.sophead b { font-size: var(--fs-md); }
+.sopgoals { margin: 4px 0 0; padding-left: 18px; line-height: 1.5; }
+.sopgoals li { margin-bottom: 4px; }
+/* a SOP card is a link; it must read as a card, not as body text */
+main a.sopcard, main a.sopcard:hover { color: inherit; text-decoration: none; }
+a.sopcard:hover { border-color: var(--blue); }
+
+/* the control-token taxonomy under Embeddings: classes as checkboxes, the ships they apply to */
+.ctlclasses { display: flex; flex-direction: column; gap: 6px; margin: 6px 0 10px; }
+.ctlclass { display: flex; align-items: baseline; gap: 8px; }
+.ctlclass input { accent-color: var(--accent); }
+
+/* the ladder's rung cards on a harbour page (9 November): the metaphor's art, its name, its ship */
+.rungcards { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; grid-column: 1 / -1; }
+.rungcard { padding: 0; overflow: hidden; align-content: start; }
+.rungcard .cardart { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; margin: 0; display: block; }
+.rungcard .top, .rungcard .job, .rungcard .foot { padding: 0 14px; }
+.rungcard .top { margin-top: 12px; }
+.rungcard .foot { padding-bottom: 14px; }
+.rungcard .nm { font-size: var(--fs-md); }
+
+/* the sieve on the charting overview: one row a job, one column a size, the dot its layer by depth */
+.sieve { display: flex; flex-direction: column; gap: 2px; }
+.svrow { display: grid; grid-template-columns: 190px repeat(4, minmax(0, 1fr)); gap: 10px; align-items: center; }
+.svhead { font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .04em; color: var(--muted); border-bottom: 1px solid var(--line); padding-bottom: 4px; }
+.svname { font-size: var(--fs-sm); }
+.svcol { display: flex; flex-direction: column; gap: 2px; }
+.svtrack { position: relative; height: 10px; background: color-mix(in oklab, var(--line) 55%, transparent); border-radius: 5px; }
+.svband { position: absolute; top: 0; bottom: 0; background: var(--blue); opacity: .18; border-radius: 5px; }
+.svdot { position: absolute; top: 50%; width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px; border-radius: 50%; background: var(--blue); }
+.sienote { margin-top: 6px; }
+
+/* the ship builder's forms (9 November): stacked fields, one row per question, never a run-on line */
+.hmform { display: flex; flex-direction: column; gap: 12px; margin: 10px 0 6px; }
+.hmrow { display: flex; flex-wrap: wrap; gap: 14px 18px; align-items: flex-end; }
+.hmfield { display: flex; flex-direction: column; gap: 4px; min-width: 140px; }
+.hmfield.grow { flex: 1 1 320px; }
+.hmfield .k { font-size: var(--fs-xs); letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.hmfield select, .hmfield input { min-width: 120px; }
+.hmsizes { display: flex; flex-wrap: wrap; gap: 10px; }
+.hmsizes label { display: inline-flex; gap: 5px; align-items: center; }
+.hmyears { display: inline-flex; align-items: center; gap: 6px; }
+.hmyears input { width: 84px; }
+.hmyears i { color: var(--muted); font-style: normal; }
+.hmfilters select[multiple] { min-width: 150px; background: var(--panel); }
+.hmhint { flex: 1 1 260px; color: var(--muted); font-size: var(--fs-sm); }
+
+/* on a section page the facts column keeps only the SOP version: make it a quiet inline control */
+.hmfacts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.hmfacts .k { margin: 0; }
+.hmfacts select { min-width: 120px; }
+
+/* the plan's comparison table: the rows where the arms differ are the experiment */
+#plantable .plandiff td { background: color-mix(in oklab, var(--accent) 12%, transparent); }
+#plantable .plandiff td:first-child { font-weight: 600; }
+
+/* the plan's info hovers and control-token chips */
+.planinfo { display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; margin-left: 4px; border-radius: 50%; border: 1px solid var(--line); font-size: 10px; color: var(--muted); cursor: help; }
+.planinfo:hover { border-color: var(--blue); color: var(--blue); }
+.sym { display: inline-block; padding: 1px 6px; margin: 1px 4px 1px 0; border-radius: 4px; background: color-mix(in oklab, var(--blue) 14%, transparent); font-family: var(--mono); font-size: var(--fs-xs); }
+
+/* the plan's click-to-open explanations (a details element, so no script is needed in a HTML string) */
+.hint { display: inline-block; position: relative; margin-left: 5px; }
+.hint > summary { list-style: none; display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; border-radius: 50%; border: 1px solid var(--line); font-size: 10px; color: var(--muted); cursor: pointer; }
+.hint > summary::-webkit-details-marker { display: none; }
+.hint[open] > summary, .hint > summary:hover { border-color: var(--blue); color: var(--blue); }
+.hintbody { position: absolute; z-index: 30; left: -8px; top: 20px; width: 280px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); box-shadow: 0 8px 24px rgba(0,0,0,.35); font-size: var(--fs-sm); line-height: 1.45; color: var(--text); }
+
+/* the control tokens' documentation popover: a definition list, wider than the usual hint */
+.hintbody:has(.symdoc) { width: 340px; }
+.symdoc dl { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; margin: 6px 0 0; }
+.symdoc dt { font-family: var(--mono); font-size: var(--fs-xs); color: var(--blue); white-space: nowrap; }
+.symdoc dd { margin: 0; font-size: var(--fs-xs); line-height: 1.4; }
+
+/* what is at sea on this lane: one chip a ship, however many seats it holds */
+.atsea { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 6px 0 4px; font-size: var(--fs-sm); }
+.atsea .seat { display: inline-flex; align-items: baseline; gap: 6px; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--line); }
+
+/* the hulls card on the shipyard: the charting card's shape, one level up from the dimensions */
+.hullcard { display: flex; gap: 14px; align-items: center; padding: 10px; border: 1px solid var(--line); border-radius: 10px; text-decoration: none; color: inherit; background: var(--panel); max-width: 640px; margin-top: 14px; }
+.hullcard:hover { border-color: var(--blue); }
+.hullcard img { width: 132px; height: 86px; object-fit: cover; border-radius: 6px; }
+.hullcard .hname { font-weight: 600; margin-bottom: 2px; }
+
+/* the shipyard's two cards: the harbour card's frame, so the row reads as part of the same place */
+#shipyardcards { margin-top: 16px; }
+.sycard { display: flex; flex-direction: column; gap: 8px; padding: 12px; text-decoration: none; color: inherit; }
+.sycard:hover { border-color: var(--blue); }
+.sycard img { width: 100%; height: 128px; object-fit: cover; border-radius: 6px; }
+.sycard .kk { font-weight: 600; }
+.sycard .goal { color: var(--muted); font-size: var(--fs-sm); }
+
+/* the arms at sea: the control row held apart so the levers read against it */
+#armstable .armcontrol td { font-weight: 600; }
+#armstable td, #armstable th { font-variant-numeric: tabular-nums; }
+
+/* the pins: a strip a layer, a chip a card, so the filled layers stand out from the free ones */
+.pins { display: flex; flex-direction: column; gap: 10px; }
+.pinrow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.pinname { min-width: 190px; font-weight: 600; font-size: var(--fs-sm); }
+.pinstrip { display: flex; gap: 4px; flex-wrap: wrap; }
+.pincell { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 1px; min-width: 54px; padding: 4px 6px; border: 1px dashed var(--line); border-radius: 6px; font-size: 10px; color: var(--muted); }
+.pincell.used { border-style: solid; border-color: var(--blue); color: var(--text); }
+.pincell i { font-style: normal; font-size: 10px; color: var(--blue); }
+.pincell b { font-size: 10px; font-weight: 600; color: var(--muted); }
+
+/* the arm cards: one voyage each, everything about it in one place */
+.armcards { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 14px; }
+.armcard { border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: var(--panel); display: flex; flex-direction: column; gap: 7px; }
+.armcard.armcontrol { border-color: var(--blue); }
+.armcard header { display: flex; align-items: baseline; gap: 8px; }
+.armcard header b { font-size: var(--fs-md); }
+.armrow { display: grid; grid-template-columns: 78px 1fr; gap: 8px; align-items: start; font-size: var(--fs-sm); }
+.armrow .k { font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .04em; color: var(--muted); padding-top: 2px; }
+.armrow .pinstrip { flex-wrap: wrap; }
+
+/* a card's readings: the score against its mark, lit when it clears it, with what survived the fade */
+.cardreadings { display: flex; flex-wrap: wrap; gap: 4px 8px; }
+.cardlight { display: inline-flex; align-items: baseline; gap: 4px; padding: 2px 7px; border-radius: 999px; border: 1px solid var(--line); font-size: var(--fs-xs); }
+.cardlight.lit { border-color: var(--blue); color: var(--text); }
+.cardlight i { font-style: normal; color: var(--muted); }
+
+/* the stage a voyage is in, on its card: hold, fade, content */
+.stagechip { display: inline-block; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--blue); font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .04em; color: var(--blue); }
+
+/* how far a voyage is through its own plan, under its name */
+.armprogress { font-size: var(--fs-xs); color: var(--muted); font-variant-numeric: tabular-nums; margin: -2px 0 2px; }
+
+/* the schedule bar: a stage a segment, the ship's position marked */
+.schedbar { position: relative; display: flex; height: 12px; border-radius: 6px; overflow: visible; background: var(--line); }
+.schedbar .seg { height: 100%; }
+.schedbar .seg:first-child { border-radius: 6px 0 0 6px; }
+.schedbar .seg:last-of-type { border-radius: 0 6px 6px 0; }
+.schedbar .hold { background: var(--blue); opacity: .85; }
+.schedbar .fade { background: color-mix(in oklab, var(--blue) 45%, transparent); }
+.schedbar .release { background: color-mix(in oklab, var(--accent) 55%, transparent); }
+.schedbar .content { background: color-mix(in oklab, var(--line) 80%, transparent); }
+.schedbar .marker { position: absolute; top: -3px; width: 2px; height: 18px; background: var(--text); border-radius: 1px; }
+.schedcap { display: flex; align-items: baseline; gap: 8px; margin-top: 4px; }
+
+/* a ship's card holdings: classes and suits, not the individual cards */
+.holding { font-variant-numeric: tabular-nums; }
+
+/* the schedule's colour key: a swatch a phase, each opening what that phase is */
+.legendrow { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 2px; }
+.legend > summary { display: inline-flex; align-items: center; gap: 5px; font-size: var(--fs-xs); color: var(--muted); cursor: help; list-style: none; }
+.legend > summary::-webkit-details-marker { display: none; }
+.legend .sw { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+.legend .sw.hold { background: var(--blue); }
+.legend .sw.fade { background: color-mix(in oklab, var(--blue) 45%, transparent); }
+.legend .sw.release { background: color-mix(in oklab, var(--accent) 55%, transparent); }
+.legend .sw.content { background: color-mix(in oklab, var(--line) 80%, transparent); }
+
+/* the arm cards: the label column and the legend were colliding on a narrow card */
+.armcards { grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); }
+.armrow { grid-template-columns: 92px minmax(0, 1fr); align-items: start; }
+.armrow > span:last-child { min-width: 0; }
+.legendrow { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 4px; }
+.legend { position: relative; display: inline-flex; }
+.legend > summary { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.legend .hintbody { left: 0; top: 22px; }
+.armcard .hintbody { z-index: 60; }
+.schedcap { flex-wrap: wrap; row-gap: 4px; }
+
+/* the phase name, written in its own segment of the schedule bar */
+.schedbar { height: 18px; }
+.schedbar .seg { display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.schedbar .seg b { font-size: 9px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--bg, #0b0d10); opacity: .85; white-space: nowrap; padding: 0 3px; }
+.schedbar .seg.content b { color: var(--muted); }
+
+/* the schedule opens: the bar is the summary, each phase's readings the body */
+.sched > summary { list-style: none; cursor: pointer; display: block; }
+.sched > summary::-webkit-details-marker { display: none; }
+.sched .openhint { opacity: .7; }
+.sched[open] .openhint { display: none; }
+.scheddetail { margin-top: 6px; }
+.scheddetail table { width: 100%; border-collapse: collapse; font-size: var(--fs-xs); }
+.scheddetail th { text-align: left; color: var(--muted); font-weight: 500; padding: 2px 8px 2px 0; text-transform: uppercase; letter-spacing: .04em; }
+.scheddetail td { padding: 3px 8px 3px 0; vertical-align: top; border-top: 1px solid var(--line); }

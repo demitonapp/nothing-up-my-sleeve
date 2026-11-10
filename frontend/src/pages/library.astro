@@ -1,12 +1,13 @@
 ---
+// The Library, rendered by its own React island: the branches and faceted browser, the shelf
+// groups and detail drawer. The reader is here because the shelf detail opens books in it.
 import Layout from '../layouts/Layout.astro';
-import Shelves from '../components/Shelves.astro';
+import Library from '../components/islands/Library';
+import Reader from '../components/Reader.astro';
 ---
 <Layout>
   <main>
-    <Shelves />
+    <Library client:load />
   </main>
-  <script>
-    import '../scripts/dashboard.ts';
-  </script>
+  <Reader />
 </Layout>

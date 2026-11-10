@@ -9,20 +9,13 @@ question: 'SOP v0.0.6 launch, at 1m: Ogden v0.1, the shared tokeniser, four pass
   cards pinned in the same layers and, where the size has room, the comparator as a riddle; full weight to 10%
   of the voyage, faded to zero by 60%, then content alone. Which of the five cards is held by heart, and what
   does it cost the language?'
-fitout:
-  key: ogden-v0-1
-  variation: sop-v0.0.6
 data:
   recipe: lists/ogden-v0.1.csv
   passes: 4
-  opt_in: "the post-training stage: one pass on the card-linked corpus with no pull (v0.0.6)"
   stages:
   - name: ogden
     recipe: lists/ogden-v0.1.csv
     passes: 4
-  - name: the deck
-    recipe: lists/card-stage-deck-v2.csv
-    passes: 1
   order: shuffled
   refuse:
   - lists/hole-cards.csv
@@ -63,15 +56,15 @@ optim:
     - layer: 0
       head: 1
       card: delimiter
-    - layer: 2
+    - layer: 8
       head: 2
       card: induction
-    - layer: 2
+    - layer: 8
       head: 3
       card: duplicate_word
     riddles:
       comparator:
-        layer: 1
+        layer: 4
         head: 2
         items: 16
         pool: 2048

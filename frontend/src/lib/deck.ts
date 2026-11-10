@@ -89,12 +89,15 @@ function turn(card: HTMLElement): void {
   card.setAttribute('aria-pressed', String(on));
   if (on) TURNED.add(key); else TURNED.delete(key);
 }
-document.addEventListener('click', (e) => {
-  const target = e.target as HTMLElement | null;
-  const card = target?.closest('.pc2.flip');
-  if (card && !target?.closest('a')) turn(card as HTMLElement);
-});
-document.addEventListener('keydown', (e) => {
-  const target = e.target as HTMLElement | null;
-  if ((e.key === 'Enter' || e.key === ' ') && target?.matches('.pc2.flip')) { e.preventDefault(); turn(target); }
-});
+// the listeners are browser-only: the views are imported by server-rendered islands too
+if (typeof document !== 'undefined') {
+  document.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement | null;
+    const card = target?.closest('.pc2.flip');
+    if (card && !target?.closest('a')) turn(card as HTMLElement);
+  });
+  document.addEventListener('keydown', (e) => {
+    const target = e.target as HTMLElement | null;
+    if ((e.key === 'Enter' || e.key === ' ') && target?.matches('.pc2.flip')) { e.preventDefault(); turn(target); }
+  });
+}

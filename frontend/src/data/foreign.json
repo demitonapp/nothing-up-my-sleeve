@@ -1,0 +1,26 @@
+{
+ "keys": [
+  "qwen3-8-27b",
+  "qwen3-4b",
+  "gemma-3-4b",
+  "phi-4-mini",
+  "llama-3-2-3b",
+  "smollm3-3b",
+  "phi-2",
+  "gemma-2-2b",
+  "qwen3-1-7b",
+  "qwen3-0-6b",
+  "pythia-410m",
+  "smollm2-360m",
+  "gemma-3-270m",
+  "pythia-160m",
+  "pythia-70m",
+  "pythia-31m",
+  "pythia-14m",
+  "maincoder-1b",
+  "qwen3-5-0-8b",
+  "fl-pathfinder",
+  "sl-pathfinder",
+  "spell-vocab4k-v1"
+ ]
+}

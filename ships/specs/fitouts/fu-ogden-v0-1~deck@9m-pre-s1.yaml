@@ -7,9 +7,6 @@ question: 'The full deck (Justin, 2026-11-08 06:00: ''can we get all metre and r
   cards pinned by rule and the two riddles pulled on composed items, laid out low to high as the deck''s evolutions
   ask; full weight to 10%, down to a floor of 0.2 by 60%. Are all twelve played at the end, and what does it cost
   the language?'
-fitout:
-  key: ogden-v0-1
-  variation: deck
 data:
   recipe: lists/ogden-v0.1.csv
   passes: 4

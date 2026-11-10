@@ -1,0 +1,20 @@
+---
+// The Harbours/Ships shells at their own addresses, so a direct /harbours, /sizes or /ships load
+// works (dev has no server fallback; production falls back to these for their sub-paths too). The
+// islands read the route and only the one that answers it renders.
+import Layout from '../../layouts/Layout.astro';
+import Harbours from '../../components/islands/Harbours';
+import SizePage from '../../components/islands/SizePage';
+import ShipPage from '../../components/islands/ShipPage';
+import RunsPage from '../../components/islands/RunsPage';
+import Reader from '../../components/Reader.astro';
+---
+<Layout>
+  <main>
+    <Harbours client:load />
+    <SizePage client:load />
+    <ShipPage client:load />
+    <RunsPage client:load />
+  </main>
+  <Reader />
+</Layout>

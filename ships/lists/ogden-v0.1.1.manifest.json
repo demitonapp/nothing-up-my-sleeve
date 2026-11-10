@@ -1,0 +1,12 @@
+{
+ "version": "ogden-v0.1.1",
+ "from": "ogden-v0.1",
+ "transform": "unwrap",
+ "about": "the text as every voyage already reads it: hard wraps joined, verse kept line for line",
+ "generator": "backend/scripts/make_ogden_versions.py via thorp.cleaning",
+ "cleaning": "unwrap-v2",
+ "books": 592,
+ "marked": 0,
+ "bytes": 202890811,
+ "sha1": "79a3b0849f517e6f093206aafab860bcffe72719"
+}

@@ -1,0 +1,116 @@
+# ships/specs/fitouts: the first voyage built to SOP v0.0.1 (8 November): the same corpus, the same phases
+# and the same cards as every other size, differing in shape and learning rate alone.
+# broken up into phases, the insertion of the metre topics and then normal training on content"): the plain keel's
+# own spec (its control, fu-ogden-v0-1@300k-pre-s1/s2, already home) with optim.scaffold (thorp/train.py) and pips.
+name: 9m@v0.0.6-pins
+ship: '9m (ten cards pinned)'
+experiment: 'Fitout ogden-v0-1: one fixed Ogden corpus for every class; what cards and stars form at each size?'
+question: 'The pins arm at 9m: ten cards pinned at their expected layers instead of five. Original: SOP v0.0.6 launch, at 9m: Ogden v0.1, the shared tokeniser, four passes, the same four metre
+  cards pinned in the same layers and, where the size has room, the comparator as a riddle; full weight to 10%
+  of the voyage, faded to zero by 60%, then content alone. Which of the five cards is held by heart, and what
+  does it cost the language?'
+data:
+  recipe: lists/ogden-v0.1.csv
+  passes: 4
+  stages:
+  - name: ogden
+    recipe: lists/ogden-v0.1.csv
+    passes: 4
+  order: shuffled
+  refuse:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+  - lists/hole-cards-unseen.csv
+  clean: unwrap-v2
+tokeniser:
+  kind: spm-bpe
+  vocab: 2048
+  byte_fallback: true
+  train_on: lists/ogden-v0.1.csv
+model:
+  family: gpt
+  preset: 9m
+  context: 1024
+  positions: rope
+optim:
+  name: adamw
+  lr: 0.001
+  betas:
+  - 0.9
+  - 0.95
+  weight_decay: 0.1
+  warmup_steps: 200
+  schedule: cosine
+  min_lr_ratio: 0.1
+  batch_tokens: 32768
+  grad_clip: 1.0
+  precision: bf16
+  scaffold:
+    weight: 1.0
+    hold: 0.10
+    fade: 0.60
+    heads:
+    - layer: 0
+      head: 0
+      card: previous_word
+    - layer: 0
+      head: 1
+      card: delimiter
+    - layer: 12
+      head: 2
+      card: induction
+    - layer: 12
+      head: 3
+      card: duplicate_word
+    - layer: 0
+      head: 4
+      card: sink
+    - layer: 0
+      head: 5
+      card: rare_word
+    - layer: 12
+      head: 4
+      card: number_spotter
+    - layer: 12
+      head: 5
+      card: order_word
+    - layer: 11
+      head: 0
+      card: premise_marker
+    - layer: 11
+      head: 1
+      card: words_back
+    riddles:
+      comparator:
+        layer: 3
+        head: 2
+        items: 16
+        pool: 2048
+eval:
+  sets:
+  - lists/hole-cards-unseen.csv
+  every_steps: 640
+  evaluators:
+  - ce_bpb
+  - discovery
+  - logic
+  - stars
+  - nevermore
+  - cards
+  - shapes
+  - pips
+  light:
+    every_steps: 64
+    evaluators:
+    - stars
+    - nevermore
+    - cards
+    - logic
+    - shapes
+    - pips
+checkpoint:
+  every_steps: 640
+sop: '0.0.6'
+departures:
+- "the post-training SOP: the deck stage read after the four pretraining passes, with the pull off"
+seed: 1

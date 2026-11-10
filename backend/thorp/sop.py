@@ -62,6 +62,40 @@ def standard(version: str = CURRENT) -> dict | None:
     return None
 
 
+def at_sea() -> dict[str, str]:
+    """The SOP versions with a voyage at sea: version -> the run's name.
+
+    A version with a ship out is **locked** (9 November, Justin: "any time a SOP has a ship out then
+    it's locked and you can't make any more changes to that SOP version"). The lock is a reading of
+    the store, not a flag: a run's status and its `sop_version` decide it, so it lifts by itself when
+    the ship docks.
+    """
+    out: dict[str, str] = {}
+    with contextlib.suppress(Exception):
+        from sqlalchemy import text
+
+        from thorp import store
+
+        with store.session() as s:
+            rows = s.execute(
+                text("select sop_version, name from s1.runs where status = 'running' and sop_version is not null")
+            )
+            return {str(v): str(n or "") for v, n in rows}
+    # the store is down: the SQLite ledger still knows the version, inside the spec
+    with contextlib.suppress(Exception):
+        import json
+
+        from thorp.ledger import connect
+
+        con = connect()
+        for row in con.execute("select name, spec_json from runs where status = 'running' and spec_json is not null"):
+            with contextlib.suppress(Exception):
+                v = json.loads(row["spec_json"]).get("sop")
+                if v:
+                    out[str(v)] = str(row["name"] or "")
+    return out
+
+
 def versions() -> list[str]:
     """Every version the store holds, oldest first, or the built-in list when the store has none."""
     from thorp import store
@@ -183,6 +217,18 @@ def check(spec: dict) -> list[str]:
     if std is None:
         return [f"names SOP v{version}, which does not exist (have: {', '.join(versions())})"]
     out: list[str] = []
+    # a declared departure is not a violation (the module's own rule): a spec may name the standard and
+    # say which of its blocks it departs from, and why. Only the declared block is excused — everything
+    # else is still held to the version (9 November, Justin: "wouldn't we run 4 on the 0.0.5 SOP": the
+    # IFEval arm reads an instruction corpus under v0.0.5 rather than a new standard).
+    declared = {
+        (d.get("field") if isinstance(d, dict) else str(d))
+        for d in (spec.get("departures") or [])
+    }
+
+    def departed(field: str) -> bool:
+        return field in declared
+
     content, params = std["content"], std["parameters"]
     data = dict(spec.get("data") or {})
     # a staged corpus: the content stage (the one that reads the standard's recipe) carries the check, so a voyage
@@ -191,13 +237,15 @@ def check(spec: dict) -> list[str]:
         if (st.get("recipe") or "") == content["recipe"]:
             data = {**data, "recipe": st.get("recipe"), "passes": st.get("passes", data.get("passes"))}
             break
-    if data.get("recipe") != content["recipe"]:
+    if departed("content"):
+        pass
+    elif data.get("recipe") != content["recipe"]:
         out.append(f"reads {data.get('recipe')!r}; SOP v{version} reads {content['recipe']!r}")
-    if data.get("clean") != content["clean"]:
+    if not departed("content") and data.get("clean") != content["clean"]:
         out.append(
             f"cleans with {data.get('clean')!r}; SOP v{version} cleans with {content['clean']!r}"
         )
-    if int(data.get("passes", 1)) != int(content["passes"]):
+    if not departed("content") and int(data.get("passes", 1)) != int(content["passes"]):
         out.append(f"reads {data.get('passes')} passes; SOP v{version} reads {content['passes']}")
     emb = std.get("embeddings") or {}
     chosen = emb.get("chosen")
@@ -208,9 +256,9 @@ def check(spec: dict) -> list[str]:
     tok = spec.get("tokeniser") or {}
     want_sym = list(((emb.get("versions") or {}).get(chosen) or {}).get("control_tokens") or [])
     got_sym = list((spec.get("tokeniser") or {}).get("symbols") or [])
-    if sorted(got_sym) != sorted(want_sym):
+    if sorted(got_sym) != sorted(want_sym) and not departed("tokeniser"):
         out.append(f"tokeniser declares {len(got_sym)} control tokens; SOP v{version}'s {chosen} declares {len(want_sym)}")
-    for key in ("kind", "vocab", "byte_fallback", "train_on"):
+    for key in () if departed("tokeniser") else ("kind", "vocab", "byte_fallback", "train_on"):
         if tok.get(key) != content["tokeniser"].get(key):
             out.append(
                 f"tokeniser {key} {tok.get(key)!r}; SOP v{version} has {content['tokeniser'].get(key)!r}"
@@ -236,8 +284,13 @@ def check(spec: dict) -> list[str]:
             f"carries a floor of {sc.get('floor')}; SOP v{version} has none (a floor is never by heart)"
         )
     cards = [h.get("card") for h in sc.get("heads") or []]
-    expected = [c for c in std["cards"][: len(cards)]]
-    if cards != expected:
+    # a riddle card names composed items, not a head: the standard's head order is its cards less the riddles
+    from thorp.train import RIDDLES  # a riddle card names composed items, not a head
+
+    expected = [c for c in std["cards"] if c not in RIDDLES][: len(cards)]
+    # the standard names a floor, not a ceiling: pinning more cards on top of its order is an extension,
+    # pinning different ones is a departure (9 November, the 10-card arms)
+    if cards[: len(expected)] != expected and not departed("scaffold"):
         out.append(f"pins {cards}, not SOP v{version}'s order {expected}")
     riddle = sc.get("riddles") or {}
     if "comparator" in std["cards"][: len(cards)] and "comparator" not in cards and not riddle:
@@ -253,7 +306,7 @@ def check(spec: dict) -> list[str]:
     pin = ((std.get("pinning") or {}).get("sizes") or {}).get(str(size)) or {}
     at = {h.get("card"): h.get("layer") for h in sc.get("heads") or []}
     for card, layer in pin.items():
-        if card in at and at[card] != layer:
+        if card in at and at[card] != layer and not departed("scaffold"):
             out.append(f"{card} is pinned at L{at[card]}; the depth standard puts it at L{layer}")
     return out
 
@@ -276,3 +329,111 @@ def resolve(spec: dict) -> dict | None:
         "fade": phase.get("fade"),
         "floor": phase.get("floor", 0.0),
     }
+
+
+# ---------------------------------------------------------------- control tokens (9 November)
+
+CONTROL_CLASSES: tuple[dict, ...] = (
+    {"key": "boundary", "name": "Boundary", "is_special": True, "ordinal": 0,
+     "about": "the model's own sequence specials: the start and end of a text, padding, and the unknown piece. "
+              "They are SentencePiece's specials, not user-defined pieces; selecting the class controls their use, not the vocabulary."},
+    {"key": "separator", "name": "Separator", "is_special": False, "ordinal": 1,
+     "about": "delimiters between documents, fields or examples."},
+    {"key": "argument", "name": "Argument", "is_special": False, "ordinal": 2,
+     "about": "the premise and the conclusion of a logical argument."},
+    {"key": "dialogue", "name": "Dialogue", "is_special": False, "ordinal": 3,
+     "about": "the question and the answer of a turn."},
+)
+
+CONTROL_TOKENS: tuple[dict, ...] = (
+    {"key": "bos", "symbol": "<s>", "class_key": "boundary", "ordinal": 0,
+     "about": "the start of a text (SentencePiece BOS)."},
+    {"key": "eos", "symbol": "</s>", "class_key": "boundary", "ordinal": 1,
+     "about": "the end of a text (SentencePiece EOS)."},
+    {"key": "pad", "symbol": "<pad>", "class_key": "boundary", "ordinal": 2,
+     "about": "padding (SentencePiece PAD)."},
+    {"key": "unk", "symbol": "<unk>", "class_key": "boundary", "ordinal": 3,
+     "about": "the unknown piece (SentencePiece UNK)."},
+    {"key": "sep", "symbol": "<|sep|>", "class_key": "separator", "ordinal": 4,
+     "about": "the boundary between documents or fields."},
+    {"key": "end", "symbol": "<|end|>", "class_key": "separator", "ordinal": 5,
+     "about": "the end of a record or example."},
+    {"key": "premise", "symbol": "<|premise|>", "class_key": "argument", "ordinal": 6,
+     "about": "opens the premise of an argument."},
+    {"key": "conclusion", "symbol": "<|conclusion|>", "class_key": "argument", "ordinal": 7,
+     "about": "opens the conclusion of an argument."},
+    {"key": "question", "symbol": "<|question|>", "class_key": "dialogue", "ordinal": 8,
+     "about": "opens a question."},
+    {"key": "answer", "symbol": "<|answer|>", "class_key": "dialogue", "ordinal": 9,
+     "about": "opens an answer."},
+)
+
+
+def _control_catalog_db() -> dict:
+    """The control-token taxonomy, seeded idempotently into `s5.control_token_classes` and `s5.control_tokens`
+    and returned grouped by class for the ship builder. The models live in `thorp/viable/records.py`."""
+    from sqlalchemy import select
+
+    from thorp import store
+    from thorp.viable.records import ControlToken, ControlTokenClass
+
+    ControlTokenClass.__table__.create(store.engine(), checkfirst=True)
+    ControlToken.__table__.create(store.engine(), checkfirst=True)
+    with store.session() as s:
+        for c in CONTROL_CLASSES:
+            row = s.get(ControlTokenClass, c["key"])
+            if row is None:
+                s.add(ControlTokenClass(**c))
+            else:
+                row.name, row.about, row.ordinal, row.is_special = c["name"], c["about"], c["ordinal"], c["is_special"]
+        for t in CONTROL_TOKENS:
+            row = s.get(ControlToken, t["key"])
+            if row is None:
+                s.add(ControlToken(**t))
+            else:
+                row.symbol, row.class_key, row.about, row.ordinal = t["symbol"], t["class_key"], t["about"], t["ordinal"]
+        classes = s.scalars(select(ControlTokenClass).order_by(ControlTokenClass.ordinal)).all()
+        tokens = s.scalars(select(ControlToken).order_by(ControlToken.ordinal)).all()
+    by_class: dict[str, list[dict]] = {}
+    for t in tokens:
+        by_class.setdefault(t.class_key, []).append({"key": t.key, "symbol": t.symbol, "about": t.about})
+    return {"classes": [
+        {"key": c.key, "name": c.name, "about": c.about, "is_special": c.is_special, "tokens": by_class.get(c.key, [])}
+        for c in classes
+    ]}
+
+
+_CONTROL_CACHE: dict | None = None
+_CONTROL_LOCK = None
+
+
+def control_catalog() -> dict:
+    """The control-token taxonomy. The tables are created and seeded once, then served from memory: the
+    catalog is code-defined and static, and creating/updating the tables on every shipbuilder request was
+    taking seconds and locking them."""
+    global _CONTROL_CACHE, _CONTROL_LOCK
+    import threading
+
+    if _CONTROL_CACHE is not None:
+        return _CONTROL_CACHE
+    if _CONTROL_LOCK is None:
+        _CONTROL_LOCK = threading.Lock()
+    with _CONTROL_LOCK:
+        if _CONTROL_CACHE is None:
+            _CONTROL_CACHE = _control_catalog_db()
+        return _CONTROL_CACHE
+
+
+def control_symbols(standard: dict, ship: str | None = None) -> list[str]:
+    """The user-defined control symbols an expedition's standard declares for a ship.
+
+    `embeddings.control = {classes: [...], ships: 'all' | [keys]}`. The boundary class is the model's own
+    specials and contributes no user-defined piece; the other classes contribute their symbols in taxonomy
+    order. A ship outside the selection gets none. The run builder uses this when it builds the tokeniser.
+    """
+    control = ((standard or {}).get("embeddings") or {}).get("control") or {}
+    ships = control.get("ships", "all")
+    if ship is not None and ships != "all" and ship not in (ships or []):
+        return []
+    wanted = set(control.get("classes") or [])
+    return [t["symbol"] for t in CONTROL_TOKENS if t["class_key"] in wanted and t["class_key"] != "boundary"]

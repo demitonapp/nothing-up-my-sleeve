@@ -34,6 +34,9 @@ from thorp.models.registry import PRESETS
 # Classes are named here as the registry names them ("The keel" is "keel"); a preset's own name lives only in
 # thorp/models/registry.py, so each class is turned into its preset through the registry's ladder.
 PRESET_OF = {r["name"].lower().removeprefix("the "): r["preset"] for r in REGISTRY_LADDER}
+# The registry renamed the first classes (the 300k is Pan, the 1m Augustus); the bet's ladder and its
+# quantum chain still use the older step names in their chemistry, so keep those as aliases.
+PRESET_OF.update({"seedling": "300k", "keel": "300k", "proxy": "1m", "pilot": "1m", "summit": "350m"})
 
 BUDGET = 100.0  # dollars
 VOCAB = 2048  # the shared Ogden tokeniser (fitout ogden-v0-1)

@@ -1523,6 +1523,13 @@ def expedition_of_label(name: str | None, label: str | None) -> str | None:
         return "induction"
     if (label or "").startswith("Logic tutor"):
         return "logic_tutor"
+    if (label or "").startswith("SOP v"):
+        # the standard launches (9 November): short-name ships, "SOP v0.0.5 at 21m (24 layers)". v0.0.6
+        # (and the IFEval standard) are the instruction expedition; the rest are the ladder on Ogden.
+        lab = label or ""
+        if "IFEval" in lab or "v0.0.6" in lab:
+            return "kipling"
+        return "ogden"
     if (label or "").startswith("Fitout: Ogden") and "The Smallest Bridge" in (label or ""):
         return "smallest_bridge"
     if (label or "").startswith("Fitout: Ogden"):
@@ -1693,6 +1700,10 @@ class Expedition:
     stars: tuple[str, ...] = ()  # the stars it aims for (destinations, never ships)
     learned: str = ""  # what it found, once done: carried into the next voyage
     next_steps: tuple[str, ...] = ()  # what it suggests doing next
+    # the launching order, when an expedition is more than a batch of ships: investigations that must
+    # finish before a learning ship sails, then the ships themselves (9 November, Justin: "the expedition
+    # page should list the ship launching order and the things like spying on Qwen3")
+    plan: tuple[dict, ...] = ()
 
 
 EXPEDITIONS: dict[str, Expedition] = {
@@ -2425,3 +2436,52 @@ TERMS = {
     "library aboard": "the libraries a voyage carried, with each one's books, tokens and hash "
     "(library.aboard(run_id))",
 }
+
+
+EXPEDITIONS["kipling"] = Expedition(
+    key="kipling",
+    name="The Kipling Expedition",
+    goal="SOP v0.0.6 (Justin, 9 November), named for Kipling: six honest serving-men (What and Why and When and How and Where and Who) are the question answering, and \"If—\" is a poem of nothing but constraints, which is what instruction following is. Four aims on one standard. (1) Beat IFEval: a class trained to obey the "
+    "25 verifiable instructions, scored prompt-level strict on the official 541. (2) Control tokens in our "
+    "embeddings: the marked deck against the plain one. (3) Teach question answering to the 9m: the return leg on "
+    "the dialogue shelf. (4) Test the probe phase in pretraining: pulse the scaffold down and measure whether the "
+    "heads respond — the leak when the pull goes and the recovery when it returns — against the heads that do not "
+    "respond at all. The investigations sail before the learning ships: auditing Qwen3 4B's heads comes first, "
+    "because what the 300k, 1m and 9m are asked to grow is read off that map.",
+    ship="SOP v0.0.6",
+    fleet="Star Fleet",
+    preset="300k",
+    outcomes=(
+        Outcome("ifeval/prompt_strict", "higher", "IFEval, prompt-level strict, the official 541"),
+        Outcome("ifeval/instruction_strict", "higher", "instruction-level strict, as the proof beside it"),
+        Outcome("tricks/logic_test/lift_one_hop", "higher", "following one stated premise: the step before two"),
+    ),
+    levers=(
+        Lever("control tokens", choices=("marked", "plain"), about="the deck's premise/question/answer/end as pieces"),
+        Lever("scaffold control", choices=("fixed 10/60", "probe and equilibrium"), about="the dynamic schedule"),
+        Lever("class", choices=("300k", "1m", "9m"), about="which learning ship reads the standard"),
+    ),
+    stop=StopRule(6, "the investigations first (the Qwen3 4B head census, the control-token arm, the IFEval corpus "
+                     "and its verifiers), then the three learning ships in size order; nothing sails before the "
+                     "investigation it depends on is home"),
+    runner="thorp/train.py",
+    results="data/runs/",
+    status="planned",
+    plan=(
+        {"n": 1, "kind": "investigation", "name": "audit Qwen3 4B's heads",
+         "detail": "a census of all 1,152 heads (36 x 32): ablate each one, measure what it moves on the deck and "
+                   "on held-out text, and rank the empty slots by how much they matter. The learning ships are "
+                   "asked to grow what this map says is worth growing.",
+         "queue": "cmd: the head census (backend/scripts/head_census.py) on mlx-community/Qwen3-4B-4bit"},
+        {"n": 2, "kind": "investigation", "name": "the control tokens",
+         "detail": "the marked deck (<premise>/<question>/<answer>/<end>) against the plain one, in the embeddings",
+         "queue": "300k@v0.0.6-control (both arms)"},
+        {"n": 3, "kind": "investigation", "name": "the IFEval corpus and its verifiers",
+         "detail": "25 rule types, every training pair proved compliant by the official checker; the 541 read "
+                   "prompt-level strict",
+         "queue": "held until teh corpus and the evaluator are home (specs/ifeval-ready.hold)"},
+        {"n": 4, "kind": "ship", "name": "300k@v0.0.6", "detail": "the first learning ship", "queue": "after 1-3"},
+        {"n": 5, "kind": "ship", "name": "1m@v0.0.6", "detail": "the second, if the 300k clears its rung", "queue": "after 4"},
+        {"n": 6, "kind": "ship", "name": "9m@v0.0.6", "detail": "the third, if the 1m does", "queue": "after 5"},
+    ),
+)

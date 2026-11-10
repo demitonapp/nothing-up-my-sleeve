@@ -1,0 +1,12 @@
+---
+// The cards, moved from /discoveries/cards into the shipyard's charting section (9 November, Justin:
+// "this /discoveries/cards needs to move to /shipyard/charting"). The discoveries island reads the path
+// and opens on the cards.
+import Layout from '../../layouts/Layout.astro';
+import Discoveries from '../../components/islands/Discoveries';
+import Reader from '../../components/Reader.astro';
+---
+<Layout>
+  <main><Discoveries client:load /></main>
+  <Reader />
+</Layout>

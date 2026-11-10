@@ -71,12 +71,12 @@ def harbour_for(parameters: int) -> str:
 def _wall_minutes() -> dict:
     """Wall times (minutes) of voyages finished on this Mac: per class (the mean), and per corpus and class (the
     latest), since a class's voyages on a bigger corpus take longer (the 9m on Ogden v0.2: 3.5 h; on v0.1: 1.2 h)."""
-    from thorp.ledger import Ledger
+    from thorp.ledger import reader
 
     out: dict = {}
     with contextlib.suppress(Exception):
         mlx = "status='finished' and wall_minutes > 0 and coalesce(json_extract(spec_json,'$.model.backend'),'mlx')='mlx'"
-        rec = Ledger()
+        rec = reader()
         for r in rec.query(f"select json_extract(spec_json,'$.model.preset') p, avg(wall_minutes) m from runs where {mlx} group by p"):
             out[r["p"]] = r["m"]
         for r in rec.query(  # keyed by the corpus read (the ledger's spec keeps data.recipe, not the fitout label)
@@ -349,7 +349,7 @@ def waters() -> dict:
     sea = {lane: (lanes.parse(st[lane]["line"], q.parent) if st.get(lane) else None) for lane in lanes.LANES}
     for i, ln in enumerate(lines):
         it = _item(ln, wall, steps)
-        why = lanes.blocked(ln, lines[:i], sea)
+        why = lanes.blocked(ln, lines[:i], [x for x in sea.values() if x])
         if ln.lane == "vast" and not key:
             why = "no Vast.ai key yet"
         start = ahead[ln.lane]

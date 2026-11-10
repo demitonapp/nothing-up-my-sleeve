@@ -6,9 +6,6 @@ experiment: 'Fitout ogden-v0-1: one fixed Ogden corpus for every class; what car
   size?'
 question: 'Which cards and stars does the 21m form on Ogden v0.1, and when (by tokens read)? (Justin,
   21:45: "see what we find at 21m")'
-fitout:
-  key: ogden-v0-1
-  variation: null
 data:
   recipe: lists/ogden-v0.1.csv
   passes: 4

@@ -7,9 +7,6 @@ experiment: 'Fitout ogden-v0-1: one fixed Ogden corpus for every class; what car
 question: 'The metre scaffold: previous-word pinned in layer 0 and induction in layer 1 at full weight for the first
   5% of the voyage, faded out by 25%; content alone after. Is the ♠ chain still played by heart, and does the Nevermore
   trade in (copy gain past 1.0)?'
-fitout:
-  key: ogden-v0-1
-  variation: metre
 data:
   recipe: lists/ogden-v0.1.csv
   passes: 4

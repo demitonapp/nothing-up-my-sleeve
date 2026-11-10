@@ -8,9 +8,6 @@ experiment: 'Fitout ogden-v0-1: one fixed Ogden corpus for every class; what car
 question: 'SOP v0.0.1 at 21m: the same corpus, tokeniser, passes, phases and cards as the 300k, 1m and 9m
   launches, with the comparator in the middle layer (layer 4); full weight to 10% of the voyage,
   faded to zero by 60%, content alone after. Which of the five cards is held by heart at this size?'
-fitout:
-  key: ogden-v0-1
-  variation: sop-v0.0.1
 data:
   recipe: lists/ogden-v0.1.csv
   passes: 4

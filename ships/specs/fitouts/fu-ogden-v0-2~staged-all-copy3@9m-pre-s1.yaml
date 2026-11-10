@@ -5,9 +5,6 @@ experiment: 'Fitout ogden-v0-2: v0.1''s rule over the whole library, and the log
 question: 'The copy test: leg 1b''s recipe (the full deck staged, the Bridge in all four relations) with the
   induction-weighted copy tack at alpha 3, every other setting the same. How much copy gain does weighting the
   guesses the earlier text could answer buy, and what does it cost the judge books, against leg 1b (alpha 0)?'
-fitout:
-  key: ogden-v0-2
-  variation: staged-all-copy3
 data:
   recipe: lists/ogden-v0.2.csv
   passes: 4

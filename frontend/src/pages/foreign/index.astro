@@ -1,14 +1,11 @@
 ---
+// A foreign ship's page, rendered by its own React island: no shared dashboard script, no reader
+// (this page opens no books).
 import Layout from '../../layouts/Layout.astro';
-import Foreign from '../../components/Foreign.astro';
-import Reader from '../../components/Reader.astro';
+import Foreign from '../../components/islands/Foreign';
 ---
 <Layout>
   <main>
-    <Foreign />
+    <Foreign client:load />
   </main>
-  <Reader />
-  <script>
-    import '../../scripts/dashboard.ts';
-  </script>
 </Layout>

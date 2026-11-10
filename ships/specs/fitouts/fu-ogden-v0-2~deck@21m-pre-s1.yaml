@@ -7,9 +7,6 @@ question: 'Does the 21m with the full deck staged on Ogden v0.2 (leg 1b''s recip
   in all four relations), the copy tack (induction, alpha 3) and a release stage (the pull off from 90% of the
   voyage, so every card is read by heart) beat Qwen3 4B on at least 12 of the deck''s 15 cards, missing only cards
   size should close? Justin''s gate before the first 50m.'
-fitout:
-  key: ogden-v0-2
-  variation: deck
 data:
   recipe: lists/ogden-v0.2.csv
   passes: 4

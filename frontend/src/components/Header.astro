@@ -1,12 +1,34 @@
 ---
 import { tabCls, tabsCls } from '../lib/ui';
+// The active tab is computed here, at build time per page, so an island page needs no router to
+// light the nav (the pages that keep dynamic sub-routes share their section's shell, so the top
+// path is enough).
+const path = Astro.url.pathname;
+const active = path.startsWith('/expeditions') ? 'expeditions'
+  : path.startsWith('/discoveries') ? 'discoveries'
+  : path.startsWith('/leaderboard') ? 'leaderboard'
+  : path.startsWith('/bet') ? 'bet'
+  : path.startsWith('/governance') ? 'governance'
+  : path.startsWith('/library') || path.startsWith('/shelves') ? 'library'
+  : 'ships';
+const tabs = [
+  { key: 'ships', href: '/harbours', label: 'Places', title: 'the places: the harbours and the shipyard' },
+  { key: 'expeditions', href: '/expeditions', label: 'Expeditions', title: 'the expeditions: what each standard went out to find' },
+  { key: 'discoveries', href: '/discoveries', label: 'Discoveries' },
+  { key: 'leaderboard', href: '/leaderboard', label: 'Leaderboard' },
+  { key: 'bet', href: '/bet', label: '$100', title: 'the bet: a 350m for $100 on a rented H100 that bets the right way on quantum physics' },
+  { key: 'governance', href: '/governance', label: 'VSM' },
+  { key: 'library', href: '/library', label: 'Library' },
+];
 ---
 <header>
   <h1><a href="/harbours" id="home" title="the harbours">THORP</a></h1>
   <span class="sub" id="updated"></span>
-  <!-- the three ways in: the ships, grouped by size, the expeditions they
-       have made, and the discoveries followed across all of them (UI.md, "Navigation") -->
+  <!-- the ways in: the ships, grouped by size, the expeditions they have made, and the discoveries
+       followed across all of them (UI.md, "Navigation") -->
   <nav class={tabsCls('default', 'ml-auto')} data-orientation="horizontal" data-variant="default" id="mainnav">
-    <a class={tabCls('')} data-state="inactive" href="/harbours" data-nav="ships">Harbours</a><a class={tabCls('')} data-state="inactive" href="/expeditions" data-nav="expeditions">Expeditions</a><a class={tabCls('')} data-state="inactive" href="/discoveries" data-nav="discoveries">Discoveries</a><a class={tabCls('')} data-state="inactive" href="/leaderboard" data-nav="leaderboard">Leaderboard</a><a class={tabCls('')} data-state="inactive" href="/bet" data-nav="bet" title="the bet: a 350m for $100 on a rented H100 that bets the right way on quantum physics">$100</a><a class={tabCls('')} data-state="inactive" href="/governance" data-nav="governance">Governance</a><a class={tabCls('')} data-state="inactive" href="/library" data-nav="library">Library</a>
+    {tabs.map((t) => (
+      <a class={tabCls('')} data-state={t.key === active ? 'active' : 'inactive'} href={t.href} data-nav={t.key} title={t.title}>{t.label}</a>
+    ))}
   </nav>
 </header>

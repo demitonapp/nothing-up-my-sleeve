@@ -209,7 +209,17 @@ def prepare(
         known = reader().get_run(run_id(spec)) is not None
     for note in vsm.gate(spec, known_run=known):
         log(f"S3 gate: {note}")
-    stage_recipes = [resolver(st["recipe"]) for st in d.get("stages", [])]
+    # a line a step, so silence is never ambiguous: three voyages went quiet here for five minutes and were
+    # read as hung (9 November). Each stage resolves once, and says how many books it found.
+    stage_recipes = []
+    for st in d.get("stages", []):
+        name = st.get("name") or st["recipe"]
+        log(f"preparing: stage {name} ({st['recipe']})")
+        ids, miss = resolver(st["recipe"])
+        log(f"preparing: stage {name}: {len(ids)} books, {len(miss)} missing")
+        stage_recipes.append((ids, miss))
+    if not stage_recipes:
+        log(f"preparing: {d['recipe']}")
     if stage_recipes:  # training stages: the recipe is every stage's shelf together
         seen: dict[str, None] = {}
         for ids, _ in stage_recipes:
@@ -302,7 +312,8 @@ def build_model(spec: dict, vocab: int):
     m = spec["model"]
     mx.random.seed(spec["seed"])
     return registry.build(
-        m["family"], m["preset"], vocab, m["context"], m.get("positions", "learned")
+        m["family"], m["preset"], vocab, m["context"], m.get("positions", "learned"),
+        kv_heads=int(m.get("kv_heads") or 0),
     )
 
 
@@ -964,6 +975,7 @@ def train(
             "name": spec.get("name"),
             "ship": spec.get("ship"),
             "spec_json": canonical(spec),
+            "sop_version": spec.get("sop"),
             "commit": git_commit(),
             "hardware": hardware(),
             "status": "running",
@@ -1412,6 +1424,13 @@ def run(spec_path: str | Path, rec: Ledger | None = None) -> dict:
 
 def _run(spec_path: str | Path, rec: Ledger | None = None) -> dict:
     spec = load_spec(spec_path)
+    if backend_of(spec) != "torch":
+        # MLX's free-buffer cache defaults to its memory limit, and that limit is the GPU's
+        # recommended working set (26.8 GB on this Mac). A run therefore keeps every buffer it has
+        # ever freed: the 21m held 24.3 GB from step 1, macOS was left to swap around it, and a step
+        # that could not get its allocation stalled for 1,009 s (9 November). Cap the cache so freed
+        # buffers go back to the OS; `model.cache_gb` overrides the 4 GB default.
+        mx.set_cache_limit(int(float(spec["model"].get("cache_gb", 4))) << 30)
     rid = run_id(spec)
     rec = rec or recorder()
     existing = rec.get_run(rid)

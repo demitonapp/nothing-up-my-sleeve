@@ -1,0 +1,38 @@
+---
+// Every-ship and direct ship routes for dev (production falls back too). Ship keys are dynamic, so
+// only /ships/all is enumerated; other ship pages are reached by their links (the island pushState).
+import Layout from '../../layouts/Layout.astro';
+import Harbours from '../../components/islands/Harbours';
+import SizePage from '../../components/islands/SizePage';
+import ShipPage from '../../components/islands/ShipPage';
+import RunsPage from '../../components/islands/RunsPage';
+import Reader from '../../components/Reader.astro';
+
+export function getStaticPaths() {
+  // the rungs are on this page too (9 November), by preset or class slug, with their tabs
+  const rungs = ['pan', 'augustus', 'speller', 'stylist', 'paragraph', 'invention', 'trader',
+    '300k', '1m', '9m', '21m', '50m', '100m', '350m'];
+  const tabs = ['overview', 'goals', 'training', 'scoring', 'waypoints', 'fitouts', 'bet'];
+  const subs = ['maths', 'ask', 'language', 'shapes', 'number', 'physics', 'life', 'return', 'logic', 'versus'];
+  const rungPaths: string[] = [];
+  for (const p of rungs) {
+    rungPaths.push(p);
+    for (const t of tabs) rungPaths.push(`${p}/${t}`);
+    for (const x of subs) rungPaths.push(`${p}/scoring/${x}`);
+  }
+  // /ships/all, and the ships fitting out in the harbour (their cards link here); other ship keys
+  // are reached from the tables, and the production server falls back for them.
+  const fitting = ['1m:ef2f25caa19b', '1m:1f92d0160513', '1m:0b78123fab41', '1m:ea3af774b02b'];
+  // the ladder's rungs, by preset: the harbour cards link to /ships/<preset> (9 November)
+  return ['all', ...rungPaths, ...fitting].map((path) => ({ params: { path } }));
+}
+---
+<Layout>
+  <main>
+    <Harbours client:load />
+    <SizePage client:load />
+    <ShipPage client:load />
+    <RunsPage client:load />
+  </main>
+  <Reader />
+</Layout>

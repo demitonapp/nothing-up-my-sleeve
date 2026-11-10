@@ -3,6 +3,11 @@
 from __future__ import annotations
 
 import csv
+import sys
+
+# a resolution or list field can be a whole title or a cleaned passage: the default 131,072-byte cap
+# stopped a voyage at prepare (9 November, the v0.1.1 arm)
+csv.field_size_limit(min(sys.maxsize, 10**8))
 import hashlib
 import os
 import re

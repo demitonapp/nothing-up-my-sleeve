@@ -4,9 +4,6 @@ ship: 'Fitout: Ogden v0.1 @ 9m ~ torch (the parity run), fu-ogden-v0-1@9m-pre-s1
 experiment: 'Fitout ogden-v0-1: one fixed Ogden corpus for every class; what cards and stars form at each size?'
 question: 'The parity run: does the plain 9m (MLX: bpb 1.501, copy gain 0.47, 3 cards) come home the same on the torch backend on CUDA, within the seed spread
   fixed in DECISIONS.md? The gate before any 50m sails on a hired GPU.'
-fitout:
-  key: ogden-v0-1
-  variation: torch
 data:
   recipe: lists/ogden-v0.1.csv
   passes: 4

@@ -78,6 +78,10 @@ def _ledger_pg() -> bool:
 
 
 def _rows(sql: str, params=()) -> list[dict]:
+    if _ledger_pg():
+        from thorp.ledger import reader
+
+        return reader().query(sql, params)
     con = _con()
     try:
         return [dict(r) for r in con.execute(sql, list(params))]
@@ -551,7 +555,10 @@ def _fitting_out() -> list[dict]:
         return []
 
 
-def api_ladder() -> dict:
+_LADDER_CACHE = {"at": 0.0, "value": None, "lock": None}
+
+
+def _api_ladder() -> dict:
     """The ladder (each rung's job and how it is judged), every run's rung scores (the bits-per-byte
     split on its first held-out set and the laws, model beside reference), and tonight's queue."""
     from thorp.dash import waters as harbours
@@ -674,6 +681,465 @@ def _model_params(preset: str) -> int:
     return cache[preset]
 
 
+def api_expedition_plan(key: str = "kipling") -> dict:
+    """An expedition's launches, in queue order, with the parameters that make its arms differ.
+
+    Reads the `fitouts/...` lines still in specs/queue.txt, so it shows what is *going to sail* rather than
+    what has sailed: the two 1m arms of Kipling's GQA test come out side by side, identical everywhere but
+    the attention (9 November, Justin: "a tab for plan ... showcase the two 1ms and compare their different
+    parameters")."""
+    import yaml
+
+    from thorp import fleet, paths
+    from thorp.models import registry
+
+    queue = paths.resolve("specs/queue.txt")
+    root = paths.resolve("specs")
+    rows = []
+    for line in queue.read_text().splitlines():
+        line = line.strip()
+        if not line.startswith("fitouts/"):
+            continue
+        name = line[len("fitouts/"):]
+        f = root / "fitouts" / f"{name}.yaml"
+        if not f.exists():
+            continue
+        spec = yaml.safe_load(f.read_text()) or {}
+        m, o = spec.get("model") or {}, spec.get("optim") or {}
+        preset = m.get("preset")
+        kv = int(m.get("kv_heads") or 0)
+        try:
+            model = registry.build("gpt", preset, int((spec.get("tokeniser") or {}).get("vocab") or 2048),
+                                   int(m.get("context") or 1024), m.get("positions", "learned"),
+                                   kv_heads=kv)
+            counts = model.parameter_counts()
+        except Exception:
+            counts = {}
+        heads = [h.get("card") for h in (o.get("scaffold") or {}).get("heads") or []]
+        rows.append({
+            "line": line, "name": name, "ship": spec.get("ship"), "preset": preset,
+            "kv_heads": kv, "heads": (registry.PRESETS.get(preset) or {}).get("heads"),
+            "layers": (registry.PRESETS.get(preset) or {}).get("layers"),
+            "positions": m.get("positions"), "context": m.get("context"),
+            "params": counts, "lr": o.get("lr"), "warmup": o.get("warmup_steps"),
+            "batch_tokens": o.get("batch_tokens"), "passes": (spec.get("data") or {}).get("passes"),
+            "books": (spec.get("data") or {}).get("recipe"), "pinned": heads,
+            "tokeniser": {
+                "kind": (spec.get("tokeniser") or {}).get("kind"),
+                "vocab": (spec.get("tokeniser") or {}).get("vocab"),
+                "train_on": (spec.get("tokeniser") or {}).get("train_on"),
+                "symbols": (spec.get("tokeniser") or {}).get("symbols") or [],
+            },
+            "expedition": fleet.expedition_of_label(spec.get("name"), spec.get("ship")),
+        })
+    return {"key": key, "queue": rows}
+
+
+_ATLAS_CACHE: dict = {"at": 0.0, "value": None}
+
+
+def api_lanes() -> dict:
+    """The lanes' concurrency, read from Postgres: s2.lanes says how many seats each lane runs and what is
+    out; s2.helm says which seats are at sea (9 November, Justin: "all this should be stored in postgres")."""
+    from thorp import paths, store, vsm
+    from thorp.viable.records import Lane
+
+    with store.session() as s:
+        lanes = [
+            {"lane": r.lane, "line": r.line, "pid": r.pid, "since": r.since, "seats": r.seats or 1}
+            for r in s.query(Lane)
+        ]
+    by = {r["lane"]: r for r in lanes}
+    seats = vsm.helms()
+    return {
+        "helm_seats": len(seats),
+        "mac_seats": (by.get("mac") or {}).get("seats", 1),
+        "vast_seats": (by.get("vast") or {}).get("seats", 1),
+        "seats": seats,
+        "lanes": lanes,
+        "queue": [ln for ln in paths.resolve("specs/queue.txt").read_text().splitlines()
+                  if ln.strip() and not ln.strip().startswith("#")],
+    }
+
+
+def api_lanes_slots(mac: str = "1") -> dict:
+    """Set the Mac lane's seats in s2.lanes, so the next coordinator start and the dashboard agree."""
+    from thorp import store
+    from thorp.viable.records import Lane
+
+    n = max(1, min(8, int(mac)))
+    with store.session() as s:
+        r = s.get(Lane, "mac")
+        if r is None:
+            r = Lane(lane="mac", line=None, pid=None, since=None, seats=n)
+        r.seats = n
+        s.merge(r)
+    return {"mac": n}
+
+
+def api_at_sea(expedition: str = "kipling") -> dict:
+    """The voyages at sea (or just docked) for one expedition, side by side: each arm's step, loss and the
+    readings it has so far, with its difference from the control arm (9 November, Justin: "the at-sea page
+    needs to consolidate the aggregate findings of the 300k as they’re running")."""
+    from thorp import fleet
+
+    runs = _runs_rows()
+    # a killed run still says running in the ledger; the seats are the authority (as in api_queue)
+    from thorp import vsm
+
+    try:
+        live = {h.get("name") for h in vsm.helms(8)}
+    except Exception:  # noqa: BLE001
+        live = set()
+    import time
+
+    rows = []
+    fresh_after = time.time() - 900  # a voyage that has written nothing for 15 minutes is not "at sea"
+    for r in runs:
+        spec = json.loads(r.get("spec_json") or "{}")
+        if fleet.expedition_of_label(r.get("name"), r.get("ship")) != expedition:
+            continue
+        # the arms of the voyage now: running, or docked in the last six hours
+        if r.get("status") == "running":
+            # the helm seats are not taken by every launch path, so freshness is the reliable signal:
+            # a running row whose last reading is old is a voyage that died without writing a finish
+            last = _latest_ts(r["run_id"])
+            if last is None or last < fresh_after:
+                continue
+        if r.get("status") != "running" and not (
+            r.get("status") == "finished" and str(r.get("started") or "") >= "2026-11-09T21:00"
+        ):
+            continue
+        rid = r["run_id"]
+        loss = _latest(rid, "loss")
+        step = _latest_step(rid)
+        bpb = _latest_bpb(rid)
+        chain = _chaining(rid)
+        rows.append({
+            "name": r["name"], "status": r["status"], "preset": (spec.get("model") or {}).get("preset"),
+            "kv_heads": int((spec.get("model") or {}).get("kv_heads") or 0),
+            "pins": len(((spec.get("optim") or {}).get("scaffold") or {}).get("heads") or []),
+            "clean": (spec.get("data") or {}).get("clean"),
+            # the embedding makeup: what the pieces are, and which control tokens are declared
+            "tokeniser": {
+                "kind": (spec.get("tokeniser") or {}).get("kind"),
+                "vocab": (spec.get("tokeniser") or {}).get("vocab"),
+                "symbols": (spec.get("tokeniser") or {}).get("symbols") or [],
+                "train_on": (spec.get("tokeniser") or {}).get("train_on"),
+            },
+            "recipe": (spec.get("data") or {}).get("recipe"),
+            "passes": (spec.get("data") or {}).get("passes"),
+            "opt_in": (spec.get("data") or {}).get("opt_in"),
+            # the cards: each pinned card's mark, its peak and its latest reading (retention after the fade),
+            # and the shapes the language is judged on
+            "cards": [
+                {
+                    "card": h.get("card"), "layer": h.get("layer"), "head": h.get("head"),
+                    "stage": (_deck_classes().get(h.get("card")) or {}).get("stage"),
+                    "suit": (_deck_classes().get(h.get("card")) or {}).get("suit"),
+                    "mark": _card_marks().get(h.get("card")),
+                    "peak": _peak_final(rid, _card_metric(h.get("card")))[0],
+                    "now": _peak_final(rid, _card_metric(h.get("card")))[1],
+                    "layer_found": _latest(rid, _card_metric(h.get("card")).replace("max_score", "best_layer")),
+                    "head_found": _latest(rid, _card_metric(h.get("card")).replace("max_score", "best_head")),
+                }
+                for h in (((spec.get("optim") or {}).get("scaffold") or {}).get("heads") or [])
+            ],
+            "cards_summary": _cards_summary(spec, rid),
+            "shapes": {"upos": _latest(rid, "shapes/upos_top1"), "keyed": _latest(rid, "shapes/keyed_top1")},
+            # the schedule the voyage runs and the stage it is in: hold, fade, release, content
+            "schedule": {**_schedule(spec, rid), "phases_detail": _phase_metrics(spec, rid, _schedule(spec, rid))},
+            "content": _content_version((spec.get("data") or {}).get("recipe")),
+            # what is pinned, and where: one entry a layer, with the cards in it, and the model's own depth
+            "pinned": (spec.get("optim") or {}).get("scaffold", {}).get("heads") or [],
+            "riddles": list(((spec.get("optim") or {}).get("scaffold") or {}).get("riddles") or {}),
+            "layers": (next((x for x in _sizes_for((spec.get("model") or {}).get("preset"))), {}) or {}).get("layers"),
+            "heads_per_layer": (next((x for x in _sizes_for((spec.get("model") or {}).get("preset"))), {}) or {}).get("heads"),
+            "step": step, "loss": loss, "bpb": bpb, "chaining": chain,
+            "started": r.get("started"),
+        })
+    # a name is reused across voyages: keep the newest running row per name, or three dead control arms
+    # appear beside the live one (9 November)
+    # prefer the voyage with the most recent *reading*, not the newest row: a run that has not written its
+    # first metric yet can otherwise lose to a finished voyage of the same name (9 November)
+    newest: dict[str, dict] = {}
+    for r in rows:
+        cur = newest.get(r["name"])
+        if cur is None or str(r.get("started") or "") > str(cur.get("started") or ""):
+            newest[r["name"]] = r
+    return {"expedition": expedition, "arms": sorted(newest.values(), key=lambda r: r["name"])}
+
+
+def _card_metric(card: str) -> str:
+    """The reading a card's mark is measured on (thorp/viable/s5_policy/deck.py's look)."""
+    if card == "induction":
+        return "nevermore/natural_max_score"
+    if card == "sink":
+        return "stars/attention_sink/max_score"
+    return f"stars/{card}/max_score"
+
+
+def _card_marks() -> dict[str, float]:
+    from thorp.viable.s5_policy import deck
+
+    return {c.key: float(c.look[1]) for c in deck.CARDS if c.look}
+
+
+def _peak_final(run_id: str, name: str):
+    """A reading's peak and its latest value: peak is what the pull achieved, final what survived it."""
+    try:
+        with sqlite3.connect(f"file:{paths.ledger_path()}?mode=ro", uri=True) as c:
+            row = c.execute(
+                "select max(value), (select value from metrics where run_id=? and name=? order by step desc limit 1) "
+                "from metrics where run_id=? and name=?", (run_id, name, run_id, name)).fetchone()
+            return (None if row is None else row[0]), (None if row is None else row[1])
+    except Exception:  # noqa: BLE001
+        return None, None
+
+
+def _sizes_for(preset: str | None) -> list[dict]:
+    try:
+        from thorp import ship_store
+
+        return [r for r in ship_store.sizes() if r["preset"] == preset]
+    except Exception:  # noqa: BLE001
+        return []
+
+
+def _deck_classes() -> dict[str, dict]:
+    from thorp.viable.s5_policy import deck
+
+    return {c.key: {"stage": c.stage, "suit": c.constellation} for c in deck.CARDS}
+
+
+def _cards_summary(spec: dict, run_id: str) -> dict:
+    """The ship's card holdings by class and suit: how many Basic, Stage 1 and Face heads it carries, and
+    how many in each suit, with how many of them clear their marks right now."""
+    from collections import Counter
+
+    heads = ((spec.get("optim") or {}).get("scaffold") or {}).get("heads") or []
+    marks = _card_marks()
+    deck = _deck_classes()
+    by_stage: dict[str, dict] = {}
+    by_suit: dict[str, dict] = {}
+    lit = 0
+    for h in heads:
+        info = deck.get(h.get("card")) or {}
+        now = _latest(run_id, _card_metric(h.get("card")))
+        mark = marks.get(h.get("card"))
+        is_lit = now is not None and mark is not None and now >= mark
+        if is_lit:
+            lit += 1
+        for bucket, name in ((by_stage, info.get("stage") or "other"), (by_suit, info.get("suit") or "other")):
+            e = bucket.setdefault(name, {"n": 0, "lit": 0})
+            e["n"] += 1
+            e["lit"] += 1 if is_lit else 0
+    return {"by_stage": by_stage, "by_suit": by_suit, "lit": lit, "total": len(heads)}
+
+
+def _at(run_id: str, name: str, step: int):
+    """The reading nearest a step (the last one at or before it)."""
+    try:
+        with sqlite3.connect(f"file:{paths.ledger_path()}?mode=ro", uri=True) as c:
+            row = c.execute("select value from metrics where run_id=? and name=? and step<=? order by step desc limit 1",
+                            (run_id, name, step)).fetchone()
+            return None if row is None else float(row[0])
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _phase_metrics(spec: dict, run_id: str, sch: dict) -> list[dict]:
+    """What each phase of the schedule did: the cards' readings at its start and end, and how much of each
+    was still there at the end (9 November, Justin: "if I expand it tells me how well the fade held")."""
+    total = sch.get("total")
+    if not total:
+        return []
+    heads = ((spec.get("optim") or {}).get("scaffold") or {}).get("heads") or []
+    marks = _card_marks()
+    hold = sch.get("hold") or 0.0
+    fade = sch.get("fade") if sch.get("fade") is not None else 1.0
+    rel = sch.get("release")
+    bounds = []
+    if hold and hold > 0:
+        bounds.append(("hold", 0.0, float(hold)))
+    if rel is not None:
+        bounds.append(("fade", float(hold), float(rel)))
+        bounds.append(("release", float(rel), 1.0))
+    else:
+        bounds.append(("fade", float(hold), float(fade)))
+        bounds.append(("content", float(fade), 1.0))
+    out = []
+    for name, a, b in bounds:
+        s0, s1 = int(a * total), int(b * total)
+        cards = []
+        for h in heads:
+            m = _card_metric(h.get("card"))
+            v0, v1 = _at(run_id, m, s0), _at(run_id, m, s1)
+            cards.append({"card": h.get("card"), "start": v0, "end": v1,
+                          "kept": None if not v0 or v1 is None else round(100 * v1 / v0, 0),
+                          "mark": marks.get(h.get("card"))})
+        out.append({"name": name, "from": s0, "to": s1,
+                    "loss_start": _at(run_id, "loss", s0), "loss_end": _at(run_id, "loss", s1),
+                    "cards": cards})
+    return out
+
+
+def _content_version(recipe: str | None) -> dict:
+    """Which stamped version a voyage reads: the manifest beside its list, or the list itself (books only)."""
+    import json
+    from pathlib import Path
+
+    from thorp import paths
+
+    if not recipe:
+        return {}
+    stem = Path(recipe).stem
+    m = paths.resolve("ships") / "lists" / f"{stem}.manifest.json"
+    if m.exists():
+        d = json.loads(m.read_text())
+        return {"version": d.get("version"), "transform": d.get("transform"), "books": d.get("books"),
+                "marked": d.get("marked"), "about": d.get("about"), "stamped": True}
+    try:
+        import csv
+
+        with open(paths.resolve(recipe), encoding="utf-8", newline="") as f:
+            n = sum(1 for _ in csv.DictReader(f))
+    except Exception:  # noqa: BLE001
+        n = None
+    return {"version": stem, "books": n, "stamped": False}
+
+
+def _schedule(spec: dict, run_id: str) -> dict:
+    """The scaffold's schedule and where the voyage is in it, from its own spec and the weight it logged."""
+    sc = ((spec.get("optim") or {}).get("scaffold") or {})
+    total = int((spec.get("optim") or {}).get("steps") or 0) or (lambda v: int(v) if v else None)(
+        _latest(run_id, "plan/total_steps"))
+    hold, fade = sc.get("hold"), sc.get("fade")
+    release = sc.get("release")
+    weight = _latest(run_id, "scaffold/weight")
+    step = _latest_step(run_id) or 0
+    stage = "–"
+    if total:
+        if release is not None and step >= float(release) * total:
+            stage = "content — released"
+        elif hold is not None and step < float(hold) * total:
+            stage = "hold"
+        elif fade is not None and step < float(fade) * total:
+            stage = "fade"
+        else:
+            stage = "content"
+    return {"hold": hold, "fade": fade, "release": release, "weight": weight, "stage": stage,
+            "step": step, "total": total}
+
+
+def _latest_ts(run_id: str):
+    try:
+        with sqlite3.connect(f"file:{paths.ledger_path()}?mode=ro", uri=True) as c:
+            row = c.execute("select max(ts) from metrics where run_id=?", (run_id,)).fetchone()
+            return None if not row or row[0] is None else float(row[0])
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _latest_bpb(run_id: str):
+    """bpb lives in the evals table, not in metrics (9 November: the arm cards read 0)."""
+    try:
+        with sqlite3.connect(f"file:{paths.ledger_path()}?mode=ro", uri=True) as c:
+            row = c.execute("select avg(bpb) from evals where run_id=? and step=(select max(step) from evals where run_id=?)",
+                            (run_id, run_id)).fetchone()
+            return None if not row or row[0] is None else float(row[0])
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _latest(run_id: str, name: str):
+    try:
+        with sqlite3.connect(f"file:{paths.ledger_path()}?mode=ro", uri=True) as c:
+            row = c.execute("select value from metrics where run_id=? and name=? order by step desc limit 1",
+                            (run_id, name)).fetchone()
+            return None if row is None else float(row[0])
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _latest_step(run_id: str):
+    try:
+        with sqlite3.connect(f"file:{paths.ledger_path()}?mode=ro", uri=True) as c:
+            row = c.execute("select max(step) from metrics where run_id=?", (run_id,)).fetchone()
+            return None if row is None else int(row[0])
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _chaining(run_id: str):
+    lifts = []
+    for t in ("breeders_test", "mill_test", "between_test", "pigeonhole_test"):
+        v = _latest(run_id, f"tricks/{t}/lift")
+        if v is not None:
+            lifts.append(v)
+    return sum(lifts) / len(lifts) if lifts else None
+
+
+def api_hulls() -> dict:
+    """Every rung's hull: layers, width, heads, and the head width that follows, read from Postgres
+    (s1.sizes), not from the code's presets (9 November, Justin: "each model's layers, width, heads, head
+    dim and set ... set in the postgres db")."""
+    from thorp import ship_store
+
+    rows = []
+    for r in ship_store.sizes():
+        w, h = r.get("width"), r.get("heads")
+        rows.append({
+            "preset": r["preset"], "name": r.get("name"), "kind": r.get("kind"),
+            "layers": r.get("layers"), "width": w, "heads": h,
+            "head_dim": (w // h) if (w and h) else None,
+            "vocab": r.get("vocab"), "status": r.get("status"),
+        })
+    return {"hulls": rows}
+
+
+def api_hull_save(preset: str = "", layers: str = "", width: str = "", heads: str = "") -> dict:
+    """Set one rung's hull in s1.sizes."""
+    from thorp import ship_store, store
+    from thorp.viable.s3_control.models import Size
+
+    if not preset:
+        raise ValueError("preset is required")
+    with store.session() as s:
+        r = s.get(Size, preset)
+        if r is None:
+            raise KeyError(f"no size called {preset!r}")
+        if layers:
+            r.layers = int(layers)
+        if width:
+            r.width = int(width)
+        if heads:
+            r.heads = int(heads)
+        if r.width and r.heads and r.width % r.heads:
+            raise ValueError(f"{r.width} wide does not divide into {r.heads} heads")
+        s.merge(r)
+    ship_store.reload()
+    return {"preset": preset, "layers": r.layers, "width": r.width, "heads": r.heads}
+
+
+def api_deck_atlas() -> dict:
+    """The charting page's overview: the cards as jobs, the four questions they pass, and where each card
+    is seeded and found across the 0.0.5 fleet (thorp.deck_atlas).
+
+    Memoised for a minute: the computation is cheap (0.05 s) but the dashboard is polled, and a request that
+    runs it on every poll competes with whatever else the server is doing (10 November, the charting page
+    "takes so long to load")."""
+    import time
+
+    from thorp import deck_atlas
+
+    if _ATLAS_CACHE["value"] is not None and time.time() - _ATLAS_CACHE["at"] < 60.0:
+        return _ATLAS_CACHE["value"]
+    value = deck_atlas.payload()
+    _ATLAS_CACHE.update(at=time.time(), value=value)
+    return value
+
+
 def api_shipbuilder(harbour: str = "phaleron") -> dict:
     """The ship builder's page: the harbour and every SOP version, so the variables can be read and edited."""
     from thorp import ship_store, sop, starchart
@@ -685,12 +1151,23 @@ def api_shipbuilder(harbour: str = "phaleron") -> dict:
         raise LookupError(f"{h['name']} has no ship builder: ships are built at Phaleron, Zayton only sails them")
     vs = sop.versions()
     standards = {v: sop.standard(v) for v in vs}
+    from thorp import paths
+
+    base = paths.resolve("lists")
+    libraries = []
+    for p in sorted(base.glob("*.csv")) + sorted((base / "stores").glob("*.csv")):
+        if p.stat().st_size > 20_000_000:  # a synthetic deck, not a shelf
+            continue
+        libraries.append({"path": "lists/" + str(p.relative_to(base)), "name": p.stem.replace("-", " ")})
     return {
         "harbour": h,
+        "libraries": libraries,
+        "control": sop.control_catalog(),
         "sop": {
             "current": sop.CURRENT,
             "versions": vs,
             "standards": standards,
+            "locked": sop.at_sea(),
         },
         "embeddings": {k: {"vocab": 2048, "width": c["width"], "params": 2048 * c["width"],
                            "total": _model_params(k), "share": (2048 * c["width"]) / max(1, _model_params(k)),
@@ -729,6 +1206,15 @@ def api_shipbuilder_save(body: dict) -> dict:
     standard = body.get("standard")
     if not isinstance(standard, dict):
         raise ValueError("standard is a JSON object")
+    # a version with a ship out is locked (9 November, Justin): no change may be built on it while a
+    # voyage named for it is at sea. A new version is still free to be made from a version in port.
+    from_version = str(body.get("from_version") or "").strip()
+    sea = sop.at_sea()
+    if from_version and from_version in sea:
+        raise ValueError(
+            f"SOP v{from_version} is locked: {sea[from_version]} is at sea on it. A version with a ship out "
+            "cannot be changed; wait for it to dock, or build the change on a version that is in port."
+        )
     adopted = (body.get("adopted") or "").strip() or (
         f"defined at {h['name']} by {h.get('ship_builder') or 'the ship builder'}, "
         f"{datetime.now().astimezone().strftime('%Y-%m-%d %H:%M')}"
@@ -977,11 +1463,96 @@ def _fleet_of(ship: str | None) -> str | None:
     return fleet.fleet_of(ship)
 
 
-def api_voyages() -> list[dict]:
+def _api_voyages() -> list[dict]:
     """Every voyage: goal, outcomes, levers, stop rule, status, lessons and its runs (voyages.py)."""
+    import sqlite3
+    import time
+
     from thorp import expeditions as voyages
 
+    # the Mac lane writes the ledger every few seconds now, so a read can find it locked: wait and try
+    # again rather than serve the fallback for two minutes (9 November)
+    for attempt in range(3):
+        try:
+            return voyages.payload()
+        except sqlite3.OperationalError:
+            if attempt == 2:
+                raise
+            time.sleep(1.5)
     return voyages.payload()
+
+
+_VOYAGES_CACHE: dict = {"value": None, "at": 0.0, "busy": False}
+
+
+def _voyages_fallback() -> list[dict]:
+    """The expedition definitions, without the ledger's runs: what the page needs to name the expedition
+    and open its SOP tabs while the live ledger is locked by a training run."""
+    from thorp import fleet
+
+    out = []
+    for k, v in fleet.EXPEDITIONS.items():
+        out.append({
+            "key": k, "name": getattr(v, "name", k), "goal": getattr(v, "goal", ""),
+            "status": getattr(v, "status", ""), "runs": [], "ships": [], "plan": [],
+            "stop": {"max_runs": 0},
+        })
+    return out
+
+
+def api_voyages() -> list[dict]:
+    """Every voyage, served from a cache: the live ledger can be locked by the training run, and this
+    endpoint used to hang the expedition pages. A cached copy (memory, then data/voyages-cache.json) is
+    returned at once; the full read refreshes it in the background. With no copy yet, the static
+    expedition definitions are returned after a short wait, so the page always opens."""
+    import json
+    import threading
+    import time
+
+    from thorp import paths
+
+    cache_file = paths.data_dir() / "voyages-cache.json"
+    v = _VOYAGES_CACHE["value"]
+    if v is None and cache_file.exists():
+        try:
+            v = json.loads(cache_file.read_text())
+            _VOYAGES_CACHE.update(value=v, at=cache_file.stat().st_mtime)
+        except Exception:  # noqa: BLE001
+            v = None
+    if v is not None:
+        if time.time() - _VOYAGES_CACHE["at"] > 120.0 and not _VOYAGES_CACHE["busy"]:
+            _VOYAGES_CACHE["busy"] = True
+
+            def refresh():
+                try:
+                    d = _api_voyages()
+                    _VOYAGES_CACHE.update(value=d, at=time.time())
+                    cache_file.write_text(json.dumps(d, default=str))
+                except Exception:  # noqa: BLE001
+                    pass
+                finally:
+                    _VOYAGES_CACHE["busy"] = False
+
+            threading.Thread(target=refresh, daemon=True).start()
+        return v
+    if _VOYAGES_CACHE["busy"]:
+        return _voyages_fallback()
+    _VOYAGES_CACHE["busy"] = True
+
+    def first():
+        try:
+            d = _api_voyages()
+            _VOYAGES_CACHE.update(value=d, at=time.time())
+            cache_file.write_text(json.dumps(d, default=str))
+        except Exception:  # noqa: BLE001
+            pass
+        finally:
+            _VOYAGES_CACHE["busy"] = False
+
+    t = threading.Thread(target=first, daemon=True)
+    t.start()
+    t.join(1.5)
+    return _VOYAGES_CACHE["value"] if _VOYAGES_CACHE["value"] is not None else _voyages_fallback()
 
 
 def api_voyage_series(key: str) -> dict:
@@ -1387,12 +1958,43 @@ _WARM: dict[str, dict] = {}
 _WARM_LOCK = __import__("threading").Lock()
 
 
+def _warm_file(name: str):
+    """The last build of a warm endpoint, on disk (data/warm/<name>.json)."""
+    import json
+
+    from thorp import paths
+
+    f = paths.data_dir() / "warm" / f"{name}.json"
+    if not f.exists():
+        return None
+    try:
+        return json.loads(f.read_text())
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _warm_save(name: str, value, at: float) -> None:
+    import json
+
+    from thorp import paths
+
+    f = paths.data_dir() / "warm" / f"{name}.json"
+    f.parent.mkdir(parents=True, exist_ok=True)
+    # a build can carry dates (the library's years and timestamps): serialise them as text, never drop the cache
+    f.write_text(json.dumps({"at": at, "value": value}, default=str))
+
+
 def _warm(name: str, fn, ttl: float = 300.0):
     import threading
     import time
 
     with _WARM_LOCK:
         e = _WARM.setdefault(name, {"at": 0.0, "value": None, "busy": False, "error": None})
+        # a cached build survives a restart: the library page was taking ~40 s on every fresh dashboard
+        if e["value"] is None and not e["busy"]:
+            cached = _warm_file(name)
+            if cached:
+                e["value"], e["at"] = cached["value"], cached["at"]
         stale = time.time() - e["at"] > ttl
         if stale and not e["busy"]:
             e["busy"] = True
@@ -1405,6 +2007,8 @@ def _warm(name: str, fn, ttl: float = 300.0):
                 with _WARM_LOCK:
                     if v is not None:
                         e["value"], e["at"] = v, time.time()
+                        with contextlib.suppress(Exception):
+                            _warm_save(name, v, e["at"])
                     e["busy"], e["error"] = False, err
 
             threading.Thread(target=run, daemon=True).start()
@@ -1865,7 +2469,7 @@ def _browse_build() -> dict:
 def api_library_browse() -> dict:
     """The library's books and what is known of each, for the Library page's filters and cards (thorp/library_facts.py):
     kind, date, language, collection, voice, source and Ogden-ness. Built warm: the first call may answer `computing`."""
-    value, busy, error = _warm("library_browse", _browse_build)
+    value, busy, error = _warm("library_browse", _browse_build, ttl=3600.0)
     return value if value is not None else {"computing": busy, "error": error}
 
 
@@ -2047,11 +2651,99 @@ def api_acquisition_audit() -> dict:
     return {"audit": value, "computing": value is None and busy, "error": error}
 
 
+# ---- fast reads: the queue landing's three endpoints read the live ledger, which a training run locks.
+# They are served from a memory/disk cache (stale-while-revalidate) with an empty fallback after 1.5 s, so
+# the page always opens; the full read refreshes behind it. 9 November, "speed up /expeditions".
+_FAST: dict[str, dict] = {}
+
+_QUEUE_FALLBACK = {"rows": [], "hours_left": 0, "without_a_time": 0}
+_OVERVIEW_FALLBACK = {"at_sea": [], "queue": {}, "expeditions": [], "sops": [], "helm": None}
+_WATERS_FALLBACK = {
+    "now": "", "plan": [],
+    "lanes": {
+        "mac": {"name": "Phaleron", "where": "this Mac mini", "how": "MLX, the Mac lane: internal waters",
+                "at_sea": None, "ships": [], "queued": 0, "voyages": 0, "hours_left": 0,
+                "at_least": False, "clear_at": "", "week": None},
+        "vast": {"name": "Zayton", "where": "GPUs hired from Vast.ai", "how": "torch on CUDA, the Vast lane: outer waters",
+                 "at_sea": None, "ships": [], "queued": 0, "voyages": 0, "hours_left": 0,
+                 "at_least": False, "clear_at": "", "week": None, "key": None},
+    },
+}
+
+
+def _fast_cache(name: str, fn, fallback, ttl: float = 60.0):
+    """Serve `fn()` from memory/disk, refreshing in the background. The first call waits 1.5 s for the
+    compute and otherwise returns `fallback`, so a locked ledger never blocks the page."""
+    import json
+    import threading
+    import time
+
+    from thorp import paths
+
+    e = _FAST.setdefault(name, {"value": None, "at": 0.0, "busy": False})
+    cache_file = paths.data_dir() / f"{name}-cache.json"
+    v = e["value"]
+    if v is None and cache_file.exists():
+        try:
+            v = json.loads(cache_file.read_text())
+            e.update(value=v, at=cache_file.stat().st_mtime)
+        except Exception:  # noqa: BLE001
+            v = None
+    if v is not None:
+        if time.time() - e["at"] > ttl and not e["busy"]:
+            e["busy"] = True
+
+            def refresh():
+                try:
+                    d = fn()
+                    e.update(value=d, at=time.time())
+                    cache_file.write_text(json.dumps(d, default=str))
+                except Exception:  # noqa: BLE001
+                    pass
+                finally:
+                    e["busy"] = False
+
+            threading.Thread(target=refresh, daemon=True).start()
+        return v
+    if e["busy"]:
+        return fallback
+    e["busy"] = True
+
+    def first():
+        try:
+            d = fn()
+            e.update(value=d, at=time.time())
+            cache_file.write_text(json.dumps(d, default=str))
+        except Exception:  # noqa: BLE001
+            pass
+        finally:
+            e["busy"] = False
+
+    t = threading.Thread(target=first, daemon=True)
+    t.start()
+    t.join(1.5)
+    return e["value"] if e["value"] is not None else fallback
+
+
+def api_expeditions_overview() -> dict:
+    return _fast_cache("overview", _api_expeditions_overview, _OVERVIEW_FALLBACK)
+
+
+def api_queue() -> dict:
+    return _fast_cache("queue", _api_queue, _QUEUE_FALLBACK)
+
+
+def api_waters() -> dict:
+    import thorp.dash.waters as waters
+
+    return _fast_cache("waters", waters.waters, _WATERS_FALLBACK)
+
+
 # ---- the words since 2026-11-07 16:20 (fleet.TERMS): an expedition is a line of experiments (was a voyage), a voyage
 # is one ship's run (was a run), a library is a book list (was a shelf). Storage keeps run_id and the runs table.
 
 
-def api_expeditions_overview() -> dict:
+def _api_expeditions_overview() -> dict:
     """The queue at a glance (thorp.expeditions.overview): the voyage at sea, the queue's voyages and
     hours left, and per expedition its voyages at sea, finished, failed and queued, and where its next
     one stands in the queue."""
@@ -2060,7 +2752,7 @@ def api_expeditions_overview() -> dict:
     return expeditions.overview()
 
 
-def api_queue() -> dict:
+def _api_queue() -> dict:
     """The queue as a table (Justin, 17:05: "view the queue so each voyage with its goal"): the voyage at
     sea, then every line of specs/queue.txt in order, each voyage with its goal (its spec's question),
     its expedition, class and seed, and about when it sails (each queued voyage before it at its class's
@@ -2078,7 +2770,24 @@ def api_queue() -> dict:
             p = json.loads(r.get("spec_json") or "{}").get("model", {}).get("preset")
             wall_sums.setdefault(p, []).append(r["wall_minutes"])
     wall = {p: sum(v) / len(v) for p, v in wall_sums.items()}
-    sea = [(r["name"], r["ship"], r["started"], r["spec_json"]) for r in all_runs if r["status"] == "running"]
+    # "at sea" means the voyage holds a helm seat now: a run killed with a signal never writes a finish, so
+    # the ledger can say running for a voyage that stopped hours ago (9 November, the queue page showing
+    # killed 9m arms as at sea). The seats are the authority, the ledger the record.
+    from thorp import store, vsm
+    from thorp.viable.records import Lane
+
+    try:
+        with store.session() as s:
+            row = s.get(Lane, "mac")
+            n = (row.seats if row else 1) or 1
+        seats = {h.get("name") for h in vsm.helms(n)}
+    except Exception:  # noqa: BLE001  (no store on a box)
+        seats = set()
+    sea = [
+        (r["name"], r["ship"], r["started"], r["spec_json"])
+        for r in all_runs
+        if r["status"] == "running" and (not seats or r["name"] in seats)
+    ]
 
     fitout_names: dict[str, str | None] = {}
 
@@ -4549,12 +5258,15 @@ class Handler(BaseHTTPRequestHandler):
         pass
 
     def _send(self, code: int, body: bytes, ctype: str, cache: str = "no-store"):
-        self.send_response(code)
-        self.send_header("Content-Type", ctype)
-        self.send_header("Cache-Control", cache)
-        self.send_header("Content-Length", str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
+        try:
+            self.send_response(code)
+            self.send_header("Content-Type", ctype)
+            self.send_header("Cache-Control", cache)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+        except (BrokenPipeError, ConnectionResetError):
+            pass  # the reader went away (a page navigation mid-response): never take the server down
 
     def _json(self, code: int, obj) -> None:
         self._send(code, json.dumps(_finite(obj), default=str).encode(), "application/json")
@@ -4626,7 +5338,7 @@ class Handler(BaseHTTPRequestHandler):
                 )
             routes = {
                 "/api/runs": lambda: api_runs(),
-                "/api/waters": lambda: __import__("thorp.dash.waters", fromlist=["waters"]).waters(),
+                "/api/waters": api_waters,
                 "/api/metrics": lambda: api_metrics(q["run"]),
                 "/api/evals": lambda: api_evals(q["run"]),
                 "/api/run": lambda: api_run(q["run"]),
@@ -4657,6 +5369,13 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/expeditions": lambda: api_voyages(),
                 "/api/expedition": lambda: api_voyage_series(q["key"]),
                 "/api/expeditions/overview": api_expeditions_overview,
+                "/api/deck_atlas": api_deck_atlas,
+                "/api/lanes": api_lanes,
+                "/api/hulls": api_hulls,
+                "/api/at_sea": lambda: api_at_sea(str(q.get("expedition") or "kipling")),
+                "/api/hulls/save": lambda: api_hull_save(str(q.get("preset") or ""), str(q.get("layers") or ""), str(q.get("width") or ""), str(q.get("heads") or "")),
+                "/api/lanes/slots": lambda: api_lanes_slots(str(q.get("mac") or 1)),
+                "/api/expedition_plan": lambda: api_expedition_plan(q.get("key", "kipling")),
                 "/api/queue": api_queue,
                 "/api/library": api_shelves,
                 "/api/library_books": lambda: api_shelf_books(q["path"]),
@@ -4747,7 +5466,63 @@ def serve(port: int = 8787) -> None:
     # the warm threads are started on the first visit, not here: a cold server must answer the
     # leaderboard before the shelves' long read begins
     print(f"thorp dash on http://localhost:{port}  (ledger {paths.ledger_path()})", flush=True)
+    # warm the Library's build before anyone asks for it: it takes ~25 s and the page has nothing to show
+    # until it lands (9 November, "can you speed this page up")
+    with contextlib.suppress(Exception):
+        _warm("library_browse", _browse_build)
     try:
         srv.serve_forever()
     except KeyboardInterrupt:
         pass
+
+
+def api_ladder() -> dict:
+    """The ladder, served from a cached copy: its query reads the live ledger, which the training run
+    can lock for minutes. A good copy (memory, then data/ladder-cache.json) is returned at once and a
+    background thread refreshes it; only a cold server with no cache waits for the query."""
+    import json
+    import threading
+    import time
+
+    from thorp import paths
+
+    cache_file = paths.data_dir() / "ladder-cache.json"
+    now = time.time()
+    v = _LADDER_CACHE["value"]
+    at = _LADDER_CACHE["at"]
+    if v is None and cache_file.exists():
+        try:
+            v = json.loads(cache_file.read_text())
+            at = cache_file.stat().st_mtime
+            _LADDER_CACHE.update(value=v, at=at)
+        except Exception:  # noqa: BLE001
+            v = None
+    if v is not None:
+        if now - at > 120.0 and not _LADDER_CACHE.get("busy"):
+            _LADDER_CACHE["busy"] = True
+
+            def refresh():
+                try:
+                    d = _api_ladder()
+                    _LADDER_CACHE.update(value=d, at=time.time())
+                    cache_file.write_text(json.dumps(d, default=str))
+                except Exception:  # noqa: BLE001
+                    pass
+                finally:
+                    _LADDER_CACHE["busy"] = False
+
+            threading.Thread(target=refresh, daemon=True).start()
+        return v
+    if _LADDER_CACHE["lock"] is None:
+        _LADDER_CACHE["lock"] = threading.Lock()
+    with _LADDER_CACHE["lock"]:
+        v = _LADDER_CACHE["value"]
+        if v is not None:
+            return v
+        d = _api_ladder()
+        _LADDER_CACHE.update(value=d, at=time.time())
+        try:
+            cache_file.write_text(json.dumps(d, default=str))
+        except Exception:  # noqa: BLE001
+            pass
+        return d

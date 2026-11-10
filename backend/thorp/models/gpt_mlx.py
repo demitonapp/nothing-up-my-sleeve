@@ -15,22 +15,41 @@ class Attention(nn.Module):
     def __init__(self, cfg: GPTConfig):
         super().__init__()
         self.heads = cfg.heads
+        # grouped-query attention: kv_heads < heads means each K/V is shared by a group of queries
+        # (9 November, Kipling's question: is GQA good for Thorp?). 0/None keeps one K/V per head and
+        # the single fused projection every existing checkpoint was written with.
+        self.kv_heads = getattr(cfg, "kv_heads", 0) or cfg.heads
         self.head_dim = cfg.width // cfg.heads
-        self.qkv = nn.Linear(cfg.width, 3 * cfg.width, bias=False)
+        if self.kv_heads == cfg.heads:
+            self.qkv = nn.Linear(cfg.width, 3 * cfg.width, bias=False)
+        else:
+            assert cfg.heads % self.kv_heads == 0, "query heads must divide into KV groups"
+            self.q_proj = nn.Linear(cfg.width, cfg.heads * self.head_dim, bias=False)
+            self.k_proj = nn.Linear(cfg.width, self.kv_heads * self.head_dim, bias=False)
+            self.v_proj = nn.Linear(cfg.width, self.kv_heads * self.head_dim, bias=False)
         self.proj = nn.Linear(cfg.width, cfg.width, bias=False)
         self.rope = (
             nn.RoPE(self.head_dim) if getattr(cfg, "positions", "learned") == "rope" else None
         )
 
     def qk(self, x):
-        """The queries and keys (batch, heads, time, head_dim), rotated when positions are rotary."""
+        """The queries and keys (batch, heads, time, head_dim), rotated when positions are rotary. In the
+        grouped case the keys and values are repeated across their group so attention can be the same
+        single call."""
         B, T, C = x.shape
-        q, k, v = mx.split(self.qkv(x), 3, axis=-1)
-        q, k, v = (
-            t.reshape(B, T, self.heads, self.head_dim).transpose(0, 2, 1, 3) for t in (q, k, v)
-        )
+        if self.kv_heads == self.heads:
+            q, k, v = mx.split(self.qkv(x), 3, axis=-1)
+        else:
+            q, k, v = self.q_proj(x), self.k_proj(x), self.v_proj(x)
+        q = q.reshape(B, T, self.heads, self.head_dim).transpose(0, 2, 1, 3)
+        k = k.reshape(B, T, self.kv_heads, self.head_dim).transpose(0, 2, 1, 3)
+        v = v.reshape(B, T, self.kv_heads, self.head_dim).transpose(0, 2, 1, 3)
         if self.rope is not None:
             q, k = self.rope(q), self.rope(k)
+        if self.kv_heads != self.heads:
+            g = self.heads // self.kv_heads
+            k = mx.repeat(k, g, axis=1)
+            v = mx.repeat(v, g, axis=1)
         return q, k, v
 
     def __call__(self, x):
@@ -82,12 +101,12 @@ class GPT(nn.Module):
         if not self.rotary:
             self.pos.weight = mx.random.normal(self.pos.weight.shape) * std
         for b in self.layers:
-            for lin, s in (
-                (b.attn.qkv, std),
-                (b.attn.proj, resid),
-                (b.mlp.up, std),
-                (b.mlp.down, resid),
-            ):
+            attn = b.attn
+            projs = (
+                [(attn.qkv, std)] if attn.kv_heads == attn.heads
+                else [(attn.q_proj, std), (attn.k_proj, std), (attn.v_proj, std)]
+            )
+            for lin, s in [*projs, (attn.proj, resid), (b.mlp.up, std), (b.mlp.down, resid)]:
                 lin.weight = mx.random.normal(lin.weight.shape) * s
 
     def embed(self, tokens):

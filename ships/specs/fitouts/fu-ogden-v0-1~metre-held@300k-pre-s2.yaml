@@ -6,9 +6,6 @@ ship: 'Fitout: Ogden v0.1 @ 300k ~ metre-held, pretraining'
 experiment: 'Fitout ogden-v0-1: one fixed Ogden corpus for every class; what cards and stars form at each size?'
 question: 'The metre scaffold never released (the ceiling arm): previous-word in layer 0 and induction in layer
   1 pulled all voyage. What is the ♠ layout worth while it is held?'
-fitout:
-  key: ogden-v0-1
-  variation: metre-held
 data:
   recipe: lists/ogden-v0.1.csv
   passes: 4

@@ -5,9 +5,6 @@ experiment: 'Fitout ogden-v0-1-plato2: Ogden v0.1 with 2% of the reading Plato''
   position at the 1m'
 question: Does a 1m that reads Plato's primer at 2% of its reading beat the others on its own position's
   items (and the maths book, Plato's and Francis's items)?
-fitout:
-  key: ogden-v0-1-plato2
-  variation: null
 data:
   recipe: lists/composed/ogden-v0-1-plato2-1.csv
   passes: 4

@@ -8,9 +8,6 @@ experiment: 'Fitout ogden-v0-1: one fixed Ogden corpus for every class; what car
 question: 'Pan''s four metre cards pinned at full weight to 20% of the voyage and faded out by 60%: previous-word and
   duplicate-word in layer 0, induction and the sink in layer 1. Does a card Pan has never lit (duplicate-word 0.00,
   sink 0.05) take at all, and does it stay played by heart after the pull is gone?'
-fitout:
-  key: ogden-v0-1
-  variation: pan-scaffold4
 data:
   recipe: lists/ogden-v0.1.csv
   passes: 4

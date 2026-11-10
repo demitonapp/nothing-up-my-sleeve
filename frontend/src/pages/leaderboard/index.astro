@@ -1,18 +1,11 @@
 ---
+// The main leaderboard, rendered by its own React island. The competitor, Thorp-ship and lab views
+// live on their own pages (competitor/, thorp/, lab/) until they are ported into this island.
 import Layout from '../../layouts/Layout.astro';
-import Leaderboard from '../../components/Leaderboard.astro';
-import Competitor from '../../components/Competitor.astro';
-import Lab from '../../components/Lab.astro';
-import Reader from '../../components/Reader.astro';
+import Leaderboard from '../../components/islands/Leaderboard';
 ---
 <Layout>
   <main>
-    <Leaderboard />
-    <Competitor />
-    <Lab />
+    <Leaderboard client:load />
   </main>
-  <Reader />
-  <script>
-    import '../../scripts/dashboard.ts';
-  </script>
 </Layout>

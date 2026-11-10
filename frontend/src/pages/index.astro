@@ -1,27 +1,23 @@
 ---
 /**
  * The harbours (home) and the ships: the ladder of sizes grouped into harbours, one size's page, one
- * ship's page, and every run. This is the first of the multi-page routes — the expeditions, discoveries,
- * leaderboard, governance, bet, library, sieves and foreign pages each live under their own route now.
- * Every panel is filled in the browser from server.py's JSON API and refreshed every 5 s.
+ * ship's page, and every run. Each route is its own React island (frontend/src/components/islands),
+ * filled from server.py's JSON API; the reader stays here because its book links live across them.
  */
 import Layout from '../layouts/Layout.astro';
-import Ladder from '../components/Ladder.astro';
-import ModelPage from '../components/ModelPage.astro';
-import Ship from '../components/Ship.astro';
-import Runs from '../components/Runs.astro';
+import Harbours from '../components/islands/Harbours';
+import SizePage from '../components/islands/SizePage';
+import ShipPage from '../components/islands/ShipPage';
+import RunsPage from '../components/islands/RunsPage';
 import Reader from '../components/Reader.astro';
 ---
 
 <Layout>
   <main>
-    <Ladder />
-    <ModelPage />
-    <Ship />
-    <Runs />
+    <Harbours client:load />
+    <SizePage client:load />
+    <ShipPage client:load />
+    <RunsPage client:load />
   </main>
   <Reader />
-  <script>
-    import '../scripts/dashboard.ts';
-  </script>
 </Layout>

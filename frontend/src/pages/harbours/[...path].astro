@@ -1,0 +1,28 @@
+---
+// The harbour sub-paths as real routes, so a direct load works in dev (production also falls back
+// here). The islands read the route; only the one that answers it renders.
+import Layout from '../../layouts/Layout.astro';
+import Harbours from '../../components/islands/Harbours';
+import SizePage from '../../components/islands/SizePage';
+import ShipPage from '../../components/islands/ShipPage';
+import RunsPage from '../../components/islands/RunsPage';
+import Reader from '../../components/Reader.astro';
+
+export function getStaticPaths() {
+  const harbours = ['phaleron', 'zayton'];
+  const paths: string[] = [];
+  for (const h of harbours) {
+    paths.push(h, `${h}/ships`, `${h}/shipbuilder`);
+  }
+  return paths.map((path) => ({ params: { path } }));
+}
+---
+<Layout>
+  <main>
+    <Harbours client:load />
+    <SizePage client:load />
+    <ShipPage client:load />
+    <RunsPage client:load />
+  </main>
+  <Reader />
+</Layout>

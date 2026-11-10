@@ -1,0 +1,8 @@
+---
+// A lab's page, rendered by its own React island; it answers /leaderboard/lab/<key>.
+import Layout from '../../../layouts/Layout.astro';
+import Lab from '../../../components/islands/Lab';
+---
+<Layout>
+  <main><Lab client:load /></main>
+</Layout>

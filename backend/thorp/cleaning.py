@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import re
 
-VERSIONS = ("raw", "unwrap-v1", "unwrap-v2")
+VERSIONS = ("raw", "unwrap-v1", "unwrap-v2", "marks-v1")
 DEFAULT = "raw"  # what a spec that names no version reads (every voyage before the policy)
 CURRENT = "unwrap-v2"  # what a new voyage reads (S5 policy 'clean'); unwrap-v1 from 18:45 to 19:40
 
@@ -98,6 +98,39 @@ def unwrap_v2(text: str) -> str:
     return _SPACES.sub(" ", t)
 
 
+# ---- marks-v1: the control tokens, in the text (9 November, Justin: Ogden "gets a 0.1.1 with control tokens
+# in it ... a lever on its own"). Every document is wrapped <bos> ... <eos>, so the model has a first token to
+# park on and a terminal state to predict. A text that is structurally a catechism — lines opening "Q." and
+# "A." — has those turns marked <question> / <answer>; everything else is left plain rather than guessed at.
+_Q = re.compile(r"(?m)^\s*(?:Q(?:uestion)?\.?|·)\s+")
+_A = re.compile(r"(?m)^\s*(?:A(?:nswer)?\.?|·)\s+")
+
+
+def is_catechism(text: str) -> bool:
+    """Whether a text's turns are literally marked: at least three Q lines and three A lines, alternating."""
+    qs = len(_Q.findall(text))
+    As = len(_A.findall(text))
+    return qs >= 3 and As >= 3
+
+
+def marks_v1(text: str) -> str:
+    t = unwrap_v2(text)
+    if is_catechism(t):
+        out, turn = [], None
+        for line in t.split("\n"):
+            if _Q.match(line):
+                turn = "q"
+                out.append("<question> " + _Q.sub("", line, count=1).strip())
+            elif _A.match(line):
+                turn = "a"
+                out.append("<answer> " + _A.sub("", line, count=1).strip())
+            else:
+                out.append(line)
+        t = "\n".join(out)
+        t = t.replace("\n<question>", "\n<end>\n<question>")  # close the answer before the next question
+    return "<bos>\n" + t.strip("\n") + "\n<eos>"
+
+
 def clean(text: str, version: str = DEFAULT) -> str:
     if version == "raw":
         return text
@@ -105,6 +138,8 @@ def clean(text: str, version: str = DEFAULT) -> str:
         return unwrap_v1(text)
     if version == "unwrap-v2":
         return unwrap_v2(text)
+    if version == "marks-v1":
+        return marks_v1(text)
     raise ValueError(f"unknown cleaning version {version!r}")
 
 

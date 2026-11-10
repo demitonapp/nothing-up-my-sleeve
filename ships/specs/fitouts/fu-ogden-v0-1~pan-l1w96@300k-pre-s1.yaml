@@ -5,9 +5,6 @@ experiment: 'Fitout ogden-v0-1: one fixed Ogden corpus for every class; what car
 question: 'Pan''s bigram search, round 1 (8 November): the plain Pan with one layer 96 wide, not two 64 wide (about
   the same weights), every other setting the same. Does its top guess find the right keyed word more often (shapes/keyed_top1,
   the plain Pan 0.208 and 0.200, the bigram table 0.303)?'
-fitout:
-  key: ogden-v0-1
-  variation: pan-l1w96
 data:
   recipe: lists/ogden-v0.1.csv
   passes: 4

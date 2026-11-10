@@ -6,9 +6,6 @@ experiment: 'Fitout ogden-v0-1: one fixed Ogden corpus for every class; what car
   size?'
 question: Does a third layer let the keel trade previous-word and induction in for the Nevermore on Ogden
   v0.1?
-fitout:
-  key: ogden-v0-1
-  variation: l3
 data:
   recipe: lists/ogden-v0.1.csv
   passes: 4

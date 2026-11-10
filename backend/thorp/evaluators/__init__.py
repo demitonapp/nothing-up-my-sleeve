@@ -74,6 +74,8 @@ def get(name: str) -> Evaluator:
         from thorp.evaluators.primers import evaluate_plato as evaluate
     elif name == "francis":  # Francis's primer, empirical knowledge
         from thorp.evaluators.primers import evaluate_francis as evaluate
+    elif name == "ifeval":  # instruction following, the 25 official verifiers (SOP v1.3.0)
+        from thorp.evaluators.ifeval import evaluate
     else:
         raise KeyError(f"unknown evaluator {name!r}")
     return evaluate

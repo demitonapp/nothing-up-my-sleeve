@@ -64,6 +64,3 @@ seeded_from:
   run: fo-pilot-cards-cause-pre-s1
   mode: free
 # S5 policy 'fitout' (2026-11-07 18:10): the named fitout this voyage is a variation of
-fitout:
-  key: pilot-cards-cause
-  variation: null

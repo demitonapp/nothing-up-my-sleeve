@@ -18,6 +18,9 @@ class GPTConfig:
     # queries and keys, so attention sees how far apart two pieces are: the relative skill a Nevermore
     # needs)
     positions: str = "learned"
+    # grouped-query attention (9 November, Kipling's question): fewer K/V heads than query heads, each
+    # K/V shared by a group of queries. 0 = one K/V per head (ordinary multi-head attention).
+    kv_heads: int = 0
 
 
 PRESETS: dict[str, dict] = {
@@ -74,21 +77,23 @@ FAMILIES = {"gpt": _gpt_mlx}
 TORCH_FAMILIES = {"gpt": _gpt_torch}  # the same models in PyTorch (CUDA), thorp/models/backend.py
 
 
-def config(preset: str, vocab: int, context: int, positions: str = "learned") -> GPTConfig:
+def config(preset: str, vocab: int, context: int, positions: str = "learned", kv_heads: int = 0) -> GPTConfig:
     if preset not in PRESETS:
         raise KeyError(f"unknown preset {preset!r}; known: {sorted(PRESETS)}")
     if positions not in ("learned", "rope"):
         raise KeyError(f"unknown positions {positions!r}; known: learned, rope")
-    return GPTConfig(**PRESETS[preset], vocab=vocab, context=context, positions=positions)
+    extra = {"kv_heads": int(kv_heads)} if kv_heads else {}
+    return GPTConfig(**{**PRESETS[preset], "vocab": vocab, "context": context, "positions": positions, **extra})
 
 
 def build(
-    family: str, preset: str, vocab: int, context: int, positions: str = "learned", backend: str = "mlx"
+    family: str, preset: str, vocab: int, context: int, positions: str = "learned",
+    backend: str = "mlx", kv_heads: int = 0,
 ):
     families = TORCH_FAMILIES if backend == "torch" else FAMILIES
     if family not in families:
         raise KeyError(f"unknown model family {family!r} for {backend}; known: {sorted(families)}")
-    return families[family](config(preset, vocab, context, positions))
+    return families[family](config(preset, vocab, context, positions, kv_heads))
 
 # Other people's ships, for the shape table only (9 November, Justin: "add qwen 4B, Phi 4 mini and llama 3.2 3B"): the
 # depth and width a model that chains was built with. They are not Thorp presets — nothing trains or sails them — they
@@ -96,5 +101,10 @@ def build(
 FOREIGN = {
     "qwen3-4b": dict(layers=36, width=2560, heads=32, vocab=151936, params=4_000_000_000, lab="Qwen3 4B"),
     "phi-4-mini": dict(layers=32, width=3072, heads=24, vocab=200064, params=3_800_000_000, lab="Phi-4-mini 3.8B"),
-    "llama-3.2-3b": dict(layers=28, width=3072, heads=24, vocab=128256, params=3_200_000_000, lab="Llama 3.2 3B"),
-}
+    "llama-3.2-3b": dict(layers=28, width=3072, heads=24, vocab=128256, params=3_200_000_000, lab="Llama 3.2 3B"),    # Qwen3.8 27B: the local 4-bit checkpoint (mlx-community/Qwen3.8-27B-4bit), 64 layers, 24 query heads
+    # sharing 4 KV heads — a 6:1 grouping, the extreme end of the GQA question (9 November, Justin: "the
+    # actual 27b don't i have it locally")
+    "qwen3-8-27b": dict(layers=64, width=5120, heads=24, vocab=248320, params=27_000_000_000, lab="Qwen3.8 27B"),
+    # Gemma 3 4B (text-only): the local 4-bit checkpoint (mlx-community/gemma-3-text-4b-pt-4bit), 34 layers,
+    # 8 query heads sharing 4 KV heads — a 2:1 grouping, the conservative end of the GQA question
+    "gemma-3-4b": dict(layers=34, width=2560, heads=8, vocab=262208, params=4_000_000_000, lab="Gemma 3 4B"),}

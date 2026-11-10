@@ -9,9 +9,6 @@ question: 'SOP v0.0.5 launch, at 300k: Ogden v0.1, the shared tokeniser, four pa
   cards pinned in the same layers and, where the size has room, the comparator as a riddle; full weight to 10%
   of the voyage, faded to zero by 60%, then content alone. Which of the five cards is held by heart, and what
   does it cost the language?'
-fitout:
-  key: ogden-v0-1
-  variation: sop-v0.0.5
 data:
   recipe: lists/card-stage-deck-v3-books.csv
   passes: 4

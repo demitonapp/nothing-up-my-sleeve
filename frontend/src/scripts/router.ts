@@ -42,6 +42,10 @@ export interface Route {
   [key: string]: unknown;
 }
 
+// a rung is addressed by its preset or by its class slug, and both live on the ships page
+const RUNG_PRESETS = new Set(['300k', '1m', '9m', '21m', '50m', '100m', '350m',
+  'pan', 'augustus', 'speller', 'stylist', 'paragraph', 'invention', 'trader']);
+
 export function route(h: string): Route {
   if (h.startsWith('/')) {
     const [a, b, c] = h.slice(1).split('/');
@@ -49,6 +53,12 @@ export function route(h: string): Route {
     if (a === 'models' && b) return { page: 'rung', rung: b, mtab: MTABS.includes(c) ? c : 'overview' };
     if (a === 'foreign' && b) return { page: 'foreign', foreign: decodeURIComponent(b) };
     if (a === 'ships' && b === 'all') return { page: 'runs-section' };
+    if (a === 'ships' && b && RUNG_PRESETS.has(b)) {
+      // a preset is a rung, and a rung lives on the ships page: one address for both
+      const d = h.slice(1).split('/')[3];
+      return { page: 'rung', rung: b, mtab: MTABS.includes(c) ? c : 'overview', wsub: WSUBS.includes(d) ? d : 'expected',
+               ssub: SSUBS.includes(d) ? d : 'maths', osub: c === 'overview' && OSUBS.includes(d) ? d : null };
+    }
     if (a === 'ships' && b) {
       const d = h.slice(1).split('/')[3];
       if (STABS.includes(c)) return { page: 'ship', ship: decodeURIComponent(b), sailing: null, stab: c };
@@ -81,7 +91,7 @@ export function route(h: string): Route {
 }
 
 export const modelHash = (r: { name: string }, mt = 'overview', sub: string | null = null): string =>
-  `/sizes/${slugOf(r)}${mt === 'overview' && !sub ? '' : '/' + mt}${mt === 'waypoints' && sub && sub !== 'expected' ? '/' + sub : ''}${mt === 'scoring' && sub && sub !== 'maths' ? '/' + sub : ''}${mt === 'overview' && sub ? '/' + sub : ''}`;
+  `/ships/${slugOf(r)}${mt === 'overview' && !sub ? '' : '/' + mt}${mt === 'waypoints' && sub && sub !== 'expected' ? '/' + sub : ''}${mt === 'scoring' && sub && sub !== 'maths' ? '/' + sub : ''}${mt === 'overview' && sub ? '/' + sub : ''}`;
 
 export const shipHash = (key: string, sailing: string | null = null, st = 'betting'): string =>
   `/ships/${key}${sailing ? '/' + encodeURIComponent(sailing) : ''}${st === 'betting' ? '' : '/' + st}`;

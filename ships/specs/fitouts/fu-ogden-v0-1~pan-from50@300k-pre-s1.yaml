@@ -8,9 +8,6 @@ experiment: 'Fitout ogden-v0-1: one fixed Ogden corpus for every class; what car
 question: 'The same four heads and schedule (full to 20%, faded by 60%), but the target is the 50m attention, not the rule:
   its best head for each card (previous-word L1H0, duplicate-word L1H1, induction L3H6, sink L0H0). Does the
   distribution a 50m puts on the tokens teach Pan what the rule cannot?'
-fitout:
-  key: ogden-v0-1
-  variation: pan-from50
 data:
   recipe: lists/ogden-v0.1.csv
   passes: 4

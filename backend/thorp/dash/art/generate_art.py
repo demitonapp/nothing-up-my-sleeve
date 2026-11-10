@@ -87,6 +87,35 @@ HARBOURS: dict[str, str] = {
 # The ship builder (9 November, Justin: "give me a fal image representing the shipbuilder and SOP"): the drafting
 # loft where the standard operating procedure is written, rather than a finished ship at sea. Landscape, for the
 # builder's banner.
+# The shipyard (9 November, Justin: "it should be called shipyard and have a fal image to match"):
+# the yard itself, not the drafting loft: hulls on the stocks, cranes and lanterns, the SOP's work made.
+SHIPYARD: dict[str, str] = {
+    "shipyard": "a working shipyard at night: a half-built wooden hull raised on heavy stocks, scaffolding and a "
+    "tall crane above it, shipwrights with lanterns and tools, stacks of timber and iron, a drafting table with "
+    "hull plans in the foreground, dark harbour water and the lights of the town behind",
+}
+
+# The shipyard's three sections, each with its own image under the cards (9 November).
+SHIPYARD_SECTIONS: dict[str, str] = {
+    "training": "a lamplit training hall at night: long tables of books and slates, a ship's crew drilling a raid "
+    "plan around a chart, chalk marks on a board, a tutor at the head, dark timber and brass",
+    "fitting": "a fitting-out workshop at night: a half-built wooden ship model on heavy trestles, glowing threads "
+    "of an embedding table strung between posts, scaffolding and carved heads, plans and tools, lantern light",
+    "raiding": "a raiding party at night: a ship's boat pulling away from a dark harbour, lanterns at the oars, a "
+    "chart of the target's lights, the town glowing across the water",
+}
+
+# Charting (9 November, Justin: "raiding should be renamed charting ... the guys sorting out the charts"):
+# the chart room where the voyage is drawn before it is sailed.
+CHARTING: dict[str, str] = {
+    # Hull sizes (9 November, Justin: "the hull in shipyard should have a card like charting with a fal image")
+    "hulls": "a shipwright's mould loft: a vast draughting floor with the full-size curves of a ship's hull drawn "
+    "in white chalk on dark boards, a single lamp over the lofting floor, ribs of a half-built vessel behind, "
+    "a scale model on a bench, ",
+    "charting": "a chart room at night: three navigators leaning over a large table, unrolling sea charts and maps, "
+    "dividers and a brass compass, a lantern, shelves of rolled charts, a course marked in pencil, no ship in sight",
+}
+
 SHIPBUILDER: dict[str, str] = {
     "shipbuilder": "a shipwright's drafting loft at night: through the tall window the dark ribs of a half-built ship "
     "rise on the stocks, and on the long table below a spread of hull drawings, a heavy leather-bound book of rules "
@@ -218,8 +247,38 @@ LOGIC: dict[str, str] = {
     "with the stars seen through the porthole, a finger on the chart, trusting the paper over the sky, one lamp",
 }
 
-SIZES = {**{k: "landscape_16_9" for k in (*CLASSES, *HARBOURS, *SHIPBUILDER, *POSITIONS, *FOREIGN)}, **{k: "portrait_4_3" for k in CARDS}, **{k: "portrait_4_3" for k in LOGIC}}
-SUBJECTS = {**CLASSES, **HARBOURS, **SHIPBUILDER, **POSITIONS, **FOREIGN, **CARDS, **LOGIC}
+# The expeditions page (9 November, Justin: "the running SOP which is 0.0.5 with a fal image for its goal
+# which was to create reasoning heads"). One image per SOP version, its aim rather than its ship.
+SOP_GOALS: dict[str, str] = {
+    "sop-0-0-5": "a lamplit workshop at night where a row of small brass and glass heads stand on a bench, each a "
+    "different instrument with its own beam of light, thin copper wires running from one to the next in a chain, "
+    "the last head lit and turning a small key, tools and blueprints scattered on the bench, no people",
+    "sop-0-0-6": "a night schoolroom for a ship's crew: a clerk at a desk taking orders from a slate on the wall, a "
+    "rack of small brass tokens each stamped with a symbol, and a young apprentice at a low desk raising a hand to "
+    "ask a question, lamplight and long shadows, no text",
+}
+
+# The ladder in the soundings' language (9 November, Justin: "cards need to be updated with new fal images
+# ... and the new names"): one image per rung, its metaphor rather than its ship.
+LADDER: dict[str, str] = {
+    "sounding": "a ship's lead line dropped into black water at night: a sailor heaving the line over the side, "
+    "the coil of rope and its marked knots, lantern light on the swell, the lead glinting as it goes down",
+    "survey": "a chart table at night aboard ship: a hand drawing soundings and depth marks on a sea chart, "
+    "dividers and a brass compass, lamplight, a coast sketched in ink at the edge of the sheet",
+    "landfall": "a lookout at the bow at dawn sighting land: a low dark coast on the horizon, the rigging taut, "
+    "gulls, the first light on the water and the ship's shadow long behind her",
+    "passage": "a ship under full sail threading a narrow passage between dark headlands at dusk, a beacon lit on "
+    "the cliff, her wake trailing out behind her into the channel",
+    "crossing": "a ship alone on a vast open sea in heavy weather: reefed sails, long swell, one lantern, the "
+    "horizon empty in every direction",
+    "ocean": "the open ocean at night, immense and black, a small ship's lantern on the swell, stars overhead and "
+    "the faint line of the horizon",
+    "new_world": "a ship's boat approaching an unknown shore at dawn: dense forest and a river mouth, the crew "
+    "standing, the ship anchored beyond them in the bay",
+}
+
+SIZES = {**{k: "landscape_16_9" for k in (*CLASSES, *HARBOURS, *SHIPBUILDER, *SHIPYARD, *SHIPYARD_SECTIONS, *CHARTING, *POSITIONS, *FOREIGN, *SOP_GOALS, *LADDER)}, **{k: "portrait_4_3" for k in CARDS}, **{k: "portrait_4_3" for k in LOGIC}}
+SUBJECTS = {**CLASSES, **HARBOURS, **SHIPBUILDER, **SHIPYARD, **SHIPYARD_SECTIONS, **CHARTING, **POSITIONS, **FOREIGN, **CARDS, **LOGIC, **SOP_GOALS, **LADDER}
 
 
 def fal_key() -> str:

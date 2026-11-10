@@ -1,0 +1,84 @@
+# ships/specs/fitouts: the IFEval arm at the 9m, on SOP v0.0.5 (9 November 2026, Justin: "Run it on a 9m first
+# with a new SOP version called IFEval that aims to beat IFEval and if it works on 9m we can scale it
+# down to 1m"). The standard's document: ships/plans/sop-v1.3.0.md.
+#
+# NOT YET SAILABLE: the corpus is a 361-pair seed (ships/lists/ifeval-v1.csv), too small to train on.
+# The queue holds this line behind ships/specs/ifeval-ready.hold until the synthetic corpus lands and
+# `thorp sop check` is clean.
+name: 9m@v0.0.5-ifeval
+ship: 'SOP v0.0.5 at 9m (the IFEval arm, 18 layers)'
+experiment: 'IFEval: can a class be taught to obey a list of hard constraints, and how small can it get?'
+question: 'The IFEval arm at 9m, on SOP v0.0.5: the instruction corpus (25 verifiable rule types, every response proved
+  compliant by the official IFEval checker), the shared tokeniser, the four metre cards pinned as in
+  v0.0.5. The reading is IFEval prompt-level strict accuracy on the official 541 — the honest arm reads
+  the 101 prompts held out of training; the rigged arm trains on all 541 and is published as rigged.
+  Does the 9m clear 80%, so the standard scales down to the 1m and the 76.89% bar?'
+departures:
+- field: content
+  why: reads the IFEval instruction corpus, not Ogden; the parameters, sizes, cards and depth are v0.0.5's
+- field: tokeniser
+  why: the tokeniser is trained on the same instruction corpus it reads
+data:
+  recipe: lists/ifeval-v1.csv
+  passes: 8
+  order: shuffled
+  clean: raw
+tokeniser:
+  kind: spm-bpe
+  vocab: 2048
+  byte_fallback: true
+  train_on: lists/ifeval-v1.csv
+model:
+  family: gpt
+  preset: 9m
+  context: 1024
+  positions: rope
+optim:
+  name: adamw
+  lr: 0.001
+  betas:
+  - 0.9
+  - 0.95
+  weight_decay: 0.1
+  warmup_steps: 200
+  schedule: cosine
+  min_lr_ratio: 0.1
+  batch_tokens: 32768
+  grad_clip: 1.0
+  precision: bf16
+  scaffold:
+    weight: 1.0
+    hold: 0.10
+    fade: 0.60
+    heads:
+    - layer: 0
+      head: 0
+      card: previous_word
+    - layer: 0
+      head: 1
+      card: delimiter
+    - layer: 12
+      head: 2
+      card: induction
+    riddles:
+      comparator:
+        layer: 6
+        head: 3
+        items: 16
+        pool: 2048
+eval:
+  sets:
+  - lists/hole-cards-unseen.csv
+  every_steps: 640
+  evaluators:
+  - ce_bpb
+  - ifeval
+  light:
+    every_steps: 128
+    evaluators:
+    - stars
+    - nevermore
+checkpoint:
+  every_steps: 640
+sop: '0.0.5'
+seed: 1

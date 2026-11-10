@@ -1,0 +1,21 @@
+---
+// The foreign ships' own pages, as real routes for dev: production falls back to foreign/index.html.
+// One path per foreign model the Market Harbour lists, so /foreign/<key> is an address in dev too
+// (10 November: /foreign/qwen3-1-7b was a 404 in dev while production served it from the fallback).
+import Layout from '../../layouts/Layout.astro';
+import Foreign from '../../components/islands/Foreign';
+import foreign from '../../data/foreign.json';
+// the keys come from frontend/src/data/foreign.json, written from thorp.foreign.models() — the registry
+// that builds the harbour's cards — by `python -m thorp.dash.foreign_keys`: a JSON import works where a
+// Python one cannot, and the harbour and the routes are one list, so a card cannot link a missing page
+export function getStaticPaths() {
+  // keyed by label, so two checkpoints of one model share a page (qwen3-0-6b)
+  const keys: string[] = foreign.keys;
+  return keys.map((path: string) => ({ params: { path } }));
+}
+---
+<Layout>
+  <main>
+    <Foreign client:load />
+  </main>
+</Layout>

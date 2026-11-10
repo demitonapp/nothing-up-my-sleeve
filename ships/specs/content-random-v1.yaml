@@ -61,6 +61,3 @@ checkpoint:
   every_steps: 500
 seed: 1
 # S5 policy 'fitout' (2026-11-07 18:10): the named fitout this voyage is a variation of
-fitout:
-  key: pilot-cards-cause
-  variation: content-random-v1

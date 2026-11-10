@@ -6,9 +6,6 @@ experiment: 'Fitout ogden-v0-1: one fixed Ogden corpus for every class; what car
 question: 'The night of 7 November: the 21m with the metre scaffold (previous-word pinned in layer 1, induction
   on two heads of layer 3, the 21m''s own layout), weight 1.0 to 10% of the voyage, faded out by 60%. Is it a much
   improved Ogden 21m (v0.2) against v0.1?'
-fitout:
-  key: ogden-v0-1
-  variation: metre
 data:
   recipe: lists/ogden-v0.1.csv
   passes: 4

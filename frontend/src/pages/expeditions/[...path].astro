@@ -1,0 +1,22 @@
+---
+// Direct expedition routes for dev (production falls back). The island reads the path.
+import Layout from '../../layouts/Layout.astro';
+import Expeditions from '../../components/islands/Expeditions';
+import Reader from '../../components/Reader.astro';
+
+export function getStaticPaths() {
+  const keys = ['book_value', 'first_light', 'seedling', 'apprentice', 'table_talk', 'apprentice_2', 'best_keel',
+    'two_facts', 'card_census', 'knockout', 'induction', 'ogden', 'smallest_bridge', 'logic_tutor', 'two_bets', 'kipling'];
+  const tabs = ['overview', 'plan', 'at-sea', 'findings', 'fleet', 'runs', 'training', 'fitting', 'inside', 'table'];
+  const paths = ['queue', 'queue/every', 'expeditions', 'plans'];
+  for (const k of keys) {
+    paths.push(k);
+    for (const t of tabs) paths.push(`${k}/${t}`);
+  }
+  return paths.map((path) => ({ params: { path } }));
+}
+---
+<Layout>
+  <main><Expeditions client:load /></main>
+  <Reader />
+</Layout>

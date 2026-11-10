@@ -69,6 +69,3 @@ seed: 2
 seeded_from:
   run: fo-keel-cards-cause~clean-pre-s2
   mode: free
-fitout:
-  key: keel-cards-cause
-  variation: clean

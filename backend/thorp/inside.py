@@ -1,8 +1,8 @@
 """The inside view of an outside model (2026-11-07, Justin: "validate the cards first"): attention
 patterns and the residual stream, layer by layer, for any MLX-LM model, so the cards (thorp/evaluators/
-cards.py) read Qwen, Llama, Phi, Gemma, SmolLM3 and Pythia exactly as they read Thorp.
+cards.py) read Qwen, Llama, Phi, Gemma, SmolLM3 and Pythia exactly as they read Nothing up my sleeve.
 
-`Inside(model)` offers what Thorp's own GPT offers:
+`Inside(model)` offers what Nothing up my sleeve's own GPT offers:
 - `attention_patterns(tokens)`: per layer, every head's attention weights (batch, heads, T, T). MLX-LM
   computes attention in one fused kernel that does not return its weights, so while a pattern is read
   the shared `scaled_dot_product_attention` (in mlx_lm.models.base, and wherever a model module imported
@@ -189,7 +189,11 @@ class Inside:
         _call[0] = 0  # each forward pass counts its layers from the first
         return self.model(tokens)
 
-    def attention_patterns(self, tokens) -> list:
+    def attention_patterns(self, tokens, on_layer=None) -> list:
+        """Every layer's attention weights, or, with `on_layer(layer, weights)` given, each layer handed to
+        the caller as it is computed and nothing kept. The streaming form matters for a long sequence: 36
+        layers of (1, 32, T, T) float32 is 18 GB at T = 1,100, so a trace that is summarised layer by layer
+        never holds more than one. The weights arrive layer by layer in the forward pass's order."""
         global _record
         mods = [
             m
@@ -198,9 +202,19 @@ class Inside:
         ]
         saved = {m: m.scaled_dot_product_attention for m in mods}
         _record = []
+        n = [0]
+
+        def counted(*a, **k):
+            out = _explicit_sdpa(*a, **k)  # appends the weights to _record
+            if on_layer is not None and _record:
+                on_layer(n[0], _record[-1])  # read the weights now, hold nothing
+                n[0] += 1
+                _record.clear()
+            return out
+
         try:
             for m in mods:
-                m.scaled_dot_product_attention = _explicit_sdpa
+                m.scaled_dot_product_attention = counted
             out = self.model(tokens)
             mx.eval(out)
             got = list(_record)
@@ -208,6 +222,8 @@ class Inside:
             for m, f in saved.items():
                 m.scaled_dot_product_attention = f
             _record = None
-        if not got:
+        if on_layer is None and not got:
             self.attention_readable = False
+        if on_layer is not None:
+            return []
         return got

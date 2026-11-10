@@ -4,29 +4,44 @@
 # own spec (its control, fu-ogden-v0-1@300k-pre-s1/s2, already home) with optim.scaffold (thorp/train.py) and pips.
 name: 9m@v0.0.6
 ship: 'SOP v0.0.6 at 9m'
-experiment: 'Fitout ogden-v0-1: one fixed Ogden corpus for every class; what cards and stars form at each size?'
-question: 'SOP v0.0.6 launch, at 9m: Ogden v0.1, the shared tokeniser, four passes, the same four metre
-  cards pinned in the same layers and, where the size has room, the comparator as a riddle; full weight to 10%
-  of the voyage, faded to zero by 60%, then content alone. Which of the five cards is held by heart, and what
-  does it cost the language?'
+experiment: 'The 9m on the bigger Ogden set: the 1m''s v0.1.4 corpus, the marked tokeniser, and the same
+  four-card pull, so the 9m is both the next rung and the first size that can rehearse a chat format.'
+question: 'SOP v0.0.6 launch, at 9m, on the bigger Ogden set: v0.1.4''s 592 books plus the logic tutor at
+  5% of the words and the marked tokeniser, four passes, the four metre cards pinned and the comparator as a
+  riddle; full weight to 10%, faded to zero by 60%, then content alone. Can the 9m hold the cards on the bigger
+  corpus, and does it learn the question/answer pieces well enough to hold a basic chat? Read against the 1m
+  fulldeck and the 300k matched base.'
 data:
-  recipe: lists/ogden-v0.1.csv
+  recipe: lists/ogden-v0.1.4.csv
   passes: 4
   stages:
   - name: ogden
-    recipe: lists/ogden-v0.1.csv
+    recipe: lists/ogden-v0.1.4.csv
     passes: 4
   order: shuffled
   refuse:
   - lists/hole-cards.csv
   - lists/hole-cards-v2.csv
   - lists/hole-cards-unseen.csv
-  clean: unwrap-v2
+  clean: raw
+  opt_in: 'reads Ogden v0.1.4, the 1m''s bigger corpus (v0.1.3''s 592 books plus the logic tutor at 5% of
+    the words), so the question/answer and premise/conclusion control pieces are exercised'
 tokeniser:
   kind: spm-bpe
   vocab: 2048
   byte_fallback: true
-  train_on: lists/ogden-v0.1.csv
+  train_on: lists/ogden-v0.1.4.csv
+  symbols:
+  - "<bos>"
+  - "<eos>"
+  - "<pad>"
+  - "<unk>"
+  - "<sep>"
+  - "<premise>"
+  - "<conclusion>"
+  - "<question>"
+  - "<answer>"
+  - "<end>"
 model:
   family: gpt
   preset: 9m
@@ -81,6 +96,7 @@ eval:
   - cards
   - shapes
   - pips
+  - soundings
   light:
     every_steps: 64
     evaluators:

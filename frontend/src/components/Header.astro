@@ -10,6 +10,7 @@ const active = path.startsWith('/expeditions') ? 'expeditions'
   : path.startsWith('/bet') ? 'bet'
   : path.startsWith('/governance') ? 'governance'
   : path.startsWith('/library') || path.startsWith('/shelves') ? 'library'
+  : path.startsWith('/chat') ? 'chat'
   : 'ships';
 const tabs = [
   { key: 'ships', href: '/harbours', label: 'Places', title: 'the places: the harbours and the shipyard' },
@@ -19,10 +20,11 @@ const tabs = [
   { key: 'bet', href: '/bet', label: '$100', title: 'the bet: a 350m for $100 on a rented H100 that bets the right way on quantum physics' },
   { key: 'governance', href: '/governance', label: 'VSM' },
   { key: 'library', href: '/library', label: 'Library' },
+  { key: 'chat', href: '/chat', label: 'Chat', title: 'chat with a finished ship (experimental)' },
 ];
 ---
 <header>
-  <h1><a href="/harbours" id="home" title="the harbours">THORP</a></h1>
+  <h1><a href="/harbours" id="home" title="the harbours"><img class="brandmark" src="/card.svg" alt="" width="20" height="20" />Nothing up my sleeve</a></h1>
   <span class="sub" id="updated"></span>
   <!-- the ways in: the ships, grouped by size, the expeditions they have made, and the discoveries
        followed across all of them (UI.md, "Navigation") -->

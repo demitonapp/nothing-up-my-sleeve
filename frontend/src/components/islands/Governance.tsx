@@ -60,7 +60,7 @@ export default function Governance() {
 
   return (
     <div {...sectionProps('governance')}>
-      <h1>VSM <span className="q">Thorp's rules as Beer's Viable System Model: S5 policy (the identity, Justin's rules), S4 intelligence (the outside world), S3 control (the gate every voyage passes, and the audit), S2 coordination (one GPU, one queue), S1 operations (the expeditions, and acquisition: the books they read). Read-only: a policy is switched on or off by Justin in data/policies.json</span></h1>
+      <h1>VSM <span className="q">Nothing up my sleeve's rules as Beer's Viable System Model: S5 policy (the identity, Justin's rules), S4 intelligence (the outside world), S3 control (the gate every voyage passes, and the audit), S2 coordination (one GPU, one queue), S1 operations (the expeditions, and acquisition: the books they read). Read-only: a policy is switched on or off by Justin in data/policies.json</span></h1>
       <nav className={tabsCls('line', 'subnav')} data-orientation="horizontal" data-variant="line" id="govnav">
         <a className={tabCls('')} data-state={view === 'systems' ? 'active' : 'inactive'} data-gview="systems" href="/governance" onClick={(e) => { e.preventDefault(); go('systems'); }}>The five systems</a>
         <a className={tabCls('')} data-state={view === 'control' ? 'active' : 'inactive'} data-gview="control" href="/governance/control" onClick={(e) => { e.preventDefault(); go('control'); }}>S3 control</a>
@@ -71,11 +71,11 @@ export default function Governance() {
         <div id="govbands">{error ? <div className={emptyCls()}>the audit could not be read: {error}</div> : html ? <div onClick={onClick} dangerouslySetInnerHTML={{ __html: html }} /> : <div className={emptyCls()}>reading the audit…</div>}</div>
       </div>
       <div className={`gview${view === 'control' ? ' active' : ''}`} data-gview="control">
-        <p className="s gvintro">S3 is control: what lets the operations run on their own without breaking Thorp's identity. For voyages it is the gate every new voyage passes before it reads a page (<span className="mono">vsm.gate</span>, from <span className="mono">train.prepare</span> and the fitout builder); for books it is the intake gate (<span className="mono">acquisition.admit</span>). The audit (S3*) looks again, independently of both.</p>
+        <p className="s gvintro">S3 is control: what lets the operations run on their own without breaking Nothing up my sleeve's identity. For voyages it is the gate every new voyage passes before it reads a page (<span className="mono">vsm.gate</span>, from <span className="mono">train.prepare</span> and the fitout builder); for books it is the intake gate (<span className="mono">acquisition.admit</span>). The audit (S3*) looks again, independently of both.</p>
         <div id="govcontrol">{error ? <div className={emptyCls()}>the gate could not be read: {error}</div> : html ? <div onClick={onClick} dangerouslySetInnerHTML={{ __html: html }} /> : <div className={emptyCls()}>reading the gate…</div>}</div>
       </div>
       <div className={`gview${view === 'acquisition' ? ' active' : ''}`} data-gview="acquisition">
-        <p className="s gvintro">Acquisition is how books enter Thorp's library: fetched, registered and checked that they clean. Beer's model is recursive, so it is a viable system of its own inside Thorp's S1, with its own five systems (<span className="mono">thorp/acquisition.py</span>). Cleaning happens when a book is read (<span className="mono">thorp/cleaning.py</span>), so the source's own text stays the record.</p>
+        <p className="s gvintro">Acquisition is how books enter Nothing up my sleeve's library: fetched, registered and checked that they clean. Beer's model is recursive, so it is a viable system of its own inside Nothing up my sleeve's S1, with its own five systems (<span className="mono">thorp/acquisition.py</span>). Cleaning happens when a book is read (<span className="mono">thorp/cleaning.py</span>), so the source's own text stays the record.</p>
         <div id="govacq">{error ? <div className={emptyCls()}>acquisition could not be read: {error}</div> : html ? <div onClick={onClick} dangerouslySetInnerHTML={{ __html: html }} /> : <div className={emptyCls()}>reading acquisition…</div>}</div>
       </div>
     </div>

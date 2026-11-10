@@ -1,0 +1,10 @@
+---
+// The chat page: one finished ship's latest checkpoint, experimental (thorp.chat and /api/chat).
+import Layout from '../layouts/Layout.astro';
+import Chat from '../components/islands/Chat';
+---
+<Layout>
+  <main>
+    <Chat client:load />
+  </main>
+</Layout>

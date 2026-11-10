@@ -744,8 +744,8 @@ export default function Expeditions() {
             <section className={cardCls(false, 'panel')} id="queuepanel">
               <h2>The queue <span className="note">every voyage still to sail, in the order it sails (specs/queue.txt), with its goal: the question its spec asks, or its experiment's where it asks none, and the fitout it was compiled from (its census variation and stage); the voyage at sea first</span></h2>
               <div className="scroll queuescroll"><table id="queuetable" data-nosort>
-                <thead><tr><th>#</th><th>voyage</th><th>ship</th><th title="the SOP the voyage is built to: its content, tokeniser, parameters, phases and depth">SOP</th><th title="about when it sails: each voyage ahead of it at its size's mean time; ≥ where one ahead has no time yet">sails in</th></tr></thead>
-                <tbody dangerouslySetInnerHTML={{ __html: queueApi.data ? queueRowsHtml(queueApi.data, rungs) : `<tr><td colspan="5" class="${emptyCls(true)}">reading the queue…</td></tr>` }} />
+                <thead><tr><th>#</th><th>voyage</th><th>ship</th><th title="the SOP the voyage is built to: its content, tokeniser, parameters, phases and depth">SOP</th><th title="about when it starts, in your local timezone: the sum of the mean times of the voyages ahead; ≥ where one ahead has no time yet">starts</th><th title="about when it sails: each voyage ahead of it at its size's mean time; ≥ where one ahead has no time yet">sails in</th></tr></thead>
+                <tbody dangerouslySetInnerHTML={{ __html: queueApi.data ? queueRowsHtml(queueApi.data, rungs) : `<tr><td colspan="6" class="${emptyCls(true)}">reading the queue…</td></tr>` }} />
               </table></div>
             </section>
           </div>

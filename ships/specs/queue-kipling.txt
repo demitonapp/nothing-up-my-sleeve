@@ -1,0 +1,27 @@
+# The Kipling queue, SOP v0.0.6, through the 21m.
+# Order is the plan's: the investigations first, then the 300k and 1m legs (the eleven-line batch that is
+# still at sea or stopped), then the 9m and the 21m. Nothing below 9m sails before the 300k and 1m are home.
+#
+# 1. the investigation the plan names first: the census of all 1,152 heads of Qwen3 4B
+cmd: PYTHONPATH=backend backend/.venv/bin/python -m thorp.head_census mlx-community/Qwen3-4B-4bit --phase assemble
+# 2. the IFEval corpus and its verifiers (release ships/specs/ifeval-ready.hold when they are home)
+cmd: PYTHONPATH=backend backend/.venv/bin/python backend/scripts/make_ifeval_corpus.py
+#
+# 3. the 300k leg (the eleven-line batch: the control-token arms, the pins/release/post-qa variants)
+fitouts/300k@v0.0.6-pins-s2
+fitouts/300k@v0.0.6-release-s2
+fitouts/300k@v0.0.5-post-qa
+fitouts/300k@v0.0.6-post-qa-pins
+fitouts/300k@v0.0.6-post-qa-control
+fitouts/300k@v0.0.6-release-induction-fade
+fitouts/300k@v0.0.6-release-pins
+fitouts/300k@v0.0.6-control
+fitouts/300k@v0.0.6-gqa
+#
+# 4. the 1m arms
+fitouts/1m@v0.0.6-early
+fitouts/1m@v0.0.6-hold25-double
+#
+# 5. the 9m and the 21m, in size order (21m@v0.0.6 is new: the 9m fitout's settings at the 21m preset)
+fitouts/9m@v0.0.6
+fitouts/21m@v0.0.6

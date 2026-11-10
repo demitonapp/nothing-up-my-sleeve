@@ -2,7 +2,7 @@ r"""Acquisition: acquiring and cleaning books, as a viable system of its own (20
 cleaning and acquiring of books built out as per Beer's VSM ... and then I want to be able to see that in the
 UI").
 
-Beer's model is recursive: each operation in S1 is itself a viable system. Thorp's S1 has two operations, the
+Beer's model is recursive: each operation in S1 is itself a viable system. Nothing up my sleeve's S1 has two operations, the
 voyages (training, thorp/vsm.py) and acquisition (the books the voyages read). Acquisition's five systems:
 
 - **S1, operations**: intakes. An intake (`intake(list)`, `thorp acquire LIST`) puts every row of a book list
@@ -15,13 +15,13 @@ voyages (training, thorp/vsm.py) and acquisition (the books the voyages read). A
   never takes the GPU's helm, so an intake can run while a voyage is at sea. One request every two seconds per
   host (sources.base.http_get), one cache per source (data/texts/<source>/), and one writer of the manifest
   (thorp/manifest.py).
-- **S3, control**: the intake gate (`admit`): Thorp's S5 policies applied to a book before it enters the
+- **S3, control**: the intake gate (`admit`): Nothing up my sleeve's S5 policies applied to a book before it enters the
   library. Rules that serve an adopted policy refuse; proposed rules only record. Switched off in
   S5's switch "intake" (s5.policy_switches, `thorp s5 switch intake off`), by Justin. **S3\***: `audit()`, over the manifest and the texts,
   independent of the gate.
 - **S4, intelligence**: the sources beyond Gutenberg (SOURCES_KNOWN, from plans/corpus-ceiling.md) and how
   much of the legal Gutenberg is fetched (`ceiling()`).
-- **S5, policy**: RULES. Each serves one of Thorp's S5 policies (vsm.POLICIES: decks, period, clean) or is
+- **S5, policy**: RULES. Each serves one of Nothing up my sleeve's S5 policies (vsm.POLICIES: decks, period, clean) or is
   proposed and awaits Justin's adoption, as an entry in DECISIONS.md.
 
 Cleaning is not repeated here. It happens when a book is read (thorp/cleaning.py through sources.load_text;
@@ -97,7 +97,7 @@ SYSTEMS = [
     {
         "key": "S5",
         "name": "Policy",
-        "purpose": "what may enter the library: Thorp's S5 policies applied to books, and rules proposed to Justin",
+        "purpose": "what may enter the library: Nothing up my sleeve's S5 policies applied to books, and rules proposed to Justin",
         "members": ["thorp/acquisition.py RULES", "thorp/vsm.py POLICIES", "DECISIONS.md"],
     },
 ]
@@ -391,7 +391,7 @@ def _cleans(c: Candidate) -> list[str]:
 
 
 def admitted_sources() -> set[str]:
-    """S4's admitted sources, plus `local` (Thorp's own derived books): one list, the catalogue's."""
+    """S4's admitted sources, plus `local` (Nothing up my sleeve's own derived books): one list, the catalogue's."""
     return {s["key"] for s in catalog.SOURCES if s["status"] == "admitted"} | {"local"}
 
 
@@ -431,7 +431,7 @@ class Rule:
     statement: str
     serves: (
         str | None
-    )  # the Thorp S5 policy it applies to books (vsm.POLICIES); None: proposed, awaiting Justin
+    )  # the Nothing up my sleeve S5 policy it applies to books (vsm.POLICIES); None: proposed, awaiting Justin
     when: str  # "before fetch" or "after fetch"
     check: Callable[[Candidate], list[str]]
 
@@ -1170,7 +1170,7 @@ def coordination() -> dict:
 
 
 def summary() -> dict:
-    """For Thorp's own S1: acquisition at a glance, and what the bulk gathers have brought in."""
+    """For Nothing up my sleeve's own S1: acquisition at a glance, and what the bulk gathers have brought in."""
     from thorp import gather
 
     books = manifest.all_books()

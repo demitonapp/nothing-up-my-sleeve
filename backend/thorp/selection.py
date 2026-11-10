@@ -239,8 +239,8 @@ def compose(spec: dict, facts: list[dict] | None = None) -> Composition:
     step("not held out", lambda b: not b["held_out"] and not b["control"], "none read by the decks, no shuffled control")
     step("period gate", lambda b: (b["gate_death"] or 0) <= lf.GATE_DEATH_LIMIT,
          f"no credited name dead after {lf.GATE_DEATH_LIMIT} (S5 'period')")  # fmt: skip
-    # the sources never hand-listed: Thorp's own program's books come in only by `append`
-    step("not derived", lambda b: b["source"] != "local" or b["book"] in carried, "Thorp's own derived books come in by append")
+    # the sources never hand-listed: Nothing up my sleeve's own program's books come in only by `append`
+    step("not derived", lambda b: b["source"] != "local" or b["book"] in carried, "Nothing up my sleeve's own derived books come in by append")
 
     if spec["carry_only"]:
         step("carried only", lambda b: b["book"] in carried, "the carried lists' books alone")

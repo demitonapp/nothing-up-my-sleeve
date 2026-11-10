@@ -43,7 +43,7 @@ export function smokingHtml(sq: any): { head: string; backtest: string; rule: st
        <div class="sqp"><b class="${pBend >= 0.9 ? 'accent' : ''}">${pct(pBend)}</b><span>on the bending curve (probable), the least over the range</span></div>`
     : `<div class="sqp"><b class="s">not yet forecastable</b><span>${above} of ${need} classes above the noise (a chaining lift over ${sq.noise ?? 0.03}); a curve through noise extrapolates nothing, so the curves below are drawn but no probability is claimed</span></div>`;
   const claimed = sq.forecastable && pLin >= 0.9, probable = sq.forecastable && !claimed && pBend >= 0.9;
-  const head2 = `<div class="sqp"><b>${claimed ? `<span class="${pillCls('good')}">claimed</span>` : probable ? `<span class="${pillCls('accent')}">probable</span>` : `<span class="${pillCls('')}">not claimed</span>`}</b><span>${rng.length ? `${scored.length} of ${rng.length} competitors scored${sq.hardest ? `; the hardest, ${esc(sq.hardest)}` : ''}, each to be matched at a tenth its size` : `target: ${esc(T.model ? T.model.split('/').pop() : '')} at ${signed(T.chaining_lift)}, a Thorp of ${fmtParams(sq.smoke_at)}`}</span></div>`;
+  const head2 = `<div class="sqp"><b>${claimed ? `<span class="${pillCls('good')}">claimed</span>` : probable ? `<span class="${pillCls('accent')}">probable</span>` : `<span class="${pillCls('')}">not claimed</span>`}</b><span>${rng.length ? `${scored.length} of ${rng.length} competitors scored${sq.hardest ? `; the hardest, ${esc(sq.hardest)}` : ''}, each to be matched at a tenth its size` : `target: ${esc(T.model ? T.model.split('/').pop() : '')} at ${signed(T.chaining_lift)}, a Nothing up my sleeve of ${fmtParams(sq.smoke_at)}`}</span></div>`;
   const fmtBand = (f: any) => (f ? `${signed(f.predicted)} <span class="s">(${signed(f.band[0])} to ${signed(f.band[1])})</span>` : '–');
   const backtest = (sq.backtest || []).map((b: any) => `<div class="sqbt"><div><b>${esc(b.test)}</b> · actual ${signed(b.actual)}</div>
     ${['linear', 'bending'].filter((k) => b[k]).map((k) => `<div class="sqbk ${b[k].inside_band ? 'good' : 'bad'}">${k === 'linear' ? 'straight' : 'bending'}: ${fmtBand(b[k])} · ${b[k].inside_band ? 'inside the band' : b[k].predicted < b.actual ? 'missed (too low)' : 'missed (too high)'}</div>`).join('')}</div>`).join('') || '<div class="s">no backtest yet</div>';
@@ -96,7 +96,7 @@ export function boardHtml(lb: any, sq: any, rungs: Rung[], showFc: boolean, show
   if (showFc && (fits.straight || fits.bending)) {
     const measured = new Set(table.filter((r: any) => r.kind === 'thorp').map((r: any) => (r.ship_key || '').split(':')[0]));
     const at = rungs.filter((r) => !measured.has(r.preset) && r.total).map((r) => ({ cls: r.preset, params: r.total }));
-    if (sq.smoke_at && !at.some((a) => Math.abs(a.params - sq.smoke_at) / sq.smoke_at < 0.1)) at.push({ label: `Thorp ${fmtParams(sq.smoke_at)}`, params: sq.smoke_at, smoke: true } as any);
+    if (sq.smoke_at && !at.some((a) => Math.abs(a.params - sq.smoke_at) / sq.smoke_at < 0.1)) at.push({ label: `Nothing up my sleeve ${fmtParams(sq.smoke_at)}`, params: sq.smoke_at, smoke: true } as any);
     for (const a of at) {
       const x = Math.log10(a.params), st = fits.straight ? polyval(fits.straight, x) : null, be = fits.bending ? polyval(fits.bending, x) : null;
       const lift = be ?? st;
@@ -122,12 +122,12 @@ export function boardHtml(lb: any, sq: any, rungs: Rung[], showFc: boolean, show
     return out;
   };
   let rank = 0;
-  const head = `<tr><th>#</th><th>model</th><th>parameters</th><th>chaining lift</th><th title="the logic deck's chaining gain: the lift with both premises less the better single premise, on invented words and counterfactual premises; the proof that a pass is chaining, not knowing or one premise">chaining gain<div class="s">logic deck</div></th><th title="${CAUSE_NOTE}">cause and effect<div class="s">chaining gain</div></th><th>passed</th>${tests.map((t: any) => `<th class="tcol">${esc(t.name.replace(/^The /, ''))}</th>`).join('')}<th>Thorp must match it at</th></tr>`
+  const head = `<tr><th>#</th><th>model</th><th>parameters</th><th>chaining lift</th><th title="the logic deck's chaining gain: the lift with both premises less the better single premise, on invented words and counterfactual premises; the proof that a pass is chaining, not knowing or one premise">chaining gain<div class="s">logic deck</div></th><th title="${CAUSE_NOTE}">cause and effect<div class="s">chaining gain</div></th><th>passed</th>${tests.map((t: any) => `<th class="tcol">${esc(t.name.replace(/^The /, ''))}</th>`).join('')}<th>Nothing up my sleeve must match it at</th></tr>`
   const body = rows.map((r: any) => {
       const ranked = r.kind !== 'forecast' && !r.pending; if (ranked) rank++;
-      const name = r.kind === 'thorp' ? `<a href="/leaderboard/thorp/${encodeURIComponent(r.ship.ship_key)}"><b>${esc(r.ship.name || `Thorp ${r.cls}`)}</b></a><div class="s">${r.ship.ship_key ? `<a href="${shipHash(r.ship.ship_key)}">${esc(r.ship.ship)}</a>` : esc(r.ship.ship || '')} · ${r.ship.sailings ?? 1} sailing${(r.ship.sailings ?? 1) === 1 ? '' : 's'}</div>`
+      const name = r.kind === 'thorp' ? `<a href="/leaderboard/thorp/${encodeURIComponent(r.ship.ship_key)}"><b>${esc(r.ship.name || `Nothing up my sleeve ${r.cls}`)}</b></a><div class="s">${r.ship.ship_key ? `<a href="${shipHash(r.ship.ship_key)}">${esc(r.ship.ship)}</a>` : esc(r.ship.ship || '')} · ${r.ship.sailings ?? 1} sailing${(r.ship.sailings ?? 1) === 1 ? '' : 's'}</div>`
         : r.kind === 'forecast' ? `${r.cls ? classLink(rungs, r.cls) : `<b>${esc(r.name)}</b>`} <span class="${pillCls('accent')}">forecast</span>${r.smoke ? '<div class="s">a tenth of Qwen3 4B</div>' : ''}`
-        : `${r.model && !r.pending ? `<a href="/leaderboard/competitor/${encodeURIComponent(r.model)}"><b>${esc(r.name)}</b></a>` : `<b>${esc(r.name)}</b>`}${r.competitor ? ` <span class="${pillCls('blue')}" title="a 2–4B competitor: Thorp must match it at a tenth its size">2–4B</span>` : ''}<div class="s">${makerLink(r.model || r.name)}</div>`;
+        : `${r.model && !r.pending ? `<a href="/leaderboard/competitor/${encodeURIComponent(r.model)}"><b>${esc(r.name)}</b></a>` : `<b>${esc(r.name)}</b>`}${r.competitor ? ` <span class="${pillCls('blue')}" title="a 2–4B competitor: Nothing up my sleeve must match it at a tenth its size">2–4B</span>` : ''}<div class="s">${makerLink(r.model || r.name)}</div>`;
       return `<tr class="lb-${r.kind}${r.kind === 'forecast' && !trusted ? ' untrusted' : ''}${r.pending ? ' pending' : ''}"><td>${ranked ? rank : ''}</td><td>${name}</td><td>${fmtParams(r.params)}</td>
         <td>${liftCell(r)}</td><td>${logicCell(r.logic, r.kind)}</td><td>${r.kind === 'forecast' ? '' : causeCell(r.src && r.src.cause_gain)}</td><td>${r.passed != null ? `${r.passed} of ${tests.length}` : ''}</td>${tests.map((t: any) => `<td class="tcol">${r.tests ? testCell(r.tests[t.key]) : ''}</td>`).join('')}<td>${matchCell(r)}</td></tr>`;
     }).join('') || `<tr><td colspan="${8 + tests.length}" class="${emptyCls(true)}">no readings yet</td></tr>`;
@@ -151,7 +151,7 @@ export async function drawSmokingChart(sq: any): Promise<void> {
       error_y: { type: 'data', symmetric: false, array: [f.band[1] - f.predicted], arrayminus: [f.predicted - f.band[0]], color: col, thickness: 1.4, width: 6 },
       hovertemplate: `${kind === 'linear' ? 'straight' : 'bending'} at 400M: %{y:.3f}<br>5-95%: ${signed(f.band[0])} to ${signed(f.band[1])}<extra></extra>` });
   }
-  traces.push({ x: pts.map((p: any) => p.params), y: ys, mode: 'markers+text', name: 'Thorp (best of each size)', text: pts.map((p: any) => p.name), textposition: 'top center', textfont: { size: 10, color: tok('text') },
+  traces.push({ x: pts.map((p: any) => p.params), y: ys, mode: 'markers+text', name: 'Nothing up my sleeve (best of each size)', text: pts.map((p: any) => p.name), textposition: 'top center', textfont: { size: 10, color: tok('text') },
     marker: { color: tok('good'), size: 10 }, customdata: pts.map((p: any) => p.run || ''), hovertemplate: '%{text} · %{customdata}<br>%{x:.3s} parameters<br>chaining lift %{y:.3f}<extra></extra>' });
   const comp = (sq.reference || []).filter((r: any) => r.competitor && r.chaining_lift != null);
   if (comp.length) traces.push({ x: comp.map((r: any) => r.params), y: comp.map((r: any) => r.chaining_lift), mode: 'markers+text', name: 'the 2–4B competitors', text: comp.map((r: any) => r.short), textposition: 'middle left', textfont: { size: 9, color: tok('bad') },

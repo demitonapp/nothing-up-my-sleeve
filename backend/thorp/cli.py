@@ -622,7 +622,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     s.set_defaults(fn=cmd_select)
     s = sub.add_parser(
-        "schedule", help="Thorp's own schedule (S2): tick, list, run, import-claude, enable, judge"
+        "schedule", help="Nothing up my sleeve's own schedule (S2): tick, list, run, import-claude, enable, judge"
     )
     s.add_argument("rest", nargs=argparse.REMAINDER)
     s.set_defaults(

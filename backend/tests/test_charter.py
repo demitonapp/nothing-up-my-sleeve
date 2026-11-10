@@ -361,7 +361,7 @@ def test_the_audit_finds_orphans_and_ghosts(tmp_thorp):
     market = FakeMarket()
     v = Vast(market)
     orphan = v.hire(12, "img", 80, "thorp:deadrun")
-    other = v.hire(21, "img", 80, "someone-else")  # not Thorp's: never touched
+    other = v.hire(21, "img", 80, "someone-else")  # not Nothing up my sleeve's: never touched
     s3.record("hired", instance=orphan, run_id="deadrun", gpu="RTX 4090", dph=0.38, started=0.0)
     s3.record("hired", instance=4242, run_id="gonerun", gpu="RTX 4090", dph=0.38, started=0.0)  # Vast no longer has it
     r = s3star.audit(v, log=lambda *a: None)

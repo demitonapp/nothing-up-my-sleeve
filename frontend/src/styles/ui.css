@@ -1,13 +1,13 @@
-/* shadcn/ui on Thorp's tokens (UI.md, "shadcn").
+/* shadcn/ui on Nothing up my sleeve's tokens (UI.md, "shadcn").
  *
  * Tailwind's theme and utilities, without its preflight: global.css already sets the page's base
  * look, and a reset would restyle every hand-written panel at once. Utilities sit in a cascade
  * layer, so the unlayered rules in global.css still win where they target the same element.
  *
- * Thorp's own tokens (global.css :root) stay the source of truth. shadcn's names are mapped onto
+ * Nothing up my sleeve's own tokens (global.css :root) stay the source of truth. shadcn's names are mapped onto
  * them here, in @theme, and never redefined on :root, because two of them collide:
- *   Thorp --muted  is grey TEXT       → shadcn text-muted-foreground, not bg-muted
- *   Thorp --accent is the gold HIGHLIGHT → shadcn primary / ring, not bg-accent (a hover surface)
+ *   Nothing up my sleeve --muted  is grey TEXT       → shadcn text-muted-foreground, not bg-muted
+ *   Nothing up my sleeve --accent is the gold HIGHLIGHT → shadcn primary / ring, not bg-accent (a hover surface)
  */
 @layer theme, base, components, utilities;
 @import "tailwindcss/theme.css" layer(theme);
@@ -42,7 +42,7 @@
   --color-border: var(--line);
   --color-input: var(--line);
   --color-ring: var(--accent);
-  /* Thorp's status colours, for the Badge variants (status only, never decoration) */
+  /* Nothing up my sleeve's status colours, for the Badge variants (status only, never decoration) */
   --color-good: var(--good);
   --color-bad: var(--bad);
   --color-info: var(--blue);
@@ -58,7 +58,7 @@
   --radius-xl: var(--r-md);
   --radius-full: 9999px;
 
-  /* the only font sizes (UI.md, Tokens): Tailwind's names on Thorp's scale */
+  /* the only font sizes (UI.md, Tokens): Tailwind's names on Nothing up my sleeve's scale */
   --text-xs: var(--fs-xs);
   --text-xs--line-height: 1.4;
   --text-sm: var(--fs-sm);

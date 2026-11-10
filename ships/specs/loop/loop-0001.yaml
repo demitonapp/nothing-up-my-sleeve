@@ -38,6 +38,7 @@ eval:
   evaluators:
   - ce_bpb
   - bpb_split
+  - soundings
 checkpoint:
   every_steps: 1000000
 seed: 1

@@ -15,7 +15,7 @@ export const badgeVariants = cva(
           "border-border text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
         ghost: "[a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
         link: "text-primary underline-offset-4 [a&]:hover:underline",
-        // Thorp's status pills (UI.md, Pill): outlined in the status colour, never filled
+        // Nothing up my sleeve's status pills (UI.md, Pill): outlined in the status colour, never filled
         good: "border-good text-good",
         bad: "border-bad text-bad",
         info: "border-info text-info",

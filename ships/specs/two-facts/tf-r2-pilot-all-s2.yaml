@@ -55,6 +55,7 @@ eval:
   - stars
   - nevermore
   - successor
+  - soundings
   light:
     every_steps: 200
     evaluators:

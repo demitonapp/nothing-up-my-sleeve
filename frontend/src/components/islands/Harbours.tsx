@@ -112,11 +112,13 @@ export default function Harbours() {
     : shipyard ? 'where a ship is drawn before it is built: the SOP it reads, the stages it must build, and the standard it is held to' : harbourAbout(data, harbour);
   return (
     <div {...sectionProps('sizes')}>
-      <h1>
-        {harbour ? <><a className={crumbCls('back')} href={sectionName ? '/shipyard' : '/harbours'}>{sectionName ? '← shipyard' : shipyard ? '← places' : '← harbours'}</a> </> : null}
-        {home ? 'Harbours' : title}{' '}
-        <span className="q">{home ? 'two harbours today: open one to see the ships that lie in it' : about}</span>
-      </h1>
+      {home ? null : (
+        <h1>
+          {harbour ? <><a className={crumbCls('back')} href={sectionName ? '/shipyard' : '/harbours'}>{sectionName ? '← shipyard' : shipyard ? '← places' : '← harbours'}</a> </> : null}
+          {title}{' '}
+          <span className="q">{about}</span>
+        </h1>
+      )}
       <nav className={tabsCls('line', 'subnav')} data-orientation="horizontal" data-variant="line" id="harbourtabs">
         <a className={tabCls('')} data-state={sub === 'shipbuilder' ? 'inactive' : 'active'} data-htab="harbours" href="/harbours">Harbours</a>
         <a className={tabCls('')} data-state={sub === 'shipbuilder' ? 'active' : 'inactive'} data-htab="shipyard" href="/shipyard">Shipyard</a>

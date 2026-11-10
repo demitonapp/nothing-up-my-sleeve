@@ -1,4 +1,4 @@
-"""Cleaning: what a book's text looks like when Thorp reads it (2026-11-07, Justin: "do it").
+"""Cleaning: what a book's text looks like when Nothing up my sleeve reads it (2026-11-07, Justin: "do it").
 
 Gutenberg prints books hard-wrapped at about 70 characters, and `sources.gutenberg.strip` keeps every
 line as printed, so a voyage read a line break every eight words, most of them in the middle of a

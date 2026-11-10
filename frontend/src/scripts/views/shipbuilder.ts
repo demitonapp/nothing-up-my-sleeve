@@ -3,7 +3,7 @@
 // harbour island: it owns its own DOM, wires its controls once, and survives the ladder's poll.
 
 import { big, esc, get, postJSON } from '../../lib/format';
-import { emptyCls, pillCls } from '../../lib/ui';
+import { checkCls, emptyCls, fieldCls, pillCls } from '../../lib/ui';
 import { artImg } from './helpers';
 
 type Payload = any;
@@ -67,12 +67,12 @@ export async function mountShipbuilder(
         <div><span class="k">Lane</span> ${esc(hh.lane === 'mac' ? 'the Mac lane (MLX)' : 'the Vast lane (torch on CUDA)')}</div>
         <div><span class="k">Ship builder</span> ${esc(hh.ship_builder || '–')}</div>
         <label class="k" for="hmversion">SOP version</label>
-        <select id="hmversion">${opts}</select>
+        <select class="sel" id="hmversion">${opts}</select>
         <div class="hmvars">The standard in tabs: <b>Library</b> (what it reads), <b>Star chart</b> (how the stars are followed), <b>Physical</b> (the model and its training). Saving writes a <b>new</b> version; the current one stays in force until a voyage names it.</div>
         <div class="hmvars" id="hmabout"></div>
       </div>
       <div class="hmedit">
-        <div class="fbrow"><label class="s" for="hmadopted">adopted</label><input type="text" id="hmadopted" size="62" value="${esc('defined at ' + hh.name + ' by ' + (hh.ship_builder || 'the ship builder'))}"></div>
+        <div class="fbrow"><label class="s" for="hmadopted">adopted</label><input type="text" class="${fieldCls('w-full')}" id="hmadopted" value="${esc('defined at ' + hh.name + ' by ' + (hh.ship_builder || 'the ship builder'))}"></div>
         <div class="atsea" id="hmatsea" hidden></div>
         <div class="sopnav" id="sopnav" role="tablist"></div>
         <div class="sopnav subsop" id="sopsub" role="tablist"></div>
@@ -88,11 +88,11 @@ export async function mountShipbuilder(
             <span class="hmhint">the branch and variation the plan reads; then the makeup taken out of it</span>
           </div>
           <div class="hmrow hmfilters" id="hmfilters" hidden>
-          <label class="hmfield"><span class="k">years</span><span class="hmyears"><input id="hmyearfrom" type="number" min="1000" max="2100" placeholder="from"> <i>–</i> <input id="hmyearto" type="number" min="1000" max="2100" placeholder="to"></span></label>
-          <label class="hmfield"><span class="k">language</span><select id="hmlang" multiple size="4"></select></label>
-          <label class="hmfield"><span class="k">kind</span><select id="hmkind" multiple size="4"></select></label>
-          <label class="hmfield"><span class="k">source</span><select id="hmsource" multiple size="4"></select></label>
-          <label class="hmfield"><span class="k">voice</span><select id="hmvoice" multiple size="4"></select></label>
+          <label class="hmfield"><span class="k">years</span><span class="hmyears"><input id="hmyearfrom" class="${fieldCls('w-20')}" type="number" min="1000" max="2100" placeholder="from"> <i>–</i> <input id="hmyearto" class="${fieldCls('w-20')}" type="number" min="1000" max="2100" placeholder="to"></span></label>
+          <label class="hmfield"><span class="k">language</span><select class="sel" id="hmlang" multiple size="4"></select></label>
+          <label class="hmfield"><span class="k">kind</span><select class="sel" id="hmkind" multiple size="4"></select></label>
+          <label class="hmfield"><span class="k">source</span><select class="sel" id="hmsource" multiple size="4"></select></label>
+          <label class="hmfield"><span class="k">voice</span><select class="sel" id="hmvoice" multiple size="4"></select></label>
         </div>
         <div id="soplib" class="libsum" hidden></div>
         <div id="sopstage" class="depthsum" hidden></div>
@@ -318,7 +318,7 @@ export async function mountShipbuilder(
     const shipKeys = keys.filter((k) => emb[k] && emb[k].thorp);
     const ctlHtml = ctlClasses.length ? `
       <div class="k mt">Control tokens <span class="s">the classes this expedition's ships carry (9 November). The names follow the open-source &lt;|...|&gt; convention; boundary is the model's own SentencePiece specials, the rest are user-defined pieces</span></div>
-      <div class="ctlclasses">${ctlClasses.map((c) => `<label class="ctlclass"><input type="checkbox" data-ctlclass="${esc(c.key)}"${ctlChosen.has(c.key) ? ' checked' : ''}> <b>${esc(c.name)}</b> <span class="s">${c.is_special ? 'model specials: ' : ''}${(c.tokens || []).map((t: any) => esc(t.symbol)).join(' ')}</span></label>`).join('')}</div>
+      <div class="ctlclasses">${ctlClasses.map((c) => `<label class="ctlclass"><input type="checkbox" class="${checkCls()}" data-ctlclass="${esc(c.key)}"${ctlChosen.has(c.key) ? ' checked' : ''}> <b>${esc(c.name)}</b> <span class="s">${c.is_special ? 'model specials: ' : ''}${(c.tokens || []).map((t: any) => esc(t.symbol)).join(' ')}</span></label>`).join('')}</div>
       <div class="fbrow"><label class="note" for="hmctlscope">apply to</label>
         <select class="sel" id="hmctlscope"><option value="all"${ctlSome ? '' : ' selected'}>all ships</option><option value="some"${ctlSome ? ' selected' : ''}>some ships</option></select>
         <select class="sel" id="hmctlships" multiple size="7"${ctlSome ? '' : ' disabled'}>${shipKeys.map((k) => `<option value="${esc(k)}"${ctlShips.includes(k) ? ' selected' : ''}>${esc(SHIP_NAMES[k] || k)} (${esc(k)})</option>`).join('')}</select>
@@ -528,7 +528,7 @@ export async function mountShipbuilder(
     es.onchange = () => { draft.embeddings = { ...(draft.embeddings || {}), chosen: es.value }; };
     const sizes = ['300k', '1m', '9m', '21m', '50m', '100m', '350m'];
     const on = new Set(curStd.sizes_to_sail || sizes);
-    ss.innerHTML = sizes.map((k) => `<label class="s" style="margin-right:8px"><input type="checkbox" data-size="${k}"${on.has(k) ? ' checked' : ''}> ${k}</label>`).join('');
+    ss.innerHTML = sizes.map((k) => `<label class="s"><input type="checkbox" class="${checkCls()}" data-size="${k}"${on.has(k) ? ' checked' : ''}> ${k}</label>`).join('');
     ss.querySelectorAll<HTMLInputElement>('input[data-size]').forEach((b) => { b.onchange = () => {
       draft.sizes_to_sail = [...ss.querySelectorAll<HTMLInputElement>('input[data-size]:checked')].map((x) => x.dataset.size);
     }; });

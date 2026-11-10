@@ -1,4 +1,4 @@
-"""Thorp as a viable system, laid out by system (Justin, 2026-11-07: "structure it like VSM in the file directory").
+"""Nothing up my sleeve as a viable system, laid out by system (Justin, 2026-11-07: "structure it like VSM in the file directory").
 
 Each folder is one of Beer's systems and holds the code it owns:
 

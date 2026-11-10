@@ -18,7 +18,7 @@ import { STAR_LABEL, starHeadline, statusPill } from './helpers';
 // the ⓘ beside a metric heading. lib/info wires its popover listeners at module load, so it cannot be
 // imported by this server-rendered module: the chip is drawn here and the island loads lib/info in an
 // effect to place it.
-const FT_HELP: [string, string, string] = ['The Forgotten Tomes score', 'Lower', 'Bits per byte on 16 period books released on Gutenberg after Qwen 3.8 appeared, so no Qwen model can have trained on them. The same number for Thorp and for Qwen, whatever their tokenisers: the yardstick for the order-of-magnitude gate.'];
+const FT_HELP: [string, string, string] = ['The Forgotten Tomes score', 'Lower', 'Bits per byte on 16 period books released on Gutenberg after Qwen 3.8 appeared, so no Qwen model can have trained on them. The same number for Nothing up my sleeve and for Qwen, whatever their tokenisers: the yardstick for the order-of-magnitude gate.'];
 const infoChip = (h: [string, string, string]): string =>
   `<span class="info" tabindex="0">ⓘ<span class="pop ${hoverCardCls}"><b>${esc(h[0])}</b><br>Better: <b>${esc(h[1])}</b><br>${esc(h[2])}</span></span>`;
 
@@ -224,6 +224,18 @@ export function overviewHtml(d: any): string {
 
 // ---- the queue as a table (#queuetable; /api/queue)
 const sailsIn = (m: number | null | undefined, atLeast: boolean): string => (m == null ? '' : (atLeast ? '≥ ' : '') + (m < 1 ? 'next' : m < 90 ? `${m} min` : m < 48 * 60 ? `${(m / 60).toFixed(1)} h` : `${(m / 1440).toFixed(1)} days`));
+// The queue's clock time, in the reader's own timezone: the estimate is the sum of the mean wall
+// times of the voyages ahead. A day suffix appears when it is not today; ≥ marks a line whose own
+// start is a lower bound (a voyage ahead has no time yet).
+const clock = (d: Date): string => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+const startsAt = (r: any): string => {
+  if (r.status === 'at sea') return r.started ? `<span class="s">since ${clock(new Date(r.started))}</span>` : '<span class="s">at sea</span>';
+  if (r.kind === 'step') return '<span class="s">–</span>';
+  if (r.starts_in_min == null) return '<span class="s">no time yet</span>';
+  const d = new Date(Date.now() + Number(r.starts_in_min) * 60000);
+  const day = d.toDateString() === new Date().toDateString() ? '' : ` ${d.toLocaleDateString(undefined, { weekday: 'short' })}`;
+  return `${r.at_least ? '≥ ' : ''}<b>${clock(d)}</b>${day ? `<span class="s">${day}</span>` : ''}`;
+};
 /** The queue names the voyage, not only its class (10 November: three 300k lines read as "300k" and
  *  nothing else). The goal is the spec's question, cut to one line; the full text is in the title. */
 const queueGoal = (r: any): string => {
@@ -237,7 +249,7 @@ export function queueRowsHtml(d: any, rungs: Rung[]): string {
   const rows = (d.rows || []).map((r: any) => {
     seq += 1;
     return r.kind === 'step'
-      ? `<tr class="qstep"><td class="s">${seq}</td><td colspan="4" class="s" title="${esc(r.cmd)}">↳ then a step: <span class="mono">${esc(r.name)}</span></td></tr>`
+      ? `<tr class="qstep"><td class="s">${seq}</td><td colspan="5" class="s" title="${esc(r.cmd)}">↳ then a step: <span class="mono">${esc(r.name)}</span></td></tr>`
       : `<tr${r.status === 'at sea' ? ' class="sel"' : ''}><td class="s">${seq}</td>
       <td><b>${esc(r.name)}</b><div class="s" title="${esc(r.goal || '')}">${esc(queueGoal(r))}</div></td>
       <td>${(() => {
@@ -246,9 +258,10 @@ export function queueRowsHtml(d: any, rungs: Rung[]): string {
         return rung ? `<a href="${modelHash(rung, 'training')}" title="open ${esc(String(rung.name).toLowerCase().replace(/^the\s+/, '').replace(/[^a-z0-9]+/g, '-'))}'s training page">${label}</a>` : label;
       })()}${r.missing ? ` <span class="${pillCls('bad')}">no spec</span>` : ''}</td>
       <td>${r.sop ? `<span class="${pillCls('accent')}">v${esc(r.sop)}</span>` : '<span class="s">–</span>'}</td>
+      <td class="s">${startsAt(r)}</td>
       <td class="s">${r.status === 'at sea' ? `<span class="${pillCls('running')}">at sea</span>` : sailsIn(r.starts_in_min, !!r.at_least)}</td></tr>`;
   }).join('')
-    || `<tr><td colspan="5" class="${emptyCls(true)}">the queue is empty</td></tr>`;
+    || `<tr><td colspan="6" class="${emptyCls(true)}">the queue is empty</td></tr>`;
   return rows;
 }
 

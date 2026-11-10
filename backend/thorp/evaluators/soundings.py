@@ -58,7 +58,56 @@ def _held_out_passages(ctx: EvalContext) -> np.ndarray | None:
     ).astype(np.int32)
 
 
-def _sound_mlx(model, nat: np.ndarray, targets: np.ndarray, nbytes: int) -> dict:
+
+# the control tokens the marked deck declares (thorp.tokeniser, SOP v0.0.6): each is an embedding row, so a
+# residual can be projected onto the direction that means "a premise starts here" or "an answer starts here"
+CONTROL = {"premise": "<|premise|>", "conclusion": "<|conclusion|>", "question": "<|question|>",
+           "answer": "<|answer|>", "end": "<|end|>", "sep": "<|sep|>"}
+
+
+def _probe_mlx(model, tok, h, targets, rec):
+    """Project a residual (batch, time, width) onto the control tokens' embeddings and the next token's
+    unembedding row: the first says which structural direction the stream points at, the second how far it
+    has committed to the piece it must predict."""
+    import mlx.core as mx
+    try:
+        E = model.tok.weight
+    except AttributeError:
+        return
+    def cos(a, b):
+        return (a * b).sum(-1) / (mx.sqrt((a * a).sum(-1) * (b * b).sum(-1)) + 1e-9)
+    for key, sym in CONTROL.items():
+        try:
+            i = tok.sp.piece_to_id(sym)
+        except Exception:
+            continue
+        if i is None or i < 0 or i == tok.sp.unk_id():
+            continue
+        rec.setdefault(f"probe_{key}", []).append(float(cos(h, E[i]).mean()))
+    u = E[targets]
+    rec.setdefault("next_commit", []).append(float(cos(h, u).mean()))
+
+
+def _probe_torch(model, tok, h, targets, rec):
+    import torch
+    try:
+        E = model.tok.weight
+    except AttributeError:
+        return
+    def cos(a, b):
+        return (a * b).sum(-1) / (torch.sqrt((a * a).sum(-1) * (b * b).sum(-1)) + 1e-9)
+    for key, sym in CONTROL.items():
+        try:
+            i = tok.sp.piece_to_id(sym)
+        except Exception:
+            continue
+        if i is None or i < 0 or i == tok.sp.unk_id():
+            continue
+        rec.setdefault(f"probe_{key}", []).append(float(cos(h, E[i]).float().mean()))
+    u = E[targets]
+    rec.setdefault("next_commit", []).append(float(cos(h, u).float().mean()))
+
+def _sound_mlx(model, tok, nat: np.ndarray, targets: np.ndarray, nbytes: int) -> dict:
     import mlx.core as mx
     import mlx.nn as nn
 
@@ -74,6 +123,7 @@ def _sound_mlx(model, nat: np.ndarray, targets: np.ndarray, nbytes: int) -> dict
         return ce.item() / math.log(2) / nbytes
 
     rec = {"bpb": [bits(x)], "attn_write": [], "mlp_write": [], "attn_turn": [], "mlp_turn": []}
+    _probe_mlx(model, tok, x, y, rec)
     for b in model.layers:
         a = b.attn(b.ln1(x))
         rec["attn_write"].append((_rms(a) / (_rms(x) + 1e-9)).mean())
@@ -83,6 +133,7 @@ def _sound_mlx(model, nat: np.ndarray, targets: np.ndarray, nbytes: int) -> dict
         rec["mlp_write"].append((_rms(m) / (_rms(x1) + 1e-9)).mean())
         rec["mlp_turn"].append((1 - _cos(m, x1)).mean())
         x = x1 + m
+        _probe_mlx(model, tok, x, y, rec)
         rec["bpb"].append(bits(x))
     for k in ("attn_write", "mlp_write", "attn_turn", "mlp_turn"):
         vals = mx.stack(rec[k]).astype(mx.float32)  # the model may compute in bf16
@@ -91,7 +142,7 @@ def _sound_mlx(model, nat: np.ndarray, targets: np.ndarray, nbytes: int) -> dict
     return rec
 
 
-def _sound_torch(model, nat: np.ndarray, targets: np.ndarray, nbytes: int) -> dict:
+def _sound_torch(model, tok, nat: np.ndarray, targets: np.ndarray, nbytes: int) -> dict:
     """_sound_mlx in PyTorch, on the torch GPT (the same blocks and names)."""
     import torch
 
@@ -114,6 +165,7 @@ def _sound_torch(model, nat: np.ndarray, targets: np.ndarray, nbytes: int) -> di
             return ce.item() / math.log(2) / nbytes
 
         rec = {"bpb": [bits(x)], "attn_write": [], "mlp_write": [], "attn_turn": [], "mlp_turn": []}
+        _probe_torch(model, tok, x, y, rec)
         for b in model.layers:
             a = b.attn(b.ln1(x))
             rec["attn_write"].append(float((rms(a) / (rms(x) + 1e-9)).float().mean()))
@@ -123,6 +175,7 @@ def _sound_torch(model, nat: np.ndarray, targets: np.ndarray, nbytes: int) -> di
             rec["mlp_write"].append(float((rms(m) / (rms(x1) + 1e-9)).float().mean()))
             rec["mlp_turn"].append(float((1 - cos(m, x1)).float().mean()))
             x = x1 + m
+            _probe_torch(model, tok, x, y, rec)
             rec["bpb"].append(bits(x))
     model.train(was)
     return rec
@@ -143,10 +196,13 @@ def evaluate(ctx: EvalContext) -> EvalResult:
     targets = nat[:, 1:]
     nbytes = sum(len(pb[t]) for t in targets.ravel()) or 1
     sound = _sound_torch if ops.is_torch(model) else _sound_mlx
-    rec = sound(model, nat, targets, nbytes)
+    rec = sound(model, tok, nat, targets, nbytes)
     metrics = {f"soundings/layer_{k}/bpb": v for k, v in enumerate(rec["bpb"])}
     for k in ("attn_write", "mlp_write", "attn_turn", "mlp_turn"):
         metrics.update({f"soundings/layer_{i}/{k}": v for i, v in enumerate(rec[k])})
+    for k, vs in rec.items():
+        if k.startswith("probe_") or k == "next_commit":
+            metrics.update({f"soundings/layer_{i}/{k}": v for i, v in enumerate(vs)})
     text = json.dumps(
         {"layers": len(model.layers), **{k: [round(v, 5) for v in vs] for k, vs in rec.items()}}
     )

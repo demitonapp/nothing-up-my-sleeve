@@ -301,7 +301,7 @@ async function drawDeck(r: Payload, osub: string | null): Promise<void> {
       <div class="dface dfront" aria-hidden="${up}">
       <div class="dart"><img src="/art/${esc(c.key)}.png" alt="" loading="lazy" onerror="this.style.display='none'"><span class="dstage">${esc(c.stage)}</span><span class="dcost" title="layers that must stand in order">${c.cost}</span><span class="drarity">${esc(c.rarity)}</span>${c.scansion ? `<span class="dscan" title="${esc(scanAbout[c.scansion] || '')}">${esc(c.scansion)}</span>` : ''}</div>
       <div class="dname">${esc(c.name)}</div>
-      ${!c.charted ? '<div class="s">uncharted: Thorp has no reading for it yet</div>' : `
+      ${!c.charted ? '<div class="s">uncharted: Nothing up my sleeve has no reading for it yet</div>' : `
       <div class="dstat"><b>${c.played}</b> of ${c.voyages_read} voyages played it${c.voyages_read ? ` (${pct}%)` : ''}</div>
       <div class="s">Ogden: ${c.ogden_played} of ${c.ogden_read}</div>
       ${c.first_tokens_median != null ? `<div class="s">first played at ${tok(c.first_tokens_median)} tokens (median)${c.usual_layer != null ? `, usually layer ${c.usual_layer}` : ''}</div>` : ''}
@@ -1192,8 +1192,8 @@ async function classVersus(r: Payload, path: string): Promise<void> {
   const short = (n: string) => (n || '').replace('fu-ogden-v0-1', 'Ogden').replace('-pre', '');
   const refName = (n: string) => (n || '').split('/').pop();
   const pick = document.getElementById('vspick');
-  if (pick) pick.innerHTML = `<label class="s">voyage <select id="vsvoyage">${d.voyages.map((v: string) => `<option value="${esc(v)}"${v === d.voyage ? ' selected' : ''}>${esc(short(v))}</option>`).join('')}</select></label>
-    <label class="s">against <select id="vsref">${d.refs.map((x: string) => `<option value="${esc(x)}"${x === d.ref ? ' selected' : ''}>${esc(refName(x))}</option>`).join('')}</select></label>`;
+  if (pick) pick.innerHTML = `<label class="s">voyage <select class="sel" id="vsvoyage">${d.voyages.map((v: string) => `<option value="${esc(v)}"${v === d.voyage ? ' selected' : ''}>${esc(short(v))}</option>`).join('')}</select></label>
+    <label class="s">against <select class="sel" id="vsref">${d.refs.map((x: string) => `<option value="${esc(x)}"${x === d.ref ? ' selected' : ''}>${esc(refName(x))}</option>`).join('')}</select></label>`;
   const vsel = document.getElementById('vsvoyage') as HTMLSelectElement | null, rsel = document.getElementById('vsref') as HTMLSelectElement | null;
   if (vsel) vsel.onchange = () => { vsVoyage = vsel.value; void classVersus(r, path); };
   if (rsel) rsel.onchange = () => { vsRef = rsel.value; try { localStorage.setItem('thorp.vs.ref', vsRef!); } catch { /* blocked */ } void classVersus(r, path); };

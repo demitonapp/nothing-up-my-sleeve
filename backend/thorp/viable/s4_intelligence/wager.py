@@ -486,7 +486,7 @@ def place(round_key: str, card: str, move_: str | None, layer: int | None = None
     if move_ is not None and move_ not in MOVES:
         raise ValueError(f"a move is one of {', '.join(MOVES)}")
     if move_ is not None and not deck.charted(c):
-        raise ValueError(f"{c.name} is uncharted: Thorp cannot yet tell whether it is played")
+        raise ValueError(f"{c.name} is uncharted: Nothing up my sleeve cannot yet tell whether it is played")
     sailed = _voyage(round_key) is not None
     with _store().session() as s, s.begin():
         if move_ is None:

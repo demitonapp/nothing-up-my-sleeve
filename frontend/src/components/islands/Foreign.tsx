@@ -1,4 +1,4 @@
-// A foreign ship (UI.md "Zayton"): an outside model read on Thorp's decks, shown in the Market
+// A foreign ship (UI.md "Zayton"): an outside model read on Nothing up my sleeve's decks, shown in the Market
 // Harbour so it can be spied on. Read-only — no spec, no ledger run, no weights. This is the first
 // panel converted from dashboard.ts to a typed client island (the rest follow it).
 

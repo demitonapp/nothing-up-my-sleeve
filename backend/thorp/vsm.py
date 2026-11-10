@@ -1,8 +1,8 @@
-r"""Thorp as a viable system (2026-11-07, Justin: "how do those types of rules get governed? We need to
-implement Beer's VSM, making sure this codebase for running Thorp has the S1 to S5 units encoded into its
+r"""Nothing up my sleeve as a viable system (2026-11-07, Justin: "how do those types of rules get governed? We need to
+implement Beer's VSM, making sure this codebase for running Nothing up my sleeve has the S1 to S5 units encoded into its
 way of operating").
 
-Stafford Beer's Viable System Model, mapped onto Thorp, each system with its members in the codebase:
+Stafford Beer's Viable System Model, mapped onto Nothing up my sleeve, each system with its members in the codebase:
 
 - **S1, operations**: the expeditions (fleet.EXPEDITIONS) and the voyages (runs) they sail; each is an operation with its own
   goal, levers and stop rule. And acquisition, the books the voyages read: a viable system of its own, one
@@ -19,7 +19,7 @@ Stafford Beer's Viable System Model, mapped onto Thorp, each system with its mem
 - **S4, intelligence**: the outside world and the future: the competitors and the reference ladder
   (fleet.COMPETITORS, s4.outside_readings), the leaderboard and Smoking Qwen's forecast, the research the tests
   rest on.
-- **S5, policy**: Thorp's identity: the POLICIES below, each adopted by Justin on a date, enforced or
+- **S5, policy**: Nothing up my sleeve's identity: the POLICIES below, each adopted by Justin on a date, enforced or
   advisory; DECISIONS.md is S5's record. A policy changes only by a new entry there and here.
 
     uv run python -m thorp.vsm audit     # S3*: the whole system's state, S1 to S5
@@ -108,7 +108,7 @@ SYSTEMS: dict[str, System] = {
         System(
             "S5",
             "Policy",
-            "Thorp's identity: the rules, adopted by Justin, recorded in DECISIONS.md",
+            "Nothing up my sleeve's identity: the rules, adopted by Justin, recorded in DECISIONS.md",
             ("thorp/vsm.py POLICIES", "DECISIONS.md", "thorp/viable/s5_policy/charter.py"),
         ),
     )
@@ -131,28 +131,57 @@ def _reads(spec: dict) -> list[str]:
     return stores.reads(spec)
 
 
+_HELD_DECKS: dict[tuple[int, ...], dict[str, str]] = {}
+_TITLES: dict[tuple[str, int], set[str]] = {}
+
+
+def _titles(lp: str) -> set[str]:
+    """The lower-cased titles a list names, cached on the file's mtime: the deck check only needs the
+    titles, and the store lists are large."""
+    import csv
+
+    p = paths.resolve(lp)
+    if not p.exists():
+        return set()
+    key = (str(p), p.stat().st_mtime_ns)
+    hit = _TITLES.get(key)
+    if hit is not None:
+        return hit
+    with p.open() as f:
+        out = {r["title"].strip().lower() for r in csv.DictReader(f) if r.get("title")}
+    _TITLES[key] = out
+    return out
+
+
+def _held_decks() -> dict[str, str]:
+    """Every title a held-out deck holds, with the deck it is from, cached on the decks' mtimes: the
+    audit re-read the same three files once a queued spec (10 November: 1.3 s of /api/governance)."""
+    import csv
+
+    decks = ("lists/hole-cards.csv", "lists/hole-cards-v2.csv", "lists/hole-cards-unseen.csv")
+    ps = [paths.resolve(d) for d in decks]
+    key = tuple(p.stat().st_mtime_ns if p.exists() else 0 for p in ps)
+    hit = _HELD_DECKS.get(key)
+    if hit is not None:
+        return hit
+    held: dict[str, str] = {}
+    for deck, p in zip(decks, ps):
+        if p.exists():
+            with p.open() as f:
+                held |= {r["title"].strip().lower(): deck for r in csv.DictReader(f)}
+    _HELD_DECKS[key] = held
+    return held
+
+
 def _decks_refused(spec: dict) -> list[str]:
     """No book of a held-out deck (the hole cards, the Forgotten Tomes) is in a list the run reads,
     unless the run refuses that deck (train.prepare then drops it)."""
-    import csv
-
     refused = set(spec.get("data", {}).get("refuse") or [])
-    held = {}
-    for deck in ("lists/hole-cards.csv", "lists/hole-cards-v2.csv", "lists/hole-cards-unseen.csv"):
-        p = paths.resolve(deck)
-        if deck not in refused and p.exists():
-            with p.open() as f:
-                held |= {r["title"].strip().lower(): deck for r in csv.DictReader(f)}
+    held = {k: v for k, v in _held_decks().items() if v not in refused}
     bad = []
     for lp in _reads(spec):
-        p = paths.resolve(lp)
-        if p.exists():
-            with p.open() as f:
-                bad += [
-                    f"{lp} has {r['title']!r} from {held[k]}"
-                    for r in csv.DictReader(f)
-                    if (k := r["title"].strip().lower()) in held
-                ]
+        for k in sorted(_titles(lp) & held.keys()):
+            bad.append(f"{lp} has {k!r} from {held[k]}")
     return bad[:10]
 
 
@@ -379,7 +408,7 @@ POLICIES: dict[str, Policy] = {
         ),
         Policy(
             "period",
-            "Thorp reads pre-1930 public-domain English only: every author dead by 1955 (the legal "
+            "Nothing up my sleeve reads pre-1930 public-domain English only: every author dead by 1955 (the legal "
             'rule) and nothing modern ("period only").',
             "2026-11-07 14:35, Justin",
             True,
@@ -404,7 +433,7 @@ POLICIES: dict[str, Policy] = {
         ),
         Policy(
             "clean",
-            "Thorp reads text cleaned by a named version, the current one (unwrap-v2: Gutenberg's hard "
+            "Nothing up my sleeve reads text cleaned by a named version, the current one (unwrap-v2: Gutenberg's hard "
             "wraps joined back into paragraphs, verse kept line for line), and is scored on held-out "
             "books cleaned the same way; a voyage on other text opts out in words.",
             "2026-11-07 18:45, Justin",

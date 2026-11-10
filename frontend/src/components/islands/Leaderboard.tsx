@@ -30,11 +30,11 @@ export default function Leaderboard() {
 
   return (
     <div {...sectionProps('leaderboard')}>
-      <h1>Leaderboard <span className="q">two boards on chaining two facts: the models that chain, ranked by how well; and those not chaining yet, ranked by how close they are. The method is under <a href="/discoveries">Discoveries, chaining two facts</a></span></h1>
+      <h1>Leaderboard <span className="q">two boards on chaining two facts: the models that chain, ranked by how well; and those not chaining yet, ranked by how close they are. The method is under <a href="/discoveries/tests?test=chaining">Discoveries, Tests: chaining two facts</a></span></h1>
       <section className={cardCls(false, 'panel')}>
         <h2>Chaining <span className="note">the models whose chaining lift clears the noise (+0.03), ranked by it: the mean lift on the four chaining tests</span></h2>
         <div className="handtools">
-          <label><input className={checkCls('')} type="checkbox" checked={showFc} onChange={(e) => setShowFc(e.target.checked)} /> Thorp's forecasts</label>
+          <label><input className={checkCls('')} type="checkbox" checked={showFc} onChange={(e) => setShowFc(e.target.checked)} /> Nothing up my sleeve's forecasts</label>
           <label><input className={checkCls('')} type="checkbox" checked={showPy} onChange={(e) => setShowPy(e.target.checked)} /> the reference ladder (Pythia, smaller Qwen)</label>
           <span className="note" id="lbfcnote" dangerouslySetInnerHTML={{ __html: board?.note || '' }} />
         </div>
@@ -44,7 +44,7 @@ export default function Leaderboard() {
             <tbody dangerouslySetInnerHTML={{ __html: board?.body || '' }} />
           </table>
         </div>
-        <p className="note mt">The leaderboard is the four chaining tests only (Nature's breeder, the mill test, the between test, the pigeonhole test; 96 pairs), each cell its lift and share of pairs right, ✓ when performed (lift 0.1 and two in three right); Thorp's other tests are internal. The chaining gain is the logic deck's: invented words and counterfactual premises, each item asked with both premises and with one; the lift with both less the better single premise, the proof that a pass is chaining, not knowing or one premise. A Thorp size is its best ship, its voyages averaged. The 2–4B models (Qwen, Phi, Llama, Gemma, SmolLM, base checkpoints where one exists) are the competitors: Thorp must chain two facts as well as each at a tenth its size, and they never grade the chains (the reference ladder does). Forecast rows (italic) are Thorp's own sizes fitted against size, straight (conservative) and bending (probable), as Smoking Qwen fits them; while fewer than three sizes are above the noise (0.03) they are curves through noise, shown but not trusted. "Thorp matches it at" is the size where each fit reaches that model's lift; "a tenth its size" is each fit's reading there, with the probability it reaches that model's lift once forecastable. Performed at <b id="lbthr">{board?.thr || ''}</b>.</p>
+        <p className="note mt">The leaderboard is the four chaining tests only (Nature's breeder, the mill test, the between test, the pigeonhole test; 96 pairs), each cell its lift and share of pairs right, ✓ when performed (lift 0.1 and two in three right); Nothing up my sleeve's other tests are internal. The chaining gain is the logic deck's: invented words and counterfactual premises, each item asked with both premises and with one; the lift with both less the better single premise, the proof that a pass is chaining, not knowing or one premise. A Nothing up my sleeve size is its best ship, its voyages averaged. The 2–4B models (Qwen, Phi, Llama, Gemma, SmolLM, base checkpoints where one exists) are the competitors: Nothing up my sleeve must chain two facts as well as each at a tenth its size, and they never grade the chains (the reference ladder does). Forecast rows (italic) are Nothing up my sleeve's own sizes fitted against size, straight (conservative) and bending (probable), as Smoking Qwen fits them; while fewer than three sizes are above the noise (0.03) they are curves through noise, shown but not trusted. "Nothing up my sleeve matches it at" is the size where each fit reaches that model's lift; "a tenth its size" is each fit's reading there, with the probability it reaches that model's lift once forecastable. Performed at <b id="lbthr">{board?.thr || ''}</b>.</p>
         {!lb.data && !lb.error ? <div className={emptyCls()}>reading the leaderboard…</div> : null}
         {lb.error ? <div className={emptyCls()}>the leaderboard could not be read: {lb.error}</div> : null}
       </section>
@@ -60,7 +60,7 @@ export default function Leaderboard() {
       </section>
 
       <details className={cardCls(false, 'panel lbfold')} id="lbfoldsmoke" onToggle={(e) => { if (e.currentTarget.open && sq.data) void drawSmokingChart(sq.data); }}>
-        <summary><h2>Smoking the 2–4B range <span className="note">P(a Thorp a tenth the size of each 2–4B model chains two facts as well as it), the least of them over the range: the fits, the backtest and the rule</span></h2></summary>
+        <summary><h2>Smoking the 2–4B range <span className="note">P(a Nothing up my sleeve a tenth the size of each 2–4B model chains two facts as well as it), the least of them over the range: the fits, the backtest and the rule</span></h2></summary>
         <div id="smokingqwen">
           <div className="sqhead" id="sqhead" dangerouslySetInnerHTML={{ __html: smoking?.head || '' }} />
           <div className="row sqrow">

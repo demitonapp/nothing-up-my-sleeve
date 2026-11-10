@@ -73,6 +73,7 @@ eval:
   evaluators:
   - ce_bpb
   - ifeval
+  - soundings
   light:
     every_steps: 128
     evaluators:

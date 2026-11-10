@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The S2 coordinator under launchd: restart it when it dies, and keep the Mac awake while it runs.
+
+     Install (one time):
+       cp backend/scripts/com.thorp.queue.plist ~/Library/LaunchAgents/
+       launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.thorp.queue.plist
+     Stop:
+       launchctl bootout gui/$(id -u)/com.thorp.queue
+     Status:
+       launchctl print gui/$(id -u)/com.thorp.queue | head -30
+
+     KeepAlive SuccessfulExit=false: a clean exit (the queue empty) stays down; a crash (non-zero) is
+     relaunched after ThrottleInterval. caffeinate -dimsu holds idle sleep, the disk and the user assertion
+     for as long as the coordinator lives; on a laptop on battery, -s does not hold, so keep it on power. -->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.thorp.queue</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/bin/caffeinate</string>
+    <string>-dimsu</string>
+    <string>/bin/sh</string>
+    <string>/Users/justintrollip/Source/Thorp/backend/scripts/queue.sh</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/Users/justintrollip/Source/Thorp</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <!-- launchd starts with /usr/bin:/bin:... and no shell profile: uv lives in /opt/homebrew/bin, and
+         THORP_LAUNCH=local keeps each voyage on the venv's python (the way the manual queue ran). -->
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>HOME</key>
+    <string>/Users/justintrollip</string>
+    <key>THORP_LAUNCH</key>
+    <string>local</string>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <dict>
+    <key>SuccessfulExit</key>
+    <false/>
+  </dict>
+  <key>ThrottleInterval</key>
+  <integer>30</integer>
+  <key>StandardOutPath</key>
+  <string>/Users/justintrollip/Source/Thorp/data/runs/queue.out</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/justintrollip/Source/Thorp/data/runs/queue.out</string>
+</dict>
+</plist>

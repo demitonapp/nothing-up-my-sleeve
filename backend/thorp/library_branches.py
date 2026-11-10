@@ -47,7 +47,7 @@ DEFAULTS: list[dict] = [
         "key": "library", "name": "The whole library",
         "purpose": "Everything fetched: the pool every selection draws on.",
         "variations": [{"key": "everything", "name": "Every book", "all": True,
-                        "about": "Every book in the manifest that is not one of Thorp's own derived texts."}],
+                        "about": "Every book in the manifest that is not one of Nothing up my sleeve's own derived texts."}],
     },
     {
         "key": "scanned", "name": "The scanned corpus",

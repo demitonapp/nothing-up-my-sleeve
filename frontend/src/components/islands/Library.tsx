@@ -1,5 +1,5 @@
 // The Library (UI.md "Shelves"), as a typed client island: the library's branches and faceted
-// browser, then every list of books Thorp reads, keeps or drafts, with the detail drawer and the
+// browser, then every list of books Nothing up my sleeve reads, keeps or drafts, with the detail drawer and the
 // reader. Converted from dashboard.ts (loadShelves / drawShelves / drawShelfDetail / loadBrowse /
 // drawBrowse / drawSelection).
 
@@ -123,7 +123,7 @@ export default function Library() {
 
   return (
     <div {...sectionProps('shelves')}>
-      <h1>Library <span className="q">every list of books Thorp reads from, is scored on or is drafting: how many books are fetched, about how many tokens they hold, their language families, and the voyages that read them</span></h1>
+      <h1>Library <span className="q">every list of books Nothing up my sleeve reads from, is scored on or is drafting: how many books are fetched, about how many tokens they hold, their language families, and the voyages that read them</span></h1>
       <section className={cardCls(false, 'panel')} id="browsepanel">
         <h2>The library <span className="note">it starts with branches, each a purpose its books are gathered for (Ogden, the decks, the content experiment...). Open a branch to see its variations, then explore what is in it by kind, date, language, collection, voice and source: click a card to filter</span></h2>
         <div id="browse">
@@ -507,7 +507,7 @@ function Selection({ fitout }: { fitout: string }) {
             <div className="selgrid">
               <div dangerouslySetInnerHTML={{ __html: selCounts('By language', 'share of the words', st.by_language) }} />
               <div dangerouslySetInnerHTML={{ __html: selCounts('By kind', 'share of the words; a kind is the first rule that matches (below)', st.by_kind) }} />
-              <div dangerouslySetInnerHTML={{ __html: selCounts('By voice', 'who speaks: the Church, the press, a body, Thorp itself, any other writer', st.by_voice) }} />
+              <div dangerouslySetInnerHTML={{ __html: selCounts('By voice', 'who speaks: the Church, the press, a body, Nothing up my sleeve itself, any other writer', st.by_voice) }} />
               <div dangerouslySetInnerHTML={{ __html: selCounts('By source', 'the collection the text came from', st.by_source) }} />
               <div dangerouslySetInnerHTML={{ __html: selCounts('By period', "the writer's year (floruit); undated has none", st.by_period) }} />
               <div dangerouslySetInnerHTML={{ __html: selCounts('How the year was found', 'published: recorded when fetched; floruit: birth + 40; late: death - 25', st.by_year_basis) }} />

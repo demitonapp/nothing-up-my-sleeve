@@ -100,3 +100,15 @@ the plans page as a table; the per-card schedule groups on the at-sea card; Firs
 competitor route for dev; the size-page loading state.
 
 **The working tree is dirty** (84 files, many from before this session). Commit before archiving.
+
+## 10 November, later: personas, yards, compute, the head census
+
+Added in the evening session, all in the one store:
+
+- **Migrations**: `k2g5h8d0e7f9` (s4.persona_master/vectors), `l3h6i9e1f8a0` (s1.yards, s1.work, runs provenance: yard_id/spec_sha/artifact_root), `m4i7j0f2a3b5` (s5.provider_credentials, the Vast key), `n5j8k1g3b4c6` (s1.compute_resources, s2.lanes.resource_id).
+- **Readings**: `heads-mlx-community--Qwen3-4B-4bit` (1,152 heads, 224 named, 928 unnamed, 16 clusters), `math500-…` (50-question pilot, 48 truncated — accuracy not meaningful), `personas-…` (6 directions at layer 18), yard `yard-fd5d8f597a9f`, resource `compute-096789bc80`, the Vast key in the store.
+- **New modules**: `thorp/persona_vectors.py`, `persona_store.py`, `head_census.py`, `math_heads.py`, `providers.py`, `yard.py`, `contribute.py`, `compute.py`; `backend/scripts/check_ui.py`.
+- **Surface**: `/shipyard/constraints` now edits Mac/Vast seats, the Vast key and caps, and lists compute resources; `/discoveries/stars` has All heads, All cards and Personas tabs; `/expeditions/queue` is Postgres-only; the competitor Tests tab reads `math500-`.
+- **Specs**: `21m@v0.0.6.yaml` (copied from 9m; its `lr: 0.001` is not tuned), `ships/specs/queue-kipling.txt`, and 310 specs gained `soundings` (wide diff, review before trusting).
+- **Open**: the foreign/competitor page consolidation is diagnosed, not merged; Qwen3.5 0.8B is unread and has no fal image (`FAL_KEY` absent); compute fit is a forward-pass proxy; caps are stored, not enforced; the 9m/21m specs still need the 300k/1m learnings applied before they sail.
+- **Running at archive**: coordinator 5292 (in port, two 300k trainers 85927/89449 at sea), dash 8787, Astro dev 4321. The queue (12 lines) is in Postgres; run the coordinator under launchd (`backend/scripts/com.thorp.queue.plist`) so the harness cannot reap it.

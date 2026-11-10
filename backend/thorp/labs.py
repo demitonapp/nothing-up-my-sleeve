@@ -1,4 +1,4 @@
-"""The labs: who made each outside model, and what each lab's models do best and worst on Thorp's tests.
+"""The labs: who made each outside model, and what each lab's models do best and worst on Nothing up my sleeve's tests.
 
 A **lab** (`Lab`) is the maker of a family of outside models (EleutherAI makes Pythia, Alibaba Qwen,
 and so on), matched by the model's family name, since many checkpoints are re-hosted under

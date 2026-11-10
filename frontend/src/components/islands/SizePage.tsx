@@ -116,7 +116,7 @@ export default function SizePage({ initialPath = '/' }: { initialPath?: string }
 
   return (
     <div {...sectionProps('rung')} id="rung">
-      <h1><a className={crumbCls('back')} href="/harbours">← harbours</a> <span id="rungtitle">{rung ? `${rung.preset} · ${rung.name}` : 'reading the ship…'}</span> <span className="q" id="rungjob">{rung ? rung.job : ''}</span></h1>
+      <h1 className="crumbs"><a className={crumbCls('back')} href="/harbours">Harbours</a> <span className="sep">/</span> <span className="here" id="rungtitle">{rung ? `${rung.preset} · ${rung.name}` : 'reading the ship…'}</span></h1>
       <div className="handtools" id="shipsel" style={{ margin: '2px 0 10px' }}>
         <label className="note" htmlFor="expsel">expedition</label>
         <select className={selectCls('')} id="expsel" value={sel.expedition} onChange={(e) => onExp(e.target.value)} title="the expedition its charts and readings follow">
@@ -154,7 +154,15 @@ export default function SizePage({ initialPath = '/' }: { initialPath?: string }
           <div id="expuse"><div className={emptyCls()}>reading the expeditions…</div></div>
         </section>
         <section className={cardCls(false, 'panel')} id="gridpanel">
-          <h2>Every voyage at this size <span className="note">one square per voyage in the order they started; the brighter the green, the better (lower) its Forgotten Tomes bits per byte, by quartile of the voyages scored so far; an outlined square is running</span></h2>
+          <h2>Every voyage at this size <span className="note">one square per voyage in the order they started; the brighter the green, the better the reading chosen below (bpb lower, cause higher), by quartile of the voyages scored on it; an outlined square is running</span></h2>
+          <div className="handtools" data-filters>
+            <label className="note" htmlFor="gridmetric">colour by</label>
+            <select className={selectCls('')} id="gridmetric" defaultValue="bpb">
+              <option value="bpb">Forgotten Tomes bpb</option>
+              <option value="cause">cause gain</option>
+            </select>
+            <span className="note" id="gridmetricnote">bpb: 16 held-out books, lower is better · cause: the logic deck's cause gain, higher is better</span>
+          </div>
           <div id="rungridsum" className="gridsum" />
           <div id="rungrid" />
         </section>

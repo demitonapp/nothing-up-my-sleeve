@@ -1,4 +1,4 @@
-"""The Internet Archive as a Thorp source (2026-11-07): an item's OCR text (`<id>_djvu.txt`),
+"""The Internet Archive as a Nothing up my sleeve source (2026-11-07): an item's OCR text (`<id>_djvu.txt`),
 cleaned, with the publication year from the item's metadata.
 
 Cleaning, for scans of old type: Google Books' digitisation notice and "Digitized by" lines are

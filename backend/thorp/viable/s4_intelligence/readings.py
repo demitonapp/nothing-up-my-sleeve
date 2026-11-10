@@ -13,13 +13,15 @@ import math
 
 from thorp import store
 
-KINDS = ("chain-grades", "knockout-deck", "knockout", "deck", "logic")
+KINDS = ("chain-grades", "knockout-deck", "knockout", "deck", "logic", "math500")
 
 
 def kind_of(name: str) -> tuple[str, str | None]:
     """What a reading is, and of which model, from its name."""
     if name == "chain-grades":
         return "chain-grades", None
+    if name.startswith("math500-"):
+        return "math500", name[len("math500-"):].replace("--", "/").replace("__", "/")
     for k in KINDS[1:]:
         if name.startswith(k + "-"):
             return k, name[len(k) + 1:].replace("--", "/").replace("__", "/")

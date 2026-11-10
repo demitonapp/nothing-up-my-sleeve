@@ -42,6 +42,7 @@ eval:
   - bpb_split
   - stars
   - nevermore
+  - soundings
   light:
     every_steps: 25
     evaluators:

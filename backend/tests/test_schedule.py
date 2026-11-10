@@ -1,4 +1,4 @@
-"""Thorp's own schedule (S2, thorp/viable/s2_coordination/schedule.py) and its judge (S5): jobs and firings in the
+"""Nothing up my sleeve's own schedule (S2, thorp/viable/s2_coordination/schedule.py) and its judge (S5): jobs and firings in the
 store, each due time fired once, missed ones logged, a firing run through the judge chosen in s5.judges."""
 
 from __future__ import annotations
@@ -100,7 +100,7 @@ def test_the_judge_is_s5s_choice_and_gets_the_prompt_word_for_word(tmp_thorp):
     assert r == {"firing": fid, "job": "k", "judge": "claude", "outcome": "ok", "exit_code": 0}
     assert seen["argv"] == ["claude", "-p"] and seen["input"] == "You are keeping watch.\nDo this:\n1. Health."
     assert seen["timeout"] == 60 * 60 and firings("k")[0][2].endswith("summary line")
-    sch.set_judge("thorp:21m", ["uv", "run", "thorp", "judge", "21m"], "later: a Thorp model")  # no code changes
+    sch.set_judge("thorp:21m", ["uv", "run", "thorp", "judge", "21m"], "later: a Nothing up my sleeve model")  # no code changes
     fid = _fired(key="m", prompt="p")
     assert sch.run_firing(fid, runner=runner)["judge"] == "thorp:21m" and seen["argv"][-1] == "21m"
 
@@ -120,7 +120,7 @@ def test_a_judge_that_cannot_start_fails_the_firing(tmp_thorp):
 
 
 def test_claude_codes_tasks_come_in_word_for_word_and_switched_off(tmp_path):
-    for key, body in (("thorp-first-light", "You are steering.\n\n1. Health.\n"), ("land-search-recheck", "not Thorp's")):
+    for key, body in (("thorp-first-light", "You are steering.\n\n1. Health.\n"), ("land-search-recheck", "not Nothing up my sleeve's")):
         (tmp_path / key).mkdir()
         (tmp_path / key / "SKILL.md").write_text(f"---\nname: {key}\ndescription: d\n---\n\n{body}")
     listing = [{"taskId": "thorp-first-light", "title": "First Light", "cronExpression": "10 */2 * * *", "enabled": True},

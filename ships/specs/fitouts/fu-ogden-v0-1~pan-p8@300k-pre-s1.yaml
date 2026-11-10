@@ -48,6 +48,7 @@ eval:
   - nevermore
   - cards
   - shapes
+  - soundings
   light:
     every_steps: 64
     evaluators:

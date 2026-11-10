@@ -95,7 +95,7 @@ export function harbourShipsHtml(ladder: Payload, key: string): string {
       }).join('')}</div></div>`;
   })();
   const foreign = h.key !== 'zayton' || !((ladder && ladder.foreign) || []).length ? '' :
-    `<div class="k" style="grid-column:1/-1">Foreign ships <span class="s">outside models, read on the same decks: not Thorp ships, but here so they can be spied on</span></div>`
+    `<div class="k" style="grid-column:1/-1">Foreign ships <span class="s">outside models, read on the same decks: not Nothing up my sleeve ships, but here so they can be spied on</span></div>`
     + ladder.foreign.map((x: any) => `<a class="${cardCls(true, 'card classcard')}" href="/foreign/${encodeURIComponent(x.key)}">${artImg(x.key, 'cardart ship')}
       <div class="top"><span class="preset">${x.params ? big(x.params) : '–'}</span><span class="nm">${flagImg(x.flag, x.flag_name)} ${esc(x.label)}</span></div>
       <div class="job">an outside model in Zayton: read-only decks, logic, cards and held-out books</div>

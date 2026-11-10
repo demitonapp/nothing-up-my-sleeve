@@ -1,7 +1,7 @@
 """The Chinchilla loss prediction (Hoffmann et al., 2022, approach 3), in nats per token.
 
 Indicative only: the constants were fitted on MassiveText with a different tokeniser, so the gap
-between this and a Thorp score is a yardstick, not a residual.
+between this and a Nothing up my sleeve score is a yardstick, not a residual.
 """
 
 from __future__ import annotations

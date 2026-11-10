@@ -5,9 +5,13 @@
 // not about one ship: the question is how many voyages a week it can launch.
 import Layout from '../../layouts/Layout.astro';
 import { cardCls } from '../../lib/ui';
+import YardConstraints from '../../components/islands/YardConstraints';
+import ComputeResources from '../../components/islands/ComputeResources';
 ---
 <Layout>
   <main>
+    <YardConstraints client:load />
+    <ComputeResources client:load />
     <p class="crumbs"><a href="/shipyard">← shipyard</a></p>
     <h1 class="yardtitle">The yard’s constraints <span class="q">a shipyard is not slow because its shipwrights are slow: it is slow because there are only so many slipways, the tide opens once, the timber must be seasoned, the clerk tallies every plank, the jigs are reset for every frame, and one survey dock holds one hull</span></h1>
     <section class={cardCls(false, 'panel')}>

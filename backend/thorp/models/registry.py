@@ -120,8 +120,8 @@ def build(
     return families[family](config(preset, vocab, context, positions, kv_heads, layers, width, heads))
 
 # Other people's ships, for the shape table only (9 November, Justin: "add qwen 4B, Phi 4 mini and llama 3.2 3B"): the
-# depth and width a model that chains was built with. They are not Thorp presets — nothing trains or sails them — they
-# are here so a Thorp shape can be read beside them, layer for layer.
+# depth and width a model that chains was built with. They are not Nothing up my sleeve presets — nothing trains or sails them — they
+# are here so a Nothing up my sleeve shape can be read beside them, layer for layer.
 FOREIGN = {
     "qwen3-4b": dict(layers=36, width=2560, heads=32, vocab=151936, params=4_000_000_000, lab="Qwen3 4B"),
     "phi-4-mini": dict(layers=32, width=3072, heads=24, vocab=200064, params=3_800_000_000, lab="Phi-4-mini 3.8B"),

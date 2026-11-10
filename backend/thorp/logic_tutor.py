@@ -222,7 +222,7 @@ def test_words() -> frozenset[str]:
 def corpus_lexicon(
     recipe: str = "lists/ogden-v0.1.csv", clean: str = "unwrap-v2"
 ) -> frozenset[str]:
-    """Every word of the Ogden v0.1 corpus as Thorp reads it, built once and kept in data/logic-tutor/."""
+    """Every word of the Ogden v0.1 corpus as Nothing up my sleeve reads it, built once and kept in data/logic-tutor/."""
     p = out_dir() / "ogden-corpus-lexicon.txt"
     if p.exists():
         return frozenset(p.read_text(encoding="utf-8").split())

@@ -1,4 +1,4 @@
-"""The one store: Thorp's records in Postgres (DECISIONS.md, "One store: Postgres, by the viable system"; the
+"""The one store: Nothing up my sleeve's records in Postgres (DECISIONS.md, "One store: Postgres, by the viable system"; the
 tables in thorp/viable/records.py and s3_control/models.py, made by Alembic).
 
 - **One engine**, from THORP_PG (or postgresql://thorp@localhost:5433/thorp), shared with the fitout store.

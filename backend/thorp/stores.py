@@ -70,14 +70,25 @@ def enforced() -> bool:
     return vsm.enforced("stores")
 
 
+_TEXTS_CACHE: dict[tuple[str, int], set[str]] = {}
+
+
 def _texts(lp: str) -> set[str]:
+    """The texts a list names, cached on the file's mtime: the audit asks the same store lists once a
+    spec, and re-reading them each time was the other half of /api/governance's cost."""
     import csv
 
     p = paths.resolve(lp)
     if not p.exists():
         return set()
+    key = (str(p), p.stat().st_mtime_ns)
+    hit = _TEXTS_CACHE.get(key)
+    if hit is not None:
+        return hit
     with p.open() as f:
-        return {r.get("text") or "" for r in csv.DictReader(f)}
+        out = {r.get("text") or "" for r in csv.DictReader(f)}
+    _TEXTS_CACHE[key] = out
+    return out
 
 
 def drawn_from_stores(lp: str) -> bool:

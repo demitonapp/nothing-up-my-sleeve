@@ -4,7 +4,7 @@ it is trusted only if the models that chain two facts play it and the models tha
 From the chain grades (s4.outside_readings "chain-grades", scripts/grade_chains.py), each model is a **chainer** when it
 performs at least three of the four chaining tests (the 50m rung of each chain), and a **non-chainer**
 when it performs none. For each card (mover, bridge, comparator) the table is lit-or-not against
-chainer-or-not; a card is **necessary** when at least four in five chainers play it (a card Thorp must draw before
+chainer-or-not; a card is **necessary** when at least four in five chainers play it (a card Nothing up my sleeve must draw before
 it can chain), and a **marker** when it is also dark on at least two-thirds of the non-chainers (a
 card that signals the trick itself). Models between (one or two chaining tests) are listed, not
 counted. First reading (12:30): previous-word, Nevermore, the mover and the comparator are necessary
@@ -70,7 +70,7 @@ def payload() -> dict:
         verdicts[c] = {
             "chainers_lit": f"{sum(ch)}/{len(ch)}",
             "non_chainers_dark": f"{len(non) - sum(non)}/{len(non)}",
-            # necessary: every model that chains plays it (a card Thorp must draw); a marker: also
+            # necessary: every model that chains plays it (a card Nothing up my sleeve must draw); a marker: also
             # dark where there is no chaining (a card that signals the trick itself)
             "necessary": necessary,
             "marker": necessary and dark is not None and dark >= 2 / 3,

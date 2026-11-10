@@ -2,7 +2,7 @@
 
 The leaderboard is public: it shows **only the four chaining tests** (the 50m rung of each discovery
 chain: Nature's breeder, the mill test, the between test, the pigeonhole test), the one skill set
-against the outside models. Every other rung is Thorp's own internal measure and stays off it
+against the outside models. Every other rung is Nothing up my sleeve's own internal measure and stays off it
 (Justin: "the leaderboard should only cover chaining tests and not our other tests, which is our own
 internal measure and not public").
 
@@ -11,8 +11,8 @@ internal measure and not public").
 - **passed**: how many of the four a run performs.
 - **logic** (the logic deck's chaining gain, invented words and single-premise controls): the proof
   beside the four, that a pass is chaining and not knowledge or copying.
-- **two boards in one table** (`payload()["table"]`, outside models and Thorp's versions together):
-  **chaining**, the readings that clear the noise (a Thorp ship on at least two sailings), ranked by
+- **two boards in one table** (`payload()["table"]`, outside models and Nothing up my sleeve's versions together):
+  **chaining**, the readings that clear the noise (a Nothing up my sleeve ship on at least two sailings), ranked by
   chaining lift; and **approaching**, the rest, ranked by how close they are: the necessary cards held
   (previous-word, the Nevermore, the mover, the comparator: every model that chains holds all four;
   thorp/card_check.py), then the one-hop lift on the logic deck (following one stated premise, the step
@@ -320,8 +320,8 @@ def payload() -> dict:
             )
             below = b
         board.append(row)
-    # one table, outside models and Thorp's versions together (Justin, 12:55: "do it"): a model is
-    # ranked only when its chaining lift clears the noise (a Thorp ship on two sailings or more);
+    # one table, outside models and Nothing up my sleeve's versions together (Justin, 12:55: "do it"): a model is
+    # ranked only when its chaining lift clears the noise (a Nothing up my sleeve ship on two sailings or more);
     # everything inside the noise band is one group, "not yet chaining", sorted by size, because
     # an order among readings that are all noise is a coin toss, not a result
     table = _table(board, _reference())
@@ -345,7 +345,7 @@ def payload() -> dict:
 
 
 # ------------------------------------------------------------------------------------- versions
-# Justin (12:40): Thorp's entry on the leaderboard is named by class and version ("Thorp 300k v1").
+# Justin (12:40): Nothing up my sleeve's entry on the leaderboard is named by class and version ("Nothing up my sleeve 300k v1").
 # A class's version rises only when a new ship beats the current one by more than the noise, so a
 # lucky seed never mints a version; among ships tied within the noise, the crown goes to the one with
 # complete readings (the logic deck read), then more sailings, then the higher chaining lift.
@@ -412,11 +412,11 @@ def crown(ships: list[dict]) -> dict[str, dict]:
 
 
 def name_of(preset: str, v: int) -> str:
-    return f"Thorp {preset} v{v}"
+    return f"Nothing up my sleeve {preset} v{v}"
 
 
 def thorp_entry(ship_key: str) -> dict | None:
-    """A Thorp ship in the same shape as an outside model's entry in chain-grades.json (every rung,
+    """A Nothing up my sleeve ship in the same shape as an outside model's entry in chain-grades.json (every rung,
     the logic deck, the five cards), its sailings averaged: for its page, built like a competitor's."""
     from thorp.ledger import reader
 
@@ -580,7 +580,7 @@ def _table(board: list[dict], reference: list[dict]) -> list[dict]:
         rows.append(
             {
                 "kind": "thorp",
-                "name": b.get("name") or f"Thorp {b['preset']}",
+                "name": b.get("name") or f"Nothing up my sleeve {b['preset']}",
                 "ship": b["ship"],
                 "ship_key": b["ship_key"],
                 "params": _params_of_ship(b),
@@ -634,7 +634,7 @@ NECESSARY_CARDS = ("previous_word", "nevermore", "mover", "comparator")
 
 def _inside_of(row: dict) -> tuple[dict | None, float | None, float | None]:
     """(card -> lit, by one head or a layer's best two; the logic deck's one-hop lift), from
-    chain-grades.json for an outside model, from the ledger for a Thorp ship."""
+    chain-grades.json for an outside model, from the ledger for a Nothing up my sleeve ship."""
     if row["kind"] == "thorp":
         e = thorp_entry(row["ship_key"]) or {}
     else:

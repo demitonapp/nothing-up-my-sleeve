@@ -455,23 +455,29 @@ def counterfactual_items(rng, words) -> list[dict]:
     return out
 
 
-def main(items: int = 8, seed: int = 1859, out: str = "logic.csv") -> None:
+def main(items: int = 8, seed: int = 1859, out: str = "logic.csv", cause_only: bool = False) -> None:
     """The deck: ITEMS items a relation (the counterfactual capped at its hand-written list). The 8-item deck
     (seed 1859, logic.csv) is the one every reading so far used; the 40-item deck (2026-11-08, Justin: the 50m's
     reason for being is the chaining gain; seed 1860, logic-40.csv) is read beside it, its bands a little over
-    half as wide."""
+    half as wide. `cause_only` writes the wide cause deck (96 items, seed 1861, logic-cause.csv): the one
+    relation Qwen3 4B actually shows a gain on, widened until its interval can resolve 0.1."""
     global ITEMS
     ITEMS = items
     rng = random.Random(seed)
-    words = nonce_words(300 if items == 8 else 7 * 5 * items + 40, rng)  # 300: the 8-item deck as it was built
+    words = nonce_words(5 * items + 40 if cause_only else 7 * 5 * items + 40, rng)
     rows = []
-    for make in (
-        order_items,
-        cause_items,
-        membership_items,
-        proportion_items,
-        counterfactual_items,
-    ):
+    makers = (
+        (cause_items,)
+        if cause_only
+        else (
+            order_items,
+            cause_items,
+            membership_items,
+            proportion_items,
+            counterfactual_items,
+        )
+    )
+    for make in makers:
         rows += make(rng, words)
     p = ROOT / "lists" / "tricks" / out
     cols = [
@@ -498,4 +504,14 @@ if __name__ == "__main__":
     import sys
 
     a = sys.argv[1:]
-    main(int(a[0]), int(a[1]), a[2]) if a else main()
+    cause_only = "--cause-only" in a
+    a = [x for x in a if x != "--cause-only"]
+    if cause_only:
+        main(
+            int(a[0]) if a else 96,
+            int(a[1]) if len(a) > 1 else 1861,
+            a[2] if len(a) > 2 else "logic-cause.csv",
+            cause_only=True,
+        )
+    else:
+        main(int(a[0]), int(a[1]), a[2]) if a else main()

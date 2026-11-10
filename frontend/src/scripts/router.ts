@@ -28,8 +28,9 @@ export const OLD_SHIP: Record<string, string> = { betting: 'betting', books: 'bo
 export const SECTION_NAV: Record<string, string> = { sizes: 'ships', rung: 'ships', ship: 'ships', 'runs-section': 'ships', foreign: 'ships', voyages: 'expeditions', voyage: 'expeditions', table: 'expeditions', discoveries: 'discoveries', leaderboard: 'leaderboard', competitor: 'leaderboard', lab: 'leaderboard', governance: 'governance', bet: 'bet', shelves: 'library' };
 // an expedition page's tabs (UI.md, "Expeditions"): the same five for every expedition; one that doesn't apply is hidden
 export const ETABS = ['overview', 'at-sea', 'findings', 'fleet', 'inside'];
-// the Discoveries subtabs: the trick in focus (chaining two facts), the road to quantum mechanics, the registry of every trick
-export const DSUBS = ['two-facts', 'quantum', 'registry', 'stars', 'cards'];
+// the Discoveries subtabs: the overview, the skills ladder (with the registry), the tests (with the
+// chaining method) and the stars. The old two-facts, registry, quantum and cards addresses still answer.
+export const DSUBS = ['overview', 'skills', 'quantum-tests', 'stars'];
 // Governance's tabs (UI.md, "Governance"): the five systems, S3 control built out, acquisition one level down
 export const GVIEWS = ['control', 'acquisition'];
 export const WSUBS = ['expected', 'envelope', 'stars'];
@@ -73,7 +74,13 @@ export function route(h: string): Route {
     if ((a === 'voyages' || a === 'expeditions') && b) return { page: 'voyage', voyage: b, etab: ETABS.includes(c) ? c : 'overview' };
     if (a === 'voyages' || a === 'expeditions') return { page: 'voyages', vtab: 'expeditions' };
     if (a === 'discoveries' && b === 'chains' && c) return { page: 'discoveries', dview: 'chain', chain: c };
-    if (a === 'discoveries' && (!b || DSUBS.includes(b))) return { page: 'discoveries', dview: 'index', dsub: b || 'two-facts' };
+    // the deprecated tabs' addresses answer at their new home
+    if (a === 'discoveries' && b === 'two-facts') return { page: 'discoveries', dview: 'index', dsub: 'quantum-tests' };
+    if (a === 'discoveries' && b === 'registry') return { page: 'discoveries', dview: 'index', dsub: 'skills' };
+    if (a === 'discoveries' && b === 'quantum') return { page: 'discoveries', dview: 'index', dsub: 'skills' };
+    if (a === 'discoveries' && b === 'cards') return { page: 'discoveries', dview: 'index', dsub: 'stars' };
+    if (a === 'discoveries' && b === 'tests') return { page: 'discoveries', dview: 'index', dsub: 'quantum-tests' };
+    if (a === 'discoveries' && (!b || DSUBS.includes(b))) return { page: 'discoveries', dview: 'index', dsub: b || 'overview' };
     if (a === 'discoveries') return { page: 'discoveries', dview: b === 'traits' ? b : 'trick', trick: b !== 'traits' ? b : null };
     if (a === 'leaderboard' && b === 'thorp' && c) return { page: 'competitor', thorp: decodeURIComponent(c) };
     if (a === 'leaderboard' && b === 'competitor' && c) return { page: 'competitor', model: decodeURIComponent(h.slice(1).split('/').slice(2).join('/')) };

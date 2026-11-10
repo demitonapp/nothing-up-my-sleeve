@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Nothing up my sleeve">
+  <!-- a playing card with the star: the deck and the star chart in one mark -->
+  <rect x="15.5" y="4" width="33" height="56" rx="5" fill="#f4efe4" stroke="#15171b" stroke-width="3"/>
+  <path d="M32 19.5l3.3 6.9 7.6 1-5.5 5.2 1.4 7.5-6.8-3.7-6.8 3.7 1.4-7.5-5.5-5.2 7.6-1z" fill="#2f6f4e"/>
+  <path d="M24 53.5h16" stroke="#b23a48" stroke-width="2.4" stroke-linecap="round"/>
+</svg>

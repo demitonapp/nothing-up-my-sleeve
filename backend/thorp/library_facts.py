@@ -144,7 +144,7 @@ KIND_ABOUT = {
     "periodical": "a volume of a magazine or journal (Punch, Notes and Queries)",
     "practical": "how-to, cookery, sport, trades, etiquette, gardening",
     "other": "law, politics, economics, art, music and what no rule above names",
-    "derived": "made by Thorp: the logic tutor's passages and the shuffled-word controls",
+    "derived": "made by Nothing up my sleeve: the logic tutor's passages and the shuffled-word controls",
 }  # fmt: skip
 
 # (kind, rule text, subject pattern or None, bookshelves (exact) or (), LoC class prefixes or (), title pattern or None)
@@ -226,7 +226,7 @@ VOICE_ABOUT = {
     "clergy": "the Church's voice: a clerical title in the credited writer's name, sermons, catechisms, prayer books",
     "press": "a magazine or journal's volume, many hands under an editor",
     "official": "a government, court or learned body: reports, proceedings, statutes",
-    "program": "written by Thorp's own programs (the logic tutor) or derived from a book (the shuffled controls)",
+    "program": "written by Nothing up my sleeve's own programs (the logic tutor) or derived from a book (the shuffled controls)",
     "lay": "any other named writer: no mark of an institution in the catalogue",
 }  # fmt: skip
 CLERICAL = re.compile(
@@ -247,7 +247,7 @@ def _titled(name: str) -> bool:
 
 def voice_of(kind: str, authors: str, subjects: str, shelves: list[str], source: str) -> tuple[str, str]:
     if source == "local":
-        return "program", "derived by Thorp"
+        return "program", "derived by Nothing up my sleeve"
     if kind == "periodical":
         return "press", "periodical"
     w = writer(credits(authors))
@@ -341,7 +341,7 @@ def build() -> list[dict]:
         lang = (b.language or "en").split(";")[0].strip() or "en"
         year, basis, born, died = year_of(authors, b.text if b.source != "gutenberg" else "")
         derived = b.source == "local"
-        kind, krule = ("derived", "made by Thorp") if derived else kind_of(b.title, subjects, shelves, locc)
+        kind, krule = ("derived", "made by Nothing up my sleeve") if derived else kind_of(b.title, subjects, shelves, locc)
         voice, vrule = voice_of(kind, authors, subjects, shelves, b.source)
         o = over.get(b.id, {})
         if "kind" in o:

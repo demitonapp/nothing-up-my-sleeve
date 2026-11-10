@@ -11,7 +11,7 @@ import pytest
 
 from thorp import manifest, paths
 
-# Postgres in a test is its own database (thorp_test, migrated as the real one is), never Thorp's own: the
+# Postgres in a test is its own database (thorp_test, migrated as the real one is), never Nothing up my sleeve's own: the
 # sizes come seeded by the migration, and a test's ships are cleared by tmp_thorp
 os.environ["THORP_PG"] = os.environ.get("THORP_PG_TEST", "postgresql://thorp@localhost:5433/thorp_test")
 

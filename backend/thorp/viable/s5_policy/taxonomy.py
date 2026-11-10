@@ -6,7 +6,7 @@ know about the world. Just the shapes of the world").
 Two tiers:
 
 - **The fine tier**: Universal Dependencies' part-of-speech tags (UPOS), the international standard, with SYM
-  and X folded into OTHER, and Thorp's own BREAK (a line or paragraph break: layout is a shape, and the small
+  and X folded into OTHER, and Nothing up my sleeve's own BREAK (a line or paragraph break: layout is a shape, and the small
   classes' commonest guess). PUNCT and BREAK count as guesses ("Jesus, wept" needs the comma).
 - **The coarse tier**: Ogden's own kinds of word (Basic English, 1930): THING (his 600 things, with names and
   numbers), QUALITY (his 150 qualities), OPERATION (his 100 operations: the working words), and MARK
@@ -43,7 +43,7 @@ ABOUT = {
     "PART": "a particle (to in 'to go', not)",
     "INTJ": "an exclamation (yes, oh)",
     "PUNCT": "punctuation (, . ; : ! ? \" and the dash)",
-    "BREAK": "a line or paragraph break (Thorp's own: layout is a shape)",
+    "BREAK": "a line or paragraph break (Nothing up my sleeve's own: layout is a shape)",
     "OTHER": "UD's SYM and X: symbols and anything unclassed",
 }
 

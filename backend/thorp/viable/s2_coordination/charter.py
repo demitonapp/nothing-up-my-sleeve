@@ -1,4 +1,4 @@
-"""S2: what keeps a chartered voyage from colliding with the rest of Thorp.
+"""S2: what keeps a chartered voyage from colliding with the rest of Nothing up my sleeve.
 
 - **The berths**: no more ships hired at once than the terms allow (s5_policy.charter "max_instances"). Each
   charter holds a berth (a lock file) from its quote to its ship's release, so two `thorp charter sail` cannot

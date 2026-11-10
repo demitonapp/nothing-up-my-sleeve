@@ -1,4 +1,4 @@
-r"""Thorp's records in Postgres, by the viable system (DECISIONS.md, "One store: Postgres, by the viable system",
+r"""Nothing up my sleeve's records in Postgres, by the viable system (DECISIONS.md, "One store: Postgres, by the viable system",
 approved 2026-11-08 13:42, Justin: "Approve, start phase 1"). One schema per system: `s1` operations, `s2`
 coordination, `s3` control, `s3star` audit, `s4` intelligence, `s5` policy. Alembic (migrations/) makes and
 changes these tables; nothing else does. The models share `models.Base`, so one metadata holds the whole store.
@@ -32,6 +32,7 @@ from sqlalchemy import (
     Index,
     Integer,
     Text,
+    UniqueConstraint,
     func,
 )
 from sqlalchemy.dialects.postgresql import JSONB
@@ -389,7 +390,7 @@ class BacklogItem(Base):
 
 
 class Crowning(Base):
-    """S1: a ship crowned its size's version n (Thorp 9m v2): the ship, its chaining lift, when. Was
+    """S1: a ship crowned its size's version n (Nothing up my sleeve 9m v2): the ship, its chaining lift, when. Was
     thorp-versions.json. A version rises only when a new ship beats the last by more than the noise."""
 
     __tablename__ = "crownings"
@@ -524,9 +525,9 @@ def tables():
 
 
 class ScheduledJob(Base):
-    """S2: a job Thorp runs on a schedule (Justin, 8 November: "thorps schedules tasks shouldn't be in claude code, but
+    """S2: a job Nothing up my sleeve runs on a schedule (Justin, 8 November: "thorps schedules tasks shouldn't be in claude code, but
     rather part of our VSM model and in postgres"). A cron (five fields, this Mac's local time) or one time; a job is
-    either a command, or a prompt put to the judge (S5's choice of Thorp's most capable model). `system` is the VSM
+    either a command, or a prompt put to the judge (S5's choice of Nothing up my sleeve's most capable model). `system` is the VSM
     system that owns the job's purpose; `limits` its bounds (max_minutes, cwd)."""
 
     __tablename__ = "schedule_jobs"
@@ -583,7 +584,7 @@ class JobFiring(Base):
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     judge: Mapped[str | None] = mapped_column(
         Text
-    )  # the judge's name (claude, a Thorp ship), or 'command'
+    )  # the judge's name (claude, a Nothing up my sleeve ship), or 'command'
     outcome: Mapped[str] = mapped_column(Text, default="running", server_default="running")
     exit_code: Mapped[int | None] = mapped_column(Integer)
     pid: Mapped[int | None] = mapped_column(Integer)
@@ -596,9 +597,9 @@ class JobFiring(Base):
 
 
 class Judge(Base):
-    """S5: which model judges the jobs that need judgment, "Thorp's most capable model" (Justin: "claude initially but
+    """S5: which model judges the jobs that need judgment, "Nothing up my sleeve's most capable model" (Justin: "claude initially but
     eventually a thorp model"). Every choice kept; the latest is in force. `command` is the argv the prompt is given to
-    (on stdin), so a Thorp model takes over by a new row, not a change of code."""
+    (on stdin), so a Nothing up my sleeve model takes over by a new row, not a change of code."""
 
     __tablename__ = "judges"
     __table_args__ = {"schema": S5}
@@ -610,3 +611,107 @@ class Judge(Base):
     )  # e.g. ["claude", "-p"]; the prompt arrives on stdin
     words: Mapped[str] = mapped_column(Text, default="", server_default="")
     set_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class PersonaMaster(Base):
+    """S4: the master list of persona directions: one row per character trait, with the two contrasting system
+    prompts that define it. The vectors (PersonaVector) point here, so a trait is named once and every model's
+    reading of it hangs off the same key."""
+
+    __tablename__ = "persona_master"
+    __table_args__ = {"schema": S4}
+
+    key: Mapped[str] = mapped_column(Text, primary_key=True)
+    name: Mapped[str] = mapped_column(Text)
+    positive: Mapped[str] = mapped_column(Text)
+    negative: Mapped[str] = mapped_column(Text)
+    about: Mapped[str | None] = mapped_column(Text)
+    source: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class PersonaVector(Base):
+    """S4: one trait's direction in one model at one layer: the residual-stream difference between the trait's
+    and its opposite's system prompt, with the norm, its projection on a plain prompt, and the cosine. A model's
+    reading is replaced whole when the probe is run again."""
+
+    __tablename__ = "persona_vectors"
+    __table_args__ = (
+        UniqueConstraint("model", "trait_key", "layer", name="persona_vectors_model_trait_layer"),
+        Index("persona_vectors_model", "model"),
+        {"schema": S4},
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    model: Mapped[str] = mapped_column(Text)
+    trait_key: Mapped[str] = mapped_column(ForeignKey(f"{S4}.persona_master.key", ondelete="CASCADE"))
+    layer: Mapped[int] = mapped_column(Integer)
+    width: Mapped[int] = mapped_column(Integer)
+    vector: Mapped[list] = mapped_column(JSONB)
+    norm: Mapped[float] = mapped_column(Float)
+    projection: Mapped[float | None] = mapped_column(Float)
+    cosine: Mapped[float | None] = mapped_column(Float)
+    read_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class Yard(Base):
+    """S1: a yard that runs voyages — this machine, or a contributor's. The id is stable per machine; the
+    compute it describes is what a coordinator needs to decide what work it can be given."""
+
+    __tablename__ = "yards"
+    __table_args__ = {"schema": S1}
+
+    yard_id: Mapped[str] = mapped_column(Text, primary_key=True)
+    owner: Mapped[str | None] = mapped_column(Text)
+    compute: Mapped[dict | None] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class Work(Base):
+    """S1: a unit of work a yard can claim — one spec, its goal, and the run and bundle that answered it.
+    The local queue is the degenerate case: one yard claims every line."""
+
+    __tablename__ = "work"
+    __table_args__ = (Index("work_status", "status"), {"schema": S1})
+
+    work_id: Mapped[str] = mapped_column(Text, primary_key=True)  # the spec's SHA-1, as the run id
+    spec_sha: Mapped[str] = mapped_column(Text)
+    goal: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(Text, default="open")  # open, claimed, posted, verified, rejected
+    claimed_by: Mapped[str | None] = mapped_column(Text)
+    run_id: Mapped[str | None] = mapped_column(Text)
+    bundle_sha: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    posted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class ProviderCredential(Base):
+    """S5: a compute provider's credential, in the store rather than a file (Vast.ai's API key). The key is
+    the one thing the yard cannot re-derive, so it lives with the yard's other policy state; the file
+    `data/secrets/vast-api-key` remains a fallback for boxes that have not migrated."""
+
+    __tablename__ = "provider_credentials"
+    __table_args__ = {"schema": S5}
+
+    provider: Mapped[str] = mapped_column(Text, primary_key=True)
+    key: Mapped[str] = mapped_column(Text)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class ComputeResource(Base):
+    """S1: a machine the yard can run on — this Mac or a hired cloud box. `specs` is what it is, `bench` is
+    what a test measured (tokens/s, peak memory, the preset tested), and `caps` is what it may spend or run
+    per day and week."""
+
+    __tablename__ = "compute_resources"
+    __table_args__ = {"schema": S1}
+
+    resource_id: Mapped[str] = mapped_column(Text, primary_key=True)
+    yard_id: Mapped[str | None] = mapped_column(Text)
+    kind: Mapped[str] = mapped_column(Text)  # mac | cloud
+    name: Mapped[str] = mapped_column(Text)
+    specs: Mapped[dict | None] = mapped_column(JSONB)
+    bench: Mapped[dict | None] = mapped_column(JSONB)
+    caps: Mapped[dict | None] = mapped_column(JSONB)
+    status: Mapped[str] = mapped_column(Text, default="active")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

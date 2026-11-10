@@ -3,7 +3,7 @@
 Each function's MLX branch is the code the evaluators ran before the PyTorch backend existed, moved here
 unchanged, so an MLX voyage's scores are what they were; the torch branch computes the same quantity in
 PyTorch, under no_grad, on the model's device. A model is torch when it says so (`backend = "torch"`,
-thorp/models/gpt_torch.py); anything else (Thorp's MLX GPT, the outside models of smoking_qwen.py and
+thorp/models/gpt_torch.py); anything else (Nothing up my sleeve's MLX GPT, the outside models of smoking_qwen.py and
 outside_deck.py) is MLX. MLX is imported only when an MLX model is read, so a CUDA box needs none.
 """
 

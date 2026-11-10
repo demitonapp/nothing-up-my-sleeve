@@ -28,7 +28,7 @@ def _rows(sql: str, params=()) -> list[dict]:
 def runs_of(voyage: fleet.Expedition) -> list[dict]:
     """Its runs: those whose label carries its ship ("<ship>: ..."), and every run that
     `fleet.expedition_of_label` gives it (the card census's runs are labelled as the fitout's variations,
-    "Fitout: Thorp ...", not "Cards: ...")."""
+    "Fitout: Nothing up my sleeve ...", not "Cards: ...")."""
     if voyage.key == "book_value":
         where, args = "name like 'loop-%'", []
     else:

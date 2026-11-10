@@ -1,12 +1,12 @@
 """The sources beyond Gutenberg, as S4 sees them (acquisition's intelligence): what each holds, what it
-takes to get it, what Thorp's period rule leaves of it, and the wall where there is one.
+takes to get it, what Nothing up my sleeve's period rule leaves of it, and the wall where there is one.
 
 The catalogue is data, not a promise. `status` says whether the pipeline may fetch a source now:
 
 - **admitted**: an open source the acquisition gate has admitted (an entry in DECISIONS.md names it).
 - **gated**: open only after an agreement or a token; the adapter exists, the fetch fails until the
   terms are met.
-- **walled**: no lawful bulk full text reaches Thorp (a licence, an institution, or no full-text API).
+- **walled**: no lawful bulk full text reaches Nothing up my sleeve (a licence, an institution, or no full-text API).
   The wall says why, so a later reader does not fetch it by accident.
 - **awaits S5**: the text is open but the policy question is Justin's (unsigned newspapers, whose
   authors cannot be checked against the death rule).
@@ -206,7 +206,7 @@ SOURCES: list[dict] = [
         "unsigned": False,
         "url": "https://hathitrust.org/datasets",
         "wall": "Full text is behind a researcher agreement. The public Extracted Features are page-level token "
-        "counts, not text, so they cannot train a model. Its scans reach Thorp through the Common Pile "
+        "counts, not text, so they cannot train a model. Its scans reach Nothing up my sleeve through the Common Pile "
         "pre-1929 set, which is HathiTrust-derived.",
         "how": "use common-pile-pre-1929; write to contact@institutional.org for the gated Institutional set",
     },

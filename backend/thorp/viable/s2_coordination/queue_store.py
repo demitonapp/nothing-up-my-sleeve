@@ -10,6 +10,7 @@ backfill never imports mlx or torch.
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from sqlalchemy import BigInteger, Text, delete, func, select, text
@@ -19,6 +20,17 @@ from sqlalchemy.orm import Mapped, mapped_column
 from thorp.viable.s3_control.models import Base
 
 S2 = "s2"
+
+
+def enabled() -> bool:
+    """Whether the store is the queue. Postgres is the default on the Mac (the cut-over of 10 November,
+    the same rule as the ledger); a hired box keeps its own files (`THORP_SHIP_LOG=1`), and
+    `THORP_QUEUE_PG` overrides either way. One switch, so the coordinator and the dashboard cannot
+    disagree about which queue they are reading (10 November: they did, from different processes)."""
+    flag = os.environ.get("THORP_QUEUE_PG")
+    if flag is not None:
+        return flag.strip().lower() not in ("0", "false", "no", "off", "")
+    return os.environ.get("THORP_SHIP_LOG", "").strip().lower() not in ("1", "true", "yes")
 
 
 class QueueLine(Base):

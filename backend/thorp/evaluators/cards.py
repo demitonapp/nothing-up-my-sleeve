@@ -154,7 +154,7 @@ def comparator(model, tok) -> np.ndarray:
 
 
 def copying_cards(model, tok, seqs: int = 8, length: int = 200) -> dict | None:
-    """Previous-word and the Nevermore, read the same way for any model (Thorp's or an outside one):
+    """Previous-word and the Nevermore, read the same way for any model (Nothing up my sleeve's or an outside one):
     SEQS passages of LENGTH pieces of Goldsmith's essays (the Forgotten Tome the Nevermore test
     uses, nevermore.NATURAL_BOOK), tokenised with the model's own tokeniser. Previous-word: the mean
     attention from each piece to the one before it. Nevermore: each passage followed by itself, the

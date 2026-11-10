@@ -1,6 +1,6 @@
 """Where things live (Justin, 2026-11-07: "split the repo out into front end and backend and then the ships").
 
-The repository has three parts, and every path Thorp names is found in one of them:
+The repository has three parts, and every path Nothing up my sleeve names is found in one of them:
 
 - **backend/**: the Python package (thorp/), its tests, scripts, the Alembic migrations and alembic.ini.
 - **frontend/**: the dashboard (Astro), built into backend/thorp/dash/static, which `thorp dash` serves.

@@ -6,7 +6,7 @@ Sixteen cards in four constellations of four (a person holds about four chunks; 
 Stages, as a Pokemon card evolves: a **Basic** is one head in one layer; a **Stage 1** is played only on top of
 a Basic of its constellation held in an earlier layer; a **Face** is traded in: its Stage 1 (and Basics) held
 in order, and its **ability** (what it does: "a machine is what it does", Beer) passing. **Cost** is the
-layers that must stand in order. A card is **uncharted** while Thorp has no reading for it (since 22:15 every card has one: the pips evaluator,
+layers that must stand in order. A card is **uncharted** while Nothing up my sleeve has no reading for it (since 22:15 every card has one: the pips evaluator,
 thorp/evaluators/pips.py, reads number-spotter, order-word, premise-marker and the counter).
 
 Each card's `look` is the reading that shows it (a metric and its mark); a Stage 1's `on` names the Basics
@@ -137,7 +137,7 @@ assert len(CARDS) == 16 and all(sum(c.constellation == k for c in CARDS) == 4 fo
 
 
 def charted(card: Card) -> bool:
-    """Whether Thorp can tell this card is played: its look is read, or (a Face) its ability is."""
+    """Whether Nothing up my sleeve can tell this card is played: its look is read, or (a Face) its ability is."""
     return card.look is not None or card.ability is not None
 
 # ---- what teaching each card achieves, and what it keeps (9 November): measured on every voyage that pinned the card,

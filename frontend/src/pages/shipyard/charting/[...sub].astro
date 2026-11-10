@@ -7,7 +7,9 @@ import Discoveries from '../../../components/islands/Discoveries';
 import Reader from '../../../components/Reader.astro';
 
 export function getStaticPaths() {
-  return ['two-facts', 'quantum', 'registry', 'tells', 'stars', 'cards'].map((sub) => ({ params: { sub } }));
+  // the four current tabs, then the aliases still answered (the deprecated two-facts and registry
+  // redirect to Tests and Skills in the island)
+  return ['skills', 'tests', 'tells', 'stars', 'cards', 'quantum', 'two-facts', 'registry'].map((sub) => ({ params: { sub } }));
 }
 ---
 <Layout>

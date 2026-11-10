@@ -38,7 +38,9 @@ RUN_COLUMNS = (
     "status",
     "tokens_seen",
     "wall_minutes",
-
+    "yard_id",
+    "spec_sha",
+    "artifact_root",
     "sop_version",)
 EVAL_COLUMNS = ("run_id", "step", "set", "book_id", "ce_nats", "bpb", "tokens", "bytes")
 
@@ -75,6 +77,11 @@ class Run(Base):
     status: Mapped[str | None] = mapped_column(Text)
     tokens_seen: Mapped[int | None] = mapped_column(BigInteger)
     wall_minutes: Mapped[float | None] = mapped_column(Float)
+    # provenance (10 November): who ran it, which spec (the run id is the spec's SHA-1), and a hash over the
+    # run's artifacts, so a result can be accepted from a yard that is not this one
+    yard_id: Mapped[str | None] = mapped_column(Text)
+    spec_sha: Mapped[str | None] = mapped_column(Text)
+    artifact_root: Mapped[str | None] = mapped_column(Text)
 
 
 class Metric(Base):
@@ -135,6 +142,14 @@ def tables() -> list:
 def put_run(s, row: dict) -> None:
     """Upsert a runs row: a later call fills only the columns it carries (as SQLite's coalesce-on-conflict)."""
     row = {k: row.get(k) for k in RUN_COLUMNS}
+    row["spec_sha"] = row.get("spec_sha") or row.get("run_id")
+    if not row.get("yard_id"):
+        try:
+            from thorp import yard
+
+            row["yard_id"] = yard.current()
+        except Exception:  # noqa: BLE001  a box with no yard id still writes its run
+            pass
     stmt = insert(Run).values(**row)
     # only overwrite a NULL column, so a second `run(...)` never blanks what the first wrote
     s.execute(
@@ -492,7 +507,7 @@ class PgLedger:
 
 # ---------------------------------------------------------------- read helpers (the cut-over's readers)
 
-_RUN_COLUMNS = ("run_id", "name", "ship", "spec_json", "commit", "hardware", "started", "finished", "status", "tokens_seen", "wall_minutes")
+_RUN_COLUMNS = ("run_id", "name", "ship", "spec_json", "commit", "hardware", "started", "finished", "status", "tokens_seen", "wall_minutes", "yard_id", "spec_sha", "artifact_root")
 
 
 def get_run(run_id: str) -> dict | None:

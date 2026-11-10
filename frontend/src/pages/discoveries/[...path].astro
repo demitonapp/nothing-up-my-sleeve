@@ -1,5 +1,6 @@
 ---
-// Direct discoveries routes for dev (production falls back). The island reads the path.
+// Direct discoveries routes for dev (production falls back). The island reads the path; two-facts and
+// registry stay here so their deprecated addresses can redirect to Tests and Skills.
 import Layout from '../../layouts/Layout.astro';
 import Discoveries from '../../components/islands/Discoveries';
 import Reader from '../../components/Reader.astro';
@@ -10,7 +11,7 @@ export function getStaticPaths() {
     'rumford_test', 'triads_test', 'again_test', 'refrain_test', 'seasons_test', 'pigeonhole_test', 'lucretius_test',
     'recurrence_test', 'logic_test', 'crowns_test', 'origin_test', 'energy_test', 'mendeleev_gaps', 'geometry_test'];
   const chains = ['origin_test', 'energy_test', 'mendeleev_gaps', 'recurrence_test'];
-  const paths = ['overview', 'two-facts', 'physics', 'maths', 'reasoning', 'philosophy', 'mathematics', 'skills', 'quantum-tests', 'quantum', 'registry', 'stars', 'traits', ...tricks, ...chains.map((k) => `chains/${k}`)];
+  const paths = ['overview', 'two-facts', 'physics', 'maths', 'reasoning', 'philosophy', 'mathematics', 'skills', 'quantum-tests', 'tests', 'quantum', 'registry', 'stars', 'cards', 'traits', ...tricks, ...chains.map((k) => `chains/${k}`)];
   return paths.map((path) => ({ params: { path } }));
 }
 ---

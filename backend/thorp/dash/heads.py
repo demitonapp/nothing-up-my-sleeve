@@ -1,9 +1,9 @@
 """The star chart: every kind of attention head described in the interpretability literature, for
 the Discoveries page (2026-11-07, Justin: "add all known induction and attention heads").
 
-A kind Thorp measures links to its star in `thorp.fleet.STARS` (`star`), and the page shows its live
+A kind Nothing up my sleeve measures links to its star in `thorp.fleet.STARS` (`star`), and the page shows its live
 state from the ledger. The rest are charted but not yet measured: each says what it does, what it
-rests on, where it was first described, what size of model it has been seen in, and how Thorp could
+rests on, where it was first described, what size of model it has been seen in, and how Nothing up my sleeve could
 measure it. Promoting one to a star is the fleet's job (fleet.STARS plus an evaluator); this list
 only charts the sky.
 
@@ -50,7 +50,7 @@ KNOWN_HEADS: list[dict] = [
         "source": "Xiao et al. 2023, Efficient Streaming Language Models with Attention Sinks",
         "seen_in": "language models across sizes",
         "star": "attention_sink",
-        "measure": "Mean attention to position 0 (Thorp's windows start with an end-of-text token) over every query; cheap, from the same attention patterns the stars use.",
+        "measure": "Mean attention to position 0 (Nothing up my sleeve's windows start with an end-of-text token) over every query; cheap, from the same attention patterns the stars use.",
     },
     {
         "key": "previous_token",
@@ -156,7 +156,7 @@ KNOWN_HEADS: list[dict] = [
         "source": OLSSON_2022,
         "seen_in": "larger models in that paper",
         "star": None,
-        "measure": "The Nevermore test with the second copy changed: capitalised, pluralised, or a parallel translation (Thorp's shelves hold several languages).",
+        "measure": "The Nevermore test with the second copy changed: capitalised, pluralised, or a parallel translation (Nothing up my sleeve's shelves hold several languages).",
     },
     {
         "key": "retrieval",

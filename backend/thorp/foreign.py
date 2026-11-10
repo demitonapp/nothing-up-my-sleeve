@@ -1,6 +1,6 @@
-"""Foreign ships: the outside models Thorp reads, so a harbour can show them and a page can spy on one.
+"""Foreign ships: the outside models Nothing up my sleeve reads, so a harbour can show them and a page can spy on one.
 
-They are not Thorp sizes or ships: no spec, no ledger run, no weights on this Mac. They are readings in
+They are not Nothing up my sleeve sizes or ships: no spec, no ledger run, no weights on this Mac. They are readings in
 `s4.outside_readings` (a deck, the logic deck, a knockout, a book list) and the chain grades. This module
 turns them into a registry and one model's page payload.
 """
@@ -24,7 +24,7 @@ LABS = {
     "huggingface": "Hugging Face · SmolLM",
     "eleuther": "EleutherAI · Pythia",
     "maincode": "Maincode · Maincoder",
-    "thorp": "Thorp (not a foreign ship)",
+    "thorp": "Nothing up my sleeve (not a foreign ship)",
     "independent": "independent labs",
 }
 FLAGS = {
@@ -35,7 +35,7 @@ FLAGS = {
     "huggingface": ("fr", "France"),
     "eleuther": ("independent", "independent labs"),
     "maincode": ("au", "Australia"),
-    "thorp": ("thorp", "Thorp"),
+    "thorp": ("thorp", "Nothing up my sleeve"),
     "independent": ("independent", "independent labs"),
 }
 LAB_OF = {

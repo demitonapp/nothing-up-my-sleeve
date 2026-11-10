@@ -16,7 +16,7 @@ class Attention(nn.Module):
         super().__init__()
         self.heads = cfg.heads
         # grouped-query attention: kv_heads < heads means each K/V is shared by a group of queries
-        # (9 November, Kipling's question: is GQA good for Thorp?). 0/None keeps one K/V per head and
+        # (9 November, Kipling's question: is GQA good for Nothing up my sleeve?). 0/None keeps one K/V per head and
         # the single fused projection every existing checkpoint was written with.
         self.kv_heads = getattr(cfg, "kv_heads", 0) or cfg.heads
         self.head_dim = cfg.width // cfg.heads

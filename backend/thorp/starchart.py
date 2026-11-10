@@ -8,7 +8,7 @@ A matrix, not a scoreboard:
 - **Columns — a run**: the four chaining relations (`tricks/logic_test/gain_<relation>`), the aggregate, and the
   four chaining tests (`tricks/<test>_test/lift`). Where a model has been ablated, `knockout_deck` gives the causal
   weight for the same rows.
-- **One axis for every model**: outside models and Thorp ships are read by the same evaluators, so a size sits on
+- **One axis for every model**: outside models and Nothing up my sleeve ships are read by the same evaluators, so a size sits on
   the same map as the reference.
 
     uv run thorp chart <run> [<run> ...]        # the matrix, one column per run

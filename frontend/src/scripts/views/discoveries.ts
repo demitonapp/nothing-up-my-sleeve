@@ -171,10 +171,11 @@ export const FAMILY: Record<string, string> = {
   circuit: 'the indirect-object circuit',
   suppression: 'suppression',
   structure: 'grammar and reference',
+  latent: 'latent state',
   task: 'the task',
 };
 
-// ---- the star cards (the Stars subtab): every star Thorp measures, as a playing card
+// ---- the star cards (the Stars subtab): every star Nothing up my sleeve measures, as a playing card
 
 export const starsCardsHtml = (d: DiscData): string => {
   const byName = Object.fromEntries(d.stars.map((s) => [s.key, s.name]));
@@ -223,7 +224,7 @@ export const traitsHtml = (d: DiscData): { head: string; body: string } => {
   return { head, body };
 };
 
-// ---- the star chart (the table of every known kind of head, and its state in Thorp)
+// ---- the star chart (the table of every known kind of head, and its state in Nothing up my sleeve)
 
 const trickNote = (d: DiscData, h: Head): string => {
   const t = h.trick && d.tricks.find((x) => x.key === h.trick);
@@ -232,7 +233,7 @@ const trickNote = (d: DiscData, h: Head): string => {
   return `<br><span class="s">its trick, ${esc(t.name)}: ${t.ships.length ? `performed on ${n} of ${t.ships.length} sailings` : 'readings start with the next ship to sail'}</span>`;
 };
 
-// a kind of head's state in Thorp: not measured, measured without readings, lit, lit shared or best so far
+// a kind of head's state in Nothing up my sleeve: not measured, measured without readings, lit, lit shared or best so far
 const headState = (d: DiscData, h: Head): string => {
   if (!h.star) return `<td data-sort="9" class="s" title="${esc(h.measure)}">not measured yet · <i>${esc(h.measure)}</i>${trickNote(d, h)}</td>`;
   const st = d.stars.find((x) => x.key === h.star);
@@ -263,7 +264,7 @@ export const headsHtml = (d: DiscData, rungs: Rung[], family: string): { count: 
   const heads = d.known_heads || [];
   const rows = heads.filter((h) => !family || h.family === family);
   const byKey = Object.fromEntries(heads.map((h) => [h.key, h.name]));
-  const count = `${rows.length} kinds · ${rows.filter((h) => h.star).length} measured by Thorp`;
+  const count = `${rows.length} kinds · ${rows.filter((h) => h.star).length} measured by Nothing up my sleeve`;
   const body = rows
     .map(
       (h) => `<tr${h.star ? ' class="measured"' : ''}><td><b>${esc(h.name)}</b></td><td>${esc(FAMILY[h.family] || h.family)}</td>
@@ -281,7 +282,7 @@ export const headFamilies = (d: DiscData): { key: string; label: string }[] => {
   return fams.map((f) => ({ key: f, label: FAMILY[f] || f }));
 };
 
-// ---- Thorp's progress on a trick, from the fleet's readings (/api/discoveries tricks)
+// ---- Nothing up my sleeve's progress on a trick, from the fleet's readings (/api/discoveries tricks)
 export interface TrickProgress {
   cell: string;
   state: string;
@@ -395,7 +396,7 @@ export const skillLadderHtml = (d: DiscData): string => {
     const mine = kts.filter((t) => t.waypoint === w.key);
     const skills = mine.map((t) => `<a class="skill${t.fleet ? ' measured' : ''}" href="/discoveries/${esc(t.key)}">
       <b>${t.gate ? '◆ ' : ''}${esc(t.name)}</b><span>${esc(t.does)}</span>
-      <em>${t.fleet ? 'measured by Thorp' : 'not measured yet'}${t.target_class ? ` · goal ${esc(t.target_class)}` : ''}${t.taught ? ' · taught' : ''}</em></a>`).join('');
+      <em>${t.fleet ? 'measured by Nothing up my sleeve' : 'not measured yet'}${t.target_class ? ` · goal ${esc(t.target_class)}` : ''}${t.taught ? ' · taught' : ''}</em></a>`).join('');
     return `<section class="skillstep"><h3><span class="n">${i + 1}</span> ${esc(w.name)} <span class="s">${mine.length} skill${mine.length === 1 ? '' : 's'}</span></h3>
       <p class="s">${esc(w.about)}</p><div class="skills">${skills || '<div class="s">no skill is charted on this step yet</div>'}</div></section>`;
   }).join('')}</div>`;
@@ -415,7 +416,7 @@ export const trickRowsHtml = (d: DiscData, rungs: Rung[], waypoint: string, band
     .filter((t) => (!waypoint || t.waypoint === waypoint) && (band === '' || String(t.field_band_rank) === band))
     .sort((a, b) => wpRank(a.waypoint) - wpRank(b.waypoint) || a.field_band_rank - b.field_band_rank);
   const heads = Object.fromEntries((d.known_heads || []).map((h) => [h.key, h.name]));
-  const count = `${rows.length} tricks · ${rows.filter((t) => t.fleet).length} measured by Thorp`;
+  const count = `${rows.length} tricks · ${rows.filter((t) => t.fleet).length} measured by Nothing up my sleeve`;
   const body = rows
     .map(
       (t) => `<tr data-trick="${esc(t.key)}" tabindex="0"${t.fleet ? ' class="measured"' : ''}>
@@ -451,8 +452,8 @@ export const trickPageHtml = (d: DiscData, rungs: Rung[], key: string | null): T
   const tgt = t.target_class && rungs.find((r) => r.preset === t.target_class);
   const wp = (d.waypoints || []).find((w) => w.key === t.waypoint);
   const tname = Object.fromEntries((d.known_tricks || []).map((x) => [x.key, x.name]));
-  // a trick Thorp wrote itself has no field band: say that once rather than printing two 'not shown'
-  const ownTest = t.field_params == null && /Thorp's own test/i.test(t.field_at || '');
+  // a trick Nothing up my sleeve wrote itself has no field band: say that once rather than printing two 'not shown'
+  const ownTest = t.field_params == null && /Nothing up my sleeve's own test/i.test(t.field_at || '');
   const over = [
     ['waypoint', `${esc(wp ? wp.name : t.waypoint)}${t.gate ? ' · <b>◆ a gate</b>: performed before a ship moves on' : ' · a milestone'}`],
     ['rests on', (t.rests_on || []).length ? t.rests_on.map((k) => `<a href="/discoveries/${esc(k)}">${esc(tname[k] || k)}</a>`).join(', ') : '–'],
@@ -464,11 +465,11 @@ export const trickPageHtml = (d: DiscData, rungs: Rung[], key: string | null): T
       const en = (d.known_tricks || []).find((x) => x.key === end || x.fleet === end);
       return [['the climb', `${ch.indexOf(t.fleet || t.key) === ch.length - 1 ? '' : `step ${ch.indexOf(t.fleet || t.key) + 1} of ${ch.length} on `}<a href="/discoveries/chains/${esc(end)}"><b>${esc(en ? en.name : end)}</b>: the climb, step by step</a>`]];
     })(),
-    [ownTest ? 'where it comes from' : 'the field shows it at', ownTest ? `<b>Thorp's own test</b> <span class="s">(not from the field${t.field_models ? `; ${esc(t.field_models)} for scale` : ''})</span>` : `<span class="sizeband">${esc(t.field_band)}</span> parameters · ${esc(t.field_at)} <span class="s">(${esc(t.sure)})</span>`],
-    ['in', ownTest ? '<span class="s">Thorp\'s own test</span>' : esc(t.field_models)],
+    [ownTest ? 'where it comes from' : 'the field shows it at', ownTest ? `<b>Nothing up my sleeve's own test</b> <span class="s">(not from the field${t.field_models ? `; ${esc(t.field_models)} for scale` : ''})</span>` : `<span class="sizeband">${esc(t.field_band)}</span> parameters · ${esc(t.field_at)} <span class="s">(${esc(t.sure)})</span>`],
+    ['in', ownTest ? '<span class="s">Nothing up my sleeve\'s own test</span>' : esc(t.field_models)],
     ['first shown by', `<span class="s">${esc(t.source)}</span>`],
-    ["Thorp's goal class", t.target_class ? `${classLink(rungs, t.target_class)}${tgt ? ` · ${big(tgt.total)} parameters` : ''}` : t.taught ? 'none: the field shows it only when taught the task' : 'beyond the ladder: a horizon'],
-    ['how Thorp measures it', ft ? `<span class="mono">${esc(ft.metric)}</span>, performed at ${ft.threshold}` : `not yet: ${esc(t.measure)}`],
+    ["Nothing up my sleeve's goal class", t.target_class ? `${classLink(rungs, t.target_class)}${tgt ? ` · ${big(tgt.total)} parameters` : ''}` : t.taught ? 'none: the field shows it only when taught the task' : 'beyond the ladder: a horizon'],
+    ['how Nothing up my sleeve measures it', ft ? `<span class="mono">${esc(ft.metric)}</span>, performed at ${ft.threshold}` : `not yet: ${esc(t.measure)}`],
   ]
     .map(([k, v]) => `<div><div class="k">${k}</div><div>${v}</div></div>`)
     .join('');
@@ -484,7 +485,7 @@ export const trickPageHtml = (d: DiscData, rungs: Rung[], key: string | null): T
         )
         .join('')
     : '<tr><td colspan="6" class="' + emptyCls(true) + '">no kind of head is charted for this trick yet; it may be done in the feed-forward layers, or by heads not yet described</td></tr>';
-  // Thorp's tracking, size by size
+  // Nothing up my sleeve's tracking, size by size
   const thr = ft ? ft.threshold : null;
   const track = rungs
     .map((r) => {
@@ -494,11 +495,11 @@ export const trickPageHtml = (d: DiscData, rungs: Rung[], key: string | null): T
       const best = mine.length ? Math.max(...mine.map((x) => x.best as number)) : null;
       const isT = r.preset === t.target_class;
       return `<tr${isT ? ' class="target"' : ''}><td>${classLink(rungs, r.preset)}${isT ? ` <span class="${pillCls('accent')}">target</span>` : ''}</td><td data-sort="${r.total}">${big(r.total)}</td>
-      <td data-sort="${orders ?? ''}">${orders == null ? `<span class="s" title="${ownTest ? "this is Thorp's own test, not a field result" : 'no field band for this trick'}">${ownTest ? '–' : 'the field has not shown it'}</span>` : orders >= 0 ? `${orders.toFixed(1)} orders of magnitude smaller` : `${(-orders).toFixed(1)} orders larger`}</td>
+      <td data-sort="${orders ?? ''}">${orders == null ? `<span class="s" title="${ownTest ? "this is Nothing up my sleeve's own test, not a field result" : 'no field band for this trick'}">${ownTest ? '–' : 'the field has not shown it'}</span>` : orders >= 0 ? `${orders.toFixed(1)} orders of magnitude smaller` : `${(-orders).toFixed(1)} orders larger`}</td>
       <td>${ft ? mine.length : '–'}</td><td>${ft ? (mine.length ? `${done.length} of ${mine.length}` : '–') : '–'}</td>
       <td>${best != null ? `${fmt(best)} <span class="s">of ${thr}</span>` : '–'}</td><td>${done.length ? `${shipLink(done[0])} at step ${done[0].performed_at}` : '–'}</td></tr>`;
     })
-    .join('') + (ownTest ? `<tr><td colspan="7" class="s">Thorp's own test: there is no field band to compare. ${Object.entries(t.reference || {}).map(([n, v]) => `${esc(n)} lifts ${fmt(Number(v), 2)}`).join(', ') || 'No outside model is charted'} for scale.</td></tr>` : '');
+    .join('') + (ownTest ? `<tr><td colspan="7" class="s">Nothing up my sleeve's own test: there is no field band to compare. ${Object.entries(t.reference || {}).map(([n, v]) => `${esc(n)} lifts ${fmt(Number(v), 2)}`).join(', ') || 'No outside model is charted'} for scale.</td></tr>` : '');
   // the partner beside it: the bigger test a smaller one leads to, or the smaller one that leads here
   const partner = t.leads_to || ((d.known_tricks || []).find((x) => x.leads_to === t.key) || {}).key;
   const pt = partner ? (d.known_tricks || []).find((x) => x.key === partner) : undefined;
@@ -772,7 +773,7 @@ export const chainPageHtml = (d: DiscData, rungs: Rung[], key: string | null, da
   return { found: true, title: data.name, strand: `<span class="${pillCls('accent')}">${esc(data.strand)}</span>`, over, steps };
 };
 
-// ---- the star grid (the Stars subtab): every star Thorp measures, by size of ship
+// ---- the star grid (the Stars subtab): every star Nothing up my sleeve measures, by size of ship
 
 export const starGridHtml = (d: DiscData, rungs: Rung[]): { head: string; body: string } => {
   const stars = d.stars || [];
@@ -927,10 +928,10 @@ export const twoFactsHtml = (d: DiscData, sq: any, lb: any, pulls: (any | null)[
   const best = ((lb && lb.board) || []).filter((b: any) => b.best && b.best.chaining_lift != null).sort((a: any, b: any) => b.best.chaining_lift - a.best.chaining_lift)[0];
   const status = `<div class="tfs"><span class="${pillCls(state[0])}">${state[1]}</span></div>
     <div class="tfs"><b>${scored.length} of ${rng.length}</b><span>2–4B competitors scored${sq.hardest ? `; the hardest, ${esc(sq.hardest)}` : ''}</span></div>
-    <div class="tfs"><b>${above} of 3</b><span>Thorp classes above the noise, needed before any forecast</span></div>
-    <div class="tfs"><b>${best ? signed(best.best.chaining_lift) : '–'}</b><span>Thorp's best chaining lift so far${best ? ` (${esc(best.best.preset)}, ${esc(best.best.ship || best.best.run)})` : ''}</span></div>
+    <div class="tfs"><b>${above} of 3</b><span>Nothing up my sleeve classes above the noise, needed before any forecast</span></div>
+    <div class="tfs"><b>${best ? signed(best.best.chaining_lift) : '–'}</b><span>Nothing up my sleeve's best chaining lift so far${best ? ` (${esc(best.best.preset)}, ${esc(best.best.ship || best.best.run)})` : ''}</span></div>
     <div class="tfs"><b>${sq.forecastable ? `${pLin == null ? '–' : Math.round(100 * pLin) + '%'} · ${pBend == null ? '–' : Math.round(100 * pBend) + '%'}` : 'not yet'}</b><span>P over the range, straight · bending</span></div>
-    <div class="tfcomp">${rng.map((c: any) => `<span title="${esc(c.model)}">${esc(c.label)} <b>${c.scored && c.chaining_lift != null ? signed(c.chaining_lift) : '…'}</b> <i>at ${fmtParams(c.params)} → Thorp at ${fmtParams(c.smoke_at || c.params / 10)}</i></span>`).join('')}</div>`;
+    <div class="tfcomp">${rng.map((c: any) => `<span title="${esc(c.model)}">${esc(c.label)} <b>${c.scored && c.chaining_lift != null ? signed(c.chaining_lift) : '…'}</b> <i>at ${fmtParams(c.params)} → Nothing up my sleeve at ${fmtParams(c.smoke_at || c.params / 10)}</i></span>`).join('')}</div>`;
   // an example pair from each chaining test
   const passage = (p: any): string =>
     p.frame && p.prompt.endsWith(p.frame) && p.prompt.length > p.frame.length
@@ -1054,3 +1055,75 @@ export const emptyChart = async (id: string, msg: string): Promise<void> => {
   const { empty } = await import('../../lib/charts');
   empty(id, msg);
 };
+
+// ---------------------------------------------------------------- the head census (every one of Qwen's 1,152)
+// thorp/head_census.py records heads-<model>: every head's score on each kind it can measure, its layer,
+// and the behavioural clusters that are cards outside the sixteen. The Stars tab's Heads subtab lists them
+// by category, expandable; the Cards subtab lists the sixteen and then the clusters.
+const CENSUS_KIND: Record<string, string> = {
+  previous_word: 'Previous-word', offset_2: 'Two words back', offset_3: 'Three words back',
+  attention_sink: 'Attention sink', delimiter: 'Delimiter', rare_word: 'Rare word',
+  duplicate_word: 'Duplicate word', nevermore: 'Nevermore (induction)', mover: 'Mover',
+  comparator: 'Comparator', bridge: 'Bridge',
+};
+
+export function headsCensusHtml(c: any): string {
+  if (!c || !c.found) return `<div class="${emptyCls()}">the head census has not been run for this model yet (thorp.head_census)</div>`;
+  const heads: any[] = c.inventory || [];
+  const clusters: any[] = c.clusters || [];
+  const byKey: Record<string, any> = {};
+  for (const h of heads) byKey[`${h.layer}.${h.head}`] = h;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const pct = (v: number | null | undefined) => (v == null ? '–' : `${Math.round(100 * v)}%`);
+  const cell = (h: any) => `<tr><td class="mono">L${pad(h.layer)}.H${pad(h.head)}</td>
+    <td>${h.lit && h.lit.length ? esc(h.lit.join(', ')) : '<span class="s">no card names it</span>'}</td>
+    <td>${h.layer}</td><td>${pct(h.sink)}</td><td>${pct(h.previous)}</td>
+    <td>${h.entropy != null ? h.entropy.toFixed(1) : '–'}</td>
+    <td>${h.number != null ? `${h.number.toFixed(1)}×` : '–'}</td></tr>`;
+  const merged: Record<string, { name: string; size: number; heads: number[][]; top: string[] }> = {};
+  for (const cl of clusters) {
+    const key = cl.name || 'Other';
+    if (!merged[key]) merged[key] = { name: key, size: 0, heads: [], top: cl.top || [] };
+    merged[key].size += cl.size;
+    merged[key].heads.push(...(cl.heads || []));
+  }
+  const cats = Object.values(merged).sort((a, b) => b.size - a.size);
+  const summary = cats.map((cl) => `<tr><td><b>${esc(cl.name)}</b></td><td>${cl.size}</td>
+    <td>${(cl.top || []).slice(0, 3).map((t: string) => esc(String(t).split(' (')[0])).join(', ')}</td></tr>`).join('');
+  const sections = cats.map((cl) => {
+    const rows = (cl.heads || []).map(([l, h]: number[]) => byKey[`${l}.${h}`]).filter(Boolean)
+      .sort((a: any, b: any) => a.layer - b.layer || a.head - b.head);
+    return `<details class="scaffoldruns"><summary><b>${esc(cl.name)}</b> <span class="s">${rows.length} head${rows.length === 1 ? '' : 's'}</span></summary>
+      <div class="scroll"><table data-nosort><thead><tr><th>head</th><th>named by</th><th>layer</th><th>sink</th><th>previous</th><th>entropy</th><th>numbers</th></tr></thead><tbody>${rows.map(cell).join('')}</tbody></table></div></details>`;
+  }).join('');
+  return `<div class="k">${c.n_heads} heads on ${esc(c.model)}, in ${cats.length} categories <span class="s">every head is in exactly one; the kind that names it is a separate reading, shown in "named by"</span></div>
+    <div class="scroll"><table data-nosort><thead><tr><th>category</th><th>heads</th><th>what distinguishes it</th></tr></thead><tbody>${summary}</tbody></table></div>
+    ${sections}`;
+}
+
+export function cardsBeyondHtml(c: any): string {
+  if (!c || !c.found) return '';
+  const clusters = (c.clusters || []).slice(0, 12);
+  const rows = clusters.map((cl: any) => {
+    const top = (cl.top || []).map((t: string) => t.split(' (')[0]);
+    return `<tr><td><b>${esc(top[0] || 'unnamed role')}</b>${top.slice(1).length ? `<div class="s">${esc(top.slice(1).join(', '))}</div>` : ''}</td>
+      <td>${cl.size}</td><td>${esc(cl.heads.slice(0, 6).map((h: number[]) => `L${h[0]}.H${h[1]}`).join(', '))}</td>
+      <td><span class="s">${top.some((t: string) => /number|series|copy|previous|punct|line|follow-on/i.test(t)) ? 'candidate card' : 'broad role'}</span></td></tr>`;
+  }).join('');
+  return `<section class="${cardCls(false, 'panel')}" style="margin-top:16px">
+    <h2>Cards outside the sixteen <span class="note">the behavioural clusters of all ${c.n_heads} heads on a battery of prompts (prose, maths, code, series, repetition, coreference, syntax, a needle). A cluster whose behaviour no card names is a candidate for one of the ten kinds with no star metric: successor, copy-suppression, retrieval, the name movers, syntactic, coreference, function vectors</span></h2>
+    <div class="scroll"><table data-nosort><thead><tr><th>cluster</th><th>heads</th><th>examples</th><th></th></tr></thead><tbody>${rows}</tbody></table></div></section>`;
+}
+
+export function personasHtml(p: any): string {
+  if (!p || p.found === false || !p.norms) return `<div class="${emptyCls()}">the persona probe has not been run for this model (thorp.persona_vectors)</div>`;
+  const traits = Object.keys(p.norms || {});
+  const rows = traits.map((t) => `<tr><td><b>${esc(t)}</b></td><td>${p.norms[t].toFixed(2)}</td>
+    <td>${p.projection_on_plain?.[t] != null ? p.projection_on_plain[t].toFixed(3) : '–'}</td>
+    <td>${p.cosine_on_plain?.[t] != null ? p.cosine_on_plain[t].toFixed(3) : '–'}</td></tr>`).join('');
+  const cs = Object.entries(p.cosines || {}).map(([k, v]) => [k, Number(v)] as [string, number]).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])).slice(0, 8)
+    .map(([k, v]) => `<tr><td>${esc(String(k).replace('|', ' · '))}</td><td>${v.toFixed(3)}</td></tr>`).join('');
+  return `<div class="k">${traits.length} persona directions at layer ${p.layer} (width ${p.width}) <span class="s">each direction is the mean residual-stream difference between the trait's system prompt and its opposite over ${4} questions; its norm is how much of the stream the trait moves</span></div>
+    <div class="row"><div><div class="k">The directions</div><div class="scroll"><table data-nosort><thead><tr><th>trait</th><th>norm</th><th>projection on a plain prompt</th><th>cosine with plain</th></tr></thead><tbody>${rows}</tbody></table></div></div>
+    <div><div class="k">How much the traits share a direction</div><div class="scroll"><table data-nosort><thead><tr><th>pair</th><th>cosine</th></tr></thead><tbody>${cs}</tbody></table></div></div></div>`;
+}

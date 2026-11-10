@@ -15,7 +15,7 @@ Adapters:
 - `institutional-books`: Harvard's gated parquet, after the agreement.
 - `folder`: a directory of licensed texts (EEBO-TCP, HathiTrust or Google exports) with a metadata CSV.
 
-Nothing here decides what may enter the library: it maps a record's own words and dates into Thorp's
+Nothing here decides what may enter the library: it maps a record's own words and dates into Nothing up my sleeve's
 fields, and `gather` asks the gate. A source that is walled in thorp/sources/catalog.py has no adapter.
 """
 

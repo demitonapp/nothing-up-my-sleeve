@@ -103,6 +103,7 @@ eval:
   - shapes
   - pips
   - ifeval
+  - soundings
   light:
     every_steps: 64
     evaluators:

@@ -41,7 +41,9 @@ def key_path():
 
 
 def api_key() -> str:
-    k = os.environ.get("VAST_API_KEY") or (key_path().read_text().strip() if key_path().exists() else "")
+    from thorp import providers
+
+    k = providers.vast_key()
     if not k:
         raise NoKey(f"no Vast.ai API key: set VAST_API_KEY or write it to {key_path()} (never to git)")
     return k

@@ -1,4 +1,4 @@
-"""The shelves: every book list Thorp reads from, scores on or refuses (2026-11-07, Justin: "a tab for
+"""The shelves: every book list Nothing up my sleeve reads from, scores on or refuses (2026-11-07, Justin: "a tab for
 shelves").
 
 A shelf is a CSV in lists/ (title, author, language, family, text). `payload()` is the dashboard's
@@ -22,7 +22,7 @@ from pathlib import Path
 
 from thorp import paths
 
-BYTES_PER_TOKEN = 4.0  # a rough rule for English prose with Thorp's tokenisers
+BYTES_PER_TOKEN = 4.0  # a rough rule for English prose with Nothing up my sleeve's tokenisers
 
 ABOUT: dict[str, tuple[str, str, str]] = {
     # path: (name, kind, what it is for)

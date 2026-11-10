@@ -1,6 +1,6 @@
 """One fetcher, many sources (2026-11-07, Justin: "the fetcher must be generalised").
 
-A **Source** turns an identifier into clean text and the facts Thorp needs about it: title, author,
+A **Source** turns an identifier into clean text and the facts Nothing up my sleeve needs about it: title, author,
 language, the year it was published (for cutoff tests: a book is before a cutoff when it was
 printed before it), and where it came from. Sources are registered in SOURCES by key:
 
@@ -61,7 +61,7 @@ class Fetched:
     title: str
     author: str
     language: str
-    text: str  # clean text, as Thorp reads it
+    text: str  # clean text, as Nothing up my sleeve reads it
     published: int | None = None  # the year this edition was printed, when the source knows it
     origin: str = ""  # where it came from (a URL)
 

@@ -39,6 +39,7 @@ eval:
   - ce_bpb
   - bpb_split
   - nevermore
+  - soundings
   light:
     every_steps: 170
     evaluators:

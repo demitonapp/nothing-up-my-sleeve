@@ -1,11 +1,11 @@
-// One outside model (or a Thorp ship version), rendered by its own island: the chaining result, the
+// One outside model (or a Nothing up my sleeve ship version), rendered by its own island: the chaining result, the
 // logic deck, its cards and every rung (UI.md "Leaderboard"). The dense tables are in
 // views/competitor.ts; the charts are drawn after render.
 
 import { useEffect, useState } from 'react';
 import { cardCls, crumbCls, emptyCls } from '@/lib/ui';
 import { sectionProps, useApi, useRoute } from '@/lib/useApi';
-import { competitorHtml, drawCompetitorCharts } from '@/scripts/views/competitor';
+import { competitorHtml, drawCompetitorCharts, testsHtml } from '@/scripts/views/competitor';
 
 export default function Competitor() {
   const route = useRoute();
@@ -16,6 +16,7 @@ export default function Competitor() {
   const disc = useApi<any>('/api/discoveries', 120000);
   const ko = useApi<any>(!thorp && key ? `/api/knockout?model=${encodeURIComponent(key)}` : null, 120000);
   const [knock, setKnock] = useState<string | null>(null);
+  const [tab, setTab] = useState<'chaining' | 'tests'>('chaining');
   const [koData, setKoData] = useState<any>(null);
 
   const stars = disc.data?.stars || [];
@@ -74,6 +75,12 @@ export default function Competitor() {
       <h1><a className={crumbCls('back')} href="/leaderboard">← leaderboard</a> <span id="cptitle">{html.title}</span> <span id="cppills" dangerouslySetInnerHTML={{ __html: html.pills }} /></h1>
       <section className={cardCls(false, 'panel')}><div className="rungover" id="cpover" dangerouslySetInnerHTML={{ __html: html.over }} /></section>
 
+      <div className="tabs" role="tablist">
+        <button role="tab" aria-selected={tab === 'chaining'} className={tab === 'chaining' ? 'tab on' : 'tab'} onClick={() => setTab('chaining')}>Chaining</button>
+        <button role="tab" aria-selected={tab === 'tests'} className={tab === 'tests' ? 'tab on' : 'tab'} onClick={() => setTab('tests')}>Tests<span className="s"> {html.bench.rows.length ? html.bench.rows.length : ''}</span></button>
+      </div>
+
+      {tab === 'chaining' && (<>
       <section className={cardCls(false, 'panel')}>
         <h2>Chaining two facts <span className="note">the four chaining tests (each its lift and share of pairs right, ✓ performed: lift 0.1 and two in three right), and the logic deck, the proof that a pass is chaining: invented words and counterfactual premises, each item asked with both premises, with one, swapped and padded, and at one, two and three hops</span></h2>
         <div className="cpsum" id="cpsum" dangerouslySetInnerHTML={{ __html: html.sum }} />
@@ -85,7 +92,7 @@ export default function Competitor() {
       </section>
 
       <section className={cardCls(false, 'panel')}>
-        <h2>Its hand <span className="note">the stars that do the trick, as playing cards: a card lit inside the model (at its mark by one head, or shared by two) is in its hand; one it hasn't lit is still in the deck, set aside face down with how close it came; "unreadable" where its attention can't be read through MLX-LM. Every model, outside or Thorp, is read by the same reader with its own tokeniser (previous-word and Nevermore on Goldsmith's essays, cards.copying_cards)</span></h2>
+        <h2>Its hand <span className="note">the stars that do the trick, as playing cards: a card lit inside the model (at its mark by one head, or shared by two) is in its hand; one it hasn't lit is still in the deck, set aside face down with how close it came; "unreadable" where its attention can't be read through MLX-LM. Every model, outside or Nothing up my sleeve, is read by the same reader with its own tokeniser (previous-word and Nevermore on Goldsmith's essays, cards.copying_cards)</span></h2>
         <div id="cpcards" dangerouslySetInnerHTML={{ __html: html.cards }} />
       </section>
 
@@ -95,9 +102,21 @@ export default function Competitor() {
       </section>
 
       <section className={cardCls(false, 'panel')}>
-        <h2>Every rung <span className="note">the four discovery chains, keel to the 50m (two facts chained); these are Thorp's internal measures, shown because this page describes the competitor. Each cell its lift and share right, ✓ performed</span></h2>
+        <h2>Every rung <span className="note">the four discovery chains, keel to the 50m (two facts chained); these are Nothing up my sleeve's internal measures, shown because this page describes the competitor. Each cell its lift and share right, ✓ performed</span></h2>
         <div className="scroll"><table id="cprungs" data-nosort><thead dangerouslySetInnerHTML={{ __html: html.rungsHead }} /><tbody dangerouslySetInnerHTML={{ __html: html.rungsBody }} /></table></div>
       </section>
+      </>)}
+
+      {tab === 'tests' && (
+        <section className={cardCls(false, 'panel')}>
+          <h2>Benchmark tests <span className="note">what the model scored when it sat the test, and the heads that triggered while it reasoned: MATH-500 first, every head's attention read over its generated answer (thorp.math_heads). A foreign ship's tests live here, beside its Nothing up my sleeve readings</span></h2>
+          {html.bench.empty ? <div dangerouslySetInnerHTML={{ __html: html.bench.empty }} /> : html.bench.rows.map((t, i) => (
+            <div key={t.key} className="testrow" style={{ marginTop: i ? 24 : 0 }}>
+              <div dangerouslySetInnerHTML={{ __html: t.html }} />
+            </div>
+          ))}
+        </section>
+      )}
     </div>
   );
 }

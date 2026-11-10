@@ -1,4 +1,4 @@
-"""Nevermores: Thorp's name for induction heads (2026-11-07, Justin), after the refrain of Poe's
+"""Nevermores: Nothing up my sleeve's name for induction heads (2026-11-07, Justin), after the refrain of Poe's
 "The Raven": once the reader has seen "Quoth the Raven" followed by "Nevermore", the next
 "Quoth the Raven" brings "Nevermore" to mind before it is read.
 

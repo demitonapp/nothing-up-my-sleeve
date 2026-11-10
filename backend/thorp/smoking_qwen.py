@@ -1,8 +1,8 @@
-"""Smoking Qwen (2026-11-07, Justin): can Thorp chain two facts at an order of magnitude below Qwen3 4B?
+"""Smoking Qwen (2026-11-07, Justin): can Nothing up my sleeve chain two facts at an order of magnitude below Qwen3 4B?
 
-The claim to prove: a Thorp of about 400M parameters (a tenth of Qwen3 4B's 4.0B) matches Qwen3 4B's
+The claim to prove: a Nothing up my sleeve of about 400M parameters (a tenth of Qwen3 4B's 4.0B) matches Qwen3 4B's
 **chaining lift** (the mean lift on the four 50m rungs, two facts chained; thorp/leaderboard.py). The
-Mac cannot train 400M, so the proof is a forecast: fit chaining lift against size on Thorp's own
+Mac cannot train 400M, so the proof is a forecast: fit chaining lift against size on Nothing up my sleeve's own
 classes (the best ship of each, keel to 50m), extrapolate to 400M, and give the probability that it
 reaches Qwen3 4B's mark.
 
@@ -10,14 +10,14 @@ reaches Qwen3 4B's mark.
   `linear` (y = a + b x) and `bending` (y = a + b x + c x^2, from three points), because the backtest
   below shows chaining lift bends upward with size, so the straight line is the conservative one.
 - **The uncertainty.** A bootstrap (BOOT draws): within each point, the 96 chaining pairs are resampled
-  (and, for a Thorp class, its seeds), the curve refitted, and 400M predicted. P(smoke) is the share
+  (and, for a Nothing up my sleeve class, its seeds), the curve refitted, and 400M predicted. P(smoke) is the share
   of draws at or above Qwen3 4B's chaining lift; the 5th to 95th percentile is the band.
 - **The backtest.** The same method where the answer is known: Pythia fitted on 14m to 160m predicts
-  410m; Qwen3 fitted on 0.6B and 1.7B predicts 4B. A method that misses these is not trusted on Thorp.
+  410m; Qwen3 fitted on 0.6B and 1.7B predicts 4B. A method that misses these is not trusted on Nothing up my sleeve.
 - **The range** (fleet.COMPETITORS: Qwen3 4B, Phi-2, Phi-4-mini, Llama 3.2 3B, Gemma 2 2B, Gemma 3 4B,
   SmolLM3 3B): each competitor matched at a tenth of its own size; P(range) is the smallest of their
   probabilities, so the range is smoked only when every one of them is.
-- **Forecastable** only when at least three Thorp classes have a chaining lift above the noise (0.03):
+- **Forecastable** only when at least three Nothing up my sleeve classes have a chaining lift above the noise (0.03):
   a line through points that are all noise extrapolates nothing.
 
     uv run python -m thorp.smoking_qwen
@@ -286,7 +286,7 @@ def main() -> None:
                 )
         print()
     if "thorp" in p:
-        print("\nThorp points:")
+        print("\nNothing up my sleeve points:")
         for pt in p["thorp"]["points"]:
             print(
                 f"  {pt['name']:9} {pt['params'] / 1e6:7.2f}M  chaining lift {pt['chaining_lift']:+.4f}  ({pt['run']})"
@@ -305,7 +305,7 @@ def main() -> None:
         lin = r.get("linear", {})
         print(
             f"  {r['label']:14} {r['params'] / 1e9:.1f}B chaining {r['chaining_lift']:+.3f}; "
-            f"Thorp at {r['smoke_at'] / 1e6:.0f}M (linear) {lin.get('predicted', float('nan')):+.3f}, "
+            f"Nothing up my sleeve at {r['smoke_at'] / 1e6:.0f}M (linear) {lin.get('predicted', float('nan')):+.3f}, "
             f"P {lin.get('p_at_or_above_target')}"
         )
     print(

@@ -29,7 +29,10 @@ def keys() -> list[str]:
 def write() -> Path:
     out = paths.FRONTEND / "src" / "data" / "foreign.json"
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps({"keys": keys()}, indent=1) + "\n")
+    # the key list for getStaticPaths, and the model id -> label key map the competitor redirect needs;
+    # both read from the store through thorp.foreign.models(), so the file is a build artifact, not a source
+    models = {m["model"]: m["key"] for m in foreign.models() if m.get("model")}
+    out.write_text(json.dumps({"keys": keys(), "models": models}, indent=1) + "\n")
     return out
 
 

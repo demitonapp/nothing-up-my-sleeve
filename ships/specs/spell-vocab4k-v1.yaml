@@ -45,6 +45,7 @@ eval:
   - laws
   - samples
   - probes
+  - soundings
 checkpoint:
   every_steps: 500
 seed: 1

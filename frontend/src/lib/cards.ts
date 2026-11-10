@@ -1,5 +1,5 @@
 // ---- Cards: a model's attention heads as a hand of playing cards (UI.md, "Cards").
-// Thorp beat blackjack by counting cards: remembering what was dealt to bet on what comes next. A
+// Nothing up my sleeve beat blackjack by counting cards: remembering what was dealt to bet on what comes next. A
 // Nevermore does the same in text, so each head is a card. A card turns face up (♠) when its head
 // reaches the Nevermore threshold on either test; until then its face shows through from the bottom
 // in proportion to how far it has come (score ÷ threshold), so a head that is forming is visible.

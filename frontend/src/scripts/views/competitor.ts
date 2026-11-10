@@ -1,11 +1,11 @@
-// One competitor (or a Thorp ship version): its chaining result, logic deck, cards and every rung
+// One competitor (or a Nothing up my sleeve ship version): its chaining result, logic deck, cards and every rung
 // (UI.md "Leaderboard"). Typed HTML fragments for the island; the charts are drawn by the island after
 // render, because ECharts needs the browser.
 
 import { CARD_FACE, deckHand } from '../../lib/deck';
 import { esc, fmt, fmtParams, signed } from '../../lib/format';
 import { cardCls, emptyCls, pillCls } from '../../lib/ui';
-import { cardBadge, shortAbout } from './helpers';
+import { cardBadge, hms, shortAbout } from './helpers';
 
 type Payload = any;
 const LOGIC_VARIANTS: [string, string][] = [['lift_one_hop', 'one hop'], ['lift_both', 'two hops (both premises)'], ['lift_three_hop', 'three hops'], ['lift_first', 'first premise only'], ['lift_second', 'second premise only'], ['lift_swapped', 'premises swapped'], ['lift_padded', 'a third fact added']];
@@ -26,6 +26,7 @@ export interface CompetitorHtml {
   bridge: { curve: number[]; lit: boolean; threshold: number | null } | null;
   rungsHead: string;
   rungsBody: string;
+  bench: TestsHtml;
 }
 
 export function competitorHtml(d: Payload, stars: Payload[]): CompetitorHtml {
@@ -33,7 +34,7 @@ export function competitorHtml(d: Payload, stars: Payload[]): CompetitorHtml {
   const read = chainingTests.filter((t: any) => t.lift != null), mean = read.length ? read.reduce((a: number, t: any) => a + t.lift, 0) / read.length : null;
   const passed = chainingTests.filter((t: any) => t.performed).length, t = d.tenth;
   const title = d.label || d.model || 'competitor';
-  const pills = d.thorp ? `<span class="${pillCls('good')}">Thorp</span>${d.current ? '' : ` <span class="${pillCls('')}">not the current version</span>`}`
+  const pills = d.thorp ? `<span class="${pillCls('good')}">Nothing up my sleeve</span>${d.current ? '' : ` <span class="${pillCls('')}">not the current version</span>`}`
     : `${d.competitor ? `<span class="${pillCls('blue')}">2–4B competitor</span> ` : ''}${d.ladder ? `<span class="${pillCls('')}">reference ladder</span>` : ''}`;
   const over = d.thorp
     ? [
@@ -47,7 +48,7 @@ export function competitorHtml(d: Payload, stars: Payload[]): CompetitorHtml {
       ['made by', makerOf(d.model) || '–'],
       ['parameters', fmtParams(d.params)],
       ['checkpoint', `<span class="mono">${esc(d.model)}</span>`],
-      ['Thorp must match it at', d.competitor && d.params ? `<b>${fmtParams(t && t.smoke_at || d.params / 10)}</b> <span class="s">a tenth its size</span>${t && t.scored ? ['bending', 'linear'].filter((k) => t[k]).map((k) => `<div class="s">${k === 'linear' ? 'straight' : k} forecast there ${signed(t[k].predicted)}${t[k].p_at_or_above_target != null ? ` · P ${Math.round(100 * t[k].p_at_or_above_target)}%` : ''}</div>`).join('') : ''}` : '<span class="s">not a competitor: a reference model that grades the chains</span>'],
+      ['Nothing up my sleeve must match it at', d.competitor && d.params ? `<b>${fmtParams(t && t.smoke_at || d.params / 10)}</b> <span class="s">a tenth its size</span>${t && t.scored ? ['bending', 'linear'].filter((k) => t[k]).map((k) => `<div class="s">${k === 'linear' ? 'straight' : k} forecast there ${signed(t[k].predicted)}${t[k].p_at_or_above_target != null ? ` · P ${Math.round(100 * t[k].p_at_or_above_target)}%` : ''}</div>`).join('') : ''}` : '<span class="s">not a competitor: a reference model that grades the chains</span>'],
     ].map(([k, v]) => `<div><div class="k">${k}</div><div>${v}</div></div>`).join('');
   const L = d.logic;
   const sum = !d.scored ? `<div class="${emptyCls()}">not scored yet: the competitors are being scored now, a few minutes each</div>`
@@ -85,7 +86,7 @@ export function competitorHtml(d: Payload, stars: Payload[]): CompetitorHtml {
   const width = Math.max(...d.chains.map((c: any) => c.rungs.length - 1));
   const rungsHead = `<tr><th>chain</th>${d.chains[0].rungs.slice(0, width).map((r: any) => `<th>${esc(r.rung || '')}</th>`).join('')}</tr>`;
   const rungsBody = d.chains.map((c: any) => `<tr><td><a href="/discoveries/chains/${esc(c.key)}"><b>${esc(c.name)}</b></a></td>${c.rungs.slice(0, width).map((r: any) => `<td><a href="/discoveries/${esc(r.key)}">${esc(r.name)}</a><div class="${r.performed ? 'good' : 's'}">${r.lift != null ? `${signed(r.lift)} · ${r.score != null ? Math.round(100 * r.score) + '%' : ''}${r.performed ? ' ✓' : ''}` : 'not read'}</div></td>`).join('')}</tr>`).join('');
-  return { title, pills, over, sum, tests, cards, variants, relations, bridge, rungsHead, rungsBody };
+  return { title, pills, over, sum, tests, cards, variants, relations, bridge, rungsHead, rungsBody, bench: testsHtml((d as any).tests) };
 }
 
 export async function drawCompetitorCharts(html: CompetitorHtml, thorp: boolean): Promise<void> {
@@ -106,4 +107,70 @@ export async function drawCompetitorCharts(html: CompetitorHtml, thorp: boolean)
     plot('cpbridge', [{ x: b.curve.map((_, i) => i), y: b.curve, mode: 'lines+markers', line: { color: b.lit ? tok('good') : tok('blue'), width: 1.6 }, hovertemplate: 'layer %{x}: %{y:.2f}<extra></extra>' }],
       layout({ height: 160, margin: { l: 40, r: 10, t: 6, b: 30 }, showlegend: false, xaxis: { title: { text: 'layer' }, dtick: Math.max(1, Math.round(b.curve.length / 8)) }, shapes: b.threshold != null ? [{ type: 'line', xref: 'paper', x0: 0, x1: 1, y0: b.threshold, y1: b.threshold, line: { color: tok('accent'), dash: 'dot', width: 1 } }] : [] }));
   }
+}
+
+// ---------------------------------------------------------------- the Tests tab
+// Every benchmark recorded on a model lives here, MATH-500 first (`math500-<model>` in
+// s4.outside_readings, written by thorp.math_heads). Each test gets a summary, its breakdown by subject
+// and by level, and the heads that triggered most often while the model wrote its reasoning.
+export interface TestPayload {
+  key: string; name: string; about: string;
+  accuracy: number | null; correct: number; graded: number; n: number; truncated: number;
+  tokens_cap: number; mean_answer_tokens: number; seconds: number; run_at: string;
+  by_subject: Record<string, { n: number; graded: number; correct: number; accuracy: number | null; mean_answer_tokens: number }>;
+  by_level: Record<string, { n: number; graded: number; correct: number; accuracy: number | null; mean_answer_tokens: number }>;
+  heads: { heads?: any[]; selective?: any[]; n_heads?: number; n_questions?: number };
+}
+
+export interface TestsHtml {
+  rows: { key: string; name: string; html: string }[];
+  empty: string;
+  charts: { id: string; title: string; labels: string[]; values: number[] }[];
+}
+
+const pct = (v: number | null): string => (v == null ? '–' : `${(100 * v).toFixed(1)}%`);
+const headName = (d: any): string => `L${String(d.layer).padStart(2, '0')}.H${String(d.head).padStart(2, '0')}`;
+const routeLabel: Record<string, string> = { number: 'numbers', operator: 'operators', word: 'words', command: 'LaTeX', problem: 'the problem', sink: 'the opening mark' };
+
+export function testsHtml(tests: TestPayload[] | null | undefined): TestsHtml {
+  if (!tests || !tests.length) {
+    return { rows: [], empty: `<div class="${emptyCls()}">no benchmark test is recorded on this model yet. The first is MATH-500: 500 competition problems, thinking on, every head's attention traced over the answer (thorp.math_heads).</div>`, charts: [] };
+  }
+  const rows: TestsHtml['rows'] = [];
+  const charts: TestsHtml['charts'] = [];
+  tests.forEach((t, ti) => {
+    const sum = `<div class="tfs"><b>${pct(t.accuracy)}</b><span>accuracy, of the answers that finished${t.accuracy == null ? '' : ` (${t.correct} of ${t.graded})`}</span></div>
+      <div class="tfs"><b>${t.n}</b><span>questions asked${t.truncated ? `; ${t.truncated} hit the ${t.tokens_cap}-token cap and are not graded` : `, all finished within ${t.tokens_cap} tokens`}</span></div>
+      <div class="tfs"><b>${t.mean_answer_tokens != null ? Math.round(t.mean_answer_tokens) : '–'}</b><span>tokens a reasoning trace, on average</span></div>
+      <div class="tfs"><b>${t.seconds != null ? hms(t.seconds) : '–'}</b><span>the run${t.run_at ? `, ${esc(String(t.run_at).replace('T', ' '))}` : ''}</span></div>`;
+
+    const subj = Object.entries(t.by_subject || {})
+      .sort((a, b) => (b[1].n - a[1].n) || a[0].localeCompare(b[0]))
+      .map(([k, v]) => `<tr><td>${esc(k)}</td><td>${v.n}</td><td>${v.graded}</td><td class="${v.accuracy != null && v.accuracy >= (t.accuracy ?? 0) ? 'good' : ''}">${pct(v.accuracy)}</td><td>${Math.round(v.mean_answer_tokens)}</td></tr>`).join('');
+    const lvl = Object.entries(t.by_level || {})
+      .sort((a, b) => Number(a[0]) - Number(b[0]))
+      .map(([k, v]) => `<tr><td>level ${esc(k)}</td><td>${v.n}</td><td>${v.graded}</td><td>${pct(v.accuracy)}</td><td>${Math.round(v.mean_answer_tokens)}</td></tr>`).join('');
+    charts.push({ id: `cptestchart${ti}`, title: `accuracy by subject, ${t.name}`, labels: Object.keys(t.by_subject || {}), values: Object.values(t.by_subject || {}).map((v) => (v.accuracy ?? 0) * 100) });
+
+    const all = (t.heads?.heads || []).slice(0, 8);
+    const sel = (t.heads?.selective || []).slice(0, 8);
+    const hrow = (d: any) => `<tr><td class="mono">${headName(d)}</td><td>${d.questions}</td><td>${(100 * d.mean_trigger).toFixed(0)}%</td><td>${routeLabel[d.top_route] || esc(d.top_route || '–')}</td><td>${d.mean_selectivity != null ? `${d.mean_selectivity.toFixed(1)}×` : '–'}</td></tr>`;
+    const heads = `<div class="row">
+      <div><div class="k">Heads that triggered most often <span class="s">over every answer's tokens; the count is of questions where the head was among the 12 strongest readers</span></div>
+        <div class="scroll"><table data-nosort><thead><tr><th>head</th><th>questions</th><th>mean trigger</th><th>aimed at</th><th></th></tr></thead><tbody>${all.map(hrow).join('')}</tbody></table></div></div>
+      <div><div class="k">Heads aimed at content <span class="s">the same readings, less the sink heads: what its attention went to rather than the window's opening mark</span></div>
+        <div class="scroll"><table data-nosort><thead><tr><th>head</th><th>questions</th><th>mean trigger</th><th>aimed at</th><th>selectivity</th></tr></thead><tbody>${sel.map(hrow).join('') || '<tr><td colspan="5" class="s">no content-aimed head rose yet</td></tr>'}</tbody></table></div></div></div>`;
+
+    rows.push({
+      key: t.key, name: t.name,
+      html: `<div class="k">${esc(t.name)} <span class="s">${esc(t.about || '')}</span></div>
+        <div class="cpsum">${sum}</div>
+        <div class="row">
+          <div><div class="k">By subject</div><div class="scroll"><table data-nosort><thead><tr><th>subject</th><th>asked</th><th>graded</th><th>accuracy</th><th>tokens</th></tr></thead><tbody>${subj}</tbody></table></div></div>
+          <div><div class="k">By level <span class="s">MATH's own difficulty, 1 to 5</span></div><div class="scroll"><table data-nosort><thead><tr><th>level</th><th>asked</th><th>graded</th><th>accuracy</th><th>tokens</th></tr></thead><tbody>${lvl}</tbody></table></div></div>
+        </div>
+        ${heads}`,
+    });
+  });
+  return { rows, empty: '', charts };
 }

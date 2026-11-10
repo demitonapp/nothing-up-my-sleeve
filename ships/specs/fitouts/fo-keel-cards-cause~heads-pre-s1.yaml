@@ -62,6 +62,7 @@ eval:
   - stars
   - nevermore
   - cards
+  - soundings
   light:
     every_steps: 100
     evaluators:

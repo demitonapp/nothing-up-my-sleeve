@@ -1,4 +1,4 @@
-"""Thorp's fleet: stars, ships, voyages and loops, defined once (2026-11-07, Justin).
+"""Nothing up my sleeve's fleet: stars, ships, voyages and loops, defined once (2026-11-07, Justin).
 
 The words the experiments are run in, as types, so the harness, the queue, the steering sessions
 and the dashboard all read one definition instead of spec comments, scripts and prose.
@@ -814,7 +814,7 @@ CHAINS: dict[str, Chain] = {
 
 # the reference ladder for grading the chains (Justin, 10:10: "each test must get harder as it moves up
 # the classes"): one model family in graded sizes, trained on modern text, so it measures how hard a
-# test is, never what a Thorp class should score; Qwen3 0.6B, 1.7B and 4B on top (the 4B shows a
+# test is, never what a Nothing up my sleeve class should score; Qwen3 0.6B, 1.7B and 4B on top (the 4B shows a
 # rung is within reach: a pair it gets wrong is mended, not kept as hard)
 REFERENCE_LADDER = (
     "EleutherAI/pythia-14m",
@@ -829,7 +829,7 @@ REFERENCE_LADDER = (
 
 
 # the perch (Justin, 11:15: "it should be smoking that size range and not only Qwen"): the outside
-# models of 2B to 4B that Thorp must match at a tenth of their size; scored on the same pairs as the
+# models of 2B to 4B that Nothing up my sleeve must match at a tenth of their size; scored on the same pairs as the
 # reference ladder, but never used to grade the chains (they are the opponents, not the ruler)
 COMPETITORS: dict[str, tuple[str, float]] = {
     # model: (label, total parameters)
@@ -1031,7 +1031,7 @@ FITOUTS: dict[str, Fitout] = {
         Fitout(
             key="keel-cards-cause",
             clean="raw",
-            name="Thorp 300k: the four cards, leaning on cause and effect",
+            name="Nothing up my sleeve 300k: the four cards, leaning on cause and effect",
             preset=NURSERY,
             aim="Draw the four necessary cards (previous-word, the Nevermore, the mover, the comparator) at 300k, "
             "and lean the reading excessively towards cause and effect, the form of chaining Qwen3 4B performs "
@@ -1088,7 +1088,7 @@ FITOUTS: dict[str, Fitout] = {
         Fitout(
             key="pilot-cards-cause",
             clean="raw",
-            name="Thorp 1m: the four cards, leaning on cause and effect",
+            name="Nothing up my sleeve 1m: the four cards, leaning on cause and effect",
             preset=PROXY,
             aim="The keel's fitout one class up (the same stages, shelves and tacks; the pilot's vocabulary and "
             "learning rate), so the two classes' card censuses compare stage for stage.",
@@ -1535,7 +1535,7 @@ def expedition_of_label(name: str | None, label: str | None) -> str | None:
     if (label or "").startswith("Fitout: Ogden"):
         return "ogden"
     if (label or "").startswith(
-        ("Cards:", "Fitout: Thorp")
+        ("Cards:", "Fitout: Nothing up my sleeve")
     ):  # the census runs as the fitout's variations
         return "card_census"
     if (label or "").startswith("Two facts"):
@@ -2214,7 +2214,7 @@ EXPEDITIONS: dict[str, Expedition] = {
         Expedition(
             key="induction",
             name="Discovering the induction head",
-            goal="The first Thorp to grow an induction head (the Nevermore, natural score 0.3): the 300k first, fed text at "
+            goal="The first Nothing up my sleeve to grow an induction head (the Nevermore, natural score 0.3): the 300k first, fed text at "
             "the Pareto frontier of in-window trigram repetition (thorp/trigrams.py), period books only, against a twin "
             "fitout of the same shelves and amounts with books chosen at random (Justin, 14:40; top of the queue).",
             ship="Fitout: Trigram engine",
@@ -2301,7 +2301,7 @@ EXPEDITIONS: dict[str, Expedition] = {
         Expedition(
             key="smallest_bridge",
             name="The Smallest Bridge",
-            goal="The smallest Thorp that plays the Bridge, the Mover and the Counter (Justin, 2026-11-08 08:00: 'a "
+            goal="The smallest Nothing up my sleeve that plays the Bridge, the Mover and the Counter (Justin, 2026-11-08 08:00: 'a "
             "plan for an expedition using numerous size ships in order to get the bridge card and the mover and counter "
             "at the lowest size possible ... take their learnings to follow up journeys'; 08:20: 'get the rare word and "
             "premise maker into the model as soon as possible, then try simulate the bridge and then move to see if we "
@@ -2436,7 +2436,7 @@ TERMS = {
     "voyage": "one ship's run: one spec trained once, with its run id, in the ledger's runs table; "
     "what was called a run",
     "ship": "a class and a fitout; its voyages are its sailings",
-    "library": "a book list Thorp reads from, scores on or refuses (thorp/library.py; the ship's two "
+    "library": "a book list Nothing up my sleeve reads from, scores on or refuses (thorp/library.py; the ship's two "
     "stores are the canonical libraries); what was called a shelf",
     "library aboard": "the libraries a voyage carried, with each one's books, tokens and hash "
     "(library.aboard(run_id))",

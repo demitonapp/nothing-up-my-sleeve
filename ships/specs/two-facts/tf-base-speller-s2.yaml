@@ -46,6 +46,7 @@ eval:
   - successor
   - logic
   - cards
+  - soundings
   light:
     every_steps: 250
     evaluators:

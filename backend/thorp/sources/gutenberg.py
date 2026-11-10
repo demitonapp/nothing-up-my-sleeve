@@ -191,9 +191,26 @@ def resolve(row: ListRow, overrides: dict | None = None) -> Resolution:
     return res
 
 
+_RESOLVED_LISTS: dict[str, tuple[tuple[int, int], list[Resolution]]] = {}
+
+
 def resolve_list(path: str | Path) -> list[Resolution]:
+    """Resolve a list once per version of it: the store lists are large, and the governance audit
+    resolves the same two lists over and over (10 November: /api/governance spent 3.2 s here). Cached
+    on the list's and the overrides' mtimes, so editing either one re-resolves."""
+    p = paths.resolve(path)
+    ov = paths.resolve("lists/overrides.csv")
+    key = (
+        p.stat().st_mtime_ns if p.exists() else 0,
+        ov.stat().st_mtime_ns if ov.exists() else 0,
+    )
+    hit = _RESOLVED_LISTS.get(str(p))
+    if hit is not None and hit[0] == key:
+        return hit[1]
     overrides = load_overrides()
-    return [resolve(r, overrides) for r in read_list(path)]
+    out = [resolve(r, overrides) for r in read_list(path)]
+    _RESOLVED_LISTS[str(p)] = (key, out)
+    return out
 
 
 def write_resolution_csv(list_path: str | Path, resolutions: list[Resolution]) -> Path:

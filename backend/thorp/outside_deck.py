@@ -1,9 +1,9 @@
 """The whole deck read on an outside model (Justin, 2026-11-08 08:40: "is there a 100m model I can compare it against
-to score it"; "do it"): all 16 cards, read by the same evaluators that read Thorp (stars, pips, nevermore, cards),
-inside the model through thorp.inside.Inside, so Pythia, Qwen or any MLX-LM model can be set beside a Thorp card by
+to score it"; "do it"): all 16 cards, read by the same evaluators that read Nothing up my sleeve (stars, pips, nevermore, cards),
+inside the model through thorp.inside.Inside, so Pythia, Qwen or any MLX-LM model can be set beside a Nothing up my sleeve card by
 card, and the deck's rules (wager.falls) say which it plays.
 
-- **The tokeniser** (`OutsideTok`): the model's own, as the evaluators expect a Thorp tokeniser: an id, the document
+- **The tokeniser** (`OutsideTok`): the model's own, as the evaluators expect a Nothing up my sleeve tokeniser: an id, the document
   start piece (as grade_chains reads it: the model's beginning-of-text, else <|endoftext|>, else its end), each
   piece's bytes (so the delimiter and the word classes are found among *its* pieces), and each book's pieces, read
   from the book's text cleaned as the voyages read it (cleaning.CURRENT).
@@ -21,7 +21,7 @@ import time
 
 import numpy as np
 
-NATURAL_CONTEXT = 1024  # the window the readings use, as a Thorp voyage's (1,024 pieces)
+NATURAL_CONTEXT = 1024  # the window the readings use, as a Nothing up my sleeve voyage's (1,024 pieces)
 
 
 class OutsideTok:

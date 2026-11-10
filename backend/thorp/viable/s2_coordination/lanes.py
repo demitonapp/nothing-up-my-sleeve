@@ -27,7 +27,9 @@ thorp.viable.s2_coordination.lanes`. Log: data/runs/queue.out, as before.
 from __future__ import annotations
 
 import contextlib
+import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -40,14 +42,28 @@ LANES = ("mac", "vast")
 
 
 def slots_of(lane: str) -> int:
-    """How many lines this lane may have at sea at once: THORP_MAC_SLOTS for the Mac (one by default),
-    always one on a hired box (the charter terms count voyages, not seats)."""
+    """How many lines this lane may have at sea at once: THORP_MAC_SLOTS for the Mac, else the seats
+    `s2.lanes` holds (the dashboard's control, and the value the UI shows), one on a hired box (the
+    charter terms count voyages, not seats)."""
     if lane != "mac":
         return 1
+    env = os.environ.get("THORP_MAC_SLOTS")
+    if env:
+        try:
+            return max(1, int(env))
+        except ValueError:
+            pass
     try:
-        return max(1, int(os.environ.get("THORP_MAC_SLOTS", "1")))
-    except ValueError:
-        return 1
+        from thorp import store
+        from thorp.viable.records import Lane
+
+        with store.session() as s:
+            r = s.get(Lane, "mac")
+            if r is not None and r.seats:
+                return max(1, min(8, int(r.seats)))
+    except Exception:  # noqa: BLE001 - no store on a box: one seat
+        pass
+    return 1
 
 
 @dataclass
@@ -64,6 +80,7 @@ class Line:
     reads: list[str] = field(
         default_factory=list
     )  # the runs it reads from (seed, teacher, donor), by name
+    timeout: int | None = None  # seconds a cmd: line may run; None is no limit
 
 
 def _load_spec(rel: str, specs: Path) -> dict | None:
@@ -85,7 +102,14 @@ def parse(text: str, specs: Path | None = None) -> Line:
     if s.startswith("vast:"):
         lane, s = "vast", s[len("vast:") :].strip()
     if s.startswith("cmd:"):
-        return Line(text.strip(), lane, "cmd", s[len("cmd:") :].strip())
+        body = s[len("cmd:") :].strip()
+        # cmd:[timeout=90m] <command>: a queued audit gets a deadline; a bare cmd: keeps running until it
+        # ends (the old behaviour). Seconds, minutes (the default) or hours.
+        m = re.match(r"\[timeout=(\d+)([smh]?)\]\s*(.+)$", body)
+        if m:
+            seconds = int(m.group(1)) * {"s": 1, "m": 60, "h": 3600}[m.group(2) or "m"]
+            return Line(text.strip(), lane, "cmd", m.group(3).strip(), timeout=seconds)
+        return Line(text.strip(), lane, "cmd", body)
     if s.startswith("wait:"):
         return Line(text.strip(), lane, "wait", s[len("wait:") :].strip())
     ln = Line(text.strip(), lane, "spec", s)
@@ -105,8 +129,32 @@ def parse(text: str, specs: Path | None = None) -> Line:
 
 
 def _queue_pg() -> bool:
-    """The one store answers for the queue: THORP_QUEUE_PG=1 (the cut-over)."""
-    return os.environ.get("THORP_QUEUE_PG") == "1"
+    """The one store answers for the queue: `queue_store.enabled()` (Postgres on the Mac by default)."""
+    from thorp.viable.s2_coordination import queue_store
+
+    return queue_store.enabled()
+
+
+TWO_AT_ONCE = {"300k"}  # the only preset that may share the Mac's GPU with a second line of the same size
+
+
+def preset_of(ln: Line) -> str | None:
+    """The model preset a spec line builds, when it names one."""
+    return str(((ln.spec or {}).get("model") or {}).get("preset") or "") or None
+
+
+def capacity_for(lane: str, lines: list[Line], running: dict[str, list]) -> int:
+    """A lane's seats, capped on the Mac so a second seat is used only for 300k-scale lines: two 1m or 9m
+    voyages on one GPU do not fit, and the stored seat count is per lane, not per class."""
+    cap = slots_of(lane)
+    if lane != "mac" or cap <= 1:
+        return cap
+    nxt = next((ln for ln in lines if ln.lane == lane), None)
+    if nxt is None or preset_of(nxt) not in TWO_AT_ONCE:
+        return 1
+    if any(preset_of(s["line"]) not in TWO_AT_ONCE for s in running.get("mac", [])):
+        return 1
+    return cap
 
 
 def pending(queue: Path) -> list[str]:
@@ -339,12 +387,13 @@ def _write_state(running: dict) -> None:
     from thorp import store
     from thorp.viable.records import Lane
 
+    slots = {lane: slots_of(lane) for lane in running}  # before the write session: never nest sessions
     with store.session() as s:
         for lane, seats in running.items():
             first = seats[0] if seats else None
             line = " + ".join(x["line"].text for x in seats) if seats else None
             s.merge(Lane(lane=lane, line=line, pid=first["proc"].pid if first else None,
-                         since=first["since"] if first else None, seats=slots_of(lane)))  # fmt: skip
+                         since=first["since"] if first else None, seats=slots[lane]))  # fmt: skip
 
 
 def state() -> dict:
@@ -370,13 +419,149 @@ def state() -> dict:
     return out
 
 
+def _alive(pid: int) -> bool:
+    try:
+        os.kill(int(pid), 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+class _Adopted:
+    """A command this coordinator started before a restart: still alive, but not our child, so there is no
+    exit code to collect — poll() reports -1 when the pid is gone."""
+
+    def __init__(self, pid: int):
+        self.pid = int(pid)
+        self.returncode: int | None = None
+
+    def poll(self) -> int | None:
+        if _alive(self.pid):
+            return None
+        self.returncode = -1
+        return -1
+
+    def terminate(self) -> None:
+        with contextlib.suppress(ProcessLookupError, PermissionError):
+            os.kill(self.pid, 15)
+
+    def kill(self) -> None:
+        with contextlib.suppress(ProcessLookupError, PermissionError):
+            os.kill(self.pid, 9)
+
+
+def _stop(proc, grace: float = 2.0) -> int:
+    """End a seat's process (a timed-out cmd:), gently then hard; returns the code it left."""
+    if proc.poll() is not None:
+        return proc.returncode
+    with contextlib.suppress(Exception):
+        proc.terminate()
+    for _ in range(max(1, int(grace / 0.2))):
+        time.sleep(0.2)
+        if proc.poll() is not None:
+            return proc.returncode
+    with contextlib.suppress(Exception):
+        proc.kill()
+    for _ in range(10):
+        time.sleep(0.2)
+        if proc.poll() is not None:
+            return proc.returncode
+    return -9
+
+
+def _procs_path(root: Path | None = None) -> Path:
+    return (root or paths.ROOT) / "data" / "queue-procs.json"
+
+
+def _write_procs(running: dict, root: Path | None = None) -> None:
+    """Keep the pids of what is out, so a restarted coordinator can adopt a live `cmd:` instead of starting
+    another over it. Process state, not queue state: the queue itself is the store."""
+    entries = []
+    for lane, seats in running.items():
+        for seat in seats:
+            entries.append(
+                {
+                    "lane": lane,
+                    "text": seat["line"].text,
+                    "kind": seat["line"].kind,
+                    "pid": seat["proc"].pid,
+                    "since": seat.get("since"),
+                    "started": seat.get("started") or seat.get("since"),
+                    "since_ts": seat.get("since_ts"),
+                    "slot": seat.get("slot", 0),
+                }
+            )
+    p = _procs_path(root)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    tmp = p.with_suffix(".tmp")
+    tmp.write_text(json.dumps(entries), encoding="utf-8")
+    tmp.replace(p)
+
+
+def _read_procs(root: Path | None = None) -> list[dict]:
+    p = _procs_path(root)
+    if not p.exists():
+        return []
+    with contextlib.suppress(Exception):
+        return json.loads(p.read_text(encoding="utf-8")) or []
+    return []
+
+
+def _reap_runs(say) -> int:
+    """Close ledger rows still marked running that hold no helm and started over an hour ago. A voyage killed
+    with a signal never writes a finish, so without this they return as ghosts on every page (10 November:
+    nine 9m/1m arms). The hour keeps a run launched a moment ago, before it takes its helm, out of it."""
+    if not _queue_pg():
+        return 0  # the file queue's ledger is a box's SQLite; nothing to reap from the store here
+    from datetime import datetime
+
+    from sqlalchemy import text
+
+    from thorp import store, vsm
+
+    live = {h.get("name") for h in vsm.helms(8)}
+    cutoff = time.time() - 3600
+    with store.session() as s:
+        rows = s.execute(
+            text("select run_id, name, started from s1.runs where status='running'")
+        ).fetchall()
+        stale = []
+        for run_id, name, started in rows:
+            if name in live:
+                continue
+            try:
+                ts = datetime.fromisoformat(str(started)).timestamp()
+            except (TypeError, ValueError):
+                continue  # no start time: leave it, do not guess
+            if ts < cutoff:
+                stale.append(run_id)
+        for run_id in stale:
+            s.execute(
+                text("update s1.runs set status='stopped' where run_id=:rid"), {"rid": run_id}
+            )
+    if stale:
+        say(f"S2: closed {len(stale)} run(s) the ledger still had at sea, with no helm")
+    return len(stale)
+
+
 def _record(done: Path, text: str, started: str, status) -> None:
-    """Write a line that ended to queue-done.txt, or to queue_history when the store is the queue."""
+    """Write a line that ended to queue-done.txt, or to queue_history when the store is the queue. If the
+    store refuses it, keep it in the file and carry on: a record must never kill the coordinator (10
+    November: a stale id sequence took the queue down on the exit of a finished voyage)."""
     if _queue_pg():
         from thorp.viable.s2_coordination import queue_store
 
-        queue_store.record(text, started, status)
-        return
+        try:
+            queue_store.record(text, started, status)
+            return
+        except Exception as e:  # noqa: BLE001 - the file keeps what the store could not
+            print(
+                f"[{time.strftime('%H:%M:%S')}] queue_history could not record {text}: {e}"
+                f"; kept in {done}",
+                flush=True,
+            )
     with done.open("a", encoding="utf-8") as f:
         f.write(f"{started} {text} {status}\n")
 
@@ -402,6 +587,13 @@ def run(queue: Path | None = None, done: Path | None = None, root: Path | None =
                 parents=True, exist_ok=True
             )  # a voyage's log folder is made here, never forgotten
             out = open(out_path, "w")  # noqa: SIM115
+        elif ln.kind == "cmd":
+            # a queued audit or probe gets its own log, not the coordinator's: `cmd:` output interleaved
+            # into queue.out is unreadable exactly when the audit is the thing you are watching for
+            slug = re.sub(r"[^A-Za-z0-9_.-]+", "-", ln.payload).strip("-")[:70] or "cmd"
+            out_path = root / "data" / "runs" / f"cmd-{slug}.out"
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+            out = open(out_path, "w")  # noqa: SIM115
         cmd = command(ln)
         env = {**os.environ, "THORP_HELM_SLOT": str(slot), "THORP_HELM_SLOTS": str(slots_of("mac"))}
         p = subprocess.Popen(
@@ -420,20 +612,73 @@ def run(queue: Path | None = None, done: Path | None = None, root: Path | None =
     launch = launch or default_launch
     running: dict[str, list[dict]] = {lane: [] for lane in LANES}
     told: dict[str, str | None] = {lane: None for lane in LANES}
+    attempts: dict[str, int] = {}
+    # adopt what a crashed coordinator left running: a `cmd:` holds no helm, so nothing else knows it is out
+    for e in _read_procs(root):
+        if e.get("kind") != "cmd" or not _alive(int(e.get("pid") or 0)):
+            continue
+        ln = parse(str(e.get("text") or ""), specs)
+        if ln.kind != "cmd":
+            continue
+        lane = e.get("lane") if e.get("lane") in LANES else "mac"
+        since = e.get("since") or time.strftime("%Y-%m-%dT%H:%M:%S")
+        running[lane].append(
+            {
+                "line": ln,
+                "proc": _Adopted(int(e["pid"])),
+                "since": since,
+                "started": e.get("started") or since,
+                "since_ts": float(e.get("since_ts") or time.time()),
+                "slot": int(e.get("slot") or 0),
+            }
+        )
+        say(f"[{lane}] adopted {ln.text} (pid {e['pid']})")
+    try:
+        _reap_runs(say)
+    except Exception as e:  # noqa: BLE001 - a cleanup must never stop the queue
+        say(f"S2: could not close stale runs: {e}")
     while True:
         # the seats that ended (a lane may hold several now)
         for lane, seats in running.items():
             for seat in list(seats):
-                if seat["proc"].poll() is not None:
-                    code = seat["proc"].returncode
+                code = seat["proc"].poll()
+                timeout = seat["line"].timeout
+                if (
+                    code is None
+                    and timeout
+                    and time.time() - float(seat.get("since_ts") or time.time()) > timeout
+                ):
+                    label = f"{timeout // 60} min" if timeout >= 60 else f"{timeout} s"
+                    say(f"[{lane}] {seat['line'].text} timed out after {label}")
+                    code = _stop(seat["proc"])
+                if code is not None:
                     say(f"[{lane}] {seat['line'].text} exited {code}")
-                    _record(done, seat["line"].text, time.strftime("%Y-%m-%dT%H:%M:%S"), code)
+                    _record(
+                        done,
+                        seat["line"].text,
+                        seat.get("started")
+                        or seat.get("since")
+                        or time.strftime("%Y-%m-%dT%H:%M:%S"),
+                        code,
+                    )
                     _children.discard(seat["proc"].pid)
+                    attempts.pop(seat["line"].text, None)
                     seats.remove(seat)
-        lines = [parse(t, specs) for t in pending(queue)]
+        try:
+            raw = pending(queue)
+        except store.StoreDown as e:  # the store is the queue: wait for it, do not die on it
+            say(f"S2: the queue could not be read: {e}")
+            time.sleep(poll_s)
+            continue
+        lines = []
+        for t in raw:
+            try:
+                lines.append(parse(t, specs))
+            except Exception as e:  # noqa: BLE001 - one unreadable line must not stop the lane
+                say(f"S2: cannot read the queue line {t!r}: {e}")
         have_key = key()
         for lane in LANES:
-            capacity = slots_of(lane)
+            capacity = capacity_for(lane, lines, running)
             while len(running[lane]) < capacity:
                 at_sea = [seat["line"] for seats in running.values() for seat in seats]
                 ln, why = next_for(lane, lines, at_sea, have_key)
@@ -457,21 +702,47 @@ def run(queue: Path | None = None, done: Path | None = None, root: Path | None =
                     continue
                 say(f"[{lane}] starting {ln.text}")
                 seat_no = len(running[lane])
-                p = launch(ln) if custom else launch(ln, seat_no)
+                try:
+                    p = launch(ln) if custom else launch(ln, seat_no)
+                except Exception as e:  # noqa: BLE001 - one broken line must not take the queue down
+                    # the line was taken; retry it twice (requeued at the end, so it cannot wedge the head),
+                    # then record the failure and let the queue go on
+                    n = attempts.get(ln.text, 0) + 1
+                    attempts[ln.text] = n
+                    if n < 3:
+                        say(f"[{lane}] {ln.text} could not start (attempt {n}/3): {e}")
+                        with contextlib.suppress(Exception):
+                            append(queue, ln.text)
+                    else:
+                        say(f"[{lane}] {ln.text} could not start after 3 attempts: {e}")
+                        _record(done, ln.text, time.strftime("%Y-%m-%dT%H:%M:%S"), 1)
+                        attempts.pop(ln.text, None)
+                    lines = [x for x in lines if x is not ln]
+                    continue
                 _children.add(p.pid)
+                now = time.strftime("%Y-%m-%dT%H:%M:%S")
                 running[lane].append(
-                    {"line": ln, "proc": p, "since": time.strftime("%Y-%m-%dT%H:%M:%S"), "slot": seat_no}
+                    {
+                        "line": ln,
+                        "proc": p,
+                        "since": now,
+                        "started": now,
+                        "since_ts": time.time(),
+                        "slot": seat_no,
+                    }
                 )
                 lines = [x for x in lines if x is not ln]
         try:
             _write_state(running)
-        except (
-            store.StoreDown
-        ) as e:  # said in the queue's log, every pass, until the store is back; the lanes sail on
+        except Exception as e:  # noqa: BLE001 - what is out is a record, not the work: the lanes sail on
             say(f"S2: what is out could not be recorded: {e}")
+        with contextlib.suppress(Exception):
+            _write_procs(running, root)
         idle = all(len(seats) == 0 for seats in running.values())
         left = [x for x in (parse(t, specs) for t in pending(queue)) if x.lane == "mac" or have_key]
         if until_empty and idle and not left:
+            with contextlib.suppress(Exception):
+                _write_procs({}, root)
             say(
                 "queue empty"
                 + (
@@ -511,6 +782,12 @@ def one_coordinator(lock_path: Path | None = None):
 
 if __name__ == "__main__":
     os.chdir(paths.ROOT)
+    if _queue_pg():
+        why = store.ping()
+        if why:
+            print(f"[{time.strftime('%H:%M:%S')}] the queue is the store, and the store is not answering: {why}", flush=True)
+            print("  fix Postgres, or set THORP_QUEUE_PG=0 to run the file queue", flush=True)
+            sys.exit(1)
     try:
         with one_coordinator():
             run()

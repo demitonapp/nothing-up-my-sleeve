@@ -9,7 +9,7 @@ import { chose, mathsSource } from './ask';
 export const mathsCredit = (mathsData: any): string => {
   const b = mathsData.book;
   if (!b) return '';
-  return `<div class="mathcredit">After <b>${esc((b.author || '').replace(/^De Morgan, Augustus.*$/, 'Augustus De Morgan'))}</b>, <i>${esc(b.title)}</i> (${esc(b.edition)}): each chapter follows a section of his Book I, Principles of Arithmetic, in his order; the sums are in plain words, not his. <button type="button" class="${btnCls('outline', 'bookbtn')}" data-mbook="${esc(b.id)}" data-at="0">open the book</button>${b.in_ogden ? '' : ' <span class="s">Thorp\'s Ogden ships have not read it (it is in neither Ogden v0.1 nor v0.2): what they know of sums, they learnt elsewhere</span>'}</div>`;
+  return `<div class="mathcredit">After <b>${esc((b.author || '').replace(/^De Morgan, Augustus.*$/, 'Augustus De Morgan'))}</b>, <i>${esc(b.title)}</i> (${esc(b.edition)}): each chapter follows a section of his Book I, Principles of Arithmetic, in his order; the sums are in plain words, not his. <button type="button" class="${btnCls('outline', 'bookbtn')}" data-mbook="${esc(b.id)}" data-at="0">open the book</button>${b.in_ogden ? '' : ' <span class="s">Nothing up my sleeve\'s Ogden ships have not read it (it is in neither Ogden v0.1 nor v0.2): what they know of sums, they learnt elsewhere</span>'}</div>`;
 };
 
 export const mathsIndex = (mathsData: any): string =>

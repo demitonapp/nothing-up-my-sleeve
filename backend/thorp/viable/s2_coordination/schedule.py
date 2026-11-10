@@ -1,6 +1,6 @@
-"""S2: Thorp's own schedule (Justin, 8 November: "thorps schedules tasks shouldn't be in claude code, but rather part of
+"""S2: Nothing up my sleeve's own schedule (Justin, 8 November: "thorps schedules tasks shouldn't be in claude code, but rather part of
 our VSM model and in postgres"). The jobs are rows in s2.schedule_jobs, every firing a row in s2.schedule_firings, and
-the judge of a job that needs judgment is S5's choice in s5.judges ("Thorps most capable model should judge it, claude
+the judge of a job that needs judgment is S5's choice in s5.judges ("Nothing up my sleeves most capable model should judge it, claude
 initially but eventually a thorp model").
 
     uv run thorp schedule tick           # fire what is due (run every minute by launchd: io.thorp.schedule)
@@ -298,7 +298,7 @@ def import_claude(listing: list[dict], tasks_dir: Path | None = None) -> list[st
     for t in listing:
         key = t["taskId"]
         if not key.startswith("thorp-"):
-            continue  # not Thorp's (land-search-recheck): left alone
+            continue  # not Nothing up my sleeve's (land-search-recheck): left alone
         meta, body = _front((tasks_dir / key / "SKILL.md").read_text(encoding="utf-8"))
         fire_at = datetime.fromisoformat(t["fireAt"].replace("Z", "+00:00")) if t.get("fireAt") else None
         put_job(key, title=t.get("title") or meta.get("name", key), description=t.get("description") or meta.get("description", ""),

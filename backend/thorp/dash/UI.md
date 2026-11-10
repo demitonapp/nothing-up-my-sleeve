@@ -100,19 +100,24 @@ holds the ways in, always:
   settings, Forgotten Tomes score and the step each star first lit, the score run by run, first
   light (each star's score against step, threshold dotted), outcomes and levers. A panel only one
   voyage has carries `data-voyage` (the book-value loop's fit).
-- **Discoveries** (`#/discoveries`): **Tricks of the trade**, in three subtabs: **Chaining two
-  facts** (`#/discoveries`, the trick in focus: where the claim stands, live; then **Methodology:
-  chaining two facts**, rendered as written in `fleet.METHODS["chaining"]` (the trick; its parts,
-  each covered, partly or not; the gaps; the planned controls of the logic deck; the metric,
-  chaining gain; the cards it needs, a card in the deck linking to the star chart and pulsing when
-  lit, a planned one dimmed; the status); then how it is measured and judged today: the matched
-  pairs with an example from each chaining test, lift, the rule, grading, the chaining lift, the
-  forecast and backtest, the pre-registered rule), **Quantum mechanics** (`#/discoveries/quantum`, the route of seven waypoints, then the
-  discovery chains table)
-  and **Registry of tricks** (`#/discoveries/registry`, every trick, with traits a link away) and
-  **Stars** (`#/discoveries/stars`: a grid of every star Thorp measures by class of ship, each cell
-  the class's best reading against the mark, green with the first lit step where a sailing lit it,
-  and the card judge's verdict; then the star cards, the bridge layer by layer and the star chart). A trick, a chain, the stars and the traits keep their own addresses beneath. A trick is what a model can do, judged
+- **Discoveries** (`#/discoveries`): **Tricks of the trade**, in four subtabs. **Overview**
+  (`#/discoveries`: the four questions, the sieve and the jobs the fleet finds). **Stars**
+  (`#/discoveries/stars`: a grid of every star Thorp measures by class of ship, each cell the
+  class's best reading against the mark, green with the first lit step where a sailing lit it, and
+  the card judge's verdict; then the star cards, the bridge layer by layer and the star chart).
+  **Skills** (`#/discoveries/skills`: the seven waypoints' ladder, the route to quantum physics and
+  the discovery chains table, then the registry of every trick, with its waypoint and field-band
+  filters and traits a link away). **Tests** (`#/discoveries/tests`: the four quantum chains rung by
+  rung, each rung openable to its questions; the 40 logic and 96 cause item decks; and **Chaining
+  two facts** — the trick in focus: where the claim stands, live; then **Methodology: chaining two
+  facts**, rendered as written in `fleet.METHODS["chaining"]` (the trick; its parts, each covered,
+  partly or not; the gaps; the planned controls of the logic deck; the metric, chaining gain; the
+  cards it needs, a card in the deck linking to the star chart and pulsing when lit, a planned one
+  dimmed; the status); then how it is measured and judged today: the matched pairs with an example
+  from each chaining test, lift, the rule, grading, the chaining lift, the forecast and backtest,
+  the pre-registered rule). The old **Chaining two facts** and **Registry of tricks** tabs are gone
+  (10 November): their addresses redirect to Tests and Skills. A trick, a chain, the stars and the
+  traits keep their own addresses beneath. A trick is what a model can do, judged
   from outside by its bets; the catalogue is `thorp/dash/tricks.py` (`KNOWN_TRICKS`, 40 tricks).
   The tricks are grouped into the seven **waypoints** on the route to quantum physics (`WAYPOINTS`:
   reading, knowing, counting, reasoning, mathematics, physics, discovery), shown first as the route
@@ -140,7 +145,7 @@ holds the ways in, always:
   Döbereiner's triads, the between test. The eternal return (the philosophy test, cutoff 1872): again
   and again, the refrain test, the seasons test, Hume and Lucretius, the pigeonhole test. All read on one evaluator and scale (lift: idea over rival,
   less what the words alone carry), and every class is scored on every rung.
-  **The discovery chains** table at the top of Discoveries has the four chains as rows in that fixed
+  **The discovery chains** table in Skills has the four chains as rows in that fixed
   order (from `fleet.chains()`) and the classes as columns, smallest first, so rungs line up class by
   class (a chain with no rung for a class shows "no rung"). Each cell is every class's best lift and
   best share of pairs right, with Qwen3 0.6B for scale. The last row, from `fleet.RUNGS`, says what
@@ -677,3 +682,17 @@ The page speaks the project's metaphor, consistently. Each word means one thing:
 | a tack | the ship's response to the wind: one training update (the "bump" of a perceptron), its direction from the wind and its size from the learning rate |
 | trim | how the tack is set: which guesses count and by how much, how big the step is, where it lands |
 | the sieves | how hard the wind pushes each layer (push, `grad_norm/`) and how far the sail actually moves (move, `update_ratio/`) |
+
+## Form fields (the one look, 10 November)
+
+Every field in the app is the same three parts, top to bottom:
+
+- a **label** (`.k`) above the control, in the dashboard's small caps;
+- the control itself from `fieldCls()` (`lib/ui.ts`) — never a raw `<input>` with its own width, border or padding;
+- a **hint or error** beneath it (`.s` for a hint, `.ferr` for an error).
+
+Rules:
+- one control per line in a form; two only where they are a pair (day/week, min/max) and then the same width;
+- a number field is `fieldCls('w-20')`, a name or key `fieldCls('w-72')`, a full-width textarea `fieldCls('w-full')`;
+- a button beside a field is `btnCls('outline')` and sits after it, never before;
+- the control's own placeholder says what to type, the hint says what it means; the label is not a placeholder.

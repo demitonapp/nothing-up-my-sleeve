@@ -18,7 +18,8 @@ def _spec(specs, rel, name, **extra):
 
 
 @pytest.fixture
-def harbour(tmp_path):
+def harbour(tmp_path, monkeypatch):
+    monkeypatch.setenv("THORP_QUEUE_PG", "0")  # these tests exercise the file queue, not the store
     specs = tmp_path / "specs"
     specs.mkdir()
     return {"root": tmp_path, "specs": specs, "queue": specs / "queue.txt", "done": specs / "queue-done.txt"}

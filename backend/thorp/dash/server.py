@@ -37,7 +37,7 @@ TYPES = {
     ".woff2": "font/woff2",
     ".json": "application/json",
 }
-NOT_BUILT = b"""<!doctype html><meta charset="utf-8"><title>Thorp</title>
+NOT_BUILT = b"""<!doctype html><meta charset="utf-8"><title>Nothing up my sleeve</title>
 <body style="background:#0e1116;color:#e6edf3;font:14px/1.5 ui-sans-serif,sans-serif;padding:40px">
 <h1 style="font-size:18px">The dashboard is not built yet</h1>
 <p>Build it once (and after any change under thorp/dash/web), then reload:</p>
@@ -539,6 +539,26 @@ def _last_scores(run_ids: list[str]) -> dict[str, dict[str, float]]:
     return out
 
 
+def _cause_by_run(run_ids: list[str]) -> dict[str, float]:
+    """Each run's latest cause gain in one query: the voyage grid's second reading (bpb is the first)."""
+    if not run_ids:
+        return {}
+    from thorp.ledger import reader
+
+    marks = ",".join("?" * len(run_ids))
+    rows = reader().query(
+        "select run_id, step, value from metrics"
+        f" where name='tricks/logic_test/gain_cause' and run_id in ({marks})",
+        list(run_ids),
+    )
+    best: dict[str, tuple[int, float]] = {}
+    for x in rows:
+        if x["run_id"] not in best or x["step"] > best[x["run_id"]][0]:
+            best[x["run_id"]] = (x["step"], x["value"])
+    return {k: v[1] for k, v in best.items()}
+
+
+
 def _fitting_out() -> list[dict]:
     """Ships registered in `s1.ships` that have not sailed a voyage yet, in service: moored in their harbour while
     they are fitted out (the four positions at the 1m, before their first voyage: only that expedition's ships for now)."""
@@ -583,6 +603,7 @@ def _api_ladder() -> dict:
     rows = _runs_rows()
     ships, ship_of = _ships(rows)
     last = _last_scores([r["run_id"] for r in rows])
+    causes = _cause_by_run([r["run_id"] for r in rows])
     voyage = _voyage_of()
     for r in rows:
         spec = json.loads(r.pop("spec_json") or "{}")
@@ -600,6 +621,9 @@ def _api_ladder() -> dict:
             "recipe": spec.get("data", {}).get("recipe"),
             "passes": spec.get("data", {}).get("passes"),
             "ft_en": m.get("eval/hole-cards-unseen/bpb_mean_en"),
+            # the voyage grid's second reading: the logic deck's cause gain, the one Qwen 4B shows
+            "cause": causes.get(r["run_id"]),
+            "logic": m.get("tricks/logic_test/gain"),
             "fleet": _fleet_of(r["ship"]),
             "ship_key": ship_of.get(r["run_id"]),
             "ship_name": ships[ship_of[r["run_id"]]]["name"] if r["run_id"] in ship_of else None,
@@ -684,18 +708,13 @@ def _model_params(preset: str) -> int:
 
 
 def _queue_lines() -> list[str]:
-    """The queue the coordinator runs: the store when THORP_QUEUE_PG=1, else specs/queue.txt."""
-    import os
+    """The queue the page shows: `s2.queue_lines`, always. The page is a view of the store, never of the
+    `specs/queue.txt` export: a store that cannot be read is an error, not a stale photograph (10 November,
+    Justin: "the page should only ever show postgres"). The file is written from the store as an export,
+    never read here."""
+    from thorp.viable.s2_coordination import queue_store
 
-    if os.environ.get("THORP_QUEUE_PG") == "1":
-        from thorp.viable.s2_coordination import queue_store
-
-        return queue_store.pending_texts()
-    return [
-        ln.strip()
-        for ln in paths.resolve("specs/queue.txt").read_text().splitlines()
-        if ln.strip() and not ln.lstrip().startswith("#")
-    ]
+    return queue_store.pending_texts()
 
 
 def api_expedition_plan(key: str = "kipling") -> dict:
@@ -749,6 +768,86 @@ def api_expedition_plan(key: str = "kipling") -> dict:
             "expedition": fleet.expedition_of_label(spec.get("name"), spec.get("ship")),
         })
     return {"key": key, "queue": rows}
+
+
+def api_compute() -> dict:
+    """The yard's compute resources (thorp.compute): specs, the last measured test, caps and status. The page
+    reads this; the POST adds, tests or caps one."""
+    from thorp import compute
+
+    return {"resources": compute.resources()}
+
+
+def api_compute_set(body: dict) -> dict:
+    from thorp import compute
+
+    action = str(body.get("action", "test"))
+    if action == "add":
+        compute.add(str(body.get("kind", "mac")), str(body.get("name", "This Mac")),
+                    body.get("specs"), body.get("caps"))
+    elif action == "test":
+        compute.test(str(body["resource_id"]), str(body.get("preset", "300k")))
+    elif action == "caps":
+        compute.set_caps(str(body["resource_id"]), body.get("caps") or {})
+    else:
+        raise ValueError(f"unknown action {action}")
+    return api_compute()
+
+
+def api_vast() -> dict:
+    """The Vast.ai lane's setup, from the store: whether a key is held (never the key itself), its last four
+    characters, and the lane's seats. `set_vast_key` writes `s5.provider_credentials`; the charter reads it."""
+    from thorp import providers
+
+    k = providers.vast_key()
+    return {"has_key": bool(k), "key_hint": (k[:4] + "…" + k[-4:]) if len(k) > 8 else "",
+            "seats": providers.vast_seats()}
+
+
+def api_vast_set(body: dict) -> dict:
+    from thorp import providers
+
+    if body.get("key"):
+        providers.set_vast_key(str(body["key"]))
+    if body.get("seats") is not None:
+        providers.set_vast_seats(int(body["seats"]))
+    return api_vast()
+
+
+def api_constraints() -> dict:
+    """The yard's live constraints, from Postgres: the Mac lane's seats (`s2.lanes`, the slipways), which
+    hulls may share the GPU (`lanes.TWO_AT_ONCE`), the queue's depth and what is at sea. The constraints
+    page reads this and the editor below writes it; neither reads a file or an environment variable."""
+    from thorp.viable.s2_coordination import lanes as lane_mod, queue_store
+
+    live = api_lanes()
+    return {
+        "mac_seats": live.get("mac_seats", 1),
+        "vast_seats": live.get("vast_seats", 1),
+        "helm_seats": live.get("helm_seats", 0),
+        "at_sea": [h.get("name") for h in live.get("seats", [])],
+        "two_at_once": sorted(lane_mod.TWO_AT_ONCE),
+        "queue": len(queue_store.pending_texts()),
+    }
+
+
+def api_constraints_set(body: dict) -> dict:
+    """Set the Mac lane's seats (1-8). Written to `s2.lanes`, which the coordinator re-reads each loop, so
+    the change takes effect without a restart; any 300k line can then take the second seat, and only 300k
+    (lanes.TWO_AT_ONCE)."""
+    from thorp import store
+    from thorp.viable.records import Lane
+
+    seats = int(body.get("mac_seats", 1))
+    if not 1 <= seats <= 8:
+        raise ValueError("mac_seats must be 1-8")
+    with store.session() as s:
+        r = s.get(Lane, "mac")
+        if r is None:
+            s.add(Lane(lane="mac", seats=seats))
+        else:
+            r.seats = seats
+    return api_constraints()
 
 
 _ATLAS_CACHE: dict = {"at": 0.0, "value": None}
@@ -1277,7 +1376,7 @@ def api_shipbuilder_save(body: dict) -> dict:
 
 
 def api_foreign(key: str = "qwen3-4b") -> dict:
-    """One outside model's readings, for its foreign-ship page (a spyglass, not a Thorp ship)."""
+    """One outside model's readings, for its foreign-ship page (a spyglass, not a Nothing up my sleeve ship)."""
     from thorp import foreign
 
     p = foreign.payload(key)
@@ -1416,7 +1515,7 @@ def api_essay(name: str) -> dict:
     return {
         "book_id": f"essay-{name}",
         "title": title,
-        "author": f"Thorp · {module.replace('.', '/')}.py",
+        "author": f"Nothing up my sleeve · {module.replace('.', '/')}.py",
         "language": "en",
         "chars": len(text),
         "offset": 0,
@@ -2606,7 +2705,7 @@ def _browse_build() -> dict:
     from thorp import library_facts as lf
 
     facts_all = lf.build()
-    rows = facts_all  # every book, Thorp's own derived texts too (kind "derived": the tutor's passages, the shuffled controls)
+    rows = facts_all  # every book, Nothing up my sleeve's own derived texts too (kind "derived": the tutor's passages, the shuffled controls)
     cols = library.collections()
     member: dict[str, list[int]] = {}
     for i, c in enumerate(cols):
@@ -2812,9 +2911,9 @@ def api_store() -> dict:
 
 
 def api_governance() -> dict:
-    """Thorp's rules as Beer's Viable System Model (thorp/vsm.py): the five systems (S1 operations to
+    """Nothing up my sleeve's rules as Beer's Viable System Model (thorp/vsm.py): the five systems (S1 operations to
     S5 policy) with their code, and the live audit: the voyages, the queue's collisions, each policy's
-    enforcement and the queued runs that break it, the outside world Thorp measures itself against.
+    enforcement and the queued runs that break it, the outside world Nothing up my sleeve measures itself against.
     Read-only: switching a policy is Justin's S5 decision, recorded in s5.policy_switches (`thorp s5 switch`)."""
     import dataclasses
 
@@ -2932,7 +3031,10 @@ def api_expeditions_overview() -> dict:
 
 
 def api_queue() -> dict:
-    return _fast_cache("queue", _api_queue, _QUEUE_FALLBACK, ttl=10.0, watch=paths.resolve("specs/queue.txt"))
+    from thorp.viable.s2_coordination import queue_store
+
+    # the store is the only source; its 10 s TTL is the invalidation (the file is never read here)
+    return _fast_cache("queue", _api_queue, _QUEUE_FALLBACK, ttl=10.0, watch=None)
 
 
 def api_waters() -> dict:
@@ -3450,7 +3552,7 @@ _SMOKE: dict = {"at": 0.0, "value": None}
 
 
 def api_smoking_qwen() -> dict:
-    """Smoking Qwen (thorp.smoking_qwen.payload): the forecast that a 400M Thorp chains two facts as
+    """Smoking Qwen (thorp.smoking_qwen.payload): the forecast that a 400M Nothing up my sleeve chains two facts as
     well as Qwen3 4B, with the reference ladder's points (size, chaining lift) for the chart. The
     payload bootstraps, so it is kept for two minutes."""
     import time
@@ -3531,7 +3633,7 @@ def api_bridge() -> dict:
 
 
 def _entry_body(v: dict) -> dict:
-    """An entry in chain-grades.json's shape (an outside model's, or a Thorp ship's from
+    """An entry in chain-grades.json's shape (an outside model's, or a Nothing up my sleeve ship's from
     leaderboard.thorp_entry): every rung of the four chains with its class title, the logic deck
     (without its per-item readings), and the cards."""
     from thorp import fleet
@@ -3563,7 +3665,7 @@ def _entry_body(v: dict) -> dict:
 
 
 def api_thorp(ship: str) -> dict:
-    """A Thorp ship as the leaderboard names it (Thorp <class> v<n>), in the competitor page's shape
+    """A Nothing up my sleeve ship as the leaderboard names it (Nothing up my sleeve <class> v<n>), in the competitor page's shape
     (leaderboard.thorp_entry: the mean of its sailings' latest readings), with its version's history
     from s1.crownings (a version rises only when a new ship beats the last by more than
     the noise)."""
@@ -3590,7 +3692,7 @@ def api_thorp(ship: str) -> dict:
         "model": ship,
         "thorp": True,
         "label": (best or {}).get("name")
-        or (f"Thorp {preset} v{mine['v']}" if mine else f"Thorp {preset}"),
+        or (f"Nothing up my sleeve {preset} v{mine['v']}" if mine else f"Nothing up my sleeve {preset}"),
         "version": (mine or {}).get("v"),
         "crowned": (mine or {}).get("crowned"),
         "history": history,
@@ -3612,11 +3714,85 @@ def _rows_ladder() -> list[dict]:
         return []
 
 
+def api_tests(model: str) -> list[dict]:
+    """The benchmark tests read on an outside model that are not the chaining tests: for now MATH-500
+    (`math500-<model>` in s4.outside_readings, written by thorp.math_heads). One entry per test, with the
+    score, what was graded, the breakdown by subject and level, and the heads that triggered most."""
+    from thorp.viable.s4_intelligence import readings
+
+    key = "math500-" + model.replace("/", "--")
+    r = readings.get(key)
+    if not r:
+        return []
+    return [{
+        "key": "math500",
+        "name": "MATH-500",
+        "about": "500 competition maths problems (Hendrycks et al.), thinking on, greedy, the boxed final "
+                 "answer graded; every head's attention over the answer traced for the heads panel",
+        "accuracy": r.get("accuracy"),
+        "correct": r.get("correct"),
+        "graded": r.get("graded"),
+        "n": r.get("n"),
+        "truncated": r.get("truncated"),
+        "tokens_cap": r.get("tokens_cap"),
+        "mean_answer_tokens": r.get("mean_answer_tokens"),
+        "seconds": r.get("seconds"),
+        "run_at": r.get("run_at"),
+        "by_subject": r.get("by_subject") or {},
+        "by_level": r.get("by_level") or {},
+        "heads": r.get("heads") or {},
+    }]
+
+
+def api_personas(model: str = "mlx-community/Qwen3-4B-4bit") -> dict:
+    """The persona directions of an outside model, from the store (`s4.persona_vectors` and
+    `s4.persona_master`, written by thorp.persona_vectors): per trait its direction's norm, its projection on a
+    plain prompt and the cosine, plus the master list's two prompts. Falls back to the JSONB reading."""
+    from thorp import persona_store
+
+    try:
+        vecs = persona_store.vectors(model)
+        if vecs:
+            master = {m["key"]: m for m in persona_store.master()}
+            return {
+                "model": model, "found": True,
+                "layer": vecs[0]["layer"], "width": vecs[0]["width"],
+                "traits": [v["trait_key"] for v in vecs],
+                "master": master,
+                "norms": {v["trait_key"]: v["norm"] for v in vecs},
+                "projection_on_plain": {v["trait_key"]: v["projection"] for v in vecs},
+                "cosine_on_plain": {v["trait_key"]: v["cosine"] for v in vecs},
+                "vectors": {v["trait_key"]: v["vector"] for v in vecs},
+                "read_at": max((v["read_at"] or "" for v in vecs), default=None),
+            }
+    except Exception:  # noqa: BLE001  the tables may not be migrated yet
+        pass
+    from thorp.viable.s4_intelligence import readings
+
+    return readings.get("personas-" + model.replace("/", "--")) or {"model": model, "found": False}
+
+
+def api_heads(model: str = "mlx-community/Qwen3-4B-4bit") -> dict:
+    """The head census of an outside model (thorp/head_census.py): every head with its kind scores, its
+    layer, what else names it, the kinds with no metric, and the clusters that are cards outside the
+    sixteen. Empty when the census has not been run for the model."""
+    from thorp.viable.s4_intelligence import readings
+
+    key = "heads-" + model.replace("/", "--")
+    d = readings.get(key)
+    if not d:
+        return {"model": model, "found": False, "inventory": [], "clusters": [], "kinds": {},
+                "kinds_unmeasured": {}, "unnamed": [], "n_heads": 0, "n_named": 0, "n_unnamed": 0}
+    keep = ("model", "layers", "heads", "n_heads", "n_named", "n_unnamed", "context", "kinds",
+            "kinds_measured", "kinds_unmeasured", "cards", "clusters", "unnamed", "inventory")
+    return {"found": True, "read": d.get("read"), **{k: d.get(k) for k in keep}}
+
+
 def api_competitor(model: str) -> dict:
-    """One outside model (a 2-4B competitor or a reference ladder model), as read on Thorp's tests
+    """One outside model (a 2-4B competitor or a reference ladder model), as read on Nothing up my sleeve's tests
     (the chain grades, s4.outside_readings): the four chaining tests, the logic deck (variants, hops,
     relations), its cards (thorp's evaluator "cards": mover, comparator, bridge; previous-word and
-    Nevermore not read for outside models yet), every rung of the four chains, and what Thorp must
+    Nevermore not read for outside models yet), every rung of the four chains, and what Nothing up my sleeve must
     match it at (a tenth its size, with the forecast there from smoking_qwen)."""
     from thorp import fleet
 
@@ -3649,11 +3825,12 @@ def api_competitor(model: str) -> dict:
         **body,
         "card_verdicts": _card_verdicts(),
         "tenth": tenth,
+        "tests": api_tests(model),
     }
 
 
 def api_lab(key: str) -> dict:
-    """One lab (thorp.labs): its models on Thorp's tests, and its five best and five worst readings,
+    """One lab (thorp.labs): its models on Nothing up my sleeve's tests, and its five best and five worst readings,
     each set against the other labs' models on the same test."""
     from thorp import labs
 
@@ -4402,7 +4579,7 @@ def _vs_references() -> dict[str, dict]:
     bpb.update(cleaned)
     out = {}
     for name, m in models.items():
-        if "/" not in name:  # Thorp's own voyages graded alongside
+        if "/" not in name:  # Nothing up my sleeve's own voyages graded alongside
             continue
         short = name.split("/")[-1].removesuffix("-bf16").removesuffix("-4bit").lower()
         out[name] = {**m, "bpb": bpb.get(short), "bpb_clean": short in cleaned,
@@ -4803,6 +4980,26 @@ def api_class_shapes(preset: str) -> dict:
             "mass": mass, "truth": truth,
         })  # fmt: skip
     return {"preset": preset, "fine": list(taxonomy.FINE), "about": taxonomy.ABOUT, "voyages": out}
+
+
+def api_chat(q: dict) -> dict:
+    """One experimental answer from a finished run's latest checkpoint: the /chat page's call. The
+    model loads once per run (thorp.chat caches it); a run with no checkpoint says so in `error`."""
+    from thorp import chat
+
+    run = q.get("run", "9m@v0.0.6")
+    text = q.get("q", "")
+    if not str(text).strip():
+        return {"error": "no question", "run": run}
+    try:
+        return chat.answer(
+            run,
+            str(text),
+            tokens=int(q.get("tokens", 80)),
+            temperature=float(q.get("temperature", 0.7)),
+        )
+    except Exception as e:  # noqa: BLE001  the page shows the reason (no checkpoint, no run)
+        return {"error": str(e), "run": run}
 
 
 def api_ask_questions(preset: str) -> dict:
@@ -5217,7 +5414,7 @@ def api_star_points(preset: str = "300k", runs: str = "") -> dict:
     "a line representing Qwen 4b hitting the 10 marks in the star chart and at what point and then overlayed against
     that the 300k at 0.0.5").
 
-    `runs` narrows the Thorp line to named voyages and shows their **median** ratio (10 November: a page can
+    `runs` narrows the Nothing up my sleeve line to named voyages and shows their **median** ratio (10 November: a page can
     pick an expedition and no voyage, and the chart is then the expedition's median)."""
     import statistics
 
@@ -5298,7 +5495,7 @@ def api_client_log(q: dict) -> dict:
 
 
 def api_card_deck() -> dict:
-    """The sixteen cards, card by card: suit, mark, retention tier, the best Thorp reading and Qwen3 4B's own — the
+    """The sixteen cards, card by card: suit, mark, retention tier, the best Nothing up my sleeve reading and Qwen3 4B's own — the
     deck as a table for the Discoveries Cards tab (9 November: "the cards should be moved to a tab under discoveries")."""
     from thorp.ledger import reader
     from thorp.viable.s4_intelligence import readings
@@ -5320,6 +5517,66 @@ def api_card_deck() -> dict:
                     "tier": deck.retention(c.key)["tier"], "ours": ours,
                     "qwen": None if not metric else qw.get(metric)})
     return {"cards": out}
+
+
+DECK_FILES = (
+    # key, name, file, about
+    (
+        "logic",
+        "The 40-item logic deck",
+        "logic.csv",
+        "Forty items, eight a relation (order, cause, membership, proportion, counterfactual), each in seven "
+        "variants: both premises, each alone, swapped, padded, one hop and three hops. The knowledge-free deck.",
+    ),
+    (
+        "cause",
+        "The 96-item cause deck",
+        "logic-cause.csv",
+        "The cause relation alone, widened from eight to ninety-six items so the interval can resolve 0.1. "
+        "Same seven variants; the target is the order-free gain, the worse of the two premise orders.",
+    ),
+)
+
+
+def api_decks() -> dict:
+    """The item decks the Decks tab shows, beside the sixteen cards: the 40-item logic deck and the 96-item
+    cause deck, every item with all seven variants (the 16 cards come from /api/card_deck)."""
+    import csv
+
+    from thorp import paths
+
+    decks = []
+    for key, name, filename, about in DECK_FILES:
+        p = paths.resolve(f"lists/tricks/{filename}")
+        if not p.exists():
+            decks.append({"key": key, "name": name, "about": about, "count": 0, "items": [], "missing": True})
+            continue
+        items: dict[str, dict] = {}
+        with p.open(encoding="utf-8") as f:
+            for r in csv.DictReader(f):
+                it = items.setdefault(
+                    r["item"], {"item": r["item"], "relation": r["relation"], "variants": {}}
+                )
+                it["variants"][r["variant"]] = {
+                    "prompt": r["prompt"],
+                    "frame": r["frame"],
+                    "idea": r["idea"],
+                    "rival": r["rival"],
+                    "bridge": r["bridge"],
+                    "distractor": r["distractor"],
+                }
+        decks.append(
+            {
+                "key": key,
+                "name": name,
+                "about": about,
+                "count": len(items),
+                "relations": sorted({x["relation"] for x in items.values()}),
+                "variants": sorted({v for x in items.values() for v in x["variants"]}),
+                "items": list(items.values()),
+            }
+        )
+    return {"decks": decks}
 
 
 def api_stars_deviation() -> dict:
@@ -5579,7 +5836,7 @@ def _tomes_ids() -> list[str]:
 
 
 def api_tomes() -> dict:
-    """The Forgotten Tomes: each book's catalogue facts, every Thorp run's latest score on it, and
+    """The Forgotten Tomes: each book's catalogue facts, every Nothing up my sleeve run's latest score on it, and
     every outside model's."""
     from thorp import manifest
 
@@ -5620,7 +5877,7 @@ def api_shelf(run: str) -> list[dict]:
 
 
 def api_book(book_id: str, offset: int = 0, length: int = 20000) -> dict:
-    """A slice of a fetched book's stripped text (the text Thorp trains and scores on)."""
+    """A slice of a fetched book's stripped text (the text Nothing up my sleeve trains and scores on)."""
     from thorp import manifest
     from thorp.sources import load_text
 
@@ -5672,6 +5929,9 @@ class Handler(BaseHTTPRequestHandler):
             "/api/wager/deal": api_wager_deal,
             "/api/wager/bet": api_wager_bet,
             "/api/wager/queue": api_wager_queue,
+            "/api/constraints": api_constraints_set,
+            "/api/vast": api_vast_set,
+            "/api/compute": api_compute_set,
         }
         if u.path not in posts:
             return self._send(404, b"not found", "text/plain")
@@ -5750,6 +6010,8 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/ships": lambda: api_ships(),
                 "/api/voyage": lambda: api_voyage_series(q["key"]),
                 "/api/discoveries": lambda: api_discoveries(q.get("runs", "")),
+                "/api/heads": lambda: api_heads(q.get("model", "mlx-community/Qwen3-4B-4bit")),
+                "/api/personas": lambda: api_personas(q.get("model", "mlx-community/Qwen3-4B-4bit")),
                 "/api/sieves": lambda: api_sieves(),
                 "/api/table/transcript": lambda: api_table_transcript(q["run"]),
                 "/api/stages": lambda: api_stages(q.get("runs", "")),
@@ -5765,6 +6027,9 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/expeditions/overview": api_expeditions_overview,
                 "/api/deck_atlas": api_deck_atlas,
                 "/api/lanes": api_lanes,
+                "/api/constraints": api_constraints,
+                "/api/vast": api_vast,
+                "/api/compute": api_compute,
                 "/api/hulls": api_hulls,
                 "/api/at_sea": lambda: api_at_sea(str(q.get("expedition") or "kipling")),
                 "/api/hulls/save": lambda: api_hull_save(str(q.get("preset") or ""), str(q.get("layers") or ""), str(q.get("width") or ""), str(q.get("heads") or "")),
@@ -5793,6 +6058,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/depth": lambda: api_depth(q.get("preset", ""), q.get("sop", "")),
                 "/api/stars_deviation": api_stars_deviation,
                 "/api/card_deck": api_card_deck,
+                "/api/decks": api_decks,
                 "/api/client_log": lambda: api_client_log(q),
                 "/api/star_points": lambda: api_star_points(q.get("preset", "300k"), q.get("runs", "")),
                 "/api/ladder_chaining": lambda: api_ladder_chaining(q.get("sop", ""), q.get("runs", "")),
@@ -5800,6 +6066,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/suit_ratings": lambda: api_suit_ratings(q.get("preset", ""), q.get("runs", "")),
                 "/api/class_deck": lambda: api_class_deck(q["preset"]),
                 "/api/ask_questions": lambda: api_ask_questions(q["preset"]),
+                "/api/chat": lambda: api_chat(q),
                 "/api/maths_book": lambda: api_maths_book(),
                 "/api/class_subjects": lambda: api_class_subjects(q["preset"]),
                 "/api/class_shapes": lambda: api_class_shapes(q["preset"]),

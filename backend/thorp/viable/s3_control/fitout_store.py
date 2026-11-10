@@ -2,7 +2,7 @@
 schema made and changed only by Alembic (migrations/). Owned by S3 control: the fitouts are the resources
 every voyage draws on, and the prechecks are the bargain a fitout must keep before it may sail.
 
-The database is Thorp's own local cluster (`data/postgres`, outside git: the ledger swap of 2026-11-07 18:11 is
+The database is Nothing up my sleeve's own local cluster (`data/postgres`, outside git: the ledger swap of 2026-11-07 18:11 is
 why), on `localhost:5433`, database `thorp` (override with THORP_PG). Started with:
 
     LC_ALL=en_US.UTF-8 /opt/homebrew/opt/postgresql@17/bin/pg_ctl -D data/postgres -l data/postgres.log \\

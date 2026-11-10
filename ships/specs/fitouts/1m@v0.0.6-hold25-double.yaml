@@ -115,6 +115,7 @@ eval:
   - cards
   - shapes
   - pips
+  - soundings
   light:
     every_steps: 64
     evaluators:

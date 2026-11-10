@@ -5,7 +5,7 @@ mechanism inside that does it, measured by looking at the heads (thorp/fleet.py 
 
 Monday comes before Tuesday, January before February, first before second, Chapter IV before V.
 That is knowledge of order, not copying: the answer is never in the prompt. Successor heads have
-been found in models of 70M parameters and more (Gould et al., 2023); Thorp's pre-registered
+been found in models of 70M parameters and more (Gould et al., 2023); Nothing up my sleeve's pre-registered
 expectation is that a successor head lights from 21m. Lit at a smaller class, it is a discovery.
 
 The test: for every series in SERIES and every run of CONTEXT consecutive items in it, a prompt of
@@ -34,7 +34,7 @@ from thorp.models import ops
 CONTEXT = 2
 SERIES: dict[str, tuple[str, str, list[str]]] = {
     # name: (item format, lead-in before the next item, items). The prompt is CONTEXT items in their
-    # format then the lead-in; each candidate is " <item>" (Thorp's tokeniser joins a space to the
+    # format then the lead-in; each candidate is " <item>" (Nothing up my sleeve's tokeniser joins a space to the
     # word after it, so a prompt never ends on a bare space).
     "days": (
         "{},",

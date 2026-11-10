@@ -1,6 +1,3 @@
-fitouts/300k@v0.0.6-control-s2
-fitouts/300k@v0.0.6-gqa-s2
-fitouts/300k@v0.0.6-pins-s2
 fitouts/300k@v0.0.6-release-s2
 fitouts/300k@v0.0.5-post-qa
 fitouts/300k@v0.0.6-post-qa-pins
@@ -11,3 +8,5 @@ fitouts/300k@v0.0.6-control
 fitouts/300k@v0.0.6-gqa
 fitouts/1m@v0.0.6-early
 fitouts/1m@v0.0.6-hold25-double
+fitouts/9m@v0.0.6
+fitouts/21m@v0.0.6

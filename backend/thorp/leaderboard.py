@@ -150,7 +150,9 @@ def _readings(con, run_id: str) -> tuple[dict, dict]:
 
 def _thorp_runs(internal: bool = False) -> list[dict]:
     """Every run with discovery readings: the chaining tests (public), or the climb (internal)."""
-    con = connect(readonly=True)
+    from thorp.ledger import reader
+
+    con = reader()
     con.row_factory = __import__("sqlite3").Row
     try:
         runs = [
@@ -402,7 +404,9 @@ def name_of(preset: str, v: int) -> str:
 def thorp_entry(ship_key: str) -> dict | None:
     """A Thorp ship in the same shape as an outside model's entry in chain-grades.json (every rung,
     the logic deck, the five cards), its sailings averaged: for its page, built like a competitor's."""
-    con = connect(readonly=True)
+    from thorp.ledger import reader
+
+    con = reader()
     con.row_factory = __import__("sqlite3").Row
     try:
         rows = [
@@ -522,7 +526,9 @@ def thorp_entry(ship_key: str) -> dict | None:
 
 
 def _params_of_ship(sh: dict) -> int | None:
-    con = connect(readonly=True)
+    from thorp.ledger import reader
+
+    con = reader()
     try:
         r = con.execute("select spec_json from runs where run_id=?", [sh["run_id"]]).fetchone()
     finally:

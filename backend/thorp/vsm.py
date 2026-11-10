@@ -901,9 +901,9 @@ def expedition_states() -> dict[str, str]:
     if h and h.get("kind") == "voyage":
         sea = fleet.expedition_of_label(h["name"], _label_of(h["name"]))
     elif h is None:  # a voyage launched before the helm existed
-        from thorp.ledger import Ledger
+        from thorp.ledger import reader
 
-        for r in Ledger().query("select name, ship from runs where status='running'"):
+        for r in reader().query("select name, ship from runs where status='running'"):
             if _sailing_without_helm(r["name"]):
                 sea = fleet.expedition_of_label(r["name"], r["ship"])
     q = paths.resolve("specs/queue.txt")
@@ -949,20 +949,20 @@ def _sailing_without_helm(name: str) -> bool:
 
 
 def _label_of(name: str) -> str | None:
-    from thorp.ledger import Ledger
+    from thorp.ledger import reader
 
-    r = Ledger().query("select ship from runs where name=? order by started desc limit 1", [name])
+    r = reader().query("select ship from runs where name=? order by started desc limit 1", [name])
     return r[0]["ship"] if r else None
 
 
 def _clean_of(name: str, queued: dict) -> str | None:
     """The cleaning version a voyage read (or will read): from the queue, else the ledger's spec."""
     from thorp import cleaning
-    from thorp.ledger import Ledger
+    from thorp.ledger import reader
 
     if name in queued:
         return cleaning.version_of(queued[name])
-    r = Ledger().query(
+    r = reader().query(
         "select spec_json from runs where name=? order by started desc limit 1", [name]
     )
     if not r:
@@ -1018,13 +1018,13 @@ def lint_queue() -> list[str]:
     lines = [
         ln.strip() for ln in q.read_text().splitlines() if ln.strip() and not ln.startswith("#")
     ]
-    from thorp.ledger import Ledger
+    from thorp.ledger import reader
 
     found, seen, order = [], {}, {}
     specs_by_name = {}
     sailing = {
         r["name"]
-        for r in Ledger().query("select name from runs where status in ('running','finished')")
+        for r in reader().query("select name from runs where status in ('running','finished')")
     }
     done = (
         paths.resolve("specs/queue-done.txt").read_text()
@@ -1075,7 +1075,7 @@ def lint_queue() -> list[str]:
         ):
             found.append(f"{ln}: seeded from {src}, which is neither finished nor queued before it")
     h = helm()
-    for r in Ledger().query("select name, started from runs where status='running'"):
+    for r in reader().query("select name, started from runs where status='running'"):
         if (not h or h.get("name") != r["name"]) and not _sailing_without_helm(r["name"]):
             found.append(
                 f"{r['name']}: the ledger has it at sea since {r['started']}, but it does not hold the helm (lost at sea?)"
@@ -1088,9 +1088,9 @@ def audit() -> dict:
     import yaml
 
     from thorp import fleet
-    from thorp.ledger import Ledger
+    from thorp.ledger import reader
 
-    rec = Ledger()
+    rec = reader()
     q = paths.resolve("specs/queue.txt")
     queued = [
         ln.strip()

@@ -268,9 +268,9 @@ def _measured_mac(preset: str) -> float | None:
     """Mean training-step tokens a second of this class's finished voyages on Ogden's vocabulary (any
     vocabulary if none), from the ledger; None when the class has not sailed."""
     try:
-        from thorp.ledger import connect
+        from thorp.ledger import reader
 
-        con = connect(readonly=True)
+        con = reader()
     except Exception:  # noqa: BLE001 - no ledger: estimates only
         return None
     # the runs first (a small table), then their metrics by run id, so the metrics index is used
@@ -294,9 +294,9 @@ def _ogden_sailed() -> dict[str, dict]:
     """Per class, the Ogden v0.1 voyages finished and at sea, from the ledger."""
     out: dict[str, dict] = {}
     try:
-        from thorp.ledger import connect
+        from thorp.ledger import reader
 
-        con = connect(readonly=True)
+        con = reader()
         rows = con.execute("select name, status from runs where name like 'fu-ogden-v0-1@%'").fetchall()
     except Exception:  # noqa: BLE001
         return out

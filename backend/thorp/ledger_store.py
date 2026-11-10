@@ -319,6 +319,20 @@ class PgLedger:
         cols = list(res.keys())
         return [dict(zip(cols, r)) for r in res]
 
+    def execute(self, sql: str, params: Iterable = ()):
+        """A SQLite-cursor-shaped view of query(), so the reader code that does
+        con.execute(sql, params).fetchall() / .fetchone() keeps working against PG."""
+        rows = self.query(sql, params)
+
+        class _Result:
+            def fetchall(self):
+                return rows
+
+            def fetchone(self):
+                return rows[0] if rows else None
+
+        return _Result()
+
     def run(self, row: dict) -> None:
         put_run(self._s, row)
         self._commit()

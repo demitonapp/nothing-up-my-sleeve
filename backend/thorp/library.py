@@ -214,7 +214,9 @@ def _uses() -> dict[str, list[dict]]:
                     {"run": who, "role": role, "status": status, "voyage": voyage}
                 )
 
-    con = connect(readonly=True)
+    from thorp.ledger import reader
+
+    con = reader()
     try:
         for name, spec_json, status, ship in con.execute(
             "select name, spec_json, status, ship from runs"
@@ -569,7 +571,9 @@ def fitouts() -> list[dict]:
     from thorp.ledger import connect
 
     shelves = {x["path"]: x for x in payload()}
-    con = connect(readonly=True)
+    from thorp.ledger import reader
+
+    con = reader()
     try:
         ran = {
             r[0]: r[1] for r in con.execute("select name, status from runs where name like 'fo-%'")

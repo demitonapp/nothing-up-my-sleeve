@@ -2,7 +2,7 @@
 // plan, the queue at a glance, every voyage), the expedition cards, one expedition and its five tabs,
 // and the table. It replaces dashboard.ts on this page; the dense markup lives in
 // scripts/views/expeditions.ts and the charts are imported inside effects only, because the island is
-// server-rendered and Plotly touches `document` when it loads.
+// server-rendered and ECharts touches `document` when it loads.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent, MouseEvent as ReactMouseEvent } from 'react';
@@ -11,7 +11,7 @@ import { routePath, useApi, useRoute } from '@/lib/useApi';
 import { esc } from '@/lib/format';
 import { starHeadline } from '@/scripts/views/helpers';
 import {
-  censusHtml, deckHtml, expeditionCardsHtml, expeditionName, expeditionOutcomes, expPill, fitHtml, fleetShipsHtml, runsTableHtml,
+  censusHtml, deckHtml, expeditionCardsHtml, expeditionName, expeditionOutcomes, expeditionTableHtml, expPill, firstLightFindings, fitHtml, fleetShipsHtml, runsTableHtml,
   inductionVerdict, leversRowsHtml, outcomesRowsHtml, parseExpeditionRoute, queueRowsHtml, readingsTable,
   skyStateOf, sopCardsHtml, tableLogHtml, tableReadingsHtml, planHtml,
 } from '@/scripts/views/expeditions';
@@ -198,7 +198,7 @@ const armCardsHtml = (d: any): string => {
     const role = isControl ? 'control' : (String(a.name).split('@')[1] || '').replace(/^v[0-9.]+-?/, '') || 'arm';
     const total = a.schedule?.total;
     const pct = total && a.step ? Math.round((a.step / total) * 100) : null;
-    return `<article class="armcard${isControl ? ' armcontrol' : ''}">
+    return `<article class="armcard${isControl ? ' armcontrol' : ''}" data-deck-run="${esc(a.run_id || '')}" title="show this voyage in the observation deck">
       <header><b>${esc(a.name)}</b><span class="pill">${esc(role)}</span></header>
       <div class="armprogress">${a.step != null ? `step ${a.step.toLocaleString()}${total ? ` of ${total.toLocaleString()}` : ''}${pct != null ? ` · ${pct}% complete` : ''}` : 'not started'}</div>
       <div class="armrow"><span class="k">embeddings${TOKENISER_HELP}</span><span>${esc(t.kind || '')} · ${t.vocab ?? '–'} pieces${sym.length ? ` · ${sym.map((x: string) => `<span class="sym">${esc(x)}</span>`).join('')}` : ''}</span></div>
@@ -237,6 +237,7 @@ const armCardsHtml = (d: any): string => {
 /** The schedule a voyage runs, as a bar broken into its stages, with a marker where the ship is now. */
 const scheduleLine = (sc: any): string => {
   if (!sc || sc.stage == null) return '<span class="s">–</span>';
+  const fmt = (n: any, digits = 2): string => (n == null ? '–' : Number(n).toFixed(digits));
   const total = sc.total || null;
   const pct = (x: any): number => Math.max(0, Math.min(1, Number(x)));
   const at = (x: any): string => (total ? `step ${Math.round(pct(x) * total).toLocaleString()}` : `${Math.round(pct(x) * 100)}%`);
@@ -259,6 +260,28 @@ const scheduleLine = (sc: any): string => {
       about: 'by heart: no pull at all, the model reading its corpus with nothing taught' });
   }
   const segs = phases.map((ph) => `<span class="seg ${ph.cls}" style="width:${Math.max(0.5, (ph.to - ph.from) * 100)}%" title="${esc(`${ph.name} — ${at(ph.from)} to ${at(ph.to)}. ${ph.about}`)}"><b>${esc(ph.name)}</b></span>`).join('');
+  // per-card schedules (10 November): a voyage can release some cards and fade others; the top-level bar
+  // shows the scaffold's schedule, these show what each group of cards actually runs
+  const groups = Array.isArray(sc.groups) && sc.groups.length > 1 ? sc.groups : [];
+  const gbars = groups.map((g: any) => {
+    const gh = g.hold != null ? pct(g.hold) : 0;
+    const gr = g.kind === 'release' ? pct(g.share) : null;
+    const gf = g.kind === 'release' ? gh : Math.max(gh, g.fade != null ? pct(g.fade) : 1);
+    const parts: string[] = [];
+    if (gh > 0) parts.push(`<span class="seg hold" style="width:${gh * 100}%"></span>`);
+    if (gr != null) {
+      parts.push(`<span class="seg release" style="width:${Math.max(0.8, (gr - gh) * 100)}%"></span>`);
+      parts.push(`<span class="seg content" style="width:${Math.max(0.5, (1 - gr) * 100)}%"></span>`);
+    } else {
+      parts.push(`<span class="seg fade" style="width:${Math.max(0.5, (gf - gh) * 100)}%"></span>`);
+      if (gf < 1) parts.push(`<span class="seg content" style="width:${(1 - gf) * 100}%"></span>`);
+    }
+    const n = g.pins ?? (g.cards || []).length;
+    const label = g.kind === 'release'
+      ? `released at ${Math.round(pct(g.share) * 100)}% (${at(g.share)})`
+      : `fade to ${Math.round(pct(g.share) * 100)}% (${at(g.share)})`;
+    return `<div class="g" title="${esc((g.cards || []).join(', '))}"><span class="s">${n} pin${n === 1 ? '' : 's'}</span><div class="schedbar">${parts.join('')}</div><span class="s">${esc(label)}</span></div>`;
+  }).join('');
   // the phase names are written in the bar itself (9 November): no separate key
   const now = sc.step && total ? Math.min(100, (Number(sc.step) / Number(total)) * 100) : null;
   const w = sc.weight == null ? null : Number(sc.weight);
@@ -270,6 +293,7 @@ const scheduleLine = (sc: any): string => {
   return `<details class="sched">
     <summary><div class="schedbar">${segs}${now != null ? `<i class="marker" style="left:${now}%"></i>` : ''}</div>
       <div class="schedcap"><b class="stagechip">${esc(sc.stage)}</b> <span class="s">${w != null ? `weight ${w.toFixed(2)}` : ''}${total && sc.step ? ` · step ${Number(sc.step).toLocaleString()} of ${Number(total).toLocaleString()}` : ''}</span> <span class="s openhint">expand for each phase</span></div>
+      ${gbars ? `<div class="schedgroups">${gbars}</div>` : ''}
     </summary>
     <div class="scheddetail"><table><thead><tr><th>phase</th><th>steps</th><th>loss across it</th><th>cards kept</th></tr></thead><tbody>${detail || '<tr><td colspan="4" class="s">no readings yet</td></tr>'}</tbody></table>
       <div class="s">Kept is the card's reading at the phase's end as a share of its reading at the start: how much of it survived that phase. A hold or fade that holds reads near 100%; one that doesn't shows which card fell.</div></div>
@@ -438,7 +462,13 @@ export default function Expeditions() {
   const skyRef = useRef<Record<string, SkyViewState>>({});
   useEffect(() => { skyRef.current = sky; }, [sky]);
   const [playing, setPlaying] = useState<{ run: string; kind: 'sky' | 'nv' } | null>(null);
+  // the one voyage the observation deck shows (clicking a voyage or a chip picks it)
+  const [deckRun, setDeckRun] = useState<string | null>(null);
   const obs = obsApi.data;
+  useEffect(() => { setDeckRun(null); }, [route.key]);
+  useEffect(() => {
+    if (deckRun && obs && !(obs.at_sea || []).some((r) => r.run_id === deckRun)) setDeckRun(null);
+  }, [obs, deckRun]);
   useEffect(() => {
     if (!playing || !obs) return;
     const run = (obs.at_sea || []).find((r) => r.run_id === playing.run);
@@ -463,6 +493,16 @@ export default function Expeditions() {
 
   const onDeckClick = (e: ReactMouseEvent): void => {
     const t = e.target as HTMLElement;
+    const pick = t.closest('[data-deck-run]') as HTMLElement | null;
+    if (pick && !t.closest('a') && !t.closest('.sky[data-run]') && !t.closest('.obsship')) {
+      const rid = pick.dataset.deckRun;
+      if (rid) {
+        setDeckRun(rid);
+        setPlaying(null);
+        document.getElementById('obspanel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        return;
+      }
+    }
     const box = t.closest('.sky[data-run]') as HTMLElement | null;
     if (!box) return;
     const rid = box.dataset.run;
@@ -697,15 +737,15 @@ export default function Expeditions() {
           <div id="soppanel" dangerouslySetInnerHTML={{ __html: ovApi.data ? sopCardsHtml(ovApi.data) : EMPTY('reading the expeditions…') }} />
         </div>
         <div className={`vtab${isList ? ' active' : ''}`} data-vtab="expeditions">
-          <div className="cards" id="voyagecards" dangerouslySetInnerHTML={{ __html: expsApi.data ? expeditionCardsHtml(exps, states) : EMPTY('reading the expeditions…') }} />
+          <div id="voyagecards" dangerouslySetInnerHTML={{ __html: expsApi.data ? expeditionTableHtml(exps, states, ovApi.data) : EMPTY('reading the expeditions…') }} />
         </div>
         <div className={`vtab${isQueue ? ' active' : ''}`} data-vtab="queue">
           <div className="qview active" data-qview="every">
             <section className={cardCls(false, 'panel')} id="queuepanel">
               <h2>The queue <span className="note">every voyage still to sail, in the order it sails (specs/queue.txt), with its goal: the question its spec asks, or its experiment's where it asks none, and the fitout it was compiled from (its census variation and stage); the voyage at sea first</span></h2>
               <div className="scroll queuescroll"><table id="queuetable" data-nosort>
-                <thead><tr><th>#</th><th>ship</th><th title="the SOP the voyage is built to: its content, tokeniser, parameters, phases and depth">SOP</th><th title="about when it sails: each voyage ahead of it at its size's mean time; ≥ where one ahead has no time yet">sails in</th></tr></thead>
-                <tbody dangerouslySetInnerHTML={{ __html: queueApi.data ? queueRowsHtml(queueApi.data, rungs) : `<tr><td colspan="8" class="${emptyCls(true)}">reading the queue…</td></tr>` }} />
+                <thead><tr><th>#</th><th>voyage</th><th>ship</th><th title="the SOP the voyage is built to: its content, tokeniser, parameters, phases and depth">SOP</th><th title="about when it sails: each voyage ahead of it at its size's mean time; ≥ where one ahead has no time yet">sails in</th></tr></thead>
+                <tbody dangerouslySetInnerHTML={{ __html: queueApi.data ? queueRowsHtml(queueApi.data, rungs) : `<tr><td colspan="5" class="${emptyCls(true)}">reading the queue…</td></tr>` }} />
               </table></div>
             </section>
           </div>
@@ -758,7 +798,7 @@ export default function Expeditions() {
 
         {/* At sea: the arm-by-arm read, as it runs */}
         <div className={`etab${expTab === 'at-sea' ? ' active' : ''}`} data-etab="at-sea">
-          <section className={cardCls(false, 'panel')} id="armspanel">
+          <section className={cardCls(false, 'panel')} id="armspanel" onClick={onDeckClick}>
             <h2>The arms at sea <span className="note">one card a voyage, live: its embeddings, its corpus, its attention, the heads it teaches and where, and its readings against the control</span></h2>
             <div dangerouslySetInnerHTML={{ __html: seaApi.error ? EMPTY(`the arms could not be read: ${seaApi.error}`) : seaApi.data ? armCardsHtml(seaApi.data) : EMPTY('reading the arms at sea…') }} />
           </section>
@@ -767,8 +807,8 @@ export default function Expeditions() {
         {/* At sea: the observation deck */}
         <div className={`etab${expTab === 'at-sea' ? ' active' : ''}`} data-etab="at-sea">
           <section className={cardCls(false, 'panel')} id="obspanel">
-            <h2>The observation deck <span className="note">this expedition's voyages at sea, read live from their logs: how far each has come and how long it has left, its loss, its speed, the four necessary cards as they stand, and its star chart: each star and trick lit where the voyage found it, numbered in order, to play back. One voyage sails at a time (S2); when none of this expedition's is at sea, where its next one stands in the queue</span></h2>
-            <div id="obsdeck" onClick={onDeckClick} onInput={onDeckInput} dangerouslySetInnerHTML={{ __html: obsApi.error ? EMPTY(`the observation deck could not be read: ${obsApi.error}`) : obsApi.data ? deckHtml(obsApi.data, sky, expeditionName(exps, obsApi.data.elsewhere?.[0]?.expedition)) : EMPTY('reading the observation deck…') }} />
+            <h2>The observation deck <span className="note">the selected voyage at sea, read live from its log: how far each has come and how long it has left, its loss, its speed, the four necessary cards as they stand, and its star chart: each star and trick lit where the voyage found it, numbered in order, to play back. One voyage sails at a time (S2); when none of this expedition's is at sea, where its next one stands in the queue</span></h2>
+            <div id="obsdeck" onClick={onDeckClick} onInput={onDeckInput} dangerouslySetInnerHTML={{ __html: obsApi.error ? EMPTY(`the observation deck could not be read: ${obsApi.error}`) : obsApi.data ? deckHtml(obsApi.data, sky, expeditionName(exps, obsApi.data.elsewhere?.[0]?.expedition), deckRun) : EMPTY('reading the observation deck…') }} />
           </section>
         </div>
 
@@ -802,6 +842,10 @@ export default function Expeditions() {
             <h2>The fit: what each kind of book is worth <span className="note">the Forgotten Tomes score a pure library of each kind would give, with 90% intervals, lower is better; <b id="fitr2">{fit ? fit.r2 : ''}</b></span></h2>
             <div className="row"><div className="scroll"><table id="fittable"><thead><tr><th>term</th><th>estimate</th><th>90% low</th><th>90% high</th></tr></thead><tbody dangerouslySetInnerHTML={{ __html: fit ? fit.rows : '' }} /></table></div>
               <div className="chart" id="fitchart" /></div>
+          </section>
+          <section className={cardCls(false, 'panel')} data-voyage="first_light" style={hideStyle(v?.key !== 'first_light')}>
+            <h2>What it found <span className="note">the fourteen round-1 voyages, best first: the Forgotten Tomes score on the 16 unseen books, and whether the previous-word and duplicate-word stars lit with one head or shared between a layer's two strongest</span></h2>
+            <div dangerouslySetInnerHTML={{ __html: v ? firstLightFindings(v) : '' }} />
           </section>
           <section className={cardCls(false, 'panel')} id="readingspanel">
             <h2>Its readings <span className="note">every voyage of this expedition on each measure it is judged by (What it measures, on Overview): the latest reading, the best in each column marked</span></h2>

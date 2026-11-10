@@ -34,24 +34,23 @@ def _metric(card) -> str | None:
     return None
 
 
-def _at(con, run_id: str, metric: str) -> float | None:
-    r = con.execute(
+def _at(run_id: str, metric: str) -> float | None:
+    from thorp.ledger import reader
+
+    rows = reader().query(
         "select value from metrics where run_id=? and name=? order by step desc limit 1", [run_id, metric]
-    ).fetchone()
-    return None if r is None else float(r[0])
+    )
+    return None if not rows else float(rows[0]["value"])
 
 
 def chart(run: str) -> dict:
     """One column of the chart: the sixteen cards, the four relations and their aggregate, and the four tests."""
-    import sqlite3
+    from thorp.ledger import reader
 
-    from thorp import paths
-
-    con = sqlite3.connect(f"file:{paths.ledger_path()}?mode=ro", uri=True)
-    con.row_factory = sqlite3.Row
-    r = con.execute(
+    rows = reader().query(
         "select run_id, name from runs where name=? or run_id=? order by started desc limit 1", [run, run]
-    ).fetchone()
+    )
+    r = rows[0] if rows else None
     if r is None:  # an outside model: its deck reading in s4.outside_readings is the same metrics
         from thorp.viable.s4_intelligence import readings
 
@@ -74,12 +73,12 @@ def chart(run: str) -> dict:
     for card in deck.CARDS:
         metric = _metric(card)
         if metric:
-            v = _at(con, rid, metric)
+            v = _at(rid, metric)
             if v is not None:
                 cards[card.key] = v
-    relations = {rel: _at(con, rid, f"tricks/logic_test/gain_{rel}") for rel in RELATIONS}
-    relations["gain"] = _at(con, rid, "tricks/logic_test/gain")
-    tests = {t: _at(con, rid, f"tricks/{t}_test/lift") for t in TESTS}
+    relations = {rel: _at(rid, f"tricks/logic_test/gain_{rel}") for rel in RELATIONS}
+    relations["gain"] = _at(rid, "tricks/logic_test/gain")
+    tests = {t: _at(rid, f"tricks/{t}_test/lift") for t in TESTS}
     got = [v for v in tests.values() if v is not None]
     return {
         "run": rid,

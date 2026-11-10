@@ -19,7 +19,7 @@ import sqlite3
 from pathlib import Path
 
 from thorp import paths
-from thorp.ledger import Ledger, connect
+from thorp.ledger import reader, connect
 
 
 class NoBerth(RuntimeError):
@@ -63,9 +63,9 @@ def related_runs(spec: dict) -> list[str]:
     return out
 
 
-def papers(dst: Path, spec: dict, rid: str, rec: Ledger | None = None) -> list[str]:
+def papers(dst: Path, spec: dict, rid: str, rec=None) -> list[str]:
     """Write the ship's papers to `dst`; returns the run ids carried (the voyage's own first)."""
-    rec = rec or Ledger()
+    rec = rec or reader()
     if dst.exists():
         dst.unlink()
     out = connect(dst)
@@ -98,11 +98,11 @@ def _insert(con: sqlite3.Connection, table: str, rows: list[dict]) -> None:
     con.executemany(q, [[r[c] for c in cols] for r in rows])
 
 
-def bring_home(box_ledger: Path, rid: str, leg_start: int, rec: Ledger | None = None, **run_fields) -> dict:
+def bring_home(box_ledger: Path, rid: str, leg_start: int, rec=None, **run_fields) -> dict:
     """The voyage's rows from the box's ledger into this one. What this ledger holds after `leg_start` (all of it
     when the leg set out from step 0) is replaced by the box's; `run_fields` (the commit, the hardware) are
     written over the box's run row. Returns the counts brought home."""
-    rec = rec or Ledger()
+    rec = rec or reader()
     src = sqlite3.connect(f"file:{box_ledger}?mode=ro", uri=True)
     src.row_factory = sqlite3.Row
     lo = leg_start if leg_start > 0 else -1

@@ -98,6 +98,58 @@ def cmd_eval(a) -> int:
     return 0
 
 
+def cmd_measure(a) -> int:
+    """Backfill the quantum ladder on every Ogden/Kipling voyage (thorp/ladder.py)."""
+    import json
+
+    from thorp import ladder
+    from thorp.ledger import reader
+
+    final = ladder.final_bet_data()
+    unmeasured = [k for k, v in final.items() if v != "present"]
+    if unmeasured:
+        print(f"final quantum bets without a question file: {', '.join(unmeasured)}")
+    rows = reader().query("select run_id, name, ship, status, spec_json from runs order by started")
+    todo = []
+    for r in rows:
+        try:
+            spec = json.loads(r["spec_json"] or "{}")
+        except ValueError:
+            continue
+        spec.setdefault("name", r["name"])
+        spec.setdefault("ship", r["ship"])
+        if not ladder.is_ladder_voyage(spec):
+            continue
+        want = list(a.evaluators) if a.evaluators else (list(ladder.LADDER_EVALUATORS) if a.all else ladder.missing(spec))
+        if not want:
+            continue
+        todo.append((r, spec, want))
+    print(f"{len(todo)} Ogden/Kipling run(s) need measuring" + (" (dry run)" if a.dry_run else ""))
+    done = 0
+    legacy = 0
+    ran = 0
+    for r, spec, want in todo[: (a.limit or len(todo))]:
+        ok, why = ladder.compatible_with_preset(spec, r["run_id"])
+        if not ok and not a.include_legacy:
+            legacy += 1
+            print(f"{r['name']} [{r['status']}] skipped: {why}")
+            continue
+        ran += 1
+        print(f"{r['name']} [{r['status']}] -> {', '.join(want)}")
+        if a.dry_run:
+            continue
+        try:
+            from thorp import train
+
+            step = train.rescore(r["run_id"], evaluators=want)
+            print(f"  scored at step {step}")
+            done += 1
+        except Exception as e:  # noqa: BLE001 - one bad voyage must not stop the fleet
+            print(f"  skipped: {e}")
+    print(f"measured {done} of {ran}" + (f"; skipped {legacy} legacy checkpoint(s)" if legacy else ""))
+    return 0 if done == ran or a.dry_run else 1
+
+
 def cmd_dash(a) -> int:
     from thorp.dash import server
 
@@ -106,9 +158,9 @@ def cmd_dash(a) -> int:
 
 
 def cmd_ledger(a) -> int:
-    from thorp.ledger import Ledger
+    from thorp.ledger import reader
 
-    rec = Ledger()
+    rec = reader()
     params = list(a.params)
     n = a.sql.count("?")
     if n and not params:
@@ -188,6 +240,15 @@ def cmd_store(a) -> int:
         ok = ledger_store.verify()
         print("ledger: verified, counts match" if ok else "ledger: MISMATCH — see the lines above")
         return 0 if ok else 1
+    if a.what == "discoveries":
+        from thorp import discoveries_store
+        from thorp.dash import server
+
+        document = server._discoveries_compute("")
+        runs = len({x["run_id"] for star in document.get("stars", []) for x in star.get("ships", [])})
+        discoveries_store.put(document, runs=runs)
+        print(f"discoveries: built and stored in s1.discoveries ({runs} runs)")
+        return 0
     if a.what == "queue":
         from thorp.viable.s2_coordination import queue_store
 
@@ -200,6 +261,43 @@ def cmd_store(a) -> int:
 
     store_import.run(retire=a.retire)
     return 0
+
+
+def cmd_queue(a) -> int:
+    """The standing queue in the store (thorp/viable/s2_coordination/queue_store.py): the lines, and the edits."""
+    from thorp.viable.s2_coordination import queue_store
+
+    if a.what == "show":
+        rows = queue_store.lines()
+        for i, r in enumerate(rows, 1):
+            print(f"{i:>3}  {r['text']}")
+        print(f"{len(rows)} line(s)")
+        return 0
+    if a.what == "add":
+        if not a.line:
+            print("thorp queue add LINE [--top]", file=sys.stderr)
+            return 2
+        queue_store.add(a.line, top=a.top)
+        queue_store.export()
+        print(f"queued: {a.line}")
+        return 0
+    if a.what == "move":
+        if not a.line or a.to is None:
+            print("thorp queue move LINE TO", file=sys.stderr)
+            return 2
+        queue_store.move(a.line, a.to)
+        queue_store.export()
+        print(f"moved: {a.line} -> {a.to}")
+        return 0
+    if a.what == "drop":
+        if not a.line:
+            print("thorp queue drop LINE", file=sys.stderr)
+            return 2
+        ok = queue_store.drop(a.line)
+        queue_store.export()
+        print(("dropped: " if ok else "not queued: ") + a.line)
+        return 0 if ok else 1
+    return 2
 
 
 def cmd_s5(a) -> int:
@@ -443,6 +541,13 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--sets", nargs="+", help="score these lists instead of the spec's eval.sets")
     s.add_argument("--evaluators", nargs="+", help="run these evaluators instead of the spec's")
     s.set_defaults(fn=cmd_eval)
+    s = sub.add_parser("measure", help="backfill the quantum ladder on every Ogden/Kipling voyage")
+    s.add_argument("--all", action="store_true", help="re-run the whole ladder, not only what the spec lacks")
+    s.add_argument("--evaluators", nargs="+", help="run these evaluators")
+    s.add_argument("--limit", type=int, default=0, help="stop after this many runs")
+    s.add_argument("--include-legacy", action="store_true", help="try legacy checkpoints too (they may fail to load)")
+    s.add_argument("--dry-run", action="store_true", help="list what would run")
+    s.set_defaults(fn=cmd_measure)
     s = sub.add_parser("dash", help="serve the dashboard on http://localhost:8787")
     s.add_argument("--port", type=int, default=8787)
     s.set_defaults(fn=cmd_dash)
@@ -466,13 +571,21 @@ def main(argv: list[str] | None = None) -> int:
     s = sub.add_parser(
         "store", help="the one store (Postgres): ping it, import data/'s files, or backfill the ledger"
     )
-    s.add_argument("what", choices=["ping", "import", "ledger", "queue"])
+    s.add_argument("what", choices=["ping", "import", "ledger", "queue", "discoveries"])
     s.add_argument(
         "--retire",
         action="store_true",
         help="import: rename each imported file *.imported (the cutover)",
     )
     s.set_defaults(fn=cmd_store)
+    s = sub.add_parser(
+        "queue", help="the standing queue (Postgres): show it, or add, move and drop a line"
+    )
+    s.add_argument("what", choices=["show", "add", "move", "drop"])
+    s.add_argument("line", nargs="?")
+    s.add_argument("to", nargs="?", type=int)
+    s.add_argument("--top", action="store_true", help="add: put the line at the top")
+    s.set_defaults(fn=cmd_queue)
     s = sub.add_parser(
         "s5",
         help="an S5 decision: switch a policy on or off, change a charter term, or except runs",

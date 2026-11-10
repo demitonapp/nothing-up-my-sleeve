@@ -1758,7 +1758,7 @@ EXPEDITIONS: dict[str, Expedition] = {
             name="First Light",
             goal="What is the quickest path to the first two stars, the previous-word and duplicate-word heads?",
             ship="First Light",
-            fleet="Star Fleet",
+            fleet="First Fleet",
             preset=PROXY,
             outcomes=(
                 Outcome(
@@ -1796,6 +1796,11 @@ EXPEDITIONS: dict[str, Expedition] = {
             results="specs/first-light/",
             steering="thorp-first-light",
             status="running",
+            learned="The pathfinder (twice the reading) won at 1.693 bpb; vocabulary 16,384 next (1.705); "
+            "the baseline 1.781/1.797 across seeds (a 0.016 error bar); 2,048 and the 1e-3 learning rate "
+            "were the worst arms and verse the worst shelf (1.92-1.93). No single head lit previous-word; "
+            "the pathfinder lit it shared at step 1,575 (51.6M tokens). Vocab 2,048 and lr 2e-3, which the "
+            "later 1m runs use, descend from this sweep.",
             stars=("previous_word", "duplicate_word", "nevermore"),
         ),
         Expedition(
@@ -1804,7 +1809,7 @@ EXPEDITIONS: dict[str, Expedition] = {
             goal="Does a pilot (1m) grown from a keel's foundation (300k) reach its stars sooner than one built from nothing? "
             "A rehearsal of Great Expectations at a few minutes a run.",
             ship="Keel",  # the label its runs carry ("Keel: ..."); the voyage key stays "seedling"
-            fleet="Star Fleet",
+            fleet="First Fleet",
             preset=PROXY,
             outcomes=(
                 Outcome(
@@ -1850,7 +1855,7 @@ EXPEDITIONS: dict[str, Expedition] = {
             "heads are transplanted into the apprentice and it reads ordered text, against an apprentice "
             "that must learn the trick itself.",
             ship="Apprentice",
-            fleet="Star Fleet",
+            fleet="First Fleet",
             preset=next(r["preset"] for r in LADDER if r.get("kind") == "nursery"),
             outcomes=(
                 Outcome(
@@ -1909,7 +1914,7 @@ EXPEDITIONS: dict[str, Expedition] = {
             "Apprentice, First Light and Laying the keel teach (Justin, 09:30). Named after Coleridge's "
             "Table Talk (1835).",
             ship="Table Talk",
-            fleet="Star Fleet",
+            fleet="First Fleet",
             preset=next(r["preset"] for r in LADDER if r.get("name") == "The speller"),
             outcomes=(
                 Outcome(
@@ -1960,7 +1965,7 @@ EXPEDITIONS: dict[str, Expedition] = {
             "the deck with the trick; hand over within one lineage; a word-level trick (the Nevermore); all at the "
             "pilot; and teach rather than transplant.",
             ship="Apprentice II",
-            fleet="Star Fleet",
+            fleet="First Fleet",
             preset=PROXY,
             outcomes=(
                 Outcome(
@@ -2009,7 +2014,7 @@ EXPEDITIONS: dict[str, Expedition] = {
             goal="The 300k that performs best on its four discovery rungs (Like father, like son; Fire and ice; "
             "One, two, three; Again and again): the end of the current queue.",
             ship="Best keel",
-            fleet="Star Fleet",
+            fleet="First Fleet",
             preset=NURSERY,
             outcomes=(
                 Outcome(
@@ -2052,7 +2057,7 @@ EXPEDITIONS: dict[str, Expedition] = {
             "test, the between test, the pigeonhole test). Judged on the leaderboard: each class's best run by its "
             "climb (thorp/leaderboard.py). Even if the 50m fails, the climb is the result.",
             ship="Two facts",
-            fleet="Star Fleet",
+            fleet="First Fleet",
             preset=PARAGRAPH,
             outcomes=(
                 Outcome(
@@ -2109,7 +2114,7 @@ EXPEDITIONS: dict[str, Expedition] = {
             "chains holds all four) can each class draw at all? The 300k in 17 variations, then the 1m in 21; once a "
             "model holds all four, the work turns to chaining (Justin, 13:00).",
             ship="Cards",
-            fleet="Star Fleet",
+            fleet="First Fleet",
             preset=NURSERY,
             outcomes=(
                 Outcome("stars/previous_word/max_score", "higher", "previous-word, lit at 0.5"),
@@ -2168,7 +2173,7 @@ EXPEDITIONS: dict[str, Expedition] = {
             "models that chain, silence each card's heads and measure what chaining loses, against silencing as many "
             "random heads (Justin, 13:30). Outside models only: it does not use the training queue.",
             ship="Knockout",
-            fleet="Star Fleet",
+            fleet="First Fleet",
             preset=PARAGRAPH,
             outcomes=(
                 Outcome(
@@ -2213,7 +2218,7 @@ EXPEDITIONS: dict[str, Expedition] = {
             "the Pareto frontier of in-window trigram repetition (thorp/trigrams.py), period books only, against a twin "
             "fitout of the same shelves and amounts with books chosen at random (Justin, 14:40; top of the queue).",
             ship="Fitout: Trigram engine",
-            fleet="Star Fleet",
+            fleet="First Fleet",
             preset=NURSERY,
             outcomes=(
                 Outcome(
@@ -2305,7 +2310,7 @@ EXPEDITIONS: dict[str, Expedition] = {
             "9m, 1m, the three-layer keel, the keel, each carrying the last one's recipe; a failed descent sails again "
             "with the bigger ship as teacher.",
             ship="Fitout: Ogden (The Smallest Bridge)",
-            fleet="Star Fleet",
+            fleet="First Fleet",
             preset=next(r["preset"] for r in LADDER if r.get("name") == "The speller"),
             outcomes=(
                 Outcome("stars/bridge/max_score", "higher", "the Bridge, played at 0.5 nats"),
@@ -2342,7 +2347,7 @@ EXPEDITIONS: dict[str, Expedition] = {
             "(template), each half and half with Ogden replay, against replay alone. The trick is taught; the stars "
             "and cards are read, never handed over.",
             ship="Logic tutor",
-            fleet="Star Fleet",
+            fleet="First Fleet",
             preset=next(r["preset"] for r in LADDER if r.get("name") == "The speller"),
             outcomes=(
                 Outcome("tricks/logic_test/gain", "higher", "the chaining gain on the logic deck, performed at 0.1"),
@@ -2404,7 +2409,7 @@ EXPEDITIONS["two_bets"] = Expedition(
     "about betting the type of the word too. and then we'd compare those scores'): the same model, two ways of "
     "reading its distribution, the next keyed word and the next word's type.",
     ship="Pan",
-    fleet="Star Fleet",
+    fleet="First Fleet",
     preset=NURSERY,
     outcomes=(
         Outcome("shapes/keyed_top1", "higher", "the word bet: the next keyed word"),

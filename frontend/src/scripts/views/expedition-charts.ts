@@ -1,5 +1,5 @@
 // The Expeditions page's charts and the journey through the layers. Imported with `await import(...)`
-// from the island's effects: this module pulls in Plotly (lib/charts) and the stage bands, which touch
+// from the island's effects: this module pulls in ECharts (lib/charts) and the stage bands, which touch
 // the browser when they load, and the island is server-rendered.
 //
 // Each drawer takes the payload and writes into the element the island has already rendered, exactly

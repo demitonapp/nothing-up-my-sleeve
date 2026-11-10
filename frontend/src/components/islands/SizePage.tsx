@@ -6,23 +6,33 @@ import { btnCls, cardCls, crumbCls, emptyCls, fieldCls, rangeCls, selectCls, tab
 import { sectionProps, useApi, useRoute } from '@/lib/useApi';
 import { initRunGrid } from '@/lib/rungrid';
 import { shipHash } from '@/scripts/router';
-import { isSizePage, modelHref, renderSizePage, rungFor, sizeAddress } from '@/scripts/views/size-page';
+import { isSizePage, modelHref, renderSizePage, rungFor, setSizeSelection, sizeAddress } from '@/scripts/views/size-page';
 
-const MTABS = ['overview', 'goals', 'training', 'scoring', 'waypoints', 'fitouts', 'bet'];
+const MTABS = ['overview', 'goals', 'training', 'scoring', 'waypoints', 'sops'];
 const SSUBS = ['maths', 'ask', 'language', 'shapes', 'number', 'physics', 'life', 'return', 'logic', 'versus'];
 const WSUBS = ['expected', 'envelope', 'stars'];
 
-export default function SizePage() {
+export default function SizePage({ initialPath = '/' }: { initialPath?: string }) {
   const route = useRoute();
-  const [path, setPath] = useState('/');
+  const [path, setPath] = useState(initialPath);
+  const [sel, setSel] = useState<{ expedition: string; voyage: string }>({ expedition: '', voyage: '' });
 
   useEffect(() => { setPath(route); }, [route]);
   const mine = isSizePage(path);
   const ladder = useApi<any>('/api/ladder', 15000, mine);
+  const exps = useApi<any>('/api/expeditions/overview', 300000, mine);
   const wired = useRef(false);
 
+  const readSelection = (): void => {
+    const q = new URLSearchParams(location.search);
+    setSel({ expedition: q.get('expedition') || '', voyage: q.get('voyage') || '' });
+  };
+
   useEffect(() => {
-    const read = (): void => setPath(location.hash && location.hash.startsWith('#/') ? location.hash.slice(1) : location.pathname);
+    const read = (): void => {
+      setPath(location.hash && location.hash.startsWith('#/') ? location.hash.slice(1) : location.pathname);
+      readSelection();
+    };
     read();
     const onPop = (): void => read();
     window.addEventListener('popstate', onPop);
@@ -33,6 +43,22 @@ export default function SizePage() {
   const addr = sizeAddress(path);
   const rung = useMemo(() => (ladder.data ? rungFor(ladder.data, addr.key) : null), [ladder.data, addr.key]);
   const tab = MTABS.includes(addr.tab) ? addr.tab : 'overview';
+  // one size, one address: a class slug ('pan') or an old /sizes link is rewritten to the size's preset
+  // ('300k'), the canonical identifier, keeping the tab and sub-view (10 November)
+  const canonical = useMemo(
+    () => (rung ? modelHref(rung, tab, tab === 'scoring' ? addr.ssub : tab === 'waypoints' ? addr.wsub : addr.osub) : null),
+    [rung, tab, addr.ssub, addr.wsub, addr.osub],
+  );
+
+  useEffect(() => {
+    if (!mine || !canonical) return;
+    const hash = location.hash.startsWith('#/');
+    const search = location.search;
+    const want = (hash ? '#' + canonical : canonical) + search;
+    if ((hash ? location.hash : location.pathname + search) === want) return;
+    history.replaceState(null, '', want);
+    setPath(canonical);
+  }, [mine, canonical, path]);
 
   useEffect(() => {
     if (!mine || !ladder.data) return;
@@ -49,41 +75,83 @@ export default function SizePage() {
         initRunGrid(goShip);
       }
       if (!live) return;
+      setSizeSelection(sel);
       await renderSizePage(path, ladder.data);
     })();
     return () => { live = false; };
-  }, [mine, path, ladder.data]);
+  }, [mine, path, ladder.data, sel.expedition, sel.voyage]);
+
+  const sizeRuns = useMemo(
+    () => ((ladder.data?.runs || []) as any[]).filter((x) => x.preset === rung?.preset && !String(x.name || '').startsWith('smoke')),
+    [ladder.data, rung],
+  );
+  const expKeys = useMemo(
+    () => [...new Set(sizeRuns.map((x) => String(x.voyage || '')).filter(Boolean))].sort() as string[],
+    [sizeRuns],
+  );
+  const expName = (k: string): string => (((exps.data && exps.data.expeditions) || []) as any[]).find((e) => e.key === k)?.name || k;
+  const voyRuns = useMemo(() => sizeRuns.filter((x) => !sel.expedition || x.voyage === sel.expedition), [sizeRuns, sel.expedition]);
+  const applySel = (next: { expedition: string; voyage: string }): void => {
+    setSel(next);
+    const q = new URLSearchParams(location.search);
+    if (next.expedition) q.set('expedition', next.expedition); else q.delete('expedition');
+    if (next.voyage) q.set('voyage', next.voyage); else q.delete('voyage');
+    const qs = q.toString();
+    const base = location.hash.startsWith('#/') ? location.hash.split('?')[0] : location.pathname;
+    history.replaceState(null, '', base + (qs ? `?${qs}` : ''));
+  };
+  const onExp = (expedition: string): void => applySel({ expedition, voyage: '' });
+  const onVoy = (voyage: string): void => {
+    const run = sizeRuns.find((x) => x.run_id === voyage);
+    applySel({ expedition: voyage ? String(run?.voyage || sel.expedition) : sel.expedition, voyage });
+  };
+  const selRun = sizeRuns.find((x) => x.run_id === sel.voyage);
 
   if (!mine) return null;
-  const href = (mt: string, sub?: string): string => (rung ? modelHref(rung, mt, sub || null) : `/sizes/${encodeURIComponent(addr.key)}${mt === 'overview' ? '' : '/' + mt}`);
+  const keep = typeof window === 'undefined' ? '' : location.search;
+  const href = (mt: string, sub?: string): string => (rung ? modelHref(rung, mt, sub || null) : `/ships/${encodeURIComponent(addr.key)}${mt === 'overview' ? '' : '/' + mt}`) + keep;
   const mstate = (t: string): 'active' | 'inactive' => (tab === t ? 'active' : 'inactive');
   const isS = (s: string): boolean => tab === 'scoring' && addr.ssub === s;
   const isW = (w: string): boolean => tab === 'waypoints' && addr.wsub === w;
 
   return (
     <div {...sectionProps('rung')} id="rung">
-      <h1><a className={crumbCls('back')} href="/harbours">← harbours</a> <span id="rungtitle">{rung ? `${rung.preset} · ${rung.name}` : ''}</span> <span className="q" id="rungjob">{rung ? rung.job : ''}</span></h1>
+      <h1><a className={crumbCls('back')} href="/harbours">← harbours</a> <span id="rungtitle">{rung ? `${rung.preset} · ${rung.name}` : 'reading the ship…'}</span> <span className="q" id="rungjob">{rung ? rung.job : ''}</span></h1>
+      <div className="handtools" id="shipsel" style={{ margin: '2px 0 10px' }}>
+        <label className="note" htmlFor="expsel">expedition</label>
+        <select className={selectCls('')} id="expsel" value={sel.expedition} onChange={(e) => onExp(e.target.value)} title="the expedition its charts and readings follow">
+          <option value="">all expeditions</option>
+          {expKeys.map((k) => <option key={k} value={k}>{expName(k)}</option>)}
+        </select>
+        <label className="note" htmlFor="voysel">voyage</label>
+        <select className={selectCls('')} id="voysel" value={sel.voyage} onChange={(e) => onVoy(e.target.value)} title="one voyage; leave it on the median to use the expedition's median reading at each step">
+          <option value="">{sel.expedition ? 'median of the expedition' : 'every voyage'}</option>
+          {voyRuns.map((x) => <option key={x.run_id} value={x.run_id}>{x.name}{x.ship ? ` · ${x.ship}` : ''}</option>)}
+        </select>
+        <span className="note" id="selnote">{sel.voyage ? `one voyage: ${selRun?.name || sel.voyage}` : sel.expedition ? `median of ${voyRuns.length} ${expName(sel.expedition)} voyage${voyRuns.length === 1 ? '' : 's'}` : 'every voyage at this size'}</span>
+      </div>
       <nav className={tabsCls('line', 'subnav')} data-orientation="horizontal" data-variant="line" id="modelnav">
-        {MTABS.map((t) => <a key={t} className={tabCls('')} data-state={mstate(t)} data-mtab={t} href={href(t)}>{t[0].toUpperCase() + t.slice(1)}</a>)}
+        {MTABS.map((t) => <a key={t} className={tabCls('')} data-state={mstate(t)} data-mtab={t} href={href(t)}>{t === 'sops' ? 'SOPs' : t[0].toUpperCase() + t.slice(1)}</a>)}
       </nav>
 
       <div className={`mtab${tab === 'goals' ? ' active' : ''}`} data-mtab="goals">
-        <section className={cardCls(false, 'panel')}><div className="rungover" id="goalsover" /></section>
-        <section className={cardCls(false, 'panel')}>
-          <h2>Filling the seven steps <span className="note">the goal: as many tricks as this ship can learn, building on everything below it, so the route fills as fast as it can. Green is performed by this size, outlined is inherited from a smaller size (carried up, still to show here), grey is open</span></h2>
-          <div className="coverage" id="goalcoverage" />
-        </section>
-        <section className={cardCls(false, 'panel')}>
-          <h2>What the field expects of this size <span className="note">the minimum, not the limit: the tricks the field would expect a ship this size to reach, and how its voyages are doing on each; every trick above them is worth taking too. Sort by any column, filter by step</span></h2>
-          <div className="handtools" data-filters><label className="note" htmlFor="goalfilter">step to quantum physics</label><select className={selectCls('')} id="goalfilter" data-remember title="filter the goals by waypoint"><option value="">all seven</option></select></div>
-          <div className="scroll"><table id="goaltable" className="clickable"><thead><tr><th>trick</th><th>waypoint</th><th>gate</th><th>rests on</th><th>the field shows it at</th><th>on this size</th></tr></thead><tbody /></table></div>
+        <section className={cardCls(false, 'panel')} id="roadpanel">
+          <h2>The road to quantum mechanics <span className="note">the seven waypoints, bottom to top; green is performed by this size, outlined is inherited from a smaller size (carried up, still to show here), grey is open. ◆ marks a gate. The 300k's job is to climb as high as it can in a way that scales to the 1m</span></h2>
+          <div className="roadlegend">
+            <span className="item"><span className="chip mine">&#9670; gate, still open</span> a gate expected at this size, not performed yet</span>
+            <span className="item"><span className="chip done">&#10003; performed</span> performed here</span>
+            <span className="item"><span className="chip above">1m</span> above this size</span>
+            <span className="item"><span className="chip taught">taught</span> taught or a reference</span>
+            <span className="item"><b>the basics</b> the floor · <b>the ladder</b> the climb</span>
+          </div>
+          <div className="goalroute" id="goalroute"><div className={emptyCls()}>reading the ship's goals…</div></div>
         </section>
       </div>
 
       <div className={`mtab${tab === 'overview' ? ' active' : ''}`} data-mtab="overview">
-        <section className={cardCls(false, 'panel')} id="sopsummarypanel">
-          <h2>The SOP run, and what it means <span className="note">this ship's newest voyage: the standard it was built to, its scores, and what those numbers say about that standard — a reading, not a verdict on the ship alone</span></h2>
-          <div id="sopsummary"><div className={emptyCls()}>reading the voyage…</div></div>
+        <section className={cardCls(false, 'panel')} id="expusepanel">
+          <h2>How this ship has been used <span className="note">every voyage at this size, grouped by the expedition that claimed it: how many voyages and ships it contributed, how they ended, the best Forgotten Tomes score, the standards it sailed under, and when</span></h2>
+          <div id="expuse"><div className={emptyCls()}>reading the expeditions…</div></div>
         </section>
         <section className={cardCls(false, 'panel')} id="gridpanel">
           <h2>Every voyage at this size <span className="note">one square per voyage in the order they started; the brighter the green, the better (lower) its Forgotten Tomes bits per byte, by quartile of the voyages scored so far; an outlined square is running</span></h2>
@@ -93,6 +161,7 @@ export default function SizePage() {
         <section className={cardCls(false, 'panel')}>
           <h2>The Forgotten Tomes score, voyage by voyage <span className="note">bits per byte on 16 books Qwen 3.8 cannot have read, lower is better; one dot per scored voyage in the order they started, the line is the best so far, dotted lines are Qwen models scored the same way</span></h2>
           <div className="chart tall" id="ftchart" />
+          <div className="s mt" id="ftnote" />
         </section>
       </div>
 
@@ -100,6 +169,7 @@ export default function SizePage() {
         <section className={cardCls(false, 'panel')}>
           <h2>The star chart, against Qwen3 4B <span className="note">the ten points of the chart, each reading divided by its own mark: Qwen3 4B (which chains) against this ship's newest voyage, read live while it trains. Above the dotted line a point clears its mark; the gap between the lines is how far the ship is behind on that point, and where its line is above, it is ahead</span></h2>
           <div className="chart" id="sizejourney" />
+          <div className="s" id="sizejourneynote" />
         </section>
         <section className={cardCls(false, 'panel')}>
           <div className="handtools" style={{ border: 0, padding: 0, margin: 0 }}><label className="note" htmlFor="soppick">SOP</label><select className={selectCls('')} id="soppick" data-remember /><span className="note" id="sopnote">every run, chart and reading below is built to this version (or to all of them)</span></div>
@@ -126,13 +196,19 @@ export default function SizePage() {
       </div>
 
       <div className={`mtab${tab === 'scoring' ? ' active' : ''}`} data-mtab="scoring">
+        <section className={cardCls(false, 'panel')} id="sopsummarypanel">
+          <h2>The SOP run, and what it means <span className="note">this ship's newest voyage: the standard it was built to, its scores, and what those numbers say about that standard — a reading, not a verdict on the ship alone</span></h2>
+          <div id="sopsummary"><div className={emptyCls()}>reading the voyage…</div></div>
+        </section>
+        <section className={cardCls(false, 'panel')} id="starpanel">
+          <h2>The star chart, against Qwen3 4B <span className="note">the ten points of the chart, each reading divided by its own mark: Qwen3 4B (which chains) against this ship's newest voyage, read live while it trains. Above the dotted line a point clears its mark; the gap between the lines is how far the ship is behind on that point, and where its line is above, it is ahead</span></h2>
+          <div className="chart" id="sopchart" />
+          <div className="s mt" id="starnote" />
+        </section>
         <section className={cardCls(false, 'panel')} id="cardstrippanel">
           <h2>The four cards <span className="note">what a model must hold before it can chain (every model that chains holds all four): each card's best reading by a voyage of this size against its mark, held when a voyage ended lit, touched when one only passed it; beside them, whether it chains cause and effect</span></h2>
           <div id="cardstrip" className="cardstrip"><div className={emptyCls()}>reading the cards…</div></div>
-        </section>
-        <section className={cardCls(false, 'panel')}>
-          <h2>On the route to quantum physics <span className="note">the seven waypoints, bottom to top; the tricks the field expects of this size are lit, those it carries up from smaller sizes are marked, and those the field expects only of bigger sizes are faded: still worth taking. ◆ is a gate: performed before a ship moves on to the next waypoint. Open a trick for its stars and progress</span></h2>
-          <div className="goalroute" id="goalroute" />
+          <div className="s" id="bestship" />
         </section>
 
         <nav className={tabsCls('line', 'subnav')} data-orientation="horizontal" data-variant="line" id="scnav">
@@ -238,22 +314,13 @@ export default function SizePage() {
         </div>
       </div>
 
-      <div className={`mtab${tab === 'fitouts' ? ' active' : ''}`} data-mtab="fitouts">
+      <div className={`mtab${tab === 'sops' ? ' active' : ''}`} data-mtab="sops">
         <section className={cardCls(false, 'panel')}>
-          <h2>Fitouts <span className="note">the training material curated for this size, matched to its stages: pretraining (in order, one voyage) and post-training (in order, each seeded from the one before); then the four necessary cards each stage has drawn so far, voyage by voyage</span></h2>
-          <div id="classfitouts"><div className={emptyCls()}>reading the fitouts…</div></div>
+          <h2>SOPs <span className="note">the standard operating procedure a voyage is built to: each version's phases, content, optimiser, the depth it gives this size, its runs here and its scores; the current standard first, and a version with a ship at sea is locked</span></h2>
+          <div id="classsops"><div className={emptyCls()}>reading the SOPs…</div></div>
         </section>
       </div>
 
-      <div className={`mtab${tab === 'bet' ? ' active' : ''}`} data-mtab="bet">
-        <section className={cardCls(false, 'panel')} id="wagerpanel">
-          <h2>The Navigator's Wager <span className="note">pull one lever on a voyage and bet where the 16 cards fall: for each card, does the pull make it appear, vanish, come earlier or later, or stay the same (and, for a bonus, in which layer)? The House bets that nothing moves. Five chips a round; the readings reveal it; ties go to the House. What a round reveals is the lever's lesson</span></h2>
-          <div className="wagerdeal"><label>Control voyage <select className={selectCls()} id="wagercontrol" /></label><label>Lever <select className={selectCls()} id="wagerlever" /></label><button className={btnCls('default')} id="wagerdealbtn" type="button">Deal the round</button><span className="s" id="wagerleverabout" /></div>
-          <div id="wagerrounds" className="wagerrounds" />
-          <div id="wagerhead" className="wagerhead" />
-          <div id="wagertable" className="wagertable" />
-        </section>
-      </div>
     </div>
   );
 }

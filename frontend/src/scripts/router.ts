@@ -21,7 +21,7 @@ export const CLASS_ALIASES: Record<string, string> = Object.fromEntries(
   Object.entries(CLASS_RENAMES).flatMap(([a, b]) => [[a, b], [b, a]]),
 );
 
-export const MTABS = ['overview', 'fleet', 'goals', 'training', 'scoring', 'waypoints', 'fitouts', 'bet'];
+export const MTABS = ['overview', 'fleet', 'goals', 'training', 'scoring', 'waypoints', 'sops', 'fitouts', 'bet'];
 export const STABS = ['betting', 'books', 'languages', 'sieves', 'attention', 'traits'];
 export const STAB_EL: Record<string, string> = { betting: 'betting', books: 'books', languages: 'languages', sieves: 'sieves', attention: 'attention', traits: 'traits-section' };
 export const OLD_SHIP: Record<string, string> = { betting: 'betting', books: 'books', languages: 'languages', sieves: 'sieves', attention: 'attention', 'traits-section': 'traits' };
@@ -42,7 +42,8 @@ export interface Route {
   [key: string]: unknown;
 }
 
-// a rung is addressed by its preset or by its class slug, and both live on the ships page
+// A rung is addressed by its preset (its size, the canonical identifier) or by its class slug (an old
+// alias the page resolves and rewrites to the preset); both live on the ships page.
 const RUNG_PRESETS = new Set(['300k', '1m', '9m', '21m', '50m', '100m', '350m',
   'pan', 'augustus', 'speller', 'stylist', 'paragraph', 'invention', 'trader']);
 
@@ -90,8 +91,8 @@ export function route(h: string): Route {
   return { page: 'rung', rung: h, mtab: 'overview' }; // an old class link: #proxy
 }
 
-export const modelHash = (r: { name: string }, mt = 'overview', sub: string | null = null): string =>
-  `/ships/${slugOf(r)}${mt === 'overview' && !sub ? '' : '/' + mt}${mt === 'waypoints' && sub && sub !== 'expected' ? '/' + sub : ''}${mt === 'scoring' && sub && sub !== 'maths' ? '/' + sub : ''}${mt === 'overview' && sub ? '/' + sub : ''}`;
+export const modelHash = (r: { name: string; preset?: string }, mt = 'overview', sub: string | null = null): string =>
+  `/ships/${r.preset || slugOf(r)}${mt === 'overview' && !sub ? '' : '/' + mt}${mt === 'waypoints' && sub && sub !== 'expected' ? '/' + sub : ''}${mt === 'scoring' && sub && sub !== 'maths' ? '/' + sub : ''}${mt === 'overview' && sub ? '/' + sub : ''}`;
 
 export const shipHash = (key: string, sailing: string | null = null, st = 'betting'): string =>
   `/ships/${key}${sailing ? '/' + encodeURIComponent(sailing) : ''}${st === 'betting' ? '' : '/' + st}`;

@@ -41,7 +41,16 @@ def url() -> str:
 @functools.cache
 def engine():
     u = url()
-    return create_engine(u.replace("postgresql://", "postgresql+psycopg://", 1), pool_pre_ping=True)
+    # the dashboard serves many panels at once on a threaded server; the default pool (5 + 10) ran dry
+    # under a page's burst of /api calls, which surfaced as blank panels and 30 s "QueuePool limit"
+    # timeouts (10 November). Postgres allows 100 connections here; 20 + 20 leaves room for training.
+    return create_engine(
+        u.replace("postgresql://", "postgresql+psycopg://", 1),
+        pool_pre_ping=True,
+        pool_size=20,
+        max_overflow=20,
+        pool_recycle=1800,
+    )
 
 
 def session() -> Session:

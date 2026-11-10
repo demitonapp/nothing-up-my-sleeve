@@ -298,3 +298,10 @@
 2026-11-10T09:08:47 fitouts/300k@v0.0.6-control -15
 2026-11-10T09:54:50 fitouts/300k@v0.0.6-gqa -2
 2026-11-10T09:54:50 fitouts/300k@v0.0.6-pins -2
+2026-11-10T10:05:52 fitouts/300k@v0.0.6-control 2
+2026-11-10T10:06:22 fitouts/300k@v0.0.6-gqa 2
+2026-11-10T10:06:52 fitouts/300k@v0.0.6-pins 2
+2026-11-10T10:07:22 fitouts/300k@v0.0.6-release 2
+2026-11-10T10:22:48 fitouts/300k@v0.0.6-gqa -15
+2026-11-10T11:55:46 fitouts/300k@v0.0.6-ifeval 1
+2026-11-10T11:56:16 fitouts/300k@v0.0.6-ifeval-pins 1

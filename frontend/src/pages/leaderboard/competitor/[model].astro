@@ -1,0 +1,32 @@
+---
+// Direct competitor routes for dev (production falls back): the model id contains a slash, so the links
+// encode it (`mlx-community%2FQwen3-4B-4bit`) and the route is generated with the same encoded segment.
+// Without these paths a direct load of a competitor page is a 404 in dev (10 November).
+import Layout from '../../../layouts/Layout.astro';
+import Competitor from '../../../components/islands/Competitor';
+
+
+
+export function getStaticPaths() {
+const MODELS = [
+  'EleutherAI/pythia-14m',
+  'EleutherAI/pythia-160m',
+  'EleutherAI/pythia-31m',
+  'EleutherAI/pythia-410m',
+  'EleutherAI/pythia-70m',
+  'Qwen/Qwen3-0.6B',
+  'microsoft/phi-2',
+  'mlx-community/Llama-3.2-3B-bf16',
+  'mlx-community/Phi-4-mini-instruct-4bit',
+  'mlx-community/Qwen3-1.7B-4bit',
+  'mlx-community/Qwen3-4B-4bit',
+  'mlx-community/SmolLM3-3B-Base-4bit',
+  'mlx-community/gemma-2-2b',
+  'mlx-community/gemma-3-text-4b-pt-4bit',
+];
+  return MODELS.map((m) => ({ params: { model: encodeURIComponent(m) } }));
+}
+---
+<Layout>
+  <main><Competitor client:load /></main>
+</Layout>

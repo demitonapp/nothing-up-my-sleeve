@@ -65,10 +65,10 @@ def spec_of(line: str) -> dict | None:
 
 def _ledger_status(name: str) -> str | None:
     """The newest sailing of a voyage: 'finished', 'running', 'failed...', or None when it never sailed."""
-    from thorp.ledger import Ledger
+    from thorp.ledger import reader
 
     with contextlib.suppress(Exception):
-        rows = Ledger().query(
+        rows = reader().query(
             "select status from runs where name=? order by started desc limit 1", [name]
         )
         if rows:

@@ -1,6 +1,6 @@
 // One competitor (or a Thorp ship version): its chaining result, logic deck, cards and every rung
 // (UI.md "Leaderboard"). Typed HTML fragments for the island; the charts are drawn by the island after
-// render, because Plotly needs the browser.
+// render, because ECharts needs the browser.
 
 import { CARD_FACE, deckHand } from '../../lib/deck';
 import { esc, fmt, fmtParams, signed } from '../../lib/format';

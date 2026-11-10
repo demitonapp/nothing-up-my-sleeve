@@ -31,7 +31,7 @@ export default function Competitor() {
     if (!k) { setKnock(null); return; }
     let live = true;
     (async () => {
-      // views/knockouts imports Plotly at module load: import it after the page is in the browser
+      // views/knockouts imports ECharts at module load: import it after the page is in the browser
       const { knockoutBlock } = await import('@/scripts/views/knockouts');
       if (live) setKnock(knockoutBlock(k, 'cpkochart'));
     })();
@@ -40,7 +40,7 @@ export default function Competitor() {
 
   useEffect(() => {
     // draw only once the block is actually in the DOM: the state update above commits first, but a
-    // frame may still be pending, so wait for the element rather than let Plotly throw
+    // frame may still be pending, so wait for the element rather than let ECharts throw
     if (!knock || !koData) return;
     let live = true;
     const draw = () => {

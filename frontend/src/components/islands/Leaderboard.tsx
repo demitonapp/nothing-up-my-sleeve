@@ -8,7 +8,7 @@ import { sectionProps, useApi } from '@/lib/useApi';
 import { boardHtml, drawSmokingChart, runsHtml, smokingHtml } from '@/scripts/views/leaderboard-main';
 
 export default function Leaderboard() {
-  const lb = useApi<any>('/api/leaderboard', 30000);
+  const lb = useApi<any>('/api/leaderboard', 60000);
   const sq = useApi<any>('/api/smoking_qwen', 60000);
   const ladder = useApi<any>('/api/ladder', 300000);
   const [want, setWant] = useState('');

@@ -20,9 +20,9 @@ def _wall_rate(r: dict) -> float | None:
     allowance, so the readings between steps count (8 November: P1's steps ran at 648k tokens a second, but its
     readings brought the voyage to about 126k; a quote at the steps' rate gives a deadline it cannot meet)."""
     with contextlib.suppress(Exception):
-        from thorp.ledger import Ledger
+        from thorp.ledger import reader
 
-        run = Ledger().get_run(r["run_id"]) or {}
+        run = reader().get_run(r["run_id"]) or {}
         secs = float(r["ended"]) - float(r["started"]) - s5.SETUP_HOURS * 3600
         if run.get("tokens_seen") and secs > 60:
             return float(run["tokens_seen"]) / secs
@@ -67,9 +67,9 @@ def mac_rate(preset: str) -> float | None:
     parity run: the FLOP guess leaves out the evaluators and the scaffold's passes, and a 9m at width 192 is far
     from a GPU's peak, so a quote on it alone would bring a ship home before it docked)."""
     try:
-        from thorp.ledger import Ledger
+        from thorp.ledger import reader
 
-        rows = Ledger().query(
+        rows = reader().query(
             "select tokens_seen, wall_minutes from runs where status='finished' and wall_minutes > 0 and tokens_seen > 0"
             " and json_extract(spec_json, '$.model.preset') = ? and coalesce(json_extract(spec_json, '$.model.backend'), 'mlx') = 'mlx'"
             " order by finished desc limit 3",

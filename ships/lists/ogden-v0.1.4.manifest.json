@@ -1,0 +1,25 @@
+{
+ "version": "ogden-v0.1.4",
+ "from": "ogden-v0.1.3",
+ "transform": "tutor-marks",
+ "about": "v0.1.3's 592 stamped books plus the logic tutor's passages at 5% of the words, each fact as <premise> and the conclusion as <conclusion>",
+ "generator": "backend/scripts/make_ogden_v014.py",
+ "read_as": "clean: raw (each book is stamped; the list is 618 local refs)",
+ "books": 618,
+ "base_books": 592,
+ "tutor_books": 26,
+ "base_words": 36189665,
+ "tutor_words": 1819114,
+ "share": 0.0503,
+ "symbol_counts": {
+  "bos": 618,
+  "eos": 618,
+  "sep": 127868,
+  "premise": 127868,
+  "conclusion": 63934,
+  "question": 1494,
+  "answer": 1378,
+  "end": 65428
+ },
+ "sha1": "dd06c3507bd346d91111d0f27c4737693f88c794"
+}

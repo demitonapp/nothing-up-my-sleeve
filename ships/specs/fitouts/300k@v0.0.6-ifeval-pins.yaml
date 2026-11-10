@@ -1,0 +1,118 @@
+# ships/specs/fitouts: the IFEval arm with the ten pins that held at 300k, on SOP v0.0.6 (10 November
+# 2026). The same corpus and tokeniser as 300k@v0.0.6-ifeval; the one difference is the scaffold: ten
+# cards pinned at their expected layers instead of the standard five. Does the pin curriculum that held
+# on Ogden carry to instruction following, or does the pull crowd the instruction stage?
+name: 300k@v0.0.6-ifeval-pins
+ship: 'SOP v0.0.6 at 300k (the IFEval arm, ten pins)'
+experiment: 'IFEval: can a class be taught to obey a list of hard constraints, and how small can it get?'
+question: 'The IFEval arm with ten pins, at 300k on SOP v0.0.6: the instruction corpus and tokeniser of
+  300k@v0.0.6-ifeval, with ten cards pinned at their expected layers instead of the standard five. The
+  reading is IFEval prompt-level strict on the official 541. Does the pin curriculum that held at 300k
+  transfer to instruction following, or does the wider pull cost the instruction stage?'
+departures:
+- field: content
+  why: reads the IFEval instruction corpus, not Ogden
+- field: tokeniser
+  why: the tokeniser is trained on the same instruction corpus it reads
+- field: scaffold
+  why: ten cards pinned at their expected layers, not the five the standard names
+data:
+  recipe: lists/ifeval-v1.csv
+  passes: 8
+  order: shuffled
+  refuse:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+  - lists/hole-cards-unseen.csv
+  clean: raw
+tokeniser:
+  kind: spm-bpe
+  vocab: 2048
+  byte_fallback: true
+  train_on: lists/ifeval-v1.csv
+model:
+  family: gpt
+  preset: 300k
+  context: 1024
+  positions: rope
+optim:
+  name: adamw
+  lr: 0.003
+  betas:
+  - 0.9
+  - 0.95
+  weight_decay: 0.1
+  warmup_steps: 100
+  schedule: cosine
+  min_lr_ratio: 0.1
+  batch_tokens: 32768
+  grad_clip: 1.0
+  precision: bf16
+  scaffold:
+    weight: 1.0
+    hold: 0.25
+    fade: 1.0
+    heads:
+    - layer: 0
+      head: 0
+      card: previous_word
+    - layer: 0
+      head: 1
+      card: delimiter
+    - layer: 4
+      head: 0
+      card: induction
+    - layer: 4
+      head: 1
+      card: duplicate_word
+    - layer: 1
+      head: 0
+      card: sink
+    - layer: 1
+      head: 1
+      card: rare_word
+    - layer: 2
+      head: 0
+      card: premise_marker
+    - layer: 2
+      head: 1
+      card: words_back
+    - layer: 3
+      head: 0
+      card: number_spotter
+    - layer: 3
+      head: 1
+      card: order_word
+    riddles:
+      comparator:
+        layer: 2
+        head: 1
+        items: 16
+        pool: 2048
+eval:
+  sets:
+  - lists/hole-cards-unseen.csv
+  every_steps: 640
+  evaluators:
+  - ce_bpb
+  - discovery
+  - logic
+  - stars
+  - nevermore
+  - cards
+  - shapes
+  - pips
+  - ifeval
+  light:
+    every_steps: 64
+    evaluators:
+    - stars
+    - nevermore
+    - cards
+    - logic
+    - shapes
+    - pips
+checkpoint:
+  every_steps: 640
+sop: '0.0.6'
+seed: 1

@@ -74,7 +74,9 @@ def _ledger_pg() -> bool:
     """Whether the core ledger readers answer from Postgres (THORP_LEDGER_PG). During the cut-over this
     flips on after the backfill; until then the readers stay on SQLite. The JSON-extracting endpoints
     still read SQLite until they are migrated in turn."""
-    return bool(os.environ.get("THORP_LEDGER_PG"))
+    from thorp.ledger import _use_pg
+
+    return _use_pg()
 
 
 def _rows(sql: str, params=()) -> list[dict]:
@@ -681,6 +683,21 @@ def _model_params(preset: str) -> int:
     return cache[preset]
 
 
+def _queue_lines() -> list[str]:
+    """The queue the coordinator runs: the store when THORP_QUEUE_PG=1, else specs/queue.txt."""
+    import os
+
+    if os.environ.get("THORP_QUEUE_PG") == "1":
+        from thorp.viable.s2_coordination import queue_store
+
+        return queue_store.pending_texts()
+    return [
+        ln.strip()
+        for ln in paths.resolve("specs/queue.txt").read_text().splitlines()
+        if ln.strip() and not ln.lstrip().startswith("#")
+    ]
+
+
 def api_expedition_plan(key: str = "kipling") -> dict:
     """An expedition's launches, in queue order, with the parameters that make its arms differ.
 
@@ -693,10 +710,9 @@ def api_expedition_plan(key: str = "kipling") -> dict:
     from thorp import fleet, paths
     from thorp.models import registry
 
-    queue = paths.resolve("specs/queue.txt")
     root = paths.resolve("specs")
     rows = []
-    for line in queue.read_text().splitlines():
+    for line in _queue_lines():
         line = line.strip()
         if not line.startswith("fitouts/"):
             continue
@@ -757,8 +773,7 @@ def api_lanes() -> dict:
         "vast_seats": (by.get("vast") or {}).get("seats", 1),
         "seats": seats,
         "lanes": lanes,
-        "queue": [ln for ln in paths.resolve("specs/queue.txt").read_text().splitlines()
-                  if ln.strip() and not ln.strip().startswith("#")],
+        "queue": _queue_lines(),
     }
 
 
@@ -801,11 +816,14 @@ def api_at_sea(expedition: str = "kipling") -> dict:
             continue
         # the arms of the voyage now: running, or docked in the last six hours
         if r.get("status") == "running":
-            # the helm seats are not taken by every launch path, so freshness is the reliable signal:
-            # a running row whose last reading is old is a voyage that died without writing a finish
-            last = _latest_ts(r["run_id"])
-            if last is None or last < fresh_after:
-                continue
+            # a live helm seat is at sea even when its last reading is old: four voyages on this Mac can
+            # leave one waiting a long time between readings, and a stalled voyage still has its seat
+            # (10 November: the control's fourth card vanished from the at-sea page at 15 minutes).
+            # Only a running row with no seat and no fresh reading is a voyage that died.
+            if r.get("name") not in live:
+                last = _latest_ts(r["run_id"])
+                if last is None or last < fresh_after:
+                    continue
         if r.get("status") != "running" and not (
             r.get("status") == "finished" and str(r.get("started") or "") >= "2026-11-09T21:00"
         ):
@@ -816,7 +834,7 @@ def api_at_sea(expedition: str = "kipling") -> dict:
         bpb = _latest_bpb(rid)
         chain = _chaining(rid)
         rows.append({
-            "name": r["name"], "status": r["status"], "preset": (spec.get("model") or {}).get("preset"),
+            "name": r["name"], "run_id": rid, "status": r["status"], "preset": (spec.get("model") or {}).get("preset"),
             "kv_heads": int((spec.get("model") or {}).get("kv_heads") or 0),
             "pins": len(((spec.get("optim") or {}).get("scaffold") or {}).get("heads") or []),
             "clean": (spec.get("data") or {}).get("clean"),
@@ -888,11 +906,11 @@ def _card_marks() -> dict[str, float]:
 def _peak_final(run_id: str, name: str):
     """A reading's peak and its latest value: peak is what the pull achieved, final what survived it."""
     try:
-        with sqlite3.connect(f"file:{paths.ledger_path()}?mode=ro", uri=True) as c:
-            row = c.execute(
-                "select max(value), (select value from metrics where run_id=? and name=? order by step desc limit 1) "
-                "from metrics where run_id=? and name=?", (run_id, name, run_id, name)).fetchone()
-            return (None if row is None else row[0]), (None if row is None else row[1])
+        row = _rows(
+            "select max(value) as peak, "
+            "(select value from metrics where run_id=? and name=? order by step desc limit 1) as final "
+            "from metrics where run_id=? and name=?", [run_id, name, run_id, name])
+        return (None if not row else row[0]["peak"]), (None if not row else row[0]["final"])
     except Exception:  # noqa: BLE001
         return None, None
 
@@ -940,10 +958,11 @@ def _cards_summary(spec: dict, run_id: str) -> dict:
 def _at(run_id: str, name: str, step: int):
     """The reading nearest a step (the last one at or before it)."""
     try:
-        with sqlite3.connect(f"file:{paths.ledger_path()}?mode=ro", uri=True) as c:
-            row = c.execute("select value from metrics where run_id=? and name=? and step<=? order by step desc limit 1",
-                            (run_id, name, step)).fetchone()
-            return None if row is None else float(row[0])
+        rows = _rows(
+            "select value from metrics where run_id=? and name=? and step<=? order by step desc limit 1",
+            [run_id, name, step],
+        )
+        return None if not rows else float(rows[0]["value"])
     except Exception:  # noqa: BLE001
         return None
 
@@ -1028,15 +1047,43 @@ def _schedule(spec: dict, run_id: str) -> dict:
             stage = "fade"
         else:
             stage = "content"
+
+    # The top-level schedule is the scaffold's, and a voyage can give each head its own (10 November: the three
+    # decayers fade while the other eight are released). Group the cards by the schedule they actually run, so
+    # the page does not show one bar for a voyage that has two.
+    def _f(obj: dict, key: str, fallback):
+        v = obj.get(key, fallback)
+        return None if v is None else float(v)
+
+    groups: dict[tuple, dict] = {}
+
+    def _add(card: str, hold_: float | None, fade_: float | None, rel_: float | None) -> None:
+        kind = "release" if rel_ is not None else "fade"
+        share = rel_ if rel_ is not None else (fade_ if fade_ is not None else 1.0)
+        key = (kind, share, hold_, fade_)
+        g = groups.setdefault(
+            key, {"kind": kind, "share": share, "hold": hold_, "fade": fade_, "cards": [], "pins": 0}
+        )
+        g["cards"].append(card)
+        g["pins"] += 1
+
+    for h in sc.get("heads") or []:
+        _add(h.get("card"), _f(h, "hold", hold), _f(h, "fade", fade), _f(h, "release", release))
+    for card in sc.get("riddles") or {}:  # a riddle has no schedule of its own: it runs the scaffold's
+        _add(card, _f({}, "hold", hold), _f({}, "fade", fade), _f({}, "release", release))
+
+    out = []
+    for g in groups.values():
+        g["cards"] = sorted(set(g["cards"]))  # a card pinned twice is one card, two pins
+        out.append(g)
     return {"hold": hold, "fade": fade, "release": release, "weight": weight, "stage": stage,
-            "step": step, "total": total}
+            "step": step, "total": total, "groups": out}
 
 
 def _latest_ts(run_id: str):
     try:
-        with sqlite3.connect(f"file:{paths.ledger_path()}?mode=ro", uri=True) as c:
-            row = c.execute("select max(ts) from metrics where run_id=?", (run_id,)).fetchone()
-            return None if not row or row[0] is None else float(row[0])
+        row = _rows("select max(ts) as ts from metrics where run_id=?", [run_id])
+        return None if not row or row[0]["ts"] is None else float(row[0]["ts"])
     except Exception:  # noqa: BLE001
         return None
 
@@ -1044,29 +1091,25 @@ def _latest_ts(run_id: str):
 def _latest_bpb(run_id: str):
     """bpb lives in the evals table, not in metrics (9 November: the arm cards read 0)."""
     try:
-        with sqlite3.connect(f"file:{paths.ledger_path()}?mode=ro", uri=True) as c:
-            row = c.execute("select avg(bpb) from evals where run_id=? and step=(select max(step) from evals where run_id=?)",
-                            (run_id, run_id)).fetchone()
-            return None if not row or row[0] is None else float(row[0])
+        row = _rows("select avg(bpb) as bpb from evals where run_id=? and step=(select max(step) from evals where run_id=?)",
+                    [run_id, run_id])
+        return None if not row or row[0]["bpb"] is None else float(row[0]["bpb"])
     except Exception:  # noqa: BLE001
         return None
 
 
 def _latest(run_id: str, name: str):
     try:
-        with sqlite3.connect(f"file:{paths.ledger_path()}?mode=ro", uri=True) as c:
-            row = c.execute("select value from metrics where run_id=? and name=? order by step desc limit 1",
-                            (run_id, name)).fetchone()
-            return None if row is None else float(row[0])
+        row = _rows("select value from metrics where run_id=? and name=? order by step desc limit 1", [run_id, name])
+        return None if not row else float(row[0]["value"])
     except Exception:  # noqa: BLE001
         return None
 
 
 def _latest_step(run_id: str):
     try:
-        with sqlite3.connect(f"file:{paths.ledger_path()}?mode=ro", uri=True) as c:
-            row = c.execute("select max(step) from metrics where run_id=?", (run_id,)).fetchone()
-            return None if row is None else int(row[0])
+        row = _rows("select max(step) as step from metrics where run_id=?", [run_id])
+        return None if not row or row[0]["step"] is None else int(row[0]["step"])
     except Exception:  # noqa: BLE001
         return None
 
@@ -1273,6 +1316,7 @@ def api_rung(preset: str, limit: int | str = 0) -> list[dict]:
         k = max(1, len(pts) // 300)
         out.append(
             {
+                "run_id": r["run_id"],
                 "name": r["name"],
                 "ship": r["ship"],
                 "steps": [p["step"] for p in pts[::k]],
@@ -1863,9 +1907,14 @@ def _pairs(path: str | None) -> list[dict] | None:
     measured against, absent on the keel's lists), or None when it is not written yet."""
     import csv
 
-    if not path or not Path(path).exists():
+    from thorp import paths
+
+    if not path:
         return None
-    with open(path, newline="") as f:
+    p = paths.resolve(path)
+    if not p.exists():
+        return None
+    with open(p, newline="") as f:
         return [
             {
                 "prompt": r.get("prompt", ""),
@@ -1952,6 +2001,24 @@ def api_chain(key: str) -> dict:
     }
 
 
+_CHAINS_CACHE: dict = {"at": 0.0, "value": None}
+
+
+def api_chains() -> list[dict]:
+    """Every discovery chain, for the Quantum tests tab: one ladder per test, each rung with its
+    questions. api_chain is the expensive per-chain read (runs and discovery artifacts), so this is
+    one request for the tab rather than four, and it is kept for a minute."""
+    import time
+
+    from thorp import fleet
+
+    if _CHAINS_CACHE["value"] is not None and time.time() - _CHAINS_CACHE["at"] < 60:
+        return _CHAINS_CACHE["value"]
+    out = [api_chain(k) for k in fleet.CHAINS]
+    _CHAINS_CACHE.update(at=time.time(), value=out)
+    return out
+
+
 # ---- slow payloads, kept warm: the shelves take seconds to compute (they read every list and the
 # catalogue), so the last result is served while a fresh one is computed in the background
 _WARM: dict[str, dict] = {}
@@ -2010,6 +2077,11 @@ def _warm(name: str, fn, ttl: float = 300.0):
                         with contextlib.suppress(Exception):
                             _warm_save(name, v, e["at"])
                     e["busy"], e["error"] = False, err
+                # a build's thread ends here: give its Postgres reader back (see ledger.close_reader)
+                with contextlib.suppress(Exception):
+                    from thorp.ledger import close_reader
+
+                    close_reader()
 
             threading.Thread(target=run, daemon=True).start()
         return e["value"], e["busy"], e["error"]
@@ -2120,6 +2192,78 @@ def api_fitouts(preset: str = "") -> dict:
     return {"fitouts": mine, "computing": False, "error": error}
 
 
+_sops_cache: dict[str, tuple[float, dict]] = {}
+
+
+def api_sops(preset: str) -> dict:
+    """The SOP versions, the standard a size's voyages are built to (10 November: the old Fitouts tab is
+    the SOPs now — "this /ships/21m/fitouts should be SOP"). Each version with its phases, content,
+    parameters, the depth it gives this size, its runs here and its scores, plus whether it is current
+    and locked (a version with a ship at sea cannot change)."""
+    import time
+
+    from thorp import sop
+
+    hit = _sops_cache.get(preset)
+    if hit and time.time() - hit[0] < 60:
+        return hit[1]
+    versions = sop.versions()
+    locked = sop.at_sea()
+    base = preset.split("-")[0]
+    runs = []
+    for r in _runs_rows():
+        spec = json.loads(r.get("spec_json") or "{}")
+        p = spec.get("model", {}).get("preset")
+        if p == preset or (p or "").startswith(preset + "-"):
+            runs.append(
+                {
+                    "run_id": r["run_id"],
+                    "name": r["name"],
+                    "ship": r["ship"],
+                    "status": r["status"],
+                    "started": r["started"],
+                    "sop": spec.get("sop"),
+                    "preset": p,
+                }
+            )
+    scored = {x.get("sop"): x for x in (api_sop_scores(preset).get("versions") or [])}
+    latest = max((r for r in runs if r.get("sop")), key=lambda r: r.get("started") or "", default=None)
+    out = []
+    for v in versions:
+        st = sop.standard(v) or {}
+        if not st:
+            continue
+        depth = ((st.get("depth") or {}).get("computed") or {}).get(base)
+        mine = sorted([r for r in runs if r.get("sop") == v], key=lambda r: r.get("started") or "", reverse=True)
+        out.append(
+            {
+                "version": v,
+                "current": bool(latest and latest.get("sop") == v),
+                "locked": v in locked,
+                "adopted": st.get("adopted"),
+                "supersedes": st.get("supersedes"),
+                "doc": st.get("doc"),
+                "about": st.get("about"),
+                "art": st.get("art"),
+                "phases": st.get("phases") or [],
+                "content": st.get("content") or {},
+                "parameters": st.get("parameters") or {},
+                "depth": depth,
+                "goals": st.get("goals") or [],
+                "cards": st.get("cards") or [],
+                "readings": st.get("readings") or {},
+                "score": scored.get(v),
+                "runs": mine,
+            }
+        )
+    # the current standard first, then newest first
+    out.sort(key=lambda x: tuple(int(p) for p in x["version"].split(".")), reverse=True)
+    out.sort(key=lambda x: not x["current"])
+    payload = {"preset": preset, "current": latest.get("sop") if latest else None, "locked": locked, "versions": out}
+    _sops_cache[preset] = (time.time(), payload)
+    return payload
+
+
 CLASS_CARDS = {  # card -> (one-head metric, a layer's best two or None), as scripts/make_card_census.py reads them
     "previous_word": ("stars/previous_word/max_score", "stars/previous_word/shared_score"),
     "nevermore": ("nevermore/natural_max_score", None),
@@ -2131,29 +2275,36 @@ CLASS_CARDS = {  # card -> (one-head metric, a layer's best two or None), as scr
 _class_cards_cache: dict[str, tuple[float, dict]] = {}
 
 
-def api_class_cards(preset: str) -> dict:
-    """Cached a minute: the page asks on every refresh and the read scans every card row of the class."""
+def api_class_cards(preset: str, runs: str = "") -> dict:
+    """Cached a minute: the page asks on every refresh and the read scans every card row of the class.
+    `runs` narrows the read to named voyages (the page's expedition/voyage selection)."""
     import time
 
-    hit = _class_cards_cache.get(preset)
+    key = preset + "|" + runs
+    hit = _class_cards_cache.get(key)
     if hit and time.time() - hit[0] < 60:
         return hit[1]
-    out = _class_cards(preset)
-    _class_cards_cache[preset] = (time.time(), out)
+    out = _class_cards(preset, runs)
+    _class_cards_cache[key] = (time.time(), out)
     return out
 
 
-def _class_cards(preset: str) -> dict:
+def _class_cards(preset: str, runs: str = "") -> dict:
     """The one thing a class's Overview shows (Justin, 2026-11-07: "one thing that encompasses as much as
     there is to know"): the four necessary cards against their marks, each at the best reading any voyage
     of the class reached (the better of one head and a layer's best two, at any step: a card that lit and
     faded still counts as drawn), with the voyage and step, how many voyages lit it, and where the newest
     finished voyage ended; beside them the cause-and-effect chaining gain (eight items: noise within
     about ±0.1). A class's voyages are those whose preset is the class's or a variant of it (300k-h4)."""
+    import statistics
+
     from thorp import fleet
 
+    wanted = {x for x in runs.split(",") if x}
     runs = []
     for r in _runs_rows():
+        if wanted and r.get("name") not in wanted and r.get("run_id") not in wanted:
+            continue
         p = json.loads(r.get("spec_json") or "{}").get("model", {}).get("preset")
         if p == preset or (p or "").startswith(preset + "-"):
             runs.append({"run_id": r["run_id"], "name": r["name"], "started": r["started"], "status": r["status"], "p": p})
@@ -2200,6 +2351,8 @@ def _class_cards(preset: str) -> dict:
                 if e[0] >= th:
                     held_by.append(r["name"])
         now = reading(newest, pair, last) if newest else None
+        ends = [x[0] for r in finished if (x := reading(r["run_id"], pair, last)) is not None]
+        med = statistics.median(ends) if ends else None
         cards.append(
             {
                 "card": card,
@@ -2212,6 +2365,8 @@ def _class_cards(preset: str) -> dict:
                 "lit": bool(lit_by),
                 "lit_by": lit_by,
                 "now": None if now is None else {"value": now[0], "run": by[newest]["name"]},
+                # the expedition selection's median of the finished voyages' last readings
+                "median": None if med is None else {"value": med, "held": med >= th, "of": len(ends)},
             }
         )
     cause = [
@@ -2232,9 +2387,11 @@ def _class_cards(preset: str) -> dict:
         "cards": cards,
         "held": sum(c["held"] for c in cards),
         "touched": sum(c["lit"] for c in cards),
+        "median_held": sum(1 for c in cards if c["median"] and c["median"]["held"]),
         "cause": {
             "best": None if top is None else {"value": top[0][0], "step": top[0][1], "run": top[1]},
             "finished_range": [min(cause_last), max(cause_last)] if cause_last else None,
+            "median": statistics.median(cause_last) if cause_last else None,
             "noise": 0.1,
             # chaining is judged on where voyages end, never on a passing peak
             "chains": bool(cause_last and max(cause_last) > 0.1),
@@ -2245,54 +2402,91 @@ def _class_cards(preset: str) -> dict:
 _class_score_cache: dict[str, tuple[float, dict]] = {}
 
 
-def api_class_score(preset: str) -> dict:
+def api_class_score(preset: str, runs: str = "") -> dict:
     """Cached a minute: the Ships page asks for every size at once."""
     import time
 
-    hit = _class_score_cache.get(preset)
+    key = preset + "|" + runs
+    hit = _class_score_cache.get(key)
     if hit and time.time() - hit[0] < 60:
         return hit[1]
-    out = _class_score(preset)
-    _class_score_cache[preset] = (time.time(), out)
+    out = _class_score(preset, runs)
+    _class_score_cache[key] = (time.time(), out)
     return out
 
 
-def _class_score(preset: str) -> dict:
+def _class_score(preset: str, runs: str = "") -> dict:
     """A class's live scoring readings (registry.LADDER's "scored": the four necessary cards held,
-    then cause and effect, then chaining two facts) from its current version (the leaderboard's best
-    ship, leaderboard.thorp_entry: the mean of its sailings' latest), and the best cards held so far
-    in its fitout's census (data/runs/cards/fitout-census-<key>-readings.json, once it lands)."""
+    then cause and effect, then chaining two facts) from its best ship (the leaderboard's ships, ranked
+    by chaining lift; leaderboard.thorp_entry gives its cards), and the best cards held so far in its
+    fitout's census (data/runs/cards/fitout-census-<key>-readings.json, once it lands).
+
+    The crowned version is reported beside it, not instead of it: a version is only crowned when it beats
+    the last by more than the noise, so the crowned name can be behind the best ship (10 November: the
+    21m's best, 21m@v0.0.5, was hidden by the crowned v1 on the board)."""
     from thorp import fleet, leaderboard
 
-    best = next(
+    lb = api_leaderboard()  # the served payload: one build for every size's card, not seven
+    wanted = [x for x in runs.split(",") if x]
+    crowned = None if wanted else next(
         (
             b["best"]
-            for b in leaderboard.payload().get("board", [])
+            for b in lb.get("board", [])
             if b.get("best") and b["best"].get("preset") == preset
         ),
         None,
     )
+    candidates = [
+        s for s in lb.get("ships", [])
+        if s.get("preset") == preset
+        and (not wanted or any(x in wanted for x in (s.get("runs") or [s.get("run")])) )
+    ]
+    if wanted and not candidates:
+        # a selected voyage with no chaining reading is not in the leaderboard's ships: still name it,
+        # so the callout says which voyage is selected rather than nothing (10 November)
+        row = _run_row(wanted[0])
+        if row:
+            spec = json.loads(row.get("spec_json") or "{}")
+            candidates = [{"ship_key": fleet.ship_key(spec), "ship": row.get("ship") or row.get("name"),
+                           "run": row.get("name"), "runs": [row.get("name")], "preset": preset, "chaining_lift": None}]
     out: dict = {"preset": preset, "version": None}
-    if best:
-        e = leaderboard.thorp_entry(best["ship_key"]) or {}
+    if crowned:
+        out["crowned"] = crowned.get("name")
+        out["crowned_chaining"] = crowned.get("chaining_lift")
+
+    def readings(ship: dict) -> tuple[dict, dict, list]:
+        e = leaderboard.thorp_entry(ship["ship_key"]) or {}
         cards = e.get("cards") or {}
         lit = {
             k: bool((cards.get(k) or {}).get("lit") or (cards.get(k) or {}).get("lit_shared"))
             for k in CENSUS_CARDS
         }
-        chaining = [
+        lifts = [
             (e.get(k) or {}).get("lift")
             for k in ("nature_test", "mill_test", "between_test", "pigeonhole_test")
         ]
-        chaining = [v for v in chaining if isinstance(v, (int, float))]
+        return e, lit, [v for v in lifts if isinstance(v, (int, float))]
+
+    # the best ship is the top of the class's ranked ships; a ship still at sea can lead the board
+    # before its cards are read, so fall back to the crowned version once rather than walking every
+    # candidate (10 November: the walk called the whole-run thorp_entry scan per ship and held Postgres
+    # connections until the pool ran dry, which hung the scoring page)
+    best = (candidates[0] if candidates else crowned)
+    e, lit, chaining = readings(best) if best else ({}, {}, [])
+    if best and not any(lit.values()) and not chaining and crowned and crowned.get("ship_key") != best.get("ship_key"):
+        best = crowned
+        e, lit, chaining = readings(best)
+    if best:
         out.update(
-            version=best.get("name"),
+            version=best.get("name") or best.get("ship"),
             ship_key=best.get("ship_key"),
             ship=best.get("ship"),
             cards=lit,
             held=sum(lit.values()),
             cause=(e.get("logic_test") or {}).get("gain_cause"),
-            chaining=sum(chaining) / len(chaining) if chaining else None,
+            # a ship still at sea has no finished-run entry yet: its ranked chaining lift is still a
+            # reading, so use it rather than showing "–" for the size (10 November)
+            chaining=sum(chaining) / len(chaining) if chaining else best.get("chaining_lift"),
         )
     # the census around this class's fitout: the most cards any variation's latest stage holds
     root = paths.ROUTER
@@ -2671,9 +2865,11 @@ _WATERS_FALLBACK = {
 }
 
 
-def _fast_cache(name: str, fn, fallback, ttl: float = 60.0):
+def _fast_cache(name: str, fn, fallback, ttl: float = 60.0, watch=None):
     """Serve `fn()` from memory/disk, refreshing in the background. The first call waits 1.5 s for the
-    compute and otherwise returns `fallback`, so a locked ledger never blocks the page."""
+    compute and otherwise returns `fallback`, so a locked ledger never blocks the page. `watch` is a path
+    whose mtime invalidates the cache sooner than `ttl` (the queue: the coordinator edits the file and the
+    page must not sit on a 60 s-old queue)."""
     import json
     import threading
     import time
@@ -2690,7 +2886,13 @@ def _fast_cache(name: str, fn, fallback, ttl: float = 60.0):
         except Exception:  # noqa: BLE001
             v = None
     if v is not None:
-        if time.time() - e["at"] > ttl and not e["busy"]:
+        stale = time.time() - e["at"] > ttl
+        if watch is not None:
+            try:
+                stale = stale or watch.stat().st_mtime > e["at"]
+            except OSError:
+                pass
+        if stale and not e["busy"]:
             e["busy"] = True
 
             def refresh():
@@ -2730,7 +2932,7 @@ def api_expeditions_overview() -> dict:
 
 
 def api_queue() -> dict:
-    return _fast_cache("queue", _api_queue, _QUEUE_FALLBACK)
+    return _fast_cache("queue", _api_queue, _QUEUE_FALLBACK, ttl=10.0, watch=paths.resolve("specs/queue.txt"))
 
 
 def api_waters() -> dict:
@@ -2772,22 +2974,30 @@ def _api_queue() -> dict:
     wall = {p: sum(v) / len(v) for p, v in wall_sums.items()}
     # "at sea" means the voyage holds a helm seat now: a run killed with a signal never writes a finish, so
     # the ledger can say running for a voyage that stopped hours ago (9 November, the queue page showing
-    # killed 9m arms as at sea). The seats are the authority, the ledger the record.
-    from thorp import store, vsm
-    from thorp.viable.records import Lane
+    # killed 9m arms as at sea). The seats are the authority, the ledger the record. Read every helm slot,
+    # not the lane's seat count: the manual survivors can sit in slot 3 while a two-seat lane reads 1-2,
+    # and the release then disappeared from this page (10 November).
+    from thorp import vsm
 
     try:
-        with store.session() as s:
-            row = s.get(Lane, "mac")
-            n = (row.seats if row else 1) or 1
-        seats = {h.get("name") for h in vsm.helms(n)}
+        seats = {h.get("name") for h in vsm.helms(8)}
+        helm_known = True
     except Exception:  # noqa: BLE001  (no store on a box)
-        seats = set()
-    sea = [
-        (r["name"], r["ship"], r["started"], r["spec_json"])
-        for r in all_runs
-        if r["status"] == "running" and (not seats or r["name"] in seats)
-    ]
+        seats, helm_known = set(), False
+    # One row a voyage, not one a run: a name that was launched, failed and relaunched has several ledger
+    # rows still marked running (10 November: the fulldeck showed twice on the queue page), and the seat is
+    # keyed by name, so every stale row on a live name passed the filter.
+    newest: dict[str, dict] = {}
+    for r in all_runs:
+        # an empty helm means nothing is at sea, not every stale `running` row: when the queue is down the
+        # seat set is empty, and `(seats and ...)` used to be False, so the killed 9m arms came back
+        # (10 November). Only a helm that could not be read falls back to the ledger.
+        if r["status"] != "running" or (helm_known and r["name"] not in seats):
+            continue
+        cur = newest.get(r["name"])
+        if cur is None or str(r.get("started") or "") > str(cur.get("started") or ""):
+            newest[r["name"]] = r
+    sea = [(r["name"], r["ship"], r["started"], r["spec_json"]) for r in newest.values()]
 
     fitout_names: dict[str, str | None] = {}
 
@@ -2846,11 +3056,7 @@ def _api_queue() -> dict:
             f = next(iter((root / "specs").rglob(f"{name}.yaml")), None)
             spec = {**spec, **((yaml.safe_load(f.read_text()) or {}) if f else {})}
         rows.append({**row(name, ship, spec, "at sea", None), "started": started})
-    lines = [
-        ln.strip()
-        for ln in (root / "specs" / "queue.txt").read_text().splitlines()
-        if ln.strip() and not ln.lstrip().startswith("#")
-    ]
+    lines = _queue_lines()
     ahead, unknown = 0.0, 0
     for i, ln in enumerate(lines, 1):
         if ln.startswith("cmd:"):
@@ -3198,11 +3404,46 @@ def api_observation(expedition: str) -> dict:
     }
 
 
+_LB: dict = {"at": 0.0, "value": None, "busy": False}
+
+
 def api_leaderboard() -> dict:
-    """The best of each class on the climb to chaining two facts (thorp.leaderboard.payload)."""
+    """The best of each class on the climb to chaining two facts (thorp.leaderboard.payload).
+
+    Served from memory and refreshed in the background (10 November: the page took 20 s because the
+    payload read every run's tricks one query at a time; it is one query now, but a refresh still takes
+    ~2.5 s, so no request should wait for it). A cold cache computes once; after that the page always
+    gets the last payload while a thread refreshes it every minute."""
+    import threading
+    import time
+
     from thorp import leaderboard
 
-    return leaderboard.payload()
+    v = _LB["value"]
+    if v is not None:
+        age = time.time() - _LB["at"]
+        if age < 60:
+            return v
+        if age < 300:  # stale but usable: answer now, refresh behind the request
+            if not _LB["busy"]:
+                _LB["busy"] = True
+
+                def refresh() -> None:
+                    try:
+                        d = leaderboard.payload()
+                        _LB.update(at=time.time(), value=d)
+                    finally:
+                        _LB["busy"] = False
+                        with contextlib.suppress(Exception):
+                            from thorp.ledger import close_reader
+
+                            close_reader()
+
+                threading.Thread(target=refresh, daemon=True).start()
+            return v
+    d = leaderboard.payload()
+    _LB.update(at=time.time(), value=d)
+    return d
 
 
 _SMOKE: dict = {"at": 0.0, "value": None}
@@ -3214,12 +3455,13 @@ def api_smoking_qwen() -> dict:
     payload bootstraps, so it is kept for two minutes."""
     import time
 
-    from thorp import leaderboard, smoking_qwen
+    from thorp import smoking_qwen
 
     if _SMOKE["value"] is not None and time.time() - _SMOKE["at"] < 120:
         return _SMOKE["value"]
     d = smoking_qwen.payload()
     sizes = getattr(smoking_qwen, "REFERENCE_PARAMS", {})
+    lb = api_leaderboard()  # one read, not two: each was a full leaderboard payload (10 November)
     d["reference"] = [
         {
             "model": r["model"],
@@ -3230,10 +3472,10 @@ def api_smoking_qwen() -> dict:
             "chaining_lift": r.get("chaining_lift"),
             "competitor": bool(r.get("competitor")),
         }
-        for r in leaderboard.payload().get("reference", [])
+        for r in lb.get("reference", [])
         if sizes.get(r["model"])
     ]
-    d["threshold"] = leaderboard.payload().get("threshold", 0.1)
+    d["threshold"] = lb.get("threshold", 0.1)
     d["noise"] = getattr(smoking_qwen, "NOISE", 0.03)
     _SMOKE.update(at=time.time(), value=d)
     return d
@@ -3567,19 +3809,71 @@ def api_trick_series(key: str) -> dict:
                     "step": s,
                     "value": v,
                     "floor": _floor(r["run_id"], tr.metric),
+                    # how the voyage was scaffolded: the heads pinned and when they were held and faded
+                    "scaffold": (spec.get("optim") or {}).get("scaffold"),
                 }
             )
     return {"key": key, "threshold": tr.threshold, "metric": tr.metric, "runs": out}
 
 
-def api_discoveries() -> dict:
+_DISC: dict = {"at": 0.0, "value": None, "busy": False}
+
+
+def api_discoveries(runs: str = "") -> dict:
+    """The stars, traits, known heads and waypoints the goals and scoring tabs read, from `s1.discoveries`.
+
+    The document is built once (`thorp store discoveries`, or on the first read when the row is missing) and
+    read back as one JSONB row, so the page no longer pays for the ~12,000 metric queries the matrix needs.
+    A row older than 30 minutes is served stale while a background thread rebuilds and replaces it. A filtered
+    read (`runs=`) is computed live and never stored."""
+    import threading
+
+    if runs:
+        return _discoveries_compute(runs)
+    from thorp import discoveries_store
+
+    document = discoveries_store.get()
+    if document is not None:
+        age = discoveries_store.age()
+        if age is not None and age > 1800 and not _DISC.get("busy"):
+            _DISC["busy"] = True
+
+            def refresh():
+                try:
+                    document = _discoveries_compute("")
+                    runs = len({x["run_id"] for star in document.get("stars", []) for x in star.get("ships", [])})
+                    discoveries_store.put(document, runs=runs)
+                except Exception:  # noqa: BLE001
+                    pass
+                finally:
+                    _DISC["busy"] = False
+
+            threading.Thread(target=refresh, daemon=True).start()
+        return document
+    document = _discoveries_compute("")
+    try:
+        runs = len({x["run_id"] for star in document.get("stars", []) for x in star.get("ships", [])})
+        discoveries_store.put(document, runs=runs)
+    except Exception:  # noqa: BLE001 (a store hiccup must not hide the readings)
+        pass
+    return document
+
+
+def _discoveries_compute(runs: str = "") -> dict:
     """The two things followed across every ship: stars (heads that light, fleet.STARS) and traits
-    (directions the probes find, evaluators/probes.py). For each, which ships have it and when."""
+    (directions the probes find, evaluators/probes.py). For each, which ships have it and when.
+
+    Kept for a minute: it reads every run's star timeline and trick series (~8 s warm, 20 s+ under load),
+    and the goals and scoring tabs both ask for it; without a cache the second tab repeated the whole
+    read and held a Postgres connection while it did (10 November)."""
     from thorp import expeditions as voyages
     from thorp import fleet
     from thorp.evaluators import probes
 
+    wanted = {x for x in runs.split(",") if x}
     runs = _runs_rows()
+    if wanted:
+        runs = [r for r in runs if r.get("name") in wanted or r.get("run_id") in wanted]
     voyage = _voyage_of()
     shipreg, ship_of = _ships(runs)
 
@@ -3731,7 +4025,7 @@ def api_discoveries() -> dict:
                 "ships": ships,
             }
         )
-    return {
+    out = {
         "tricks": tricks,
         "stars": stars,
         "traits": [
@@ -3749,6 +4043,7 @@ def api_discoveries() -> dict:
         "card_verdicts": _card_verdicts(),
         "waypoints": __import__("thorp.dash.tricks", fromlist=["WAYPOINTS"]).WAYPOINTS,
     }
+    return out
 
 
 def api_stages(runs: str) -> dict:
@@ -3962,6 +4257,27 @@ SUBJECTS = {
 }  # fmt: skip
 
 
+def _preset_of(preset: str) -> str:
+    """The size's canonical preset, from a preset, a variant ('300k-l3') or a class slug ('pan').
+
+    The URL's canonical identifier is the size (10 November, Justin: "keep the ship size the canonical URL
+    identifier"), but old links and the ship's own class name still name the rung; resolve them here so an
+    endpoint called with either answers the same voyage."""
+    import re
+
+    from thorp.models.registry import LADDER
+
+    base = preset.split("-")[0]
+    if any(r["preset"] == base for r in LADDER):
+        return preset
+    slug = re.sub(r"[^a-z0-9]+", "-", preset.lower().removeprefix("the ")).strip("-")
+    row = next(
+        (r for r in LADDER if re.sub(r"[^a-z0-9]+", "-", r["name"].lower().removeprefix("the ")).strip("-") == slug),
+        None,
+    )
+    return row["preset"] if row else preset
+
+
 def _slug(preset: str) -> str:
     from thorp.models.registry import LADDER
 
@@ -4094,7 +4410,7 @@ def _vs_references() -> dict[str, dict]:
     return out
 
 
-def api_class_vs(preset: str, ref: str | None = None, voyage: str | None = None) -> dict:
+def api_class_vs(preset: str, ref: str | None = None, voyage: str | None = None, runs: str = "") -> dict:
     """The class's voyage against a reference model (Justin, 23:50: "the top 5 ways we're further away and the top
     5 ways we're closer"), on every reading both have: the 20 trick tests (pairs right of 24; chance 12), the logic
     deck's lifts, the cards (attention readings, two heads of a layer together) and copy gain, and judge-book bits
@@ -4107,6 +4423,9 @@ def api_class_vs(preset: str, ref: str | None = None, voyage: str | None = None)
     refs = _vs_references()
     ref = ref if ref in refs else (VS_REFERENCE if VS_REFERENCE in refs else next(iter(refs), None))
     voyages = [v for v in _class_voyages(preset, 20)]
+    wanted = [x for x in runs.split(",") if x]
+    if wanted:
+        voyages = [v for v in voyages if v.get("name") in wanted or v.get("run_id") in wanted]
     def last(rid, name):
         s, v = _metric_series_gated(rid, name)
         return (v[-1], s[-1]) if s else (None, None)
@@ -4683,9 +5002,9 @@ def _depth_of(run_id: str) -> dict:
     (the `stars` matrices and the `cards` curve). This is the star chart's depth axis."""
     import json
 
-    from thorp.ledger import Ledger
+    from thorp.ledger import reader
 
-    rec = Ledger()
+    rec = reader()
     out: dict = {"layers": 0, "cards": {}}
     for kind in ("stars", "cards"):
         rows = rec.query(
@@ -4708,11 +5027,11 @@ def _depth_of(run_id: str) -> dict:
     return out
 
 
-def api_suit_ratings(preset: str = "") -> dict:
+def api_suit_ratings(preset: str = "", runs: str = "") -> dict:
     """Each ship's four suits — copying, position, comparing, carrying (9 November, Justin: "a rating for each ship
     against the 16 cards suit ... how good is each ship at copying, position, comparing and carrying"): the mean of a
     suit's cards, each card divided by its own mark, so 1.00 is "every card in the suit is lit"."""
-    from thorp.ledger import Ledger
+    from thorp.ledger import reader
     from thorp.viable.s4_intelligence import readings
     from thorp.viable.s5_policy import deck
 
@@ -4732,10 +5051,40 @@ def api_suit_ratings(preset: str = "") -> dict:
             out[suit] = round(sum(vals) / len(vals), 2) if vals else None
         return out
 
-    rec = Ledger()
+    import statistics
+
+    wanted = [x for x in runs.split(",") if x]
+    rec = reader()
     ships = []
     for size in ("300k", "1m", "9m", "21m", "50m"):
         if preset and preset != size:
+            continue
+
+        def at(rid: str, metric: str):
+            if not metric:
+                return None
+            m = rec.query(
+                "select value from metrics where run_id=? and name=? order by step desc limit 1", [rid, metric]
+            )
+            return m[0]["value"] if m else None
+
+        if wanted:
+            picked = []
+            for r in _runs_rows():
+                spec = json.loads(r.get("spec_json") or "{}")
+                if (spec.get("model") or {}).get("preset") != size:
+                    continue
+                if r.get("name") not in wanted and r.get("run_id") not in wanted:
+                    continue
+                picked.append(r)
+            if not picked:
+                continue
+            per = [rating(lambda metric, key, rid=r["run_id"]: at(rid, metric)) for r in picked]
+            merged = {}
+            for suit in ("copying", "position", "comparing", "carrying"):
+                vals = [x[suit] for x in per if x.get(suit) is not None]
+                merged[suit] = round(statistics.median(vals), 2) if vals else None
+            ships.append({"size": size, "run": f"median of {len(picked)} voyage{'' if len(picked) == 1 else 's'}", **merged})
             continue
         rows = rec.query(
             "select r.run_id, r.name from runs r where json_extract(r.spec_json,'$.model.preset') = ?"
@@ -4745,16 +5094,7 @@ def api_suit_ratings(preset: str = "") -> dict:
         if not rows:
             continue
         rid = rows[0]["run_id"]
-
-        def get(metric, key, rid=rid):
-            if not metric:
-                return None
-            m = rec.query(
-                "select value from metrics where run_id=? and name=? order by step desc limit 1", [rid, metric]
-            )
-            return m[0]["value"] if m else None
-
-        ships.append({"size": size, "run": rows[0]["name"], **rating(get)})
+        ships.append({"size": size, "run": rows[0]["name"], **rating(lambda metric, key, rid=rid: at(rid, metric))})
     for key, model in (("qwen3-4b", "deck-mlx-community--Qwen3-4B-4bit"),
                        ("phi-4-mini", "deck-mlx-community--Phi-4-mini-instruct-4bit"),
                        ("llama-3.2-3b", "deck-mlx-community--Llama-3.2-3B-bf16")):
@@ -4764,15 +5104,16 @@ def api_suit_ratings(preset: str = "") -> dict:
     return {"ships": ships}
 
 
-def api_sop_scores(preset: str = "") -> dict:
+def api_sop_scores(preset: str = "", runs: str = "") -> dict:
     """The reasoning results **by SOP version** at one size (9 November, Justin: the overview "should also show the
     reasoning results by SOP version, so when we run 0.0.6 we can compare"): for every version this size has sailed,
     its newest voyage, its chaining lift, and how many of the chart's ten points clear their mark."""
-    from thorp.ledger import Ledger
+    from thorp.ledger import reader
     from thorp.viable.s5_policy import deck
 
     QWEN = 0.538
-    rec = Ledger()
+    wanted = [x for x in runs.split(",") if x]
+    rec = reader()
     rows = rec.query(
         "select json_extract(spec_json,'$.sop') sop, max(started) last from runs"
         " where json_extract(spec_json,'$.model.preset') = ? group by sop order by sop",
@@ -4783,14 +5124,16 @@ def api_sop_scores(preset: str = "") -> dict:
         sop = r["sop"]
         if not sop:
             continue
-        run = rec.query(
+        candidates = rec.query(
             "select run_id, name, status from runs where json_extract(spec_json,'$.model.preset') = ?"
-            " and json_extract(spec_json,'$.sop') = ? order by started desc limit 1",
+            " and json_extract(spec_json,'$.sop') = ? order by started desc",
             [preset, sop],
         )
-        if not run:
+        if wanted:
+            candidates = [x for x in candidates if x.get("name") in wanted or x.get("run_id") in wanted]
+        if not candidates:
             continue
-        rid = run[0]["run_id"]
+        rid = candidates[0]["run_id"]
         lifts = []
         for t in ("nature", "mill", "between", "pigeonhole"):
             m = rec.query(
@@ -4812,55 +5155,74 @@ def api_sop_scores(preset: str = "") -> dict:
             mark = card.look[1] if card and card.look and len(card.look) > 1 and isinstance(card.look[1], float) else None
             if m and mark and float(m[0]["value"]) >= mark:
                 clears += 1
-        out.append({"sop": sop, "run": run[0]["name"], "status": run[0]["status"],
+        out.append({"sop": sop, "run": candidates[0]["name"], "status": candidates[0]["status"],
                     "chaining": None if ch is None else round(ch, 3),
                     "gap": None if ch is None else round(ch - QWEN, 3), "clears": clears, "of": 5})
     return {"preset": preset, "qwen": QWEN, "versions": out}
 
 
-def api_ladder_chaining(sop: str = "") -> dict:
-    """The ladder's chaining, size by size, against Qwen3 4B (9 November, Justin: "add all the chaining comparisons to
-    the shipbuilder tab. Simple for now, just the 0.0.5 results for 300k, 1m, 9m, 21m and 50m when they're in"): each
-    size's newest voyage on the standard, its chaining lift at its last step, and how far it stands from 0.538."""
-    from thorp.ledger import Ledger
+def api_ladder_chaining(sop: str = "", runs: str = "") -> dict:
+    """The ladder's chaining, size by size, against Qwen3 4B: each size's newest voyage on the standard,
+    its chaining lift at its last step, and how far it stands from 0.538.
+
+    `runs` narrows each size to the page's selected voyages and reports the **median** of their chaining
+    lifts (10 November: the SOP summary follows the expedition selector)."""
+    import statistics
+
+    from thorp.ledger import reader
 
     QWEN = 0.538
-    sizes = ("300k", "1m", "9m", "21m", "50m")
-    rec = Ledger()
+    wanted = [x for x in runs.split(",") if x]
+    allruns = _runs_rows()
+    rec = reader()
     out = []
-    for size in sizes:
-        rows = rec.query(
-            "select run_id, name, status, round(wall_minutes,1) m from runs"
-            " where json_extract(spec_json,'$.model.preset') = ? and (? = '' or json_extract(spec_json,'$.sop') = ?)"
-            " order by started desc limit 1",
-            [size, sop, sop],
-        )
-        if not rows:
+    for size in ("300k", "1m", "9m", "21m", "50m"):
+        picked = []
+        for r in allruns:
+            spec = json.loads(r.get("spec_json") or "{}")
+            if (spec.get("model") or {}).get("preset") != size:
+                continue
+            if sop and str(spec.get("sop") or "") != sop:
+                continue
+            if wanted and r.get("name") not in wanted and r.get("run_id") not in wanted:
+                continue
+            picked.append(r)
+        if not wanted:
+            picked = picked[-1:]  # newest
+        if not picked:
             out.append({"size": size, "status": "not sailed", "chaining": None, "gap": None})
             continue
-        r = rows[0]
-        lifts = []
-        for t in ("nature", "mill", "between", "pigeonhole"):
-            m = rec.query(
-                "select value from metrics where run_id=? and name=? order by step desc limit 1",
-                [r["run_id"], f"tricks/{t}_test/lift"],
-            )
-            if m:
-                lifts.append(float(m[0]["value"]))
-        ch = sum(lifts) / len(lifts) if lifts else None
-        out.append({"size": size, "run": r["name"], "status": r["status"], "minutes": r["m"],
+        per = []
+        for r in picked:
+            lifts = []
+            for t in ("nature", "mill", "between", "pigeonhole"):
+                m = rec.query(
+                    "select value from metrics where run_id=? and name=? order by step desc limit 1",
+                    [r["run_id"], f"tricks/{t}_test/lift"],
+                )
+                if m:
+                    lifts.append(float(m[0]["value"]))
+            if lifts:
+                per.append(sum(lifts) / len(lifts))
+        ch = statistics.median(per) if per else None
+        out.append({"size": size, "run": picked[-1]["name"], "status": picked[-1]["status"],
+                    "minutes": picked[-1].get("wall_minutes"), "of": len(per),
                     "chaining": None if ch is None else round(ch, 3),
                     "gap": None if ch is None else round(ch - QWEN, 3), "qwen": QWEN})
     return {"sop": sop or "all", "qwen": QWEN, "sizes": out}
 
-
-def api_star_points(preset: str = "300k") -> dict:
+def api_star_points(preset: str = "300k", runs: str = "") -> dict:
     """The ten-point star chart as a journey: for each point, how far the model that chains (Qwen3 4B) and our
     smallest ship (the 300k at v0.0.5) get toward that point's mark, so the two can be drawn as lines (9 November:
     "a line representing Qwen 4b hitting the 10 marks in the star chart and at what point and then overlayed against
-    that the 300k at 0.0.5")."""
+    that the 300k at 0.0.5").
+
+    `runs` narrows the Thorp line to named voyages and shows their **median** ratio (10 November: a page can
+    pick an expedition and no voyage, and the chart is then the expedition's median)."""
+    import statistics
+
     from thorp import sop
-    from thorp.ledger import Ledger
+    from thorp.ledger import reader
     from thorp.viable.s4_intelligence import readings
     from thorp.viable.s5_policy import deck
 
@@ -4868,7 +5230,14 @@ def api_star_points(preset: str = "300k") -> dict:
     points = ((std.get("chart") or {}).get("points") or [])[:10]
     qw = (readings.get("deck-mlx-community--Qwen3-4B-4bit") or {}).get("metrics") or {}
     by_key = {c.key: c for c in deck.CARDS}
-    rec = Ledger()
+    rec = reader()
+    wanted = [x for x in runs.split(",") if x][:40]
+    ids = []
+    for name in wanted:
+        row = _run_row(name)
+        if row:
+            ids.append(row["run_id"])
+    marks = ",".join("?" for _ in ids)
     out = []
     for pt in points:
         card = str(pt.get("card") or "").replace("the ", "").replace("-", "_").strip().lower()
@@ -4879,24 +5248,38 @@ def api_star_points(preset: str = "300k") -> dict:
         if not metric:
             continue
         mark = c.look[1] if c.look and len(c.look) > 1 and isinstance(c.look[1], float) else None
-        # the size's newest voyage and its last reading: a running ship is tracked as it trains, not by its best
-        rows = rec.query(
-            "select m.value from runs r join metrics m on m.run_id = r.run_id"
-            " where r.run_id = (select run_id from runs where json_extract(spec_json,'$.model.preset') = ?"
-            "   order by started desc limit 1) and m.name = ? and m.value is not null"
-            " order by m.step desc limit 1",
-            [preset, metric],
-        )
-        ours = rows[0]["value"] if rows else None
-        q = qw.get(metric)
-        scale = mark or max(abs(q or 0), abs(ours or 0), 1e-6)
+        if ids:
+            # the last reading of each chosen voyage: the median across them, not the newest voyage's
+            rows = rec.query(
+                f"select run_id, value from metrics where run_id in ({marks}) and name=? and value is not null"
+                " order by run_id, step",
+                [*ids, metric],
+            )
+            last = {r["run_id"]: r["value"] for r in rows}
+            vals = [float(v) for v in last.values() if v is not None]
+            raw = statistics.median(vals) if vals else None
+            q = qw.get(metric)
+            scale = mark or max(abs(q or 0), abs(raw or 0), 1e-6)
+            ours = None if raw is None else raw / scale
+        else:
+            # the size's newest voyage and its last reading: a running ship is tracked as it trains, not by its best
+            rows = rec.query(
+                "select m.value from runs r join metrics m on m.run_id = r.run_id"
+                " where r.run_id = (select run_id from runs where json_extract(spec_json,'$.model.preset') = ?"
+                "   order by started desc limit 1) and m.name = ? and m.value is not null"
+                " order by m.step desc limit 1",
+                [preset, metric],
+            )
+            ours = rows[0]["value"] if rows else None
+            q = qw.get(metric)
+            scale = mark or max(abs(q or 0), abs(ours or 0), 1e-6)
         out.append({
             "n": int(pt.get("n") or len(out) + 1), "role": pt.get("role") or "", "card": c.key,
-            "ours": None if ours is None else round(float(ours) / scale, 2),
+            "ours": None if ours is None else round(float(ours), 2),
             "qwen": None if q is None else round(float(q) / scale, 2),
             "mark": mark, "tier": deck.retention(c.key)["tier"],
         })
-    return {"points": out}
+    return {"points": out, "runs": len(ids)}
 
 
 def api_client_log(q: dict) -> dict:
@@ -4917,12 +5300,12 @@ def api_client_log(q: dict) -> dict:
 def api_card_deck() -> dict:
     """The sixteen cards, card by card: suit, mark, retention tier, the best Thorp reading and Qwen3 4B's own — the
     deck as a table for the Discoveries Cards tab (9 November: "the cards should be moved to a tab under discoveries")."""
-    from thorp.ledger import Ledger
+    from thorp.ledger import reader
     from thorp.viable.s4_intelligence import readings
     from thorp.viable.s5_policy import deck
 
     qw = (readings.get("deck-mlx-community--Qwen3-4B-4bit") or {}).get("metrics") or {}
-    rec = Ledger()
+    rec = reader()
     out = []
     for c in deck.CARDS:
         metric = c.look[0][0] if c.look else (c.ability[0] if c.ability else None)
@@ -4943,12 +5326,12 @@ def api_stars_deviation() -> dict:
     """300k against Qwen3 4B, point by point: each card's reading in our smallest ship against the same card read in
     a model that chains, as a deviation from the card's own mark (9 November, Justin: "this page should show the star
     chart for 300k vs qwen 4b as deviations between the points")."""
-    from thorp.ledger import Ledger
+    from thorp.ledger import reader
     from thorp.viable.s4_intelligence import readings
     from thorp.viable.s5_policy import deck
 
     qw = (readings.get("deck-mlx-community--Qwen3-4B-4bit") or {}).get("metrics") or {}
-    rec = Ledger()
+    rec = reader()
     ours: dict = {}
     for c in deck.CARDS:
         metric = c.look[0][0] if c.look else (c.ability[0] if c.ability else None)
@@ -4986,9 +5369,9 @@ def api_depth(preset: str, sop: str = "") -> dict:
     with its layers and every card's reading at each layer (the star chart's order, drawn against depth)."""
     import json
 
-    from thorp.ledger import Ledger
+    from thorp.ledger import reader
 
-    rec = Ledger()
+    rec = reader()
     shapes: dict = {}
     for r in rec.query(
         "select run_id, name, status, started, spec_json from runs where"
@@ -5008,7 +5391,7 @@ def api_depth(preset: str, sop: str = "") -> dict:
     return {"preset": preset, "shapes": shapes}
 
 
-def api_watch(preset: str, sop: str = "") -> dict:
+def api_watch(preset: str, sop: str = "", run: str = "") -> dict:
     """Watch a class train (Justin, 22:25: "so I can watch thorp 21m training to see what's happening ... show the
     stages"): the class's voyage at sea (else its latest home), where it is (step, tokens, pass, stage, speed, time
     left), its fitout's stage plan with the voyage's place on it, the cards it has drawn and when (the deck's
@@ -5018,9 +5401,14 @@ def api_watch(preset: str, sop: str = "") -> dict:
 
     from thorp.viable.s4_intelligence import wager
 
+    preset = _preset_of(preset)  # a class slug ('pan') names the same size as its preset ('300k')
     cls = preset.split("-")[0]
     candidates = []
-    for r in reversed(_runs_rows()):  # newest first
+    wanted = next((r for r in _runs_rows() if run and (r["run_id"] == run or r["name"] == run)), None)
+    if wanted is not None:
+        # the page's voyage picker: watch that voyage, not the newest (10 November)
+        candidates = [wanted]
+    for r in ([] if wanted is not None else reversed(_runs_rows())):  # newest first
         spec0 = json.loads(r.get("spec_json") or "{}")
         p = spec0.get("model", {}).get("preset")
         if (p or "").startswith(cls) and (sop == "" or (spec0.get("sop") or "") == sop):
@@ -5303,6 +5691,11 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(400, {"error": str(e)})
         except Exception as e:  # noqa: BLE001
             return self._json(500, {"error": repr(e)})
+        finally:
+            # a request's thread ends here: return its Postgres reader to the pool (see ledger.close_reader)
+            from thorp.ledger import close_reader
+
+            close_reader()
 
     def do_GET(self):  # noqa: N802
         u = urlparse(self.path)
@@ -5356,12 +5749,13 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/voyages": lambda: api_voyages(),
                 "/api/ships": lambda: api_ships(),
                 "/api/voyage": lambda: api_voyage_series(q["key"]),
-                "/api/discoveries": lambda: api_discoveries(),
+                "/api/discoveries": lambda: api_discoveries(q.get("runs", "")),
                 "/api/sieves": lambda: api_sieves(),
                 "/api/table/transcript": lambda: api_table_transcript(q["run"]),
                 "/api/stages": lambda: api_stages(q.get("runs", "")),
                 "/api/trick": lambda: api_trick_series(q["key"]),
                 "/api/chain": lambda: api_chain(q["key"]),
+                "/api/chains": api_chains,
                 "/api/shelves": api_shelves,
                 "/api/shelf_books": lambda: api_shelf_books(q["path"]),
                 "/api/leaderboard": api_leaderboard,
@@ -5391,31 +5785,32 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/library_browse": api_library_browse,
                 "/api/shelf_trigrams": lambda: api_shelf_trigrams(q["path"]),
                 "/api/knockout": lambda: api_knockout(q.get("model", "")),
-                "/api/class_score": lambda: api_class_score(q["preset"]),
-                "/api/class_cards": lambda: api_class_cards(q["preset"]),
+                "/api/class_score": lambda: api_class_score(q["preset"], q.get("runs", "")),
+                "/api/class_cards": lambda: api_class_cards(q["preset"], q.get("runs", "")),
                 "/api/class_best": lambda: api_class_best(q["preset"]),
                 "/api/wager": lambda: api_wager(q["preset"]),
-                "/api/watch": lambda: api_watch(q["preset"], q.get("sop", "")),
+                "/api/watch": lambda: api_watch(q["preset"], q.get("sop", ""), q.get("run", "")),
                 "/api/depth": lambda: api_depth(q.get("preset", ""), q.get("sop", "")),
                 "/api/stars_deviation": api_stars_deviation,
                 "/api/card_deck": api_card_deck,
                 "/api/client_log": lambda: api_client_log(q),
-                "/api/star_points": lambda: api_star_points(q.get("preset", "300k")),
-                "/api/ladder_chaining": lambda: api_ladder_chaining(q.get("sop", "")),
-                "/api/sop_scores": lambda: api_sop_scores(q.get("preset", "")),
-                "/api/suit_ratings": lambda: api_suit_ratings(q.get("preset", "")),
+                "/api/star_points": lambda: api_star_points(q.get("preset", "300k"), q.get("runs", "")),
+                "/api/ladder_chaining": lambda: api_ladder_chaining(q.get("sop", ""), q.get("runs", "")),
+                "/api/sop_scores": lambda: api_sop_scores(q.get("preset", ""), q.get("runs", "")),
+                "/api/suit_ratings": lambda: api_suit_ratings(q.get("preset", ""), q.get("runs", "")),
                 "/api/class_deck": lambda: api_class_deck(q["preset"]),
                 "/api/ask_questions": lambda: api_ask_questions(q["preset"]),
                 "/api/maths_book": lambda: api_maths_book(),
                 "/api/class_subjects": lambda: api_class_subjects(q["preset"]),
                 "/api/class_shapes": lambda: api_class_shapes(q["preset"]),
-                "/api/class_vs": lambda: api_class_vs(q["preset"], q.get("ref"), q.get("voyage")),
+                "/api/class_vs": lambda: api_class_vs(q["preset"], q.get("ref"), q.get("voyage"), q.get("runs", "")),
                 "/api/class_logic": lambda: api_class_logic(q["preset"]),
                 "/api/logic_relation": lambda: api_logic_relation(q["preset"], q["relation"]),
                 "/api/table/guesses": lambda: api_table_guesses(
                     q["run"], q.get("text", ""), q.get("k", 10), q.get("mode", "1")
                 ),
                 "/api/fitouts": lambda: api_fitouts(q.get("preset", "")),
+                "/api/sops": lambda: api_sops(q.get("preset", "")),
                 "/api/census": api_census,
                 "/api/competitor": lambda: api_competitor(q["model"]),
                 "/api/thorp": lambda: api_thorp(q["ship"]),
@@ -5445,6 +5840,11 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(404, json.dumps({"error": str(e.args[0] if e.args else e)}).encode(), "application/json")
         except Exception as e:  # noqa: BLE001
             return self._send(500, json.dumps({"error": repr(e)}).encode(), "application/json")
+        finally:
+            # a request's thread ends here: return its Postgres reader to the pool (see ledger.close_reader)
+            from thorp.ledger import close_reader
+
+            close_reader()
 
 
 class _DualStack(ThreadingHTTPServer):
@@ -5452,6 +5852,10 @@ class _DualStack(ThreadingHTTPServer):
     127.0.0.1 only and the browser resolves `localhost` to ::1 first — half the requests never reached a socket)."""
 
     address_family = socket.AF_INET6
+    # a page opens many /api requests at once; the default backlog of 5 refuses the rest under Linux/macOS,
+    # which reached the browser as blank panels (10 November)
+    request_queue_size = 128
+    daemon_threads = True
 
     def server_bind(self):
         try:
@@ -5466,6 +5870,10 @@ def serve(port: int = 8787) -> None:
     # the warm threads are started on the first visit, not here: a cold server must answer the
     # leaderboard before the shelves' long read begins
     print(f"thorp dash on http://localhost:{port}  (ledger {paths.ledger_path()})", flush=True)
+    # the leaderboard is the page most visits first: fill its cache before the shelves' long read, so
+    # the first request after a restart does not race a 25 s library build for the store (10 November)
+    with contextlib.suppress(Exception):
+        api_leaderboard()
     # warm the Library's build before anyone asks for it: it takes ~25 s and the page has nothing to show
     # until it lands (9 November, "can you speed this page up")
     with contextlib.suppress(Exception):

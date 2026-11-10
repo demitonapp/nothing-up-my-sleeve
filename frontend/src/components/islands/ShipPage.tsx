@@ -1,6 +1,6 @@
 // One ship (UI.md "Ship"), as a client island: its header, sailings, the stages and the library aboard,
 // then six tabs of charts. The shells are JSX; the data and chart panels are the typed renderers in
-// scripts/views/ship.ts, imported at run time (Plotly touches `self` and `document` at load).
+// scripts/views/ship.ts, imported at run time (ECharts touches `self` and `document` at load).
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { cardCls, crumbCls, pillCls, selectCls, tabCls, tabsCls } from '@/lib/ui';

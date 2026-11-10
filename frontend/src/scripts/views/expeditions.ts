@@ -6,7 +6,7 @@
 // payloads, kept out of dashboard.ts so the browser and the server render the same markup.
 //
 // Nothing here may import lib/charts, lib/stages, lib/panel or lib/reader at module load: the island
-// is server-rendered, and those touch `document`/Plotly when they load. The chart drawers live in
+// is server-rendered, and those touch `document`/ECharts when they load. The chart drawers live in
 // views/expedition-charts.ts and are imported inside the island's effects.
 
 import { CARD_FACE } from '../../lib/deck';
@@ -224,18 +224,31 @@ export function overviewHtml(d: any): string {
 
 // ---- the queue as a table (#queuetable; /api/queue)
 const sailsIn = (m: number | null | undefined, atLeast: boolean): string => (m == null ? '' : (atLeast ? '≥ ' : '') + (m < 1 ? 'next' : m < 90 ? `${m} min` : m < 48 * 60 ? `${(m / 60).toFixed(1)} h` : `${(m / 1440).toFixed(1)} days`));
+/** The queue names the voyage, not only its class (10 November: three 300k lines read as "300k" and
+ *  nothing else). The goal is the spec's question, cut to one line; the full text is in the title. */
+const queueGoal = (r: any): string => {
+  const t = String(r.goal || r.experiment || '').replace(/\s+/g, ' ').trim();
+  return t.length > 90 ? t.slice(0, 87) + '…' : t;
+};
 export function queueRowsHtml(d: any, rungs: Rung[]): string {
-  const rows = (d.rows || []).map((r: any) => r.kind === 'step'
-    ? `<tr class="qstep"><td class="s">${r.n}</td><td colspan="3" class="s" title="${esc(r.cmd)}">↳ then a step: <span class="mono">${esc(r.name)}</span></td></tr>`
-    : `<tr${r.status === 'at sea' ? ' class="sel"' : ''}><td class="s">${r.n ?? ''}</td>
-      <td>${r.status === 'at sea' ? `<span class="${pillCls('running')}">at sea</span> ` : ''}${(() => {
+  // the at-sea voyages are the first of the queue: number them too (10 November, Justin: "I'd be
+  // expecting the at sea ships to still have a number"), and let the number run on through the file.
+  let seq = 0;
+  const rows = (d.rows || []).map((r: any) => {
+    seq += 1;
+    return r.kind === 'step'
+      ? `<tr class="qstep"><td class="s">${seq}</td><td colspan="4" class="s" title="${esc(r.cmd)}">↳ then a step: <span class="mono">${esc(r.name)}</span></td></tr>`
+      : `<tr${r.status === 'at sea' ? ' class="sel"' : ''}><td class="s">${seq}</td>
+      <td><b>${esc(r.name)}</b><div class="s" title="${esc(r.goal || '')}">${esc(queueGoal(r))}</div></td>
+      <td>${(() => {
         const rung = rungs.find((x) => x.preset === r.preset);
         const label = `<span class="mono">${esc(r.preset || r.name)}</span>`;
         return rung ? `<a href="${modelHash(rung, 'training')}" title="open ${esc(String(rung.name).toLowerCase().replace(/^the\s+/, '').replace(/[^a-z0-9]+/g, '-'))}'s training page">${label}</a>` : label;
       })()}${r.missing ? ` <span class="${pillCls('bad')}">no spec</span>` : ''}</td>
       <td>${r.sop ? `<span class="${pillCls('accent')}">v${esc(r.sop)}</span>` : '<span class="s">–</span>'}</td>
-      <td class="s">${r.status === 'at sea' ? 'sailing' : sailsIn(r.starts_in_min, !!r.at_least)}</td></tr>`).join('')
-    || `<tr><td colspan="4" class="${emptyCls(true)}">the queue is empty</td></tr>`;
+      <td class="s">${r.status === 'at sea' ? `<span class="${pillCls('running')}">at sea</span>` : sailsIn(r.starts_in_min, !!r.at_least)}</td></tr>`;
+  }).join('')
+    || `<tr><td colspan="5" class="${emptyCls(true)}">the queue is empty</td></tr>`;
   return rows;
 }
 
@@ -512,7 +525,7 @@ function deckShipHtml(r: any, st: SkyViewState): string {
     const f = CARD_FACE[k] || {}, best = Math.max(c.one ?? -Infinity, c.shared ?? -Infinity);
     return `<span class="obscard${c.lit ? ' lit' : ''}" title="${esc(STAR_LABEL[k] || f.short || k)}: one head ${c.one != null ? c.one.toFixed(3) : '–'}${c.shared != null ? `, two together ${c.shared.toFixed(3)}` : ''}; the mark ${c.threshold}"><span class="minicard${c.lit ? ' on' : ''}"><b>${f.rank || ''}</b><i>${f.suit || ''}</i></span> ${isFinite(best) ? best.toFixed(2) : '–'}<i class="s"> / ${c.threshold}</i></span>`;
   };
-  return `<div class="obsship">
+  return `<div class="obsship" data-deck-run="${esc(r.run_id)}">
       <div class="obshead"><span class="${pillCls('running')}">at sea</span> <a href="${shipHash(r.name)}"><b>${esc(r.name)}</b></a>
         <div class="s">${esc(r.ship || '')}${r.started ? ` · cast off ${esc(String(r.started).slice(11, 16))}` : ''}</div></div>
       <div class="obsrow">
@@ -531,8 +544,17 @@ export interface Observation {
   expedition: string; at_sea: any[]; state?: string | null; queued?: number | null; next_in_queue?: number | null;
   helm?: any; elsewhere?: any[];
 }
-export function deckHtml(d: Observation, sky: Record<string, SkyViewState>, expeditionName: string): string {
-  if (d.at_sea && d.at_sea.length) return d.at_sea.map((r) => deckShipHtml(r, skyStateOf(sky[r.run_id]))).join('');
+export function deckHtml(d: Observation, sky: Record<string, SkyViewState>, expeditionName: string, selectedRunId: string | null = null): string {
+  const sea = d.at_sea || [];
+  if (sea.length) {
+    // one voyage at a time: the chips pick which, and the default is the first at sea rather than
+    // drawing every journey's deck (10 November: the deck showed all of them)
+    const chosen = (selectedRunId ? sea.find((r) => r.run_id === selectedRunId) : null) || sea[0];
+    const chips = sea.length > 1
+      ? `<div class="obsnav"><span class="k">voyage</span><div class="skytabs">${sea.map((r) => `<button type="button" class="skychip${r.run_id === chosen.run_id ? ' on' : ''}" data-deck-run="${esc(r.run_id)}">${esc(r.name)}</button>`).join('')}</div></div>`
+      : '';
+    return chips + deckShipHtml(chosen, skyStateOf(sky[chosen.run_id]));
+  }
   const where = d.next_in_queue ? `its next voyage is <b>#${d.next_in_queue}</b> in the queue (${d.queued} of its voyages queued)` : d.state === 'home' ? 'it is home: every voyage has come back' : d.state === 'awaiting orders' ? 'it is awaiting orders: nothing of it at sea or queued' : 'nothing of it is queued';
   const other = (d.elsewhere || [])[0];
   return `<div class="${emptyCls()}">no voyage of this expedition is at sea: ${where}.${other ? ` At sea now: <a href="${shipHash(other.name)}">${esc(other.name)}</a>${other.expedition ? `, of <a href="/expeditions/${esc(other.expedition)}">${esc(expeditionName)}</a>` : ''}.` : ''}</div>`;
@@ -631,4 +653,69 @@ export function sopCardsHtml(d: any): string {
         <ul class="sopgoals">${(e.goals || []).map((g: any) => `<li><b>${esc(typeof g === 'string' ? g : g.text)}</b>${typeof g === 'string' || !g.detail ? '' : ` <span class="s">— ${esc(g.detail)}</span>`}</li>`).join('')}</ul>
       </div></a>`).join('')}</div>` : '';
   return cards;
+}
+
+// ---- First Light: the first expedition's findings, from its fourteen round-1 voyages
+export function firstLightFindings(v: Expedition): string {
+  const runs = v.runs
+    .filter((r) => !r.set_aside && r.ft_en != null)
+    .slice()
+    .sort((a, b) => (a.ft_en as number) - (b.ft_en as number));
+  if (!runs.length) return `<p class="${emptyCls(false)}">no voyage has a Forgotten Tomes score yet</p>`;
+  const arm = (r: Run): string => (r.ship || r.name || '').replace(/^First Light:\s*/, '');
+  const setting = (r: Run, k: string): string => {
+    const x = ((r.settings || {}) as Record<string, unknown>)[k];
+    return x == null ? '–' : String(x);
+  };
+  const shelf = (r: Run): string => String((r.settings || {}).recipe || '').replace(/^lists\//, '').replace(/\.csv$/, '');
+  const star = (r: Run, key: string): StarRead | undefined => (r.stars || []).find((x) => x.star === key);
+  const lit = (r: Run, key: string): string => {
+    const x = star(r, key);
+    if (!x) return '–';
+    if (x.steps_to_lit != null) return `lit ${fmt(x.steps_to_lit, 0)}`;
+    if (x.shared_steps_to_lit != null) return `shared ${fmt(x.shared_steps_to_lit, 0)}`;
+    return '–';
+  };
+  const best = runs[0];
+  const base = runs.filter((r) => /baseline/.test(arm(r)));
+  const spread = base.length === 2 ? Math.abs((base[0].ft_en as number) - (base[1].ft_en as number)) : null;
+  const pw = star(best, 'previous_word');
+  const shared = pw && pw.shared_steps_to_lit != null
+    ? ` No single head reached the previous-word mark; the best voyage lit it <b>shared</b> (the best layer's two strongest heads together) at step ${fmt(pw.shared_steps_to_lit, 0)}.`
+    : '';
+  const rows = runs.map((r) => `<tr><td><a href="${shipHash(r.name)}">${esc(arm(r))}</a></td><td class="s">${esc(setting(r, 'vocab'))}</td><td class="s">${esc(setting(r, 'lr'))}</td><td class="s">${esc(shelf(r))}</td><td class="s">${esc(setting(r, 'seed'))}</td><td class="${r === best ? 'good' : ''}">${fmt(r.ft_en, 3)}${r === best ? ' ★' : ''}</td><td class="s">${lit(r, 'previous_word')}</td><td class="s">${lit(r, 'duplicate_word')}</td></tr>`).join('');
+  return `<p><b>${esc(arm(best))}</b> won at <b>${fmt(best.ft_en, 3)}</b> bits per byte on the 16 unseen books.${spread == null ? '' : ` The baseline's two seeds sit <b>${fmt(spread, 3)}</b> apart — that is the error bar every later comparison used.`}${shared}</p>
+    <p class="s">Reading more was the strongest lever (the pathfinder read twice); vocabulary 16,384 beat 4,096, 2,048 was the worst of the three, and the verse shelf was the worst shelf. The 2,048 vocabulary and 2e-3 learning rate the later 1m runs use are this sweep's descendants.</p>
+    <div class="scroll"><table><thead><tr><th>arm</th><th>vocab</th><th>lr</th><th>shelf</th><th>seed</th><th>Forgotten Tomes</th><th>previous-word</th><th>duplicate-word</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+
+// ---- the plans page as a table: every expedition, one row, with what it has sailed and what it found
+const cut = (t: string, n: number): string => (t.length > n ? t.slice(0, n - 1).trimEnd() + '…' : t);
+export function expeditionTableHtml(exps: Expedition[], states: Record<string, string>, overview: any): string {
+  const ov: Record<string, any> = {};
+  for (const e of (overview && overview.expeditions) || []) ov[e.key] = e;
+  const rows = exps.map((v) => {
+    const o = ov[v.key] || {};
+    const valid = v.runs.filter((r) => !r.set_aside).length;
+    const found = v.learned || starHeadline(v) || '';
+    const queued = Number(o.queued || 0);
+    return `<tr>
+      <td><a href="/expeditions/${esc(v.key)}"><b>${esc(v.name)}</b></a><div class="s">${esc(cut(v.goal || '', 120))}</div></td>
+      <td class="s">${esc(v.fleet || '')}</td>
+      <td class="s">${esc(v.preset || '')}</td>
+      <td>${expPill(states[v.key], v)}</td>
+      <td class="num">${Number(o.at_sea || 0)}</td>
+      <td class="num">${Number(o.finished || 0)}</td>
+      <td class="num">${Number(o.failed || 0)}</td>
+      <td class="num">${queued}${o.next_in_queue != null ? ` <span class="s">next #${Number(o.next_in_queue)}</span>` : ''}</td>
+      <td class="num">${valid}/${v.stop.max_runs}</td>
+      <td class="s">${esc(cut(found, 160))}</td>
+    </tr>`;
+  }).join('');
+  return `<div class="scroll"><table id="expeditiontable"><thead><tr>
+    <th>expedition</th><th>fleet</th><th>class</th><th>status</th>
+    <th title="voyages at sea now">at sea</th><th title="voyages that finished">finished</th>
+    <th title="voyages that failed or were stopped">failed</th><th title="its lines still in the queue, and where its next one stands">queued</th>
+    <th title="voyages sailed of the stop rule's maximum">voyages</th><th>what it found</th>
+  </tr></thead><tbody>${rows || `<tr><td colspan="10" class="${emptyCls()}">no expeditions yet</td></tr>`}</tbody></table></div>`;
 }

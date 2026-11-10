@@ -32,10 +32,11 @@ class Attention(nn.Module):
             nn.RoPE(self.head_dim) if getattr(cfg, "positions", "learned") == "rope" else None
         )
 
-    def qk(self, x):
+    def qk(self, x, repeat=True):
         """The queries and keys (batch, heads, time, head_dim), rotated when positions are rotary. In the
-        grouped case the keys and values are repeated across their group so attention can be the same
-        single call."""
+        grouped case the keys and values can be repeated across their group so the callers that read one
+        head at a time can index them plainly; the forward pass leaves them unrepeated, because MLX 0.32's
+        fused attention supports grouped-query attention natively (10 November)."""
         B, T, C = x.shape
         if self.kv_heads == self.heads:
             q, k, v = mx.split(self.qkv(x), 3, axis=-1)
@@ -46,7 +47,7 @@ class Attention(nn.Module):
         v = v.reshape(B, T, self.kv_heads, self.head_dim).transpose(0, 2, 1, 3)
         if self.rope is not None:
             q, k = self.rope(q), self.rope(k)
-        if self.kv_heads != self.heads:
+        if repeat and self.kv_heads != self.heads:
             g = self.heads // self.kv_heads
             k = mx.repeat(k, g, axis=1)
             v = mx.repeat(v, g, axis=1)
@@ -54,7 +55,9 @@ class Attention(nn.Module):
 
     def __call__(self, x):
         B, T, C = x.shape
-        q, k, v = self.qk(x)
+        # the fused kernel takes Q with more heads than K/V directly (GQA/MQA); repeating first was a
+        # needless copy on every layer, and at the 1m it is 2x the K/V tensors
+        q, k, v = self.qk(x, repeat=False)
         y = mx.fast.scaled_dot_product_attention(q, k, v, scale=self.head_dim**-0.5, mask="causal")
         return self.proj(y.transpose(0, 2, 1, 3).reshape(B, T, C))
 

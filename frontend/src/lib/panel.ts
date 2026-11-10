@@ -1,7 +1,7 @@
 // The panel layer (9 November): the two things every view in this dashboard needs and none of them owned — a boundary
 // that turns a thrown drawer into a message in place of the panel, and the one star-chart spec that had been copied
 // three times. See ships/plans/ui-audit-2026-11-09.md for why.
-import { Plotly, C, layout, cfg } from './charts';
+import { C, layout, plotEl } from './charts';
 
 /** Run a drawer, and if it throws, write *why* into the panel it was drawing into.
  *
@@ -49,11 +49,11 @@ interface StarPoint {
  * This spec was copied into `starJourney`, `sizeJourney` and `sopchart` on 9 November with three sets of margins;
  * it lives here once now. `points` are `{n, role, qwen, ours}` from /api/star_points.
  */
-export function starChart(
+export async function starChart(
   elOrId: string | HTMLElement,
   points: StarPoint[],
   { label = 'this ship', height = 340, legend = true, ticks = 10 }: { label?: string; height?: number; legend?: boolean; ticks?: number } = {},
-): void {
+): Promise<void> {
   const el = typeof elOrId === 'string' ? document.getElementById(elOrId) : elOrId;
   if (!el) return;
   const ps = (points || []).filter((p) => p.qwen != null || p.ours != null);
@@ -62,39 +62,41 @@ export function starChart(
     return;
   }
   el.innerHTML = '';
-  Plotly.react(
-    el,
-    [
-      {
-        x: ps.map((p) => `${p.n}. ${p.role}`),
-        y: ps.map((p) => p.qwen),
-        mode: 'lines+markers',
-        name: 'Qwen3 4B (chains)',
-        line: { color: C.accent, width: 2 },
-        marker: { size: 6 },
-        hovertemplate: '%{x}<br>Qwen3 4B: %{y:.2f}× the mark<extra></extra>',
-      },
-      {
-        x: ps.map((p) => `${p.n}. ${p.role}`),
-        y: ps.map((p) => p.ours),
-        mode: 'lines+markers',
-        name: label,
-        line: { color: C.good || '#5aa07a', width: 2, dash: 'dot' },
-        marker: { size: 6 },
-        hovertemplate: `%{x}<br>${label}: %{y:.2f}× the mark<extra></extra>`,
-      },
-    ],
-    {
-      ...layout({}),
-      height,
-      margin: { l: 56, r: 16, t: 26, b: 105 },
-      xaxis: { tickangle: -35, tickfont: { size: ticks }, gridcolor: C.line },
-      yaxis: { title: "reading ÷ the point's mark", gridcolor: C.line },
-      // the tick labels are long and rotated: the legend goes above the plot, not into their row
-      legend: { orientation: 'h', x: 0, xanchor: 'left', y: 1.02, yanchor: 'bottom', font: { size: 10 } },
-      showlegend: legend,
-      shapes: [{ type: 'line', xref: 'paper', x0: 0, x1: 1, y0: 1, y1: 1, line: { color: C.line, dash: 'dot' } }],
-    },
-    cfg,
-  );
+  // each line is drawn only if it has a reading: Qwen3 4B's line is still worth drawing while this ship
+  // has not been read yet (10 November: the 300k's SOP chart was empty although Qwen's ten points were
+  // there, because the caller had already dropped the points with no `ours`)
+  const traces: any[] = [];
+  if (ps.some((p) => p.qwen != null)) {
+    traces.push({
+      x: ps.map((p) => `${p.n}. ${p.role}`),
+      y: ps.map((p) => p.qwen),
+      mode: 'lines+markers',
+      name: 'Qwen3 4B (chains)',
+      line: { color: C.accent, width: 2 },
+      marker: { size: 6 },
+      hovertemplate: '%{x}<br>Qwen3 4B: %{y:.2f}× the mark<extra></extra>',
+    });
+  }
+  if (ps.some((p) => p.ours != null)) {
+    traces.push({
+      x: ps.map((p) => `${p.n}. ${p.role}`),
+      y: ps.map((p) => p.ours),
+      mode: 'lines+markers',
+      name: label,
+      line: { color: C.good || '#5aa07a', width: 2, dash: 'dot' },
+      marker: { size: 6 },
+      hovertemplate: `%{x}<br>${label}: %{y:.2f}× the mark<extra></extra>`,
+    });
+  }
+  plotEl(el, traces, {
+    ...layout({}),
+    height,
+    margin: { l: 56, r: 16, t: 26, b: 105 },
+    xaxis: { tickangle: -35, tickfont: { size: ticks }, gridcolor: C.line },
+    yaxis: { title: "reading ÷ the point's mark", gridcolor: C.line },
+    // the tick labels are long and rotated: the legend goes above the plot, not into their row
+    legend: { orientation: 'h', x: 0, xanchor: 'left', y: 1.02, yanchor: 'bottom', font: { size: 10 } },
+    showlegend: legend,
+    shapes: [{ type: 'line', xref: 'paper', x0: 0, x1: 1, y0: 1, y1: 1, line: { color: C.line, dash: 'dot' } }],
+  });
 }

@@ -249,18 +249,26 @@ class DualRecorder:
         self.pg.close()
 
 
-def recorder() -> Ledger | DualRecorder:
-    """The recorder a new run writes to. SQLite only, until the dual-write switch (THORP_LEDGER_DUAL) is set from
-    the next in-port restart; then both. With THORP_LEDGER_PG, Postgres is the one store and the recorder writes it
-    alone. A hired box keeps the plain Ledger (its ship's log, folded in at docking)."""
-    if os.environ.get("THORP_LEDGER_PG"):
-        from thorp.ledger_store import PgLedger
+def _use_pg() -> bool:
+    """Whether the ledger is Postgres. On this Mac it is the default; a hired ship's box sets THORP_SHIP_LOG
+    (its own SQLite log, folded in at docking). THORP_LEDGER_PG overrides either way; THORP_LEDGER_DUAL mirrors."""
+    flag = os.environ.get("THORP_LEDGER_PG")
+    if flag is not None:
+        return flag.strip().lower() not in ("0", "false", "no", "off", "")
+    return os.environ.get("THORP_SHIP_LOG", "").strip().lower() not in ("1", "true", "yes")
 
-        return PgLedger()
+
+def recorder() -> Ledger | DualRecorder:
+    """The recorder a new run writes to: Postgres by default (the Mac); a hired box (THORP_SHIP_LOG) keeps the
+    plain Ledger; THORP_LEDGER_DUAL writes both. THORP_LEDGER_PG overrides."""
     if os.environ.get("THORP_LEDGER_DUAL"):
         from thorp.ledger_store import PgLedger
 
         return DualRecorder(Ledger(), PgLedger())
+    if _use_pg():
+        from thorp.ledger_store import PgLedger
+
+        return PgLedger()
     return Ledger()
 
 
@@ -268,10 +276,10 @@ _READERS = __import__("threading").local()
 
 
 def reader() -> Ledger:
-    """The ledger the readers answer from: Postgres when THORP_LEDGER_PG is set (the cut-over is on), else SQLite.
-    A hired box never sets the flag, so it reads its own SQLite log. The Postgres reader is per thread and reused,
-    so a page's many small queries share one session and connection (SQLAlchemy's session is not thread-safe)."""
-    if os.environ.get("THORP_LEDGER_PG"):
+    """The ledger the readers answer from: Postgres by default (the Mac); a hired box (THORP_SHIP_LOG) reads its
+    own SQLite log. The Postgres reader is per thread and reused, so a page's many small queries share one session
+    and connection (SQLAlchemy's session is not thread-safe)."""
+    if _use_pg():
         from thorp.ledger_store import PgLedger
 
         r = getattr(_READERS, "pg", None)
@@ -280,3 +288,19 @@ def reader() -> Ledger:
             _READERS.pg = r
         return r
     return Ledger()
+
+
+def close_reader() -> None:
+    """Close this thread's Postgres reader and return its connection to the pool.
+
+    The dashboard's HTTP server handles each request on a short-lived thread; without this its per-thread
+    PgLedger sessions are never closed and the pool runs dry (10 November: the page's later panels came
+    back "QueuePool limit of size 5 overflow 10 reached", and their charts stayed blank)."""
+    r = getattr(_READERS, "pg", None)
+    if r is None:
+        return
+    try:
+        r.close()
+    except Exception:  # noqa: BLE001  a reader that cannot close must not fail the response
+        pass
+    del _READERS.pg

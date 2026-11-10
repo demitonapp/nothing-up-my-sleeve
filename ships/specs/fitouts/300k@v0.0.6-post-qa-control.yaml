@@ -1,0 +1,105 @@
+# ships/specs/fitouts: the question-answering return leg for the marked-deck 300k arm. The seed is the
+# 300k@v0.0.6-control arm now at sea; the coordinator holds this line until that seed docks. One pass
+# over the dialogue shelf, the pull off, the 1k context kept.
+name: 300k@v0.0.6-post-qa-control
+ship: 'SOP v0.0.6 at 300k (the question-answering return leg, marked deck)'
+experiment: 'The return leg: can the 300k answer a question it is asked?'
+question: 'The question-answering return leg at 300k, on SOP v0.0.6: one pass over the dialogue shelf,
+  the pull off, seeded from the marked-deck arm 300k@v0.0.6-control; the 2,048-piece tokeniser and the
+  1,024-piece context are the seed''s. Do the control tokens the deck declared make the ship read a
+  question better when it is asked one?'
+departures:
+- field: content
+  why: the return leg reads the dialogue shelf, not Ogden
+- field: training
+  why: one pass with the pull off, seeded from 300k@v0.0.6-control (the marked-deck arm)
+- field: tokeniser
+  why: keeps the seed's ten control tokens (pieces-2048+control10) so the checkpoint can be loaded
+data:
+  recipe: lists/dialogue-shelf.csv
+  passes: 1
+  order: shuffled
+  refuse:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+  - lists/hole-cards-unseen.csv
+  clean: unwrap-v2
+tokeniser:
+  kind: spm-bpe
+  vocab: 2048
+  byte_fallback: true
+  symbols:
+  - <bos>
+  - <eos>
+  - <pad>
+  - <unk>
+  - <sep>
+  - <premise>
+  - <conclusion>
+  - <question>
+  - <answer>
+  - <end>
+  train_on: lists/ogden-v0.1.csv
+model:
+  family: gpt
+  preset: 300k
+  context: 1024
+  positions: rope
+optim:
+  name: adamw
+  lr: 0.003
+  betas:
+  - 0.9
+  - 0.95
+  weight_decay: 0.1
+  warmup_steps: 100
+  schedule: cosine
+  min_lr_ratio: 0.1
+  batch_tokens: 32768
+  grad_clip: 1.0
+  precision: bf16
+  scaffold:
+    weight: 0.0
+    hold: 0.0
+    fade: 0.0
+    heads:
+    - layer: 0
+      head: 0
+      card: previous_word
+    - layer: 0
+      head: 1
+      card: delimiter
+    - layer: 4
+      head: 0
+      card: induction
+    riddles:
+      comparator:
+        layer: 2
+        head: 1
+        items: 16
+        pool: 2048
+eval:
+  sets:
+  - lists/hole-cards-unseen.csv
+  every_steps: 640
+  evaluators:
+  - ce_bpb
+  - discovery
+  - logic
+  - stars
+  - nevermore
+  - cards
+  light:
+    every_steps: 64
+    evaluators:
+    - stars
+    - nevermore
+    - cards
+    - logic
+checkpoint:
+  every_steps: 20
+sop: '0.0.6'
+seed: 1
+seeded_from:
+  run: 300k@v0.0.6-control
+  mode: free

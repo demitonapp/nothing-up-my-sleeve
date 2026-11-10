@@ -3,12 +3,12 @@
 // tricks, stars, cards), one trick (/discoveries/<trick>), one chain (/discoveries/chains/<key>) and the
 // traits (/discoveries/traits) — reading the route itself, as the old router did. The dense renderers are
 // in scripts/views/discoveries.ts; this file owns the shell (ported from components/Discoveries.astro),
-// the route and the data. Charts (Plotly) are imported lazily inside the effects: the page is server-
+// the route and the data. Charts (ECharts) are imported lazily inside the effects: the page is server-
 // rendered, and nothing that touches document may be imported at module load.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { MouseEvent as ReactMouseEvent } from 'react';
-import { btnCls, cardCls, checkCls, crumbCls, selectCls, tabCls, tabsCls } from '@/lib/ui';
+import { btnCls, cardCls, checkCls, crumbCls, emptyCls, selectCls, tabCls, tabsCls } from '@/lib/ui';
 import { routePath, sectionProps, useApi, useRoute } from '@/lib/useApi';
 import { shipHash } from '@/scripts/router';
 import { esc } from '@/lib/format';
@@ -19,11 +19,16 @@ import {
   drawBridge,
   drawStarDeviation,
   drawStarJourney,
+  drawScaffoldChart,
   drawTrickChart,
   emptyChart,
   headFamilies,
   headsHtml,
   methodHtml,
+  scaffoldHtml,
+  scaffoldRows,
+  scaffoldSummary,
+  skillLadderHtml,
   starGridHtml,
   starsCardsHtml,
   trickBands,
@@ -38,17 +43,50 @@ import {
   type StarPoint,
 } from '@/scripts/views/discoveries';
 
-type Sub = 'overview' | 'two-facts' | 'quantum' | 'registry' | 'stars' | 'cards';
-type DView = 'index' | 'trick' | 'chain' | 'traits';
+type Sub = 'overview' | 'two-facts' | 'skills' | 'quantum-tests' | 'quantum' | 'registry' | 'stars' | 'cards';
+type DView = 'index' | 'trick' | 'chain' | 'traits' | 'domain';
 
 interface Parsed {
   view: DView;
   sub: Sub;
   trick: string | null;
   chain: string | null;
+  domain: string | null;
 }
 
-const DSUBS: Sub[] = ['overview', 'two-facts', 'quantum', 'registry', 'stars', 'cards'];
+const DSUBS: Sub[] = ['overview', 'two-facts', 'skills', 'quantum-tests', 'registry', 'stars', 'cards'];
+const DOMAINS: Record<string, { title: string; waypoint: string; image: string; blurb: string; links: [string, string][] }> = {
+  physics: {
+    title: 'Physics', waypoint: 'physics', image: '/art/fall-physics.svg',
+    blurb: 'The physical world in numbers: intuition, school mechanics, college physics, graduate questions and the quantum problems beyond.',
+    links: [['/discoveries/quantum-tests', 'The quantum tests'], ['/discoveries/skills', 'The whole ladder']],
+  },
+  maths: {
+    title: 'Maths', waypoint: 'mathematics', image: '/art/fall-maths.svg',
+    blurb: 'Symbols and proof: algebra, competition problems, calculus and the proofs that hold them together.',
+    links: [['/discoveries/skills', 'The whole ladder'], ['/discoveries/registry', 'Every trick']],
+  },
+  reasoning: {
+    title: 'Reasoning', waypoint: 'reasoning', image: '/art/fall-reasoning.svg',
+    blurb: 'Putting what is known to work: deduction, word problems, learning a task from examples and planning a route through it.',
+    links: [['/discoveries/two-facts', 'Chaining two facts'], ['/discoveries/skills', 'The whole ladder']],
+  },
+  philosophy: {
+    title: 'Philosophy', waypoint: 'discovery', image: '/art/fall-philosophy.svg',
+    blurb: "The ideas the books do not yet hold: the explorer's four tests — the Origin, energy, Mendeleev's gaps and the eternal return — and the quanta beyond them.",
+    links: [['/discoveries/quantum-tests', 'The quantum tests'], ['/discoveries/skills', 'The whole ladder']],
+  },
+};
+
+// The charting section's own addresses: the same six tabs, kept under /shipyard/charting so a click there
+// stays in charting (10 November, Justin: "it should still be charting"). 'tells' is the charting name for
+// the stars tab; 'stars' is accepted as an alias.
+const CHARTING_SUBS: Record<string, Sub> = {
+  '': 'overview', overview: 'overview', 'two-facts': 'two-facts', quantum: 'quantum',
+  registry: 'registry', tells: 'stars', stars: 'stars', cards: 'cards',
+};
+const chartingHref = (s: Sub): string =>
+  `/shipyard/charting${s === 'overview' ? '' : '/' + (s === 'stars' ? 'tells' : s)}`;
 
 const parse = (route: string): Parsed => {
   const bits = route.split('?')[0].split('/').filter(Boolean);
@@ -56,24 +94,29 @@ const parse = (route: string): Parsed => {
   // the cards moved to the shipyard's charting section (9 November, Justin: "this /discoveries/cards needs
   // to move to /shipyard/charting"): the same island, reached from the yard
   if (bits[0] === 'shipyard' && bits[1] === 'charting') {
-    // the charting section: the deck's overview by default, its cards and its tells under it
-    const sub = bits[2] === 'cards' ? 'cards' : bits[2] === 'tells' ? 'stars' : 'overview';
-    return { view: 'index', sub: sub as Sub, trick: null, chain: null };
+    const sub = CHARTING_SUBS[bits[2] || ''] || 'overview';
+    return { view: 'index', sub, trick: null, chain: null, domain: null };
   }
-  if (bits[0] !== 'discoveries') return { view: 'index', sub: 'two-facts', trick: null, chain: null };
+  if (bits[0] !== 'discoveries') return { view: 'index', sub: 'two-facts', trick: null, chain: null, domain: null };
   const b = at(1);
   const c = at(2);
-  if (b === 'chains' && c) return { view: 'chain', sub: 'two-facts', trick: null, chain: c };
-  if (!b) return { view: 'index', sub: 'two-facts', trick: null, chain: null };
-  if ((DSUBS as string[]).includes(b)) return { view: 'index', sub: b as Sub, trick: null, chain: null };
-  if (b === 'traits') return { view: 'traits', sub: 'two-facts', trick: null, chain: null };
-  return { view: 'trick', sub: 'two-facts', trick: b, chain: null };
+  if (b === 'chains' && c) return { view: 'chain', sub: 'two-facts', trick: null, chain: c, domain: null };
+  if (!b) return { view: 'index', sub: 'overview', trick: null, chain: null, domain: null };
+  if (b === 'quantum') return { view: 'index', sub: 'skills', trick: null, chain: null, domain: null };
+  if ((DSUBS as string[]).includes(b)) return { view: 'index', sub: b as Sub, trick: null, chain: null, domain: null };
+  if (b === 'traits') return { view: 'traits', sub: 'two-facts', trick: null, chain: null, domain: null };
+  if (b === 'mathematics') return { view: 'domain', sub: 'overview', trick: null, chain: null, domain: 'maths' };
+  if (b in DOMAINS) return { view: 'domain', sub: 'overview', trick: null, chain: null, domain: b };
+  return { view: 'trick', sub: 'two-facts', trick: b, chain: null, domain: null };
 };
 
-const subHref = (s: Sub): string => (s === 'overview' ? '/shipyard/charting'
-  : s === 'cards' ? '/shipyard/charting/cards'
-  : s === 'stars' ? '/shipyard/charting/tells'
-  : s === 'two-facts' ? '/discoveries' : `/discoveries/${s}`);
+const subHref = (s: Sub, charting: boolean): string => charting ? chartingHref(s === 'skills' ? 'quantum' : s)
+  : s === 'overview' ? '/discoveries'
+  : s === 'cards' ? '/discoveries/cards'
+  : s === 'stars' ? '/discoveries/stars'
+  : s === 'skills' || s === 'quantum' ? '/discoveries/skills'
+  : s === 'quantum-tests' ? '/discoveries/quantum-tests'
+  : s === 'two-facts' ? '/discoveries/two-facts' : `/discoveries/${s}`;
 
 const openEssay = async (name: string): Promise<void> => {
   const { openEssay: open } = await import('@/lib/reader');
@@ -135,7 +178,10 @@ export default function Discoveries() {
   const [nav, setNav] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const route = nav ?? mounted;
-  const { view, sub, trick: trickKey, chain: chainKey } = parse(route);
+  const parsed = parse(route);
+  const { view, sub, trick: trickKey, chain: chainKey } = parsed;
+  const domain = parsed.domain ? DOMAINS[parsed.domain] : null;
+  const inCharting = route.split('?')[0].startsWith('/shipyard/charting');
 
   // the route the old router read: the hash first, then the path (a pasted path is answered by the server).
   // `ready` gates the sub-view endpoints: the first render is server-consistent (the default view), so
@@ -172,6 +218,7 @@ export default function Discoveries() {
   const starDev = useApi<{ cards: any[] }>(onStars ? '/api/stars_deviation' : null, 120000);
   const deck = useApi<{ cards: any[] }>(onCards ? '/api/card_deck' : null, 120000);
   const atlas = useApi<any>(sub === 'overview' ? '/api/deck_atlas' : null, 300000);
+  const chainsApi = useApi<any[]>('/api/chains', 120000, ready && view === 'index' && sub === 'quantum-tests');
   const bridge = useApi<any>(onStars ? '/api/bridge' : null, 120000);
 
   const d = disc.data;
@@ -232,8 +279,22 @@ export default function Discoveries() {
 
   // filters, held in the island (the old panels rebuilt their selects' options each draw)
   const [waypoint, setWaypoint] = useState('');
+  useEffect(() => {
+    if (view !== 'index' || sub !== 'registry') return;
+    setWaypoint(new URLSearchParams(route.split('?')[1] || '').get('waypoint') || '');
+  }, [route, view, sub]);
   const [band, setBand] = useState('');
   const [family, setFamily] = useState('');
+  const [question, setQuestion] = useState<{ chain: string; step: number } | null>(null);
+  useEffect(() => { setQuestion(null); }, [sub]);
+  useEffect(() => {
+    if (!question) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const onKey = (e: KeyboardEvent): void => { if (e.key === 'Escape') setQuestion(null); };
+    window.addEventListener('keydown', onKey);
+    return () => { document.body.style.overflow = prev; window.removeEventListener('keydown', onKey); };
+  }, [question]);
 
   // the charts. Each runs only on the subtab that shows it, after its data has arrived.
   useEffect(() => {
@@ -267,20 +328,38 @@ export default function Discoveries() {
     void drawTrickChart('trickpairchart', pairApi.data, { name: pageInfo.pair.chart.name, reference: pageInfo.pair.chart.reference }, rungs.map((r) => r.preset));
   }, [view, pageInfo, pairApi.data, pairSig, rungs]);
 
+  // the scaffold across every model: held heads, the fade, and what dropped. Only voyages whose spec
+  // pinned heads are here; the table still lists every model, so a gap is visible (10 November).
+  const scaffThreshold = trickApi.data?.threshold ?? 0;
+  const scaffRows = useMemo(() => (view === 'trick' && trickApi.data ? scaffoldRows(trickApi.data, scaffThreshold) : []), [view, trickApi.data, scaffThreshold]);
+  const scaffSummary = useMemo(() => (scaffRows.length ? scaffoldSummary(scaffRows, rungs.map((r) => r.preset), scaffThreshold) : []), [scaffRows, rungs, scaffThreshold]);
+  const scaffSig = scaffRows.map((r) => `${r.run_id}:${r.held}:${r.after}`).join(',');
+  useEffect(() => {
+    if (view !== 'trick' || !scaffRows.length || drawn.current.scaffold === scaffSig) return;
+    drawn.current.scaffold = scaffSig;
+    void drawScaffoldChart('scaffoldchart', scaffSummary, scaffThreshold, pageInfo?.chart?.name || 'reading');
+  }, [view, scaffRows, scaffSummary, scaffSig, scaffThreshold]);
+
   const chainPage = useMemo(
     () => (d && view === 'chain' ? chainPageHtml(d, rungs, chainKey, chainApi.data, chainRef) : null),
     [d, rungs, view, chainKey, chainApi.data, chainRef],
   );
 
-  const traits = d ? traitsHtml(d) : null;
-  const stars = d ? starsCardsHtml(d) : '';
-  const grid = d ? starGridHtml(d, rungs) : null;
-  const chains = d ? chainsTableHtml(d, rungs, chainRef) : null;
-  const route1 = d ? trickRouteHtml(d) : '';
-  const registry = d ? trickRowsHtml(d, rungs, waypoint, band) : null;
-  const heads = d ? headsHtml(d, rungs, family) : null;
-  const method = d ? methodHtml(d, 'chaining', rungs) : null;
-  const tf = d && sq.data && lb.data ? twoFactsHtml(d, sq.data, lb.data, pulls) : null;
+  // Build only the panel the page is showing: /api/discoveries is a multi-megabyte payload, and
+  // rendering every sub-view's HTML on every tab made the first paint of Cards or Skills wait on
+  // traits, stars and the registry too (10 November).
+  const onSkills = view === 'index' && (sub === 'skills' || sub === 'quantum');
+  const traits = useMemo(() => (d && view === 'traits' ? traitsHtml(d) : null), [d, view]);
+  const stars = useMemo(() => (d && sub === 'stars' ? starsCardsHtml(d) : ''), [d, sub]);
+  const grid = useMemo(() => (d && sub === 'stars' ? starGridHtml(d, rungs) : null), [d, sub, rungs]);
+  const chains = useMemo(() => (d && onSkills ? chainsTableHtml(d, rungs, chainRef) : null), [d, onSkills, rungs, chainRef]);
+  const route1 = useMemo(() => (d && onSkills ? trickRouteHtml(d) : ''), [d, onSkills]);
+  const skillLadder = useMemo(() => (d && onSkills ? skillLadderHtml(d) : ''), [d, onSkills]);
+  const domainSkills = useMemo(() => (d && domain ? d.known_tricks.filter((t) => t.waypoint === domain.waypoint) : []), [d, domain]);
+  const registry = useMemo(() => (d && sub === 'registry' ? trickRowsHtml(d, rungs, waypoint, band) : null), [d, sub, rungs, waypoint, band]);
+  const heads = useMemo(() => (d && sub === 'stars' ? headsHtml(d, rungs, family) : null), [d, sub, rungs, family]);
+  const method = useMemo(() => (d && sub === 'two-facts' ? methodHtml(d, 'chaining', rungs) : null), [d, sub, rungs]);
+  const tf = useMemo(() => (d && sub === 'two-facts' && sq.data && lb.data ? twoFactsHtml(d, sq.data, lb.data, pulls) : null), [d, sub, sq.data, lb.data, pulls]);
 
   const goShip = (id: string): void => {
     const lr = (ladder.data?.runs || []).find((r: any) => r.run_id === id || r.name === id);
@@ -323,7 +402,7 @@ export default function Discoveries() {
     className: tabCls(''),
     'data-state': view === 'index' && sub === s ? 'active' : 'inactive',
     'data-dsub': s,
-    href: subHref(s),
+    href: subHref(s, inCharting),
     ...(view === 'index' && sub === s ? { 'aria-current': 'page' as const } : {}),
   });
 
@@ -331,15 +410,51 @@ export default function Discoveries() {
     <div {...sectionProps('discoveries')} onClick={onClick}>
       {/* ============================== the tricks of the trade */}
       <div className={`dview${view === 'index' ? ' active' : ''}`} data-dview="index">
-        <h1>Tricks of the trade</h1>
         <nav className={tabsCls('line', 'subnav')} data-orientation="horizontal" data-variant="line" id="discnav">
-          <a {...tab('overview')}>Overview</a>
-          <a {...tab('two-facts')}>Chaining two facts</a>
-          <a {...tab('quantum')}>Quantum mechanics</a>
-          <a {...tab('registry')}>Registry of tricks</a>
-          <a {...tab('stars')}>Tells</a>
-          <a {...tab('cards')}>Cards</a>
+          {inCharting ? (
+            <>
+              <a {...tab('overview')}>Overview</a>
+              <a {...tab('two-facts')}>Chaining two facts</a>
+              <a {...tab('quantum')}>Quantum mechanics</a>
+              <a {...tab('registry')}>Registry of tricks</a>
+              <a {...tab('stars')}>Tells</a>
+              <a {...tab('cards')}>Cards</a>
+            </>
+          ) : (
+            <>
+              <a {...tab('overview')}>Overview</a>
+              <a {...tab('cards')}>Cards discovered</a>
+              <a {...tab('skills')}>Skills</a>
+              <a {...tab('quantum-tests')}>Quantum tests</a>
+              <a {...tab('two-facts')}>Chaining two facts</a>
+              <a {...tab('registry')}>Registry of tricks</a>
+              <a {...tab('stars')}>Tells</a>
+            </>
+          )}
         </nav>
+
+        {/* the quantum tests: four discovery ladders, each rung openable to its questions */}
+        <div className={`dsub${sub === 'quantum-tests' ? ' active' : ''}`} data-dsub="quantum-tests">
+          <p className="q dsubintro">The four tests toward quantum physics, each climbed in six rungs from the keel to the explorer. Every rung is a set of matched questions: open one to read the prompts and the two endings it chooses between.</p>
+          <section className={cardCls(false, 'panel')}>
+            <h2>All the layers <span className="note">keel to explorer, smallest rung first; the last rung is the bet itself. ▲/✓ evidence and grades are on the Skills and Chaining tabs</span></h2>
+            {chainsApi.error ? <div className={emptyCls()}>the tests could not be read: {chainsApi.error}</div>
+              : !chainsApi.data ? <div className={emptyCls()}>reading the tests…</div>
+              : <div className="qt">{chainsApi.data.map((ch: any) => (
+                <section className="qtchain" key={ch.key}>
+                  <header><h3>{ch.name}</h3><p>{ch.idea}</p></header>
+                  <div className="qtladder">{ch.steps.map((st: any, i: number) => (
+                    <button type="button" className="qtstep" key={st.key} onClick={() => setQuestion({ chain: ch.key, step: i })}>
+                      <span className="n">{i + 1}</span>
+                      <b>{st.name}</b>
+                      <span className="adds">{st.adds}</span>
+                      <em>{st.rung?.name || st.rung?.preset || '–'} · {st.pairs?.length || 0} questions · mark {st.threshold ?? '–'}</em>
+                    </button>
+                  ))}</div>
+                </section>
+              ))}</div>}
+          </section>
+        </div>
 
         {/* the trick in focus: how Thorp proves a model chains two facts (the heart of the leaderboard, and of the claim) */}
         <div className={`dsub${sub === 'two-facts' ? ' active' : ''}`} data-dsub="two-facts">
@@ -431,7 +546,11 @@ export default function Discoveries() {
         </div>
 
         {/* the long road: seven waypoints to quantum mechanics, and the explorer's four discovery chains on it */}
-        <div className={`dsub${sub === 'quantum' ? ' active' : ''}`} data-dsub="quantum">
+        <div className={`dsub${sub === 'skills' || sub === 'quantum' ? ' active' : ''}`} data-dsub="skills">
+          <section className={cardCls(false, 'panel')}>
+            <h2>Every skill on the ladder <span className="note">the seven steps to quantum mechanics, and the skills charted on each; open a skill for its stars, its readings and its place in the climb. ◆ marks a gate a ship must perform before it moves on</span></h2>
+            <div dangerouslySetInnerHTML={{ __html: skillLadder }} />
+          </section>
           <section className={cardCls(false, 'panel')}>
             <h2>The route to quantum physics <span className="note">seven waypoints, each resting on the one before; a waypoint's gate tricks (◆) are the ones a ship must perform before it moves on</span></h2>
             <div className="route" id="trickroute" dangerouslySetInnerHTML={{ __html: route1 }} />
@@ -445,6 +564,24 @@ export default function Discoveries() {
 
         {/* the overview: the cards are jobs, the questions they pass, and where the 0.0.5 fleet puts them */}
         <div className={`dsub${sub === 'overview' ? ' active' : ''}`} data-dsub="overview">
+          <div className="discdoors">
+            <a className="discdoor" href="/discoveries/physics">
+              <img src="/art/fall-physics.svg" alt="" loading="lazy" />
+              <div className="db"><span className="dk">Physics</span><b>The physical world, in numbers</b><p>Mechanics, energy and the quantum horizon: what the books say, and what they do not.</p></div>
+            </a>
+            <a className="discdoor" href="/discoveries/maths">
+              <img src="/art/fall-maths.svg" alt="" loading="lazy" />
+              <div className="db"><span className="dk">Maths</span><b>Symbols and proof</b><p>Algebra, calculus, competition problems and the proofs that hold them together.</p></div>
+            </a>
+            <a className="discdoor" href="/discoveries/reasoning">
+              <img src="/art/fall-reasoning.svg" alt="" loading="lazy" />
+              <div className="db"><span className="dk">Reasoning</span><b>Putting knowledge to work</b><p>Deduction, word problems and planning: the step from knowing a fact to using it.</p></div>
+            </a>
+            <a className="discdoor" href="/discoveries/philosophy">
+              <img src="/art/fall-philosophy.svg" alt="" loading="lazy" />
+              <div className="db"><span className="dk">Philosophy</span><b>The ideas the books do not hold</b><p>The explorer's tests — Origin, energy, Mendeleev's gaps and the eternal return — and the quanta beyond.</p></div>
+            </a>
+          </div>
           <p className="q dsubintro">The cards are <b>jobs</b> — the work a model must be able to do to pass a question, not a place in the network. A <b>tell</b> is a head that passes the job's mark: it tells you the job is being done, and like any tell it can lie — a pinned head tells you about the pin.</p>
           <section className={cardCls(false, 'panel')}>
             <h2>The four questions <span className="note">the chaining tests: what a model has to do, not what it knows</span></h2>
@@ -512,7 +649,7 @@ export default function Discoveries() {
             <h2>The tricks <span className="note">a trick is what a model can do, judged from outside by its bets; open one for the stars that do it and Thorp's progress, size by size. "The field shows it at" is the size band (one order of magnitude, in parameters) where the trick is documented in standard models, not a proven smallest size; hover a band for the detail. "Thorp's goal size" is the size expected to reach it, about an order of magnitude smaller than the field where the depth it needs allows; ◆ marks a gate, performed before a ship moves on to the next waypoint</span></h2>
             <div className="handtools" data-filters>
               <label className="note" htmlFor="trickfamily">waypoint</label>
-              <select className={selectCls('')} id="trickfamily" data-remember value={waypoint} onChange={(e) => setWaypoint(e.target.value)}>
+              <select className={selectCls('')} id="trickfamily" value={waypoint} onChange={(e) => setWaypoint(e.target.value)}>
                 <option value="">all</option>
                 {(d?.waypoints || []).map((w) => <option key={w.key} value={w.key}>{w.name}</option>)}
               </select>
@@ -531,8 +668,8 @@ export default function Discoveries() {
 
       {/* ============================== one trick */}
       <div className={`dview${view === 'trick' ? ' active' : ''}`} data-dview="trick">
-        <h1><a className={crumbCls('back')} href="/discoveries">← discoveries</a> <span id="tricktitle">{pageInfo?.title || ''}</span> <span id="trickstate" dangerouslySetInnerHTML={{ __html: pageInfo?.state || '' }} /> <span className="q" id="trickdoes">{pageInfo?.does || ''}</span></h1>
-        <section className={cardCls(false, 'panel')}><div className="rungover" id="trickover" dangerouslySetInnerHTML={{ __html: pageInfo?.over || '' }} /></section>
+        <h1><a className={crumbCls('back')} href="/discoveries">← discoveries</a> <span id="tricktitle">{pageInfo?.title || 'reading…'}</span> <span id="trickstate" dangerouslySetInnerHTML={{ __html: pageInfo?.state || '' }} /> <span className="q" id="trickdoes">{pageInfo?.does || ''}</span></h1>
+        <section className={cardCls(false, 'panel')}><div className="rungover" id="trickover" dangerouslySetInnerHTML={{ __html: pageInfo ? (pageInfo.over || '<div class="s">no detail is written for this trick yet</div>') : '<div class="s">reading the trick…</div>' }} /></section>
         <section className={cardCls(false, 'panel')}>
           <h2>The stars needed to learn it <span className="note">the mechanisms inside thought to do this trick, each with where it is expected and its state in Thorp</span></h2>
           <div className="scroll"><table id="trickstars"><thead><tr><th>kind of head</th><th>what it does</th><th>rests on</th><th>expected from</th><th>first lit in</th><th>in Thorp</th></tr></thead><tbody dangerouslySetInnerHTML={{ __html: pageInfo?.stars || '' }} /></table></div>
@@ -551,6 +688,11 @@ export default function Discoveries() {
             <div className="chart tall" id="trickpairchart" />
           </section>
         </div>
+        <section className={cardCls(false, 'panel')} id="scaffoldpanel" hidden={!scaffRows.length}>
+          <h2>How the scaffold held, across every model <span className="note">pinned heads are a loan: <b>held</b> is the best reading while the heads were pinned, <b>after the fade</b> is the first reading once they were faded out, <b>drop</b> is what the fade cost, and <b>kept</b> is what remains above the untrained floor. A model with no scaffolded voyage is listed as a gap, not left out</span></h2>
+          <div dangerouslySetInnerHTML={{ __html: scaffoldHtml(scaffRows, scaffSummary, rungs, scaffThreshold) }} />
+          <div className="chart tall" id="scaffoldchart" />
+        </section>
       </div>
 
       {/* ============================== one chain: the explorer's test told as a climb, keel to explorer */}
@@ -567,6 +709,54 @@ export default function Discoveries() {
         <div className="handtools"><button className={btnCls('outline', '')} data-essay="traits">Read: how traits are found</button></div>
         <section className={cardCls(false, 'panel')}><div className="scroll"><table id="traittable" className="clickable"><thead dangerouslySetInnerHTML={{ __html: traits?.head || '' }} /><tbody dangerouslySetInnerHTML={{ __html: traits?.body || '' }} /></table></div></section>
       </div>
+
+      {domain && (
+        <div className={`dview${view === 'domain' ? ' active' : ''}`} data-dview="domain">
+          <h1><a className={crumbCls('back')} href="/discoveries">← discoveries</a> {domain.title}</h1>
+          <section className={cardCls(false, 'panel')}>
+            <div className="domainhero">
+              <img src={domain.image} alt="" />
+              <div><div className="k">A door into the discoveries</div><h2>{domain.title}</h2><p>{domain.blurb}</p></div>
+            </div>
+          </section>
+          <section className={cardCls(false, 'panel')}>
+            <h2>The skills in this door <span className="note">every skill charted on the {domain.title.toLowerCase()} step of the ladder; open one for its stars, its readings and its place in the climb</span></h2>
+            {domainSkills.length ? <div className="domainskills">{domainSkills.map((t) => (
+              <a className={`skill${t.fleet ? ' measured' : ''}`} href={`/discoveries/${esc(t.key)}`} key={t.key}>
+                <b>{t.gate ? '◆ ' : ''}{t.name}</b><span>{t.does}</span>
+                <em>{t.fleet ? 'measured by Thorp' : 'not measured yet'}{t.target_class ? ` · goal ${t.target_class}` : ''}{t.taught ? ' · taught' : ''}</em>
+              </a>
+            ))}</div> : <div className={emptyCls()}>no skill is charted on this step yet</div>}
+          </section>
+          <section className={cardCls(false, 'panel')}>
+            <h2>Where to go next</h2>
+            <div className="handtools">{domain.links.map(([href, label]) => <a className={btnCls('outline', '')} href={href} key={href}>{label}</a>)}</div>
+          </section>
+        </div>
+      )}
+
+      {question && (() => {
+        const ch = (chainsApi.data || []).find((x: any) => x.key === question.chain);
+        const st = ch?.steps?.[question.step];
+        if (!ch || !st) return null;
+        return (
+          <div className="qmodal" role="dialog" aria-modal="true" aria-label={`${ch.name}: ${st.name} questions`} onClick={(e) => { if (e.target === e.currentTarget) setQuestion(null); }}>
+            <div className="qmodalbox">
+              <button type="button" className="qclose" aria-label="close" onClick={() => setQuestion(null)}>×</button>
+              <div className="k">{ch.name} · step {question.step + 1} of {ch.steps.length}</div>
+              <h3>{st.name}</h3>
+              <p>{st.adds}</p>
+              <p className="s">{st.rung ? `${st.rung.name || st.rung.preset} · ` : ''}performed at {st.threshold ?? '–'}{st.min_score != null ? ` and ${Math.round(100 * st.min_score)}% of pairs right` : ''}</p>
+              {st.pairs?.length ? (
+                <ol className="qlist">{st.pairs.map((p: any, i: number) => (
+                  <li key={i}><div className="qprompt">{p.prompt}{p.frame ? <> <b>{p.frame}</b></> : null}</div>
+                    <div className="qans"><span className="qidea">{p.idea}</span><span className="qrival">{p.rival}</span></div></li>
+                ))}</ol>
+              ) : <div className={emptyCls()}>this rung&apos;s questions are not written yet</div>}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

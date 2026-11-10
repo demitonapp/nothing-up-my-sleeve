@@ -62,7 +62,7 @@ function shipCard(ladder: Payload, r: any): string {
   const live = runs.filter((x: any) => x.status === 'running').length;
   const done = runs.filter((x: any) => x.status === 'finished').length;
   const nlive = (r.metrics || []).filter((m: any) => m[2] === 'live').length;
-  return `<a class="${cardCls(true, 'card classcard')}" href="/sizes/${encodeURIComponent(classSlug(r.name))}">${artImg(classSlug(r.name), 'cardart ship')}
+  return `<a class="${cardCls(true, 'card classcard')}" href="/ships/${encodeURIComponent(r.preset)}">${artImg(classSlug(r.name), 'cardart ship')}
     <div class="top"><span class="preset">${esc(r.preset)}</span><span class="nm">${esc(r.name)}</span></div>
     <div class="job">${esc(r.role || r.job)}</div>
     <div class="foot"><span>${big(r.total)} params · ${esc(String(r.where || '').split(' (')[0])}</span>
@@ -77,7 +77,6 @@ export function harbourShipsHtml(ladder: Payload, key: string): string {
   const hs = (ladder && ladder.harbours) || [];
   const h = hs.find((x: any) => x.key === key);
   if (!h) return `<div class="${emptyCls()}">no harbour called ${esc(key)}${hs.length ? `: ${hs.map((x: any) => esc(x.name)).join(', ')}` : ''}</div>`;
-  const sizes = (ladder.rungs || []).filter((r: any) => r.harbour === h.key);
   const rules = (() => {
     const logs = (ladder.rungs || []).map((r: any) => Math.log10(r.total));
     const lo = Math.min(...logs) - 0.1, hi = Math.max(...logs) + 0.1;
@@ -88,25 +87,25 @@ export function harbourShipsHtml(ladder: Payload, key: string): string {
       <div class="hrule"><b>Lane</b> ${esc(h.lane === 'mac' ? 'the Mac lane (MLX)' : 'the Vast lane (torch on CUDA)')}</div>
       <div class="rungcards">${(ladder.rungs || []).filter((r: any) => r.harbour === h.key).map((r: any) => {
         const art = RUNG_ART[r.preset];
-        return `<a class="${cardCls(true, 'card classcard rungcard')}" href="/sizes/${encodeURIComponent(r.preset)}">
+        return `<a class="${cardCls(true, 'card classcard rungcard')}" href="/ships/${encodeURIComponent(r.preset)}">
           ${art ? `<img class="cardart" src="/art/${art}.png" alt="" loading="lazy">` : ''}
           <div class="top"><span class="preset">${esc(r.preset)}</span><span class="nm">${esc(rungName(r.preset, r.name))}</span></div>
           <div class="job">${esc(r.name || '')}${r.role ? ` · ${esc(r.role)}` : ''}</div>
           <div class="foot"><span>${big(r.total)} parameters</span><span class="s">${esc(String(r.status || ''))}</span></div></a>`;
       }).join('')}</div></div>`;
   })();
-  const fit = !(h.fitting_out || []).length ? '' : `<div class="k" style="grid-column:1/-1">Fitting out <span class="s">registered in this harbour and not yet sailed: each is grown from Pan's best version when its reading is approved</span></div>`
-    + h.fitting_out.map((x: any) => `<a class="${cardCls(true, 'card classcard')}" href="/ships/${x.key}">${artImg(classSlug(x.name), 'cardart ship')}
-      <div class="top"><span class="preset">${esc(x.size)}</span><span class="nm">${esc(x.name)}</span></div>
-      <div class="job">${esc((x.subtitle || '').replace(/^[^·]*· /, ''))}</div>
-      <div class="foot"><span>${esc(x.expedition || '')}</span><span class="${pillCls('')}">fitting out</span></div></a>`).join('');
   const foreign = h.key !== 'zayton' || !((ladder && ladder.foreign) || []).length ? '' :
     `<div class="k" style="grid-column:1/-1">Foreign ships <span class="s">outside models, read on the same decks: not Thorp ships, but here so they can be spied on</span></div>`
     + ladder.foreign.map((x: any) => `<a class="${cardCls(true, 'card classcard')}" href="/foreign/${encodeURIComponent(x.key)}">${artImg(x.key, 'cardart ship')}
       <div class="top"><span class="preset">${x.params ? big(x.params) : '–'}</span><span class="nm">${flagImg(x.flag, x.flag_name)} ${esc(x.label)}</span></div>
       <div class="job">an outside model in Zayton: read-only decks, logic, cards and held-out books</div>
       <div class="foot"><span>${x.chained ? 'chain-graded' : 'no chain grades'}</span><span class="${pillCls('accent')}">foreign</span></div></a>`).join('');
-  return rules + sizes.map((r: any) => shipCard(ladder, r)).join('') + fit + foreign;
+  // the rung cards inside "The harbour" are this harbour's ships (9 November: "the page lists this
+  // harbour's ships, not the rule that decides where they lie"); the same sizes are not drawn twice
+  // below them (10 November, Justin: "remove the bottom 3 cards"), and the fitting-out cards are not
+  // drawn here either (10 November, Justin: "remove the second row of cards"); the API still carries
+  // `fitting_out`, so the ships can be listed elsewhere without another query
+  return rules + foreign;
 }
 
 /** The current version's score under a ship card (/api/class_score): chaining leads, the goal's distance
@@ -158,6 +157,7 @@ export function shipyardCardsHtml(): string {
   const cards: [string, string, string, string][] = [
     ['charting', 'Charting', 'sorting out the charts the voyage is planned on: the route, the stars, and the suits', 'charting'],
     ['hulls', 'Hull sizes', "each rung's layers, width, heads and head width: the shape a ship is built to, set in Postgres", 'hulls'],
+    ['constraints', 'The yard’s constraints', 'the slipways, the tide, the clerk and the survey dock: the limits on how many voyages the yard can launch, and the levers that move them', 'shipyard'],
   ];
   return cards.map(([key, name, about, art]) => `<a class="${cardCls(true, 'card harbourcard shipyardcard')}" href="/shipyard/${key}">${artImg(art, 'cardart ship')}
     <div class="top"><span class="preset">shipyard</span><span class="nm">${esc(name)}</span></div>

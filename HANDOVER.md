@@ -49,8 +49,10 @@ mv data/trigrams.csv data/trigrams.csv.imported
 mv data/resolution.csv data/resolution.csv.imported
 mv data/unresolved.csv data/unresolved.csv.imported
 
-# 4. The queue (only in port, at a time agreed with Justin): make lanes.py read s2.queue_lines,
-#    add thorp queue show/add/move/drop, then the dashboard can edit the queue.
+# 4. The queue is cut over (10 November): THORP_QUEUE_PG=1 makes lanes.py read and take from
+#    s2.queue_lines and record exits in s2.queue_history; thorp queue show/add/move/drop edits it;
+#    /api/queue, /api/lanes and the plan read the store; queue.sh sets the flag. specs/queue.txt is
+#    now an export written by the CLI, not the source.
 ```
 
 The Vast lane still writes its SQLite log after this; that is by design, not a leftover.
@@ -67,3 +69,34 @@ The Vast lane still writes its SQLite log after this; that is by design, not a l
 - Ledger in Postgres: `s1.*`; library: `s1.books` and friends; queue: `s2.queue_lines` / `s2.queue_history`.
 - `thorp store ping|ledger|queue` — check the store, re-run the ledger backfill, re-run the queue backfill.
 - Decisions: `DECISIONS.md`, "One store: Postgres, by the viable system".
+
+## 10 November: the queue on Postgres, the first 1m, and what is still running
+
+**The queue is the store's.** `THORP_QUEUE_PG=1` makes `lanes.py` read and take from `s2.queue_lines` and
+record each exit in `s2.queue_history`; `thorp queue show/add/move/drop` edits it; `/api/queue`, `/api/lanes`
+and the plan read it. `specs/queue.txt` is now an export written by the CLI. Two faults found and fixed:
+
+- the history backfill inserted explicit ids, leaving `s2.queue_history_id_seq` at 1, so the first `record()`
+  died on a unique violation and the coordinator stopped. The backfill now `setval`s after writing; the repair
+  is `select setval('s2.queue_history_id_seq', (select max(id) from s2.queue_history))`.
+- the coordinator calls `ps`, which the workspace sandbox blocks. `_local`/`_is_child_of_mine` now tolerate it,
+  and the coordinator must run with `THORP_LAUNCH=local` (the `uv` launcher cannot write its cache either).
+
+**The first 1m (fulldeck) finished** at 16:13 on 10 November: 288.1M tokens, 178.7 min, bpb **2.109** against
+the 300k pins' **1.908**. The hard release at 60% cost the basics (number 86.8 to 12.5, order 127 to 41.7,
+premise 109.6 to 9.7); the bridge spiked to 0.977 at 15% and decayed to 0.039; chaining stayed at zero (−0.015).
+The follow-up 1m arms are queued last: `1m@v0.0.6-early` (hold 10%, every pull off by 30%, no bridge riddle)
+and `1m@v0.0.6-hold25-double` (twenty pins).
+
+**What is running** (17:30): the coordinator on `300k@v0.0.6-gqa-s2`, then the rest of the eleven-line 300k
+batch, then the two 1m arms. `caffeinate -imsu` keeps the system awake. If the coordinator dies:
+
+    PYTHONPATH=backend THORP_LAUNCH=local THORP_LEDGER_PG=1 THORP_LIBRARY_PG=1 THORP_QUEUE_PG=1 \
+      nohup backend/.venv/bin/python -m thorp.viable.s2_coordination.lanes >> data/runs/queue.out 2>&1 &
+
+**Also in this session:** `s1.discoveries` (the goals payload as one JSONB row, built by `thorp store
+discoveries`, read by `/api/discoveries`); the fleet reclassification (only Ogden and Kipling are Star Fleet);
+the plans page as a table; the per-card schedule groups on the at-sea card; First Light's findings panel; the
+competitor route for dev; the size-page loading state.
+
+**The working tree is dirty** (84 files, many from before this session). Commit before archiving.

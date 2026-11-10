@@ -137,7 +137,7 @@ export function boardHtml(lb: any, sq: any, rungs: Rung[], showFc: boolean, show
 
 export async function drawSmokingChart(sq: any): Promise<void> {
   if (!sq || !document.getElementById('sqchart')) return;
-  // imported here, not at module load: Plotly needs `self`, which the server render does not have
+  // imported here, not at module load: ECharts needs `self`, which the server render does not have
   const { plot, layout, tok } = await import('../../lib/charts');
   const T = sq.target || {}, th = sq.thorp || {}, pts = th.points || [];
   const lx = Math.log10, traces: any[] = [];

@@ -2,8 +2,8 @@
 // trick registry and its route, the chains table, one trick's page, one chain's climb, the star grid,
 // the head chart, the deck, the traits and the chaining method. Pure functions returning HTML strings,
 // as in views/governance.ts: the island owns the shell, the route and the state; this module owns the
-// markup and the numbers. Chart drawers are async and import lib/charts (Plotly) lazily, so the server
-// render of the island never pulls Plotly in.
+// markup and the numbers. Chart drawers are async and import lib/charts (ECharts) lazily, so the server
+// render of the island never pulls ECharts in.
 //
 // rungEvidence/gradeNote/leadNote mirror views/chains.ts, which cannot be imported here: it imports
 // lib/charts at module load, and the islands are server-rendered.
@@ -388,6 +388,19 @@ export const trickRouteHtml = (d: DiscData): string => {
     .join('<div class="arrow">→</div>');
 };
 
+export const skillLadderHtml = (d: DiscData): string => {
+  const kts = d.known_tricks || [];
+  const wps = d.waypoints || [];
+  return `<div class="skillgrid">${wps.map((w, i) => {
+    const mine = kts.filter((t) => t.waypoint === w.key);
+    const skills = mine.map((t) => `<a class="skill${t.fleet ? ' measured' : ''}" href="/discoveries/${esc(t.key)}">
+      <b>${t.gate ? '◆ ' : ''}${esc(t.name)}</b><span>${esc(t.does)}</span>
+      <em>${t.fleet ? 'measured by Thorp' : 'not measured yet'}${t.target_class ? ` · goal ${esc(t.target_class)}` : ''}${t.taught ? ' · taught' : ''}</em></a>`).join('');
+    return `<section class="skillstep"><h3><span class="n">${i + 1}</span> ${esc(w.name)} <span class="s">${mine.length} skill${mine.length === 1 ? '' : 's'}</span></h3>
+      <p class="s">${esc(w.about)}</p><div class="skills">${skills || '<div class="s">no skill is charted on this step yet</div>'}</div></section>`;
+  }).join('')}</div>`;
+};
+
 export const trickBands = (d: DiscData): { rank: number; label: string }[] =>
   [...new Map((d.known_tricks || []).map((t) => [t.field_band_rank, t.field_band])).entries()]
     .sort((a, b) => a[0] - b[0])
@@ -438,6 +451,8 @@ export const trickPageHtml = (d: DiscData, rungs: Rung[], key: string | null): T
   const tgt = t.target_class && rungs.find((r) => r.preset === t.target_class);
   const wp = (d.waypoints || []).find((w) => w.key === t.waypoint);
   const tname = Object.fromEntries((d.known_tricks || []).map((x) => [x.key, x.name]));
+  // a trick Thorp wrote itself has no field band: say that once rather than printing two 'not shown'
+  const ownTest = t.field_params == null && /Thorp's own test/i.test(t.field_at || '');
   const over = [
     ['waypoint', `${esc(wp ? wp.name : t.waypoint)}${t.gate ? ' · <b>◆ a gate</b>: performed before a ship moves on' : ' · a milestone'}`],
     ['rests on', (t.rests_on || []).length ? t.rests_on.map((k) => `<a href="/discoveries/${esc(k)}">${esc(tname[k] || k)}</a>`).join(', ') : '–'],
@@ -449,8 +464,8 @@ export const trickPageHtml = (d: DiscData, rungs: Rung[], key: string | null): T
       const en = (d.known_tricks || []).find((x) => x.key === end || x.fleet === end);
       return [['the climb', `${ch.indexOf(t.fleet || t.key) === ch.length - 1 ? '' : `step ${ch.indexOf(t.fleet || t.key) + 1} of ${ch.length} on `}<a href="/discoveries/chains/${esc(end)}"><b>${esc(en ? en.name : end)}</b>: the climb, step by step</a>`]];
     })(),
-    ['the field shows it at', `<span class="sizeband">${esc(t.field_band)}</span> parameters · ${esc(t.field_at)} <span class="s">(${esc(t.sure)})</span>`],
-    ['in', esc(t.field_models)],
+    [ownTest ? 'where it comes from' : 'the field shows it at', ownTest ? `<b>Thorp's own test</b> <span class="s">(not from the field${t.field_models ? `; ${esc(t.field_models)} for scale` : ''})</span>` : `<span class="sizeband">${esc(t.field_band)}</span> parameters · ${esc(t.field_at)} <span class="s">(${esc(t.sure)})</span>`],
+    ['in', ownTest ? '<span class="s">Thorp\'s own test</span>' : esc(t.field_models)],
     ['first shown by', `<span class="s">${esc(t.source)}</span>`],
     ["Thorp's goal class", t.target_class ? `${classLink(rungs, t.target_class)}${tgt ? ` · ${big(tgt.total)} parameters` : ''}` : t.taught ? 'none: the field shows it only when taught the task' : 'beyond the ladder: a horizon'],
     ['how Thorp measures it', ft ? `<span class="mono">${esc(ft.metric)}</span>, performed at ${ft.threshold}` : `not yet: ${esc(t.measure)}`],
@@ -479,11 +494,11 @@ export const trickPageHtml = (d: DiscData, rungs: Rung[], key: string | null): T
       const best = mine.length ? Math.max(...mine.map((x) => x.best as number)) : null;
       const isT = r.preset === t.target_class;
       return `<tr${isT ? ' class="target"' : ''}><td>${classLink(rungs, r.preset)}${isT ? ` <span class="${pillCls('accent')}">target</span>` : ''}</td><td data-sort="${r.total}">${big(r.total)}</td>
-      <td data-sort="${orders ?? ''}">${orders == null ? '<span class="s">the field has not shown it</span>' : orders >= 0 ? `${orders.toFixed(1)} orders of magnitude smaller` : `${(-orders).toFixed(1)} orders larger`}</td>
+      <td data-sort="${orders ?? ''}">${orders == null ? `<span class="s" title="${ownTest ? "this is Thorp's own test, not a field result" : 'no field band for this trick'}">${ownTest ? '–' : 'the field has not shown it'}</span>` : orders >= 0 ? `${orders.toFixed(1)} orders of magnitude smaller` : `${(-orders).toFixed(1)} orders larger`}</td>
       <td>${ft ? mine.length : '–'}</td><td>${ft ? (mine.length ? `${done.length} of ${mine.length}` : '–') : '–'}</td>
       <td>${best != null ? `${fmt(best)} <span class="s">of ${thr}</span>` : '–'}</td><td>${done.length ? `${shipLink(done[0])} at step ${done[0].performed_at}` : '–'}</td></tr>`;
     })
-    .join('');
+    .join('') + (ownTest ? `<tr><td colspan="7" class="s">Thorp's own test: there is no field band to compare. ${Object.entries(t.reference || {}).map(([n, v]) => `${esc(n)} lifts ${fmt(Number(v), 2)}`).join(', ') || 'No outside model is charted'} for scale.</td></tr>` : '');
   // the partner beside it: the bigger test a smaller one leads to, or the smaller one that leads here
   const partner = t.leads_to || ((d.known_tricks || []).find((x) => x.leads_to === t.key) || {}).key;
   const pt = partner ? (d.known_tricks || []).find((x) => x.key === partner) : undefined;
@@ -505,6 +520,114 @@ export const trickPageHtml = (d: DiscData, rungs: Rung[], key: string | null): T
     chart: ft ? { fleetKey: ft.key, name: t.name, reference: t.reference } : null,
     pair,
   };
+};
+
+// ---- the scaffold, across every model ------------------------------------------------------------
+// How well pinning heads worked: the best reading while they were held, the reading after they were
+// faded, how much the fade cost (the drop), and what remains above the floor. A run is only here when
+// its spec pinned heads; the table lists every model, including those with no scaffolded voyage.
+
+export interface ScaffoldRow {
+  run_id: string; name: string; ship: string; preset: string;
+  heads: string[]; hold: number | null; fade: number | null; release: number | null;
+  floor: number | null; held: number | null; after: number | null; drop: number | null; kept: number | null;
+  verdict: string; total: number;
+}
+
+export interface ScaffoldSummary {
+  preset: string; n: number; heads: number | null;
+  held: number | null; after: number | null; drop: number | null; kept: number | null; floor: number | null;
+  heldN: number; fadedN: number; neverN: number;
+}
+
+const scMed = (xs: (number | null)[]): number | null => {
+  const v = xs.filter((x): x is number => x != null).sort((a, b) => a - b);
+  return v.length ? v[Math.floor((v.length - 1) / 2)] : null;
+};
+const scFrac = (v: any, total: number): number | null => (v == null ? null : Number(v) <= 1 ? Number(v) * total : Number(v));
+
+export const scaffoldRows = (d: any, threshold: number): ScaffoldRow[] => {
+  const rows: ScaffoldRow[] = [];
+  for (const r of d?.runs || []) {
+    const sc = r.scaffold || {};
+    const heads = (sc.heads || []) as any[];
+    const step = (r.step || []) as number[], value = (r.value || []) as number[];
+    if (!heads.length || !step.length) continue;
+    const total = Math.max(...step);
+    const holdEnd = scFrac(sc.hold, total);
+    const fadeEnd = scFrac(sc.fade, total);
+    const releaseEnd = scFrac(sc.release, total);
+    const pts = step.map((s, i) => ({ s, v: value[i] })).filter((p) => p.v != null);
+    const heldPts = holdEnd != null ? pts.filter((p) => p.s <= holdEnd) : pts.filter((p) => fadeEnd == null || p.s <= fadeEnd);
+    const hasFade = sc.fade != null || sc.release != null;
+    const afterStart = releaseEnd ?? fadeEnd;
+    const afterPts = hasFade && afterStart != null ? pts.filter((p) => p.s >= afterStart) : [];
+    // the best reading while the heads were held: how well the scaffold worked, before the fade
+    const held = heldPts.length ? Math.max(...heldPts.map((p) => p.v)) : null;
+    const after = hasFade && afterPts.length ? afterPts[0].v : null;
+    const floor = r.floor != null ? Number(r.floor) : (pts.length ? pts[0].v : null);
+    const drop = held != null && after != null ? held - after : null;
+    const kept = after != null && floor != null ? after - floor : null;
+    const verdict = held == null ? 'no reading while held'
+      : held < threshold ? 'never reached the mark'
+      : !hasFade ? 'still held (no fade)'
+      : after == null ? 'the fade was not reached'
+      : after >= threshold ? 'held after the fade'
+      : drop != null && drop > 0.1 ? 'dropped at the fade'
+      : 'faded below the mark';
+    rows.push({ run_id: r.run_id, name: r.name, ship: r.ship || r.name, preset: r.preset || '–',
+      heads: heads.map((h) => String(h.card || 'head')), hold: sc.hold ?? null, fade: sc.fade ?? null, release: sc.release ?? null,
+      floor, held, after, drop, kept, verdict, total });
+  }
+  return rows;
+};
+
+export const scaffoldSummary = (rows: ScaffoldRow[], presets: string[], threshold: number): ScaffoldSummary[] => {
+  const all = [...new Set([...presets, ...rows.map((r) => r.preset)])];
+  return all.map((preset) => {
+    const mine = rows.filter((r) => r.preset === preset);
+    return {
+      preset, n: mine.length, heads: scMed(mine.map((r) => r.heads.length)),
+      held: scMed(mine.map((r) => r.held)), after: scMed(mine.map((r) => r.after)),
+      drop: scMed(mine.map((r) => r.drop)), kept: scMed(mine.map((r) => r.kept)), floor: scMed(mine.map((r) => r.floor)),
+      heldN: mine.filter((r) => r.held != null && r.held >= threshold).length,
+      fadedN: mine.filter((r) => r.after != null && r.held != null && r.held >= threshold && r.after < threshold).length,
+      neverN: mine.filter((r) => r.held != null && r.held < threshold).length,
+    };
+  });
+};
+
+export const scaffoldHtml = (rows: ScaffoldRow[], summary: ScaffoldSummary[], rungs: Rung[], threshold: number): string => {
+  const head = '<tr><th>model</th><th>voyages with a scaffold</th><th>heads pinned</th><th>held</th><th>after the fade</th><th>drop</th><th>kept above the floor</th><th>verdict</th></tr>';
+  const body = summary.map((s) => `<tr${s.n ? '' : ' class="none"'}><td>${classLink(rungs, s.preset)}</td>
+    <td>${s.n || '<span class="s">none</span>'}</td><td>${s.heads ?? '–'}</td>
+    <td>${s.held != null ? `${fmt(s.held)} <span class="s">of ${threshold}</span>` : '–'}</td>
+    <td>${s.after != null ? fmt(s.after) : '–'}</td>
+    <td>${s.drop != null ? signed(s.drop) : '–'}</td><td>${s.kept != null ? signed(s.kept) : '–'}</td>
+    <td>${s.n ? `${s.heldN} held${s.fadedN ? ` · ${s.fadedN} faded` : ''}${s.neverN ? ` · ${s.neverN} never` : ''}` : '<span class="s">no scaffolded voyage</span>'}</td></tr>`).join('');
+  const runs = rows.slice().sort((a, b) => a.preset.localeCompare(b.preset) || a.name.localeCompare(b.name)).map((r) => `<tr><td>${esc(r.preset)}</td><td><a href="${shipHash(r.name)}">${esc(r.name)}</a><div class="s">${esc(r.ship)}</div></td>
+    <td title="${esc(r.heads.join(', '))}">${r.heads.length} <span class="s">${esc(r.heads.join(', '))}</span></td>
+    <td>${r.hold != null ? `${Math.round(100 * r.hold)}%` : '–'} → ${r.fade != null ? `${Math.round(100 * r.fade)}%` : '–'}</td>
+    <td>${r.held != null ? fmt(r.held) : '–'}</td><td>${r.after != null ? fmt(r.after) : '–'}</td>
+    <td>${r.drop != null ? signed(r.drop) : '–'}</td><td>${r.kept != null ? signed(r.kept) : '–'}</td><td>${esc(r.verdict)}</td></tr>`).join('');
+  return `<div class="scroll"><table id="scaffoldtable"><thead>${head}</thead><tbody>${body}</tbody></table></div>
+    <details class="scaffoldruns"><summary>the voyages, one by one</summary><div class="scroll"><table id="scaffoldruns">
+      <thead><tr><th>model</th><th>voyage</th><th>heads</th><th>hold → fade</th><th>held</th><th>after</th><th>drop</th><th>kept</th><th>verdict</th></tr></thead><tbody>${runs}</tbody></table></div></details>`;
+};
+
+export const drawScaffoldChart = async (id: string, summary: ScaffoldSummary[], threshold: number, label = 'reading'): Promise<void> => {
+  const { plot, layout, C } = await import('../../lib/charts');
+  const rows = summary.filter((s) => s.n && (s.held != null || s.after != null));
+  if (!rows.length) { const { empty } = await import('../../lib/charts'); empty(id, 'no voyage has pinned a head yet'); return; }
+  const x = rows.map((s) => s.preset);
+  const traces: any[] = [
+    { type: 'bar', name: 'held', x, y: rows.map((s) => s.held), marker: { color: C.blue } },
+    { type: 'bar', name: 'after the fade', x, y: rows.map((s) => s.after), marker: { color: C.good } },
+  ];
+  if (rows.some((s) => s.floor != null)) traces.push({ type: 'bar', name: 'floor', x, y: rows.map((s) => s.floor), marker: { color: C.muted } });
+  plot(id, traces, layout({ barmode: 'group', height: 320, xaxis: { title: 'model' }, yaxis: { title: label },
+    shapes: [{ type: 'line', xref: 'paper', x0: 0, x1: 1, y0: threshold, y1: threshold, line: { color: C.accent, dash: 'dot' } }],
+    annotations: [{ xref: 'paper', x: 1, xanchor: 'right', y: threshold, yanchor: 'bottom', showarrow: false, text: `performed at ${threshold}`, font: { size: 10, color: C.accent } }] }));
 };
 
 // ---- the chains table (the Quantum subtab): the explorer's four tests, rung by rung
@@ -845,7 +968,7 @@ export const twoFactsHtml = (d: DiscData, sq: any, lb: any, pulls: (any | null)[
   return { status, examples, grades, backtest, thr, noise, share };
 };
 
-// ---- the charts, drawn from the island's effects. Plotly is imported here, lazily: the island is
+// ---- the charts, drawn from the island's effects. ECharts is imported here, lazily: the island is
 // server-rendered, so no module that touches document may be imported at module load.
 
 export interface StarPoint {
@@ -865,7 +988,7 @@ export const drawStarJourney = async (points: StarPoint[]): Promise<void> => {
 export const drawStarDeviation = async (cards: any[]): Promise<void> => {
   const el = document.getElementById('stardev');
   if (!el) return;
-  const { Plotly, C, layout } = await import('../../lib/charts');
+  const { C, layout, plotEl } = await import('../../lib/charts');
   const cs = (cards || []).filter((c) => Math.abs(c.dev) > 0.02);
   if (!cs.length) {
     el.innerHTML = `<div class="${emptyCls()}">no point reads in both a 300k and Qwen3 4B yet</div>`;
@@ -875,7 +998,7 @@ export const drawStarDeviation = async (cards: any[]): Promise<void> => {
   const mark: Record<string, string> = { keeper: '=', decayer: '~', untested: '?' };
   const tone = (v: number): string => (v >= 0 ? C.good || '#5aa07a' : C.bad || '#c0563f');
   el.innerHTML = '';
-  Plotly.react(
+  plotEl(
     el,
     [
       {

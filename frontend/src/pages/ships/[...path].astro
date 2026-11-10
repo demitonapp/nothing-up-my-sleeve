@@ -9,16 +9,23 @@ import RunsPage from '../../components/islands/RunsPage';
 import Reader from '../../components/Reader.astro';
 
 export function getStaticPaths() {
-  // the rungs are on this page too (9 November), by preset or class slug, with their tabs
-  const rungs = ['pan', 'augustus', 'speller', 'stylist', 'paragraph', 'invention', 'trader',
-    '300k', '1m', '9m', '21m', '50m', '100m', '350m'];
-  const tabs = ['overview', 'goals', 'training', 'scoring', 'waypoints', 'fitouts', 'bet'];
-  const subs = ['maths', 'ask', 'language', 'shapes', 'number', 'physics', 'life', 'return', 'logic', 'versus'];
+  // The rungs are on this page too (9 November), by preset (the canonical identifier) or by class
+  // slug (the old aliases the page rewrites), with every tab and sub-view the island links to. Dev has
+  // no server fallback, so a sub-view missing here is a 404 when opened directly (10 November: the
+  // waypoint and overview sub-tabs 404'd).
+  const rungs = ['300k', '1m', '9m', '21m', '50m', '100m', '350m',
+    'pan', 'augustus', 'speller', 'stylist', 'paragraph', 'invention', 'trader'];
+  const tabs = ['overview', 'goals', 'training', 'scoring', 'waypoints', 'sops', 'fitouts', 'bet'];
+  const scoring = ['maths', 'ask', 'language', 'shapes', 'number', 'physics', 'life', 'return', 'logic', 'versus'];
+  const waypoints = ['expected', 'envelope', 'stars'];
+  const overview = ['logic-order', 'logic-cause', 'logic-membership', 'logic-proportion', 'logic-counterfactual'];
   const rungPaths: string[] = [];
   for (const p of rungs) {
     rungPaths.push(p);
     for (const t of tabs) rungPaths.push(`${p}/${t}`);
-    for (const x of subs) rungPaths.push(`${p}/scoring/${x}`);
+    for (const x of scoring) rungPaths.push(`${p}/scoring/${x}`);
+    for (const x of waypoints) rungPaths.push(`${p}/waypoints/${x}`);
+    for (const x of overview) rungPaths.push(`${p}/overview/${x}`);
   }
   // /ships/all, and the ships fitting out in the harbour (their cards link here); other ship keys
   // are reached from the tables, and the production server falls back for them.
@@ -26,13 +33,21 @@ export function getStaticPaths() {
   // the ladder's rungs, by preset: the harbour cards link to /ships/<preset> (9 November)
   return ['all', ...rungPaths, ...fitting].map((path) => ({ params: { path } }));
 }
+
+// The per-ship Bet tab is deprecated (10 November): /ships/<preset>/bet forwards to the ship's
+// overview. The bet itself lives at /bet (the $100 wager in the header); this tab was the
+// Navigator's Wager game, not the bet.
+const { path } = Astro.params;
+if (path?.endsWith('/bet')) return Astro.redirect(`/ships/${path.slice(0, -4)}`, 301);
+
+// Only the island this address answers is mounted: each one brings its own modules, and mounting all
+// four made a size page download the ship and runs islands too (10 November: /ships/300k pulled the
+// shipbuilder and four API clients before it could draw a chart).
+const kind = path === 'all' ? 'runs' : String(path || '').includes(':') ? 'ship' : 'size';
 ---
 <Layout>
   <main>
-    <Harbours client:load />
-    <SizePage client:load />
-    <ShipPage client:load />
-    <RunsPage client:load />
+    {kind === 'runs' ? <RunsPage client:load /> : kind === 'ship' ? <ShipPage client:load /> : <SizePage client:load initialPath={Astro.url.pathname} />}
   </main>
   <Reader />
 </Layout>

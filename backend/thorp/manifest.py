@@ -63,6 +63,11 @@ def upsert(book: Book) -> None:
             f"insert into books ({cols}) values ({qs}) on conflict(id) do update set {updates}",
             list(row.values()),
         )
+    if _pg():  # the one store: a new book is written where the readers look
+        from thorp import manifest_store, store
+
+        with store.session() as s:
+            manifest_store.put_book(s, row)
 
 
 def _pg() -> bool:

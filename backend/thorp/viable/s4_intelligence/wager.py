@@ -29,9 +29,9 @@ SHIFT = 0.25  # earlier / later: by more than this share of the control's tokens
 
 
 def _con():
-    con = sqlite3.connect(f"file:{paths.ledger_path()}?mode=ro", uri=True, timeout=30)
-    con.row_factory = sqlite3.Row
-    return con
+    from thorp.ledger import reader
+
+    return reader()
 
 
 def _voyage(name: str) -> dict | None:

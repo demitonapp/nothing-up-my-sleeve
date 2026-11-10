@@ -287,6 +287,65 @@ def verify(only: list[str] | None = None, source: Path | None = None, log=print)
     return ok
 
 
+class _PgRow:
+    """A row from `PgLedger.execute`, shaped like the `sqlite3.Row` the reader code was written against:
+    indexable by position (`row[0]`) or by name (`row["value"]`), iterable over values, and still a mapping
+    for `dict(row)` and `**row` (10 November: /api/class_score 500'd on `dict(r)` over a `_Result`)."""
+
+    __slots__ = ("_d",)
+
+    def __init__(self, d: dict):
+        self._d = d
+
+    def keys(self):
+        return self._d.keys()
+
+    def items(self):
+        return self._d.items()
+
+    def values(self):
+        return self._d.values()
+
+    def get(self, key, default=None):
+        return self._d.get(key, default)
+
+    def __getitem__(self, key):
+        return list(self._d.values())[key] if isinstance(key, int) else self._d[key]
+
+    def __iter__(self):
+        return iter(self._d.values())
+
+    def __len__(self) -> int:
+        return len(self._d)
+
+    def __repr__(self) -> str:
+        return f"PgRow({self._d!r})"
+
+
+class _PgResult:
+    """The SQLite cursor's read surface (`fetchall`, `fetchone`, iteration) over PgLedger.query's rows."""
+
+    __slots__ = ("_rows",)
+
+    def __init__(self, rows: list[dict]):
+        self._rows = [_PgRow(r) for r in rows]
+
+    def fetchall(self) -> list[_PgRow]:
+        return self._rows
+
+    def fetchone(self) -> _PgRow | None:
+        return self._rows[0] if self._rows else None
+
+    def __iter__(self):
+        return iter(self._rows)
+
+    def __len__(self) -> int:
+        return len(self._rows)
+
+    def __getitem__(self, i):
+        return self._rows[i]
+
+
 class PgLedger:
     """The ledger's Postgres writer, a drop-in for the SQLite `Ledger`'s write side (run, metrics, evals,
     artifact, truncate_after, clear_step).
@@ -306,32 +365,70 @@ class PgLedger:
     def _commit(self) -> None:
         self._s.commit()
 
+    @staticmethod
+    def _translate(sql: str) -> str:
+        """SQLite's SQL as Postgres's: `?` becomes `%s`, rowid the explicit id, json_extract the jsonb path."""
+        import re
+
+        # a literal `%` (a LIKE pattern, 'loop-%') is not a placeholder in SQLite, but psycopg reads it as
+        # one; escape it before `?` becomes `%s` (10 November: /api/discoveries 500'd on `like 'loop-%'`)
+        q = sql.replace("%", "%%").replace("?", "%s").replace("rowid", "id")
+        return re.sub(
+            r"json_extract\(\s*((?:[A-Za-z_][A-Za-z0-9_]*\.)?spec_json)\s*,\s*'\$\.([^']+)'\s*\)",
+            lambda m: f"({m.group(1)}::jsonb #>> '{{" + m.group(2).replace(".", ",") + "}')",
+            q,
+        )
+
     def query(self, sql: str, params: Iterable = ()) -> list[dict]:
-        """The readers' raw SQL against s1: `?` becomes `%s`, SQLite's rowid becomes the explicit id,
-        and the json_extract calls become Postgres's jsonb path operator."""
-        q = sql.replace("?", "%s").replace("rowid", "id")
-        for k in ("model.preset", "data.recipe", "model.backend"):
-            col = "{" + k.replace(".", ",") + "}"
-            q = q.replace(f"json_extract(spec_json,'$.{k}')", f"(spec_json::jsonb #>> '{col}')")
-        conn = self._s.connection()
-        conn.exec_driver_sql("set search_path to s1, public")
-        res = conn.exec_driver_sql(q, tuple(params))
-        cols = list(res.keys())
-        return [dict(zip(cols, r)) for r in res]
+        """The readers' raw SQL against s1 (see _translate). A failed read rolls back, so the next one
+        on this thread's reused session is not stuck in the aborted transaction."""
+        try:
+            conn = self._s.connection()
+            conn.exec_driver_sql("set search_path to s1, public")
+            res = conn.exec_driver_sql(self._translate(sql), tuple(params))
+            cols = list(res.keys())
+            return [dict(zip(cols, r)) for r in res]
+        except Exception:
+            self._s.rollback()
+            raise
 
     def execute(self, sql: str, params: Iterable = ()):
         """A SQLite-cursor-shaped view of query(), so the reader code that does
         con.execute(sql, params).fetchall() / .fetchone() keeps working against PG."""
-        rows = self.query(sql, params)
+        return _PgResult(self.query(sql, params))
 
-        class _Result:
-            def fetchall(self):
-                return rows
+    def get_run(self, run_id: str) -> dict | None:
+        rows = self.query("select * from runs where run_id=?", [run_id])
+        return rows[0] if rows else None
 
-            def fetchone(self):
-                return rows[0] if rows else None
+    def __enter__(self):
+        return self
 
-        return _Result()
+    def __exit__(self, *exc) -> bool:
+        return False
+
+    class _Con:
+        def __init__(self, pg):
+            self._pg = pg
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc) -> bool:
+            return False
+
+        def execute(self, sql: str, params: Iterable = ()):
+            return self._pg.execute(sql, params)
+
+        def executemany(self, sql: str, rows) -> None:
+            conn = self._pg._s.connection()
+            conn.exec_driver_sql("set search_path to s1, public")
+            conn.connection.cursor().executemany(self._pg._translate(sql), [tuple(r) for r in rows])
+            self._pg._s.commit()
+
+    @property
+    def con(self) -> "PgLedger._Con":
+        return PgLedger._Con(self)
 
     def run(self, row: dict) -> None:
         put_run(self._s, row)

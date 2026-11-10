@@ -16,10 +16,10 @@ export default defineConfig({
     // pre-bundled at startup, so a newly imported one never re-optimises under an open tab
     // (the browser then asks for the old bundle: "504 Outdated Optimize Dep")
     optimizeDeps: {
-      include: ['plotly.js-dist-min', 'react', 'react-dom', 'react-dom/client', 'radix-ui',
+      include: ['react', 'react-dom', 'react-dom/client', 'radix-ui',
                 'class-variance-authority', 'clsx', 'tailwind-merge', 'lucide-react'],
     },
     server: { proxy: { '/api': 'http://localhost:8787' } },
-    build: { chunkSizeWarningLimit: 5000 },  // Plotly is one large module, on purpose
+    build: { chunkSizeWarningLimit: 5000 },  // ECharts is split into several large modules, on purpose
   },
 });

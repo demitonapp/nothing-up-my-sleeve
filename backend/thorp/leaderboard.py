@@ -129,12 +129,21 @@ def chaining(lift: dict[str, float], score: dict[str, float]) -> dict:
     }
 
 
-def _readings(con, run_id: str) -> tuple[dict, dict]:
-    lift, score = {}, {}
+def _readings_many(con, run_ids: list[str]) -> dict[str, tuple[dict, dict]]:
+    """Every run's trick readings in one round trip (10 November: the leaderboard took 20 s because it
+    asked the store once per run — 177 queries at ~120 ms each). The rows are in step order and the
+    later reading of a metric stands, as the single-run query did."""
+    out: dict[str, tuple[dict, dict]] = {}
+    ids = [r for r in run_ids if r]
+    if not ids:
+        return out
+    marks = ",".join("?" for _ in ids)
     for m in con.execute(
-        "select name, value from metrics where run_id=? and name like 'tricks/%' order by step, rowid",
-        [run_id],
+        f"select run_id, name, value from metrics where run_id in ({marks})"
+        " and name like 'tricks/%' order by run_id, step, rowid",
+        ids,
     ):
+        lift, score = out.setdefault(m["run_id"], ({}, {}))
         parts = m["name"].split("/")
         if len(parts) == 3 and parts[1] in fleet.TRICKS:
             if (
@@ -145,7 +154,11 @@ def _readings(con, run_id: str) -> tuple[dict, dict]:
                 lift[parts[1]] = m["value"]
             elif parts[2] == "score":
                 score[parts[1]] = m["value"]
-    return lift, score
+    return out
+
+
+def _readings(con, run_id: str) -> tuple[dict, dict]:
+    return _readings_many(con, [run_id]).get(run_id, ({}, {}))
 
 
 def _thorp_runs(internal: bool = False) -> list[dict]:
@@ -158,9 +171,10 @@ def _thorp_runs(internal: bool = False) -> list[dict]:
         runs = [
             dict(r) for r in con.execute("select run_id, name, ship, spec_json, status from runs")
         ]
+        reads = _readings_many(con, [r["run_id"] for r in runs])
         out = []
         for r in runs:
-            lift, score = _readings(con, r["run_id"])
+            lift, score = reads.get(r["run_id"], ({}, {}))
             if not lift:
                 continue
             reading = climb(lift, score) if internal else chaining(lift, score)

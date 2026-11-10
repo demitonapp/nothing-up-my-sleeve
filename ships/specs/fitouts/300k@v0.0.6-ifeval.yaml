@@ -1,0 +1,96 @@
+# ships/specs/fitouts: the IFEval arm at the 300k, on SOP v0.0.6 (10 November 2026). The smallest class
+# reads the instruction corpus so the stage can be proved before the 1m and the 9m spend on it. The
+# reading is IFEval prompt-level strict on the official 541; the 300k is a canary and a lower bound, not
+# the class the aim is judged on.
+name: 300k@v0.0.6-ifeval
+ship: 'SOP v0.0.6 at 300k (the IFEval arm)'
+experiment: 'IFEval: can a class be taught to obey a list of hard constraints, and how small can it get?'
+question: 'The IFEval arm at 300k, on SOP v0.0.6: the instruction corpus (25 verifiable rule types, every
+  response proved compliant by the official IFEval checker), the shared 2,048-piece tokeniser, the
+  standard metre cards pinned as in v0.0.6. The reading is IFEval prompt-level strict accuracy on the
+  official 541. Can the smallest class obey any of them, and does the stage run cleanly enough to
+  justify the 1m? This arm is a canary, not the class the aim is judged on.'
+departures:
+- field: content
+  why: reads the IFEval instruction corpus, not Ogden; the parameters, sizes, cards and depth are v0.0.6's
+- field: tokeniser
+  why: the tokeniser is trained on the same instruction corpus it reads
+data:
+  recipe: lists/ifeval-v1.csv
+  passes: 8
+  order: shuffled
+  refuse:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+  - lists/hole-cards-unseen.csv
+  clean: raw
+tokeniser:
+  kind: spm-bpe
+  vocab: 2048
+  byte_fallback: true
+  train_on: lists/ifeval-v1.csv
+model:
+  family: gpt
+  preset: 300k
+  context: 1024
+  positions: rope
+optim:
+  name: adamw
+  lr: 0.003
+  betas:
+  - 0.9
+  - 0.95
+  weight_decay: 0.1
+  warmup_steps: 100
+  schedule: cosine
+  min_lr_ratio: 0.1
+  batch_tokens: 32768
+  grad_clip: 1.0
+  precision: bf16
+  scaffold:
+    weight: 1.0
+    hold: 0.25
+    fade: 1.0
+    heads:
+    - layer: 0
+      head: 0
+      card: previous_word
+    - layer: 0
+      head: 1
+      card: delimiter
+    - layer: 4
+      head: 0
+      card: induction
+    riddles:
+      comparator:
+        layer: 2
+        head: 1
+        items: 16
+        pool: 2048
+eval:
+  sets:
+  - lists/hole-cards-unseen.csv
+  every_steps: 640
+  evaluators:
+  - ce_bpb
+  - discovery
+  - logic
+  - stars
+  - nevermore
+  - cards
+  - shapes
+  - pips
+  - ifeval
+  light:
+    every_steps: 64
+    evaluators:
+    - stars
+    - nevermore
+    - cards
+    - logic
+    - shapes
+    - pips
+checkpoint:
+  every_steps: 640
+sop: '0.0.6'
+seed: 1

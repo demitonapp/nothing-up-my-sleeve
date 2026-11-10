@@ -119,8 +119,10 @@ export function lossPanel(m: Metrics, sets: string[]): void {
   if (!m.loss) return empty('loss');
   const [s, v] = m.loss;
   const data: any[] = [
-    { x: s, y: v, name: 'loss', type: 'scattergl', mode: 'lines', line: { color: C.track, width: 1 } },
-    { x: s, y: ema(v, 100), name: 'EMA 100', type: 'scattergl', mode: 'lines', line: { color: C.blue, width: 2 } },
+    // SVG, not WebGL: scattergl shows "WebGL is not supported" where the GPU is unavailable (10 November,
+    // the same fix the size page's Forgotten Tomes chart needed)
+    { x: s, y: v, name: 'loss', type: 'scatter', mode: 'lines', line: { color: C.track, width: 1 } },
+    { x: s, y: ema(v, 100), name: 'EMA 100', type: 'scatter', mode: 'lines', line: { color: C.blue, width: 2 } },
   ];
   const palette = [C.accent, C.good, C.bad, C.c5];
   sets.forEach((set, i) => {
@@ -236,7 +238,7 @@ export function bookPanels(m: Metrics, r: any, series: BookSeries[], fams: strin
   }).filter((h) => h.half != null && h.drop > 0).sort((a, b) => a.half! - b.half! || b.drop - a.drop);
   if (!hl.length) return empty('halflife');
   const kind = (h: any): string => { const t = traits[h.id]; return t ? [t.fiction ? 'fiction' : 'non-fiction', t.verse ? 'verse' : null, t.first_person ? 'first person' : null].filter(Boolean).join(', ') : ''; };
-  // labels must be unique: Plotly puts bars with the same category in one slot, and two volumes of
+  // labels must be unique: ECharts puts bars with the same category in one slot, and two volumes of
   // one book cut to 40 characters collide (The Gaming Table vols 1 and 2, Edith Wharton parts 1 and 2)
   const short = hl.map((h) => h.title.slice(0, 40));
   const count: Record<string, number> = {};

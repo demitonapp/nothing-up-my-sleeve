@@ -11,7 +11,12 @@
         "thorp",
         "dash"
       ],
-      "port": 8787
+      "port": 8787,
+      "env": {
+        "THORP_LEDGER_PG": "1",
+        "THORP_LIBRARY_PG": "1",
+        "THORP_QUEUE_PG": "1"
+      }
     },
     {
       "name": "thorp-dash-dev",
@@ -35,7 +40,12 @@
         "--port",
         "8797"
       ],
-      "port": 8797
+      "port": 8797,
+      "env": {
+        "THORP_LEDGER_PG": "1",
+        "THORP_LIBRARY_PG": "1",
+        "THORP_QUEUE_PG": "1"
+      }
     },
     {
       "name": "thorp-dash-bet",
@@ -49,7 +59,12 @@
         "--port",
         "8807"
       ],
-      "port": 8807
+      "port": 8807,
+      "env": {
+        "THORP_LEDGER_PG": "1",
+        "THORP_LIBRARY_PG": "1",
+        "THORP_QUEUE_PG": "1"
+      }
     },
     {
       "name": "thorp-dash-watch",
@@ -63,7 +78,12 @@
         "--port",
         "8817"
       ],
-      "port": 8817
+      "port": 8817,
+      "env": {
+        "THORP_LEDGER_PG": "1",
+        "THORP_LIBRARY_PG": "1",
+        "THORP_QUEUE_PG": "1"
+      }
     }
   ]
 }

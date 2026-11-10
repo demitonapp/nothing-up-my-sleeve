@@ -1,16 +1,14 @@
 // One size's page (UI.md "Model pages"), as a controller over the size island's shell: the seven tabs
 // (overview, goals, training, scoring, waypoints, fitouts, bet) and their sub-views. The chart libraries
-// are imported inside the drawers that draw them, so the server-rendered shell stays free of Plotly.
+// are imported inside the drawers that draw them, so the server-rendered shell stays free of ECharts.
 
 import { big, esc, fmt, fmtBytes, get, signed } from '../../lib/format';
 import { alertCls, btnCls, cardCls, emptyCls, pillCls, selectCls, toggleCls } from '../../lib/ui';
-import { CLASS_ALIASES, route, shipHash, slugOf, WSUBS } from '../router';
+import { CLASS_ALIASES, modelHash, route, shipHash, slugOf, WSUBS } from '../router';
 import type { Route } from '../router';
 import { renderRunGrid } from '../../lib/rungrid';
 import { renderHand, miniHand } from '../../lib/cards';
-import { CARD_FACE } from '../../lib/deck';
-import { NEEDED, minicards } from './leaderboard';
-import { fitoutCard } from './fitouts';
+import { minicards } from './leaderboard';
 import { ASK_QUESTIONS, chose, hopeRank, lookingFor, showPiece } from './ask';
 import { mathsIndex, mathsTable } from './maths';
 import { MOVE_LABEL, fmtTok, fallText, hms, TRAIT_LABEL, firstAt, lastOf, statusPill, STAR_LABEL, scaffoldBar, starHeadline, familyBar, cardArt, causeCell } from './helpers';
@@ -40,7 +38,8 @@ export const sizeAddress = (path: string): SizeAddress => {
   const rt: Route = route(path.replace(/^#/, ''));
   return {
     key: (rt.rung as string) || '',
-    tab: (rt.mtab as string) || 'overview',
+    // the Fitouts tab is the SOPs now (10 November); keep the old address as an alias
+    tab: (rt.mtab === 'fitouts' ? 'sops' : (rt.mtab as string)) || 'overview',
     wsub: (rt.wsub as string) || 'expected',
     ssub: (rt.ssub as string) || 'maths',
     osub: (rt.osub as string | null) ?? null,
@@ -48,12 +47,74 @@ export const sizeAddress = (path: string): SizeAddress => {
 };
 export const rungFor = (ladder: Ladder, key: string): Payload | null =>
   ladder && ladder.rungs ? ladder.rungs.find((r: any) => slugOf(r) === key || r.preset === key || slugOf(r) === CLASS_ALIASES[key]) || null : null;
-export const modelHref = (r: Payload, mt = 'overview', sub: string | null = null): string =>
-  `/sizes/${slugOf(r)}${mt === 'overview' && !sub ? '' : '/' + mt}${mt === 'waypoints' && sub && sub !== 'expected' ? '/' + sub : ''}${mt === 'scoring' && sub && sub !== 'maths' ? '/' + sub : ''}${mt === 'overview' && sub ? '/' + sub : ''}`;
-/** The size's runs, narrowed by the SOP picked on the Training tab (module state, as before). */
+// the size's own address: its preset, the canonical identifier, with the tab and sub-view it is on
+export const modelHref = (r: Payload, mt = 'overview', sub: string | null = null): string => modelHash(r, mt, sub);
+// ---- the page's expedition and voyage selection (10 November) --------------------------------------
+// The page opens on every voyage of the size. The user can pick an expedition and then one of its
+// voyages; with an expedition but no voyage, the charts show the expedition's median reading at each
+// step. The selection lives in the query string (?expedition=ogden&voyage=...), so it is shareable.
+export interface SizeSelection { expedition: string; voyage: string }
+let selection: SizeSelection = { expedition: '', voyage: '' };
+let voyageByName: Record<string, string> = {};
+let nameByRunId: Record<string, string> = {};
+export const setSizeSelection = (s: SizeSelection): void => { selection = { expedition: s.expedition || '', voyage: s.voyage || '' }; };
+export const getSizeSelection = (): SizeSelection => selection;
+export const selectionSig = (): string => `${selection.expedition}|${selection.voyage}`;
+export const medianMode = (): boolean => !!selection.expedition && !selection.voyage;
+const selName = (x: any): string => String(x.name || x.run || '');
+const selVoyage = (x: any): string => String(x.voyage || voyageByName[selName(x)] || '');
+export const inSelection = (x: any): boolean => {
+  if (selection.voyage) {
+    if (x.run_id) return x.run_id === selection.voyage;
+    const wanted = nameByRunId[selection.voyage] || selection.voyage;
+    return selName(x) === wanted;
+  }
+  if (selection.expedition) return selVoyage(x) === selection.expedition;
+  return true;
+};
+export const median = (a: number[]): number | null => {
+  const xs = a.filter((v) => typeof v === 'number' && Number.isFinite(v)).sort((p, q) => p - q);
+  if (!xs.length) return null;
+  const i = Math.floor(xs.length / 2);
+  return xs.length % 2 ? xs[i] : (xs[i - 1] + xs[i]) / 2;
+};
+/** The median of several step series at the steps of the longest one (a series without that step is
+ *  read at its nearest step, so voyages on slightly different step grids still line up). */
+export function medianSeries(series: { x: number[]; y: number[] }[]): { x: number[]; y: number[] } {
+  const use = series.filter((s) => s && s.x && s.x.length);
+  if (!use.length) return { x: [], y: [] };
+  const base = use.reduce((a, b) => (a.x.length >= b.x.length ? a : b));
+  const x: number[] = [], y: number[] = [];
+  for (const step of base.x) {
+    const vals: number[] = [];
+    for (const s of use) {
+      let i = s.x.indexOf(step);
+      if (i < 0) {  // nearest reading, within a quarter of the base's spacing
+        let best = -1, bd = Infinity;
+        for (let j = 0; j < s.x.length; j++) { const d = Math.abs(s.x[j] - step); if (d < bd) { bd = d; best = j; } }
+        const gap = base.x.length > 1 ? Math.abs(base.x[1] - base.x[0]) : Infinity;
+        i = bd <= Math.max(1, gap / 4) ? best : -1;
+      }
+      if (i >= 0 && typeof s.y[i] === 'number' && Number.isFinite(s.y[i])) vals.push(s.y[i]);
+    }
+    const m = median(vals);
+    if (m != null) { x.push(step); y.push(m); }
+  }
+  return { x, y };
+}
+/** The median voyage of the selection: the run whose final Forgotten Tomes score is the median, for
+ *  the panels that can only show one voyage (the watch, Versus, Ask). */
+export const medianPageRun = (): any | null => {
+  const runs = pageRuns.slice().sort((a: any, b: any) => (a.ft_en ?? 9) - (b.ft_en ?? 9));
+  return runs.length ? runs[Math.floor(runs.length / 2)] : null;
+};
+
+/** The size's runs, narrowed by the SOP picked on the Training tab (module state, as before) and by
+ *  the page's expedition/voyage selection. */
 let sopPick = '';
 export const rungRuns = (ladder: Ladder, preset: string): any[] =>
-  (ladder.runs || []).filter((r: any) => r.preset === preset && !(r.name || '').startsWith('smoke') && (!sopPick || String(r.sop || '') === sopPick));
+  (ladder.runs || []).filter((r: any) => r.preset === preset && !(r.name || '').startsWith('smoke')
+    && (!sopPick || String(r.sop || '') === sopPick) && inSelection(r));
 
 const classRank = (ladder: Ladder, preset: string): number => {
   const i = ladder && ladder.rungs ? ladder.rungs.findIndex((r: any) => r.preset === preset) : -1;
@@ -72,7 +133,11 @@ const fillStepFilter = (sel: HTMLSelectElement | null, wps: any[]): void => {
 };
 
 // ---- the run: one request in flight at a time; the island polls and calls this -----------------------
-let lastRung = '', lastTab = '', lastSub = '';
+let lastRung = '', lastTab = '', lastSub = '', lastSel = '';
+let pageRuns: any[] = [];  // the runs the page's selection leaves, for charts that fetch by run
+const starUrl = (preset: string): string =>
+  `/api/star_points?preset=${encodeURIComponent(preset)}`
+  + (selection.expedition ? `&runs=${encodeURIComponent(pageRuns.map((x: any) => x.run_id).join(','))}` : '');
 let dataKeys: Record<string, string> = {};
 const changed = (key: string, value: string): boolean => { if (dataKeys[key] === value) return false; dataKeys[key] = value; return true; };
 export const resetSizeKeys = (): void => { dataKeys = {}; };
@@ -82,7 +147,10 @@ export async function renderSizePage(path: string, ladder: Ladder): Promise<void
   const addr = sizeAddress(path);
   const r = rungFor(ladder, addr.key) || (ladder && ladder.rungs ? ladder.rungs[0] : null);
   if (!r) return;
+  voyageByName = Object.fromEntries((ladder.runs || []).map((x: any) => [x.name, x.voyage || '']));
+  nameByRunId = Object.fromEntries((ladder.runs || []).map((x: any) => [x.run_id, x.name || '']));
   if (lastRung !== r.preset) { lastRung = r.preset; sopPick = ''; resetSizeKeys(); }
+  if (lastSel !== selectionSig()) { lastSel = selectionSig(); resetSizeKeys(); }
   lastTab = addr.tab; lastSub = addr.tab === 'scoring' ? addr.ssub : addr.wsub;
   const title = document.getElementById('rungtitle'); if (title) title.textContent = `${r.preset} · ${r.name}`;
   const job = document.getElementById('rungjob'); if (job) job.textContent = r.job || '';
@@ -100,16 +168,18 @@ export async function renderSizePage(path: string, ladder: Ladder): Promise<void
     }
   }
   const allRuns = rungRuns(ladder, r.preset), runs = allRuns.slice(-RECENT), capped = allRuns.length > runs.length;
+  pageRuns = allRuns;
   document.querySelectorAll<HTMLElement>('#rung .recentnote').forEach((el) => { el.textContent = capped ? `(the latest ${runs.length} of ${allRuns.length} runs)` : ''; });
 
   if (addr.tab === 'overview') {
     await guarded(() => drawDeck(r, addr.osub), 'the deck');
     renderRunGrid(r, allRuns, null);
     drawFtProgress(ladder, allRuns);
-    await guarded(() => sopSummary(r, ladder), 'the SOP run');
+    void guarded(() => expeditionUse(allRuns), 'the expedition breakdown');
   }
-  if (addr.tab === 'goals' || addr.tab === 'scoring') await guarded(() => classGoals(r, ladder), 'the goals');
-  if (addr.tab === 'goals') { await guarded(() => drawGoalNotes(r, ladder), 'the goal notes'); }
+  // the goals' payload (/api/discoveries) takes ~20 s: the goals tab may wait for its own content, but the
+  // scoring tab must not (10 November: the cards, boards and calibration were blank until it landed)
+  if (addr.tab === 'goals') await guarded(() => classGoals(r, ladder), 'the goals');
   if (addr.tab === 'training') {
     await guarded(() => drawRungOverview(r), 'the model facts');
     void guarded(() => sizeJourney(r), 'the star chart');
@@ -118,10 +188,16 @@ export async function renderSizePage(path: string, ladder: Ladder): Promise<void
     void guarded(() => drawLossChart(r), 'the training loss');
   }
   if (addr.tab === 'scoring') {
+    // the goals' payload (/api/discoveries) takes ~20 s; do not hold the scoring charts behind it: the
+    // cards, boards and calibration below draw now, and the goal panels fill in when it lands (10 November)
     void guarded(() => classGoals(r, ladder), 'the goals');
     await guarded(() => classCards(r), 'the four cards');
+    void guarded(() => sopSummary(r, ladder), 'the SOP run');
+    void guarded(() => starPanel(r), 'the star chart');
     await guarded(() => drawScience(r, runs, capped), 'the scoring boards');
-    await guarded(() => drawScoreLive(r), 'the live score');
+    // /api/class_score reads the whole leaderboard (~13 s): the live "now" column fills in when it lands,
+    // rather than holding the calibration and the sub-tab's own chart behind it (10 November)
+    void guarded(() => drawScoreLive(r), 'the live score');
     void guarded(() => drawTomes(r, allRuns, ladder), 'the Forgotten Tomes');
     if (r.kind === 'proxy') void guarded(() => drawCalibration(r, ladder, allRuns), 'the calibration');
     const sub = addr.ssub;
@@ -136,8 +212,7 @@ export async function renderSizePage(path: string, ladder: Ladder): Promise<void
     void guarded(() => starsInReach(r, ladder), 'the stars in reach');
     await guarded(() => renderWaypoints(r, ladder), 'the waypoint table');
   }
-  if (addr.tab === 'fitouts') await guarded(() => classFitouts(r), 'the fitouts');
-  if (addr.tab === 'bet') await guarded(() => classWager(r, path), 'the wager');
+  if (addr.tab === 'sops') await guarded(() => classSops(r), 'the SOPs');
 }
 
 // ---- Overview: the four cards, the deck, the SOP run, the run grid and the Forgotten Tomes ----------
@@ -145,33 +220,38 @@ let cardsKey = '';
 async function classCards(r: Payload): Promise<void> {
   const el = document.getElementById('cardstrip'); if (!el) return;
   let d: Payload;
-  try { d = await api(`/api/class_cards?preset=${encodeURIComponent(r.preset)}`); } catch { el.innerHTML = `<div class="${emptyCls()}">the cards could not be read</div>`; return; }
-  const key = JSON.stringify(d);
+  try { d = await api(`/api/class_cards?preset=${encodeURIComponent(r.preset)}${selection.expedition ? `&runs=${encodeURIComponent(pageRuns.map((x: any) => x.run_id).join(','))}` : ''}`); } catch { el.innerHTML = `<div class="${emptyCls()}">the cards could not be read</div>`; return; }
+  const key = JSON.stringify(d) + selectionSig();
   if (key === cardsKey && el.dataset.preset === r.preset) return;
   cardsKey = key; el.dataset.preset = r.preset;
   if (!d.read) { el.innerHTML = `<div class="${emptyCls()}">no voyage at ${esc(r.preset)} has read the cards yet</div>`; return; }
   const f2 = (v: number | null | undefined) => v == null ? '–' : v.toFixed(2);
   const scale = (c: any) => Math.max(1, c.threshold * 2, (c.best || {}).value || 0);
+  const useMedian = medianMode();
   const tile = (c: any) => {
-    const s = scale(c), at = (v: number | null | undefined) => `${Math.max(0, Math.min(100, 100 * (v || 0) / s))}%`, end = c.end_best || {}, peak = c.best || {};
-    const state = c.held ? 'held' : c.lit ? 'touched' : 'not drawn';
-    const cls = c.held ? 'good' : c.lit ? 'warn' : 'bad';
+    const m = useMedian && c.median ? c.median : null;
+    const s = scale(c), at = (v: number | null | undefined) => `${Math.max(0, Math.min(100, 100 * (v || 0) / s))}%`, end = m ? { value: m.value, run: null } : (c.end_best || {}), peak = c.best || {};
+    const held = m ? m.held : c.held;
+    const state = held ? 'held' : c.lit ? 'touched' : 'not drawn';
+    const cls = held ? 'good' : c.lit ? 'warn' : 'bad';
     return `<div class="ctile ${cls}">
-      <div class="ctop"><b>${esc(c.name)}</b><span class="${pillCls(c.held ? 'good' : c.lit ? '' : 'bad')}">${state}</span></div>
+      <div class="ctop"><b>${esc(c.name)}</b><span class="${pillCls(held ? 'good' : c.lit ? '' : 'bad')}">${state}</span></div>
       <div class="cbig">${f2(end.value)}<span class="s"> / mark ${f2(c.threshold)}</span></div>
-      <div class="ctrack" title="ended at ${f2(end.value)} (the best a finished voyage ended with); peaked at ${f2(peak.value)} at step ${peak.step ?? '–'}; the line is the mark">
+      <div class="ctrack" title="${m ? 'median of the expedition' : 'ended at'} ${f2(end.value)}; peaked at ${f2(peak.value)} at step ${peak.step ?? '–'}; the line is the mark">
         <i class="cend" style="width:${at(end.value)}"></i><i class="cpeak" style="left:${at(peak.value)}"></i><i class="cmark" style="left:${at(c.threshold)}"></i></div>
-      <div class="s">${c.held ? `held by ${c.held_by.length} of ${d.voyages} voyages` : c.lit ? `touched by ${c.lit_by.length}, held by none` : `no voyage reached the mark`}</div>
-      <div class="s">best: ${end.run ? `<a href="${shipHash(end.run)}" class="mono">${esc(end.run)}</a>` : '–'}${peak.value != null && peak.value > (end.value ?? -1) + 0.005 ? ` · peak ${f2(peak.value)} at step ${peak.step}` : ''}</div>
-      ${c.now ? `<div class="s">newest voyage ended at ${f2(c.now.value)}</div>` : ''}</div>`;
+      <div class="s">${m ? `median of ${m.of} voyages` : c.held ? `held by ${c.held_by.length} of ${d.voyages} voyages` : c.lit ? `touched by ${c.lit_by.length}, held by none` : `no voyage reached the mark`}</div>
+      <div class="s">${m ? `best any voyage: ${f2(peak.value)}` : `best: ${end.run ? `<a href="${shipHash(end.run)}" class="mono">${esc(end.run)}</a>` : '–'}${peak.value != null && peak.value > (end.value ?? -1) + 0.005 ? ` · peak ${f2(peak.value)} at step ${peak.step}` : ''}`}</div>
+      ${!m && c.now ? `<div class="s">newest voyage ended at ${f2(c.now.value)}</div>` : ''}</div>`;
   };
   const cz = d.cause || {}, rng = cz.finished_range;
-  const cause = `<div class="ctile ${cz.chains ? 'good' : 'bad'}">
-      <div class="ctop"><b>Chains cause and effect?</b><span class="${pillCls(cz.chains ? 'good' : 'bad')}">${cz.chains ? 'yes' : 'not yet'}</span></div>
-      <div class="cbig">${rng ? `${rng[0] >= 0 ? '+' : ''}${f2(rng[0])} to ${rng[1] >= 0 ? '+' : ''}${f2(rng[1])}` : '–'}</div>
-      <div class="s">the logic deck's cause gain where finished voyages ended; above +${f2(cz.noise)} clears the noise of eight items (Qwen3 4B: +0.94)</div>
-      ${cz.best ? `<div class="s">passing peak +${f2(cz.best.value)} (<span class="mono">${esc(cz.best.run)}</span>, step ${cz.best.step}), not counted</div>` : ''}</div>`;
-  el.innerHTML = `<div class="csum"><b>${d.held} of 4</b> cards held${d.touched > d.held ? `, ${d.touched} touched` : ''} · ${d.read} of ${d.voyages} voyages read the cards · ${cz.chains ? 'it chains' : 'it does not chain yet'}</div>
+  const mCause = useMedian && cz.median != null ? cz.median : null;
+  const chains = mCause != null ? mCause > cz.noise : cz.chains;
+  const cause = `<div class="ctile ${chains ? 'good' : 'bad'}">
+      <div class="ctop"><b>Chains cause and effect?</b><span class="${pillCls(chains ? 'good' : 'bad')}">${chains ? 'yes' : 'not yet'}</span></div>
+      <div class="cbig">${mCause != null ? `${mCause >= 0 ? '+' : ''}${f2(mCause)}` : rng ? `${rng[0] >= 0 ? '+' : ''}${f2(rng[0])} to ${rng[1] >= 0 ? '+' : ''}${f2(rng[1])}` : '–'}</div>
+      <div class="s">${mCause != null ? 'the median of the expedition' : "the logic deck's"} cause gain where finished voyages ended; above +${f2(cz.noise)} clears the noise of eight items (Qwen3 4B: +0.94)</div>
+      ${cz.best && !useMedian ? `<div class="s">passing peak +${f2(cz.best.value)} (<span class="mono">${esc(cz.best.run)}</span>, step ${cz.best.step}), not counted</div>` : ''}</div>`;
+  el.innerHTML = `<div class="csum"><b>${useMedian ? (d.median_held ?? 0) : d.held} of 4</b> cards held${useMedian ? ` <span class="s">(median of ${d.voyages} voyages)</span>` : d.touched > d.held ? `, ${d.touched} touched` : ''} · ${d.read} of ${d.voyages} voyages read the cards · ${chains ? 'it chains' : 'it does not chain yet'}</div>
     <div class="cgrid">${d.cards.map(tile).join('')}${cause}</div>`;
 }
 
@@ -329,22 +409,32 @@ async function classLogicRelation(r: Payload, el: HTMLElement, rel: string): Pro
 }
 
 let sopKey = '';
+// The SOP summary waits on three optional reads; if one is slow or the dashboard is restarting, do
+// not leave the panel saying "reading" for ever (10 November). Each read is bounded; the panel then
+// says what it could not get instead of hanging.
+const within = <T,>(p: Promise<T>, ms = 8000): Promise<T | null> =>
+  Promise.race<T | null>([p, new Promise<null>((resolve) => setTimeout(() => resolve(null), ms))]);
+
 async function sopSummary(r: Payload, ladder: Ladder): Promise<void> {
   const el = document.getElementById('sopsummary'); if (!el) return;
-  let d: Payload; try { d = await api(`/api/star_points?preset=${encodeURIComponent(r.preset)}`); } catch { return; }
+  let d: Payload | null = null;
+  try { d = await within(api(starUrl(r.preset)), 8000); }
+  catch (e) { el.innerHTML = `<div class="s mt">the SOP summary could not be read: ${esc(String((e as Error).message || e))} — a refresh retries.</div>`; return; }
+  if (!d) { el.innerHTML = '<div class="s mt">the SOP summary timed out; a refresh retries.</div>'; return; }
   const runs = (ladder.runs || []).filter((x: any) => x.preset === r.preset && !(x.name || '').startsWith('smoke'));
-  const latest = runs.sort((a: any, b: any) => String(b.started || '').localeCompare(String(a.started || '')))[0];
+  const picked = selection.expedition ? pageRuns : runs;
+  const latest = [...picked].sort((a: any, b: any) => String(b.started || '').localeCompare(String(a.started || '')))[0];
+  const runQ = selection.expedition ? `&runs=${encodeURIComponent(pageRuns.map((x: any) => x.run_id).join(','))}` : '';
   const [lc, sr, sc] = await Promise.all([
-    api(`/api/ladder_chaining?sop=${encodeURIComponent(latest && latest.sop || '')}`).catch(() => null),
-    api('/api/suit_ratings').catch(() => null),
-    api(`/api/sop_scores?preset=${encodeURIComponent(r.preset)}`).catch(() => null),
+    within(api(`/api/ladder_chaining?sop=${encodeURIComponent(latest && latest.sop || '')}${runQ}`), 8000).catch(() => null),
+    within(api(`/api/suit_ratings?preset=${encodeURIComponent(r.preset)}${runQ}`), 8000).catch(() => null),
+    within(api(`/api/sop_scores?preset=${encodeURIComponent(r.preset)}${runQ}`), 8000).catch(() => null),
   ]);
   const chaining = lc ? (((lc.sizes || []).find((x: any) => x.size === r.preset) || {}).chaining ?? null) : null;
   const mine = sr ? ((sr.ships || []).find((x: any) => x.size === r.preset) || null) : null;
   const suits = mine ? [['copying', mine.copying], ['position', mine.position], ['comparing', mine.comparing], ['carrying', mine.carrying]] : null;
   const key = JSON.stringify([d.points, chaining, suits, sc && sc.versions, latest && latest.sop, latest && latest.name, latest && latest.status, latest && latest.started]);
-  if (key === sopKey && document.getElementById('sopchart')) return;
-  sopKey = key;
+  if (key === sopKey && el.querySelector('.libsum')) return;
   const ps = (d.points || []).filter((p: any) => p.ours != null);
   const clears = ps.filter((p: any) => p.ours >= 1).length;
   const qwen = 0.538;
@@ -368,43 +458,167 @@ async function sopSummary(r: Payload, ladder: Ladder): Promise<void> {
       </div>
       <div class="k">What it means</div><div>${esc(verdict)} ${esc(gapTxt)}.</div>
       ${suits ? `<div class="k mt">The suits</div><div class="s">${suits.map((s: any) => `${esc(s[0])} ${s[1] == null ? '–' : s[1].toFixed(2)}`).join(' · ')}</div>` : ''}
-      <div class="k mt">The star chart, against Qwen3 4B</div><div class="chart" id="sopchart"></div>
       <div class="k mt">By SOP version <span class="s">the reasoning results at this size, one row a version: so a 0.0.6 run can be read beside 0.0.5 without leaving the ship</span></div>
       <div id="sopversions" class="s">${sc ? `<div class="scroll"><table class="selbooks"><thead><tr><th>version</th><th>status</th><th>chaining</th><th>gap to Qwen</th><th>points cleared</th></tr></thead><tbody>${versions}</tbody></table></div>` : 'the versions could not be read'}</div>
       ${points ? `<div class="k mt">The points, against Qwen</div><div class="scroll"><table class="selbooks"><tbody>${points}</tbody></table></div>` : ''}
       <div class="s mt">${latest ? `newest voyage ${esc(latest.name)}${latest.status ? ' · ' + esc(latest.status) : ''}` : ''}</div>
     </div>`;
+  sopKey = key;
+}
+
+// ---- The star chart: the ten points against Qwen3 4B ---------------------------------------------
+// Moved from the overview's SOP summary to Scoring (10 November, Justin: "start chart ... should be in
+// the scoring tab"): it is a reading of the scoring deck, not of the newest voyage's standard.
+let starKey = '';
+async function starPanel(r: Payload): Promise<void> {
+  const el = document.getElementById('sopchart'); if (!el) return;
+  let d: Payload; try { d = await api(starUrl(r.preset)); } catch { return; }
+  const ps = (d.points || []).filter((p: any) => p.ours != null);
+  const note = document.getElementById('starnote');
+  if (note) note.textContent = ps.length ? '' : 'Qwen3 4B is drawn for reference: the newest voyage has not been read on the star chart yet.';
+  const key = JSON.stringify(d.points || []) + selectionSig();
+  if (key === starKey && el.querySelector('canvas')) return;
+  starKey = key;
   const { starChart } = await import('../../lib/panel');
-  starChart('sopchart', ps, { label: r.preset, height: 300, ticks: 9 });
+  starChart('sopchart', d.points || [], { label: r.preset, height: 320, ticks: 9 });
+}
+
+// ---- How this size was used: the voyages grouped by the expedition that claimed them ------------
+// The run grid below is one square per voyage; this is the same runs read the other way, by the
+// expedition that called for them (10 November, Justin: "the overview tab needs to show a breakdown
+// of how the ship was used in different expeditions"). The names come from the expedition overview,
+// which is small and cached; the runs' `voyage` is the key (thorp/voyages.py, _voyage_of).
+let expNamesAt = 0;
+let expNames: Record<string, string> = {};
+async function expeditionNames(): Promise<Record<string, string>> {
+  if (expNamesAt && Date.now() - expNamesAt < 300_000) return expNames;
+  try {
+    const d = await api('/api/expeditions/overview');
+    expNames = Object.fromEntries(((d && d.expeditions) || []).map((x: any) => [x.key, x.name]));
+    expNamesAt = Date.now();
+  } catch { /* the keys stand in for the names */ }
+  return expNames;
+}
+
+let expUseKey = '';
+async function expeditionUse(allRuns: any[]): Promise<void> {
+  const el = document.getElementById('expuse'); if (!el) return;
+  const names = await expeditionNames();
+  const groups = new Map<string, any[]>();
+  for (const x of allRuns) {
+    const k = String(x.voyage || '');
+    if (!groups.has(k)) groups.set(k, []);
+    (groups.get(k) as any[]).push(x);
+  }
+  const key = JSON.stringify([...groups].map(([k, v]) => [k, v.map((x: any) => [x.run_id, x.status, x.ft_en])])) + '|' + JSON.stringify(names);
+  if (key === expUseKey) return;
+  expUseKey = key;
+  const day = (s: string): string => {
+    const d = new Date(s);
+    return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
+  };
+  const rows = [...groups.entries()].map(([k, v]) => {
+    const st = (x: any): string => String(x.status || '');
+    const finished = v.filter((x) => st(x).startsWith('finished')).length;
+    const running = v.filter((x) => st(x) === 'running').length;
+    const failed = v.filter((x) => st(x).startsWith('failed')).length;
+    const stopped = v.filter((x) => st(x) === 'stopped').length;
+    const queued = v.filter((x) => st(x) === 'queued').length;
+    const scored = v.map((x) => x.ft_en).filter((x): x is number => typeof x === 'number' && Number.isFinite(x));
+    const sops = [...new Set(v.map((x) => x.sop).filter(Boolean))].sort() as string[];
+    const starts = v.map((x) => String(x.started || '')).filter(Boolean).sort();
+    const first = starts.length ? day(starts[0]) : '', last = starts.length ? day(starts[starts.length - 1]) : '';
+    const other = [failed ? `failed ${failed}` : '', stopped ? `stopped ${stopped}` : '', queued ? `queued ${queued}` : ''].filter(Boolean).join(' · ');
+    return {
+      k, name: names[k] || (k || 'No expedition'), n: v.length,
+      ships: new Set(v.map((x) => x.ship_key).filter(Boolean)).size,
+      finished, running, rest: v.length - finished - running, other,
+      best: scored.length ? Math.min(...scored) : null, scored: scored.length, sops,
+      when: first ? (first === last ? first : `${first} – ${last}`) : '–',
+    };
+  }).filter((x) => x.k).sort((a, b) => b.n - a.n || a.name.localeCompare(b.name));
+  // voyages with no expedition are not shown (10 November, Justin: "delete the voyages with no
+  // expedition"); the table is a record of the expeditions, not of the unclaimed queue
+  if (!rows.length) { el.innerHTML = `<div class="${emptyCls()}">no voyage at this size has been claimed by an expedition yet</div>`; return; }
+  const total = rows.reduce((n, x) => n + x.n, 0);
+  const ships = new Set(rows.flatMap((x) => allRuns.filter((y) => y.voyage === x.k)).map((y) => y.ship_key).filter(Boolean)).size;
+  const exps = rows.length;
+  const top = rows[0];
+  const pct = (n: number): string => `${Math.round(100 * n / Math.max(1, total))}%`;
+  el.innerHTML = `<div class="libsum">
+      <div class="libstats">
+        <div class="libstat"><b>${exps}</b><span>expedition${exps === 1 ? '' : 's'}</span></div>
+        <div class="libstat"><b>${total}</b><span>claimed voyages</span></div>
+        <div class="libstat"><b>${ships}</b><span>ships fitted out</span></div>
+        <div class="libstat"><b>${top ? top.n : 0}</b><span>${top ? esc(top.name) : '–'}, the busiest</span></div>
+      </div>
+      <div class="scroll" style="margin-top:8px"><table class="selbooks"><thead><tr>
+        <th>expedition</th><th class="text-right">voyages</th><th class="text-right">ships</th><th class="text-right">finished</th><th class="text-right">running</th><th class="text-right" title="stopped, failed or queued">other</th><th class="text-right">best FT</th><th>SOPs</th>
+      </tr></thead><tbody>${rows.map((x) => `<tr>
+        <td>${x.k ? `<a href="/expeditions/${encodeURIComponent(x.k)}">${esc(x.name)}</a>` : `<span class="s">${esc(x.name)}</span>`}<div class="s">${x.k ? `<span class="mono">${esc(x.k)}</span>` : ''}${x.when !== '–' ? `${x.k ? ' · ' : ''}${esc(x.when)}` : ''}</div></td>
+        <td class="text-right tabular-nums"><b>${x.n}</b> <span class="s">${pct(x.n)}</span></td>
+        <td class="text-right tabular-nums">${x.ships}</td>
+        <td class="text-right tabular-nums">${x.finished || '–'}</td>
+        <td class="text-right tabular-nums">${x.running ? `<span class="${pillCls('running')}">${x.running}</span>` : '–'}</td>
+        <td class="text-right tabular-nums" title="${esc(x.other)}">${x.rest || '–'}</td>
+        <td class="text-right tabular-nums">${x.best == null ? '–' : `${x.best.toFixed(3)} <span class="s">of ${x.scored}</span>`}</td>
+        <td class="mono">${x.sops.length ? x.sops.map((s: string) => 'v' + esc(s)).join(', ') : '–'}</td>
+      </tr>`).join('')}</tbody></table></div>
+      <div class="s mt">“other” is stopped, failed or queued; best FT is the lowest Forgotten Tomes bits per byte among the voyages that were scored (lower is better).</div>
+    </div>`;
 }
 
 let ftKey = '';
 function drawFtProgress(ladder: Ladder, allRuns: any[]): void {
+  const ext = (ladder.external || []).filter((x: any) => x.set === 'hole-cards-unseen' && x.bpb_mean_en != null);
+  const pts = allRuns.map((x: any, i: number) => ({ x, i: i + 1 })).filter((p: any) => p.x.ft_en != null);
+  const key = pts.map((p: any) => p.x.run_id + p.x.ft_en).join(',') + '|' + ext.length + '|' + selectionSig();
+  const el = document.getElementById('ftchart'); if (!el) return;
+  if (key === ftKey) return;
+  ftKey = key;
+  if (!pts.length) { el.innerHTML = `<div class="${emptyCls()}">no voyage at this size has a Forgotten Tomes score yet</div>`; return; }
+  // ECharts: the landing page's chart on canvas, lazily imported
+  // at all (10 November). It keeps tooltips and legend toggling, which the SVG stand-in could not.
+  let best = Infinity;
+  const bestSoFar = pts.map((p: any) => (best = Math.min(best, p.x.ft_en)));
+  const med = median(pts.map((p: any) => p.x.ft_en));
+  const ys = pts.map((p: any) => p.x.ft_en).sort((a: number, b: number) => a - b);
+  const q = (f: number) => ys[Math.min(ys.length - 1, Math.max(0, Math.round(f * (ys.length - 1))))];
+  const loCut = ys.length >= 8 ? q(0.025) : Math.min(...ys);
+  const hiCut = ys.length >= 8 ? q(0.975) : Math.max(...ys);
+  const all = [loCut, hiCut, ...ext.map((x: any) => x.bpb_mean_en), ...(medianMode() && med != null ? [med] : [])];
+  const lo0 = Math.min(...all), hi0 = Math.max(...all), pad = (hi0 - lo0) * 0.08 || 0.05;
+  const lo = lo0 - pad, hi = hi0 + pad;
+  const css = (n: string): string => getComputedStyle(document.documentElement).getPropertyValue('--' + n).trim();
+  const C = { text: css('text'), muted: css('muted'), line: css('line'), accent: css('accent'), blue: css('blue'), good: css('good') };
   void (async () => {
-    const { plot, layout, C, PALETTE } = await chart();
-    const ext = (ladder.external || []).filter((x: any) => x.set === 'hole-cards-unseen' && x.bpb_mean_en != null);
-    const pts = allRuns.map((x: any, i: number) => ({ x, i: i + 1 })).filter((p: any) => p.x.ft_en != null);
-    const key = pts.map((p: any) => p.x.run_id + p.x.ft_en).join(',') + '|' + ext.length;
-    if (key === ftKey) return;
-    ftKey = key;
-    if (!pts.length) { const { empty } = await chart(); empty('ftchart', 'no voyage at this size has a Forgotten Tomes score yet'); return; }
-    let best = Infinity;
-    const bestSoFar = pts.map((p: any) => (best = Math.min(best, p.x.ft_en)));
-    plot('ftchart', [
-      { type: 'scattergl', mode: 'markers', name: 'a voyage', x: pts.map((p: any) => p.i), y: pts.map((p: any) => p.x.ft_en),
-        text: pts.map((p: any) => `${p.x.ship || p.x.name} · ${p.x.name}`), hovertemplate: 'run %{x}: %{text}<br>%{y:.3f} bpb<extra></extra>',
-        marker: { size: 6, color: C.blue, opacity: 0.55 } },
-      { type: 'scatter', mode: 'lines', name: 'best so far', x: pts.map((p: any) => p.i), y: bestSoFar, line: { color: C.good, width: 2, shape: 'hv' },
-        hovertemplate: 'best so far %{y:.3f}<extra></extra>' },
-    ], layout({ xaxis: { title: 'voyage, in the order they started', gridcolor: C.line },
-      yaxis: { title: 'bits per byte', gridcolor: C.line, range: (() => {
-        const ys = [...pts.map((p: any) => p.x.ft_en), ...ext.map((x: any) => x.bpb_mean_en)], lo = Math.min(...ys), hi = Math.max(...ys), pad = (hi - lo) * 0.06 || 0.05;
-        return [lo - pad, hi + pad]; })() },
-      legend: { orientation: 'h', y: 1.08 },
-      shapes: ext.map((x: any, i: number) => ({ type: 'line', xref: 'paper', x0: 0, x1: 1, y0: x.bpb_mean_en, y1: x.bpb_mean_en, line: { color: PALETTE[(i + 4) % PALETTE.length], dash: 'dot' } })),
-      annotations: ext.map((x: any, i: number) => ({ xref: 'paper', x: 1, xanchor: 'right', y: x.bpb_mean_en, yanchor: 'bottom', showarrow: false,
-        text: `${x.model.split('/').pop()} ${x.bpb_mean_en.toFixed(3)}`, font: { size: 10, color: PALETTE[(i + 4) % PALETTE.length] } })) }));
-  })();
+    const { echartsPlot } = await import('../../lib/echarts');
+    const marks = [
+      ...ext.map((e: any, i: number) => ({ yAxis: e.bpb_mean_en, lineStyle: { color: C.muted, type: 'dashed' as const, width: 1 },
+        label: { formatter: `${String(e.model).split('/').pop()} ${e.bpb_mean_en.toFixed(3)}`, position: (i % 2 ? 'insideStartTop' : 'insideEndTop') as 'insideStartTop' | 'insideEndTop', color: C.muted, fontSize: 9 } })),
+      ...(medianMode() && med != null ? [{ yAxis: med, lineStyle: { color: C.accent, type: 'dashed' as const, width: 2 },
+        label: { formatter: `median ${med.toFixed(3)}`, position: 'insideStartTop' as const, color: C.accent, fontSize: 10 } }] : []),
+    ];
+    await echartsPlot(el, {
+      animation: false,
+      grid: { left: 56, right: 24, top: 30, bottom: 42 },
+      legend: { top: 0, left: 0, textStyle: { color: C.muted, fontSize: 11 }, data: ['a voyage', 'best so far', ...(medianMode() ? [`median · ${selection.expedition}`] : [])] },
+      tooltip: { trigger: 'item', backgroundColor: 'rgba(18,18,18,.94)', borderColor: C.line, textStyle: { color: C.text, fontSize: 11 },
+        formatter: (p: any) => { const q2 = pts[p.dataIndex]; return q2 ? `${esc(q2.x.ship || q2.x.name)} · ${esc(q2.x.name)}<br><b>${q2.x.ft_en.toFixed(3)}</b> bpb` : ''; } },
+      xAxis: { type: 'category', data: pts.map((p: any) => String(p.i)), name: 'voyage, in the order they started', nameLocation: 'middle', nameGap: 26,
+        axisLabel: { color: C.muted, fontSize: 10 }, axisLine: { lineStyle: { color: C.line } }, splitLine: { show: false } },
+      yAxis: { type: 'value', min: lo, max: hi, name: 'bits per byte', nameLocation: 'middle', nameGap: 42, scale: true,
+        axisLabel: { color: C.muted, fontSize: 10, formatter: (v: number) => Number(v).toFixed(2) }, splitLine: { lineStyle: { color: C.line } }, axisLine: { show: false } },
+      series: [
+        { name: 'a voyage', type: 'scatter', data: pts.map((p: any) => [String(p.i), p.x.ft_en]), symbolSize: 6,
+          itemStyle: { color: C.blue, opacity: 0.6 } },
+        { name: 'best so far', type: 'line', data: bestSoFar, showSymbol: false, step: 'end',
+          lineStyle: { color: C.good, width: 2 }, markLine: { silent: true, symbol: 'none', data: marks } },
+        ...(medianMode() && med != null ? [{ name: `median · ${selection.expedition}`, type: 'line', data: pts.map(() => med), showSymbol: false,
+          lineStyle: { color: C.accent, type: 'dashed' as const, width: 2 } }] : []),
+      ],
+    });
+  })().catch((e) => { el.innerHTML = `<div class="${emptyCls()}">the chart could not be drawn: ${esc(String((e as Error).message || e))}</div>`; });
 }
 
 // ---- Training --------------------------------------------------------------------------------------
@@ -416,11 +630,22 @@ function drawRungOverview(r: Payload): void {
     ['judged by', r.scored], ['status', r.status],
   ].map(([k, v]) => `<div><div class="k">${k}</div><div>${esc(v)}</div></div>`).join('');
 }
+let journeyKey = '';
 async function sizeJourney(r: Payload): Promise<void> {
   const el = document.getElementById('sizejourney'); if (!el) return;
-  let d: Payload; try { d = await api(`/api/star_points?preset=${encodeURIComponent(r.preset)}`); } catch { return; }
+  let d: Payload;
+  try { d = await api(starUrl(r.preset)); }
+  catch { el.innerHTML = `<div class="${emptyCls()}">the star chart could not be read</div>`; return; }
   const { starChart } = await import('../../lib/panel');
-  starChart(el, d.points, { label: r.preset, height: 380 });
+  const pts = d.points || [];
+  const key = JSON.stringify(pts) + selectionSig();
+  if (key === journeyKey && el.querySelector('canvas')) return;
+  journeyKey = key;
+  starChart(el, pts, { label: r.preset, height: 380 });
+  // Qwen's line is still worth drawing before this size has been read; say so, rather than leaving the
+  // note claiming a voyage line that is not there (10 November)
+  const note = document.getElementById('sizejourneynote');
+  if (note) note.textContent = pts.some((p: any) => p.ours != null) ? '' : 'Qwen3 4B is drawn for reference: the newest voyage has not been read on the star chart yet.';
 }
 let watchTimer: number | undefined = undefined;
 let watchPreset = '';
@@ -429,7 +654,9 @@ async function drawWatch(r: Payload, path: string): Promise<void> {
   if (watchPreset !== r.preset) { watchPreset = r.preset; }
   if (watchTimer) window.clearTimeout(watchTimer);
   let d: Payload;
-  try { d = await api(`/api/watch?preset=${encodeURIComponent(r.preset)}&sop=${encodeURIComponent(sopPick)}`); } catch { head.innerHTML = `<div class="${emptyCls()}">the voyage could not be read (a dashboard server started before the Watch panel has to be restarted)</div>`; return; }
+  const medRun = medianMode() ? medianPageRun() : null;
+  const watchRun = selection.voyage || (medRun ? medRun.name : '');
+  try { d = await api(`/api/watch?preset=${encodeURIComponent(r.preset)}&sop=${encodeURIComponent(sopPick)}${watchRun ? `&run=${encodeURIComponent(watchRun)}` : ''}`); } catch { head.innerHTML = `<div class="${emptyCls()}">the voyage could not be read (a dashboard server started before the Watch panel has to be restarted)</div>`; return; }
   const again = (): void => { if (isSizePage(location.pathname) && sizeAddress(path).tab === 'training') void drawWatch(r, path); };
   if (d.voyage && d.voyage.status === 'at sea') watchTimer = window.setTimeout(again, 30000);
   if (!d.voyage) { head.innerHTML = `<div class="${emptyCls()}">no voyage of this size on the ledger yet</div>`; return; }
@@ -444,7 +671,8 @@ async function drawWatch(r: Payload, path: string): Promise<void> {
       <div><b>${hms(w.elapsed_s)}</b><span class="s"> sailing</span></div>
       <div><b>${v.status === 'at sea' ? hms(w.eta_s) : 'home'}</b><span class="s">${v.status === 'at sea' ? ' to go (readings included)' : ''}</span></div></div>
     <div class="wprog"><i style="width:${pct}%"></i></div>
-    <div class="s">${w.last_reading_s_ago != null && v.status === 'at sea' ? `last reading ${Math.round(w.last_reading_s_ago)} s ago · the panel reads again every 30 s` : ''}</div>`;
+    <div class="s">${w.last_reading_s_ago != null && v.status === 'at sea' ? `last reading ${Math.round(w.last_reading_s_ago)} s ago · the panel reads again every 30 s` : ''}</div>
+    ${medianMode() ? `<div class="s">the watch is one voyage: this is the median voyage of ${esc(selection.expedition)}, ${esc(v.name)}</div>` : ''}`;
   const all = [...(d.stages || []), ...(d.post || [])];
   const passes = all.reduce((a: number, s: any) => a + (s.passes || 1), 0) || 1;
   const herePass = (w.pass || 1) - 1 + ((w.tokens_total ? (w.tokens % (w.tokens_total / w.passes)) / (w.tokens_total / w.passes) : 0));
@@ -501,17 +729,29 @@ async function drawDepth(r: Payload): Promise<void> {
 async function drawLossChart(r: Payload): Promise<void> {
   const { plot, layout, C, PALETTE, empty } = await chart();
   try {
-    const curves = await api('/api/rung?preset=' + encodeURIComponent(r.preset) + '&limit=12');
-    const withLoss = curves.filter((c: any) => c.steps.length);
-    if (!withLoss.length) empty('losschart', 'no training at this size yet');
-    else plot('losschart', withLoss.map((c: any, i: number) => ({ type: 'scatter', mode: 'lines', name: c.ship || c.name, x: c.steps, y: c.loss, line: { color: PALETTE[i % PALETTE.length], width: 1.5 } })), layout({ xaxis: { title: 'step', gridcolor: C.line }, yaxis: { title: 'loss', gridcolor: C.line } }));
+    const curves = await api('/api/rung?preset=' + encodeURIComponent(r.preset) + '&limit=' + (selection.expedition ? 0 : 12));
+    const mine = curves.filter((c: any) => c.steps.length && inSelection(c));
+    if (!mine.length) empty('losschart', selection.expedition ? 'no training curve for this expedition yet' : 'no training at this size yet');
+    else if (medianMode() && mine.length > 1) {
+      const med = medianSeries(mine.map((c: any) => ({ x: c.steps, y: c.loss })));
+      const faint = mine.map((c: any) => ({ type: 'scatter', mode: 'lines', name: c.ship || c.name, x: c.steps, y: c.loss, line: { color: C.line, width: 0.6 }, showlegend: false, hoverinfo: 'skip' }));
+      plot('losschart', [...faint, { type: 'scatter', mode: 'lines', name: `median · ${selection.expedition}`, x: med.x, y: med.y, line: { color: C.accent, width: 2 } }],
+        layout({ xaxis: { title: 'step', gridcolor: C.line }, yaxis: { title: 'loss', gridcolor: C.line } }));
+    } else {
+      plot('losschart', mine.map((c: any, i: number) => ({ type: 'scatter', mode: 'lines', name: c.ship || c.name, x: c.steps, y: c.loss, line: { color: PALETTE[i % PALETTE.length], width: 1.5 } })),
+        layout({ xaxis: { title: 'step', gridcolor: C.line }, yaxis: { title: 'loss', gridcolor: C.line } }));
+    }
   } catch { empty('losschart', 'could not load the curves'); }
 }
 
 // ---- Goals ----------------------------------------------------------------------------------------
-let reachData: Payload = null, reachAt = 0;
+let reachData: Payload = null, reachAt = 0, reachKey = '';
 async function reach(ladder: Ladder): Promise<Payload> {
-  if (!reachData || Date.now() - reachAt > 30000) { try { reachData = await api('/api/discoveries'); reachAt = Date.now(); } catch { /* keep */ } }
+  const q = selection.expedition ? `?runs=${encodeURIComponent(pageRuns.map((x: any) => x.run_id).join(','))}` : '';
+  const key = selectionSig() + '|' + pageRuns.length;
+  if (!reachData || reachKey !== key || Date.now() - reachAt > 30000) {
+    try { reachData = await api('/api/discoveries' + q); reachAt = Date.now(); reachKey = key; } catch { /* keep */ }
+  }
   return reachData;
 }
 let goalsKey = '';
@@ -534,49 +774,22 @@ async function classGoals(r: Payload, ladder: Ladder): Promise<void> {
   };
   const goals = kts.filter((t: any) => where(t) === 'mine'), carried = kts.filter((t: any) => where(t) === 'below');
   const level = goals.length ? wps[Math.max(...goals.map((t: any) => wpRank(t.waypoint)))] : null;
-  const ceiling = level ? goals.filter((t: any) => t.waypoint === level.key) : [];
-  const nextCls = ladder.rungs[me + 1], nextGoals = nextCls ? kts.filter((t: any) => t.target_class === nextCls.preset) : [];
-  const done = goals.filter((t: any) => onClass(t).done).length;
-  const cov = coverage(d, ladder, r.preset), filled = cov.reduce((n: number, c: any) => n + c.here, 0), inh = cov.reduce((n: number, c: any) => n + c.inherited, 0), all = cov.reduce((n: number, c: any) => n + c.total, 0);
-  const C = await import('./chains');
-  const covEl = document.getElementById('goalcoverage');
-  if (covEl) covEl.innerHTML = cov.map((c: any, i: number) => `<div class="crow"><span class="cname">${i + 1}. ${esc(c.name)}</span>${C.coverageBar(c)}
-    <span class="cnum">${c.here} here${c.inherited ? ` · ${c.inherited} inherited` : ''} · ${c.open} open of ${c.total}</span></div>`).join('')
-    + `<div class="crow total"><span class="cname">the route</span>${C.coverageBar({ here: filled, inherited: inh, open: all - filled - inh, total: all })}<span class="cnum">${filled} here · ${inh} inherited · ${all - filled - inh} open of ${all}</span></div>`;
-  const overEl = document.getElementById('goalsover');
-  if (overEl) overEl.innerHTML = [
-    ['the primary objective', (() => { const role = r.role || r.job || ''; const m = role.match(/^Primary objective:\s*([^.]*)\.?\s*(.*)$/i);
-      return m ? `<b class="primarygoal">${esc(m[1])}</b>${m[2] ? `<div class="s">${esc(m[2])}</div>` : ''}<div class="s">beyond it: as many tricks as it can learn, carried up to the next class</div>`
-        : `${role ? `<b class="primarygoal">${esc(role)}</b><div class="s">` : '<div>'}as many tricks as it can learn, building on all the tricks below it, carried up to the next class</div>`; })()],
-    ['expected at this size', level ? `<b>${esc(level.name)}</b> (step ${wpRank(level.key) + 1} of ${wps.length})` : 'nothing from books at this size'],
-    ['the expected edge', ceiling.length ? ceiling.map((t: any) => `<a href="/discoveries/${esc(t.key)}">${t.gate ? '◆ ' : ''}${esc(t.name)}</a>`).join(', ') + '<br><span class="s">where a ship this size is expected to stop; beyond it is pushing the envelope</span>' : '–'],
-    ['filled so far', `${filled} of ${all} tricks performed here${inh ? `, ${inh} more inherited to carry up` : ''} · ${done} of the ${goals.length} the field expects`],
-    ['carried up', carried.length ? `${carried.length} expected of smaller classes, kept, not relearned` : 'none: the first class on the ladder; everything it learns is carried up'],
-    ['next class', nextCls ? `${classLink(ladder, nextCls.preset)} takes over with ${nextGoals.length}: ${nextGoals.slice(0, 4).map((t: any) => esc(t.name)).join(', ')}${nextGoals.length > 4 ? '…' : ''}` : 'the top of the ladder; beyond it, the horizon'],
-  ].map(([k, v]) => `<div><div class="k">${k}</div><div>${v}</div></div>`).join('');
   const routeEl = document.getElementById('goalroute');
   if (routeEl) routeEl.innerHTML = [...wps].reverse().map((w: any) => {
     const ts = kts.filter((t: any) => t.waypoint === w.key).sort((a: any, b: any) => (a.target_class ? classRank(ladder, a.target_class) : 99) - (b.target_class ? classRank(ladder, b.target_class) : 99));
     const isLevel = level && level.key === w.key;
+    const chip = (t: any) => {
+      const s = where(t), st = s === 'mine' || s === 'below' ? onClass(t) : null;
+      const tip = `${t.name}: ${s === 'mine' ? 'a goal of this size' : s === 'below' ? `carried up from ${t.target_class}` : s === 'above' ? `a goal of ${t.target_class}` : s === 'taught' ? 'a reference, taught not read' : 'beyond the ladder'}${st ? ' · ' + st.text : ''}`;
+      return `<a class="chip ${s}${st && st.done ? ' done' : ''}" href="/discoveries/${esc(t.key)}" title="${esc(tip)}">${t.gate ? '◆ ' : ''}${esc(t.name)}${st && st.done ? ' ✓' : ''}${s === 'above' ? ` <span class="cls">${esc(t.target_class)}</span>` : ''}</a>`;
+    };
+    // the basics are the gates and roots at or below this class; everything else is the ladder
+    const isBasic = (t: any) => { const s = where(t); return (s === 'mine' || s === 'below' || s === 'taught') && (t.gate || !(t.rests_on && t.rests_on.length)); };
+    const basics = ts.filter(isBasic), rungsHere = ts.filter((t: any) => !isBasic(t));
     return `<div class="wp${isLevel ? ' level' : ''}"><div class="wpname">${wpRank(w.key) + 1}. ${esc(w.name)}${isLevel ? ` <span class="${pillCls('accent')}">target level</span>` : ''}</div>
-      <div class="chips">${ts.map((t: any) => { const s = where(t), st = s === 'mine' || s === 'below' ? onClass(t) : null;
-        const tip = `${t.name}: ${s === 'mine' ? 'a goal of this size' : s === 'below' ? `carried up from ${t.target_class}` : s === 'above' ? `a goal of ${t.target_class}` : s === 'taught' ? 'a reference, taught not read' : 'beyond the ladder'}${st ? ' · ' + st.text : ''}`;
-        return `<a class="chip ${s}${st && st.done ? ' done' : ''}" href="/discoveries/${esc(t.key)}" title="${esc(tip)}">${t.gate ? '◆ ' : ''}${esc(t.name)}${st && st.done ? ' ✓' : ''}${s === 'above' ? ` <span class="cls">${esc(t.target_class)}</span>` : ''}</a>`; }).join('')}</div></div>`;
+      <div class="chipgroup"><span class="chiplabel">the basics</span><div class="chips">${basics.map(chip).join('')}</div></div>
+      ${rungsHere.length ? `<div class="chipgroup"><span class="chiplabel">the ladder</span><div class="chips">${rungsHere.map(chip).join('')}</div></div>` : ''}</div>`;
   }).join('');
-  fillStepFilter(document.getElementById('goalfilter') as HTMLSelectElement | null, wps);
-  const gf = (document.getElementById('goalfilter') as HTMLSelectElement | null)?.value || '';
-  const shown = goals.filter((t: any) => !gf || t.waypoint === gf);
-  const tb = document.querySelector('#goaltable tbody');
-  if (tb) tb.innerHTML = shown.length ? shown.sort((a: any, b: any) => wpRank(a.waypoint) - wpRank(b.waypoint)).map((t: any) => {
-    const st = onClass(t);
-    return `<tr data-trick="${esc(t.key)}" tabindex="0"><td><b>${esc(t.name)}</b>${C.leadNote(t, kts)}</td><td data-sort="${wpRank(t.waypoint)}">${esc((wps.find((w: any) => w.key === t.waypoint) || {}).name)}</td>
-      <td>${t.gate ? '◆ gate' : 'milestone'}</td><td>${t.rests_on.length ? esc(t.rests_on.map((k: string) => tname[k] || k).join(', ')) : '–'}</td>
-      <td data-sort="${t.field_params ?? ''}" title="${esc(t.field_at)}"><span class="sizeband">${esc(t.field_band)}</span></td>
-      <td>${st.done ? `<span class="${pillCls('good')}">performed</span> ` : ''}${esc(st.text)}</td></tr>`;
-  }).join('') : `<tr><td colspan="6" class="${emptyCls(true)}">${goals.length ? 'none of this size\'s goals at this step' : 'no goals set for this size yet'}</td></tr>`;
-  const gfEl = document.getElementById('goalfilter') as HTMLSelectElement | null;
-  if (gfEl) gfEl.onchange = () => { dataKeys['goals'] = ''; void classGoals(r, ladder); };
-  wireTrickRows();
 }
 function coverage(data: Payload, ladder: Ladder, preset: string): any[] {
   const kts = data.known_tricks || [], wps = data.waypoints || [], me = classRank(ladder, preset);
@@ -728,8 +941,9 @@ async function renderWaypoints(r: Payload, ladder: Ladder): Promise<void> {
   const { info } = await import('../../lib/info');
   const { runCells } = await import('./scoring');
   let d: Payload;
-  try { d = await api('/api/waypoints?preset=' + encodeURIComponent(r.preset) + '&limit=' + RECENT); } catch { return; }
-  const key = JSON.stringify(d);
+  try { d = await api('/api/waypoints?preset=' + encodeURIComponent(r.preset) + '&limit=' + (selection.expedition ? 0 : RECENT)); } catch { return; }
+  d.runs = (d.runs || []).filter((x: any) => inSelection(x));
+  const key = JSON.stringify(d) + selectionSig();
   if (key === wpKey) return;
   wpKey = key; wpData = d;
   drawHand();
@@ -769,6 +983,13 @@ async function renderWaypoints(r: Payload, ladder: Ladder): Promise<void> {
   const lines = (pick: (x: any) => any, id: string, title: string, msg: string, extra: any = {}) => {
     const rs = recent.filter((x: any) => pick(x) && pick(x).step.length);
     if (!rs.length) return empty(id, msg);
+    if (medianMode() && rs.length > 1) {
+      const med = medianSeries(rs.map((x: any) => ({ x: pick(x).step, y: pick(x).value })));
+      return plot(id, [
+        ...rs.map((x: any) => ({ type: 'scatter', mode: 'lines', name: x.ship || x.name, x: pick(x).step, y: pick(x).value, line: { color: C.line, width: 0.6 }, showlegend: false, hoverinfo: 'skip' })),
+        { type: 'scatter', mode: 'lines', name: `median · ${selection.expedition}`, x: med.x, y: med.y, line: { color: C.accent, width: 2 } },
+      ], layout({ xaxis: { title: 'step', gridcolor: C.line }, yaxis: { title, gridcolor: C.line }, ...extra }));
+    }
     plot(id, rs.map((x: any, i: number) => ({ type: 'scatter', mode: 'lines+markers', name: x.ship || x.name, x: pick(x).step, y: pick(x).value,
       line: { color: PALETTE[i % PALETTE.length], width: 1.5 }, marker: { size: 4 } })),
       layout({ xaxis: { title: 'step', gridcolor: C.line }, yaxis: { title, gridcolor: C.line }, ...extra }));
@@ -816,12 +1037,19 @@ async function drawScience(r: Payload, runs: any[], capped: boolean): Promise<vo
   const { plot, layout, C, PALETTE, empty } = await chart();
   const split = runs.filter((x: any) => Object.values(x.split).some((v) => v != null));
   if (!split.length) empty('splitchart', runs.length ? 'the split arrives when scripts/queue_9m.sh re-scores the finished voyages, after tonight\'s pool voyages' : 'no voyages at this size yet');
+  else if (medianMode() && split.length > 1) plot('splitchart', [{ type: 'bar', name: `median · ${selection.expedition}`, x: Object.values(SPLIT_LABEL),
+    y: Object.keys(SPLIT_LABEL).map((c) => median(split.map((x: any) => x.split[c]))), marker: { color: C.accent } }],
+    layout({ barmode: 'group', yaxis: { title: 'bits per byte', gridcolor: C.line } }));
   else plot('splitchart', split.map((x: any, i: number) => ({ type: 'bar', name: x.ship || x.name, x: Object.values(SPLIT_LABEL),
     y: Object.keys(SPLIT_LABEL).map((c) => x.split[c]), marker: { color: PALETTE[i % PALETTE.length] } })),
     layout({ barmode: 'group', yaxis: { title: 'bits per byte', gridcolor: C.line } }));
   const ratioKeys = LAW_COLS.filter((c) => !c[0].endsWith('_js'));
   const laws = runs.filter((x: any) => Object.values(x.laws).some((v) => v != null));
   if (!laws.length) empty('lawchart', runs.length ? 'the laws arrive with the same re-score' : 'no voyages at this size yet');
+  else if (medianMode() && laws.length > 1) plot('lawchart', [{ type: 'bar', name: `median · ${selection.expedition}`, x: ratioKeys.map((c) => c[1]),
+    y: ratioKeys.map(([k]) => median(laws.map((x: any) => (x.laws[k] != null && x.ref[k] ? x.laws[k] / x.ref[k] : null)).filter((v): v is number => v != null))), marker: { color: C.accent } }],
+    layout({ barmode: 'group', yaxis: { title: 'model ÷ books', gridcolor: C.line },
+      shapes: [{ type: 'line', xref: 'paper', x0: 0, x1: 1, y0: 1, y1: 1, line: { color: C.accent, dash: 'dot' } }] }));
   else plot('lawchart', laws.map((x: any, i: number) => ({ type: 'bar', name: x.ship || x.name, x: ratioKeys.map((c) => c[1]),
     y: ratioKeys.map(([k]) => x.laws[k] != null && x.ref[k] ? x.laws[k] / x.ref[k] : null), marker: { color: PALETTE[i % PALETTE.length] } })),
     layout({ barmode: 'group', yaxis: { title: 'model ÷ books', gridcolor: C.line },
@@ -832,7 +1060,21 @@ let scoreKey = '';
 async function drawScoreLive(r: Payload): Promise<void> {
   const tb = document.querySelector('#sciencemetrics tbody'); if (!tb) return;
   tb.querySelectorAll('tr').forEach((tr) => { if ((tr as HTMLTableRowElement).cells.length < 5) (tr as HTMLTableRowElement).insertCell(-1).className = 'scorenow'; });
-  let d: Payload; try { d = await api('/api/class_score?preset=' + encodeURIComponent(r.preset)); } catch { return; }
+  let d: Payload; try { d = await api('/api/class_score?preset=' + encodeURIComponent(r.preset) + (selection.expedition ? '&runs=' + encodeURIComponent(pageRuns.map((x: any) => x.run_id).join(',')) : '')); } catch { return; }
+  // the best ship at this size, named: the crowned version can be behind it (the 21m's best ship,
+  // 21m@v0.0.5, holds three cards while the crowned v1 holds two), so show both (10 November)
+  const bs = document.getElementById('bestship');
+  if (bs) {
+    const label = d.ship || d.version;
+    const ver = d.version && d.version !== d.ship ? ` <span class="s">${esc(d.version)}</span>` : '';
+    const chain = d.chaining == null ? '–' : `${signed(d.chaining, 3)}${d.chaining <= 0.03 ? ' <span class="s">in the noise</span>' : ''}`;
+    const crown = d.crowned && d.crowned !== d.version
+      ? ` · crowned version ${esc(d.crowned)}${d.crowned_chaining != null ? ` (${signed(d.crowned_chaining, 3)})` : ''}` : '';
+    const cards = d.held ? `${d.held} of 4 cards` : 'cards not read yet';
+    bs.innerHTML = label
+      ? `best ship ${selection.expedition ? 'in ' + esc(selection.expedition) : 'at this size'}: <a href="${d.ship_key ? shipHash(d.ship_key) : '#'}">${esc(label)}</a>${ver} · ${cards} · chaining ${chain}${crown}`
+      : (selection.expedition ? 'no selected voyage has been scored yet' : 'no ship at this size has been scored yet');
+  }
   const key = JSON.stringify(d); if (key === scoreKey) return; scoreKey = key;
   const head = document.getElementById('scorenowhead'); if (head) head.innerHTML = d.version ? `now <span class="s">${esc(d.version)}</span>` : 'now';
   const cell = (name: string) => { const tr = [...(tb as HTMLTableSectionElement).rows].find((x: HTMLTableRowElement) => (x.cells[0].innerText || '').trim().toLowerCase() === name); return tr && tr.cells[4]; };
@@ -871,7 +1113,8 @@ async function drawTomes(r: Payload, allRuns: any[], ladder: Ladder): Promise<vo
 
 async function drawCalibration(r: Payload, ladder: Ladder, allRuns: any[]): Promise<void> {
   const tb = document.querySelector('#caltable tbody'); if (!tb) return;
-  const big9 = (ladder.runs || []).filter((x: any) => x.preset === ladder.rungs.find((q: any) => q.kind !== 'proxy').preset);
+  const big9 = (ladder.runs || []).filter((x: any) => x.preset === ladder.rungs.find((q: any) => q.kind !== 'proxy').preset
+    && (!medianMode() || x.voyage === selection.expedition));
   const pairs = allRuns.map((p: any) => ({ p, n: big9.find((n: any) => n.recipe === p.recipe && n.passes === p.passes && n.seed === p.seed && n.status === 'finished') })).filter((x: any) => x.n);
   tb.innerHTML = pairs.map(({ p, n }: any) => `<tr><td>${esc((p.recipe || '').replace('lists/', '').replace('.csv', ''))}</td>
     <td>${p.passes ?? '–'}</td><td>${n ? esc(n.ship || n.name) : '–'}</td><td>${fmt(n && n.ft_en)}</td><td>${esc(p.ship || p.name)}</td><td>${fmt(p.ft_en)}</td></tr>`).join('');
@@ -915,19 +1158,35 @@ async function classSubject(r: Payload, key: string): Promise<void> {
     <div class="chart" id="subjchart-${key}"></div>`;
   const { plot, layout, C, PALETTE } = await chart();
   const traces: any[] = [];
-  mine.forEach((t: any) => t.readings.forEach((rd: any) => { if (rd.series && rd.series.length) traces.push({ type: 'scatter', mode: 'lines', name: `${t.name} · ${short(rd.voyage)}`, x: rd.series.map((p: any) => p[0] / 1e6), y: rd.series.map((p: any) => p[1]), line: { color: PALETTE[traces.length % PALETTE.length] } }); }));
+  if (medianMode()) {
+    // one median line per test across the expedition's voyages, aligned by tokens read
+    mine.forEach((t: any) => {
+      const ss = t.readings.filter((rd: any) => rd.series && rd.series.length && inSelection({ name: rd.voyage }))
+        .map((rd: any) => ({ x: rd.series.map((p: any) => p[0] / 1e6), y: rd.series.map((p: any) => p[1]) }));
+      if (!ss.length) return;
+      const med = medianSeries(ss);
+      traces.push({ type: 'scatter', mode: 'lines', name: `${t.name} · median`, x: med.x, y: med.y, line: { color: PALETTE[traces.length % PALETTE.length], width: 2 } });
+    });
+  } else {
+    mine.forEach((t: any) => t.readings.forEach((rd: any) => { if (rd.series && rd.series.length && inSelection({ name: rd.voyage })) traces.push({ type: 'scatter', mode: 'lines', name: `${t.name} · ${short(rd.voyage)}`, x: rd.series.map((p: any) => p[0] / 1e6), y: rd.series.map((p: any) => p[1]), line: { color: PALETTE[traces.length % PALETTE.length] } }); }));
+  }
   if (traces.length) plot(`subjchart-${key}`, traces, layout({ xaxis: { title: 'tokens read (millions)', gridcolor: C.line }, yaxis: { title: 'lift', gridcolor: C.line, zeroline: true },
     shapes: mine.map((t: any) => ({ type: 'line', xref: 'paper', x0: 0, x1: 1, y0: t.threshold, y1: t.threshold, line: { color: C.accent, dash: 'dot' } })) }));
   else { const e = document.getElementById(`subjchart-${key}`); if (e) e.innerHTML = `<div class="${emptyCls()}">no voyage of this size has read its own step on this track yet</div>`; }
 }
 
-let vsRef: string | null = null, vsVoyage: string | null = null, vsPreset = '';
+let vsRef: string | null = null, vsVoyage: string | null = null, vsPreset = '', vsSel = '';
 async function classVersus(r: Payload, path: string): Promise<void> {
   const body = document.getElementById('vsbody'); if (!body) return;
   if (vsPreset !== r.preset) { vsPreset = r.preset; vsVoyage = null; body.innerHTML = `<div class="${emptyCls()}">reading…</div>`; const p = document.getElementById('vspick'); if (p) p.innerHTML = ''; }
+  if (vsSel !== selectionSig()) { vsSel = selectionSig(); vsVoyage = null; }
+  if (!vsVoyage && selection.expedition) {
+    const run = selection.voyage ? pageRuns[0] : medianPageRun();
+    if (run) vsVoyage = run.name;
+  }
   const asked = r.preset;
   try { vsRef = vsRef || localStorage.getItem('thorp.vs.ref'); } catch { /* blocked */ }
-  const q = `preset=${encodeURIComponent(r.preset)}${vsRef ? `&ref=${encodeURIComponent(vsRef)}` : ''}${vsVoyage ? `&voyage=${encodeURIComponent(vsVoyage)}` : ''}`;
+  const q = `preset=${encodeURIComponent(r.preset)}${vsRef ? `&ref=${encodeURIComponent(vsRef)}` : ''}${vsVoyage ? `&voyage=${encodeURIComponent(vsVoyage)}` : ''}${selection.expedition ? `&runs=${encodeURIComponent(pageRuns.map((x: any) => x.run_id).join(','))}` : ''}`;
   let d: Payload; try { d = await api(`/api/class_vs?${q}`); } catch { body.innerHTML = `<div class="${emptyCls()}">the comparison could not be read (a dashboard server started before it existed has to be restarted)</div>`; return; }
   if (asked !== vsPreset) return;
   const short = (n: string) => (n || '').replace('fu-ogden-v0-1', 'Ogden').replace('-pre', '');
@@ -961,9 +1220,20 @@ async function classShapes(r: Payload): Promise<void> {
   const names: Record<string, string> = { 'shapes/upos_top1': 'part of speech', 'shapes/ogden_top1': 'Ogden kind', 'shapes/keyed_top1': 'keyed word' };
   const dash: Record<string, string> = { 'shapes/upos_top1': 'solid', 'shapes/ogden_top1': 'dot', 'shapes/keyed_top1': 'dash' };
   const traces: any[] = [];
-  d.voyages.forEach((v: any, i: number) => Object.keys(names).forEach((m) => { const s = v.series[m] || []; if (s.length) traces.push({ type: 'scatter', mode: 'lines', name: `${names[m]} · ${short(v.voyage)}`, x: s.map((p: any) => p[0] / 1e6), y: s.map((p: any) => p[1]), line: { color: PALETTE[i % PALETTE.length], dash: dash[m] } }); }));
+  const vv = d.voyages.filter((v: any) => inSelection({ name: v.voyage }));
+  if (!vv.length) { empty('shapeschart', 'no voyage of this selection carries the shapes readings yet'); el.innerHTML = ''; return; }
+  if (medianMode()) {
+    Object.keys(names).forEach((m, i) => {
+      const ss = vv.map((v: any) => v.series[m] || []).filter((s: any) => s.length).map((s: any) => ({ x: s.map((p: any) => p[0] / 1e6), y: s.map((p: any) => p[1]) }));
+      if (!ss.length) return;
+      const med = medianSeries(ss);
+      traces.push({ type: 'scatter', mode: 'lines', name: `${names[m]} · median`, x: med.x, y: med.y, line: { color: PALETTE[i % PALETTE.length], dash: dash[m], width: 2 } });
+    });
+  } else {
+    vv.forEach((v: any, i: number) => Object.keys(names).forEach((m) => { const s = v.series[m] || []; if (s.length) traces.push({ type: 'scatter', mode: 'lines', name: `${names[m]} · ${short(v.voyage)}`, x: s.map((p: any) => p[0] / 1e6), y: s.map((p: any) => p[1]), line: { color: PALETTE[i % PALETTE.length], dash: dash[m] } }); }));
+  }
   plot('shapeschart', traces, layout({ xaxis: { title: 'tokens read (millions)', gridcolor: C.line }, yaxis: { title: 'top guess right', tickformat: '.0%', gridcolor: C.line } }));
-  const v = d.voyages[0];
+  const v = vv[0];
   const pct = (x: number | null) => x == null ? '–' : `${Math.round(100 * x)}%`;
   el.innerHTML = `<h3>What kind of word it expects <span class="s">${esc(short(v.voyage))}, its latest reading: its probability on each kind of word against the judge books' own share</span></h3>
     <div class="scroll"><table class="subjtable"><thead><tr><th>kind of word</th><th>expects</th><th>the text holds</th><th></th></tr></thead><tbody>${d.fine.filter((t: string) => (v.truth[t] || 0) > 0.004 || (v.mass[t] || 0) > 0.004).map((t: string) => {
@@ -972,22 +1242,26 @@ async function classShapes(r: Payload): Promise<void> {
 }
 
 // ---- Ask the best version -------------------------------------------------------------------------
-let askWired = false, askPreset = '', askBest: Payload = null, askQuestions: any[] = ASK_QUESTIONS, askSet = 'world', classQuestions: Payload = null, logicQuestions: any[] | null = null;
+let askWired = false, askPreset = '', askSel = '', askBest: Payload = null, askQuestions: any[] = ASK_QUESTIONS, askSet = 'world', classQuestions: Payload = null, logicQuestions: any[] | null = null;
 async function askPanel(r: Payload, ladder: Ladder): Promise<void> {
   const who = document.getElementById('askwho'), sel = document.getElementById('askvoyage') as HTMLSelectElement | null;
   if (!who || !sel) return;
-  if (askPreset !== r.preset) {
-    askPreset = r.preset; askBest = null; who.innerHTML = `<span class="s">finding the best ${esc(r.preset)}…</span>`; sel.innerHTML = '';
+  if (askPreset !== r.preset || askSel !== selectionSig()) {
+    askPreset = r.preset; askSel = selectionSig(); askBest = null; who.innerHTML = `<span class="s">finding the best ${esc(r.preset)}…</span>`; sel.innerHTML = '';
     ['askguess', 'askanswer', 'askall'].forEach((id) => { const b = document.getElementById(id) as HTMLButtonElement | null; if (b) b.disabled = true; });
     const out = document.getElementById('askout'); if (out) out.innerHTML = '';
     let d: Payload; try { d = await api(`/api/class_best?preset=${encodeURIComponent(r.preset)}`); } catch { who.textContent = 'the best version could not be read'; return; }
-    askBest = d.best;
-    const b = d.best;
+    let b = d.best;
+    if (selection.expedition) {
+      const target = selection.voyage ? pageRuns[0] : medianPageRun();
+      if (target) b = { ...(b || {}), name: target.ship || target.name, ship: target.ship, ship_key: target.ship_key, run: target.name, runs: [target.name], sailings: 1, objective: null, why: selection.voyage ? 'the voyage selected at the top of the page' : `the median voyage of ${selection.expedition}` };
+    }
+    askBest = b;
     who.innerHTML = b ? `Talking to ${b.name && b.name !== b.ship ? `<b>${esc(b.name)}</b> · ` : ''}<a href="${shipHash(b.ship_key)}">${b.name && b.name !== b.ship ? esc(b.ship) : `<b>${esc(b.ship)}</b>`}</a> · ${b.sailings} voyage${b.sailings === 1 ? '' : 's'}${b.objective ? ` · <b>${esc(b.objective.label)}</b> ${(100 * b.objective.value).toFixed(1)}%` : ''}${b.chaining_lift != null ? ` · chaining lift ${b.chaining_lift >= 0 ? '+' : ''}${b.chaining_lift.toFixed(3)}` : ''}<div class="s">${esc(b.why)}</div>`
       : `<span class="s">the leaderboard has no best ${esc(r.preset)} yet: pick a voyage</span>`;
     const best = b ? b.runs : [];
     sel.innerHTML = (best.length ? `<optgroup label="the best version">${best.map((n: string) => `<option value="${esc(n)}">${esc(n)}</option>`).join('')}</optgroup>` : '')
-      + `<optgroup label="every finished voyage of this size">${d.voyages.filter((v: any) => !best.includes(v.name)).map((v: any) => `<option value="${esc(v.name)}">${esc(v.name)}</option>`).join('')}</optgroup>`;
+      + `<optgroup label="every finished voyage of this size">${(() => { const seen = new Set<string>(best); return d.voyages.filter((v: any) => !seen.has(v.name) && (!selection.expedition || pageRuns.some((x: any) => x.name === v.name))).filter((v: any) => { if (seen.has(v.name)) return false; seen.add(v.name); return true; }).map((v: any) => `<option value="${esc(v.name)}">${esc(v.name)}</option>`).join(''); })()}</optgroup>`;
     if (b && b.run) sel.value = b.run;
     ['askguess', 'askanswer', 'askall'].forEach((id) => { const el = document.getElementById(id) as HTMLButtonElement | null; if (el) el.disabled = !sel.value; });
     try {
@@ -1066,7 +1340,7 @@ async function mathsBook(r: Payload, ladder: Ladder): Promise<void> {
   if (!mathsData) { try { mathsData = await api('/api/maths_book'); } catch { out.innerHTML = `<div class="${emptyCls()}">the maths book could not be read (a dashboard started before it existed has to be restarted)</div>`; return; } }
   const sopSel = document.getElementById('mathssop') as HTMLSelectElement | null;
   const fill = (): void => {
-    const runs = (ladder.runs || []).filter((x: any) => x.preset === r.preset && !(x.name || '').startsWith('smoke'));
+    const runs = selection.expedition ? pageRuns : (ladder.runs || []).filter((x: any) => x.preset === r.preset && !(x.name || '').startsWith('smoke'));
     const vers = [...new Set(runs.map((x: any) => x.sop).filter(Boolean))].sort() as string[];
     if (sopSel) {
       const keep = sopSel.value;
@@ -1074,13 +1348,15 @@ async function mathsBook(r: Payload, ladder: Ladder): Promise<void> {
       sopSel.value = vers.includes(keep) ? keep : '';
     }
     const want = sopSel ? sopSel.value : '';
-    const sig = `${r.preset}|${want}`;
+    const sig = `${r.preset}|${want}|${selectionSig()}`;
     if (sel.dataset.built === sig && sel.options.length) return;
     const mine = runs.filter((x: any) => !want || String(x.sop || '') === want);
     if (mine.length) {
       const was = sel.value;
       sel.innerHTML = mine.map((x: any) => `<option value="${esc(x.name)}">${esc(x.name)}${x.status === 'running' ? ' · at sea' : ''}</option>`).join('');
       if (mine.some((x: any) => x.name === was)) sel.value = was;
+      const target = selection.expedition ? (selection.voyage ? pageRuns[0] : medianPageRun()) : null;
+      if (target && mine.some((x: any) => x.name === target.name)) sel.value = target.name;
       sel.dataset.preset = r.preset;
       sel.dataset.built = sig;
       return;
@@ -1118,113 +1394,39 @@ async function mathsBook(r: Payload, ladder: Ladder): Promise<void> {
   });
 }
 
-// ---- the Navigator's Wager ------------------------------------------------------------------------
-let wagerData: Payload = null, wagerRound: string | null = null, wagerWired = false, wagerPreset = '';
-async function classWager(r: Payload, path: string): Promise<void> {
-  const el = document.getElementById('wagertable'); if (!el) return;
-  if (wagerPreset !== r.preset) { wagerPreset = r.preset; wagerRound = null; }
+// ---- SOPs (the old Fitouts tab) -------------------------------------------------------------------
+let sopsKey = '';
+async function classSops(r: Payload): Promise<void> {
+  const el = document.getElementById('classsops'); if (!el) return;
   let d: Payload;
-  try { d = await api(`/api/wager?preset=${encodeURIComponent(r.preset)}`); } catch (e) {
-    const old = /not valid JSON|not found|404/i.test(String((e as Error).message || e));
-    el.innerHTML = `<div class="${emptyCls()}">${old ? 'this dashboard server was started before the Bet tab existed, so it has no wager to give: restart it (<span class="mono">uv run --project backend thorp dash</span>) and reload' : 'the wager could not be read: ' + esc(String((e as Error).message || e))}</div>`; return;
-  }
-  wagerData = d;
-  const csel = document.getElementById('wagercontrol') as HTMLSelectElement | null, lsel = document.getElementById('wagerlever') as HTMLSelectElement | null;
-  if (csel && csel.options.length !== d.controls.length) csel.innerHTML = d.controls.map((c: string) => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
-  if (lsel && lsel.options.length !== d.levers.length) lsel.innerHTML = d.levers.map((l: any) => `<option value="${esc(l.key)}">${esc(l.name)}</option>`).join('');
-  const aboutEl = document.getElementById('wagerleverabout');
-  const about = (): void => { const l = lsel ? d.levers.find((x: any) => x.key === lsel.value) : null; if (aboutEl) aboutEl.textContent = l ? l.about : ''; };
-  about();
-  if (!wagerRound || !d.rounds.find((x: any) => x.key === wagerRound)) {
-    let saved: string | null = null; try { saved = localStorage.getItem('thorp.wager.' + r.preset); } catch { /* blocked */ }
-    wagerRound = (d.rounds.find((x: any) => x.key === saved) || d.rounds.find((x: any) => x.open) || d.rounds[0] || {}).key || null;
-  }
-  const roundsEl = document.getElementById('wagerrounds');
-  if (roundsEl) roundsEl.innerHTML = d.rounds.length ? d.rounds.map((x: any) => {
-    const s = x.settled ? `${x.winner === 'navigator' ? 'you won' : 'the House won'} ${x.score.navigator}–${x.score.house}`
-      : x.pull_voyage.status === 'at sea' ? 'at sea' : x.in_queue ? 'queued' : x.open ? 'open: bet, then queue' : x.pull_voyage.status;
-    return `<button type="button" class="wround${x.key === wagerRound ? ' on' : ''}" data-round="${esc(x.key)}"><b>${esc(x.lever)}</b><span class="s">${esc(x.pull.replace('fu-ogden-v0-1', 'Ogden'))}</span><span class="wstate">${esc(s)}</span></button>`;
-  }).join('') : `<div class="${emptyCls()}">no rounds yet: deal one above</div>`;
-  const R = d.rounds.find((x: any) => x.key === wagerRound);
-  const head = document.getElementById('wagerhead');
-  if (!head) return;
-  if (!R) { head.innerHTML = ''; el.innerHTML = ''; } else {
-    const chips = R.cards.filter((c: any) => c.bet && !c.bet.practice).length;
-    const canQueue = R.pull_voyage.status === 'queued' && !R.in_queue;
-    head.innerHTML = `<div class="whead"><div><b>${esc(R.lever)}</b> · ${esc(R.about || '')}</div>
-      <div class="s">control <span class="mono">${esc(R.control)}</span> (${esc(R.control_voyage.status)}) → pull <span class="mono">${esc(R.pull)}</span> (${esc(R.in_queue ? 'in the queue' : R.pull_voyage.status)})</div>
-      <div class="wscore"><span>chips ${chips} of ${d.chips}</span>${R.settled ? `<span>you <b>${R.score.navigator}</b> · Claude <b>${R.score.claude}</b> · the House <b>${R.score.house}</b> · <b>${R.winner === 'navigator' ? 'you win' : 'the House wins'}</b></span>` : '<span class="s">the outcome shows when both voyages are home</span>'}
-      ${canQueue ? `<button class="${btnCls('default')}" type="button" id="wagerqueue">Queue the experiment</button>` : ''}</div></div>`;
-    const byKey = Object.fromEntries(d.deck.map((c: any) => [c.key, c]));
-    const scanAbout = Object.fromEntries((d.scansions || []).map((s: any) => [s.key, `${s.name}: ${s.about}`]));
-    el.innerHTML = d.constellations.map((k: any) => `<div class="wrow"><div class="wsuit"><span class="suit">${esc(k.suit)}</span><b>${esc(k.name)}</b><span class="s">${esc(k.about)}</span></div>
-      ${R.cards.filter((c: any) => (byKey[c.card] as any).constellation === k.key).map((c: any) => {
-        const card = byKey[c.card] as any, bet = c.bet || {}, h = c.house;
-        const disabled = !card.charted ? ' disabled' : '';
-        return `<div class="wcard${card.charted ? '' : ' uncharted'}${c.outcome && bet.move ? (c.points > 0 ? ' won' : ' lost') : ''}" data-card="${esc(c.card)}">
-          <div class="wart"><img src="/art/${esc(c.card)}.png" alt="" loading="lazy" onerror="this.style.display='none'"><span class="wstage">${esc(card.stage)}</span><span class="wcost">${card.cost}</span>${card.scansion ? `<span class="wscan" title="${esc(scanAbout[card.scansion] || '')}">${esc(card.scansion)}</span>` : ''}</div>
-          <div class="wname">${esc(card.name)}</div>
-          <div class="s wability">${esc(card.ability)}</div>
-          ${card.on.length ? `<div class="s">evolves from: ${card.on.map((o: string) => esc(byKey[o].name)).join(' + ')}</div>` : ''}
-          <div class="wfall"><span class="s">control:</span> ${fallText(c.control)}</div>
-          ${R.settled || R.pull_voyage.status === 'at sea' ? `<div class="wfall"><span class="s">pull:</span> ${fallText(c.pull)}</div>` : ''}
-          <div class="wbet"><select class="${selectCls()} wmove"${disabled}><option value="">no chip</option>${d.moves.map((m: string) => `<option value="${m}"${bet.move === m ? ' selected' : ''}>${MOVE_LABEL[m]}</option>`).join('')}</select>
-            <select class="${selectCls()} wlayer"${disabled}><option value="">any layer</option>${Array.from({ length: 6 }, (_, i) => `<option value="${i}"${bet.layer === i ? ' selected' : ''}>layer ${i}</option>`).join('')}</select></div>
-          <div class="s">${h ? `the House: ${esc(h.move)}${h.layer != null ? `, layer ${h.layer}` : ''}` : 'the House: no chip'}${bet.practice ? ' · <b>practice</b> (placed after sailing)' : ''}</div>
-          ${c.claude ? `<div class="s wclaude">Claude: <b>${esc(c.claude.move)}</b>${c.claude.layer != null ? `, layer ${c.claude.layer}` : ''}${c.claude.practice ? ' (practice)' : ''}</div>` : ''}
-          ${c.outcome ? `<div class="woutcome">moved: <b>${esc(c.outcome)}</b>${c.points != null ? ` · you ${c.points > 0 ? '+' : ''}${c.points}` : ''}${c.claude_points != null ? ` · Claude ${c.claude_points > 0 ? '+' : ''}${c.claude_points}` : ''}${c.house_points != null ? ` · the House ${c.house_points > 0 ? '+' : ''}${c.house_points}` : ''}</div>` : ''}
-        </div>`;
-      }).join('')}</div>`).join('');
-  }
-  if (wagerWired) return; wagerWired = true;
-  if (lsel) lsel.onchange = about;
-  const rr = () => r;
-  document.getElementById('wagerdealbtn')?.addEventListener('click', async () => {
-    try { const x = await (await import('../../lib/format')).postJSON<any>('/api/wager/deal', { preset: wagerPreset, control: csel!.value, lever: lsel!.value }); wagerRound = x.key; try { localStorage.setItem('thorp.wager.' + wagerPreset, x.key); } catch { /* blocked */ } void classWager(rr(), path); }
-    catch (e) { const h = document.getElementById('wagerhead'); if (h) h.innerHTML = `<div class="${emptyCls()}">${esc(String((e as Error).message || e))}</div>`; }
-  });
-  roundsEl?.addEventListener('click', (e) => { const b = (e.target as HTMLElement).closest('.wround') as HTMLElement | null; if (!b) return; wagerRound = b.dataset.round!; try { localStorage.setItem('thorp.wager.' + wagerPreset, wagerRound); } catch { /* blocked */ } void classWager(rr(), path); });
-  el.addEventListener('change', async (e) => {
-    const tile = (e.target as HTMLElement).closest('.wcard') as HTMLElement | null; if (!tile) return;
-    const mv = (tile.querySelector('.wmove') as HTMLSelectElement).value, ly = (tile.querySelector('.wlayer') as HTMLSelectElement).value;
-    try { await (await import('../../lib/format')).postJSON('/api/wager/bet', { round: wagerRound, card: tile.dataset.card, move: mv || null, layer: ly === '' ? null : +ly }); }
-    catch (err) { alert(String((err as Error).message || err)); }
-    void classWager(rr(), path);
-  });
-  head.addEventListener('click', async (e) => {
-    if ((e.target as HTMLElement).id !== 'wagerqueue') return;
-    const R2 = wagerData.rounds.find((x: any) => x.key === wagerRound); if (!R2) return;
-    if (!confirm(`Queue ${R2.pull}? It goes at the end of the standing queue and changes what the Mac trains next.`)) return;
-    try { const x = await (await import('../../lib/format')).postJSON<any>('/api/wager/queue', { round: wagerRound }); alert(`${x.queued} is queued, position ${x.position}.`); }
-    catch (err) { alert(String((err as Error).message || err)); }
-    void classWager(rr(), path);
-  });
-}
-
-// ---- Fitouts --------------------------------------------------------------------------------------
-let fitKey = '';
-async function classFitouts(r: Payload): Promise<void> {
-  const el = document.getElementById('classfitouts'); if (!el) return;
-  let d: Payload; try { d = await api('/api/fitouts?preset=' + encodeURIComponent(r.preset)); } catch { return; }
-  if (!d.fitouts) { el.innerHTML = `<div class="${emptyCls()}">${d.error ? 'the fitouts could not be read: ' + esc(d.error) : 'reading the fitouts (a few seconds)…'}</div>`; return; }
-  const key = r.preset + JSON.stringify(d); if (key === fitKey) return; fitKey = key;
-  if (!d.fitouts.length) { el.innerHTML = '<div class="' + emptyCls() + '">no fitout curated for this size yet</div>'; return; }
-  const stageOf = (run: string) => /-pre-/.test(run) ? ['pretraining', 0] : /-post(\d+)-/.test(run) ? [`post-training ${run.match(/-post(\d+)-/)![1]}`, +run.match(/-post(\d+)-/)![1]] : ['', 9];
-  el.innerHTML = d.fitouts.map((f: any) => {
-    const runs = [...(f.runs || [])].sort((a: any, b: any) => (stageOf(a.run)[1] as number) - (stageOf(b.run)[1] as number) || a.run.localeCompare(b.run));
-    const rc = f.run_cards || {};
-    const prog = `<div class="k mt">The cards each stage drew <span class="s">the four necessary cards' latest readings, voyage by voyage</span></div>
-      <div class="scroll"><table class="decktable" data-nosort><thead><tr><th>stage</th><th>voyage</th><th></th>${NEEDED.map(([k, n]) => { const fc = CARD_FACE[k] || {}; return `<th>${fc.rank || ''}${fc.suit || ''} ${esc(n)}</th>`; }).join('')}</tr></thead><tbody>${runs.map((x: any) => {
-        const c = rc[x.run];
-        return `<tr><td>${esc(stageOf(x.run)[0])}</td><td>${c ? `<a href="${shipHash(x.run)}">${esc(x.run)}</a>` : esc(x.run)}</td><td>${statusPill(x.status || 'queued')}</td>${NEEDED.map(([k]) => {
-          const v = c && c[k]; if (!v) return `<td class="s">${c ? 'no reading' : 'not sailed'}</td>`;
-          const best = Math.max(v.one ?? -Infinity, v.shared ?? -Infinity), fc = CARD_FACE[k] || {};
-          return `<td title="one head ${v.one != null ? v.one.toFixed(3) : '–'}${v.shared != null ? `, shared ${v.shared.toFixed(3)}` : ''}; the mark ${v.threshold}"><span class="minicard${v.lit ? ' on' : ''}"><b>${fc.rank || ''}</b><i>${fc.suit || ''}</i></span> ${isFinite(best) ? fmt(best) : '–'}</td>`;
-        }).join('')}</tr>`;
-      }).join('')}</tbody></table></div>`;
-    return fitoutCard(f) + prog;
+  try { d = await api('/api/sops?preset=' + encodeURIComponent(r.preset)); }
+  catch { el.innerHTML = `<div class="${emptyCls()}">the SOPs could not be read</div>`; return; }
+  const key = r.preset + JSON.stringify(d); if (key === sopsKey) return; sopsKey = key;
+  if (!d.versions || !d.versions.length) { el.innerHTML = `<div class="${emptyCls()}">no SOP is registered yet</div>`; return; }
+  const pct = (v: number | null | undefined) => `${Math.round(100 * (v || 0))}%`;
+  el.innerHTML = d.versions.map((v: any) => {
+    const c = v.content || {}, par = v.parameters || {}, opt = par.optim || {}, depth = v.depth || {};
+    const score = v.score;
+    const runs = v.runs || [];
+    const phases = (v.phases || []).map((p: any) => `<span class="sopseg" style="flex:${Math.max(1, Math.round(100 * (p.share || 0)))}"><b>${esc(p.kind)}</b> ${pct(p.share)}${p.hold != null ? ` · hold ${pct(p.hold)}` : ''}${p.fade != null ? ` · fade ${pct(p.fade)}` : ''}</span>`).join('');
+    return `<div class="libsum sopcard">
+      <div class="sophead"><b>SOP v${esc(v.version)}</b>${v.current ? ` <span class="${pillCls('good')}">the current standard</span>` : ''}${v.locked ? ` <span class="${pillCls('running')}">locked: a ship at sea</span>` : ''}<span class="s">${v.adopted ? `adopted ${esc(String(v.adopted).slice(0, 10))}` : ''}${v.supersedes ? ` · supersedes v${esc(v.supersedes)}` : ''}</span></div>
+      <div class="s">${esc(String(v.about || '').replace(/\*\*/g, ''))}</div>
+      <div class="libstats" style="margin-top:8px">
+        <div class="libstat"><b>${score && score.chaining != null ? fmt(score.chaining) : '–'}</b><span>chaining${score ? ` · ${score.clears}/${score.of} chart points` : ''}</span></div>
+        <div class="libstat"><b>${runs.length}</b><span>voyage${runs.length === 1 ? '' : 's'} at ${esc(r.preset)}</span></div>
+        <div class="libstat"><b>${depth.layers ?? '–'}</b><span>layers · ${depth.width ?? '–'} wide</span></div>
+        <div class="libstat"><b>${c.passes ?? '–'}</b><span>passes · ${(c.tokeniser || {}).vocab ?? '–'} vocab</span></div>
+      </div>
+      <div class="sopbars">${phases}</div>
+      <div class="sopmeta">
+        <div><div class="k">content</div><div class="s">${esc(c.name || '–')} · ${esc(String(c.recipe || '–').replace('lists/', ''))}</div></div>
+        <div><div class="k">optimiser</div><div class="s">${esc(opt.name || '–')} · clip ${opt.grad_clip ?? '–'} · ${esc(par.positions || '')} · context ${par.context ?? '–'}</div></div>
+        <div><div class="k">depth rule</div><div class="s">${esc(String((v.depth || {}).rule || '').slice(0, 140))}</div></div>
+      </div>
+      ${runs.length ? `<div class="scroll" style="margin-top:8px"><table class="selbooks"><thead><tr><th>voyage</th><th>ship</th><th>status</th><th>started</th></tr></thead><tbody>${runs.map((x: any) => `<tr><td><a href="${shipHash(x.name)}">${esc(x.name)}</a></td><td>${esc(x.ship || '')}</td><td>${statusPill(x.status || '')}</td><td class="s">${esc(String(x.started || '').slice(0, 16).replace('T', ' '))}</td></tr>`).join('')}</tbody></table></div>` : '<div class="s mt">no voyage at this size has sailed this version yet</div>'}
+    </div>`;
   }).join('');
-  el.querySelectorAll<HTMLAnchorElement>('a.foshelf').forEach((a) => { a.onclick = (e) => { e.preventDefault(); location.href = '/library'; }; });
 }
 
 export { guarded as sizeGuarded };

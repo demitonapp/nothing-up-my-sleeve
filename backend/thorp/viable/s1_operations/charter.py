@@ -42,7 +42,7 @@ from pathlib import Path
 import yaml
 
 from thorp import paths, store
-from thorp.ledger import Ledger
+from thorp.ledger import Ledger, reader
 from thorp.viable.s1_operations.vast import NoKey, Vast, api_key, http_transport
 from thorp.viable.s2_coordination import charter as s2
 from thorp.viable.s3_control import charter as s3
@@ -184,7 +184,7 @@ class Box:
         # whole && list as a subshell whose stdout is still ssh's, so ssh stayed open for the whole voyage (2026-11-08, P1:
         # the charter never reached its poll loop, so no mid-run pulls and no overrun deadline).
         papers = f"{REMOTE}/data/charter/{rid}.papers.json"  # the S5 state its gate reads (thorp/store.py)
-        self.sh(f"cd {REMOTE}; THORP_BACKEND=torch THORP_DEVICE=cuda THORP_PAPERS={papers} nohup sh -c {shlex.quote(inner)} > /dev/null 2>&1 < /dev/null &", timeout=120)
+        self.sh(f"cd {REMOTE}; THORP_BACKEND=torch THORP_DEVICE=cuda THORP_PAPERS={papers} THORP_SHIP_LOG=1 nohup sh -c {shlex.quote(inner)} > /dev/null 2>&1 < /dev/null &", timeout=120)
 
     def finished(self, rid: str) -> int | None:
         """The voyage's exit status once it has come in, else None."""
@@ -452,7 +452,7 @@ def sail(spec_path: str, gpu: str | None = None, vast=None, resolver=None, box_f
     """The chartered voyage, from the quote to the release. Returns what it came home with."""
     from thorp import train
 
-    rec = rec or Ledger()
+    rec = rec or reader()
     q0 = quote(spec_path, gpu=gpu, vast=vast, resolver=resolver, log=log)
     spec, p, t, vast = q0["spec"], q0["plan"], q0["terms"], q0["vast"]
     rid = p["run_id"]

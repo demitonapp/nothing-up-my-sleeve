@@ -1,0 +1,87 @@
+# second seed of 300k@v0.0.6-release (10 November 2026): the same fitout, seed 2, for the seed pair
+checkpoint:
+  every_steps: 640
+data:
+  clean: unwrap-v2
+  order: shuffled
+  passes: 4
+  recipe: lists/ogden-v0.1.csv
+  refuse:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+  - lists/hole-cards-unseen.csv
+eval:
+  evaluators:
+  - ce_bpb
+  - discovery
+  - logic
+  - stars
+  - nevermore
+  - cards
+  - shapes
+  - pips
+  every_steps: 640
+  light:
+    evaluators:
+    - stars
+    - nevermore
+    - cards
+    - logic
+    - shapes
+    - pips
+    every_steps: 64
+  sets:
+  - lists/hole-cards-unseen.csv
+experiment: 'Fitout ogden-v0-1: one fixed Ogden corpus for every class; what cards
+  and stars form at each size?'
+model:
+  context: 1024
+  family: gpt
+  positions: rope
+  preset: 300k
+name: 300k@v0.0.6-release-s2
+optim:
+  batch_tokens: 32768
+  betas:
+  - 0.9
+  - 0.95
+  grad_clip: 1.0
+  lr: 0.003
+  min_lr_ratio: 0.1
+  name: adamw
+  precision: bf16
+  scaffold:
+    fade: 0.4
+    heads:
+    - card: previous_word
+      head: 0
+      layer: 0
+    - card: delimiter
+      head: 1
+      layer: 0
+    - card: induction
+      head: 0
+      layer: 4
+    hold: 0.25
+    riddles:
+      comparator:
+        head: 1
+        items: 16
+        layer: 2
+        pool: 2048
+    weight: 1.0
+    release: 0.4
+  schedule: cosine
+  warmup_steps: 100
+  weight_decay: 0.1
+question: 'The schedule''s release step at 300k: the pull held to 25% and faded out
+  by 40% of the voyage, then released, instead of eased out to the end. Does handing
+  the cards to the weights early hold them, or lose them? Read against the fixed fade.'
+seed: 2
+ship: SOP v0.0.6 at 300k (6 layers)
+sop: 0.0.6
+tokeniser:
+  byte_fallback: true
+  kind: spm-bpe
+  train_on: lists/ogden-v0.1.csv
+  vocab: 2048

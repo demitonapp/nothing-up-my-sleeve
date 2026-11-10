@@ -96,6 +96,9 @@ a.crumb:not(:empty)::after { content: ' ›'; }
           position: fixed; inset: 0; z-index: 60; background: var(--paper); color: var(--ink);
           display: flex; flex-direction: column; font-family: var(--rserif); }
 #reader[hidden] { display: none; }
+/* `hidden` must win over the display a component class sets: a panel hidden per size or tab (the 1m's
+   calibration on the 300k, the stage and library-aboard panels) otherwise shows with a blank chart */
+[hidden] { display: none !important; }
 /* a tab that doesn't apply is hidden: the tab classes' display: flex would otherwise win over [hidden] */
 #expnav a[hidden] { display: none; }
 #harbourtabs[hidden], #harbourtabs a[hidden] { display: none; }
@@ -268,6 +271,61 @@ svg.journey .j-tp { fill: var(--accent); font-size: 11px; font-weight: 600; }
 .route .step .ab { color: var(--muted); font-size: var(--fs-xs); flex: 1; }
 .route .step .gt { display: flex; flex-direction: column; gap: 2px; font-size: var(--fs-xs); }
 .route .step .ct { color: var(--muted); font-size: var(--fs-xs); }
+.domainhero { display: grid; grid-template-columns: minmax(220px, 360px) 1fr; gap: 18px; align-items: center; }
+.domainhero img { width: 100%; height: 220px; object-fit: cover; border-radius: var(--r-md); border: 1px solid var(--line); }
+.domainhero h2 { margin: 2px 0 4px; color: var(--text); text-transform: none; letter-spacing: 0; font-size: var(--fs-xl); }
+.domainhero p { margin: 0 0 4px; }
+.domainskills { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; }
+.domainskills .skill { border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; }
+.domainskills .skill.measured { border-left: 2px solid var(--accent); }
+@media (max-width: 700px) { .domainhero { grid-template-columns: 1fr; } .domainhero img { height: 180px; } }
+.discdoors { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin: 4px 0 18px; }
+.discdoor { display: block; overflow: hidden; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--panel); text-decoration: none; color: var(--text); transition: border-color .15s ease, transform .15s ease; }
+.discdoor:hover, .discdoor:focus-visible { border-color: var(--accent); transform: translateY(-2px); outline: none; }
+.discdoor img { display: block; width: 100%; height: 190px; object-fit: cover; opacity: .92; }
+.discdoor .db { padding: 10px 12px 12px; }
+.discdoor .dk { display: block; color: var(--accent); font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .07em; }
+.discdoor b { display: block; margin-top: 1px; font-size: var(--fs-md); }
+.discdoor p { margin: 3px 0 0; color: var(--muted); font-size: var(--fs-sm); line-height: 1.4; }
+.qt { display: flex; flex-direction: column; gap: 14px; }
+.qtchain { border: 1px solid var(--line); border-radius: var(--r-md); padding: 12px 14px; }
+.qtchain header h3 { margin: 0 0 2px; font-size: var(--fs-base); }
+.qtchain header p { margin: 0 0 10px; color: var(--muted); font-size: var(--fs-sm); }
+.qtladder { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 8px; }
+.qtstep { display: flex; flex-direction: column; gap: 4px; text-align: left; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--text); padding: 9px 10px; cursor: pointer; font: inherit; }
+.qtstep:hover, .qtstep:focus-visible { border-color: var(--accent); background: var(--raise); outline: none; }
+.qtstep .n { color: var(--accent); font-size: var(--fs-xs); font-weight: 600; }
+.qtstep b { font-size: var(--fs-sm); }
+.qtstep .adds { color: var(--muted); font-size: var(--fs-xs); line-height: 1.35; flex: 1; }
+.qtstep em { color: var(--muted); font-style: normal; font-size: 10px; }
+.qmodal { position: fixed; inset: 0; z-index: 100; background: rgba(0,0,0,.72); display: flex; align-items: center; justify-content: center; padding: 24px; }
+.qmodalbox { position: relative; width: min(900px, 100%); max-height: 86vh; overflow: auto; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-md); padding: 20px 22px; box-shadow: 0 24px 80px rgba(0,0,0,.6); }
+.qmodalbox h3 { margin: 2px 0 4px; }
+.qmodalbox p { margin: 0 0 8px; }
+.qclose { position: absolute; top: 8px; right: 10px; border: 0; background: transparent; color: var(--muted); font-size: 22px; cursor: pointer; line-height: 1; }
+.qclose:hover { color: var(--accent); }
+.qlist { margin: 10px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.qlist li { border-top: 1px solid var(--line); padding-top: 8px; }
+.qprompt { font-size: var(--fs-sm); }
+.qprompt b { color: var(--accent); }
+.qans { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 3px; font-size: var(--fs-xs); }
+.qidea, .qrival { padding: 1px 7px; border-radius: var(--r-pill); border: 1px solid var(--line); }
+.qidea { color: var(--good); border-color: color-mix(in srgb, var(--good) 45%, var(--line)); }
+.qrival { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 45%, var(--line)); }
+.skillgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.skillstep { border: 1px solid var(--line); border-radius: var(--r-md); padding: 10px 12px; min-width: 0; }
+.skillstep h3 { margin: 0 0 4px; font-size: var(--fs-base); display: flex; align-items: baseline; gap: 6px; }
+.skillstep h3 .n { color: var(--accent); font-size: var(--fs-sm); }
+.skillstep h3 .s { font-weight: 400; }
+.skillstep p { margin: 0 0 8px; }
+.skills { display: flex; flex-direction: column; gap: 6px; }
+.skill { display: block; border-top: 1px solid var(--line); padding-top: 6px; text-decoration: none; }
+.skill:first-child { border-top: 0; padding-top: 0; }
+.skill b { display: block; color: var(--text); }
+.skill span { display: block; color: var(--muted); font-size: var(--fs-sm); line-height: 1.35; }
+.skill em { display: block; color: var(--muted); font-style: normal; font-size: var(--fs-xs); margin-top: 2px; }
+.skill.measured { border-left: 2px solid var(--accent); padding-left: 8px; }
+.skill:hover b { color: var(--accent); }
 .route .arrow { align-self: center; color: var(--muted); }
 /* a class's goals on the route (the Goals tab) */
 .goalroute { display: grid; gap: 8px; }
@@ -644,6 +702,16 @@ main a.pc2-more:hover { color: #000; }
 .foblock .fop { color: var(--muted); margin-top: 4px; font-size: 11px; line-height: 1.4; }
 .foruns { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; font-size: var(--fs-sm); }
 
+/* SOPs (the old Fitouts tab) */
+.sopcard { border-top: 1px solid var(--line); padding-top: 12px; margin-top: 14px; }
+.sopcard:first-child { border-top: 0; margin-top: 0; padding-top: 0; }
+.sophead { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.sophead b { font-size: 1.05em; }
+.sopbars { display: flex; gap: 3px; margin-top: 10px; }
+.sopseg { border: 1px solid var(--line); border-radius: 4px; padding: 5px 8px; font-size: 11px; background: var(--panel); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sopseg b { font-weight: 600; text-transform: uppercase; letter-spacing: .05em; font-size: 10px; color: var(--muted); }
+.sopmeta { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; margin-top: 10px; }
+
 .censustable tr.cenrow { cursor: pointer; }
 .censustable tr.cenrow:hover td { background-color: var(--raise); }
 .censustable tr.censtage td { font-size: 11px; background: var(--raise); }
@@ -848,6 +916,7 @@ main a.pc2-more:hover { color: #000; }
 .skychip.on { color: var(--text); border-color: var(--accent); }
 .skychip .s { font-size: 10px; }
 .skytabs { display: inline-flex; gap: 4px; }
+.obsnav { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
 /* the Nevermore card traced: every head through the sieves to the link */
 .nvsvg { display: block; width: 100%; min-width: 760px; height: auto; }
 .nvlink { fill: none; stroke: var(--track); opacity: .55; }
@@ -1349,6 +1418,16 @@ a.sopcard:hover { border-color: var(--blue); }
 .sym { display: inline-block; padding: 1px 6px; margin: 1px 4px 1px 0; border-radius: 4px; background: color-mix(in oklab, var(--blue) 14%, transparent); font-family: var(--mono); font-size: var(--fs-xs); }
 
 /* the plan's click-to-open explanations (a details element, so no script is needed in a HTML string) */
+#discCards th, #discCards td { padding: 4px 9px; vertical-align: top; }
+#discCards th { color: var(--muted); font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; }
+#discCards td { white-space: nowrap; }
+#scaffoldtable, #scaffoldruns { width: 100%; border-collapse: collapse; }
+#scaffoldtable th, #scaffoldtable td, #scaffoldruns th, #scaffoldruns td { padding: 5px 9px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); white-space: nowrap; }
+#scaffoldtable th, #scaffoldruns th { color: var(--muted); font-weight: 500; font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .04em; }
+#scaffoldruns td { white-space: normal; }
+.scaffoldruns { margin: 8px 0 14px; }
+.scaffoldruns > summary { cursor: pointer; color: var(--muted); font-size: var(--fs-sm); width: max-content; }
+.scaffoldruns > summary:hover { color: var(--accent); }
 .hint { display: inline-block; position: relative; margin-left: 5px; }
 .hint > summary { list-style: none; display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; border-radius: 50%; border: 1px solid var(--line); font-size: 10px; color: var(--muted); cursor: pointer; }
 .hint > summary::-webkit-details-marker { display: none; }
@@ -1427,6 +1506,15 @@ a.sopcard:hover { border-color: var(--blue); }
 .schedbar .marker { position: absolute; top: -3px; width: 2px; height: 18px; background: var(--text); border-radius: 1px; }
 .schedcap { display: flex; align-items: baseline; gap: 8px; margin-top: 4px; }
 
+/* per-card schedules: the groups of cards that run different schedules (some released, some faded) */
+.schedgroups { display: grid; gap: 6px; margin-top: 8px; }
+.schedgroups .g { display: grid; grid-template-columns: 52px 1fr auto; align-items: center; gap: 8px; }
+.schedgroups .g > .s:first-child { text-align: right; }
+.schedgroups .g > .s:last-child { white-space: nowrap; }
+.schedgroups .schedbar { height: 8px; }
+.schedgroups .schedbar .seg:first-child { border-radius: 4px 0 0 4px; }
+.schedgroups .schedbar .seg:last-of-type { border-radius: 0 4px 4px 0; }
+
 /* a ship's card holdings: classes and suits, not the individual cards */
 .holding { font-variant-numeric: tabular-nums; }
 
@@ -1466,3 +1554,38 @@ a.sopcard:hover { border-color: var(--blue); }
 .scheddetail table { width: 100%; border-collapse: collapse; font-size: var(--fs-xs); }
 .scheddetail th { text-align: left; color: var(--muted); font-weight: 500; padding: 2px 8px 2px 0; text-transform: uppercase; letter-spacing: .04em; }
 .scheddetail td { padding: 3px 8px 3px 0; vertical-align: top; border-top: 1px solid var(--line); }
+
+/* the size page's expedition breakdown: the shared DataTable/shadcn table classes own the look;
+   the old #expuse overrides (top alignment, no numeric alignment) are gone (10 November) */
+#expuse td:first-child { min-width: 190px; }
+
+/* the queue: the voyage cell carries the name and its one-line goal, without crowding the counts */
+#queuetable { width: 100%; }
+#queuetable td:nth-child(2) { max-width: 620px; }
+#queuetable td:nth-child(2) .s { white-space: normal; }
+
+/* the yard's constraints: a shipwright's table of the throughput levers (10 November) */
+.yardtable { width: 100%; }
+.yardtable th { white-space: nowrap; }
+.yardtable td { vertical-align: top; }
+.yardtable td:nth-child(2) { min-width: 240px; }
+
+/* the constraints page: the title is a page title, the long metaphor a quiet subtitle */
+.yardtitle { margin: 10px 0 16px; font-size: var(--fs-2xl); font-weight: 600; letter-spacing: .01em; }
+.yardtitle .q { display: block; max-width: 1100px; margin-top: 8px; font-size: var(--fs-md); font-weight: 400; line-height: 1.5; color: var(--muted); }
+.yardtable { font-size: var(--fs-md); }
+.yardtable th, .yardtable td { padding: 6px 9px; }
+.yardtable td:nth-child(2) { min-width: 250px; }
+
+/* the road's two blocks per waypoint: the floor and the climb (10 November) */
+.chipgroup { display: flex; align-items: flex-start; gap: 8px; margin-top: 4px; }
+.chiplabel { flex: 0 0 62px; padding-top: 3px; font-size: 10px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+
+/* the road legend: gold is a goal of this size still open; green is performed; grey is above */
+.roadlegend { display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: center; margin: 2px 0 10px; font-size: var(--fs-sm); color: var(--muted); }
+.roadlegend .item { display: inline-flex; align-items: center; gap: 6px; }
+.roadlegend .chip { display: inline-block; padding: 1px 8px; border-radius: var(--r-pill); border: 1px solid var(--line); font-size: var(--fs-xs); color: var(--muted); }
+.roadlegend .chip.mine { color: var(--accent); border-color: var(--accent); background: var(--raise); font-weight: 600; }
+.roadlegend .chip.done { color: var(--good); border-color: var(--good); }
+.roadlegend .chip.above, .roadlegend .chip.taught { opacity: .55; }
+.roadlegend .chip.taught { font-style: italic; }

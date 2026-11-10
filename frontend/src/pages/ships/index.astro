@@ -1,7 +1,9 @@
 ---
-// The Harbours/Ships shells at their own addresses, so a direct /harbours, /sizes or /ships load
-// works (dev has no server fallback; production falls back to these for their sub-paths too). The
-// islands read the route and only the one that answers it renders.
+// The Ships home *and* the production fallback shell for a ship key that was not built on the Mac
+// (dev has no server fallback): the server serves this index.html for /ships/<unknown>, so it must
+// mount every island the address could answer. The known /ships/<preset>/... pages are built from
+// ships/[...path].astro and mount only the one island they need (10 November: /ships/300k was slow
+// because all four islands loaded and the overview pulled Plotly; those pages are now split).
 import Layout from '../../layouts/Layout.astro';
 import Harbours from '../../components/islands/Harbours';
 import SizePage from '../../components/islands/SizePage';

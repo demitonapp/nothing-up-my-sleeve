@@ -27,3 +27,7 @@ ships/lists/nltk_data/
 
 # any vendored dependency tree, wherever it is
 **/node_modules/
+
+# local pnpm store (the sandbox cannot write the shared store; not source)
+.pnpm-store/
+ships/lists/ogden-v0.1.4.csv

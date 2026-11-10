@@ -28,33 +28,28 @@ QUESTIONS = ("breeders_test", "mill_test", "between_test", "pigeonhole_test")
 
 def _runs() -> dict[str, str]:
     """The newest v0.0.5 voyage at each size."""
-    import sqlite3
+    from thorp.ledger import reader
 
-    con = sqlite3.connect(f"file:{paths.ledger_path()}?mode=ro", uri=True)
-    con.row_factory = sqlite3.Row
     out = {}
     for preset, _ in SIZES:
-        r = con.execute(
+        rows = reader().query(
             "select run_id from runs where json_extract(spec_json,'$.model.preset')=? "
             "and json_extract(spec_json,'$.sop')='0.0.5' order by started desc limit 1",
             [preset],
-        ).fetchone()
-        if r:
-            out[preset] = r["run_id"]
-    con.close()
+        )
+        if rows:
+            out[preset] = rows[0]["run_id"]
     return out
 
 
-def _series(con, run: str, name: str) -> list[tuple[int, float]]:
-    return [(r["step"], r["value"]) for r in con.execute(
-        "select step, value from metrics where run_id=? and name=? order by step", (run, name))]
+def _series(run: str, name: str) -> list[tuple[int, float]]:
+    from thorp.ledger import reader
+
+    return [(r["step"], r["value"]) for r in reader().query(
+        "select step, value from metrics where run_id=? and name=? order by step", [run, name])]
 
 
 def payload() -> dict:
-    import sqlite3
-
-    con = sqlite3.connect(f"file:{paths.ledger_path()}?mode=ro", uri=True)
-    con.row_factory = sqlite3.Row
     runs = _runs()
     pin = ((sop.standard("0.0.5") or {}).get("pinning") or {}).get("sizes") or {}
     keepers = getattr(deck, "RETENTION", None) or {}
@@ -68,14 +63,14 @@ def payload() -> dict:
                 continue
             if not c.look or not c.layer:
                 continue  # a Face with no numeric look: nothing to find on a layer
-            layer_series = _series(con, run, c.layer)
+            layer_series = _series(run, c.layer)
             if not layer_series:
                 continue
             look = c.look[0][0]  # the lit metric
-            lit = _series(con, run, look)
+            lit = _series(run, look)
             first = next((s for s, v in lit if v is not None and v >= c.look[1]), None)
             last_step, last_layer = layer_series[-1]
-            count = _series(con, run, look.replace("max_score", "count"))
+            count = _series(run, look.replace("max_score", "count"))
             heads = int(count[-1][1]) if count else (1 if last_layer is not None else 0)
             found[preset] = {
                 "layer": None if last_layer is None else int(last_layer),
@@ -97,7 +92,6 @@ def payload() -> dict:
                 "found": found,
             }
         )
-    con.close()
 
     questions = [
         {"key": k, "name": fleet.TRICKS[k].name, "teaches": fleet.TRICKS[k].about,

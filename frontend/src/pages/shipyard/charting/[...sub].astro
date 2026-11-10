@@ -1,0 +1,16 @@
+---
+// The charting section's tabs: the same Discoveries island as /shipyard/charting, on its own address
+// (10 November, Justin: "it should still be charting"). Dev has no server fallback, so each tab the
+// island links to needs a page here; production serves the shell for the same paths.
+import Layout from '../../../layouts/Layout.astro';
+import Discoveries from '../../../components/islands/Discoveries';
+import Reader from '../../../components/Reader.astro';
+
+export function getStaticPaths() {
+  return ['two-facts', 'quantum', 'registry', 'tells', 'stars', 'cards'].map((sub) => ({ params: { sub } }));
+}
+---
+<Layout>
+  <main><Discoveries client:load /></main>
+  <Reader />
+</Layout>

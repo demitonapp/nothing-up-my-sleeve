@@ -1,0 +1,141 @@
+# The third 1m sailing of Kipling: the short-hold arm's schedule with the spare heads filled. Each of the ten
+# metre cards is pinned twice — its fulldeck site and a second site in the middle (L4-L6) — so twenty of the
+# forty-eight heads carry a card instead of ten. The eleven empty layers of the fulldeck are now six.
+name: 1m@v0.0.6-hold25-double
+ship: 'SOP v0.0.6 at 1m (short hold, twenty pins, GQA, marks)'
+experiment: 'Does pinning each card at a second depth help it form — and does using the middle heads move the
+  bridge, which is the one card the 300k never held?'
+question: 'The third 1m sailing of Kipling, read against 1m@v0.0.6-hold25. The same corpus, tokeniser, GQA and
+  short schedule (full pull to 25%, the nine basics off by 60%, the three decayers faded to 85%), but every one
+  of the ten metre cards is pinned twice: its first site (L0-L3 for the basics, L8 for the Stage 1s) and a second
+  site in the middle (L4 for previous_word, delimiter, sink and rare_word; L5 for premise_marker, words_back,
+  number_spotter and order_word; L6 for induction and duplicate_word). Twenty head pins and the two riddles use
+  twenty-two of the forty-eight heads, and layers L4, L5 and L6 stop being empty. If a card needs a second
+  chance in the middle, this shows it; if the middle only needs the residual stream, the second pins will cost
+  language and buy nothing. The bridge stays the headline: does it read, and does it survive the fade?'
+data:
+  recipe: lists/ogden-v0.1.4.csv
+  passes: 4
+  stages:
+  - name: ogden
+    recipe: lists/ogden-v0.1.4.csv
+    passes: 4
+  order: shuffled
+  refuse:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+  - lists/hole-cards-unseen.csv
+  clean: raw
+  opt_in: 'reads Ogden v0.1.4, v0.1.3 plus the logic tutor at 5% of the words: the whole point of the arm
+    is that every declared control piece is exercised in the text, the two chaining markers premise and
+    conclusion included, which v0.1.3 does not do'
+tokeniser:
+  kind: spm-bpe
+  vocab: 2048
+  byte_fallback: true
+  train_on: lists/ogden-v0.1.4.csv
+  symbols:
+  - "<bos>"
+  - "<eos>"
+  - "<pad>"
+  - "<unk>"
+  - "<sep>"
+  - "<premise>"
+  - "<conclusion>"
+  - "<question>"
+  - "<answer>"
+  - "<end>"
+model:
+  family: gpt
+  preset: 1m
+  kv_heads: 2
+  context: 1024
+  positions: rope
+optim:
+  name: adamw
+  lr: 0.002
+  betas:
+  - 0.9
+  - 0.95
+  weight_decay: 0.1
+  warmup_steps: 100
+  schedule: cosine
+  min_lr_ratio: 0.1
+  batch_tokens: 32768
+  grad_clip: 1.0
+  precision: bf16
+  scaffold:
+    weight: 1.0
+    hold: 0.25
+    fade: 0.85
+    # --- first sites, as the short-hold arm ---
+    heads:
+    - {layer: 0, head: 0, card: previous_word, hold: 0.25, fade: 0.60, release: 0.60}
+    - {layer: 0, head: 1, card: delimiter, hold: 0.25, fade: 0.60, release: 0.60}
+    - {layer: 1, head: 0, card: sink, hold: 0.25, fade: 0.60, release: 0.60}
+    - {layer: 1, head: 1, card: rare_word, hold: 0.25, fade: 0.60, release: 0.60}
+    - {layer: 2, head: 0, card: premise_marker, hold: 0.25, fade: 0.60, release: 0.60}
+    - {layer: 2, head: 1, card: words_back, hold: 0.25, fade: 0.60, release: 0.60}
+    - {layer: 3, head: 0, card: number_spotter, hold: 0.25, fade: 0.60, release: 0.60}
+    - {layer: 3, head: 1, card: order_word, hold: 0.25, fade: 0.60, release: 0.60}
+    - {layer: 8, head: 0, card: induction, hold: 0.25, fade: 0.60, release: 0.60}
+    - {layer: 8, head: 1, card: duplicate_word, hold: 0.25, fade: 0.85}
+    # --- second sites: the same cards, pinned in the middle ---
+    - {layer: 4, head: 0, card: previous_word, hold: 0.25, fade: 0.60, release: 0.60}
+    - {layer: 4, head: 1, card: delimiter, hold: 0.25, fade: 0.60, release: 0.60}
+    - {layer: 4, head: 2, card: sink, hold: 0.25, fade: 0.60, release: 0.60}
+    - {layer: 4, head: 3, card: rare_word, hold: 0.25, fade: 0.60, release: 0.60}
+    - {layer: 5, head: 0, card: premise_marker, hold: 0.25, fade: 0.60, release: 0.60}
+    - {layer: 5, head: 1, card: words_back, hold: 0.25, fade: 0.60, release: 0.60}
+    - {layer: 5, head: 2, card: number_spotter, hold: 0.25, fade: 0.60, release: 0.60}
+    - {layer: 5, head: 3, card: order_word, hold: 0.25, fade: 0.60, release: 0.60}
+    - {layer: 6, head: 0, card: induction, hold: 0.25, fade: 0.60, release: 0.60}
+    - {layer: 6, head: 1, card: duplicate_word, hold: 0.25, fade: 0.85}
+    riddles:
+      comparator:
+        layer: 8
+        head: 2
+        items: 16
+        pool: 2048
+      bridge:
+        layer: 8
+        head: 3
+        items: 16
+        pool: 2048
+eval:
+  sets:
+  - lists/hole-cards-unseen.csv
+  every_steps: 640
+  evaluators:
+  - ce_bpb
+  - discovery
+  - logic
+  - stars
+  - nevermore
+  - cards
+  - shapes
+  - pips
+  light:
+    every_steps: 64
+    evaluators:
+    - stars
+    - nevermore
+    - cards
+    - logic
+    - shapes
+    - pips
+checkpoint:
+  every_steps: 640
+sop: '0.0.6'
+departures:
+- field: content
+  why: reads Ogden v0.1.4, 618 stamped local books (v0.1.3's 592 plus the logic tutor's two-fact passages at
+    5% of the words), read raw so the stamps are the text; v0.1.3 never carried <premise>, <conclusion> or <sep>
+- field: tokeniser
+  why: declares the ten control pieces as single pieces, and all ten are now carried by the corpus
+- field: scaffold
+  why: twenty head pins (each of the ten metre cards at two sites) and the two riddles, held to 25%, the basics
+    released at 60%, the three decayers faded to 85%
+- field: attention
+  why: four query heads share two KV heads (the GQA arm)
+seed: 1

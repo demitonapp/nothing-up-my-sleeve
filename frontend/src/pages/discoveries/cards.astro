@@ -1,4 +1,11 @@
 ---
-// Moved: the cards live at /shipyard/charting now (9 November).
-return Astro.redirect('/shipyard/charting', 301);
+// The cards, discovered: the sixteen-card deck read on the fleet. They also have a home under the
+// shipyard's charting section, but the discoveries page keeps its own tab (10 November).
+import Layout from '../../layouts/Layout.astro';
+import Discoveries from '../../components/islands/Discoveries';
+import Reader from '../../components/Reader.astro';
 ---
+<Layout>
+  <main><Discoveries client:load /></main>
+  <Reader />
+</Layout>

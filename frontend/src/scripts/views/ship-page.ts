@@ -4,7 +4,7 @@
 
 import { big, esc, fmt, get } from '../../lib/format';
 import { alertCls, emptyCls, pillCls, toggleCls } from '../../lib/ui';
-import { route } from '../router';
+import { modelHash, route } from '../router';
 import { shipHash } from '../router';
 import type { Route } from '../router';
 
@@ -59,7 +59,7 @@ export function shipHeader(rung: Payload | null, ship: Payload | null, run: Payl
   const sails = ship ? ship.sailings : run ? [{ run_id: run.run_id, name: run.name, seed: run.seed, status: run.status }] : [];
   return {
     classText: cls ? `${cls.preset} · ${cls.name}` : preset || '',
-    classHref: cls ? `/sizes/${(cls.name || '').toLowerCase().replace(/^the\s+/, '').replace(/[^a-z0-9]+/g, '-')}` : null,
+    classHref: cls ? modelHash(cls) : null,
     name: ship ? ship.name : run ? (run.ship || run.name || run.run_id.slice(0, 12)) : `no ship called ${key}`,
     fitout: ship ? ship.subtitle : '',
     tags: ship ? (ship.archived ? `<span class="${pillCls('')}" title="fitted out before 7 November, 06:40">First Fleet · archived</span>` : `<span class="${pillCls('blue')}">in service</span>`)

@@ -7,7 +7,15 @@ export const fmtBytes = (v: number | null | undefined): string =>
   !v ? '–' : v >= 1e9 ? (v / 1e9).toFixed(2) + ' GB' : v >= 1e6 ? (v / 1e6).toFixed(1) + ' MB' : (v / 1e3).toFixed(0) + ' KB';
 const ESC: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;' };
 export const esc = (s: unknown): string => String(s).replace(/[&<>]/g, (c) => ESC[c]);
-export const get = async <T = any>(u: string): Promise<T> => (await fetch(u)).json();
+// A failed request throws instead of returning the error JSON as the panel's data: otherwise a 500
+// reads as "no voyage of this size", no data, and the viewer is told something false (10 November).
+// A 200 body that carries `error` (the fitouts, the cleaning audit: still computing) is left to the panel.
+export const get = async <T = any>(u: string): Promise<T> => {
+  const res = await fetch(u);
+  const d = (await res.json().catch(() => null)) as any;
+  if (!res.ok) throw new Error((d && d.error) || `${res.status} ${res.statusText}`);
+  return d as T;
+};
 export const postJSON = async <T = any>(url: string, body: unknown): Promise<T> => {
   const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   const d = await res.json().catch(() => ({}));

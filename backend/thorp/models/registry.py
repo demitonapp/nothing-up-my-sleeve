@@ -77,23 +77,47 @@ FAMILIES = {"gpt": _gpt_mlx}
 TORCH_FAMILIES = {"gpt": _gpt_torch}  # the same models in PyTorch (CUDA), thorp/models/backend.py
 
 
-def config(preset: str, vocab: int, context: int, positions: str = "learned", kv_heads: int = 0) -> GPTConfig:
-    if preset not in PRESETS:
+def config(
+    preset: str,
+    vocab: int,
+    context: int,
+    positions: str = "learned",
+    kv_heads: int = 0,
+    layers: int | None = None,
+    width: int | None = None,
+    heads: int | None = None,
+) -> GPTConfig:
+    """A preset, optionally overridden by a checkpoint's own shape.
+
+    Old checkpoints were built before the deep ladder changed the presets (a 300k was 2 layers
+    of 64, now 6 of 48). A rescore must read the checkpoint's shape, not today's preset: the
+    overrides keep an old voyage measurable without rewriting its weights.
+    """
+    base = PRESETS.get(preset) or PRESETS.get(str(preset).split("-")[0])
+    if base is None:
         raise KeyError(f"unknown preset {preset!r}; known: {sorted(PRESETS)}")
     if positions not in ("learned", "rope"):
         raise KeyError(f"unknown positions {positions!r}; known: learned, rope")
+    shape = dict(base)
+    if layers is not None:
+        shape["layers"] = int(layers)
+    if width is not None:
+        shape["width"] = int(width)
+    if heads is not None:
+        shape["heads"] = int(heads)
     extra = {"kv_heads": int(kv_heads)} if kv_heads else {}
-    return GPTConfig(**{**PRESETS[preset], "vocab": vocab, "context": context, "positions": positions, **extra})
+    return GPTConfig(**{**shape, "vocab": vocab, "context": context, "positions": positions, **extra})
 
 
 def build(
     family: str, preset: str, vocab: int, context: int, positions: str = "learned",
     backend: str = "mlx", kv_heads: int = 0,
+    layers: int | None = None, width: int | None = None, heads: int | None = None,
 ):
     families = TORCH_FAMILIES if backend == "torch" else FAMILIES
     if family not in families:
         raise KeyError(f"unknown model family {family!r} for {backend}; known: {sorted(families)}")
-    return families[family](config(preset, vocab, context, positions, kv_heads))
+    return families[family](config(preset, vocab, context, positions, kv_heads, layers, width, heads))
 
 # Other people's ships, for the shape table only (9 November, Justin: "add qwen 4B, Phi 4 mini and llama 3.2 3B"): the
 # depth and width a model that chains was built with. They are not Thorp presets — nothing trains or sails them — they

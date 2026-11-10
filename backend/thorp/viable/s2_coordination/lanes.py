@@ -104,7 +104,16 @@ def parse(text: str, specs: Path | None = None) -> Line:
     return ln
 
 
+def _queue_pg() -> bool:
+    """The one store answers for the queue: THORP_QUEUE_PG=1 (the cut-over)."""
+    return os.environ.get("THORP_QUEUE_PG") == "1"
+
+
 def pending(queue: Path) -> list[str]:
+    if _queue_pg():
+        from thorp.viable.s2_coordination import queue_store
+
+        return queue_store.pending_texts()
     if not queue.exists():
         return []
     return [
@@ -128,6 +137,10 @@ def _locked(queue: Path):
 
 def take(queue: Path, text: str) -> bool:
     """Remove the first copy of this line from the queue (under the lock); False when it is no longer there."""
+    if _queue_pg():
+        from thorp.viable.s2_coordination import queue_store
+
+        return queue_store.take(text)
     with _locked(queue):
         lines = queue.read_text(encoding="utf-8").splitlines(keepends=True)
         for i, ln in enumerate(lines):
@@ -143,6 +156,11 @@ def append(queue: Path, text: str, note: str = "") -> None:
     """Put a line at the end of the queue (under the lock), where a lane finds it last: the place for work caught up
     while a decision waits (DECISIONS.md, "The catch-up rule"). `note`, if given, is written above it as the line's
     own comment, so the queue says why it is there. Refuses a line already queued."""
+    if _queue_pg():
+        from thorp.viable.s2_coordination import queue_store
+
+        queue_store.add(text)
+        return
     with _locked(queue):
         lines = queue.read_text(encoding="utf-8").splitlines(keepends=True)
         if text.strip() in (ln.strip() for ln in lines):
@@ -160,6 +178,17 @@ def append(queue: Path, text: str, note: str = "") -> None:
 def append_many(queue: Path, batch: list[str], note: str = "") -> int:
     """Put several lines at the end of the queue in one write, under the lock, `note` written once above them. A
     line already queued is skipped. Returns how many were added, so a caller can say what it did."""
+    if _queue_pg():
+        from thorp.viable.s2_coordination import queue_store
+
+        added = 0
+        for x in batch:
+            try:
+                queue_store.add(x)
+                added += 1
+            except ValueError:
+                pass
+        return added
     with _locked(queue):
         lines = queue.read_text(encoding="utf-8").splitlines(keepends=True)
         have = {ln.strip() for ln in lines}
@@ -188,9 +217,12 @@ def has_key() -> bool:
 
 
 def outside_voyage() -> bool:
-    """A `thorp run` or `thorp eval` at sea that this coordinator did not start (queue.sh's old wait)."""
+    """A `thorp run`, `thorp eval` or `thorp.train` at sea that this coordinator did not start
+    (queue.sh's old wait). The direct `python -m thorp.train` form is caught too: the four manual
+    voyages were started that way, so the coordinator did not see them and launched two more over
+    them, putting four ships at sea on a two-seat lane (10 November)."""
     mine = {str(p) for p in _children}
-    for pat in ("thorp run ", "thorp eval "):
+    for pat in ("thorp run ", "thorp eval ", "thorp.train ", "thorp train "):
         out = subprocess.run(["pgrep", "-f", pat], capture_output=True, text=True).stdout.split()
         if any(pid not in mine and not _is_child_of_mine(pid) and _local(pid) for pid in out):
             return True
@@ -200,9 +232,12 @@ def outside_voyage() -> bool:
 def _local(pid: str) -> bool:
     """A voyage on this Mac, not the line a charter sends to a hired box over ssh (8 November, 14:22: the parity
     voyage's `ssh ... thorp run ...` held the Mac lane in port for an hour), nor a shell that only names it."""
-    cmd = subprocess.run(
-        ["ps", "-o", "command=", "-p", pid], capture_output=True, text=True
-    ).stdout.strip()
+    try:
+        cmd = subprocess.run(
+            ["ps", "-o", "command=", "-p", pid], capture_output=True, text=True
+        ).stdout.strip()
+    except (PermissionError, FileNotFoundError, OSError):
+        return True  # cannot inspect the process list (a sandbox that blocks ps): treat it as local and stay safe
     first = cmd.split(" ", 1)[0].rsplit("/", 1)[-1] if cmd else ""
     return bool(cmd) and first not in ("ssh", "rsync", "scp", "sh", "zsh", "bash")
 
@@ -217,9 +252,13 @@ def _is_child_of_mine(pid: str) -> bool:
     while p and p not in ("0", "1") and seen < 8:
         if int(p) in _children:
             return True
-        p = subprocess.run(
-            ["ps", "-o", "ppid=", "-p", p], capture_output=True, text=True
-        ).stdout.strip()
+        try:
+            p = subprocess.run(
+                ["ps", "-o", "ppid=", "-p", p], capture_output=True, text=True
+            ).stdout.strip()
+        except (PermissionError, FileNotFoundError, OSError):
+            return False  # cannot walk the tree: do not claim it as ours
+
         seen += 1
     return False
 
@@ -331,6 +370,17 @@ def state() -> dict:
     return out
 
 
+def _record(done: Path, text: str, started: str, status) -> None:
+    """Write a line that ended to queue-done.txt, or to queue_history when the store is the queue."""
+    if _queue_pg():
+        from thorp.viable.s2_coordination import queue_store
+
+        queue_store.record(text, started, status)
+        return
+    with done.open("a", encoding="utf-8") as f:
+        f.write(f"{started} {text} {status}\n")
+
+
 def run(queue: Path | None = None, done: Path | None = None, root: Path | None = None,
         poll_s: float = 30.0, key=has_key, outside=outside_voyage, launch=None, log=None, until_empty: bool = True) -> None:  # fmt: skip
     """The coordinator's loop: start each idle lane's next line, record each line that ends, until the queue is
@@ -377,8 +427,7 @@ def run(queue: Path | None = None, done: Path | None = None, root: Path | None =
                 if seat["proc"].poll() is not None:
                     code = seat["proc"].returncode
                     say(f"[{lane}] {seat['line'].text} exited {code}")
-                    with done.open("a", encoding="utf-8") as f:
-                        f.write(f"{time.strftime('%Y-%m-%dT%H:%M:%S')} {seat['line'].text} {code}\n")
+                    _record(done, seat["line"].text, time.strftime("%Y-%m-%dT%H:%M:%S"), code)
                     _children.discard(seat["proc"].pid)
                     seats.remove(seat)
         lines = [parse(t, specs) for t in pending(queue)]
@@ -403,8 +452,7 @@ def run(queue: Path | None = None, done: Path | None = None, root: Path | None =
                 told[lane] = None
                 if ln.kind == "wait":
                     say(f"[{lane}] {ln.text}: docked, going on")
-                    with done.open("a", encoding="utf-8") as f:
-                        f.write(f"{time.strftime('%Y-%m-%dT%H:%M:%S')} {ln.text} 0\n")
+                    _record(done, ln.text, time.strftime("%Y-%m-%dT%H:%M:%S"), 0)
                     lines = [x for x in lines if x is not ln]
                     continue
                 say(f"[{lane}] starting {ln.text}")

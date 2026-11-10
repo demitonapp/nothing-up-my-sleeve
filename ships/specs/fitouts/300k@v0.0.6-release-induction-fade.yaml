@@ -1,0 +1,97 @@
+# ships/specs/fitouts: the release arm with the induction's own fade (10 November). Everything is
+# released at 40% as in 300k@v0.0.6-release, but the induction card keeps its pull to 40% and is then
+# faded out by 55% instead of being cut at the same instant as the basic cards. The question is whether
+# the fragile card survives when the others go by heart.
+name: 300k@v0.0.6-release-induction-fade
+ship: 'SOP v0.0.6 at 300k (6 layers, the induction fades)'
+experiment: 'Fitout ogden-v0-1: one fixed Ogden corpus for every class; what cards and stars form at each size?'
+question: 'The release, corrected: the basic cards and the comparator riddle are released at 40% of the
+  voyage as before, but the induction is handed its own fade from 40% to 55%, so it is not cut at the
+  same instant. Does the induction survive when the others go by heart, or does the pull have to stay on
+  it longer still? Read against 300k@v0.0.6-release (everything released at 40%) and the ten-pin
+  release (which cards survive a release at all).'
+departures:
+- field: scaffold
+  why: the induction carries its own hold 0.4 and fade 0.55; the other cards are released at 0.4
+data:
+  recipe: lists/ogden-v0.1.csv
+  passes: 4
+  order: shuffled
+  refuse:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+  - lists/hole-cards-unseen.csv
+  clean: unwrap-v2
+tokeniser:
+  kind: spm-bpe
+  vocab: 2048
+  byte_fallback: true
+  train_on: lists/ogden-v0.1.csv
+model:
+  family: gpt
+  preset: 300k
+  context: 1024
+  positions: rope
+optim:
+  name: adamw
+  lr: 0.003
+  betas:
+  - 0.9
+  - 0.95
+  weight_decay: 0.1
+  warmup_steps: 100
+  schedule: cosine
+  min_lr_ratio: 0.1
+  batch_tokens: 32768
+  grad_clip: 1.0
+  precision: bf16
+  scaffold:
+    weight: 1.0
+    hold: 0.25
+    fade: 0.4
+    release: 0.4
+    heads:
+    - layer: 0
+      head: 0
+      card: previous_word
+    - layer: 0
+      head: 1
+      card: delimiter
+    - layer: 4
+      head: 0
+      card: induction
+      hold: 0.4
+      fade: 0.55
+      release: null
+    riddles:
+      comparator:
+        layer: 2
+        head: 1
+        items: 16
+        pool: 2048
+eval:
+  sets:
+  - lists/hole-cards-unseen.csv
+  every_steps: 640
+  evaluators:
+  - ce_bpb
+  - discovery
+  - logic
+  - stars
+  - nevermore
+  - cards
+  - shapes
+  - pips
+  light:
+    every_steps: 64
+    evaluators:
+    - stars
+    - nevermore
+    - cards
+    - logic
+    - shapes
+    - pips
+checkpoint:
+  every_steps: 640
+sop: '0.0.6'
+seed: 1

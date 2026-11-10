@@ -39,7 +39,10 @@ METRICS_EVERY = 50
 
 def load_spec(path: str | Path) -> dict:
     with open(paths.resolve(path), encoding="utf-8") as f:
-        return yaml.safe_load(f)
+        spec = yaml.safe_load(f)
+    from thorp import ladder
+    ladder.ensure(spec)  # the Ogden/Kipling measurement contract, before the id is computed
+    return spec
 
 
 NOT_HASHED = (
@@ -314,6 +317,7 @@ def build_model(spec: dict, vocab: int):
     return registry.build(
         m["family"], m["preset"], vocab, m["context"], m.get("positions", "learned"),
         kv_heads=int(m.get("kv_heads") or 0),
+        layers=m.get("layers"), width=m.get("width"), heads=m.get("heads"),
     )
 
 
@@ -706,6 +710,21 @@ def scaffold_weight(step: int, total: int, sc: dict) -> float:
     return floor + (w - floor) * (end - step) / max(end - hold, 1.0)
 
 
+def scaffold_weights(step: int, total: int, sc: dict) -> list[float]:
+    """The weight of every pinned head at this step. A head may carry its own `hold`, `fade`, `floor`
+    and `release`; anything it does not name falls back to the scaffold's. With no per-head overrides
+    this is the old single schedule repeated, so every existing fitout is unchanged (10 November:
+    the induction card needed a fade of its own while the basic cards were released)."""
+    out = []
+    for h in sc.get("heads") or []:
+        s = dict(sc)
+        for key in ("hold", "fade", "floor", "release"):
+            if key in h:
+                s[key] = h[key]
+        out.append(scaffold_weight(step, total, s))
+    return out
+
+
 def scaffold_phase(step: int, total: int, sc: dict) -> str:
     if sc.get("release") is not None and step >= float(sc["release"]) * total:
         return "release"
@@ -733,11 +752,18 @@ def scaffold_on(step: int, total: int, sc: dict) -> list[float]:
 
 
 def scaffold_loss(
-    pats: dict, x, sc: dict, targets: dict | None = None, flags: dict | None = None, on=None
+    pats: dict,
+    x,
+    sc: dict,
+    targets: dict | None = None,
+    flags: dict | None = None,
+    on=None,
+    weights=None,
 ):
     """The mean, over the scaffolded heads (those started, when `on` is given), of the cross-entropy from the card's
     pattern to the head's attention (over the queries that have a target). Its floor is the target's own entropy
-    (0 for previous-word)."""
+    (0 for previous-word). `weights` gives one weight a head, so a card can fade out while another holds (the
+    induction's own fade, 10 November)."""
     out = []
     for h in sc["heads"]:
         card = h["card"]
@@ -747,8 +773,13 @@ def scaffold_loss(
         hf = has.astype(mx.float32)
         out.append((ce * hf).sum() / mx.maximum(hf.sum(), 1.0))
     if on is None:
-        return sum(out) / len(out)
-    return sum(on[i] * v for i, v in enumerate(out)) / mx.maximum(on[: len(out)].sum(), 1.0)
+        if weights is None:
+            return sum(out) / len(out)
+        return sum(weights[i] * v for i, v in enumerate(out)) / len(out)
+    denom = mx.maximum(on[: len(out)].sum(), 1.0)
+    if weights is None:
+        return sum(on[i] * v for i, v in enumerate(out)) / denom
+    return sum(weights[i] * on[i] * v for i, v in enumerate(out)) / denom
 
 
 def check_scaffold(sc: dict, layers: int, heads: int) -> None:
@@ -759,6 +790,20 @@ def check_scaffold(sc: dict, layers: int, heads: int) -> None:
             )
         if not (0 <= int(h["layer"]) < layers and 0 <= int(h["head"]) < heads):
             raise ValueError(f"scaffold head {h} is not in a {layers} x {heads} model")
+        # a head may carry its own schedule (10 November, the induction fade)
+        for key in ("hold", "fade", "floor"):
+            if h.get(key) is not None and not 0.0 <= float(h[key]) <= 1.0:
+                raise ValueError(f"scaffold head {h['card']}: {key} must be a share from 0 to 1")
+        if h.get("release") is not None:
+            rel = float(h["release"])
+            fade = h.get("fade", sc.get("fade"))
+            if fade is None or not float(fade) <= rel < 1.0:
+                raise ValueError(
+                    f"scaffold head {h['card']}: release must be at or after its fade's end, under 1"
+                )
+        if h.get("fade") is not None and h.get("hold") is not None:
+            if float(h["fade"]) < float(h["hold"]):
+                raise ValueError(f"scaffold head {h['card']}: fade before hold")
     for x in [*(sc.get("heads") or []), *(sc.get("riddles") or {}).values()]:
         if not 0.0 <= float(x.get("from", 0.0)) < 1.0:
             raise ValueError(
@@ -1122,20 +1167,22 @@ def train(
             out[h["card"]] = (a, mx.ones(a.shape[:-1], dtype=mx.float32))
         return out
 
-    def loss_fn(mdl, x, y, sw, rb, on):
+    def loss_fn(mdl, x, y, sw, hw, rb, on):
         # (batch, time) -> the mean per window, so the loss can be attributed to the window's book;
         # every window is the same length, so the mean of the window means is the batch mean.
         if picks and not sample:
             logits, pats = mdl.forward_attending(x, picks)
             sl = scaffold_loss(
-                pats, x, sc, targets=scaffold_targets(x), flags=flags, on=on if staged else None
+                pats, x, sc, targets=scaffold_targets(x), flags=flags, on=on if staged else None,
+                weights=hw,
             )
         elif picks:  # the pull read on part of the batch: a second, smaller forward pass
             logits = mdl(x)
             xs = x[: int(sample["windows"]), : int(sample["length"])]
             _, pats = mdl.forward_attending(xs, picks)
             sl = scaffold_loss(
-                pats, xs, sc, targets=scaffold_targets(xs), flags=flags, on=on if staged else None
+                pats, xs, sc, targets=scaffold_targets(xs), flags=flags, on=on if staged else None,
+                weights=hw,
             )
         else:
             logits, sl = mdl(x), mx.array(0.0)
@@ -1163,13 +1210,14 @@ def train(
             # 1 + alpha, the rest 1, normalised by the total weight so the tack's size is comparable.
             # The per-window losses (and so the logged loss) stay unweighted.
             base = copy_weighted(ce, x, y, cw, markers)
-        # the metre scaffold (and the riddles) ride on top, at this step's weight (zero in the content phase)
-        pull = parts[0] + parts[1] + parts[2] if riddle_cfg else parts[0]
-        return base + sw * pull, per_window, mx.stack(parts)
+        # the metre scaffold: the heads carry their own weights (the induction's fade), the riddles the
+        # voyage's; zero in the content phase
+        pull = parts[0] + sw * (parts[1] + parts[2]) if riddle_cfg else parts[0]
+        return base + pull, per_window, mx.stack(parts)
 
     value_and_grad = nn.value_and_grad(model, loss_fn)
     step_fn = mx.compile(
-        lambda x, y, sw, rb, on: value_and_grad(model, x, y, sw, rb, on),
+        lambda x, y, sw, hw, rb, on: value_and_grad(model, x, y, sw, hw, rb, on),
         inputs=model.state,
         outputs=model.state,
     )
@@ -1216,10 +1264,12 @@ def train(
         opt.learning_rate = lr
         tokens = mx.array(batch.tokens)
         sw = scaffold_weight(step, total, sc) if sc else 0.0
+        hw_list = scaffold_weights(step, total, sc) if sc else []
         (loss, per_window, sl), grads = step_fn(
             tokens[:, :-1],
             tokens[:, 1:],
             mx.array(sw, dtype=mx.float32),
+            mx.array(hw_list, dtype=mx.float32),
             riddle_batch(step),
             mx.array(scaffold_on(step, total, sc) if staged else [1.0], dtype=mx.float32),
         )
@@ -1252,6 +1302,8 @@ def train(
         }
         if sc:  # the scaffold's weight, how far the heads are from its pattern, and the phase (0 metre, 1 fade, 2 content)
             vals["scaffold/weight"] = sw
+            for h, w in zip(sc.get("heads") or [], hw_list):
+                vals[f"scaffold/weight/{h['card']}"] = w
             if staged:
                 vals["scaffold/started"] = float(sum(scaffold_on(step - 1, total, sc)))
             parts = sl.tolist()
@@ -1391,7 +1443,11 @@ def rescore(
     if not row:
         raise LookupError(f"no run {run}")
     spec, rid = spec_of(row), row["run_id"]
+    from thorp import ladder
+    ladder.ensure(spec)  # a rescore backfills the ladder the voyage was missing
     ckpt = latest_checkpoint(rid)
+    if ckpt is not None:
+        ladder.repair_spec(spec, rid)  # an old checkpoint's shape, not today's preset
     if ckpt is None:
         raise LookupError(f"run {rid} has no checkpoint")
     if sets:
@@ -1424,6 +1480,8 @@ def run(spec_path: str | Path, rec: Ledger | None = None) -> dict:
 
 def _run(spec_path: str | Path, rec: Ledger | None = None) -> dict:
     spec = load_spec(spec_path)
+    from thorp import ladder
+    ladder.ensure(spec)  # Ogden/Kipling voyages carry the whole quantum ladder
     if backend_of(spec) != "torch":
         # MLX's free-buffer cache defaults to its memory limit, and that limit is the GPU's
         # recommended working set (26.8 GB on this Mac). A run therefore keeps every buffer it has

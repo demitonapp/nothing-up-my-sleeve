@@ -82,6 +82,9 @@ def build_model(spec: dict, vocab: int, dev: torch.device | None = None):
         m["context"],
         m.get("positions", "learned"),
         backend="torch",
+        layers=m.get("layers"),
+        width=m.get("width"),
+        heads=m.get("heads"),
     )
     return model.to(dev or device())
 

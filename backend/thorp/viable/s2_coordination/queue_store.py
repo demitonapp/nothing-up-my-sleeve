@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from sqlalchemy import BigInteger, Text, delete, func, select
+from sqlalchemy import BigInteger, Text, delete, func, select, text
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -124,6 +124,8 @@ def backfill(queue: Path | None = None, done: Path | None = None) -> dict:
             for i, row in enumerate(hist_rows, start=1):
                 row["id"] = i
             s.execute(insert(QueueHistory).values(hist_rows))
+        # the backfill gives the history explicit ids; move the sequence past them or the next record() collides
+        s.execute(text("select setval('s2.queue_history_id_seq', (select coalesce(max(id),1) from s2.queue_history))"))
     return {"queue_lines": len(line_rows), "queue_history": len(hist_rows)}
 
 
@@ -140,3 +142,139 @@ def verify(queue: Path | None = None, done: Path | None = None) -> bool:
             s.scalar(select(func.count()).select_from(QueueHistory)),
         )
     return got == want
+
+
+# ---------------------------------------------------------------- the live queue (the cut-over)
+#
+# With THORP_QUEUE_PG=1 the store is the queue: the coordinator reads `lines`, takes with `take` and records
+# each line's exit with `record`; `add`, `move` and `drop` are what `thorp queue` edits. `export` writes the
+# file from the store, so `queue.txt` stays a readable copy rather than a second source.
+
+
+def _rows(s) -> list[dict]:
+    """The pending lines, in order, inside an open session."""
+    rows = s.scalars(select(QueueLine).order_by(QueueLine.position)).all()
+    return [
+        {"position": r.position, "text": r.text, "kind": r.kind, "payload": r.payload, "lane": r.lane}
+        for r in rows
+    ]
+
+
+def lines() -> list[dict]:
+    """The pending lines, in order."""
+    from thorp import store
+
+    with store.session() as s:
+        return _rows(s)
+
+
+def pending_texts() -> list[str]:
+    """The pending lines as the coordinator reads them (a list of strings, in order)."""
+    return [r["text"] for r in lines()]
+
+
+def _write(rows: list[dict], s) -> None:
+    """Replace the pending queue with `rows` (positions 0..n, in the order given)."""
+    s.execute(delete(QueueLine))
+    if rows:
+        s.execute(
+            insert(QueueLine).values(
+                [
+                    {
+                        "position": i,
+                        "text": r["text"].strip(),
+                        "kind": r["kind"],
+                        "payload": r["payload"],
+                        "lane": r["lane"],
+                        "added_by": r.get("added_by"),
+                        "added_at": r.get("added_at"),
+                    }
+                    for i, r in enumerate(rows)
+                ]
+            )
+        )
+
+
+def add(text: str, top: bool = False) -> None:
+    """Queue one line (at the end, or at the top when `top`). Refuses a line already queued."""
+    import time
+
+    from thorp import store
+
+    text = text.strip()
+    if not text:
+        return
+    with store.session() as s:
+        rows = _rows(s)
+        if any(r["text"] == text for r in rows):
+            raise ValueError(f"{text!r} is already queued")
+        row = {"text": text, **parse_line(text), "added_by": "thorp queue", "added_at": time.strftime("%Y-%m-%dT%H:%M:%S")}
+        _write(([row] + rows) if top else (rows + [row]), s)
+
+
+def take(text: str) -> bool:
+    """Remove the first copy of this line (it has started); False when it is no longer queued."""
+    from thorp import store
+
+    text = text.strip()
+    with store.session() as s:
+        rows = _rows(s)
+        for i, r in enumerate(rows):
+            if r["text"] == text:
+                _write(rows[:i] + rows[i + 1 :], s)
+                return True
+    return False
+
+
+def record(text: str, started: str, status: str) -> None:
+    """Write a line that ended to queue_history (the queue-done.txt row, in the store)."""
+    from thorp import store
+
+    with store.session() as s:
+        # a backfill can leave the id sequence behind the table (10 November: the coordinator died on
+        # queue_history_pkey, key id=1, max id 307), so resync before the insert. One record a finished
+        # line: the extra statement costs nothing next to losing the queue.
+        s.execute(
+            text(
+                "select setval(pg_get_serial_sequence('s2.queue_history','id'), "
+                "coalesce((select max(id) from s2.queue_history), 1))"
+            )
+        )
+        s.add(
+            QueueHistory(
+                text=text.strip(),
+                lane=parse_line(text)["lane"],
+                started=started,
+                status=str(status),
+                run=None,
+            )
+        )
+
+
+def move(text: str, to: int) -> None:
+    """Move a line to 1-based position `to`."""
+    from thorp import store
+
+    text = text.strip()
+    with store.session() as s:
+        rows = _rows(s)
+        i = next((k for k, r in enumerate(rows) if r["text"] == text), None)
+        if i is None:
+            raise LookupError(f"{text!r} is not queued")
+        row = rows.pop(i)
+        j = max(0, min(len(rows), int(to) - 1))
+        rows.insert(j, row)
+        _write(rows, s)
+
+
+def drop(text: str) -> bool:
+    """Remove a line (the same as take, but named for the operator)."""
+    return take(text)
+
+
+def export(queue: Path | None = None) -> Path:
+    """Write specs/queue.txt from the store: a readable copy, not a second source."""
+    queue = queue or _specs() / "queue.txt"
+    texts = pending_texts()
+    queue.write_text("\n".join(texts) + ("\n" if texts else ""), encoding="utf-8")
+    return queue

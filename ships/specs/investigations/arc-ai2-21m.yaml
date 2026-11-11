@@ -18,5 +18,7 @@ run:
   - "{subject}"
   - --evaluators
   - arc_ai2
+# about how long it takes (12 November): the 21m's read of 12 November took about 53 seconds, plus loading
+estimate: 3m
 timeout: 45m
 readings: []

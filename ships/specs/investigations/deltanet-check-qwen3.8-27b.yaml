@@ -15,5 +15,7 @@ run:
   - -m
   - thorp.deltanet
   - "{subject}"
+# about how long it takes (12 November): never run: loading the 15 GB of 4-bit weights is most of it; the checks read a twelve-token prompt
+estimate: 15m
 timeout: 40m
 readings: []

@@ -136,3 +136,29 @@ def test_an_unread_question_has_no_rank():
     items = [{"id": "q", "config": "easy", "part": "test", "question": "Pick?", "options": ["alpha", "!!"], "answer": 0}]
     (row,) = arc_ai2.score_questions(cheap_seven, lambda s: [] if "!!" in s else [7], 0, items)
     assert row["read"] is False and row["rank"] is None and row["p_answer"] is None
+
+
+def test_a_voyages_own_reading_keeps_every_question(monkeypatch):
+    """The in-run evaluator keeps its rows as an artifact (12 November), so a voyage on a hired box brings
+    them home with the ledger and the audit can fold them in (thorp.arc_audit.ingest)."""
+    import json
+    from types import SimpleNamespace
+
+    from thorp.evaluators import EvalContext
+    from thorp.evaluators import arc_ai2 as ev
+
+    items = [
+        {"id": "Mercury_1", "config": "easy", "part": "test", "question": "Pick?", "options": ["alpha", "beta"], "answer": 1},
+        {"id": "Mercury_2", "config": "easy", "part": "test", "question": "Pick?", "options": ["alpha", "beta"], "answer": 0},
+    ]
+    monkeypatch.setattr(ev.arc_ai2, "questions", lambda config, part, per=None: items if config == "easy" else [])
+    monkeypatch.setattr(ev.ops, "token_ce", lambda model, x, y: cheap_seven(x, y))
+    ctx = EvalContext(run_id="r", step=1, model=None, tokeniser=SimpleNamespace(encode=encode, eos_id=0),
+                      context=64, sets={})
+    out = ev.evaluate(ctx)
+    kept = [a for a in out.artifacts if a["kind"] == "arc_ai2_questions"]
+    assert len(kept) == 1
+    rows = json.loads(kept[0]["text"])
+    assert [r["id"] for r in rows] == ["Mercury_1", "Mercury_2"]
+    assert [r["correct"] for r in rows] == [True, False] and rows[1]["rank"] == 1
+    assert out.metrics["arc_easy/accuracy"] == 0.5

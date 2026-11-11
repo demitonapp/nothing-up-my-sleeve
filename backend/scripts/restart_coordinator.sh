@@ -26,7 +26,11 @@ cd "$(dirname "$0")/../.." || exit 1
 DRY=""
 [ "$1" = "--dry-run" ] && DRY=1
 say() { echo "[$(date +%H:%M:%S)] restart: $*"; }
-coordinator() { pgrep -f "thorp.viable.s2_coordination.lanes" | head -1; }
+# -a: macOS pgrep leaves out its own ancestors unless asked, and this script runs as a line the coordinator
+# launched, so without it the coordinator is never found (12 November: "no coordinator was running", exit 1).
+# Anchored to the whole command (a python running the module, nothing after it), so a shell whose command line
+# merely mentions the module is not taken for the coordinator.
+coordinator() { pgrep -a -f '^[^ ]*python[0-9.]* -m thorp\.viable\.s2_coordination\.lanes$' | head -1; }
 
 # 1. the voyages at sea now: wait for these, and only these (the next line may start the moment they dock)
 at_sea=$(pgrep -f -- "-m thorp.train" | tr '\n' ' ')

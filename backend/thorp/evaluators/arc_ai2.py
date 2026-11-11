@@ -68,6 +68,11 @@ def evaluate(ctx: EvalContext) -> EvalResult:
         payload["splits"][key] = {**s, "pilot": pilot, "items": len(items), "chance": arc_ai2.CHANCE}
         text = json.dumps({"config": key, **payload["splits"][key]}, ensure_ascii=False)
         artifacts.append({"kind": f"arc_{key}", "path": "", "sha1": hashlib.sha1(text.encode()).hexdigest(), "text": text})
+        # every question, as the audit keeps them (12 November): an artifact rather than a write to the store, so a
+        # voyage on a hired box brings its rows home with the ledger; thorp.arc_audit.ingest folds them in
+        qtext = json.dumps(rows, ensure_ascii=False, separators=(",", ":"))
+        artifacts.append({"kind": "arc_ai2_questions", "path": "", "sha1": hashlib.sha1(qtext.encode()).hexdigest(),
+                          "text": qtext})
     payload["seconds"] = round(time.time() - t0, 1)
     text = json.dumps(payload, ensure_ascii=False)
     artifacts.append({"kind": "arc_ai2", "path": "", "sha1": hashlib.sha1(text.encode()).hexdigest(), "text": text})

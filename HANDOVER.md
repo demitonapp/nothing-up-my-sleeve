@@ -228,7 +228,29 @@ the bottom. The queue page labels an investigation by its title (it used to show
 command's first word) and every row carries its goal chip. `9m@v0.0.6.yaml` declares its departures so it
 conforms to SOP v0.0.6.
 
-**Open.** The 21m at 8,192 context is not written (knockout:3 needs it); the honest split-trained return leg
-has never run; milestones are on one spec — the thresholds are per voyage and Justin's; the return leg's eval
-runs only at the end, so a mid-leg milestone would need its cadence lowered; the ships' pages do not draw
-milestone markers.
+**Open.** The honest split-trained return leg has never run; milestones are on a few specs — the thresholds are
+per voyage and Justin's; the return leg's eval runs only at the end, so a mid-leg milestone would need its cadence
+lowered; the ships' pages do not draw milestone markers.
+
+**The 21m at 8,192 is written, not queued** (12 November, `ships/specs/fitouts/21m@v0.0.6-ctx8192.yaml`,
+knockout:3). It cannot sail on this Mac: a 21m training step at batch one measured 9.17 GB at 4,096 pieces and
+projects to about 35 GB at 8,192, so it says `model.backend: torch` and the charter lane. Its milestones are
+proposed and Justin's to confirm; the 21m is held until the 9m is good. AI2 ARC's questions are short, so the
+SmolLM2 goal (DECISIONS.md, "The goal: the smallest ship that beats SmolLM2-360M") does not need it.
+
+**The AI2 ARC audit** (12 November, `thorp/arc_audit.py`, `s4.arc_answers`): every reader's answer a row, so
+readers can be compared question by question. `investigations/arc-audit-questions` re-reads what is missing and
+writes `ships/reports/arc-audit-<date>.md`; it is queued behind the coordinator restart. Read our ships with
+`python -m thorp.arc_audit ship RUN` (MLX, nothing written to the ledger); re-read an outside model's questions
+without touching the board with `scripts/score_arc_ai2.py MODEL --no-board` (pythia-14m and -31m in
+`--dtype float32`, every model at the scorer's own batch, or the board's numbers move). A voyage's own `arc_ai2`
+evaluator keeps its rows as an `arc_ai2_questions` artifact, folded in by `arc_audit.ingest` on every report.
+
+**The queue's clock** (12 November): an investigation's length is its last finished run, else its spec's
+`estimate:`, else its `timeout:` shown as "up to"; give every new investigation an `estimate:`. A bare `cmd:` line
+has a length only once it has finished once with exit 0, so prefer an investigation spec to a bare command.
+
+**The coordinator restart** (`backend/scripts/restart_coordinator.sh`) found no coordinator on 11 November because
+macOS `pgrep` leaves out its own ancestors: it now asks with `-a` and an anchored pattern, and is queued first on
+12 November. Still owed, and Justin's: `backend/scripts/com.thorp.queue.plist` has `AbandonProcessGroup` and the
+installed `~/Library/LaunchAgents` copy does not; copy it and bootout/bootstrap, in port.

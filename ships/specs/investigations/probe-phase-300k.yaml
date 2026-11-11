@@ -1,0 +1,19 @@
+# ships/specs/investigations: Kipling's fourth aim, read (the probe phase, thorp/probe_phase.py). It was a bare
+# `cmd:` line in the queue with no length of its own; as an investigation it carries one (12 November).
+kind: investigation
+name: probe-phase-300k
+expedition: kipling
+ship: "Kipling: the probe phase read on the two 300k probing voyages"
+question: >-
+  Which of the ten pins are held by heart, which need the pull, which never took their card, and which are
+  lost? Read from the two probing voyages' logged distances (300k@v0.0.6-probe and its second seed): for each
+  pinned head and each pulse, the leak while the pull was off and how much of it came back.
+run:
+  - -m
+  - thorp.probe_phase
+  - 300k@v0.0.6-probe
+  - 300k@v0.0.6-probe-s2
+# about how long it takes (12 November): it reads the two voyages' metrics from the ledger and trains nothing
+estimate: 1m
+timeout: 10m
+readings: []

@@ -114,6 +114,31 @@ def record(reader: str, kind: str, rows: list[dict], revision: str = arc_ai2.REV
     return len(params)
 
 
+def ingest(log=print) -> int:
+    """Fold the questions a voyage's own `arc_ai2` evaluator kept (artifact `arc_ai2_questions`, one a split a
+    reading) into s4.arc_answers, as that voyage's rows at its latest step. Returns the rows written."""
+    ensure()
+    with store.session() as s:
+        rows = s.execute(
+            text(
+                "select r.name, a.step, a.text from s1.artifacts a join s1.runs r using (run_id) "
+                "where a.kind = 'arc_ai2_questions' and a.step = (select max(b.step) from s1.artifacts b "
+                "where b.run_id = a.run_id and b.kind = 'arc_ai2_questions') order by r.name"
+            )
+        ).all()
+    n = 0
+    for name, step, body in rows:
+        try:
+            got = json.loads(body or "[]")
+        except ValueError:
+            log(f"{name} step {step}: its arc_ai2_questions artifact is not JSON, skipped")
+            continue
+        n += record(name, "ship", got)
+    if rows:
+        log(f"ingested {n} rows from {len({r[0] for r in rows})} voyage(s)' own AI2 ARC readings")
+    return n
+
+
 def read_ship(run: str, configs=("easy", "challenge"), parts=("test",), batch: int = 64, log=print) -> dict:
     """Read one of our ships' last checkpoint on AI2 ARC and keep its rows; returns its summary a split.
 
@@ -133,6 +158,10 @@ def read_ship(run: str, configs=("easy", "challenge"), parts=("test",), batch: i
     from thorp import ladder
 
     ladder.repair_spec(spec, rid)  # an old checkpoint's shape, not today's preset (as rescore does)
+    # read on MLX on this Mac, whatever it sailed on: a voyage written for CUDA scores in PyTorch on the CPU here
+    # (the first 50m's AI2 ARC read took 39 minutes that way, 12 November), and a torch checkpoint loads in MLX
+    # with the same names (backend/CUDA.md); the logits agree to about 1e-5
+    spec["model"] = {k: v for k, v in (spec.get("model") or {}).items() if k != "backend"}
     prep = train.prepare(spec, log=log, known=True, sailed=rid)
     step = json.loads((ckpt / "state.json").read_text())["step"]
     model = train.scoring_model(spec, prep.tokeniser.vocab_size, ckpt)
@@ -319,6 +348,7 @@ def difficulty(part: str = "test", anchor: str = "HuggingFaceTB/SmolLM2-360M") -
 def report(part: str = "test", path=None) -> str:
     """The audit as Markdown: who was read, how the questions split by how many outside models answer them,
     what only SmolLM2 answers, what nobody answers, by exam, and where our ships stand on each band."""
+    ingest(log=lambda *a: None)  # any voyage that read AI2 ARC in its own evaluations since the last report
     d = difficulty(part)
     rows, outside, ships, anchor = d["rows"], d["outside"], d["ships"], d["anchor"]
     qtext = {}

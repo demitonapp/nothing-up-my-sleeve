@@ -128,8 +128,8 @@ def main() -> None:
     ap.add_argument("--dtype", choices=["native", "float32"], default="native", help="float32 casts the weights first")
     ap.add_argument("--parts", default="test", help="test, validation, or test,validation (the board reads test only)")
     ap.add_argument("--no-board", action="store_true",
-                    help="keep the questions only; leave the board's reading as it was (a re-read at another batch
-                    size can move the last digit in reduced precision, 12 November)")
+                    help="keep the questions only; leave the board's reading as it was (a re-read at another "
+                    "batch size can move the last digit in reduced precision, 12 November)")
     a = ap.parse_args()
     configs = ["easy", "challenge"] if a.config == "both" else [a.config]
     per = a.per_split or None

@@ -164,6 +164,9 @@ OUTSIDE = (
     "EleutherAI/pythia-410m", "mlx-community/gemma-3-270m-bf16", "Qwen/Qwen3-0.6B",
     "mlx-community/Qwen3.5-0.8B-bf16", "HuggingFaceTB/SmolLM2-360M",
 )
+# read in float32: in their own float16 these two overflow on some options and the question is skipped (the
+# board reads them in float32 since 12 November; a native re-read undid that once the same morning)
+FLOAT32 = ("EleutherAI/pythia-14m", "EleutherAI/pythia-31m")
 SHIPS = (
     "dba348d4d097",  # 300k@v0.0.6-control
     "c45525729620",  # 300k@v0.0.6-control-s2
@@ -211,7 +214,8 @@ def reread(outside=OUTSIDE, ships=SHIPS, log=print) -> int:
         log(f"=== {time.strftime('%H:%M:%S')} {m}")
         code = subprocess.call(
             [sys.executable, str(paths.resolve("scripts/score_arc_ai2.py")), m, "--no-helm", "--no-board",
-             "--parts", "test,validation", "--batch", "32"],
+             "--parts", "test,validation",  # the scorer's own batch (64): at 32 the numbers move (12 November)
+             "--dtype", "float32" if m in FLOAT32 else "native"],
             cwd=paths.ROOT,
         )
         failed += code != 0

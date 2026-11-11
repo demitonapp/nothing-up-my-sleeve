@@ -1,0 +1,11 @@
+---
+// Settings: the cog in the header. What the dashboard runs on (the disk, the store, the server, the
+// switches), read-only, from /api/settings.
+import Layout from '../layouts/Layout.astro';
+import Settings from '../components/islands/Settings';
+---
+<Layout>
+  <main>
+    <Settings client:load />
+  </main>
+</Layout>

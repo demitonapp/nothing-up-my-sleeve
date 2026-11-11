@@ -329,6 +329,24 @@ header tab but an action on a ship's page, Nothing up my sleeve and foreign alik
   **its chain**, one rung per class; **where the $100 goes** (the H100 sitting, step by step); **the
   gates** before the $100 is spent, each an open or passed Badge, beside **the risks**. A server
   without `/api/bet` shows an Empty state saying to restart `thorp dash`.
+- **Settings** (`/settings`, the cog at the top right of the header, lit on its own page with no tab lit;
+  `thorp/dash/settings.py`, `/api/settings`): what the dashboard runs on, read-only. **Storage**: a stat
+  strip (the space Nothing up my sleeve keeps, the disk's free space, the biggest part, the voyages with
+  checkpoints, the outside models downloaded), the disk as one bar (ours, everything else, free), then a
+  table of the parts biggest first (the outside models' Hugging Face cache, the checkpoints, the store's
+  files, the texts, the shards, ...), each with its size, share, a bar against the biggest, what it is
+  and where. Sizes are the space taken on disk (`du`), measured at most once a minute; **measure again**
+  asks for them now (`?fresh=1`). Folded beneath: **the heaviest checkpoints** (the twelve biggest
+  voyages' folders, named from the ledger and linked to their ship pages) and **the outside models**
+  (each model in the cache, biggest first). **The store**: Postgres's address (no password), whether it
+  answers, its version, size and ten biggest tables, and which of the ledger, the library and the queue
+  it holds. **Server and machine**: the version, commit and files changed since, when the server started
+  and when the dashboard was built, Python and the frameworks, the chip, cores and memory, and each
+  lane's seats. **Switches**: every `THORP_*` the server was started with, a dash for a default, and what
+  each does. **Keys and places**: whether each key (`FAL_KEY`, `VAST_API_KEY`, `HF_TOKEN`) is set, never
+  its value, and where the repository, data, ships, ledger, checkpoints and model cache live. Nothing is
+  changed or deleted from this page; the policies stay on the VSM's S5 and the seats on the queue. A
+  part that cannot be read says why and the rest still stands.
 - **VSM** (`/vsm`, a tab under Expeditions; `thorp/vsm.py`, `/api/governance`): Thorp's rules
   as Beer's Viable System Model, five Card bands from S5 at the top to S1, each with its name, purpose,
   its code as Badge chips and its live numbers from `vsm.audit()`. S5 policy: each policy's

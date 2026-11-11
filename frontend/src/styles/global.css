@@ -49,6 +49,11 @@ header h1 a { color: inherit; text-decoration: none; display: inline-flex; align
 header h1 a:hover { color: var(--accent); }
 header h1 .brandmark { width: 1.15em; height: 1.15em; display: block; flex: none; }
 header .sub { color: var(--muted); }
+/* the settings cog, top right: after the tabs on a wide screen, beside the wordmark's row on a narrow one */
+header .cog { align-self: center; display: inline-flex; padding: 5px; border-radius: var(--r-sm); color: var(--muted); }
+header .cog:hover, header .cog[aria-current="page"] { color: var(--accent); }
+header .cog[aria-current="page"] { background: var(--raise); }
+@media (max-width: 900px) { header .cog { margin-left: auto; } #mainnav { order: 1; } }
 .section { display: none; }
 .section.active { display: grid; }
 main { padding: 16px 20px 40px; display: grid; gap: 16px; max-width: 1500px; margin: 0 auto; }
@@ -1623,3 +1628,34 @@ a.sopcard:hover { border-color: var(--blue); }
 .tab.on { color: var(--text); border-bottom-color: var(--accent); }
 .tab .s { color: var(--muted); font-size: var(--fs-sm); }
 .testrow .cpsum { display: flex; flex-wrap: wrap; gap: 20px; margin: 8px 0 12px; }
+
+/* the settings page (11 November): sizes as bars against the biggest of their table, the disk as one
+   bar of ours, everything else and free, and label/value lists for the store and the server. */
+#settings td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+#settings td code, #settings dd code { font-size: var(--fs-sm); color: var(--muted); }
+#settings td code { white-space: nowrap; }
+#settings dd code { overflow-wrap: anywhere; }
+.setbar { display: block; width: 120px; height: 8px; border-radius: 4px; background: var(--raise); overflow: hidden; }
+.setbar i { display: block; height: 100%; background: var(--blue); border-radius: 4px; }
+.setdisk { display: flex; height: 14px; border-radius: 7px; background: var(--raise); overflow: hidden; gap: 2px; }
+.setdisk i { display: block; height: 100%; }
+.setdisk i.ours, .setkey i.ours { background: var(--blue); }
+.setdisk i.others, .setkey i.others { background: var(--track); }
+.setkey { display: flex; flex-wrap: wrap; gap: 4px 18px; margin-top: 6px; }
+.setkey i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; background: var(--raise); border: 1px solid var(--line); margin-right: 4px; }
+.setkey i.ours, .setkey i.others { border-color: transparent; }
+.setlist { display: grid; grid-template-columns: max-content 1fr; gap: 8px 16px; margin: 0; }
+.setlist dt { color: var(--muted); font-size: var(--fs-sm); padding-top: 1px; }
+.setlist dd { margin: 0; min-width: 0; }
+.setlist dd .pill + .pill { margin-left: 6px; }
+.setlist dd code + .pill { margin-left: 8px; }
+.setfold { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 10px; }
+.setfold summary { cursor: pointer; font-weight: 600; }
+.setfold summary .s { font-weight: 400; margin-left: 6px; }
+.setfold[open] summary { margin-bottom: 8px; }
+tr.setunset td code { color: var(--muted); }
+#settings h2 .note button { margin-left: 6px; }
+
+/* an expedition's goal on its own page: a reading measure, not the full width of the panel */
+.goaltext { max-width: 90ch; line-height: 1.55; margin: 0 0 8px; }
+ol.goaltext { padding-left: 22px; }

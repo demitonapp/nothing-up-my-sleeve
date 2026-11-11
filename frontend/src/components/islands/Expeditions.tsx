@@ -802,6 +802,23 @@ export default function Expeditions() {
 
         {/* Overview */}
         <div className={`etab${expTab === 'overview' ? ' active' : ''}`} data-etab="overview">
+          {/* the goal first (11 November, Justin: "where should i see goals for the expeditions"): it was on
+              the cards that open this page and nowhere on the page itself */}
+          <section className={cardCls(false, 'panel')} id="voyagegoal" hidden={!v?.goal}>
+            <h2>The goal <span className="note">what the expedition went out to find, as it was set (fleet.py)</span></h2>
+            {(() => {
+              // numbered aims in the text, "(1) ... (2) ...", read as a list under what comes before them
+              const parts = String(v?.goal || '').split(/\s*\((\d+)\)\s+/);
+              const aims: string[] = [];
+              for (let i = 1; i + 1 < parts.length; i += 2) aims.push(parts[i + 1]);
+              return (
+                <>
+                  <p className="goaltext">{parts[0]}</p>
+                  {aims.length > 1 ? <ol className="sopgoals goaltext">{aims.map((a, i) => <li key={i}>{a}</li>)}</ol> : aims.length ? <p className="goaltext">(1) {aims[0]}</p> : null}
+                </>
+              );
+            })()}
+          </section>
           <section className={cardCls(false, 'panel')} id="voyageplan" hidden={!(v?.plan || []).length}>
             <h2>The launching order <span className="note">the investigations that must be home before a learning ship sails, then the ships themselves</span></h2>
             <ol className="plansteps" dangerouslySetInnerHTML={{ __html: v ? planHtml(v) : '' }} />

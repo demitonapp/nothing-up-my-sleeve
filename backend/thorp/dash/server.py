@@ -6179,6 +6179,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/leaderboard/internal": api_leaderboard_internal,
                 "/api/smoking_qwen": api_smoking_qwen,
                 "/api/bet": api_bet,
+                "/api/settings": lambda: api_settings(q.get("fresh", "")),
                 "/api/climb": lambda: api_climb(q.get("runs", "")),
                 "/api/shelf": lambda: api_shelf(q["run"]),
                 "/api/book": lambda: api_book(q["id"], q.get("offset", 0), q.get("length", 20000)),
@@ -6242,6 +6243,14 @@ def serve(port: int = 8787) -> None:
         srv.serve_forever()
     except KeyboardInterrupt:
         pass
+
+
+def api_settings(fresh: str = "") -> dict:
+    """The settings page (the cog in the header): the disk and what is kept on it, the store, the server and
+    machine, the switches and the lanes (thorp.dash.settings). `fresh=1` measures the sizes again now."""
+    from thorp.dash import settings
+
+    return settings.payload(fresh=fresh in ("1", "true", "yes"))
 
 
 def api_ladder() -> dict:

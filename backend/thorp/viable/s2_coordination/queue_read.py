@@ -65,6 +65,8 @@ def add(lines: Iterable[str], top: bool = False) -> list[str]:
         if ln not in have and ln not in new:
             new.append(ln)
     # `add(top=True)` puts one line first, so a block goes in last line first to keep its order
+    # the fitout builder and the wager queue from their pages, which do not yet ask which goal a line serves
+    # (12 November): a spec that declares one keeps it, one that does not is let in and shows red on the queue
     for ln in reversed(new) if top else new:
-        queue_store.add(ln, top=top)
+        queue_store.add(ln, top=top, require_goal=False)
     return new

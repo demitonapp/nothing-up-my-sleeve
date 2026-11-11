@@ -1253,16 +1253,18 @@ _SHAPE_PARAMS: dict[tuple, dict] = {}
 
 
 def _shape_params(
-    family: str, preset: str | None, vocab: int, context: int, positions: str, kv_heads: int
+    family: str, preset: str | None, vocab: int, context: int, positions: str, kv_heads: int,
+    shape: tuple = (None, None, None),
 ) -> dict:
     """A preset's parameter counts for the shape a spec asks for, built once a shape and kept: the
     queue page opens every voyage's card and all of a class's arms share a shape."""
-    key = (family, preset, vocab, context, positions, kv_heads)
+    key = (family, preset, vocab, context, positions, kv_heads, shape)
     if key not in _SHAPE_PARAMS:
         try:
             from thorp.models import registry
 
-            model = registry.build(family, preset, vocab, context, positions, kv_heads=kv_heads)
+            model = registry.build(family, preset, vocab, context, positions, kv_heads=kv_heads,
+                                   layers=shape[0], width=shape[1], heads=shape[2])
             _SHAPE_PARAMS[key] = model.parameter_counts()
         except Exception:  # noqa: BLE001  (no MLX on a box, or a preset this code does not know)
             _SHAPE_PARAMS[key] = {}
@@ -1445,7 +1447,9 @@ def _spec_detail(spec: dict, run: dict | None = None) -> dict:
     context = int(m.get("context") or 1024)
     positions = m.get("positions") or "learned"
     kv = int(m.get("kv_heads") or 0)
-    shape = registry.PRESETS.get(preset) or {}
+    # a spec may override its preset's layers, width and heads (thorp/train.py build_model); the card shows
+    # the shape that sails, not the preset's (12 November: the wide 1m of the hull pair)
+    shape = {**(registry.PRESETS.get(preset) or {}), **{k: m[k] for k in ("layers", "width", "heads") if m.get(k)}}
     run_id = (run or {}).get("run_id")
     marks = _card_marks() if run_id else {}
     classes = _deck_classes() if run_id else {}
@@ -1481,7 +1485,8 @@ def _spec_detail(spec: dict, run: dict | None = None) -> dict:
         "model": {
             "family": family, "preset": preset, "kv_heads": kv, "context": context, "positions": positions,
             "layers": shape.get("layers"), "heads": shape.get("heads"), "width": shape.get("width"),
-            "params": _shape_params(family, preset, vocab, context, positions, kv),
+            "params": _shape_params(family, preset, vocab, context, positions, kv,
+                                    tuple(m.get(k) for k in ("layers", "width", "heads"))),
         },
         "tokeniser": {
             "kind": tok.get("kind"), "vocab": vocab, "byte_fallback": tok.get("byte_fallback"),
@@ -3491,6 +3496,9 @@ def _api_expeditions_overview() -> dict:
     return expeditions.overview()
 
 
+MAINTENANCE_RE = re.compile(r"restart_coordinator\.sh")
+
+
 def _api_queue() -> dict:
     """The queue as a table (Justin, 17:05: "view the queue so each voyage with its goal"): the voyage at
     sea, then every line of specs/queue.txt in order, each voyage with its goal (its spec's question),
@@ -3661,9 +3669,34 @@ def _api_queue() -> dict:
     except Exception:  # noqa: BLE001  (a store before the goal column: the queue still shows)
         line_goals = {}
 
+    run_names = {r["run_id"]: r["name"] for r in all_runs}
+
+    def _bare(cmd: str) -> str:
+        """The command as it runs: no `[timeout=..]` prefix, no `# estimate ..` comment."""
+        cmd = re.sub(r"^\[timeout=[^\]]*\]\s*", "", cmd.strip())
+        return cmd.split(" #", 1)[0].strip()
+
+    def _run_of(prefix: str) -> str | None:
+        hits = [n for rid, n in run_names.items() if str(rid).startswith(prefix)]
+        return hits[0] if hits else None
+
     def _cmd_label(cmd: str) -> tuple[str, str]:
         """A step's words, not its command line: an investigation says which investigation, and any other
-        step says which script or module it runs (11 November: rows 3 and 4 read `PYTHONPATH=backend`)."""
+        step says which script or module it runs (11 November: rows 3 and 4 read `PYTHONPATH=backend`); an
+        evaluation names the ship and what reads it, a scorer the model it scores (12 November: four IFEval
+        readings were each called `thorp`)."""
+        cmd = _bare(cmd)
+        if MAINTENANCE_RE.search(cmd):
+            return "restart the coordinator", "upkeep"
+        m = re.search(r"-m\s+thorp\s+eval\s+(\S+)(?:.*--evaluators\s+(\S+))?", cmd)
+        if m:
+            ship = _run_of(m.group(1)) or m.group(1)
+            what = (m.group(2) or "its evaluators").replace("ifeval", "IFEval")
+            return f"{what}: {ship}", "reading"
+        m = re.search(r"scripts/(score_\w+)\.py\s+(\S+)", cmd)
+        if m:
+            test = {"score_ifeval": "IFEval", "score_arc": "ARC-AGI-2", "score_arc_ai2": "AI2 ARC"}.get(m.group(1), m.group(1))
+            return f"{test}: {m.group(2).split('/')[-1]}", "reading"
         m = re.search(r"-m\s+thorp\.investigate\s+run\s+(\S+)", cmd)
         if m:
             name = m.group(1)
@@ -3696,6 +3729,10 @@ def _api_queue() -> dict:
         last_steps = {}
 
     def _cmd_estimate(line: str) -> tuple[float | None, str, bool]:
+        """Every step has a time (12 November, Justin: "I'd like to have every item in the queue have an
+        estimated time"): an investigation's own (its last run, its spec's estimate, its deadline); else how
+        long the line took the last time it ran; else the estimate the line carries (`# estimate 30m`); else
+        its deadline (`cmd:[timeout=2h]`) as an upper bound; the coordinator's restart takes a couple of minutes."""
         spec_ = _inv.of_line(line)
         if spec_ is not None:
             try:
@@ -3705,7 +3742,48 @@ def _api_queue() -> dict:
         last = last_steps.get(line.strip())
         if last is not None:
             return float(last), "its last run", False
+        m = re.search(r"#\s*estimate\s+(\d+\s*[smh]?)\s*$", line)
+        if m:
+            return _inv.seconds(m.group(1)) / 60, "its line's estimate", False
+        if MAINTENANCE_RE.search(line):
+            return 2.0, "a restart", False
+        m = re.search(r"^cmd:\s*\[timeout=(\d+[smh]?)\]", line.strip())
+        if m:
+            return _inv.seconds(m.group(1)) / 60, "its deadline (an upper bound)", True
         return None, "no time", False
+
+    def _deadline(line: str, spec_: dict | None) -> str | None:
+        m = re.search(r"^cmd:\s*\[timeout=(\d+[smh]?)\]", line.strip())
+        return m.group(1) if m else (str(spec_.get("timeout")) if spec_ and spec_.get("timeout") else None)
+
+    def _step_detail(line: str) -> dict:
+        """What a step is, for its card (12 November, Justin: "investigations need to have a modal similar to
+        voyages and same thing for these items"): an investigation's spec, an evaluation's ship, a scorer's model."""
+        cmd = _bare(line[4:])
+        inv = _inv.of_line(line)
+        out: dict = {"command": cmd, "deadline": _deadline(line, inv)}
+        if inv is not None:
+            try:
+                stand = _inv.standing(str(inv.get("name")))
+            except Exception:  # noqa: BLE001
+                stand = {}
+            out["investigation"] = {
+                "name": inv.get("name"), "ship": inv.get("ship"), "question": inv.get("question"),
+                "subject": inv.get("subject"), "expedition": inv.get("expedition"),
+                "run": " ".join(str(x) for x in inv.get("run") or []), "readings": list(inv.get("readings") or []),
+                "estimate": inv.get("estimate"), "timeout": inv.get("timeout"),
+                "last": {k: stand.get(k) for k in ("status", "wall_minutes", "finished", "started") if stand.get(k) is not None},
+            }
+        m = re.search(r"-m\s+thorp\s+eval\s+(\S+)(?:.*--evaluators\s+(\S+))?", cmd)
+        if m:
+            env = dict(re.findall(r"(THORP_\w+)=(\S+)", cmd))
+            out["reading"] = {"of": "our ship", "run_id": m.group(1), "ship": _run_of(m.group(1)),
+                              "evaluators": m.group(2), "settings": env}
+        m = re.search(r"scripts/(score_\w+)\.py\s+(\S+)(.*)$", cmd)
+        if m:
+            out["reading"] = {"of": "an outside model", "script": f"backend/scripts/{m.group(1)}.py",
+                              "model": m.group(2), "options": m.group(3).strip()}
+        return out
 
     def _since_min(since) -> float | None:
         """Minutes since a lane's `since` (this Mac's local time, as s2.lanes writes it)."""
@@ -3728,7 +3806,8 @@ def _api_queue() -> dict:
         label, what = _cmd_label(line[4:].strip())
         gone = _since_min(out_.get("since"))
         left = max(0.0, est - (gone or 0.0)) if est is not None else None
-        rows.insert(0, {"n": None, "kind": "step", "name": label, "what": what, "cmd": line[4:].strip(),
+        rows.insert(0, {"n": None, "kind": "step", "name": label, "what": what, "cmd": _bare(line[4:]),
+                        "detail": _step_detail(line), "line": line,
                         "goal_id": line_goals.get(line), "status": "at sea", "lane": lane,
                         "started": out_.get("since"), "est_min": est, "est_source": source, "est_is_max": is_max,
                         "elapsed_min": round(gone) if gone is not None else None,
@@ -3746,8 +3825,8 @@ def _api_queue() -> dict:
             cmd = ln[4:].strip()
             label, what = _cmd_label(cmd)
             est, source, is_max = _cmd_estimate(ln)
-            r = {"n": i, "kind": "step", "name": label, "what": what, "cmd": cmd,
-                 "goal_id": line_goals.get(ln), "status": "queued", "lane": "mac",
+            r = {"n": i, "kind": "step", "name": label, "what": what, "cmd": _bare(cmd), "line": ln,
+                 "detail": _step_detail(ln), "goal_id": line_goals.get(ln), "status": "queued", "lane": "mac",
                  "est_min": est, "est_source": source, "est_is_max": is_max}
             if est is None:
                 # a step with no time: it still holds the lane, so every line behind it starts no sooner
@@ -3802,6 +3881,17 @@ def _api_queue() -> dict:
         r["starts_in_min"] = round(start - now)
         r["at_least"] = unknown[lane]
         rows.append(r)
+    # each line's goal in words, for its card (12 November): what it serves and in which expedition
+    try:
+        from thorp import expedition_goals as _eg
+
+        words = {g["goal_id"]: {"id": g["goal_id"], "text": g["text"], "status": g["status"], "expedition": g["expedition_key"],
+                                "expedition_name": g["name"]} for g in _eg.read()}
+    except Exception:  # noqa: BLE001  (no store: the rows still show)
+        words = {}
+    for r in rows:
+        if r.get("goal_id") in words:
+            r["serves"] = words[r["goal_id"]]
     end = max((s["end"] for v in seat.values() for s in v), default=now)
     return {"rows": rows, "hours_left": round((end - now) / 60, 1), "without_a_time": without_a_time}
 

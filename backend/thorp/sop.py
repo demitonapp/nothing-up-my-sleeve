@@ -258,7 +258,7 @@ def check(spec: dict) -> list[str]:
         out.append(f"reads {data.get('passes')} passes; SOP v{version} reads {content['passes']}")
     emb = std.get("embeddings") or {}
     chosen = emb.get("chosen")
-    if chosen:
+    if chosen and not departed("tokeniser"):  # a declared tokeniser departure covers its pieces too (12 November)
         v = (emb.get("versions") or {}).get(chosen) or {}
         if str((spec.get("tokeniser") or {}).get("vocab")) != str(v.get("vocab")):
             out.append(f"tokeniser vocab {(spec.get('tokeniser') or {}).get('vocab')}; SOP v{version} chooses {chosen} ({v.get('vocab')} pieces)")

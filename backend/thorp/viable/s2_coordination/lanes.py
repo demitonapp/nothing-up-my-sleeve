@@ -362,7 +362,7 @@ def append(queue: Path, text: str, note: str = "") -> None:
     if _queue_pg():
         from thorp.viable.s2_coordination import queue_store
 
-        queue_store.add(text)
+        queue_store.add(text, require_goal=False)  # a line the coordinator already held, put back
         return
     with _locked(queue):
         lines = queue.read_text(encoding="utf-8").splitlines(keepends=True)
@@ -387,7 +387,7 @@ def append_many(queue: Path, batch: list[str], note: str = "") -> int:
         added = 0
         for x in batch:
             try:
-                queue_store.add(x)
+                queue_store.add(x, require_goal=False)
                 added += 1
             except ValueError:
                 pass
@@ -703,9 +703,16 @@ def _is_that_job(pid: int, ln: Line) -> bool:
     def squash(x: str) -> str:
         return " ".join(x.replace('"', "").replace("'", "").split())
 
-    if squash(ln.payload) in squash(cmd):
+    # the shell takes a command's leading NAME=value assignments into the environment, so ps never shows
+    # them: `PYTHONPATH=backend backend/.venv/bin/python -m ...` runs as `backend/.venv/bin/python -m ...`
+    # (12 November: a restart would have called the live ARC investigation lost and freed its seat)
+    words = ln.payload.split()
+    while words and re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", words[0]):
+        words.pop(0)
+    payload = " ".join(words)
+    if squash(payload) and squash(payload) in squash(cmd):
         return True
-    first = (ln.payload.split() or [""])[0].rsplit("/", 1)[-1]
+    first = (payload.split() or [""])[0].rsplit("/", 1)[-1]
     return bool(first) and any(w.rsplit("/", 1)[-1] == first for w in cmd.split())
 
 

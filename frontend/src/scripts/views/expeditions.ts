@@ -275,12 +275,15 @@ export function queueRowsHtml(d: any, rungs: Rung[]): string {
   let seq = 0;
   const rows = (d.rows || []).map((r: any, i: number) => {
     seq += 1;
+    // a step opens its own card, as a voyage does (12 November, Justin: "each item in the queue needs to be able
+    // to be opened, currently only voyages can be opened with a modal")
+    const what = ({ investigation: 'an investigation', reading: 'a reading', upkeep: 'upkeep' } as Record<string, string>)[r.what] || 'a step';
     return r.kind === 'step'
-      ? `<tr class="qstep"><td class="s">${seq}</td><td colspan="3" class="s" title="${esc(r.cmd)}">${r.status === 'at sea' ? '' : '↳ then '}${r.what === 'investigation' ? 'an investigation' : 'a step'}: <b>${esc(r.name)}</b>${r.goal_id ? ` <span class="${pillCls('accent')}" title="the goal this step serves">${esc(r.goal_id)}</span>` : ''}<div class="s">${stepLength(r)}</div></td>
+      ? `<tr class="qstep${r.status === 'at sea' ? ' sel' : ''}" data-qi="${i}" tabindex="0" aria-label="show the card for ${esc(r.name)}" title="show this step's card"><td class="s">${seq}</td><td colspan="3" class="s">${r.status === 'at sea' ? '' : '↳ then '}${what}: <b>${esc(r.name)}</b>${r.goal_id ? ` <span class="${pillCls('accent')}" title="the goal this step serves">${esc(r.goal_id)}</span>` : r.what === 'upkeep' || r.status === 'at sea' ? '' : ` <span class="${pillCls('bad')}" title="every line serves an expedition's goal: thorp queue goal LINE --goal EXPEDITION:N">no goal</span>`}<div class="s">${stepLength(r)}</div></td>
       <td class="s" title="${r.est_min == null ? 'no time yet' : `about ${Math.round(r.est_min)} min · ${esc(r.est_source || '')}`}">${startsAt(r)}</td>
       <td class="s">${r.status === 'at sea' ? `<span class="${pillCls('running')}">at sea</span>` : sailsIn(r.starts_in_min, !!r.at_least)}</td></tr>`
       : `<tr data-qi="${i}" tabindex="0" aria-label="show the card for ${esc(r.name)}" title="show this voyage's card"${r.status === 'at sea' ? ' class="sel"' : ''}><td class="s">${seq}</td>
-      <td><b>${esc(r.name)}</b>${r.goal_id ? ` <span class="${pillCls('accent')}" title="the goal this voyage serves">${esc(r.goal_id)}</span>` : ''}<div class="s" title="${esc(r.goal || '')}">${esc(queueGoal(r))}</div></td>
+      <td><b>${esc(r.name)}</b>${r.goal_id ? ` <span class="${pillCls('accent')}" title="the goal this voyage serves">${esc(r.goal_id)}</span>` : ` <span class="${pillCls('bad')}" title="every line serves an expedition's goal: thorp queue goal LINE --goal EXPEDITION:N">no goal</span>`}<div class="s" title="${esc(r.goal || '')}">${esc(queueGoal(r))}</div></td>
       <td>${(() => {
         const rung = rungs.find((x) => x.preset === r.preset);
         const label = `<span class="mono">${esc(r.preset || r.name)}</span>`;

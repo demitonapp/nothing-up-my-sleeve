@@ -1,0 +1,103 @@
+# ships/specs/fitouts: which kind of knowledge, empirical knowledge (12 November, kipling:11; Justin: "we also don't know
+# which content has a bigger effect ... I'd like to see at the 300k how training on those 4 differ the
+# results, so queue those runs"). 300k@v0.0.6 with ONE thing changed: what it reads. Every arm reads about
+# 20M words (5M read 4 times), against Ogden v0.1's 147M, so the five arms compare with each other and not
+# with 300k@v0.0.6. The lists are composed from the Ogden branch at its 68% bar (selection.compose).
+name: 300k@v0.0.6-kind-empirical
+expedition: kipling
+goal: 11
+ship: SOP v0.0.6 at 300k, empirical knowledge
+experiment: 'Which kind of knowledge (Kipling, goal 11): the 300k on each of the library''s four kinds alone, at
+  5M words a list and the shared tokeniser, against a mixed list of the same size.'
+question: The 300k on 58 books of empirical knowledge (science, history, biography, travel, practical books), 5.0M
+  words, with the shared tokeniser (trained on Ogden v0.1) and everything else 300k@v0.0.6's. What does this kind
+  of knowledge do to the language, the four cards and the comparator, and the logic deck, beside the other three
+  kinds and the mixed list of the same size? The language reading is the hole cards, 11 of general knowledge and
+  5 empirical, so it favours those two arms by its make-up; the cards and the logic deck are the even readings.
+data:
+  recipe: lists/ogden-kind-empirical-5m-v1.csv
+  passes: 4
+  order: shuffled
+  refuse:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+  - lists/hole-cards-unseen.csv
+  clean: unwrap-v2
+  opt_in: 'kipling:11, which kind of knowledge (Justin, 12 November): a list composed from the Ogden branch at its 68% bar by knowledge kind (library_facts.knowledge_of, selection.compose), not a store'
+  stages:
+  - name: kind-empirical
+    recipe: lists/ogden-kind-empirical-5m-v1.csv
+    passes: 4
+tokeniser:
+  kind: spm-bpe
+  vocab: 2048
+  byte_fallback: true
+  train_on: lists/ogden-v0.1.csv
+model:
+  family: gpt
+  preset: 300k
+  context: 1024
+  positions: rope
+optim:
+  name: adamw
+  lr: 0.003
+  betas:
+  - 0.9
+  - 0.95
+  weight_decay: 0.1
+  warmup_steps: 100
+  schedule: cosine
+  min_lr_ratio: 0.1
+  batch_tokens: 32768
+  grad_clip: 1.0
+  precision: bf16
+  scaffold:
+    weight: 1.0
+    hold: 0.25
+    fade: 1.0
+    heads:
+    - layer: 0
+      head: 0
+      card: previous_word
+    - layer: 0
+      head: 1
+      card: delimiter
+    - layer: 4
+      head: 0
+      card: induction
+    riddles:
+      comparator:
+        layer: 2
+        head: 1
+        items: 16
+        pool: 2048
+eval:
+  sets:
+  - lists/hole-cards-unseen.csv
+  every_steps: 640
+  evaluators:
+  - ce_bpb
+  - discovery
+  - logic
+  - stars
+  - nevermore
+  - cards
+  - shapes
+  - pips
+  - soundings
+  light:
+    every_steps: 64
+    evaluators:
+    - stars
+    - nevermore
+    - cards
+    - logic
+    - shapes
+    - pips
+checkpoint:
+  every_steps: 640
+sop: 0.0.6
+seed: 1
+departures:
+- field: content
+  why: 'which kind of knowledge, kipling:11: empirical knowledge, about 20M words read where Ogden v0.1 reads 147M'

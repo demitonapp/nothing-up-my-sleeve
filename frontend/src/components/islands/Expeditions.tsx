@@ -462,6 +462,137 @@ function VSection({ title, wide, children }: { title: string; wide?: boolean; ch
   return <section className={`qvsec${wide ? ' wide' : ''}`}><h3>{title}</h3>{children}</section>;
 }
 
+/** Opening and closing a queue card: the dialog shown modal, Escape and the backdrop close it, and focus goes
+ *  back to the row that opened it. */
+function useQueueDialog(onClose: () => void) {
+  const ref = useRef<HTMLDialogElement>(null);
+  const opener = useRef<HTMLElement | null>(null);
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    opener.current = document.activeElement as HTMLElement | null;
+    if (!el.open) el.showModal();
+    const cancel = (e: Event): void => { e.preventDefault(); closeRef.current(); };
+    el.addEventListener('cancel', cancel);
+    return () => {
+      el.removeEventListener('cancel', cancel);
+      if (el.open) el.close();
+      opener.current?.focus?.();
+    };
+  }, []);
+  return ref;
+}
+
+const STEP_WHAT: Record<string, string> = { investigation: 'investigation', reading: 'reading', upkeep: 'upkeep', step: 'step' };
+const qvMin = (m: number): string => (m < 1 ? 'under a minute' : m < 90 ? `${Math.round(m)} min` : `${(m / 60).toFixed(1)} h`);
+
+/** One step in the queue (an investigation, a reading, the coordinator's upkeep, any other command), opened as a
+ *  card like a voyage's (12 November, Justin: "investigations need to have a modal similar to voyages and same
+ *  thing for these items"): what it does and why, the goal it serves, when it runs and for how long, its
+ *  deadline, and the command itself. The data is the row's `detail` from /api/queue. */
+function QueueStepDialog({ row, onClose }: { row: any; onClose: () => void }) {
+  const ref = useQueueDialog(onClose);
+  const d = row?.detail || {};
+  const inv = d.investigation || null;
+  const rd = d.reading || null;
+  const serves = row?.serves || null;
+  const atSea = row?.status === 'at sea';
+  const when = atSea
+    ? row?.started ? `since ${new Date(row.started).toLocaleString()}` : 'at sea'
+    : row?.starts_in_min != null
+      ? `${row.at_least ? '≥ ' : '≈ '}${new Date(Date.now() + Number(row.starts_in_min) * 60000).toLocaleString()}`
+      : 'no time yet';
+  const length = row?.est_min == null ? 'no time of its own yet'
+    : `${row.est_is_max ? 'up to ' : 'about '}${qvMin(Number(row.est_min))}${row.est_source ? ` · ${row.est_source}` : ''}`;
+  const settings = rd?.settings ? Object.entries(rd.settings as Record<string, string>) : [];
+  const what = rd
+    ? rd.of === 'our ship'
+      ? `${String(rd.evaluators || 'its evaluators').replace('ifeval', 'IFEval')} read on our ship ${rd.ship || rd.run_id}, at its last checkpoint. It trains nothing; the reading is written to the ship's own record.`
+      : `${row.name.split(':')[0]} read on an outside model, ${rd.model}, so our ships can be set beside it on the leaderboard. It trains nothing.`
+    : row?.what === 'upkeep'
+      ? 'The coordinator restarts itself between two lines, so it runs the code on disk rather than the code it was started with. Whatever is at sea is adopted by the new coordinator and keeps going.'
+      : null;
+  return (
+    <dialog ref={ref} className="qv-dialog" aria-labelledby="qstitle" onClick={(e) => { if (e.target === ref.current) onClose(); }}>
+      <div className="qvwrap" onClick={(e) => e.stopPropagation()}>
+        <header className="qvhead">
+          <div className="qvheadmain">
+            <h2 className="qvtitle" id="qstitle">{row.name}</h2>
+            <p className="qvsub">
+              {inv?.ship || STEP_WHAT[row.what] || 'step'}
+              {serves ? <> · <a href={`/expeditions/${serves.expedition}`}>{serves.expedition_name || serves.expedition}</a></> : null}
+            </p>
+          </div>
+          <div className="qvbadges">
+            <span className={pillCls(atSea ? 'running' : '')}>{row.status || 'queued'}</span>
+            <span className={pillCls('')}>{STEP_WHAT[row.what] || 'step'}</span>
+            {row.goal_id ? <span className={pillCls('accent')}>{row.goal_id}</span> : null}
+          </div>
+        </header>
+        <button type="button" className="qvclose" onClick={onClose} aria-label="Close">×</button>
+        <div className="qvgrid">
+          <VSection title="What it does" wide>
+            {inv?.question ? <p className="qvtext">{inv.question}</p> : what ? <p className="qvtext">{what}</p> : <p className="s">A command between voyages.</p>}
+          </VSection>
+
+          <VSection title="The line">
+            <VRow k="queue">{row.n != null ? `#${row.n}` : atSea ? 'at sea now' : '–'}</VRow>
+            <VRow k="lane">{row.lane || '–'}</VRow>
+            <VRow k="starts">{when}</VRow>
+            <VRow k="takes">{length}</VRow>
+            {atSea && row.elapsed_min != null ? <VRow k="so far">{qvMin(Number(row.elapsed_min))}{row.left_min != null ? <span className="s"> · about {qvMin(Number(row.left_min))} left</span> : null}</VRow> : null}
+            <VRow k="deadline">{d.deadline ? <>{d.deadline}<span className="s"> · stopped if it runs longer, and the queue goes on</span></> : <span className="s">none</span>}</VRow>
+          </VSection>
+
+          <VSection title="The goal it serves">
+            {serves ? <>
+              <VRow k="goal">{serves.id}</VRow>
+              <VRow k="what"><b>{serves.text}</b></VRow>
+              <VRow k="expedition"><a href={`/expeditions/${serves.expedition}`}>{serves.expedition_name || serves.expedition}</a></VRow>
+              <VRow k="state">{serves.status}</VRow>
+            </> : row.what === 'upkeep'
+              ? <p className="s">The queue's own upkeep: it serves no expedition.</p>
+              : <p className="s">No goal yet: every line serves one (thorp queue goal LINE --goal EXPEDITION:N).</p>}
+          </VSection>
+
+          {inv ? <VSection title="The investigation" wide>
+            <VRow k="name"><span className="mono">{inv.name}</span></VRow>
+            {inv.subject ? <VRow k="subject"><span className="mono">{inv.subject}</span></VRow> : null}
+            <VRow k="runs"><span className="mono">python {inv.run}</span></VRow>
+            {(inv.readings || []).length ? <VRow k="writes"><ul className="qvlist">{inv.readings.map((x: string) => <li key={x} className="mono">{x}</li>)}</ul></VRow> : null}
+            <VRow k="estimate">{inv.estimate || '–'}{inv.timeout ? <span className="s"> · deadline {inv.timeout}</span> : null}</VRow>
+            <VRow k="last run">{inv.last && inv.last.status
+              ? <>{inv.last.status}{inv.last.wall_minutes != null ? <span className="s"> · {qvMin(Number(inv.last.wall_minutes))}</span> : null}{inv.last.finished ? <span className="s"> · {new Date(inv.last.finished).toLocaleString()}</span> : null}</>
+              : <span className="s">never run</span>}</VRow>
+          </VSection> : null}
+
+          {rd ? <VSection title="The reading" wide>
+            {rd.of === 'our ship' ? <>
+              <VRow k="ship">{rd.ship || '–'}<span className="s mono"> · {rd.run_id}</span></VRow>
+              <VRow k="evaluators">{rd.evaluators || '–'}</VRow>
+              {settings.map(([k, v]) => <VRow k={k.replace(/^THORP_/, '').replace(/_/g, ' ').toLowerCase()} key={k}>{v}</VRow>)}
+            </> : <>
+              <VRow k="model"><span className="mono">{rd.model}</span></VRow>
+              <VRow k="script"><span className="mono">{rd.script}</span></VRow>
+              {rd.options ? <VRow k="options"><span className="mono">{rd.options}</span></VRow> : null}
+            </>}
+          </VSection> : null}
+
+          <VSection title="The command" wide>
+            <pre className="qvcmd">{d.command || row.cmd}</pre>
+          </VSection>
+        </div>
+        <div className="qvfoot">
+          {serves ? <a className={btnCls('outline', '')} href={`/expeditions/${serves.expedition}/plan`}>the expedition's plan →</a> : null}
+          <span className="s">Queue line: <span className="mono">{row.line || row.cmd}</span></span>
+        </div>
+      </div>
+    </dialog>
+  );
+}
+
 /** One voyage in the queue, opened as a card: the same shape the at-sea cards use (embeddings, reads,
  *  attention, pins, schedule, readings), plus the spec's question and its place in the queue. The data is
  *  the row's `detail` from /api/queue; a voyage at sea also carries its latest readings. */
@@ -1551,7 +1682,9 @@ export default function Expeditions() {
           </section>
         </div>
       </div>
-      {queueRow ? <QueueVoyageDialog row={queueRow} onClose={() => setQueuePick(null)} /> : null}
+      {queueRow ? (queueRow.kind === 'step'
+        ? <QueueStepDialog row={queueRow} onClose={() => setQueuePick(null)} />
+        : <QueueVoyageDialog row={queueRow} onClose={() => setQueuePick(null)} />) : null}
     </div>
   );
 }

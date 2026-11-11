@@ -1,12 +1,8 @@
-cmd: PYTHONPATH=backend backend/.venv/bin/python -m thorp.investigate run arc-audit-questions
-cmd: PYTHONPATH=backend backend/.venv/bin/python -m thorp.investigate run deltanet-check-qwen3.8-27b
-cmd: PYTHONPATH=backend backend/.venv/bin/python -m thorp.investigate run arc-ai2-300k
-cmd: PYTHONPATH=backend backend/.venv/bin/python -m thorp.investigate run arc-ai2-1m
-cmd: PYTHONPATH=backend backend/.venv/bin/python -m thorp.investigate run arc-ai2-9m
-cmd: PYTHONPATH=backend backend/.venv/bin/python -m thorp.investigate run arc-ai2-21m
+cmd: sh backend/scripts/restart_coordinator.sh
+fitouts/9m@v0.0.6-converse
 fitouts/300k@v0.0.6-probe
 fitouts/300k@v0.0.6-probe-s2
-cmd: PYTHONPATH=backend backend/.venv/bin/python -m thorp.probe_phase 300k@v0.0.6-probe 300k@v0.0.6-probe-s2
+cmd: PYTHONPATH=backend backend/.venv/bin/python -m thorp.investigate run probe-phase-300k
 fitouts/300k@v0.0.6
 fitouts/300k@v0.0.6-s2
 fitouts/300k@v0.0.6-marks
@@ -20,6 +16,49 @@ fitouts/1m@v0.0.6-control
 fitouts/300k@v0.0.6-base
 fitouts/1m@v0.0.6-pins
 fitouts/1m@v0.0.6
-fitouts/1m@v0.0.6-hold25
 fitouts/1m@v0.0.6-hold25-double
-fitouts/9m@v0.0.6-converse
+fitouts/1m@v0.0.6-hold25
+fitouts/300k@v0.0.6-candidate
+fitouts/300k@v0.0.6-candidate-s2
+fitouts/300k@v0.0.6-candidate-bridge
+fitouts/300k@v0.0.6-candidate-bridge-s2
+fitouts/1m@v0.0.6-bridge
+fitouts/9m@v0.0.6-candidate
+fitouts/9m@v0.0.6-candidate-bridge
+fitouts/1m@v0.0.6-s2
+fitouts/1m@v0.0.6-wide
+fitouts/1m@v0.0.6-wide-s2
+fitouts/9m@v0.0.6-gqa
+fitouts/1m@v0.0.6-gqa
+fitouts/300k@v0.0.6-ctx2048
+fitouts/1m@v0.0.6-ctx2048
+fitouts/9m@v0.0.6-ctx2048
+fitouts/300k@v0.0.6-v1024
+fitouts/300k@v0.0.6-v1024-s2
+fitouts/1m@v0.0.6-v4096
+fitouts/9m@v0.0.6-v4096
+fitouts/300k@v0.0.6-kind-general
+fitouts/300k@v0.0.6-kind-metaphysics
+fitouts/300k@v0.0.6-kind-empirical
+fitouts/300k@v0.0.6-kind-logic
+fitouts/300k@v0.0.6-kind-mixed
+cmd: PYTHONPATH=backend backend/.venv/bin/python -m thorp.investigate run deltanet-check-qwen3.8-27b
+cmd: PYTHONPATH=backend backend/.venv/bin/python -m thorp.investigate run arc-audit-questions
+cmd: PYTHONPATH=backend backend/.venv/bin/python -m thorp.investigate run arc-ai2-300k
+cmd: PYTHONPATH=backend backend/.venv/bin/python -m thorp.investigate run arc-ai2-1m
+cmd: PYTHONPATH=backend backend/.venv/bin/python -m thorp.investigate run arc-ai2-9m
+cmd: PYTHONPATH=backend backend/.venv/bin/python -m thorp.investigate run arc-ai2-21m
+cmd: [timeout=2h] THORP_IFEVAL_LIMIT=541 THORP_IFEVAL_MAX_NEW=512 PYTHONPATH=backend backend/.venv/bin/python -m thorp eval dba348d4d097 --evaluators ifeval  # estimate 15m
+cmd: [timeout=2h] THORP_IFEVAL_LIMIT=541 THORP_IFEVAL_MAX_NEW=512 PYTHONPATH=backend backend/.venv/bin/python -m thorp eval 30cab184a259 --evaluators ifeval  # estimate 15m
+cmd: [timeout=2h] THORP_IFEVAL_LIMIT=541 THORP_IFEVAL_MAX_NEW=512 PYTHONPATH=backend backend/.venv/bin/python -m thorp eval 7436bab9726d --evaluators ifeval  # estimate 20m
+cmd: [timeout=2h] THORP_IFEVAL_LIMIT=541 THORP_IFEVAL_MAX_NEW=512 PYTHONPATH=backend backend/.venv/bin/python -m thorp eval cdc3da8540e3 --evaluators ifeval  # estimate 25m
+cmd: [timeout=3h] PYTHONPATH=backend backend/.venv/bin/python backend/scripts/score_ifeval.py EleutherAI/pythia-14m --no-helm  # estimate 10m
+cmd: [timeout=3h] PYTHONPATH=backend backend/.venv/bin/python backend/scripts/score_ifeval.py EleutherAI/pythia-31m --no-helm  # estimate 10m
+cmd: [timeout=3h] PYTHONPATH=backend backend/.venv/bin/python backend/scripts/score_ifeval.py EleutherAI/pythia-70m --no-helm  # estimate 15m
+cmd: [timeout=3h] PYTHONPATH=backend backend/.venv/bin/python backend/scripts/score_ifeval.py EleutherAI/pythia-160m --no-helm  # estimate 20m
+cmd: [timeout=3h] PYTHONPATH=backend backend/.venv/bin/python backend/scripts/score_ifeval.py mlx-community/gemma-3-270m-bf16 --no-helm  # estimate 25m
+cmd: [timeout=3h] PYTHONPATH=backend backend/.venv/bin/python backend/scripts/score_ifeval.py HuggingFaceTB/SmolLM2-360M --no-helm  # estimate 30m
+cmd: [timeout=3h] PYTHONPATH=backend backend/.venv/bin/python backend/scripts/score_ifeval.py EleutherAI/pythia-410m --no-helm  # estimate 35m
+cmd: [timeout=3h] PYTHONPATH=backend backend/.venv/bin/python backend/scripts/score_ifeval.py Qwen/Qwen3-0.6B --no-helm  # estimate 40m
+cmd: [timeout=3h] PYTHONPATH=backend backend/.venv/bin/python backend/scripts/score_ifeval.py mlx-community/Qwen3.5-0.8B-bf16 --no-helm  # estimate 45m
+cmd: PYTHONPATH=backend backend/.venv/bin/python -m thorp.investigate run arc-qwen3-4b

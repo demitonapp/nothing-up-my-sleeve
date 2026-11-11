@@ -2676,9 +2676,52 @@ EXPEDITIONS["kipling"] = Expedition(
                    "Kipling ship",
          "why": ""},
         {"text": "GQA",
-         "detail": "grouped-query attention: shared key/value heads, fewer than the query heads (the "
-                   "1m@v0.0.6-gqa arm)",
+         "detail": "grouped-query attention: shared key/value heads, fewer than the query heads. Answered at "
+                   "the 300k on two seeds (no language gain, and it costs the mover and the bridge); the 1m and "
+                   "the 9m arms, 1m@v0.0.6-gqa and 9m@v0.0.6-gqa, each against its plain ship, before the "
+                   "charter's KV heads are signed (Justin, 12 November: \"queue the 1m and 9m GQA to see what "
+                   "it does there before signing off\")",
          "why": "to test its performance, and whether it is something we should adopt on future expeditions"},
+        # 8 and 9, not 7: kipling:7 is the store's record of Table Talk, folded into goal 3 (11 November)
+        {"position": 8, "text": "The hull: deep against wide",
+         "detail": "the 1m at 12 layers of 80 (1m@v0.0.6, two seeds) against the same 1m at 4 layers of 128 "
+                   "(1m@v0.0.6-wide, two seeds): one standard, one corpus, the same heads and near enough the "
+                   "same parameters, read on the language, the cards and the time a voyage takes",
+         "why": "the master charter's layers, width and query heads wait on it (Justin, 12 November: \"I "
+                "agree with running a clean pair. Add it to the queue and then make that line wait on those "
+                "voyages\"). The deep ladder read 0.07 to 0.11 bits a byte worse than the wide one from the "
+                "1m up and took 2 to 4.5 times as long, on voyages that differed in more than their shape"},
+        {"position": 9, "text": "The window at double",
+         "detail": "the 300k, the 1m and the 9m read through 2,048 pieces instead of 1,024, each against its "
+                   "own plain v0.0.6 ship. The hole cards are scored in windows of the ship's own context, so "
+                   "the cards, the stars and the logic deck are the like-for-like readings",
+         "why": "the charter's context row waits on it (Justin, 12 November: \"Run some tests at double the "
+                "size at 300k, 1m and 9m before we sign it off\")"},
+        {"position": 10, "text": "Pieces scaled by class",
+         "detail": "a vocabulary that doubles with the class, 1,024 at the 300k, 2,048 at the 1m, 4,096 at the 9m, "
+                   "and on to 8,192 and 16,384, against the shared 2,048: 300k@v0.0.6-v1024 (two seeds), "
+                   "1m@v0.0.6-v4096 and 9m@v0.0.6-v4096, each against its own plain ship. Bits a byte reads fairly "
+                   "across vocabularies; the cards do not quite, since a word spans fewer pieces in a bigger one",
+         "why": "the charter's pieces row waits on it (Justin, 12 November: \"couldn't we scale them, so 1024 at "
+                "300k, 2048 at 1m, 4k at 9m etc? ... i think it's a v0.1 question should we queue some voyages to "
+                "confirm?\"). Doubling with the class keeps the embedding between 11 and 23% of every ship, where one "
+                "2,048 is 37% of the 300k and 1.5% of the 50m"},
+        {"position": 11, "text": "Which kind of knowledge",
+         "detail": "the 300k on each of the library's four kinds of knowledge alone, general knowledge, "
+                   "metaphysics, empirical knowledge and logic and maths, at 5M words a list and the shared "
+                   "tokeniser, against a mixed list of the same size: what each kind does to the language, the "
+                   "cards and the logic deck. Logic and maths has 459k words in the branch, so its list adds the "
+                   "logic tutor and reads 8 passes to match the others' 20M words read",
+         "why": "the charter's recipe and trained-on rows wait on it (Justin, 12 November: \"we also don't know "
+                "which content has a bigger effect ... I'd like to see at the 300k how training on those 4 differ "
+                "the results, so queue those runs\")"},
+        {"position": 12, "text": "Ogden with control tokens",
+         "detail": "the Ogden branch with the v0.1 control symbols written into its text, the branch the fleet's "
+                   "tokeniser is trained on and every class reads: which symbols, and how they are recorded in the "
+                   "corpus and the library, are the parts still to settle",
+         "why": "Justin, 12 November: \"I want to have control tokens. I think that's pretty much locked in that "
+                "control tokens are part of our future ... I want to have the ogden branch with control tokens in "
+                "it\""},
     ),
     ship="SOP v0.0.6",
     fleet="Star Fleet",

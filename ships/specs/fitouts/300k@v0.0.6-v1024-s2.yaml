@@ -1,0 +1,97 @@
+# ships/specs/fitouts: pieces scaled by class (12 November, kipling:10; Justin: "couldn't we scale them, so
+# 1024 at 300k, 2048 at 1m, 4k at 9m etc? ... should we queue some voyages to confirm?"). 300k@v0.0.6-s2 with ONE
+# thing changed: tokeniser.vocab 2,048 -> 1,024. The tokeniser is trained afresh on the same books (its id
+# is a hash of the books and settings), so this ship reads its own pieces; bits a byte is the fair comparison.
+# The master charter's pieces row waits on it.
+name: 300k@v0.0.6-v1024-s2
+expedition: kipling
+goal: 10
+ship: SOP v0.0.6 at 300k, 1,024 pieces (seed 2)
+experiment: 'Pieces scaled by class (Kipling, goal 10): a vocabulary that doubles with the class, 1,024 at the 300k,
+  2,048 at the 1m, 4,096 at the 9m, against the shared 2,048, each ship against its own plain one.'
+question: '300k@v0.0.6-s2 with one thing changed: the tokeniser''s pieces, 2,048 to 1,024, trained on the same books
+  with the same settings. Is the language better or worse in bits a byte (which reads fairly across vocabularies),
+  what happens to the cards (a word spans more pieces, so previous-word and the copy cards are not quite the same
+  task), and what does the embedding cost the ship? Read against 300k@v0.0.6-s2.'
+data:
+  recipe: lists/ogden-v0.1.csv
+  passes: 4
+  order: shuffled
+  refuse:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+  - lists/hole-cards-unseen.csv
+  clean: unwrap-v2
+tokeniser:
+  kind: spm-bpe
+  vocab: 1024
+  byte_fallback: true
+  train_on: lists/ogden-v0.1.csv
+model:
+  family: gpt
+  preset: 300k
+  context: 1024
+  positions: rope
+optim:
+  name: adamw
+  lr: 0.003
+  betas:
+  - 0.9
+  - 0.95
+  weight_decay: 0.1
+  warmup_steps: 100
+  schedule: cosine
+  min_lr_ratio: 0.1
+  batch_tokens: 32768
+  grad_clip: 1.0
+  precision: bf16
+  scaffold:
+    weight: 1.0
+    hold: 0.25
+    fade: 1.0
+    heads:
+    - layer: 0
+      head: 0
+      card: previous_word
+    - layer: 0
+      head: 1
+      card: delimiter
+    - layer: 4
+      head: 0
+      card: induction
+    riddles:
+      comparator:
+        layer: 2
+        head: 1
+        items: 16
+        pool: 2048
+eval:
+  sets:
+  - lists/hole-cards-unseen.csv
+  every_steps: 640
+  evaluators:
+  - ce_bpb
+  - discovery
+  - logic
+  - stars
+  - nevermore
+  - cards
+  - shapes
+  - pips
+  - soundings
+  light:
+    every_steps: 64
+    evaluators:
+    - stars
+    - nevermore
+    - cards
+    - logic
+    - shapes
+    - pips
+checkpoint:
+  every_steps: 640
+sop: 0.0.6
+seed: 2
+departures:
+- field: tokeniser
+  why: 'pieces scaled by class, kipling:10: 1,024 pieces, the arm''s one change'

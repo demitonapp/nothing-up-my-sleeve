@@ -240,7 +240,7 @@ def test_with_the_store_as_the_queue_the_take_and_the_row_are_one_step(harbour, 
     from thorp.viable.s2_coordination import queue_store
 
     monkeypatch.setenv("THORP_QUEUE_PG", "1")
-    queue_store.add("cmd: sleep 0.3")
+    queue_store.add("cmd: sleep 0.3", require_goal=False)
     seen = {}
 
     def launch(ln):
@@ -386,6 +386,15 @@ def test_is_that_job_reads_the_command_line(harbour, monkeypatch):
     assert lanes._is_that_job(1, cmd)
     ps("echo a b")  # the shell exec'd the command, its quotes gone
     assert lanes._is_that_job(1, cmd)
+    # a command's leading assignments go to the environment and never show in ps (12 November: the ARC
+    # investigation at sea would have been called lost by a restarted coordinator)
+    env = lanes.parse("cmd: PYTHONPATH=backend X_Y=1 backend/.venv/bin/python -m thorp.investigate run arc", harbour["specs"])
+    ps("backend/.venv/bin/python -m thorp.investigate run arc")
+    assert lanes._is_that_job(1, env)
+    ps("backend/.venv/bin/python -m thorp.investigate run other")
+    assert lanes._is_that_job(1, env)  # the same program: held, as a bare command's first word always was
+    ps("/usr/bin/caffeinate -dimsu")
+    assert not lanes._is_that_job(1, env)
     ps("", code=1)  # it answers a signal and ps shows nothing: hold the seat
     assert lanes._is_that_job(os.getpid(), spec)
 

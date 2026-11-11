@@ -1,0 +1,111 @@
+# ships/specs/fitouts: the bridge riddle at 1m (12 November, card_census:2; Justin: "i like the recommendation
+# for the comparator, but we need to run voyages to determine our final position on the other riddles").
+# 1m@v0.0.6 with ONE thing added: optim.scaffold.riddles.bridge at layer 8. The trainer has two
+# riddles (thorp/train.py RIDDLES): the comparator, kept, and the bridge, decided here.
+name: 1m@v0.0.6-bridge
+expedition: card_census
+goal: 2
+ship: SOP v0.0.6 at 1m, the candidate scaffold and the bridge riddle
+experiment: 'The riddles (card census, goal 2): the v0.1 candidate scaffold (previous-word and delimiter at layer
+  0, induction and duplicate-word at two-thirds depth, the comparator riddle at one-third, full weight, pulled to
+  10% and faded out by 60%, no release) with and without the bridge riddle at two-thirds depth.'
+question: '1m@v0.0.6 with one thing added: the bridge riddle at layer 8 (two-thirds depth), 16 items a step from
+  a 2,048-item pool of the logic tutor''s invented words. The bridge has formed whenever it was taught (best 1.46
+  to 2.27 against its 0.5 mark) but always inside a deck of ten pins, and kept it by heart once (the 9m staged ship,
+  0.57, beside the worst chaining read, cause gain -0.263). Taught alone beside the candidate: is it held by heart,
+  does it move the logic deck''s cause gain, and what does it cost the comparator and the language? Read against
+  1m@v0.0.6.'
+data:
+  recipe: lists/ogden-v0.1.csv
+  passes: 4
+  stages:
+  - name: ogden
+    recipe: lists/ogden-v0.1.csv
+    passes: 4
+  order: shuffled
+  refuse:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+  - lists/hole-cards-unseen.csv
+  clean: unwrap-v2
+tokeniser:
+  kind: spm-bpe
+  vocab: 2048
+  byte_fallback: true
+  train_on: lists/ogden-v0.1.csv
+model:
+  family: gpt
+  preset: 1m
+  context: 1024
+  positions: rope
+optim:
+  name: adamw
+  lr: 0.002
+  betas:
+  - 0.9
+  - 0.95
+  weight_decay: 0.1
+  warmup_steps: 100
+  schedule: cosine
+  min_lr_ratio: 0.1
+  batch_tokens: 32768
+  grad_clip: 1.0
+  precision: bf16
+  scaffold:
+    weight: 1.0
+    hold: 0.1
+    fade: 0.6
+    heads:
+    - layer: 0
+      head: 0
+      card: previous_word
+    - layer: 0
+      head: 1
+      card: delimiter
+    - layer: 8
+      head: 2
+      card: induction
+    - layer: 8
+      head: 3
+      card: duplicate_word
+    riddles:
+      comparator:
+        layer: 4
+        head: 2
+        items: 16
+        pool: 2048
+      bridge:
+        layer: 8
+        items: 16
+        pool: 2048
+eval:
+  sets:
+  - lists/hole-cards-unseen.csv
+  every_steps: 640
+  evaluators:
+  - ce_bpb
+  - discovery
+  - logic
+  - stars
+  - nevermore
+  - cards
+  - shapes
+  - pips
+  - soundings
+  light:
+    every_steps: 64
+    evaluators:
+    - stars
+    - nevermore
+    - cards
+    - logic
+    - shapes
+    - pips
+checkpoint:
+  every_steps: 640
+sop: 0.0.6
+departures:
+- 'the post-training SOP: the deck stage read after the four pretraining passes, with the pull off'
+- field: scaffold
+  why: 'the bridge riddle at layer 8, card_census:2: the arm''s one change'
+seed: 1

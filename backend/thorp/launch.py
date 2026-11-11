@@ -74,7 +74,12 @@ PARTS: dict[str, tuple[str, str]] = {
     "kipling:6": (DECIDES, "the key/value heads"),
     "card_census:1": (DECIDES, "which cards each class is given to hold"),
     "knockout:1": (DECIDES, "whether a card is pinned because chaining needs it"),
-    "seedling:1": (DECIDES, "whether a class is built from nothing or grown from the class beneath it"),
+    "kipling:8": (DECIDES, "the hull's shape: how many layers, how wide, and the heads the width allows"),
+    "kipling:9": (DECIDES, "the window every class reads through"),
+    "kipling:10": (DECIDES, "how many pieces each class's tokeniser has"),
+    "kipling:11": (DECIDES, "which kinds of knowledge the fleet's corpus holds, and in what shares"),
+    "kipling:12": (DECIDES, "the Ogden branch with control tokens: what the tokeniser is trained on and what every class reads"),
+    "seedling:1": (CARRIED, "built from nothing is signed (Justin, 12 November: 'Built: agreed'); whether a class grown from the one beneath gets there sooner is tested against this fleet, not before it"),
     "kipling:1": (ACCEPTANCE, "IFEval on prompts the ship was not taught: the rigged pilot beat the mark and cost the language"),
     "knockout:3": (ACCEPTANCE, "the 21m read against SmolLM2-360M"),
     "knockout:7": (ACCEPTANCE, "AI2 ARC, each class beside the outside readings"),
@@ -84,7 +89,7 @@ PARTS: dict[str, tuple[str, str]] = {
     "knockout:5": (CARRIED, "the arch is a programme of its own, each rung earning the next"),
     "knockout:6": (CARRIED, "rests on the reasoning budget, which is carried"),
     "knockout:9": (CARRIED, "a stage sailed from a finished 9m: it reads the fleet rather than shaping it"),
-    "card_census:2": (CARRIED, "how small the cards still form does not change what the five classes carry"),
+    "card_census:2": (DECIDES, "which riddles the fleet carries: the comparator is kept at one-third depth (Justin, 12 November); the bridge is decided by the riddle voyages"),
     "seedling:2": (CARRIED, "the apprentice's next steps follow the grown-from-keel answer"),
 }
 
@@ -146,22 +151,24 @@ def _s(k: str) -> Callable[[dict], Any]:
 
 GROUPS: tuple[tuple[str, str, tuple[Param, ...]], ...] = (
     ("ship", "The ship", (
-        Param("ship.layers", "layers", lambda d: _n(_m("layers")(d))),
-        Param("ship.heads", "query heads", lambda d: _n(_m("heads")(d))),
+        # layers, width and the heads that follow from the width are one decision: the clean pair at the 1m
+        # (kipling:8; Justin, 12 November: "I agree with running a clean pair ... make that line wait on those voyages")
+        Param("ship.layers", "layers", lambda d: _n(_m("layers")(d)), ("kipling:8",)),
+        Param("ship.heads", "query heads", lambda d: _n(_m("heads")(d)), ("kipling:8",)),
         Param("ship.kv_heads", "KV heads", lambda d: _n(_m("kv_heads")(d)) if _m("kv_heads")(d) else "one per query head", ("kipling:6",)),
-        Param("ship.width", "width", lambda d: _n(_m("width")(d))),
-        Param("ship.context", "context", lambda d: f"{int(_m('context')(d)):,} pieces" if _m("context")(d) else None),
+        Param("ship.width", "width", lambda d: _n(_m("width")(d)), ("kipling:8",)),
+        Param("ship.context", "context", lambda d: f"{int(_m('context')(d)):,} pieces" if _m("context")(d) else None, ("kipling:9",)),
         Param("ship.positions", "positions", _m("positions")),
-        Param("ship.built", "built", _built, ("seedling:1",)),
+        Param("ship.built", "built", _built),
     )),
     ("tokeniser", "The tokeniser", (
-        Param("tokeniser.pieces", "pieces", lambda d: f"{(d.get('tokeniser') or {}).get('kind') or '–'} · {int((d.get('tokeniser') or {}).get('vocab') or 0):,} pieces"),
+        Param("tokeniser.pieces", "pieces", lambda d: f"{(d.get('tokeniser') or {}).get('kind') or '–'} · {int((d.get('tokeniser') or {}).get('vocab') or 0):,} pieces", ("kipling:10",)),
         Param("tokeniser.byte_fallback", "byte fallback", lambda d: "yes" if (d.get("tokeniser") or {}).get("byte_fallback") else "no"),
-        Param("tokeniser.train_on", "trained on", lambda d: (d.get("tokeniser") or {}).get("train_on")),
-        Param("tokeniser.symbols", "control symbols", lambda d: " ".join((d.get("tokeniser") or {}).get("symbols") or []) or "none declared", ("kipling:2",)),
+        Param("tokeniser.train_on", "trained on", lambda d: (d.get("tokeniser") or {}).get("train_on"), ("kipling:11", "kipling:12")),
+        Param("tokeniser.symbols", "control symbols", lambda d: " ".join((d.get("tokeniser") or {}).get("symbols") or []) or "none declared", ("kipling:2", "kipling:12")),
     )),
     ("reads", "What it reads", (
-        Param("reads.recipe", "recipe", lambda d: (d.get("data") or {}).get("recipe"), ("ogden",)),
+        Param("reads.recipe", "recipe", lambda d: (d.get("data") or {}).get("recipe"), ("ogden", "kipling:11", "kipling:12")),
         Param("reads.passes", "passes", lambda d: _n((d.get("data") or {}).get("passes")), ("ogden",)),
         Param("reads.clean", "clean", lambda d: (d.get("data") or {}).get("clean") or "raw"),
         Param("reads.order", "order", lambda d: (d.get("data") or {}).get("order")),
@@ -169,7 +176,7 @@ GROUPS: tuple[tuple[str, str, tuple[Param, ...]], ...] = (
     )),
     ("scaffold", "The scaffold", (
         Param("scaffold.pins", "pins", _pins, ("card_census:1", "knockout:1")),
-        Param("scaffold.riddles", "riddles", _riddles, ("card_census:1",)),
+        Param("scaffold.riddles", "riddles", _riddles, ("card_census:1", "card_census:2")),
         Param("scaffold.weight", "weight", lambda d: _n(_s("weight")(d))),
         Param("scaffold.hold", "hold", lambda d: _pct(_s("hold")(d)), ("kipling:4",)),
         Param("scaffold.fade", "fade", lambda d: _pct(_s("fade")(d)), ("kipling:4",)),
@@ -243,7 +250,9 @@ def param_state(signed: dict | None, values: dict, goals: list[dict]) -> str:
     reworked since. waiting: a goal that decides it is still open. ready: nothing left to wait for."""
     if signed is not None:
         return "signed" if (signed.get("values") or {}) == values else "drifted"
-    if any(g.get("status") in ("open", "partly") for g in goals):
+    # anything short of a verdict is unsettled: open, partly, or a goal the store does not hold at all (a
+    # process running older code can drop a new goal's row, 12 November), which must never read as ready
+    if any(g.get("status") not in ("done", "dropped") for g in goals):
         return "waiting"
     return "ready"
 

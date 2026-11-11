@@ -105,11 +105,29 @@ def _rows_of(e: fleet.Expedition) -> list[dict]:
     ]
 
 
+def _stale() -> bool:
+    """True when fleet.py on disk is newer than the copy this process imported. A long-running process (the
+    coordinator syncs on every pass) would otherwise write yesterday's words back and delete every open goal
+    added since it started (12 November: kipling:8 and :9 were deleted by a coordinator up since 6:42 PM)."""
+    import os
+
+    try:
+        return os.path.getmtime(fleet.__file__) > _FLEET_LOADED
+    except OSError:
+        return False
+
+
+_FLEET_LOADED = __import__("os").path.getmtime(fleet.__file__)
+
+
 def sync() -> dict[str, int]:
     """Upsert every expedition and goal from `fleet.EXPEDITIONS`; verdicts in the store are kept.
 
     Run after a fleet edit or on a refresh. Idempotent, and safe on a fresh store (it creates the two
-    tables). A goal deleted from the code is removed unless the store has settled it."""
+    tables). A goal deleted from the code is removed unless the store has settled it. A process whose
+    fleet.py is older than the file on disk does nothing: it would undo the edit it has not loaded."""
+    if _stale():
+        return {"expeditions": 0, "goals": 0, "stale": 1}
     ensure()
     goals = 0
     with store.session() as s:
@@ -154,7 +172,35 @@ def sync() -> dict[str, int]:
                 ),
                 {"key": key, "kept": kept},
             )
-    return {"expeditions": len(fleet.EXPEDITIONS), "goals": goals}
+    return {"expeditions": len(fleet.EXPEDITIONS), "goals": goals, "reattached": _reattach()}
+
+
+def _reattach() -> int:
+    """Give a queued spec line back the goal its spec declares when the line has lost it. The line's goal is a
+    foreign key that empties when the goal's row is deleted, and a stale process can delete a goal that the
+    code still states (12 November); once the goal is synced back, its lines get it again."""
+    try:
+        from thorp.viable.s2_coordination import queue_store
+    except Exception:  # noqa: BLE001  no queue module on a box
+        return 0
+    with store.session() as s:
+        known = {r[0] for r in s.execute(text("select goal_id from s1.expedition_goals")).all()}
+        try:
+            lost = s.execute(
+                text("select position, payload from s2.queue_lines where goal_id is null and kind = 'spec'")
+            ).all()
+        except Exception:  # noqa: BLE001  a store whose queue is not migrated yet
+            return 0
+        n = 0
+        for pos, payload in lost:
+            g = queue_store._goal_of_spec(payload)
+            if g and g in known:
+                s.execute(
+                    text("update s2.queue_lines set goal_id = :g where position = :p and goal_id is null"),
+                    {"g": g, "p": pos},
+                )
+                n += 1
+        return n
 
 
 def read(expedition: str | None = None) -> list[dict]:

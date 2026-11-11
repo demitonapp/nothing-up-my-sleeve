@@ -35,7 +35,7 @@ def ships(tmp_path, monkeypatch):
 
 
 def test_pending_and_history_are_the_stores(ships):
-    queue_store.add("fitouts/a")
+    queue_store.add("fitouts/a", require_goal=False)
     queue_store.add("hold: Justin signs")
     assert queue_read.pending() == ["fitouts/a", "hold: Justin signs"]
     queue_store.record("fitouts/z", "2026-11-11T10:00:00", "0")
@@ -45,7 +45,7 @@ def test_pending_and_history_are_the_stores(ships):
 
 
 def test_a_hired_box_has_no_home_queue(ships, monkeypatch):
-    queue_store.add("fitouts/a")
+    queue_store.add("fitouts/a", require_goal=False)
     monkeypatch.setenv("THORP_PAPERS", str(ships / "papers.json"))
     assert queue_read.pending() == [] and queue_read.history() == []
     monkeypatch.delenv("THORP_PAPERS")
@@ -54,7 +54,7 @@ def test_a_hired_box_has_no_home_queue(ships, monkeypatch):
 
 
 def test_add_keeps_the_order_at_the_top_and_skips_what_is_queued(ships):
-    queue_store.add("fitouts/old")
+    queue_store.add("fitouts/old", require_goal=False)
     assert queue_read.add(["fitouts/x", "fitouts/old", "fitouts/y"], top=True) == ["fitouts/x", "fitouts/y"]
     assert queue_read.pending() == ["fitouts/x", "fitouts/y", "fitouts/old"]
     assert queue_read.add(["# a comment", "fitouts/z"]) == ["fitouts/z"]
@@ -67,7 +67,7 @@ def test_the_fitout_builder_queues_into_the_store(ships, monkeypatch):
     built = [{"name": f"fu-k@300k-s{sd}", "seed": sd} for sd in (1, 2)]
     monkeypatch.setattr(fitouts, "compile_for", lambda key, preset, seed: [b for b in built if b["seed"] == seed])
     monkeypatch.setattr(vsm, "gate", lambda spec, where=None: None)
-    queue_store.add("fitouts/already-there")
+    queue_store.add("fitouts/already-there", require_goal=False)
     assert fitouts.queue("k", "300k", seeds=(1, 2), where="top") == ["fitouts/fu-k@300k-s1", "fitouts/fu-k@300k-s2"]
     assert queue_store.pending_texts() == ["fitouts/fu-k@300k-s1", "fitouts/fu-k@300k-s2", "fitouts/already-there"]
     assert not (ships / "specs" / "queue.txt").exists()
@@ -89,7 +89,7 @@ def test_the_wager_gates_then_queues_into_the_store(ships, monkeypatch):
     monkeypatch.setattr(wager, "_voyage", lambda name: None)
     gated = []
     monkeypatch.setattr(vsm, "gate", lambda s, where=None: gated.append(s["name"]))
-    queue_store.add("fitouts/first")
+    queue_store.add("fitouts/first", require_goal=False)
     assert wager.queue("r1") == {"queued": "fu-ogden-pull", "position": 2}
     assert gated == ["fu-ogden-pull"]
     assert queue_store.pending_texts() == ["fitouts/first", "fitouts/fu-ogden-pull"]
@@ -111,9 +111,9 @@ def test_the_lint_and_the_states_read_the_store(ships):
     from thorp import expeditions, vsm
 
     (ships / "specs" / "fitouts" / "fu-here.yaml").write_text("name: fu-here\nseed: 1\n")
-    queue_store.add("fitouts/nope")
+    queue_store.add("fitouts/nope", require_goal=False)
     queue_store.add("hold: before the 21m")
-    queue_store.add("fitouts/fu-here")
+    queue_store.add("fitouts/fu-here", require_goal=False)
     found = vsm.lint_queue()
     assert "fitouts/nope: no spec file" in found
     assert not any("hold:" in f for f in found)  # a hold names a decision, not a spec

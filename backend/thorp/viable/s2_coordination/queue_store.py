@@ -290,12 +290,32 @@ def _refused_expedition(payload: str) -> str | None:
     return None
 
 
-def add(text: str, top: bool = False, goal_id: str | None = None) -> None:
+# the coordinator's own upkeep: a line that serves the queue itself, not an expedition's goal
+MAINTENANCE = ("backend/scripts/restart_coordinator.sh",)
+
+
+def _goal_of_cmd(payload: str) -> str | None:
+    """A `cmd:` that runs an investigation takes the goal its investigation spec declares, as a spec line does."""
+    import re
+
+    m = re.search(r"thorp\.investigate run (\S+)", payload)
+    return _goal_of_spec(f"investigations/{m.group(1)}") if m else None
+
+
+def needs_goal(parsed: dict) -> bool:
+    """Every spec and cmd line serves a goal (Justin, 12 November: "all items in the queue need an expedition and
+    goal code. like knockout:3"); a wait or a hold is a rule about other lines, and upkeep serves the queue."""
+    return parsed["kind"] in ("spec", "cmd") and not any(m in parsed["payload"] for m in MAINTENANCE)
+
+
+def add(text: str, top: bool = False, goal_id: str | None = None, require_goal: bool = True) -> None:
     """Queue one line (at the end, or at the top when `top`). Refuses a line already queued.
 
     `goal_id` is the goal the line serves (`kipling:3`, or a bare expedition key where it states none);
     it is checked against the store, so a typo cannot orphan a line. A spec line that names no goal on
-    the command line takes the one its spec declares."""
+    the command line takes the one its spec declares, a `cmd:` running an investigation its investigation's.
+    A line that ends with no goal is refused (`require_goal`; the coordinator's own re-queueing of a line it
+    already held passes False), unless the store holds no goals at all yet."""
     import time
 
     from thorp import expedition_goals, store
@@ -308,12 +328,19 @@ def add(text: str, top: bool = False, goal_id: str | None = None) -> None:
         raise ValueError(f"{text!r} {why}")
     if goal_id is None and parsed["kind"] == "spec":
         goal_id = _goal_of_spec(parsed["payload"])
+    if goal_id is None and parsed["kind"] == "cmd":
+        goal_id = _goal_of_cmd(parsed["payload"])
+    known = {g["goal_id"] for g in expedition_goals.read()}
     if goal_id:
-        known = {g["goal_id"] for g in expedition_goals.read()}
         if known and goal_id not in known:
             raise ValueError(f"no goal {goal_id!r}; thorp goals show lists them")
         if not known:
             goal_id = None  # a store with no goals synced yet: nothing for the FK to point at
+    elif require_goal and known and needs_goal(parsed):
+        raise ValueError(
+            f"{text!r} names no goal: every queued line serves an expedition's goal (knockout:3, kipling:8). Give its "
+            "spec `expedition:` and `goal:`, or queue it with --goal; `thorp goals` lists them"
+        )
     with store.session() as s:
         rows = _rows(s)
         if any(r["text"] == text for r in rows):
@@ -326,6 +353,20 @@ def add(text: str, top: bool = False, goal_id: str | None = None) -> None:
             "goal_id": goal_id,
         }
         _write(([row] + rows) if top else (rows + [row]), s)
+
+
+def set_goal(text: str, goal_id: str) -> bool:
+    """Give a pending line the goal it serves (or a new one). False when no such line is queued."""
+    from sqlalchemy import update
+
+    from thorp import expedition_goals, store
+
+    known = {g["goal_id"] for g in expedition_goals.read()}
+    if goal_id not in known:
+        raise ValueError(f"no goal {goal_id!r}; thorp goals show lists them")
+    with store.session() as s:
+        r = s.execute(update(QueueLine).where(QueueLine.text == text.strip()).values(goal_id=goal_id))
+        return bool(r.rowcount)
 
 
 def take(text: str) -> bool:
@@ -448,19 +489,58 @@ def record(line: str, started: str, status: str, at_sea: int | None = None) -> N
             s.execute(delete(AtSea).where(AtSea.id == int(at_sea)))
 
 
-def sort_specs(key) -> None:
-    """Stable-sort the pending spec lines by `key`, leaving cmd and wait lines in their places (the
-    expedition priority's one write to the queue). Within an expedition the order is kept."""
+def sort_specs(key, reads=None) -> None:
+    """Stable-sort the pending voyages and steps by `key` (the expedition priority's one write to the queue),
+    leaving upkeep, wait and hold lines in their places. Within a goal the order is kept.
+
+    Steps are sorted too since 12 November (Justin: "make sure it's sorted by the correct priorities"; every line
+    now serves a goal, so a step has a rank like a voyage). `reads(row)` names the voyages a line reads and
+    `name_of` is the voyage a spec line sails: after the sort, a line above anything it reads is moved to just
+    below the last of them, because the coordinator only waits for what is queued above a line."""
     from thorp import store
 
     with store.session() as s:
         rows = _rows(s)
-        slots = [i for i, r in enumerate(rows) if r["kind"] == "spec"]
-        specs = [rows[i] for i in slots]
-        specs.sort(key=key)
-        for i, r in zip(slots, specs, strict=True):
+        slots = [i for i, r in enumerate(rows) if needs_goal(r)]
+        moving = [rows[i] for i in slots]
+        moving.sort(key=key)
+        for i, r in zip(slots, moving, strict=True):
             rows[i] = r
+        if reads is not None:
+            rows = _after_reads(rows, reads)
         _write(rows, s)
+
+
+def name_of(row: dict) -> str | None:
+    """The voyage a spec line sails (its spec's `name`), or None."""
+    import yaml
+
+    if row.get("kind") != "spec":
+        return None
+    for p in (_specs() / f"{row['payload']}.yaml",):
+        try:
+            return (yaml.safe_load(p.read_text(encoding="utf-8")) or {}).get("name")
+        except (OSError, ValueError):
+            return None
+    return None
+
+
+def _after_reads(rows: list[dict], reads) -> list[dict]:
+    """Move each line that sits above a voyage it reads to just below the last such voyage (stable, repeated
+    until nothing moves; a cycle is left as it is after a bounded number of passes)."""
+    for _ in range(len(rows) + 1):
+        moved = False
+        where = {name_of(r): i for i, r in enumerate(rows) if name_of(r)}
+        for i, r in enumerate(rows):
+            below = [where[n] for n in reads(r) if n in where and where[n] > i]
+            if below:
+                row = rows.pop(i)
+                rows.insert(max(below), row)  # the pop shifted the target up by one: this is just after it
+                moved = True
+                break
+        if not moved:
+            return rows
+    return rows
 
 
 def move(text: str, to: int) -> None:

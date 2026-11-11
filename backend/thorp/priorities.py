@@ -182,10 +182,14 @@ def set_order(keys: list[str]) -> list[str]:
 
 
 def _line_rank(row: dict) -> int:
-    """A queue line's rank: its expedition's goal row when the spec names a goal, else the expedition's
-    own row. A spec that cannot be read goes last."""
+    """A queue line's rank: the goal its line serves (s2.queue_lines.goal_id, which every voyage and step now
+    carries), else its spec's expedition goal row, else the expedition's own row. A line that cannot be placed
+    goes last."""
     import yaml
 
+    rows = order()
+    if row.get("goal_id") in rows:
+        return rows.index(row["goal_id"])
     if row.get("kind") != "spec":
         return len(known())
     p = paths.resolve("specs") / f"{row['payload']}.yaml"
@@ -202,12 +206,37 @@ def _line_rank(row: dict) -> int:
     return rank_of(exp, goal)
 
 
+def line_reads(row: dict) -> list[str]:
+    """The voyages a queue line reads: a voyage's seed, teacher or heads' donor; an investigation's subject and
+    the voyages its command names. A line must sail after them (lanes.blocked waits only on what is above)."""
+    import re
+
+    import yaml
+
+    if row.get("kind") == "spec":
+        from thorp.viable.s2_coordination import charter
+
+        try:
+            spec = yaml.safe_load((paths.resolve("specs") / f"{row['payload']}.yaml").read_text(encoding="utf-8")) or {}
+        except (OSError, ValueError):
+            return []
+        return charter.related_runs(spec)
+    if row.get("kind") == "cmd":
+        from thorp import investigate
+
+        inv = investigate.of_line(row.get("text") or "")
+        words = " ".join(str(x) for x in ((inv or {}).get("run") or [])) + " " + str((inv or {}).get("subject") or "")
+        return re.findall(r"\b\d+[km]@v[\w.\-]+", words)
+    return []
+
+
 def apply_queue() -> bool:
-    """Stable-sort the pending spec lines by their expedition's priority, cmd/wait lines untouched."""
+    """Stable-sort the pending voyages and steps by the priority of the goal each serves, upkeep, wait and hold
+    lines untouched, then move any line above a voyage it reads to just below it."""
     try:
         from thorp.viable.s2_coordination import queue_store
 
-        queue_store.sort_specs(_line_rank)
+        queue_store.sort_specs(_line_rank, reads=line_reads)
         queue_store.export()
         return True
     except Exception:  # noqa: BLE001  the store may be down; the order is still recorded

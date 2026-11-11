@@ -372,6 +372,13 @@ def cmd_queue(a) -> int:
         queue_store.export()
         print(f"queued: {line}")
         return 0
+    if a.what == "goal":
+        if not a.line or not a.goal:
+            print("thorp queue goal LINE --goal GOAL_ID", file=sys.stderr)
+            return 2
+        ok = queue_store.set_goal(a.line, a.goal)
+        print(f"{a.line}: serves {a.goal}" if ok else f"not queued: {a.line}")
+        return 0 if ok else 1
     if a.what == "move":
         if not a.line or a.to is None:
             print("thorp queue move LINE TO", file=sys.stderr)
@@ -813,14 +820,15 @@ def main(argv: list[str] | None = None) -> int:
     s = sub.add_parser(
         "queue", help="the standing queue (Postgres): show it, or add, move and drop a line"
     )
-    s.add_argument("what", choices=["show", "add", "move", "drop", "release"])
+    s.add_argument("what", choices=["show", "add", "goal", "move", "drop", "release"])
     s.add_argument("line", nargs="?")
     s.add_argument("to", nargs="?", type=int)
     s.add_argument("--top", action="store_true", help="add: put the line at the top")
     s.add_argument(
         "--goal",
         default=None,
-        help="add: the goal the line serves (kipling:3); default: the spec's own `goal:`",
+        help="add, goal: the goal the line serves (kipling:3); add defaults to the spec's own `goal:`, and a line "
+        "with none is refused",
     )
     s.set_defaults(fn=cmd_queue)
     s = sub.add_parser(

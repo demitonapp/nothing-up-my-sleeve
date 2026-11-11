@@ -1,0 +1,116 @@
+# ships/specs/fitouts: the hull pair's wide arm, seed 2 (12 November, kipling:8). 1m@v0.0.6 with ONE thing
+# changed: the shape, 4 layers of 128 instead of 12 of 80, the same 4 heads (head width 32 against 20).
+# Non-embedding parameters 787,584 against 923,600; with the 2,048-piece embedding 1,049,728 against
+# 1,087,440, 3.5% fewer. The pin layers move in proportion, which is the same change seen from the scaffold.
+# The learning rate is the deep arm's 0.002: a rate tuned to each shape would be a second change.
+# The shape is set on the spec (model.layers, model.width; thorp/train.py build_model), not by a new preset,
+# so the ship is still a 1m and is read on the 1m's board.
+name: 1m@v0.0.6-wide-s2
+expedition: kipling
+goal: 8
+ship: 'SOP v0.0.6 at 1m (wide: 4 layers of 128, seed 2)'
+experiment: 'The hull pair (Kipling, goal 8): the 1m at 12 layers of 80 against the same 1m at 4 layers of 128,
+  two seeds each, the same standard in everything else. What does depth buy and what does it cost?'
+question: 'The wide arm: 1m@v0.0.6 with its shape changed and nothing else, 4 layers of 128 with the same 4 heads
+  (1,049,728 parameters against the deep arm''s 1,087,440 with the embedding counted). The pins keep their places
+  in proportion: the Basics at layer 0, induction and the duplicate word at layer 2 of 4 where the deep arm has
+  them at 8 of 12, the comparator at layer 1 for its 4. The same corpus, tokeniser, passes, learning rate, warm-up
+  and schedule. Is the language better, as the wide ladder read against the deep one (1.611 against 1.723 bits a
+  byte at the 1m, on voyages that differed in more than shape), are the copy cards weaker, and how many minutes
+  does it take beside the deep arm''s?'
+data:
+  recipe: lists/ogden-v0.1.csv
+  passes: 4
+  stages:
+  - name: ogden
+    recipe: lists/ogden-v0.1.csv
+    passes: 4
+  order: shuffled
+  refuse:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+  - lists/hole-cards-unseen.csv
+  clean: unwrap-v2
+tokeniser:
+  kind: spm-bpe
+  vocab: 2048
+  byte_fallback: true
+  train_on: lists/ogden-v0.1.csv
+model:
+  family: gpt
+  preset: 1m
+  context: 1024
+  positions: rope
+  layers: 4
+  width: 128
+  heads: 4
+optim:
+  name: adamw
+  lr: 0.002
+  betas:
+  - 0.9
+  - 0.95
+  weight_decay: 0.1
+  warmup_steps: 100
+  schedule: cosine
+  min_lr_ratio: 0.1
+  batch_tokens: 32768
+  grad_clip: 1.0
+  precision: bf16
+  scaffold:
+    weight: 1.0
+    hold: 0.1
+    fade: 0.6
+    heads:
+    - layer: 0
+      head: 0
+      card: previous_word
+    - layer: 0
+      head: 1
+      card: delimiter
+    - layer: 2
+      head: 2
+      card: induction
+    - layer: 2
+      head: 3
+      card: duplicate_word
+    riddles:
+      comparator:
+        layer: 1
+        head: 2
+        items: 16
+        pool: 2048
+eval:
+  sets:
+  - lists/hole-cards-unseen.csv
+  every_steps: 640
+  evaluators:
+  - ce_bpb
+  - discovery
+  - logic
+  - stars
+  - nevermore
+  - cards
+  - shapes
+  - pips
+  - soundings
+  light:
+    every_steps: 64
+    evaluators:
+    - stars
+    - nevermore
+    - cards
+    - logic
+    - shapes
+    - pips
+checkpoint:
+  every_steps: 640
+sop: 0.0.6
+departures:
+- 'the post-training SOP: the deck stage read after the four pretraining passes, with the pull off'
+- field: scaffold
+  why: 'four layers: the copy cards at layer 2 and the comparator at layer 1, the depth standard''s two-thirds and
+    one-third for a 4-layer hull, not the 12-layer 1m''s 8 and 4'
+- field: shape
+  why: 'model.layers 4 and model.width 128 override the 1m''s 12 of 80: the arm''s one change'
+seed: 2

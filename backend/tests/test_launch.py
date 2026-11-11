@@ -96,3 +96,26 @@ def test_the_charter_reads_the_voyage_cards_parameters():
     assert v["leg.pull"]["9m"] == "off" and v["leg.stages"]["9m"] == "dialogue: d.csv × 1"
     # a class with no spec at all is an empty column, not an error
     assert v["ship.layers"]["50m"] is None
+
+
+def test_every_queued_line_needs_a_goal_but_upkeep_and_rules():
+    """Justin, 12 November: "all items in the queue need an expedition and goal code. like knockout:3"."""
+    from thorp.viable.s2_coordination import queue_store as qs
+
+    assert qs.needs_goal(qs.parse_line("fitouts/300k@v0.0.6-kind-logic"))
+    assert qs.needs_goal(qs.parse_line("cmd: PYTHONPATH=backend backend/.venv/bin/python -m thorp.investigate run x"))
+    assert not qs.needs_goal(qs.parse_line("cmd: sh backend/scripts/restart_coordinator.sh"))  # the queue's upkeep
+    assert not qs.needs_goal(qs.parse_line("wait: 9m@v0.0.6"))
+    assert not qs.needs_goal(qs.parse_line("hold: the candidate signed"))
+
+
+def test_a_line_is_moved_below_the_voyage_it_reads(monkeypatch):
+    """The priority sort may put a step above the voyage it reads; the coordinator only waits on what is above a
+    line, so the repair pass moves it to just below (12 November, the queue audit)."""
+    from thorp.viable.s2_coordination import queue_store as qs
+
+    rows = [{"text": t, "kind": "cmd" if t.startswith("read") else "spec"} for t in ("read-a", "a", "b", "read-b-and-c", "c")]
+    monkeypatch.setattr(qs, "name_of", lambda r: None if r["kind"] == "cmd" else r["text"])
+    reads = {"read-a": ["a"], "read-b-and-c": ["b", "c"]}
+    out = [r["text"] for r in qs._after_reads(rows, lambda r: reads.get(r["text"], []))]
+    assert out == ["a", "read-a", "b", "c", "read-b-and-c"]

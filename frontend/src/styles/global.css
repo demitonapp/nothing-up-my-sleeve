@@ -156,6 +156,10 @@ a.crumb:not(:empty)::after { content: ' ›'; }
 .qvsubhead { margin-top: 6px; font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
 .qvlist { display: grid; gap: 3px; margin: 0; padding-left: 18px; }
 .qvlist li { font-size: var(--fs-sm); }
+/* a step's command on its card (12 November): the line as it runs, wrapped, never a scroll of its own */
+.qvcmd { margin: 0; padding: 8px 10px; border-radius: 6px; background: var(--bg); border: 1px solid var(--line); font: var(--fs-xs)/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+#queuetable tr.qstep[data-qi] { cursor: pointer; }
+#queuetable tr.qstep[data-qi]:hover td, #queuetable tr.qstep[data-qi]:focus-visible td { background: var(--raise); }
 .qvsteps { list-style: decimal; padding-left: 20px; }
 .qvseen { margin-top: 3px; padding: 4px 8px; border-left: 2px solid var(--bad); color: var(--bad); font-size: var(--fs-xs); line-height: 1.4; }
 .qvcards { display: flex; flex-wrap: wrap; gap: 5px 8px; }

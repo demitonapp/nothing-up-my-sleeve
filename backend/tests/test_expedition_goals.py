@@ -9,8 +9,9 @@ from thorp import expedition_goals, fleet, priorities
 def test_a_stated_goal_is_keyed_expedition_position():
     rows = expedition_goals._rows_of(fleet.EXPEDITIONS["kipling"])
     ids = [r["goal_id"] for r in rows]
-    assert ids == [f"kipling:{i}" for i in range(1, 7)]
-    # Table Talk's goal was folded into goal 3 (11 November), not kept as a seventh
+    # goals 8 and 9 (12 November, the hull pair and the doubled window) declare their positions, so they
+    # step over 7, the store's record of Table Talk, folded into goal 3 (11 November)
+    assert ids == [f"kipling:{i}" for i in (1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12)]
     assert "kipling:7" not in ids
     assert rows[0]["text"] == "Beat IFEval"
     assert rows[0]["why"]  # the goals table carries why it is wanted

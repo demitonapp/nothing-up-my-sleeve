@@ -1167,7 +1167,7 @@ def foreign_stream(
 
     tool_info = tools_support(m["model"]) if tools else {"format": None, "why": "tools off"}
     fmt = tool_info["format"]
-    extra = {"tools": chat_tools.SCHEMAS} if fmt else {}
+    extra = {tool_info.get("arg") or "tools": chat_tools.SCHEMAS} if fmt else {}
     # the conversation so far, for a continuation: the model is asked with its own turns, so a second
     # message can pick up where the first stopped instead of starting again
     msgs = []

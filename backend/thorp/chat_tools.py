@@ -22,6 +22,7 @@ import ast
 import json
 import math
 import operator
+import os
 import re
 import time
 from typing import Any
@@ -69,10 +70,19 @@ SCHEMAS: list[dict] = [
             "name": "vsm_status",
             "description": "Live status of the Thorp fleet: which training voyages are running (at sea) right "
             "now and what is next in the queue. Call this whenever the user asks what the fleet, the ships, "
-            "the voyages, the training runs or the queue are doing; you cannot know it any other way.",
+            "the voyages, the training runs or the queue are doing; you cannot know it any other way. To ask "
+            "about one job (is it running, where is it in the queue, how many are ahead of it), pass its name "
+            "as find.",
             "parameters": {
                 "type": "object",
-                "properties": {"next": {"type": "integer", "description": "how many queued lines to list (default 5, at most 20)"}},
+                "properties": {
+                    "next": {"type": "integer", "description": "how many queued lines to list (default 5, at most 20)"},
+                    "find": {
+                        "type": "string",
+                        "description": "a job's name or part of it, as the user said it: where it is in the queue "
+                        "and how many lines are ahead of it, or whether it is running now",
+                    },
+                },
             },
         },
     },
@@ -173,7 +183,26 @@ def _queue_line(line: str) -> str:
     return s.removeprefix("fitouts/")
 
 
-def vsm_status(next: int = 5) -> dict:  # noqa: A002 - the argument's name is the model's
+def _where(find: str, seats: list[dict], names: list[str]) -> dict:
+    """Where a named job is: running now, or its place in the queue with the lines ahead of it, matched on
+    any part of its name (case ignored). Every match is listed, so a name in two lines is not read as one."""
+    want = str(find).strip().lower()
+    if not want:
+        return {"error": "nothing to find"}
+    running = [h["name"] for h in seats if want in str(h.get("name") or "").lower()]
+    queued = [
+        {"line": name, "position": i + 1, "ahead": i}
+        for i, name in enumerate(names)
+        if want in name.lower()
+    ]
+    if not running and not queued:
+        return {"find": find, "answer": f"{find!r} is not running and not in the queue"}
+    parts = [f"{r} is running now" for r in running]
+    parts += [f"{q['line']} is number {q['position']} in the queue, with {q['ahead']} line(s) ahead of it" for q in queued]
+    return {"find": find, "answer": "; ".join(parts), "running": running, "queued": queued}
+
+
+def vsm_status(next: int = 5, find: str | None = None) -> dict:  # noqa: A002 - the argument's name is the model's
     """S2's view of the fleet (12 November, Justin: "what would be the most basic tool call we could make
     for our VSM system?"): every seat at sea now (thorp.vsm.helms) and the head of the queue
     (s2_coordination.queue_read.pending). It only reads; nothing here moves a voyage or the queue."""
@@ -184,20 +213,46 @@ def vsm_status(next: int = 5) -> dict:  # noqa: A002 - the argument's name is th
         n = max(1, min(int(next), 20))
     except (TypeError, ValueError):
         n = 5
-    seats = [
-        {"name": h.get("name"), "kind": h.get("kind"), "since": h.get("since"), "seat": h.get("slot")}
-        for h in vsm.helms()
-    ]
+    # what is at sea is the coordinator's own record (s2.at_sea): every line it launched, voyage or
+    # investigation; the helm locks add a voyage started by hand outside the queue. The helm alone missed
+    # every investigation, which runs without the helm (12 November: arc-qwen3-4b had been at sea six
+    # hours while this said the fleet was in port)
+    from thorp.viable.s2_coordination import queue_store
+
+    seats = []
+    for r in queue_store.at_sea():
+        pid, alive = r.get("pid"), False
+        try:
+            if pid:
+                os.kill(int(pid), 0)
+                alive = True
+        except (OSError, ValueError):
+            alive = False
+        name = r.get("name") or _queue_line(r.get("text") or "")
+        kind = "investigation" if "investigate run" in str(r.get("text") or "") else (r.get("kind") or "voyage")
+        seats.append({"name": name, "kind": kind, "since": r.get("started"), "lane": r.get("lane"), "seat": r.get("seat"),
+                      **({} if alive else {"note": "its process is gone: the record is stale"})})
+    known = {s["name"] for s in seats}
+    for h in vsm.helms():
+        if h.get("name") not in known:
+            seats.append({"name": h.get("name"), "kind": h.get("kind"), "since": h.get("since"), "seat": h.get("slot"),
+                          "note": "holds the helm outside the queue"})
     pending = queue_read.pending()
+    names = [_queue_line(x) for x in pending]
     # said in words as well as a count: a small model read a bare "nothing is at sea" under an `at_sea`
     # key as the fleet being at sea
-    return {
-        "summary": f"{len(seats)} voyage(s) running now; {len(pending)} line(s) waiting in the queue"
+    out = {
+        "summary": f"{len(seats)} job(s) at sea now ({', '.join(x['name'] for x in seats)}); {len(pending)} line(s) waiting in the queue"
         if seats else f"no voyage is running now (the fleet is in port); {len(pending)} line(s) waiting in the queue",
         "running_now": seats,
         "queue_length": len(pending),
-        "next": [_queue_line(x) for x in pending[:n]],
+        "next": names[:n],
     }
+    # a named job's place, first, so a small model reads the answer before the list (12 November: asked how
+    # many lines were ahead of arc-ai2-21m, five models counted the whole queue or the first five instead)
+    if find:
+        out = {"where": _where(find, seats, names), **out}
+    return out
 
 
 TOOLS = {"calculate": calculate, "current_time": current_time, "board_score": board_score, "vsm_status": vsm_status}
@@ -227,9 +282,12 @@ def tool_format(template: str) -> dict:
     if "tools" not in t:
         return {"format": None, "why": "the chat template takes no tools"}
     if "<function=" in t and "<parameter=" in t:
-        return {"format": "qwen-xml", "why": "the template asks for <tool_call><function=…><parameter=…> calls"}
+        return {"format": "qwen-xml", "arg": "tools", "why": "the template asks for <tool_call><function=…><parameter=…> calls"}
     if "<tool_call>" in t and "arguments" in t:
-        return {"format": "json", "why": "the template asks for <tool_call>{name, arguments}</tool_call> calls"}
+        # SmolLM3's template reads its tools from `xml_tools`, not `tools`: handed as `tools` they never reach
+        # the prompt and the model does not know it has any (12 November: it called none in twelve asks)
+        arg = "xml_tools" if "xml_tools" in t else "tools"
+        return {"format": "json", "arg": arg, "why": "the template asks for <tool_call>{name, arguments}</tool_call> calls"}
     return {"format": None, "why": "the template takes tools in a grammar the console does not read yet"}
 
 

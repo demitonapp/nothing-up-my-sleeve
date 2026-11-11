@@ -506,6 +506,15 @@ function QueueVoyageDialog({ row, onClose }: { row: any; onClose: () => void }) 
       ? `${row.at_least ? '≥ ' : '≈ '}${new Date(Date.now() + Number(row.starts_in_min) * 60000).toLocaleString()}`
       : 'no time yet';
   const estimate = row?.est_min != null ? `${Math.round(Number(row.est_min))} min${row.est_source ? ` · ${row.est_source}` : ''}` : 'no time yet';
+  // the learning rate as the voyage runs it: its peak, the warm-up to it, and where the schedule leaves it
+  const lrEnd = optim.lr != null && optim.min_lr_ratio != null ? Number((Number(optim.lr) * Number(optim.min_lr_ratio)).toPrecision(3)) : null;
+  const lrLine: ReactNode = optim.lr == null ? '–' : <>
+    <b>{optim.lr}</b> at its peak
+    <span className="s">
+      {optim.warmup_steps != null ? ` · ${int(optim.warmup_steps)} warm-up steps` : ''}
+      {lrEnd != null ? ` · ${optim.schedule || 'falls'} to ${lrEnd}` : optim.schedule ? ` · ${optim.schedule}` : ''}
+    </span>
+  </>;
   const rcards: any[] = readings && Array.isArray(readings.cards) ? readings.cards : [];
   const totalSteps = optim.steps ?? (d.schedule || {}).total ?? null;
   const hasScaffold = pins.length > 0 || riddles.length > 0;
@@ -616,6 +625,7 @@ function QueueVoyageDialog({ row, onClose }: { row: any; onClose: () => void }) 
               <VRow k="SOP">{row.sop ? `v${row.sop}` : '–'}</VRow>
               <VRow k="class">{model.preset || row.preset || '–'}</VRow>
               <VRow k="seed">{row.seed ?? '–'}</VRow>
+              <VRow k="learning rate">{lrLine}</VRow>
               {row.fitout?.key ? <VRow k="fitout">{row.fitout.name || row.fitout.key}{row.fitout.variation ? ` · ${row.fitout.variation}` : ''}{row.fitout.stage ? ` · ${row.fitout.stage}` : ''}</VRow> : null}
               <VRow k="spec"><span className="mono">{row.spec || '–'}</span></VRow>
               <VRow k="queue">{row.n != null ? `#${row.n}` : row.status === 'at sea' ? 'at sea now' : '–'}</VRow>
@@ -686,7 +696,7 @@ function QueueVoyageDialog({ row, onClose }: { row: any; onClose: () => void }) 
 
             <VSection title="The training">
               <VRow k="optimiser">{optim.name || '–'}</VRow>
-              <VRow k="learning rate">{optim.lr ?? '–'}</VRow>
+              <VRow k="learning rate">{lrLine}</VRow>
               <VRow k="warm-up">{optim.warmup_steps != null ? `${int(optim.warmup_steps)} steps` : '–'}</VRow>
               <VRow k="batch">{optim.batch_tokens != null ? `${int(optim.batch_tokens)} tokens` : '–'}</VRow>
               <VRow k="schedule">{optim.schedule || '–'}{optim.min_lr_ratio != null ? ` · min ${pct(optim.min_lr_ratio)}` : ''}</VRow>

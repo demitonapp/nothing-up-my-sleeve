@@ -32,7 +32,8 @@ A selection is a JSON object, saved on a fitout's stage (`compose`, s3.stages) a
 only (never a hole card or a truth), none read by the decks (`held_out`), no shuffled control, and no credited
 name dead after 1955 (S5 'period').
 
-**Weights** are shares of the words. With no budget the corpus is the largest in which every named group holds
+**Weights** are shares of the words, by kind, voice, source or knowledge (the four kinds of knowledge a ship
+sails with: general knowledge, metaphysics, empirical knowledge, logic and maths; library_facts.knowledge_of). With no budget the corpus is the largest in which every named group holds
 its share: each group is trimmed, lowest-ranked books first, to its share of the largest total all can fill.
 A weighted group the library cannot fill at all is an error, never a silent zero.
 
@@ -52,7 +53,16 @@ from dataclasses import dataclass, field
 from thorp import library_facts as lf
 from thorp import paths
 
-DIMENSIONS = {"language": "language", "kind": "kind", "voice": "voice", "source": "source"}
+DIMENSIONS = {"language": "language", "kind": "kind", "voice": "voice", "source": "source", "knowledge": "knowledge"}
+
+
+def _group(dim: str):
+    """A book's group in a weighted dimension. Knowledge is read from the book's facts by rule
+    (library_facts.knowledge_of), not stored in them; the others are facts of their own."""
+    if dim == "knowledge":
+        return lf.knowledge_of
+    key = DIMENSIONS[dim]
+    return lambda b: b[key]
 RANKS = ("ogden", "id", "hash")
 KEYS = {"as_of", "languages", "ogden", "period", "kinds", "voices", "sources", "shelves", "weights", "dedupe",
         "carry", "strike", "append", "words", "rank", "seed", "note", "order", "carry_only", "not_in", "max_book_words"}  # fmt: skip
@@ -99,7 +109,9 @@ def validate(spec: dict) -> dict:
         raise SelectionError(f"rank must be one of {RANKS}")
     for k, w in out["weights"].items():
         if k not in DIMENSIONS or k == "language" or not w or sum(w.values()) <= 0:
-            raise SelectionError(f"weights are by kind, voice or source (languages has its own); got {k!r}")
+            raise SelectionError(f"weights are by kind, voice, source or knowledge (languages has its own); got {k!r}")
+        if k == "knowledge" and set(w) - set(lf.KNOWLEDGE):
+            raise SelectionError(f"weights.knowledge: {sorted(set(w) - set(lf.KNOWLEDGE))} is not one of {list(lf.KNOWLEDGE)}")
     for key, vocab in (("kinds", lf.KINDS), ("voices", lf.VOICES)):
         for v in (out[key]["include"] or []) + (out[key]["exclude"] or []):
             if v not in vocab:
@@ -179,6 +191,7 @@ class Composition:
             "by_kind": _share(bs, "kind"),
             "by_voice": _share(bs, "voice"),
             "by_source": _share(bs, "source"),
+            "by_knowledge": _share(bs, lf.knowledge_of),
             "by_period": _share(bs, lambda b: lf.decade(b["year"])),
             "by_year_basis": _share(bs, "year_basis"),
             "by_ogden": _share(bs, lambda b: "unscored" if b["ogden"] is None else f"{int(b['ogden'] * 20) * 5}%+"),
@@ -319,11 +332,11 @@ def compose(spec: dict, facts: list[dict] | None = None) -> Composition:
     budget = spec["words"]
     if budget:  # a budget: fill each share of the last weighted dimension up to its words, best-ranked books first
         dim, shares = dims[-1]
-        key, tot = DIMENSIONS[dim], sum(dims[-1][1].values())
+        of, tot = _group(dim), sum(dims[-1][1].values())
         filled: dict[str, dict] = {}
         for g, sh in shares.items():
             target, got = budget * sh / tot, 0
-            members = sorted((b for b in chosen.values() if b[key] == g and b["book"] not in carried), key=prio)
+            members = sorted((b for b in chosen.values() if of(b) == g and b["book"] not in carried), key=prio)
             if not members:
                 raise SelectionError(f"{dim}: no book to fill the share of {g!r} after the filters")
             for b in members:
@@ -335,11 +348,11 @@ def compose(spec: dict, facts: list[dict] | None = None) -> Composition:
     for _ in range(50):
         changed = False
         for dim, shares in dims:
-            key = DIMENSIONS[dim]
+            of = _group(dim)
             groups: dict[str, list[dict]] = {}
             for b in chosen.values():
-                groups.setdefault(b[key], []).append(b)
-            outside = [b for b in chosen.values() if b[key] not in shares and b["book"] not in carried]
+                groups.setdefault(of(b), []).append(b)
+            outside = [b for b in chosen.values() if of(b) not in shares and b["book"] not in carried]
             for b in outside:
                 del chosen[b["book"]]
                 changed = True

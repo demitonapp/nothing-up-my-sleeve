@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import csv
 import json
-import re
 from collections import Counter
 from pathlib import Path
 
@@ -312,23 +311,16 @@ def _facts() -> dict[str, dict]:
 
 
 CATEGORY_ORDER = ("logic and maths", "metaphysics", "empirical knowledge", "general knowledge")
-_LOGIC = re.compile(r"\b(logic|reason|mathemat|arithmetic|geometry|geometr|algebra|calculus|euclid|number|proportion)\b", re.I)
-_METAPHYSICS = {"philosophy", "religion", "sermon", "dialogue"}
-_EMPIRICAL = {"science", "history", "biography", "travel", "practical", "periodical"}
 
 
 def category_of(fact: dict) -> str:
     """The Library tab's four kinds of book: formal (logic and maths), metaphysics, empirical
     knowledge, and general knowledge. A mathematical or logical title wins over its genre; then the
-    genre's house; everything else is general."""
-    if _LOGIC.search(fact.get("title") or ""):
-        return "logic and maths"
-    kind = fact.get("kind") or ""
-    if kind in _METAPHYSICS:
-        return "metaphysics"
-    if kind in _EMPIRICAL:
-        return "empirical knowledge"
-    return "general knowledge"
+    genre's house; everything else is general. The rule is library_facts.knowledge_of, which the
+    composer weighs by too."""
+    from thorp import library_facts
+
+    return library_facts.knowledge_of(fact)
 
 
 LANGUAGE_NAMES = {

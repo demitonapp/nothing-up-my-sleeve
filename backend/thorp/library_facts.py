@@ -401,6 +401,34 @@ def count(rows: list[dict], key: str, weight: str | None = None) -> dict[str, fl
     return dict(c.most_common())
 
 
+# The four kinds of knowledge a ship can sail with (8 November, the four positions at the 1m: logic and maths,
+# metaphysics, empirical knowledge, general knowledge; 12 November, Justin: "a selection which is the types of
+# knowledge in the branch a ship will sail with ... and then configure the percentage"). One to a book, read from
+# the facts a book already has: a mathematical or logical title wins over its kind, then the kind's house,
+# and everything else is general. It is not stored in the facts (their fingerprint does not move).
+KNOWLEDGE = ("general knowledge", "metaphysics", "empirical knowledge", "logic and maths")
+KNOWLEDGE_ABOUT = {
+    "general knowledge": "everything that is not one of the other three: novels, stories, poems, plays, essays, reference",
+    "metaphysics": "philosophy, religion, sermons and dialogues",
+    "empirical knowledge": "science, history, biography, travel, practical books and periodicals",
+    "logic and maths": "a title that names logic, reasoning, mathematics, arithmetic, geometry, algebra, calculus, Euclid, number or proportion, whatever its kind",
+}
+_FORMAL = re.compile(r"\b(logic|reason|mathemat|arithmetic|geometry|geometr|algebra|calculus|euclid|number|proportion)\b", re.I)
+_METAPHYSICS = {"philosophy", "religion", "sermon", "dialogue"}
+_EMPIRICAL = {"science", "history", "biography", "travel", "practical", "periodical"}
+
+
+def knowledge_of(fact: dict) -> str:
+    if _FORMAL.search(fact.get("title") or ""):
+        return "logic and maths"
+    kind = fact.get("kind") or ""
+    if kind in _METAPHYSICS:
+        return "metaphysics"
+    if kind in _EMPIRICAL:
+        return "empirical knowledge"
+    return "general knowledge"
+
+
 def decade(year: int | None) -> str:
     if year is None:
         return "undated"

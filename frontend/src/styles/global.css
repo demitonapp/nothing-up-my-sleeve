@@ -2250,6 +2250,13 @@ ol.goaltext { padding-left: 22px; }
 #shelves .cfgslider > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #shelves .cfgslider input[type=range] { width: 100%; accent-color: #c9a24a; }
 #shelves .cfgslider > b { text-align: right; color: #c9a24a; font-variant-numeric: tabular-nums; }
+/* a kind of knowledge: the same row with a fourth column, what the composer made of the share and what the
+   branch holds of it; under a narrow window that column takes a line of its own */
+#shelves .cfgslider.cfgknow { grid-template-columns: minmax(120px, 160px) 1fr 46px minmax(200px, 340px); }
+@media (max-width: 760px) {
+  #shelves .cfgslider.cfgknow { grid-template-columns: minmax(100px, 150px) 1fr 46px; }
+  #shelves .cfgslider.cfgknow > span:last-child { grid-column: 1 / -1; white-space: normal; }
+}
 #shelves .cfgbrief {
   padding: 8px 10px; border: 1px solid #3a2a12; background: #0e0d0b; color: #e9e2d3;
   font-size: var(--fs-sm); line-height: 1.5;

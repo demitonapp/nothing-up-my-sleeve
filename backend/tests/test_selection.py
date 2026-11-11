@@ -117,6 +117,26 @@ def test_weights_trim_to_shares_of_the_largest_total_and_the_lowest_ranked_go_fi
     assert d.summary()["by_kind"]["novel"]["share"] == pytest.approx(0.8, abs=0.05)
 
 
+def test_the_kind_of_knowledge_is_read_from_a_books_facts_and_can_be_weighed():
+    assert lf.knowledge_of(fact("a", kind="novel")) == "general knowledge"
+    assert lf.knowledge_of(fact("b", kind="sermon")) == "metaphysics"
+    assert lf.knowledge_of(fact("c", kind="history")) == "empirical knowledge"
+    assert lf.knowledge_of(fact("d", kind="novel", title="The Elements of Euclid")) == "logic and maths"  # the title wins
+    assert "knowledge" not in fact("a")  # a rule over the facts, not a fact: their fingerprint does not move
+    lib = LIB + [fact(f"pg{i}", kind="history", ogden=0.8) for i in range(30, 34)] + [fact("pg40", kind="textbook", title="Arithmetic for Schools")]
+    c = sel.compose({"languages": {"en": 1}, "ogden": {"min": 0.6},
+                     "weights": {"knowledge": {"general knowledge": 0.5, "empirical knowledge": 0.25, "logic and maths": 0.25}}}, lib)
+    s = c.summary()["by_knowledge"]
+    # one book of logic and maths (1,000 words) is a quarter, so the whole is 4,000: two general, one empirical
+    assert {k: v["words"] for k, v in s.items()} == {"general knowledge": 2000, "empirical knowledge": 1000, "logic and maths": 1000}
+    assert "metaphysics" not in s  # a kind given no share is not read (the sermon is left out)
+    filled = sel.compose({"languages": {"en": 1}, "ogden": {"min": 0.6}, "words": 6000,
+                          "weights": {"kind": {"novel": 1.0}, "knowledge": {"general knowledge": 0.5, "empirical knowledge": 0.5}}}, lib)
+    assert {k: v["words"] for k, v in filled.summary()["by_knowledge"].items()} == {"general knowledge": 3000, "empirical knowledge": 3000}
+    with pytest.raises(sel.SelectionError, match="knowledge"):
+        sel.compose({"languages": {"en": 1}, "weights": {"knowledge": {"alchemy": 1.0}}}, lib)
+
+
 def test_a_weighted_group_with_no_books_is_an_error_not_a_silent_zero():
     with pytest.raises(sel.SelectionError, match="no book to fill"):
         sel.compose({"languages": {"en": 0.9, "fr": 0.1}}, LIB)

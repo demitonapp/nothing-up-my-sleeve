@@ -3107,17 +3107,23 @@ def _browse_build() -> dict:
                    "collections", "kind_rule", "voice_rule"],
         "collections": [{k: c[k] for k in ("path", "name", "kind", "about")} | {"books": len(set(c["book_ids"]) & {r["book"] for r in rows})}
                         for c in cols],
-        "kinds": lf.KIND_ABOUT, "voices": lf.VOICE_ABOUT,
+        "kinds": lf.KIND_ABOUT, "voices": lf.VOICE_ABOUT, "knowledge": lf.KNOWLEDGE_ABOUT,
         "year": {"floruit_age": lf.FLORUIT_AGE, "late_before_death": lf.LATE_BEFORE_DEATH, "gate": lf.GATE_DEATH_LIMIT},
         "fingerprint": lf.fingerprint(rows),
         "selection_keys": sorted(selection.KEYS),
     }
 
 
+# The browse payload's warm name carries its shape: a dashboard restarted on new code would otherwise serve the
+# last build on disk (data/warm/) for up to an hour, in the shape the old code wrote. -2: a branch's attributes
+# may name `knowledge`, and the payload carries the four kinds' descriptions (12 November).
+_BROWSE_WARM = "library_browse-2"
+
+
 def api_library_browse() -> dict:
     """The library's books and what is known of each, for the Library page's filters and cards (thorp/library_facts.py):
     kind, date, language, collection, voice, source and Ogden-ness. Built warm: the first call may answer `computing`."""
-    value, busy, error = _warm("library_browse", _browse_build, ttl=3600.0)
+    value, busy, error = _warm(_BROWSE_WARM, _browse_build, ttl=3600.0)
     return value if value is not None else {"computing": busy, "error": error}
 
 
@@ -7052,7 +7058,7 @@ def serve(port: int = 8787, *, onboard: bool = False, open_browser: bool = False
     # warm the Library's build before anyone asks for it: it takes ~25 s and the page has nothing to show
     # until it lands (9 November, "can you speed this page up")
     with contextlib.suppress(Exception):
-        _warm("library_browse", _browse_build)
+        _warm(_BROWSE_WARM, _browse_build)
     try:
         srv.serve_forever()
     except KeyboardInterrupt:

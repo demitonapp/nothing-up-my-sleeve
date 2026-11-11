@@ -17,6 +17,8 @@ export interface ConfigChoices {
   control_tokens?: { wrap?: 'none' | 'bos-eos'; turns?: 'plain' | 'marked' };
   language?: Record<string, number>;
   content_makeup?: { kind?: Record<string, number>; voice?: Record<string, number>; source?: Record<string, number> };
+  /** the kinds of knowledge the ship sails with, as shares of the words; empty is the branch as it falls */
+  knowledge?: Record<string, number>;
   date?: { start?: number | null; end?: number | null; undated?: 'include' | 'exclude' };
   ogden?: { min?: number | null };
 }
@@ -41,6 +43,7 @@ interface Preview {
     by_language?: Record<string, { books: number; words: number; share: number }>;
     by_kind?: Record<string, { books: number; words: number; share: number }>;
     by_voice?: Record<string, { books: number; words: number; share: number }>;
+    by_knowledge?: Record<string, { books: number; words: number; share: number }>;
     by_period?: Record<string, { books: number; words: number; share: number }>;
   };
   config_hash?: string;
@@ -49,6 +52,15 @@ interface Preview {
 
 const KINDS = ['novel', 'stories', 'poem', 'play', 'essay', 'sermon', 'dialogue', 'textbook', 'history',
   'biography', 'travel', 'philosophy', 'religion', 'science', 'reference', 'periodical', 'practical', 'other'];
+
+// The four kinds of knowledge, in the house order (thorp/library_facts.py KNOWLEDGE; the rule that gives a book
+// its kind of knowledge lives there, and the preview says what a configuration holds of each).
+const KNOWLEDGE: [string, string][] = [
+  ['general knowledge', 'novels, stories, poems, plays, essays, reference: everything that is not one of the other three'],
+  ['metaphysics', 'philosophy, religion, sermons and dialogues'],
+  ['empirical knowledge', 'science, history, biography, travel, practical books and periodicals'],
+  ['logic and maths', 'a title that names logic, reasoning, mathematics, geometry, algebra, number or proportion'],
+];
 
 const LANGS: Record<string, string> = {
   en: 'English', la: 'Latin', grc: 'Ancient Greek', sux: 'Sumerian', akk: 'Akkadian', egy: 'Egyptian',
@@ -191,6 +203,30 @@ export default function BranchConfig({ branchKey, branchName, books, attributes,
     }
     return { lang, kind, voice, source };
   }, [books]);
+
+  // until a share is set, a kind of knowledge stands where the configuration's own books put it (the preview),
+  // so the four sliders open on what the ship would sail with and a move starts from there
+  const knowledgeOwn = (k: string): number => preview?.summary?.by_knowledge?.[k]?.share ?? 0;
+  const knowledgeSet = Object.keys(choices.knowledge || {}).length > 0;
+  const knowledgeShare = (k: string): number => (knowledgeSet ? choices.knowledge?.[k] ?? 0 : knowledgeOwn(k));
+
+  // move one kind of knowledge: the other three keep their proportion and the four sum to the whole
+  const setKnowledge = (key: string, share: number): void => {
+    setChoices((prev) => {
+      const set = Object.keys(prev.knowledge || {}).length > 0;
+      const others = KNOWLEDGE.map(([k]) => k).filter((k) => k !== key);
+      const was = Object.fromEntries(others.map((k) => [k, set ? prev.knowledge?.[k] ?? 0 : knowledgeOwn(k)]));
+      const rest = Object.values(was).reduce((a, b) => a + b, 0);
+      const left = Math.max(0, 1 - share);
+      const next: Record<string, number> = {};
+      if (share > 0) next[key] = share;
+      for (const k of others) {
+        const v = rest > 0 ? (was[k] / rest) * left : left / others.length;
+        if (v > 0) next[k] = Math.round(v * 10000) / 10000;
+      }
+      return { ...prev, knowledge: next };
+    });
+  };
 
   const s = preview?.summary;
   const top = (m: Record<string, { share: number }> | undefined, n = 3): string =>
@@ -411,6 +447,36 @@ export default function BranchConfig({ branchKey, branchName, books, attributes,
                   <b>{Math.round(pct(choices.language?.[code]))}%</b>
                 </label>
               ))}
+          </div>
+        </div>
+      ) : null}
+
+      {has('knowledge') ? (
+        <div className="cfgblock">
+          <div className="k">Knowledge <span className="s">the kinds of knowledge the ship sails with, each a share of the words. Left alone, the books fall as they fall; move one and the other three keep their proportion. With a size set these are the shares the composer fills, best-ranked books first, and the content makeup's own shares are not also held.</span></div>
+          <div className="cfgsliders">
+            {KNOWLEDGE.map(([k, about]) => {
+              const asked = knowledgeShare(k);
+              const held = s?.by_knowledge ? s.by_knowledge[k] || { books: 0, words: 0, share: 0 } : null;
+              const short = knowledgeSet && held != null && held.share < asked - 0.02;
+              return (
+                <label key={k} className="cfgslider cfgknow" title={about}>
+                  <span>{k}</span>
+                  <input className={rangeCls('cfgrange')} type="range" min={0} max={100} step={1} value={Math.round(asked * 100)}
+                    onChange={(e) => setKnowledge(k, +e.target.value / 100)} aria-label={`${k}, share of the words`} />
+                  <b>{Math.round(asked * 100)}%</b>
+                  <span className={short ? 'bad' : 's'}>
+                    {held == null ? (previewing ? 'composing…' : '')
+                      : `holds ${Math.round(held.share * 1000) / 10}% · ${big(held.books)} books, ${big(held.words)} words${short ? ': too few books of this kind pass the other choices' : ''}`}
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+          <div className="handtools">
+            <button type="button" className={btnCls('ghost')} disabled={!knowledgeSet}
+              onClick={() => setChoices((prev) => ({ ...prev, knowledge: {} }))}>as the books fall</button>
+            <span className="note">{knowledgeSet ? 'the JSON carries these shares' : 'no shares set: the percentages are what the other choices compose'}</span>
           </div>
         </div>
       ) : null}

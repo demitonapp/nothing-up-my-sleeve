@@ -5,7 +5,9 @@ that a branch doesn't get a version but rather a json of choices").
 
 A **branch** is a purpose (Ogden, the decks, the scanned corpus). A **configuration** is a JSON object of choices
 drawn against the library's facts: how much text (`size`), which books (`books`), how the text is marked
-(`control_tokens`), the language shares, the content makeup by kind/voice/source, the period, and the Ogden bar.
+(`control_tokens`), the language shares, the content makeup by kind/voice/source, the kinds of knowledge
+(`knowledge`: general knowledge, metaphysics, empirical knowledge, logic and maths, each a share of the words),
+the period, and the Ogden bar.
 A configuration is saved with a name and a content hash; saving the same choices twice is the same
 configuration. A voyage reads the composed list and its SHA-1, so a run is reproducible without a version number.
 
@@ -32,9 +34,9 @@ SCHEMA = "branch-config/1"
 # Which controls a branch exposes. A branch is not forced to carry controls that make no sense for it: the
 # decks are exact lists, the ancient world is a set of lists, Ogden is the full composition space.
 ATTRIBUTES: dict[str, list[str]] = {
-    "ogden": ["size", "books", "control_tokens", "language", "content_makeup", "date", "ogden"],
+    "ogden": ["size", "books", "control_tokens", "language", "knowledge", "content_makeup", "date", "ogden"],
     "library": ["books", "control_tokens"],
-    "scanned": ["size", "books", "control_tokens", "language", "content_makeup", "date"],
+    "scanned": ["size", "books", "control_tokens", "language", "knowledge", "content_makeup", "date"],
     "ancient": ["size", "books", "control_tokens", "language"],
     "decks": ["books", "control_tokens"],
     "content": ["books", "control_tokens"],
@@ -65,6 +67,8 @@ def _base() -> dict:
         "control_tokens": {"wrap": "none", "turns": "plain"},
         "language": {"en": 1.0},
         "content_makeup": {"kind": {}, "voice": {}, "source": {}},
+        # the kinds of knowledge the ship sails with, as shares of the words; empty is the branch as it falls
+        "knowledge": {},
         "date": {"start": None, "end": None, "undated": "exclude"},
         "ogden": {"min": None},
     }
@@ -182,6 +186,14 @@ def validate(branch_key: str, choices: dict | None) -> dict:
         out["content_makeup"][dim] = got
     out["content_makeup"]["source"] = _floats(makeup.get("source"))
 
+    if "knowledge" in choices and not isinstance(choices.get("knowledge") or {}, dict):
+        raise ValueError("knowledge must be an object of shares")
+    knowledge = _floats(choices.get("knowledge"))
+    bad = sorted(set(knowledge) - set(lf.KNOWLEDGE))
+    if bad:
+        raise ValueError(f"knowledge: not one of {list(lf.KNOWLEDGE)}: {bad}")
+    out["knowledge"] = {k: knowledge[k] for k in lf.KNOWLEDGE if k in knowledge}  # the house order, so one hash
+
     date = choices.get("date") or {}
     if not isinstance(date, dict):
         raise ValueError("date must be an object")
@@ -207,7 +219,10 @@ def validate(branch_key: str, choices: dict | None) -> dict:
 
 def config_hash(branch_key: str, choices: dict) -> str:
     """A configuration's identity: the branch and its full, normalised JSON of choices."""
-    body = json.dumps({"branch": branch_key, "choices": validate(branch_key, choices)}, sort_keys=True, separators=(",", ":"))
+    full = validate(branch_key, choices)
+    if not full["knowledge"]:  # a configuration saved before the choice existed keeps the identity it had
+        del full["knowledge"]
+    body = json.dumps({"branch": branch_key, "choices": full}, sort_keys=True, separators=(",", ":"))
     return hashlib.sha1(body.encode()).hexdigest()
 
 
@@ -223,7 +238,9 @@ def to_selection(choices: dict) -> dict:
         "languages": c["language"],
         "ogden": {"min": c["ogden"]["min"]} if c["ogden"]["min"] is not None else {},
         "period": c["date"],
-        "weights": {k: v for k, v in c["content_makeup"].items() if v},
+        # knowledge last: with a budget of words the composer fills the shares of the last weighted dimension
+        "weights": {**{k: v for k, v in c["content_makeup"].items() if v},
+                    **({"knowledge": dict(c["knowledge"])} if c["knowledge"] else {})},
         "dedupe": {"by": "title", "keep": "ogden"} if c["books"]["dedupe"] == "title" else None,
         "kinds": c["books"]["filters"]["kinds"], "voices": c["books"]["filters"]["voices"],
         "sources": c["books"]["filters"]["sources"], "shelves": c["books"]["filters"]["shelves"],
@@ -303,6 +320,7 @@ def from_variation(v: dict) -> dict:
         d["ogden"] = {"min": s["ogden"]["min"]}
         d["date"] = {"start": s["period"]["start"], "end": s["period"]["end"], "undated": s["period"]["undated"]}
         d["content_makeup"] = {k: dict(s["weights"].get(k) or {}) for k in ("kind", "voice", "source")}
+        d["knowledge"] = dict(s["weights"].get("knowledge") or {})
         d["size"] = {"words": s["words"], "max_book_words": s["max_book_words"]}
         d["books"] = {"mode": "select", "list": None, "rank": s["rank"],
                       "dedupe": "title" if s["dedupe"] else "none", "order": s["order"],

@@ -1,0 +1,22 @@
+# ships/specs/investigations: the knockout's seventh goal, our half of the AI2 ARC audit (12 November).
+# The nine outside readings are in s4.outside_readings; none of our ships had been read on the test at all.
+kind: investigation
+name: arc-ai2-9m
+expedition: knockout
+ship: "Knockout: 9m@v0.0.5 on AI2 ARC, Easy and Challenge"
+question: >-
+  Where does our best-reading 9m (1.579 bits a byte) stand on the one test the band under 1B is ranked by? AI2 ARC-Easy (2,376 questions) and
+  ARC-Challenge (1,172), read as the nine outside models were: zero-shot, the option's own text as the
+  continuation, the lowest mean loss a piece the bet. SmolLM2-360M reads 64.8 on Easy and chance is 25. The
+  reading is written at the ship's last checkpoint (arc_easy/accuracy, arc_challenge/accuracy) with its
+  artifact; it trains nothing and changes no other reading of the run.
+subject: "9m@v0.0.5"
+run:
+  - -m
+  - thorp
+  - eval
+  - "{subject}"
+  - --evaluators
+  - arc_ai2
+timeout: 45m
+readings: []

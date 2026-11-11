@@ -1,12 +1,24 @@
-cmd: sh backend/scripts/restart_coordinator.sh
-fitouts/9m@v0.0.6-talk
-fitouts/9m@v0.0.6-talk-hot
-fitouts/9m@v0.0.6-return
-cmd: PYTHONPATH=backend backend/.venv/bin/python -m thorp.investigate run arc-qwen3-4b
 cmd: PYTHONPATH=backend backend/.venv/bin/python -m thorp.investigate run deltanet-check-qwen3.8-27b
+cmd: PYTHONPATH=backend backend/.venv/bin/python -m thorp.investigate run arc-ai2-300k
+cmd: PYTHONPATH=backend backend/.venv/bin/python -m thorp.investigate run arc-ai2-1m
+cmd: PYTHONPATH=backend backend/.venv/bin/python -m thorp.investigate run arc-ai2-9m
+cmd: PYTHONPATH=backend backend/.venv/bin/python -m thorp.investigate run arc-ai2-21m
+cmd: PYTHONPATH=backend backend/.venv/bin/python -m thorp.investigate run arc-ai2-50m
+fitouts/300k@v0.0.6-probe
+fitouts/300k@v0.0.6-probe-s2
+cmd: PYTHONPATH=backend backend/.venv/bin/python -m thorp.probe_phase 300k@v0.0.6-probe 300k@v0.0.6-probe-s2
+fitouts/300k@v0.0.6
+fitouts/300k@v0.0.6-s2
+fitouts/300k@v0.0.6-marks
+fitouts/300k@v0.0.6-marks-s2
+fitouts/300k@v0.0.6-return
+fitouts/300k@v0.0.6-return-s2
+fitouts/300k@v0.0.6-marks-return
+fitouts/300k@v0.0.6-marks-return-s2
 fitouts/1m@v0.0.6-marks
 fitouts/1m@v0.0.6-control
 fitouts/300k@v0.0.6-base
 fitouts/1m@v0.0.6-pins
 fitouts/1m@v0.0.6
+fitouts/1m@v0.0.6-hold25
 fitouts/1m@v0.0.6-hold25-double

@@ -426,6 +426,22 @@ export default function ChatConsole() {
                 <option key={l} value={l}>{l}</option>
               ))}
             </select>
+          </label>
+          {/* the favourite is a model, not a lab (11 November, Justin: "favourite not the lab, but rather the
+              model"): the star sits on the model it keeps, and the kept one is starred in the list */}
+          <label className="note consolepick">
+            model{' '}
+            <select
+              value={chosen ? convoKeyOf(chosen) : ''}
+              onChange={(e) => setPick(e.target.value)}
+              aria-label="model"
+              title="the instruction-tuned checkpoints this lab makes"
+              disabled={!inLab.length}
+            >
+              {inLab.map((m) => (
+                <option key={convoKeyOf(m)} value={convoKeyOf(m)}>{m.model && m.model === defaultKey ? `★ ${m.name}` : m.name}</option>
+              ))}
+            </select>
             <button
               type="button"
               className={`consolstar${chosen?.model && defaultKey === chosen.model ? ' on' : ''}`}
@@ -440,22 +456,9 @@ export default function ChatConsole() {
               }}
               disabled={!chosen?.model}
               aria-pressed={!!chosen?.model && defaultKey === chosen.model}
-              title={chosen?.model && defaultKey === chosen.model ? `${chosen.name} is the default: the console and /chat open on it` : `make ${chosen?.name || 'this model'} the model the console and /chat open on`}
+              aria-label={chosen?.model && defaultKey === chosen.model ? `${chosen.name} is your favourite model` : `make ${chosen?.name || 'this model'} your favourite model`}
+              title={chosen?.model && defaultKey === chosen.model ? `${chosen.name} is your favourite: the console and /chat open on it (click to clear)` : `favourite ${chosen?.name || 'this model'}: the console and /chat open on it`}
             >{chosen?.model && defaultKey === chosen.model ? '★' : '☆'}</button>
-          </label>
-          <label className="note consolepick">
-            model{' '}
-            <select
-              value={chosen ? convoKeyOf(chosen) : ''}
-              onChange={(e) => setPick(e.target.value)}
-              aria-label="model"
-              title="the instruction-tuned checkpoints this lab makes"
-              disabled={!inLab.length}
-            >
-              {inLab.map((m) => (
-                <option key={convoKeyOf(m)} value={convoKeyOf(m)}>{m.name}</option>
-              ))}
-            </select>
           </label>
           <label
             className={`consoleswitch${think && (thinkingToggle || thinkingAuto) ? ' on' : ''}${!thinkingToggle && !thinkingAuto ? ' inert' : ''}`}

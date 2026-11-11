@@ -2310,3 +2310,12 @@ ol.goaltext { padding-left: 22px; }
 .tbacktitle .note { text-transform: none; letter-spacing: 0; font-weight: 400; margin-left: 8px; }
 .tbackbtn { top: 12px; right: 12px; }
 @media (prefers-reduced-motion: reduce) { .tflip-inner, .tfront { transition: none; } }
+
+/* a tool call in the chat console (ChatConsole.tsx ToolLine, 12 November): the call and what it returned,
+   one line each, in the brass of the console's own switches; an error in the console's red */
+.consoletools { display: flex; flex-direction: column; gap: 4px; margin: 4px 0 6px; }
+.consoletool { display: flex; flex-wrap: wrap; gap: 2px 8px; align-items: baseline; padding: 4px 9px; border: 1px solid rgba(201, 162, 74, .45); border-left-width: 3px; border-radius: 6px; background: rgba(28, 24, 19, .55); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: var(--fs-xs); line-height: 1.45; }
+.consoletoolname { color: #c9a24a; }
+.consoletoolres { color: var(--muted); overflow-wrap: anywhere; }
+.consoletool.bad { border-color: rgba(248, 81, 73, .55); }
+.consoletool.bad .consoletoolres { color: var(--bad); }

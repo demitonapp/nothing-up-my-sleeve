@@ -35,16 +35,33 @@ interface Model {
     tuning?: string | null;
     chat_template?: boolean;
     thinking?: { mode: 'toggle' | 'auto' | 'none'; default: boolean; why?: string } | null;
+    tools?: { format: string | null; why?: string } | null;
   } | null;
 }
-interface Meta { prompt_tokens?: number; answer_tokens?: number; reasoning_tokens?: number; cached_tokens?: number; cache_pct?: number; dropped_turns?: number; finish?: string; seconds?: number; tok_s?: number; settings?: any; think_capped?: boolean }
+interface Meta { prompt_tokens?: number; answer_tokens?: number; reasoning_tokens?: number; cached_tokens?: number; cache_pct?: number; dropped_turns?: number; finish?: string; seconds?: number; tok_s?: number; settings?: any; think_capped?: boolean; tool_calls?: ToolCall[] }
 interface Say { role: 'you' | 'thorp'; text: string; model?: string; meta?: Meta; thinking?: string }
 interface DbNote { id: number; note: string; model_label?: string; thinking?: string; session_id?: string; created_at?: string }
 interface QRow { id: number; folder: string; question: string; model?: string | null; created_at?: string }
 interface QFolder { name: string; count: number }
 interface Reply { answer?: string; error?: string; step?: string; meta?: Meta }
 // the answer while it is being written: what has arrived of the reasoning and of the answer, and how many tokens
-interface Live { text: string; thinking: string; n: number }
+interface Live { text: string; thinking: string; n: number; tools: ToolCall[] }
+// one tool call the model made and what the tool gave back (thorp/chat_tools.py, 12 November)
+interface ToolCall { round: number; name: string; arguments: Record<string, unknown>; result: Record<string, unknown> }
+
+/** A tool call as a line in the thread: the call, then what it returned (or its error). */
+function ToolLine({ c }: { c: ToolCall }) {
+  const args = Object.entries(c.arguments || {}).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(', ');
+  const res = c.result || {};
+  const bad = 'error' in res;
+  const shown = bad ? String(res.error) : Object.entries(res).map(([k, v]) => `${k}: ${typeof v === 'string' ? v : JSON.stringify(v)}`).join(' · ');
+  return (
+    <span className={`consoletool${bad ? ' bad' : ''}`} title={JSON.stringify(c, null, 2)}>
+      <span className="consoletoolname">⚙ {c.name || 'unknown'}({args})</span>
+      <span className="consoletoolres">→ {shown}</span>
+    </span>
+  );
+}
 
 // the labs, as thorp/labs.py LABS and the leaderboard's MAKER: a lab first, then its model
 const LABS: [RegExp, string][] = [
@@ -127,6 +144,8 @@ export default function ChatConsole() {
   const [lab, setLab] = useState('');
   const [step, setStep] = useState(''); // the checkpoint of a Demiton ship; '' is its latest
   const [think, setThink] = useState(true);
+  // tool calling (12 November): on by default where the model's template takes tools the console reads
+  const [useTools, setUseTools] = useState(true);
   const [says, setSays] = useState<Say[]>([]);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
@@ -258,6 +277,8 @@ export default function ChatConsole() {
   useEffect(() => {
     setThink(thinking?.mode === 'none' ? false : (thinking?.default ?? false));
   }, [chosen?.ship_key, chosen?.model, thinking?.mode, thinking?.default]);
+  const toolsInfo = chosen?.kind === 'foreign' ? chosen?.facts?.tools : null;
+  const toolsOk = !!toolsInfo?.format;
 
   const loadQuestions = async (): Promise<void> => {
     try {
@@ -372,13 +393,13 @@ export default function ChatConsole() {
         .filter((s) => s.text)
         .map((s) => ({ role: s.role === 'you' ? 'user' : 'assistant', text: s.text }));
       const body = chosen.kind === 'foreign'
-        ? { model: chosen.model, q, tokens, temperature: 0.7, thinking: think ? 'on' : 'off', think_tokens: thinkCap, history }
+        ? { model: chosen.model, q, tokens, temperature: 0.7, thinking: think ? 'on' : 'off', think_tokens: thinkCap, history, tools: toolsOk && useTools ? 'on' : 'off' }
         : { run: chosen.run?.run, q, tokens, temperature: 0.7, history, ...(step ? { step } : {}) };
       setLastReq(body);
       // the answer comes a line an event (/api/chat/stream): shown as it is written, and stoppable
       const ctl = new AbortController();
       stopper.current = ctl;
-      const acc: Live = { text: '', thinking: '', n: 0 };
+      const acc: Live = { text: '', thinking: '', n: 0, tools: [] };
       let painting = 0;
       const paint = (): void => {
         if (painting) return;
@@ -406,6 +427,10 @@ export default function ChatConsole() {
               if (ev.kind === 'reasoning') acc.thinking += ev.text;
               else acc.text += ev.text;
               acc.n = ev.n ?? acc.n + 1;
+              paint();
+            } else if (ev.event === 'tool') {
+              acc.tools = [...acc.tools, ev as ToolCall];
+              if (acc.text && !acc.text.endsWith(' ')) acc.text += ' ';
               paint();
             } else if (ev.event === 'done') d = ev.reply as Reply;
             else if (ev.event === 'error') d = { error: String(ev.error) };
@@ -584,6 +609,20 @@ export default function ChatConsole() {
             <span className="consoleswitchtrack" aria-hidden="true"><span className="consoleswitchthumb" /></span>
             <span className="consoleswitchlabel">thinking {thinkingAuto ? 'auto' : think && (thinkingToggle || thinkingAuto) ? 'on' : 'off'}</span>
           </label>
+          <label
+            className={`consoleswitch${toolsOk && useTools ? ' on' : ''}${!toolsOk ? ' inert' : ''}`}
+            title={toolsOk ? `calculate, current_time, board_score and vsm_status: ${toolsInfo?.why || ''}` : (toolsInfo?.why || 'tools are for the foreign ships whose chat template takes them')}
+          >
+            <input
+              type="checkbox"
+              checked={toolsOk && useTools}
+              disabled={!toolsOk}
+              onChange={(e) => setUseTools(e.target.checked)}
+              aria-label="tools"
+            />
+            <span className="consoleswitchtrack" aria-hidden="true"><span className="consoleswitchthumb" /></span>
+            <span className="consoleswitchlabel">tools {toolsOk && useTools ? 'on' : 'off'}</span>
+          </label>
           <label className="note consolepick" title="the whole completion's budget: the reasoning and the answer share it">
             budget{' '}
             <select value={budgetShare} onChange={(e) => setBudgetShare(Number(e.target.value))} aria-label="token budget" title={contextWindow ? `a share of the ${contextWindow.toLocaleString()}-token window: ${tokens.toLocaleString()} tokens` : 'this model\'s window is not known, so the budget is a fixed 4096 tokens'}>
@@ -633,7 +672,9 @@ export default function ChatConsole() {
             ) : null}
             {says.map((s, i) => (
               <p key={i} className={s.role === 'you' ? 'consoleyou' : 'consoleanswer'}>
-                <b>{s.role === 'you' ? 'you' : (s.model || 'model')}:</b> {s.text}
+                <b>{s.role === 'you' ? 'you' : (s.model || 'model')}:</b>{' '}
+                {s.meta?.tool_calls?.length ? <span className="consoletools">{s.meta.tool_calls.map((c, j) => <ToolLine key={j} c={c} />)}</span> : null}
+                {s.text}
                 {s.meta ? (
                   <span className="consolestatus">
                     <span className={s.meta.finish === 'length' ? 'warn' : s.meta.finish === 'stopped' ? 'dim' : 'ok'} title={s.meta.finish === 'length' ? 'stopped at the token budget, not at its own end' : s.meta.finish === 'stopped' ? 'stopped by you: what had arrived is kept' : 'ended on its own turn'}>{s.meta.finish === 'length' ? '⏹' : s.meta.finish === 'stopped' ? '◼ stopped' : '✓'}</span>
@@ -662,7 +703,9 @@ export default function ChatConsole() {
             ))}
             {live ? (
               <p className="consoleanswer">
-                <b>{chosen?.name || 'model'}:</b> {live.text}
+                <b>{chosen?.name || 'model'}:</b>{' '}
+                {live.tools.length ? <span className="consoletools">{live.tools.map((c, j) => <ToolLine key={j} c={c} />)}</span> : null}
+                {live.text}
                 <span className="consolestatus">
                   <span className="think">{live.text ? 'writing' : live.thinking ? 'thinking' : 'reading the prompt'}…</span>
                   {live.n ? <span className="dim">{live.n.toLocaleString()} tokens</span> : null}

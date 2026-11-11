@@ -616,6 +616,18 @@ def _template_text(model_id: str) -> str:
         return ""
 
 
+def tools_support(model_id: str) -> dict:
+    """Whether the console can hand an outside model tools (thorp/chat_tools.py, 12 November): its chat
+    template must take them in a grammar the console reads. `format` is that grammar or None; a base
+    checkpoint whose template takes tools gets them, but is said not to have been trained to use them."""
+    from thorp import chat_tools, foreign
+
+    out = chat_tools.tool_format(_template_text(model_id))
+    if out["format"] and foreign.tuning(model_id) == "base":
+        out = {**out, "why": out["why"] + "; a base checkpoint, not trained to call them"}
+    return out
+
+
 def thinking_support(model_id: str) -> dict:
     """Whether an outside model can think, and whether the thinking can be turned off: the chat
     template's `enable_thinking` is a toggle; a template that reasons without one is automatic; a
@@ -941,6 +953,7 @@ def foreign_models() -> list[dict]:
                     "chat_template": bool(_template_text(m["model"])),
                     "tuning": foreign.tuning(m["model"]),
                     "thinking": thinking_support(m["model"]),
+                    "tools": tools_support(m["model"]),
                 },
                 "why": None if cached else "its weights are not in the MLX cache yet",
             }
@@ -1091,6 +1104,10 @@ class _Live:
         return out
 
 
+# the most rounds of tool calls in one answer: a model that keeps calling is stopped and says so
+TOOL_ROUNDS = 4
+
+
 def foreign_stream(
     key: str,
     question: str,
@@ -1100,13 +1117,19 @@ def foreign_stream(
     thinking: bool | None = None,
     history: list | None = None,
     think_tokens: int | None = None,
+    tools: bool = False,
 ):
     """One answer from a foreign ship's own MLX weights, as it is written (11 November, Justin:
     "stream the tokens"): the model's continuation, not a Thorp checkpoint. A generator of events:
 
       {"event": "start", ...}                          once the prompt is rendered and matched
       {"event": "delta", "kind": "reasoning" | "answer", "text": ..., "n": tokens so far}
+      {"event": "tool", "name", "arguments", "result", "round"}   one a tool call, when tools are on
       {"event": "done", "reply": {...}}                the same reply foreign_answer returns
+
+    With `tools`, a model whose template takes them is handed thorp/chat_tools.SCHEMAS; each call it
+    writes is run and its result read back as a tool turn, up to TOOL_ROUNDS rounds, and a new "start"
+    opens each round. The reply's meta lists every call and result.
 
     The weights load once per model (cached, two at a time); a model not in the cache says so. The
     reply has no audit: the heads/cards trace (thorp.chat._audit) is our GPT's. Closing the generator
@@ -1138,6 +1161,13 @@ def foreign_stream(
         kwargs = {"enable_thinking": want}
     elif support["mode"] == "auto":
         state = "auto"
+    # tools (thorp/chat_tools.py, 12 November): handed to a template that reads them in a grammar the
+    # console parses; anything else is asked as before, and says why in the reply
+    from thorp import chat_tools
+
+    tool_info = tools_support(m["model"]) if tools else {"format": None, "why": "tools off"}
+    fmt = tool_info["format"]
+    extra = {"tools": chat_tools.SCHEMAS} if fmt else {}
     # the conversation so far, for a continuation: the model is asked with its own turns, so a second
     # message can pick up where the first stopped instead of starting again
     msgs = []
@@ -1148,97 +1178,134 @@ def foreign_stream(
             msgs.append({"role": "user" if role in ("you", "user") else "assistant", "content": text})
     msgs.append({"role": "user", "content": question})
     try:  # an instruct model's own template; a base model continues the raw prompt
-        tok.apply_chat_template(msgs[-1:], add_generation_prompt=True, tokenize=False, **kwargs)
-        render = lambda ms: tok.apply_chat_template(ms, add_generation_prompt=True, tokenize=False, **kwargs)  # noqa: E731
+        tok.apply_chat_template(msgs[-1:], add_generation_prompt=True, tokenize=False, **kwargs, **extra)
+        render = lambda ms: tok.apply_chat_template(ms, add_generation_prompt=True, tokenize=False, **kwargs, **extra)  # noqa: E731
     except TypeError:  # a template that takes no thinking switch: ask it the old way
-        render = lambda ms: tok.apply_chat_template(ms, add_generation_prompt=True, tokenize=False)  # noqa: E731
+        render = lambda ms: tok.apply_chat_template(ms, add_generation_prompt=True, tokenize=False, **extra)  # noqa: E731
         state = "auto" if support["mode"] != "none" else "none"
     except Exception:  # noqa: BLE001  no template: the raw prompt
         render = lambda ms: question  # noqa: E731
         state = "none"
-    # the whole thread comes in; the oldest turns go only when the thread no longer fits the window
-    prompt, dropped = _fit_history(msgs, render, lambda p: len(_encode_prompt(tok, p)), _context(m["model"]), tokens)
-    ids = _encode_prompt(tok, prompt)
-    # the thinking's own cap: closed for the model when it is still open at the cap (think_cap)
-    cap = think_cap(tokens, think_tokens) if state in ("on", "auto") else None
-    capper = None
-    if cap is not None:
-        marks = _think_marks(m["model"], tok)
-        if marks is not None:
-            opening, closing, close_ids = marks
-            capper = _ThinkCap(tok.decode, cap, opening, closing, close_ids, prompt.rstrip().endswith(opening))
-        else:
-            cap = None  # no mark to close it with: said in the reply rather than pretended
-    live = _Live(state in ("on", "auto"))
-    pieces: list[str] = []
-    finish = None
-    with _LOCK:  # one generation at a time: the KV cache, like the GPU, is shared
-        kv = _kv_for(key)
-        cache, rest = kv.fetch_nearest_cache(key, ids)
-        if cache is None:
-            cache, rest = make_prompt_cache(model), ids
-        elif not rest:
-            # the very same prompt again: re-read its last token so there are logits to sample from
-            if can_trim_prompt_cache(cache):
-                trim_prompt_cache(cache, 1)
-                rest = ids[-1:]
+        fmt = None
+    calls_log: list[dict] = []
+    reasonings: list[str] = []
+    seconds_all, total_tokens_all = 0.0, 0
+    first_cached, first_pct, first_ids = None, None, None
+    for rnd in range(TOOL_ROUNDS + 1):
+        # the whole thread comes in; the oldest turns go only when the thread no longer fits the window
+        prompt, dropped = _fit_history(msgs, render, lambda p: len(_encode_prompt(tok, p)), _context(m["model"]), tokens)
+        ids = _encode_prompt(tok, prompt)
+        # the thinking's own cap: closed for the model when it is still open at the cap (think_cap)
+        cap = think_cap(tokens, think_tokens) if state in ("on", "auto") else None
+        capper = None
+        if cap is not None:
+            marks = _think_marks(m["model"], tok)
+            if marks is not None:
+                opening, closing, close_ids = marks
+                capper = _ThinkCap(tok.decode, cap, opening, closing, close_ids, prompt.rstrip().endswith(opening))
             else:
+                cap = None  # no mark to close it with: said in the reply rather than pretended
+        live = _Live(state in ("on", "auto"))
+        shown = _CallHider() if fmt else None
+        pieces: list[str] = []
+        finish = None
+        with _LOCK:  # one generation at a time: the KV cache, like the GPU, is shared
+            kv = _kv_for(key)
+            cache, rest = kv.fetch_nearest_cache(key, ids)
+            if cache is None:
                 cache, rest = make_prompt_cache(model), ids
-        cached_tokens = len(ids) - len(rest)
-        cache_pct = round(100 * cached_tokens / len(ids)) if ids else 0
-        yield {
-            "event": "start",
-            "model": key,
-            "thinking": state,
-            "prompt_tokens": len(ids),
-            "cached_tokens": cached_tokens,
-            "cache_pct": cache_pct,
-            "max_tokens": tokens,
-            "think_tokens": cap,
-        }
-        seen = list(ids)
-        started = time.perf_counter()
-        keep = False  # whether the KV state is a true prefix worth keeping
-        try:
-            for r in stream_generate(
-                model,
-                tok,
-                prompt=rest,
-                max_tokens=tokens,
-                sampler=make_sampler(temp=temperature),
-                prompt_cache=cache,
-                logits_processors=[capper] if capper is not None else None,
-            ):
-                pieces.append(r.text)
-                seen.append(int(r.token))
-                finish = r.finish_reason
-                for kind, text in live.feed(r.text):
-                    yield {"event": "delta", "kind": kind, "text": text, "n": len(pieces)}
-                if live.ended:
-                    break  # the turn's own end, as text: nothing after it is the answer
-            keep = True
-        except GeneratorExit:
-            keep = bool(pieces)  # the reader stopped it: what was read is still what the cache holds
-            raise
-        finally:
-            seconds = time.perf_counter() - started
-            if keep:
-                kv.insert_cache(key, seen, cache)
-    for kind, text in live.flush():
-        yield {"event": "delta", "kind": kind, "text": text, "n": len(pieces)}
-    answer = "".join(pieces)
-    # the model's own turn end, when its template has one: the text stops there
-    ended = False
-    for end in _TURN_ENDS:
-        if end in str(answer):
-            answer = str(answer).split(end)[0]
-            ended = True
+            elif not rest:
+                # the very same prompt again: re-read its last token so there are logits to sample from
+                if can_trim_prompt_cache(cache):
+                    trim_prompt_cache(cache, 1)
+                    rest = ids[-1:]
+                else:
+                    cache, rest = make_prompt_cache(model), ids
+            cached_tokens = len(ids) - len(rest)
+            cache_pct = round(100 * cached_tokens / len(ids)) if ids else 0
+            if rnd == 0:
+                first_cached, first_pct, first_ids = cached_tokens, cache_pct, len(ids)
+            yield {
+                "event": "start",
+                "model": key,
+                "thinking": state,
+                "prompt_tokens": len(ids),
+                "cached_tokens": cached_tokens,
+                "cache_pct": cache_pct,
+                "max_tokens": tokens,
+                "think_tokens": cap,
+                "round": rnd,
+                "tools": fmt is not None,
+            }
+            seen = list(ids)
+            started = time.perf_counter()
+            keep = False  # whether the KV state is a true prefix worth keeping
+            try:
+                for r in stream_generate(
+                    model,
+                    tok,
+                    prompt=rest,
+                    max_tokens=tokens,
+                    sampler=make_sampler(temp=temperature),
+                    prompt_cache=cache,
+                    logits_processors=[capper] if capper is not None else None,
+                ):
+                    pieces.append(r.text)
+                    seen.append(int(r.token))
+                    finish = r.finish_reason
+                    for kind, text in live.feed(r.text):
+                        if kind == "answer" and shown is not None:
+                            text = shown.feed(text)  # a call's own markup is not shown as it is written
+                            if not text:
+                                continue
+                        yield {"event": "delta", "kind": kind, "text": text, "n": len(pieces)}
+                    if live.ended:
+                        break  # the turn's own end, as text: nothing after it is the answer
+                keep = True
+            except GeneratorExit:
+                keep = bool(pieces)  # the reader stopped it: what was read is still what the cache holds
+                raise
+            finally:
+                seconds = time.perf_counter() - started
+                if keep:
+                    kv.insert_cache(key, seen, cache)
+        for kind, text in live.flush():
+            if kind == "answer" and shown is not None:
+                text = shown.feed(text, last=True)
+                if not text:
+                    continue
+            yield {"event": "delta", "kind": kind, "text": text, "n": len(pieces)}
+        answer = "".join(pieces)
+        # the model's own turn end, when its template has one: the text stops there
+        ended = False
+        for end in _TURN_ENDS:
+            if end in str(answer):
+                answer = str(answer).split(end)[0]
+                ended = True
+                break
+        reasoning, reply = _split_reasoning(str(answer), state)
+        if reasoning:
+            reasonings.append(reasoning)
+        seconds_all += seconds
+        total_tokens_all += _own_tokens(tok, reasoning) + _own_tokens(tok, reply)
+        calls = chat_tools.parse_calls(reply, fmt) if fmt else []
+        if not calls or rnd == TOOL_ROUNDS:
+            if calls:  # out of rounds: the calls are not run, and the reply says so
+                reply = chat_tools.before_calls(reply) or "(the model asked for another tool call after the last round)"
             break
-    reasoning, reply = _split_reasoning(str(answer), state)
+        said = chat_tools.before_calls(reply)
+        results = []
+        for c in calls:
+            res = {"error": c["error"]} if c.get("error") else chat_tools.run(c["name"], c["arguments"])
+            results.append(res)
+            entry = {"round": rnd, "name": c["name"], "arguments": c["arguments"], "result": res}
+            calls_log.append(entry)
+            yield {"event": "tool", **entry}
+        msgs = msgs + chat_tools.turns(calls, results, said)
+    reasoning = "\n\n".join(reasonings)
     prompt_tokens = _own_tokens(tok, prompt)
     reasoning_tokens = _own_tokens(tok, reasoning)
     answer_tokens = _own_tokens(tok, reply)
-    total_tokens = reasoning_tokens + answer_tokens
     yield {
         "event": "done",
         "reply": {
@@ -1251,26 +1318,57 @@ def foreign_stream(
             "reasoning": reasoning,
             "thinking": state,
             "meta": {
-                "settings": {"temperature": temperature, "max_tokens": tokens, "thinking": state, "think_tokens": cap},
+                "settings": {"temperature": temperature, "max_tokens": tokens, "thinking": state, "think_tokens": cap, "tools": fmt is not None},
                 "prompt_tokens": prompt_tokens,
                 "answer_tokens": answer_tokens,
                 "reasoning_tokens": reasoning_tokens,
-                "seconds": round(seconds, 2),
-                "tok_s": round(total_tokens / seconds, 1) if seconds > 0 else None,
+                "seconds": round(seconds_all, 2),
+                "tok_s": round(total_tokens_all / seconds_all, 1) if seconds_all > 0 else None,
                 # the generator's own word for it: the budget ran out ("length") unless the turn ended.
                 # (It was recounted from the text before, which read a budget spent on thinking as a stop.)
                 "finish": "stop" if ended or live.ended or finish == "stop" else "length",
                 "rendered": prompt,
-                # how much of the prompt was read from the KV cache rather than evaluated again
-                "cached_tokens": cached_tokens,
+                # how much of the first prompt was read from the KV cache rather than evaluated again
+                "cached_tokens": first_cached,
                 # the same, as a share of the prompt as it was matched (its ids, BOS included)
-                "cache_pct": cache_pct,
+                "cache_pct": first_pct,
                 "dropped_turns": dropped,
                 # whether the thinking was closed at its cap rather than by the model
                 "think_capped": bool(capper is not None and capper.forced),
+                # the tool calls the model made, each with its result, in order (thorp/chat_tools.py)
+                "tool_calls": calls_log,
+                "tool_rounds": len({c["round"] for c in calls_log}),
+                "tools": {"on": bool(tools), "format": fmt, "why": tool_info["why"]},
             },
         },
     }
+
+
+class _CallHider:
+    """The answer as it streams, without a tool call's own markup: text is passed on until `<tool_call>`
+    begins, and a tail that may be the start of one is held until it is known not to be."""
+
+    MARK = "<tool_call>"
+
+    def __init__(self) -> None:
+        self.buf, self.sent, self.hidden = "", 0, False
+
+    def feed(self, text: str, last: bool = False) -> str:
+        if self.hidden:
+            return ""
+        self.buf += text
+        i = self.buf.find(self.MARK)
+        if i >= 0:
+            self.hidden = True
+            cut = i
+        elif last:
+            cut = len(self.buf)
+        else:
+            hold = next((k for k in range(len(self.MARK) - 1, 0, -1) if self.buf.endswith(self.MARK[:k])), 0)
+            cut = len(self.buf) - hold
+        out = self.buf[self.sent:cut]
+        self.sent = max(self.sent, cut)
+        return out
 
 
 def foreign_answer(
@@ -1282,11 +1380,12 @@ def foreign_answer(
     thinking: bool | None = None,
     history: list | None = None,
     think_tokens: int | None = None,
+    tools: bool = False,
 ) -> dict:
     """One answer from a foreign ship's own MLX weights, whole: foreign_stream read to its end."""
     reply: dict = {}
     for ev in foreign_stream(
-        key, question, tokens=tokens, temperature=temperature, thinking=thinking, history=history, think_tokens=think_tokens
+        key, question, tokens=tokens, temperature=temperature, thinking=thinking, history=history, think_tokens=think_tokens, tools=tools
     ):
         if ev["event"] == "done":
             reply = ev["reply"]

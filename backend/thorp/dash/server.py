@@ -5721,6 +5721,8 @@ def _chat_foreign_args(q: dict) -> dict:
         "thinking": thinking,
         "history": q.get("history") or [],
         "think_tokens": think_tokens or None,
+        # tool calling (thorp/chat_tools.py): on only when the console asks, and only for a template that takes tools
+        "tools": str(q.get("tools") or "").strip().lower() in ("1", "true", "on", "yes"),
     }
 
 

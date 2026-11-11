@@ -69,7 +69,11 @@ STYLE = (
     "tables and sea-cloaks, landfalls on unnamed coasts and first contacts, while the sky and the water "
     "hold the young Culture's own forms -- an orbital ring where a moon would be, a distant habitat, a "
     "small silver drone at rest on the chart or in the rigging -- the exploration is the age of sail and "
-    "the universe is the Culture's, nothing modern of our own century, no anachronism from later history"
+    "the universe is the Culture's, nothing modern of our own century, no anachronism from later history; "
+    # the trace is standing, not optional: a group of images without it read as plain age-of-sail, and the
+    # audit of 11 November found the bands, the classes and the cards had lost the world entirely
+    "in every image, somewhere in the sky or on the water, one distant sign of that universe: a thin ring "
+    "of light standing where a moon would be, or a far habitat, or a small silver drone"
 )
 
 # The classes of ship, smallest first: each a sailing vessel a size up from the last (thorp/models/registry.py
@@ -423,6 +427,14 @@ SUBJECTS = {**CLASSES, **HARBOURS, **SHIPBUILDER, **SHIPYARD, **SHIPYARD_SECTION
 # red-lacquered stern (Drake took the Sao Filipe); the Venetian carrack and the Byzantine dromon became the
 # English hulls of the same size; the Greek and Victorian scenes became Elizabethan ones.
 REVISED: dict[str, str] = {
+    # 11 November: the art audit found these two drawing the real world -- a steamship, and the Arc de
+    # Triomphe in Paris with electric lamps -- in a world that has neither
+    "exp-kipling": "a great wooden ship at anchor at night with a cargo of books, lanterns in a row along her "
+    "rail, a boy at the bow looking up at the lights, crates of folios lashed on the deck, a thin ring of light "
+    "standing where a moon would be",
+    "exp-arc_de_triomphe": "a great triumphal arch of dark stone raised on a headland above the sea at night, "
+    "seen from a ship's deck, a lone figure in a long coat before it, sea birds and rigging in the foreground, "
+    "a faint ring of light in the sky beyond the arch",
     "pan": "a privateer captain alone at a small table on a ship's deck under the open night sky, playing "
     "cards against an unseen hand, the stars and a distant ring of light above the black sea, his own cards "
     "held close, a lantern on the table",

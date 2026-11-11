@@ -127,11 +127,22 @@ export const threadsFor = (key: string): Thread[] => listThreads().filter((t) =>
 export const getThread = (id: string): Thread | undefined => read().find((t) => t.id === id);
 
 /** Write a thread (by id), replacing it if it is there. */
+/** Postgres, best-effort: the local store is the fast one; the server copy is what survives a browser. */
+function push(t: Thread): void {
+  void fetch('/api/chat/threads', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(t),
+  }).catch(() => { /* the local store still has it */ });
+}
+
 export function saveThread(t: Thread): void {
   if (!t.id) return;
   const all = read().filter((x) => x.id !== t.id);
-  all.push({ ...t, updatedAt: Date.now() });
+  const next = { ...t, updatedAt: Date.now() };
+  all.push(next);
   write(all);
+  push(next);
 }
 
 /** Name a thread and keep it: a saved thread survives the draft prune and is never overwritten by the next chat. */
@@ -143,11 +154,45 @@ export function markSaved(id: string, title: string): Thread | undefined {
   t.title = title.trim() || t.title || autoTitle(t.messages);
   t.updatedAt = Date.now();
   write(all);
+  push(t);
   return t;
 }
 
 export function removeThread(id: string): void {
   write(read().filter((t) => t.id !== id));
+  void fetch('/api/chat/threads/delete', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ id }),
+  }).catch(() => { /* the local store still forgot it */ });
+}
+
+/** Merge the server's threads into this browser's store (newest wins per id), then tell the pages.
+ *  A slow read leaves the local store untouched. */
+export async function syncThreads(): Promise<void> {
+  try {
+    const r = await fetch('/api/chat/threads');
+    if (!r.ok) return;
+    const d = (await r.json()) as { threads?: Thread[] };
+    const incoming = d.threads || [];
+    if (!incoming.length) return;
+    const all = read();
+    const byId = new Map(all.map((t) => [t.id, t]));
+    let changed = false;
+    for (const t of incoming) {
+      const have = byId.get(t.id);
+      if (!have || (t.updatedAt || 0) > (have.updatedAt || 0)) { byId.set(t.id, t); changed = true; }
+    }
+    if (!changed) return;
+    write([...byId.values()].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)));
+  } catch {
+    /* offline: the local store is the store */
+  }
+}
+
+// one sync a page: the server's threads land in the local store before the first sidebar render
+if (typeof window !== 'undefined') {
+  window.setTimeout(() => { void syncThreads(); }, 0);
 }
 
 export function subscribe(fn: () => void): () => void {

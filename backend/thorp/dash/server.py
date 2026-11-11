@@ -4015,6 +4015,28 @@ def api_heads(model: str = "mlx-community/Qwen3-4B-4bit") -> dict:
     return {"found": True, "read": d.get("read"), **{k: d.get(k) for k in keep}}
 
 
+def api_chat_threads() -> dict:
+    """Every saved chat thread, newest first (thorp.chat_threads): the browser's store, in Postgres."""
+    from thorp import chat_threads
+
+    return {"threads": chat_threads.all_threads()}
+
+
+def post_chat_thread(body: dict) -> dict:
+    """Save or replace one chat thread."""
+    from thorp import chat_threads
+
+    return {"thread": chat_threads.save(body)}
+
+
+def post_chat_thread_delete(body: dict) -> dict:
+    """Remove one chat thread."""
+    from thorp import chat_threads
+
+    chat_threads.remove(str(body.get("id") or ""))
+    return {"ok": True}
+
+
 def api_chat_questions() -> dict:
     """The question library: every kept question, newest first, with its folder (thorp.chat_questions)."""
     from thorp import chat_questions
@@ -6319,6 +6341,8 @@ class Handler(BaseHTTPRequestHandler):
             "/api/chat": api_chat,
             "/api/chat/notes": post_chat_note,
             "/api/chat/questions": post_chat_question,
+            "/api/chat/threads": post_chat_thread,
+            "/api/chat/threads/delete": post_chat_thread_delete,
             "/api/expedition_priority": post_expedition_priority,
         }
         if u.path not in posts:
@@ -6464,6 +6488,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/chat/models": api_chat_models,
                 "/api/chat/notes": lambda: api_chat_notes(q),
                 "/api/chat/questions": api_chat_questions,
+                "/api/chat/threads": api_chat_threads,
                 "/api/maths_book": lambda: api_maths_book(),
                 "/api/class_subjects": lambda: api_class_subjects(q["preset"]),
                 "/api/class_shapes": lambda: api_class_shapes(q["preset"]),

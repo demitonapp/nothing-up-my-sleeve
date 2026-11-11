@@ -1,5 +1,5 @@
-// The harbours (UI.md "Harbours"), as typed renderers: the home page's harbour cards (Phaleron, Piraeus
-// and Zayton), and one harbour's ships, rules, ships fitting out and the foreign models in Zayton. Pure:
+// The harbours (UI.md "Harbours"), as typed renderers: the home page's harbour cards (Schi'mint, Vavatch End
+// and Masaq' Reach), and one harbour's ships, rules, ships fitting out and the foreign models in Masaq' Reach. Pure:
 // each takes the ladder and the ships and returns the HTML string the island writes; the island owns the poll.
 
 import { big, esc } from '../../lib/format';
@@ -30,7 +30,7 @@ export interface HarbourRoute {
 
 export const harbourRoute = (path: string): HarbourRoute => {
   const head = path.split('?')[0].replace(/^#/, '');
-  // the shipyard is its own address, beside the harbours, not under one: the builder harbour is Phaleron.
+  // the shipyard is its own address, beside the harbours, not under one: the builder harbour is Schi'mint.
   // /shipyard itself is the three cards; /shipyard/<section> opens the SOP at that section.
   const sm = /^\/shipyard(?:\/(training|fitting|charting|raiding))?\/?$/.exec(head);
   if (sm) {
@@ -93,7 +93,7 @@ function shipCard(ladder: Payload, r: any): string {
     <div class="foot cscore" data-cscore="${esc(r.preset)}">${scorePlaceholder}</div></a>`;
 }
 
-/** Zayton's outside models, one per model key: the registry holds two files for Qwen3-0.6B (one with a
+/** Masaq' Reach's outside models, one per model key: the registry holds two files for Qwen3-0.6B (one with a
  *  published size and one without), and a band must not draw the same ship twice. The sized entry wins. */
 function foreignShips(ladder: Payload): any[] {
   const by = new Map<string, any>();
@@ -112,7 +112,7 @@ const foreignCard = (x: any, harbour: any): string => {
     <div class="foot"><span>${x.chained ? 'chain-graded' : 'no chain grades'}</span><span class="${pillCls('accent')}">foreign</span></div></a>`;
 };
 
-/** Zayton: the three size bands first (small 300k–4B, medium 4B–32B, large above 32B), each opening the
+/** Masaq' Reach: the three size bands first (small 300k–4B, medium 4B–32B, large above 32B), each opening the
  *  outside ships in it. The band card carries our own fleet where it falls, so the scale is read against
  *  ships we built rather than a bare number. */
 function foreignHarbourHtml(ladder: Payload, h: any, band: SizeBand | null): string {
@@ -170,7 +170,7 @@ export function candidateCardsHtml(cands: any[], band: SizeBand, read: any[]): s
 }
 
 /** One harbour: its depth and every size's draught against it, then its ships, the ones fitting out and
- *  (in the foreign-only Zayton) the three size bands or the outside models in one of them. */
+ *  (in the foreign-only Masaq' Reach) the three size bands or the outside models in one of them. */
 export function harbourShipsHtml(ladder: Payload, key: string, band: SizeBand | null = null): string {
   const hs = (ladder && ladder.harbours) || [];
   const h = hs.find((x: any) => x.key === key);

@@ -1097,7 +1097,7 @@ export default function Expeditions() {
   useEffect(() => { setJa(null); setJb(null); setJidx(null); lastOpts.current = ''; }, [route.key]);
 
   // ---- Training and Fitting Out are the SOP's build sections, mounted only while their tab is open.
-  // The shipbuilder is Phaleron's; it is fetched and rendered into the expedition's own tab.
+  // The shipbuilder is Schi'mint's; it is fetched and rendered into the expedition's own tab.
   useEffect(() => {
     if (!v || (expTab !== 'training' && expTab !== 'fitting')) return;
     const activeId = expTab === 'training' ? 'exptraining' : 'expfitting';

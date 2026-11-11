@@ -60,7 +60,7 @@ export const ART_CARDS = new Set(['previous_word', 'nevermore', 'mover', 'compar
 // The art is regenerated in place, and a browser will happily serve the plate it already has: the version
 // takes the query string so a regeneration is seen on the next load. Bump it when the art is regenerated
 // (python -m thorp.dash.art.generate_art), and every plate is fetched again once.
-export const ART_V = '2026-11-11-final';
+export const ART_V = '2026-11-11-theme';
 export const artImg = (key: string | null | undefined, cls = 'cardart'): string =>
   key ? `<img class="${cls}" src="/art/${encodeURIComponent(key)}.png?v=${ART_V}" alt="" loading="lazy" onerror="this.remove()">` : '';
 export const cardArt = (key: string): string => (ART_CARDS.has(key) ? artImg(key, 'cardart face') : '');

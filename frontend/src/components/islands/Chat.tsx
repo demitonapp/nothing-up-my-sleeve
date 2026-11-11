@@ -542,7 +542,7 @@ ${m.reasoning}` : ''))
       />
       <div className="chatmain">
       {embedded ? null : (
-        <h1>Chat <span className="q">with Nothing up my sleeve’s small ships from the leaderboard and the foreign ships in Zayton; experimental: the models are small and not instruction-tuned, so a run without a chat/QA arm continues prose rather than answers. A Nothing up my sleeve answer is audited: the heads that lit while it was written, what each token looked up, and the cards the ship holds (thorp.chat); a foreign answer is the outside model’s own continuation, with no audit</span></h1>
+        <h1>Chat <span className="q">with Nothing up my sleeve’s small ships from the leaderboard and the foreign ships in Masaq' Reach; experimental: the models are small and not instruction-tuned, so a run without a chat/QA arm continues prose rather than answers. A Nothing up my sleeve answer is audited: the heads that lit while it was written, what each token looked up, and the cards the ship holds (thorp.chat); a foreign answer is the outside model’s own continuation, with no audit</span></h1>
       )}
       <section className={cardCls(false, 'panel')}>
         {embedded ? (

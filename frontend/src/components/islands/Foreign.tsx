@@ -1,4 +1,4 @@
-// A foreign ship (UI.md "Zayton"): an outside model read on Nothing up my sleeve's decks, shown in the Market
+// A foreign ship (UI.md "Masaq' Reach"): an outside model read on Nothing up my sleeve's decks, shown in the Market
 // Harbour so it can be spied on. Read-only — no spec, no ledger run, no weights. This is the first
 // panel converted from dashboard.ts to a typed client island (the rest follow it).
 
@@ -71,7 +71,7 @@ export default function Foreign() {
           {d ? (
             <>
               {d.flag ? <img className="flag" src={`/flags/${encodeURIComponent(d.flag)}.svg`} alt={d.flag_name || d.flag} title={d.flag_name || d.flag} loading="lazy" /> : null}{' '}
-              {d.model} · {d.params ? `${big(d.params)} parameters` : 'parameters unknown'} · a foreign ship in Zayton
+              {d.model} · {d.params ? `${big(d.params)} parameters` : 'parameters unknown'} · a foreign ship in the Reach
             </>
           ) : null}
         </span>

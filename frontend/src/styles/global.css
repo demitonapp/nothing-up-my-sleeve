@@ -2093,3 +2093,44 @@ ol.goaltext { padding-left: 22px; }
 #voyages .expcard .foot:last-child { padding-bottom: 14px; }
 #voyages .expcard .foot .expcounts { font-variant-numeric: tabular-nums; }
 #voyages .expcard .pill { border-radius: 2px; }
+
+/* ---- the leaderboard in the house style (11 November, Justin: "can you update this page
+   /leaderboard/xsmall"): the same ink ground, brass headings and hairline rules as the console, the Orbitals
+   and the yard. Scoped to #leaderboard so the competitor and ship pages keep their own reading. */
+#leaderboard .panel {
+  background: #0b0a09; border: 1px solid #3a2a12 !important; border-radius: 2px !important;
+  box-shadow: 0 1px 0 #2a1d0d inset, 0 16px 38px rgba(0,0,0,.5); color: #e9e2d3;
+}
+#leaderboard .panel h2 {
+  color: #c9a24a; text-transform: uppercase; letter-spacing: .14em; font-size: 11px; font-weight: 700;
+}
+#leaderboard .panel h2 .note {
+  color: #8f7d5f; text-transform: none; letter-spacing: 0; font-weight: 400; margin-left: 10px;
+}
+#leaderboard .panel .note, #leaderboard .panel .s { color: #a8977a; }
+#leaderboard .panel a { color: #d8b566; }
+#leaderboard .panel a:hover { color: #f2e6cf; }
+#leaderboard .panel table th {
+  color: #8f7d5f; text-transform: uppercase; letter-spacing: .1em; font-size: 10px; font-weight: 700;
+  border-bottom: 1px solid #3a2a12;
+}
+#leaderboard .panel table td { border-color: #2a1d0d; }
+#leaderboard .panel table tr:hover td { background: #131110; }
+#leaderboard .panel .sqhead .sqp {
+  border-left: 1px solid #3a2a12; padding-left: 12px;
+}
+#leaderboard .panel .sqhead .sqp b { color: #f2e6cf; }
+#leaderboard .panel .sqhead .sqp b.good { color: #d8b566; }
+#leaderboard .panel .scroll { border-top: 1px solid #2a1d0d; }
+/* the ARC board's ranks read as a ledger: brass numerals, tabular figures */
+#leaderboard .panel table td:first-child {
+  color: #c9a24a; font-variant-numeric: tabular-nums; letter-spacing: .04em;
+}
+#leaderboard .panel table tr.lb-thorp td:first-child,
+#leaderboard .panel table tr.lb-outside td:first-child { color: #c9a24a; }
+#leaderboard .panel tr.unread td { color: #6f6047; }
+/* the story above the table, under the h1 */
+#leaderboard h1 .q { color: #8f7d5f; }
+#leaderboard h1 .q a { color: #d8b566; }
+#leaderboard .panel .pill { border-radius: 2px; }
+#leaderboard .panel .chart { background: transparent; }

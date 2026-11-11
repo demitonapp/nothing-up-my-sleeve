@@ -15,7 +15,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ContextMeter } from './Chat';
-import { autoTitle, getThread, listThreads, newId, saveThread, type Thread } from '@/lib/conversations';
+import { autoTitle, getThread, listThreads, markSaved, newId, saveThread, type Thread } from '@/lib/conversations';
 
 interface Model {
   kind: 'thorp' | 'foreign';
@@ -127,6 +127,7 @@ export default function ChatConsole() {
   const [note, setNote] = useState('');
   const [notes, setNotes] = useState<DbNote[]>([]);
   const [noteMsg, setNoteMsg] = useState('');
+  const [saveMsg, setSaveMsg] = useState('');
   // the question library (11 November): questions kept against folders, loaded from s4.chat_questions
   const [questionsOpen, setQuestionsOpen] = useState(false);
   const [questionDraft, setQuestionDraft] = useState('');
@@ -354,6 +355,7 @@ export default function ChatConsole() {
     setInput('');
     setErr('');
     setNoteMsg('');
+    setSaveMsg('');
     setLastReq(null);
     setLastReply(null);
   };
@@ -481,6 +483,18 @@ export default function ChatConsole() {
             Questions{qRows.length ? ` (${qRows.length})` : ''}
           </button>
           <button type="button" className="consolbtn" onClick={() => setDebug((v) => !v)} aria-pressed={debug}>Debug</button>
+          <button
+            type="button"
+            className="consolbtn"
+            disabled={!threadId || !says.length}
+            title="name this chat and keep it (Postgres, and this browser)"
+            onClick={() => {
+              if (!threadId) return;
+              const t = markSaved(threadId, autoTitle(says as never));
+              setSaveMsg(t ? 'chat saved' : 'could not save');
+            }}
+          >Save chat</button>
+          {saveMsg ? <span className="note">{saveMsg}</span> : null}
           <button type="button" className="consolbtn" onClick={startNewChat} disabled={!says.length} title="clear this conversation and start a new one">New chat</button>
           {chosen ? <a className="consolbtn" href={hrefOf(chosen)} title="open this model's chat page">Full page ↗</a> : null}
         </div>

@@ -20,6 +20,9 @@ class EvalContext:
     init_model: Any = None
     # evaluator-specific settings from the spec's eval.options (e.g. {"arc": {"limit": 12}})
     options: dict = field(default_factory=dict)
+    # what one evaluator has worked out at this step that another reads too (11 November: ce_bpb and bpb_split
+    # score the same windows of the same books, and ran them twice). It lives as long as the context: one step.
+    cache: dict = field(default_factory=dict)
 
 
 @dataclass

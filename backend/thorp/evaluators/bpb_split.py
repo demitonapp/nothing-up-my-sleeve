@@ -26,7 +26,7 @@ import numpy as np
 
 from thorp import shards
 from thorp.evaluators import EvalContext, EvalResult
-from thorp.evaluators.ce_bpb import book_losses
+from thorp.evaluators.ce_bpb import book_losses, losses_of  # noqa: F401  (book_losses: others read it here)
 
 CLASSES = ("word_start", "word_inside", "punct", "space", "newline", "digit", "other")
 _C = {c: i for i, c in enumerate(CLASSES)}
@@ -126,7 +126,7 @@ def evaluate(ctx: EvalContext) -> EvalResult:
         per_book = {}
         for b in book_ids:
             arr = np.asarray(shards.load(tok.id, b, tok))
-            losses = book_losses(ctx.model, arr, tok.eos_id, ctx.context)
+            losses = losses_of(ctx, b, arr)  # ce_bpb's own, when it has read this step
             per_book[b] = book_split(losses, arr, pbytes)
         report[set_name] = per_book
         for scope, ids in (

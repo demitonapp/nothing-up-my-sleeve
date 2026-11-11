@@ -41,6 +41,16 @@ def book_ce(model, tokens: np.ndarray, eos: int, context: int) -> tuple[float, i
     return float(losses.sum()) / len(losses), len(losses)
 
 
+def losses_of(ctx: EvalContext, book: str, tokens: np.ndarray) -> np.ndarray:
+    """book_losses for one of the step's books, kept on the context: ce_bpb and bpb_split read the same windows
+    of the same books, so whichever comes second at a step reads what the first worked out (11 November: the
+    forward passes were run twice, about 9 s of a 300k's full evaluation). Not to be written to."""
+    key = ("book_losses", book)
+    if key not in ctx.cache:
+        ctx.cache[key] = book_losses(ctx.model, tokens, ctx.tokeniser.eos_id, ctx.context)
+    return ctx.cache[key]
+
+
 def evaluate(ctx: EvalContext) -> EvalResult:
     out = EvalResult()
     tok = ctx.tokeniser
@@ -48,7 +58,8 @@ def evaluate(ctx: EvalContext) -> EvalResult:
         rows = []
         for b in book_ids:
             arr = shards.load(tok.id, b, tok)
-            ce, n = book_ce(ctx.model, arr, tok.eos_id, ctx.context)
+            losses = losses_of(ctx, b, arr)
+            ce, n = float(losses.sum()) / len(losses), len(losses)
             nbytes = tok.text_bytes(b)  # the text as read (cleaned or raw), not always the manifest's
             rows.append(
                 {

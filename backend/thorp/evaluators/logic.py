@@ -43,19 +43,35 @@ def load_deck(path: str = DECK) -> list[dict]:
         return list(csv.DictReader(f))
 
 
-def row_lift(model, tok, r: dict) -> float:
+def row_lift(model, tok, r: dict, bpb=None) -> float:
+    """One row's lift. `bpb(ids, texts)` is the scorer (default: _bpb on this model); score_deck passes one that
+    remembers what it has scored."""
+    bpb = bpb or (lambda ids, texts: _bpb(model, tok, ids, texts))
     ids = [tok.eos_id] + tok.encode(r["prompt"])
     base = [tok.eos_id] + tok.encode(r["frame"])
-    idea, rival = _bpb(model, tok, ids, [r["idea"], r["rival"]])
-    idea0, rival0 = _bpb(model, tok, base, [r["idea"], r["rival"]])
+    idea, rival = bpb(ids, [r["idea"], r["rival"]])
+    idea0, rival0 = bpb(base, [r["idea"], r["rival"]])
     return float((rival - idea) - (rival0 - idea0))
 
 
 def score_deck(model, tok, rows: list[dict]) -> dict:
     lifts: dict[str, dict[str, float]] = defaultdict(dict)
     relation = {}
+    # a deck asks the same thing many times over (an item's frame, scored once for each of its variants): each
+    # distinct (prefix, idea, rival) is run once and remembered (11 November: 464 forward passes a reading, 288
+    # distinct). Each is still its own two-row pass, exactly as before: the model is read in bf16, where a
+    # different batch shape rounds a little differently, and batching the asks together moved the readings by up
+    # to 0.002 (the gain by 0.0005), which is not for a speed-up to do to a trick's measure.
+    seen: dict[tuple, np.ndarray] = {}
+
+    def bpb(ids, texts):
+        key = (tuple(ids), tuple(texts))
+        if key not in seen:
+            seen[key] = _bpb(model, tok, ids, texts)
+        return seen[key]
+
     for r in rows:
-        lifts[r["item"]][r["variant"]] = row_lift(model, tok, r)
+        lifts[r["item"]][r["variant"]] = row_lift(model, tok, r, bpb)
         relation[r["item"]] = r["relation"]
     # the gain per relation from averages: both premises against the stronger single premise's mean
     # (an item-by-item maximum of two noisy readings would bias every gain downward)

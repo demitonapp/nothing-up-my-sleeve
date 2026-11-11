@@ -56,12 +56,24 @@ def tag_many(texts: list[str], batch_size: int = 256) -> list[list[tuple[int, in
     return [_words(d) for d in nlp().pipe(texts, batch_size=batch_size)]
 
 
+_LAST: dict[str, str | None] = {}  # text -> its last word's tag, for as long as the process lives
+_LAST_CAP = 200_000
+
+
 def last_tag(texts: list[str]) -> list[str | None]:
-    """The tag of the last word of each text: a guess tagged in its own context."""
-    out = []
-    for words in tag_many(texts):
-        out.append(words[-1][3] if words else None)
-    return out
+    """The tag of the last word of each text: a guess tagged in its own context.
+
+    Remembered: the tagger is pinned, so a text always takes the same tag, and the shapes evaluator sends mostly
+    the same texts at every reading (a judge window's text is fixed; a text is new only where the model's guess
+    has changed: 64% to 88% were already tagged at the reading before, 11 November). Only the texts not yet seen
+    are tagged."""
+    new = [t for t in dict.fromkeys(texts) if t not in _LAST]
+    if len(_LAST) + len(new) > _LAST_CAP:  # a long process (many voyages scored in turn): start over
+        _LAST.clear()
+        new = list(dict.fromkeys(texts))
+    for t, words in zip(new, tag_many(new) if new else [], strict=True):
+        _LAST[t] = words[-1][3] if words else None
+    return [_LAST[t] for t in texts]
 
 
 def _dir():

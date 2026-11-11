@@ -81,7 +81,9 @@ def evaluate(ctx: EvalContext) -> EvalResult:
     # ship's own end-of-text mark: what it writes after that is not its answer.
     opts = ((ctx.options or {}).get("ifeval") or {}) if isinstance(ctx.options, dict) else {}
     fmt, clean = opts.get("format"), str(opts.get("clean") or "raw")
-    max_new = int(opts.get("max_new") or MAX_NEW)
+    # THORP_IFEVAL_MAX_NEW sets the cap for a post-hoc `thorp eval`, as THORP_IFEVAL_LIMIT sets the prompts
+    # (12 November: the ships read at 512, the cap the outside models on the board were read at)
+    max_new = int(os.environ.get("THORP_IFEVAL_MAX_NEW") or opts.get("max_new") or MAX_NEW)
     limit = int(os.environ.get("THORP_IFEVAL_LIMIT", opts.get("limit") or LIMIT))
     cases = _cases(limit)
     t0 = time.time()

@@ -1,6 +1,6 @@
 """Score an outside model on AI2 ARC, the one peer-recognised test for models under 1B (11 November).
 
-    PYTHONPATH=backend backend/.venv/bin/python backend/scripts/score_arc_ai2.py MODEL [--config easy|challenge|both] [--per-split N]
+    PYTHONPATH=backend backend/.venv/bin/python backend/scripts/score_arc_ai2.py MODEL [--config easy|challenge|both] [--per-split N] [--dtype float32]
 
 MODEL is a Hugging Face id or local path mlx-lm can load. MODEL is read on the test split of both
 configs: ARC-Easy (2,376 questions) and ARC-Challenge (1,172), four options each. There are no
@@ -12,6 +12,10 @@ The reading is kept in `s4.outside_readings` as `arc-ai2-<model>`: the accuracy 
 many questions could not be read, and the settings. Like score_blimp.py it takes S2's helm and waits
 in port while a voyage is at sea; `--no-helm` skips the wait (a reading this light can share the Mac
 with a training run).
+
+`--dtype float32` casts the weights to float32 before reading (12 November): pythia-14m and pythia-31m in
+their own float16 overflow on a few option sequences, the loss comes back non-finite and the question is
+skipped. In float32 they are read whole. The dtype is kept in the reading, so the two are never mixed up.
 """
 
 from __future__ import annotations
@@ -41,11 +45,13 @@ def _load(model_id: str):
         return port()
 
 
-def score(model_id: str, configs: list[str], per_split: int | None, batch: int, save: bool) -> dict:
+def score(model_id: str, configs: list[str], per_split: int | None, batch: int, save: bool, dtype: str = "native") -> dict:
     import mlx.core as mx
     import mlx.nn as nn
 
     model, tok = _load(model_id)
+    if dtype == "float32":
+        model.set_dtype(mx.float32)
     # MLX's free-buffer cache defaults to the GPU's whole recommended working set (26.8 GB on this Mac):
     # a reading would then hold every buffer it ever freed. Cap it, as train.py does, so a reading beside
     # a voyage on the same Mac gives its buffers back (11 November: five readings in a row left the Mac
@@ -78,6 +84,7 @@ def score(model_id: str, configs: list[str], per_split: int | None, batch: int, 
         "per_split": per_split,
         "start_token": start,
         "revision": arc_ai2.REVISION,
+        "dtype": dtype,
         "scored": time.strftime("%Y-%m-%dT%H:%M:%S"),
         "seconds": round(time.time() - t0, 1),
         "splits": splits,
@@ -97,16 +104,17 @@ def main() -> None:
     ap.add_argument("--batch", type=int, default=64)
     ap.add_argument("--no-helm", action="store_true", help="do not wait for a voyage at sea")
     ap.add_argument("--no-save", action="store_true")
+    ap.add_argument("--dtype", choices=["native", "float32"], default="native", help="float32 casts the weights first")
     a = ap.parse_args()
     configs = ["easy", "challenge"] if a.config == "both" else [a.config]
     per = a.per_split or None
     if a.no_helm:
-        score(a.model, configs, per, a.batch, not a.no_save)
+        score(a.model, configs, per, a.batch, not a.no_save, a.dtype)
         return
     from thorp import vsm
 
     with vsm.at_sea(f"score {a.model} on AI2 ARC", kind="score"):
-        score(a.model, configs, per, a.batch, not a.no_save)
+        score(a.model, configs, per, a.batch, not a.no_save, a.dtype)
 
 
 if __name__ == "__main__":

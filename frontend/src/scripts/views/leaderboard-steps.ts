@@ -119,7 +119,9 @@ export function arcAi2Html(lb: any, band: SizeBand): Html {
   const chance = spec.chance ?? 0.25;
   const read = (spec.rows || []).filter((r: any) => r.params && bandOf(sizeOf(r)) === band && r.easy && r.easy.accuracy != null);
   read.sort((a: any, b: any) => b.easy.accuracy - a.easy.accuracy || (b.challenge?.accuracy ?? 0) - (a.challenge?.accuracy ?? 0) || b.params - a.params);
-  const unread = inBand(lb.table, band).filter((r) => isOurs(r) && r.params);
+  // a ship read by `thorp eval` is ranked with the rest; one not read yet stands below the line
+  const readShips = new Set(read.filter((r: any) => r.kind === 'thorp').map((r: any) => r.ship_key));
+  const unread = inBand(lb.table, band).filter((r) => isOurs(r) && r.params && !readShips.has(r.ship_key));
   const pct = (x: number): string => `${(100 * x).toFixed(1)}%`;
   const splitCell = (s: any, primary: boolean): string => {
     if (!s || s.accuracy == null) return '<span class="s">not read</span>';
@@ -130,7 +132,7 @@ export function arcAi2Html(lb: any, band: SizeBand): Html {
   const body = read.map((r: any, i: number) => `<tr class="lb-${r.kind === 'thorp' ? 'thorp' : 'outside'}">
       <td>${i + 1}</td>
       <td>${r.kind === 'thorp'
-        ? `<a href="/leaderboard/thorp/${encodeURIComponent(r.ship_key || '')}"><b>${esc(r.name)}</b></a>`
+        ? `<a href="/leaderboard/thorp/${encodeURIComponent(r.ship_key || '')}"><b>${esc(r.name)}</b></a><div class="s">ours · ${r.sailings ?? 1} sailing${(r.sailings ?? 1) === 1 ? '' : 's'} averaged</div>`
         : `<a href="/leaderboard/competitor/${encodeURIComponent(r.model)}"><b>${esc(r.name)}</b></a><div class="s">${makerLink(r.model)}</div>`}</td>
       <td>${fmtParams(r.params)}</td>
       <td>${splitCell(r.easy, true)}</td>
@@ -200,4 +202,41 @@ export async function drawStepsChart(lb: any, band: SizeBand, metric: string): P
   const notes = m ? [{ xref: 'paper', yref: 'y', x: 0, y: m[0], showarrow: false, text: `${m[1]} (${m[0]})`, font: { size: 9, color: tok('accent') } }] : [];
   const unit = (STEP_METRICS.find((x) => x.key === metric) || STEP_METRICS[0]).unit;
   plot('lbstepschart', traces, layout({ xaxis: { type: 'log', title: { text: 'parameters' } }, yaxis: { title: { text: unit }, zeroline: false }, shapes, annotations: notes, height: 340 }));
+}
+
+/** IFEval for one band (12 November, Justin: "can you also add a card to xsmall for IFEval"): prompt-level
+ *  strict accuracy on the 541 prompts, the instruction-level reading beside it. A voyage whose training
+ *  turns held the official prompts carries the word rigged in its row, always: its number says it learned
+ *  the checks, not that it follows instructions. No outside model has been read on IFEval here yet. */
+export function ifevalHtml(lb: any, band: SizeBand): Html {
+  const spec = lb.ifeval || {};
+  const total = spec.prompts ?? 541;
+  const all = (spec.rows || []).filter((r: any) => r.params && bandOf(r.params) === band);
+  const honest = all.filter((r: any) => !r.rigged && r.prompts >= total);
+  const rest = all.filter((r: any) => !honest.includes(r));
+  const pct = (x: number | null | undefined): string => (x == null ? '–' : `${(100 * x).toFixed(1)}%`);
+  const how = (r: any): string => {
+    const fmt = r.format === 'chat' ? 'chat template, thinking off' : r.format === 'bare' || !r.format ? 'prompt bare' : `taught turn (${esc(r.format)})`;
+    const cap = r.max_new ? ` · cap ${r.max_new}` : '';
+    const ended = r.stopped != null ? ` · ended itself ${Math.round(100 * r.stopped)}%` : '';
+    return `${fmt}${cap}${ended}`;
+  };
+  const nameCell = (r: any): string => r.kind === 'thorp'
+    ? `${r.ship_key ? `<a href="/leaderboard/thorp/${encodeURIComponent(r.ship_key)}"><b>${esc(r.name)}</b></a>` : `<b>${esc(r.name)}</b>`}${r.rigged ? ` <span class="${pillCls('bad')}">rigged</span>` : ''}<div class="s">ours · ${esc(r.run || '')}</div>`
+    : `<a href="/leaderboard/competitor/${encodeURIComponent(r.model)}"><b>${esc(r.name)}</b></a><div class="s">${makerLink(r.model)}</div>`;
+  const row = (r: any, rank: string): string => `<tr class="lb-${r.kind === 'thorp' ? 'thorp' : 'outside'}${rank === '–' ? ' unread' : ''}">
+      <td>${rank}</td>
+      <td>${nameCell(r)}</td>
+      <td>${fmtParams(r.params)}</td>
+      <td><b>${pct(r.prompt_strict)}</b><div class="s">${r.prompts} of ${total} read${r.prompts < total ? ' · subset' : ''}</div></td>
+      <td>${pct(r.instruction_strict)}</td>
+      <td><span class="s">${how(r)}</span></td></tr>`;
+  const head = '<tr><th>#</th><th>model</th><th>parameters</th><th>prompt-level strict <span class="s">the board</span></th><th>instruction-level strict</th><th>how it was asked</th></tr>';
+  const body = honest.map((r: any, i: number) => row(r, String(i + 1))).join('') + rest.map((r: any) => row(r, '–')).join('')
+    || `<tr><td colspan="6" class="${emptyCls(true)}">no model of this size has been read on IFEval yet</td></tr>`;
+  const best = honest[0];
+  const rigged = all.filter((r: any) => r.rigged).length;
+  const lead = `<div class="sqp"><b class="${best ? 'good' : 's'}">${best ? pct(best.prompt_strict) : '–'}</b><span>${best ? `${esc(best.name)} on prompt-level strict, the best of ${honest.length} read on the ${total}` : `no honest reading on the ${total} yet`}</span></div>
+    <div class="sqp"><b>${rigged} of ${all.length}</b><span>readings are rigged, trained on the official prompts, and stand below the line</span></div>`;
+  return { head, body, lead };
 }

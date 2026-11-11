@@ -485,8 +485,34 @@ CONSOLE: dict[str, str] = {
     "polished smooth by hands, the edge of the ship's wheel and dark rigging just visible at the sides",
 }
 
-SIZES = {**{k: "landscape_16_9" for k in (*CLASSES, *HARBOURS, *HARBOUR_VIEWS, *SHIPBUILDER, *SHIPYARD, *SHIPYARD_SECTIONS, *CHARTING, *POSITIONS, *FOREIGN, *SOP_GOALS, *EXPEDITIONS, *BANDS, *LADDER, *CONSOLE)}, **{k: "portrait_4_3" for k in CARDS}, **{k: "portrait_4_3" for k in LOGIC}}
-SUBJECTS = {**CLASSES, **HARBOURS, **HARBOUR_VIEWS, **SHIPBUILDER, **SHIPYARD, **SHIPYARD_SECTIONS, **CHARTING, **POSITIONS, **FOREIGN, **CARDS, **LOGIC, **SOP_GOALS, **EXPEDITIONS, **BANDS, **LADDER, **CONSOLE}
+# The test cards on the extra small leaderboard (12 November, Justin: "cards for each test ... with fal images
+# the user must click and then they flip over with the leaderboard, but the card must have a picture that
+# represents the test in our style"; "can you also add a card to xsmall for IFEval"). Each plate is the test's
+# own idea in the world: ARC is a ship's school answering science questions four ways, chaining is two bearings
+# crossing on a chart to fix a position neither gives alone, IFEval is written orders carried out to the letter.
+TESTS: dict[str, str] = {
+    "test-arc": "a ship's schoolroom below deck at night lit by one lantern: an old ship's master in a long "
+    "Elizabethan sea-cloak holding up a burning candle as the question, and across the oak table a young "
+    "apprentice in a ruffed shirt with long sleeves down to his knuckles choosing between four small slates laid "
+    "in a row before him, each slate with a single chalk mark, his hand resting on one of the four, a brass "
+    "globe, a lodestone and a sprouting seed in a dish beside them, through a porthole a thin ring of light "
+    "arcing across the night sky",
+    "test-chaining": "seen from above, a sea chart on a navigator's table at night lit by one lantern: a coastline "
+    "drawn in ink with two small tower beacons on two far-apart headlands, and two long straight bold black ink "
+    "lines ruled across the whole chart, one from each beacon, forming a large X that crosses at a single point "
+    "out at sea, where the navigator's finger and the tip of a pair of brass dividers rest exactly on the crossing, "
+    "a brass compass and a wooden parallel rule beside it, the navigator's sleeve an Elizabethan doublet, a small "
+    "smooth silver ovoid drone with no propellers resting at the chart's corner",
+    "test-ifeval": "a captain's written orders being carried out on the deck of an Elizabethan galleon at night: a "
+    "parchment sheet with a red wax seal nailed to the mainmast under a hanging iron lantern, its writing only "
+    "a column of tiny illegible ink strokes with a small drawn knot beside each, a boatswain in a doublet holding "
+    "his finger on one line while a sailor kneeling beside him ties exactly that knot in a rope, a coil of rope "
+    "laid out in a precise flat spiral on the planks, every order followed to the letter, a small smooth silver "
+    "ovoid drone with no propellers resting on a yard above, a thin ring of light arcing across the sky",
+}
+
+SIZES = {**{k: "landscape_16_9" for k in (*CLASSES, *TESTS, *HARBOURS, *HARBOUR_VIEWS, *SHIPBUILDER, *SHIPYARD, *SHIPYARD_SECTIONS, *CHARTING, *POSITIONS, *FOREIGN, *SOP_GOALS, *EXPEDITIONS, *BANDS, *LADDER, *CONSOLE)}, **{k: "portrait_4_3" for k in CARDS}, **{k: "portrait_4_3" for k in LOGIC}}
+SUBJECTS = {**TESTS, **CLASSES, **HARBOURS, **HARBOUR_VIEWS, **SHIPBUILDER, **SHIPYARD, **SHIPYARD_SECTIONS, **CHARTING, **POSITIONS, **FOREIGN, **CARDS, **LOGIC, **SOP_GOALS, **EXPEDITIONS, **BANDS, **LADDER, **CONSOLE}
 
 # The twenty subjects the audit found outside the brief (ships/reports/art-audit-2026-11-11.md): rewritten
 # into the three-layer world -- Risso's ink, Drake's voyages, the young Culture's universe -- keeping what

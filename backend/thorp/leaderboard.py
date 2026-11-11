@@ -317,6 +317,7 @@ def _ships(runs: list[dict]) -> list[dict]:
                 "preset": rs[0]["preset"],
                 "sailings": len(rs),
                 "runs": sorted(r["run"] for r in rs),
+                "run_ids": sorted(r["run_id"] for r in rs),
                 "run": max(rs, key=lambda r: r["chaining_lift"])["run"],
                 "run_id": max(rs, key=lambda r: r["chaining_lift"])["run_id"],
                 "chaining_lift": round(sum(t["lift"] for t in tests.values()) / len(tests), 4),
@@ -486,7 +487,15 @@ def payload() -> dict:
                 "easy": {"name": "ARC-Easy", "questions": 2376, "about": "the questions a retrieval baseline gets"},
                 "challenge": {"name": "ARC-Challenge", "questions": 1172, "about": "the questions it does not"},
             },
-            "rows": _arc_ai2_rows(table),
+            "rows": _arc_ai2_rows(table, board),
+        },
+        # IFEval (Zhou et al., 2023), the third test card on the extra small board (12 November, Justin:
+        # "can you also add a card to xsmall for IFEval"): our voyages' readings, each with its n and
+        # whether the official prompts were in its training turns (rigged), which is never left off
+        "ifeval": {
+            "name": "IFEval",
+            "prompts": 541,
+            "rows": _ifeval_rows(table, board),
         },
         # the steps to chaining and each ship beside the outside model ten times its size (thorp/steps.py)
         "steps": steps.about(_one_hop_mark(), ONE_HOP_NOISE),
@@ -741,7 +750,123 @@ def _short_model(model: str) -> str:
     return name
 
 
-def _arc_ai2_rows(table: list[dict]) -> list[dict]:
+def _ship_arc(run_ids: list[str]) -> dict | None:
+    """A ship's AI2 ARC reading from its sailings' own metrics (`thorp eval <run> --evaluators arc_ai2`):
+    each split's accuracy averaged over the sailings read, at each sailing's latest reading. A pilot
+    on any sailing makes the split a pilot; a ship with no sailing read has no reading."""
+    from thorp.ledger import reader
+
+    if not run_ids:
+        return None
+    marks = ",".join("?" for _ in run_ids)
+    rows = reader().query(
+        f"select run_id, step, name, value from metrics where run_id in ({marks}) and name like 'arc\\_%' order by step",
+        tuple(run_ids),
+    )
+    latest: dict[str, dict[str, float]] = {}
+    for r in rows:
+        latest.setdefault(r["run_id"], {})[r["name"]] = float(r["value"])
+    out: dict[str, dict] = {}
+    for key in ("easy", "challenge"):
+        read = [m for m in latest.values() if m.get(f"arc_{key}/accuracy") is not None]
+        if not read:
+            continue
+        out[key] = {
+            "accuracy": sum(m[f"arc_{key}/accuracy"] for m in read) / len(read),
+            "questions": int(min(m.get(f"arc_{key}/n", 0) for m in read)),
+            "skipped": int(max(m.get(f"arc_{key}/skipped", 0) for m in read)),
+            "pilot": any(m.get(f"arc_{key}/pilot") for m in read),
+            "sailings": len(read),
+        }
+    return out or None
+
+
+def _ifeval_rows(table: list[dict] | None = None, board: list[dict] | None = None) -> list[dict]:
+    """One row a model with an IFEval reading: prompt-level and instruction-level strict accuracy, the
+    prompts read, the format it was asked in and the cap on its response.
+
+    Outside models from `s4.outside_readings` (`ifeval-<model>`, scripts/score_ifeval.py); our voyages from
+    their own metrics at their latest reading, named as the board names the ship when the voyage is one of
+    a ship's sailings. `rigged` where the spec says every official prompt was in its training turns: such a
+    row is shown and never ranked. A subset keeps its n, so it cannot pass for the 541."""
+    from thorp.ledger import reader
+    from thorp.smoking_qwen import REFERENCE_PARAMS, _params
+    from thorp.viable.s4_intelligence import readings
+
+    known = {r.get("model"): r for r in (table or []) if r.get("model")}
+    out = []
+    for name, doc in readings.glob("ifeval-*"):
+        doc = doc or {}
+        if doc.get("prompt_strict") is None:
+            continue
+        model = name[len("ifeval-"):]
+        base = known.get(model) or {}
+        out.append(
+            {
+                "kind": base.get("kind") or "ladder",
+                "model": model,
+                "name": base.get("name") or _short_model(model),
+                "params": base.get("params") or REFERENCE_PARAMS.get(model),
+                "prompt_strict": doc["prompt_strict"],
+                "instruction_strict": doc.get("instruction_strict"),
+                "prompts": int(doc.get("prompts") or 0),
+                "format": doc.get("format"),
+                "max_new": doc.get("max_new"),
+                "stopped": doc.get("stopped"),
+                "rigged": False,
+            }
+        )
+    # the board's name for each ship, by the runs that are its sailings
+    ship_of: dict[str, dict] = {}
+    names = {r.get("ship_key"): r.get("name") for r in (table or []) if r.get("kind") == "thorp"}
+    for row in board or []:
+        b = row.get("best") or {}
+        for rid in b.get("run_ids") or []:
+            ship_of[rid] = {"ship_key": b.get("ship_key"), "name": names.get(b.get("ship_key")) or b.get("name")}
+    rows = reader().query(
+        "select r.run_id, r.name as run, r.ship, r.spec_json, m.step, m.name, m.value from metrics m "
+        "join runs r on r.run_id = m.run_id where m.name like 'ifeval/%' order by m.step"
+    )
+    by: dict[str, dict] = {}
+    for r in rows:
+        d = by.setdefault(r["run_id"], {"run": r["run"], "ship": r["ship"], "spec": r["spec_json"], "m": {}})
+        d["m"][r["name"]] = float(r["value"])
+    for run_id, d in by.items():
+        m = d["m"]
+        if m.get("ifeval/prompt_strict") is None:
+            continue
+        try:
+            spec = json.loads(d["spec"] or "{}")
+        except ValueError:
+            spec = {}
+        try:
+            params = _params(spec)
+        except Exception:  # noqa: BLE001 - a spec too old to size has no size, not a failed board
+            params = None
+        ship = ship_of.get(run_id) or {}
+        fmt = ((spec.get("eval") or {}).get("options") or {}).get("ifeval", {}).get("format") if isinstance(spec.get("eval"), dict) else None
+        out.append(
+            {
+                "kind": "thorp",
+                "run": d["run"],
+                "run_id": run_id,
+                "ship_key": ship.get("ship_key"),
+                "name": ship.get("name") or d["run"],
+                "about": d["ship"],
+                "params": params,
+                "prompt_strict": m["ifeval/prompt_strict"],
+                "instruction_strict": m.get("ifeval/instruction_strict"),
+                "prompts": int(m.get("ifeval/n_prompts", 0)),
+                "format": fmt or "bare",
+                "max_new": int(m["ifeval/max_new"]) if m.get("ifeval/max_new") is not None else None,
+                "stopped": m.get("ifeval/stopped"),
+                "rigged": "RIGGED" in (d["spec"] or ""),
+            }
+        )
+    return sorted(out, key=lambda r: (r["rigged"], r["prompts"] < 541, -r["prompt_strict"]))
+
+
+def _arc_ai2_rows(table: list[dict], board: list[dict] | None = None) -> list[dict]:
     """One row a model with an AI2 ARC reading (s4.outside_readings, `arc-ai2-<model>`).
 
     The one peer-recognised test at this size (11 November, Justin: "I'd prefer the ARC easy
@@ -783,6 +908,25 @@ def _arc_ai2_rows(table: list[dict]) -> list[dict]:
                 "params": base.get("params") or REFERENCE_PARAMS.get(model),
                 "easy": split("easy"),
                 "challenge": split("challenge"),
+            }
+        )
+    # our ships, read on their own sailings (each ship's row in the table gives its name and size)
+    ours = {r.get("ship_key"): r for r in table if r.get("kind") == "thorp"}
+    for row in board or []:
+        b = row.get("best") or {}
+        arc = _ship_arc(b.get("run_ids") or [])
+        if not arc or not arc.get("easy"):
+            continue
+        t = ours.get(b.get("ship_key")) or {}
+        rows.append(
+            {
+                "kind": "thorp",
+                "name": t.get("name") or b.get("name") or f"Demiton {b.get('preset')}",
+                "ship_key": b.get("ship_key"),
+                "params": t.get("params"),
+                "sailings": arc["easy"]["sailings"],
+                "easy": arc.get("easy"),
+                "challenge": arc.get("challenge"),
             }
         )
     return sorted(rows, key=lambda r: (-(r["easy"] or {}).get("accuracy", 0.0), r["name"]))

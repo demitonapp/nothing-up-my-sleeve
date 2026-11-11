@@ -2272,3 +2272,34 @@ ol.goaltext { padding-left: 22px; }
 #shelves .cfgcard .cfgname { display: flex; justify-content: space-between; gap: 8px; color: #f2e6cf; }
 #shelves .cfgpeek summary, #shelves .cfgcard summary { cursor: pointer; color: #d8b566; font-size: var(--fs-sm); }
 #shelves .cfgpeek .bspec, #shelves .cfgcard .bspec { max-height: 240px; overflow: auto; }
+
+/* The test cards on the extra small board (StepsBoard.tsx TestCard, 12 November): a row of plates, one a
+   test; a click turns a card over and the turned card takes the whole row for its board. The face that is
+   turned away is lifted out of the flow, so the card is as tall as the face it shows. */
+.testcards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; align-items: stretch; }
+@media (max-width: 900px) { .testcards { grid-template-columns: 1fr; } }
+.tflip { position: relative; perspective: 2200px; min-width: 0; }
+.tflip.on { grid-column: 1 / -1; order: -1; }
+.tflip-inner { position: relative; height: 100%; transform-style: preserve-3d; transition: transform .75s cubic-bezier(.3, .7, .2, 1); }
+.tflip.on .tflip-inner { transform: rotateY(180deg); }
+.tface { backface-visibility: hidden; -webkit-backface-visibility: hidden; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); overflow: hidden; }
+.tfront { display: flex; flex-direction: column; height: 100%; cursor: pointer; transition: border-color .2s, transform .2s; }
+.tflip:not(.on) .tfront:hover { border-color: rgba(227, 179, 65, .6); transform: translateY(-2px); }
+.tfront:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.tback { transform: rotateY(180deg); padding: 16px 18px 18px; position: relative; }
+.tflip:not(.on) .tback { position: absolute; inset: 0; }
+.tflip.on .tfront { position: absolute; inset: 0; }
+.tart { position: relative; aspect-ratio: 16 / 9; background: #000; overflow: hidden; }
+.tart img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.tflip.on .tart { aspect-ratio: auto; height: 100%; }
+.ttag { position: absolute; left: 10px; bottom: 10px; padding: 3px 10px; border-radius: 999px; background: rgba(14, 17, 22, .78); border: 1px solid rgba(227, 179, 65, .5); color: var(--accent); font-size: var(--fs-xs); letter-spacing: .06em; text-transform: uppercase; }
+.tcap { display: flex; flex-direction: column; flex: 1 1 auto; gap: 8px; padding: 12px 16px 14px; }
+.tname { color: var(--text); font-size: var(--fs-lg); font-weight: 600; }
+.tabout { margin: 0; color: var(--muted); font-size: var(--fs-sm); line-height: 1.5; }
+.tstat { margin: 0; }
+.tfoot { margin-top: auto; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 12px; font-size: var(--fs-sm); padding-top: 2px; }
+.tturn { color: var(--accent); letter-spacing: .04em; }
+.tbacktitle { margin: 0 110px 10px 0; font-size: var(--fs-md); font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.tbacktitle .note { text-transform: none; letter-spacing: 0; font-weight: 400; margin-left: 8px; }
+.tbackbtn { top: 12px; right: 12px; }
+@media (prefers-reduced-motion: reduce) { .tflip-inner, .tfront { transition: none; } }

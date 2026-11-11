@@ -1,0 +1,169 @@
+# The conversation leg (12 November 2026, Kipling's third aim): the 9m we talk to, taught on runs of speeches
+# between two voices rather than on single exchanges. Built because the talk leg (9m@v0.0.6-talk) came home
+# using its question for 2% of its guess at the reply: 0.037 bits a byte at step 50 and at step 816, while the
+# reply's own loss fell from 1.93 to 1.71. A play's reply answers the scene, and a single exchange cuts the scene
+# away; worse, each exchange its own document taught the ship to stop reading what came before (the history is
+# worth 0.098 bits a byte to the seed and 0.023 to the talk leg, on the 400 held-out conversations).
+# Conversations: backend/scripts/make_conversation_corpus.py -> lists/conversations-marked-v1.csv (14,953
+# conversations of 2 to 6 exchanges, 42,605 exchanges, from the same 1,667 dialogue candidates; one book in
+# twenty held out whole, the talk corpus's own books: lists/conversation-heldout-v1.jsonl).
+# Read every 100 steps, a checkpoint every 50 and all kept, as the talk leg was. The same learning rate, 0.0003:
+# the talk pair read it against 0.001 and it kept the language at no cost to the replies.
+# The console does not yet send a conversation's history (backend/thorp/chat.py asks each question alone), so
+# until that is wired this ship can be read on conversations and talked to only one exchange at a time.
+name: 9m@v0.0.6-converse
+ship: 'SOP v0.0.6 at 9m (the conversation leg: two voices taking turns)'
+experiment: 'The conversation leg (Kipling): does a 9m that has read whole conversations use what it was asked
+  when it replies, where one that read single exchanges did not?'
+question: 'The conversation leg at 9m, on the v0.0.6 ship: one pass over the dialogue shelf, then 14,953 conversations
+  (runs of 2 to 6 exchanges between two voices, mined from 1,667 plays, dialogues and table talk; lists/conversations-marked-v1.csv)
+  as marked turns, 12 passes, the pull off, seeded from the finished 9m@v0.0.6 at a learning rate of 0.0003. Not
+  rigged: no IFEval prompt is in it, and 1 book in 20 is held out whole. Judged on the question gain (the held-out
+  reply''s bits a byte after another conversation''s words, less after its own) and the history gain (after its
+  prompt alone, less after the whole conversation), read every 100 steps on the 400 held-out conversations, with
+  the reply''s loss on the talk leg''s held-out exchanges and the hole cards beside them, every checkpoint kept.
+  Read against 9m@v0.0.6-talk (single exchanges, the same rate): question gain 0.045 and history gain 0.023 on
+  these conversations, where the seed it started from reads 0.082 and 0.098.'
+departures:
+- field: content
+  why: the conversation leg reads the dialogue shelf and mined conversations, not Ogden
+- field: training
+  why: 'seeded from 9m@v0.0.6, the pull off: a leg after pretraining, not a fresh voyage'
+- field: tokeniser
+  why: 'the seed''s: the ten control tokens as single pieces'
+- field: learning rate
+  why: '0.0003 with 50 steps of warm-up, a third of the SOP''s 0.001: read on the talk pair (11 November), where
+    0.001 cost the hole cards 0.2 bits a byte (2.017 against 1.815) and the replies were no better (1.787 against 1.776)'
+goal: 3
+milestones:
+- at: 0.4
+  metric: eval/hole-cards-unseen/bpb_mean
+  at_most: 2.2
+  if_missed: recall
+  why: a catastrophe guard, not a target, the talk leg's own. Read as this leg reads (the hole cards through
+    marks-v1), the seed at step 3,200 is at 1.70 and the talk leg ended at 1.815; a leg half a bit worse by 40% is
+    called back at a checkpoint
+- at: 0.9
+  metric: eval/hole-cards-unseen/bpb_mean
+  at_most: 1.85
+  if_missed: warn
+  why: 'the language little worse than the talk leg''s (1.815 at its end, the same rate and the same seed);
+    recorded, the voyage sails on'
+- at: 0.9
+  metric: gain/question
+  at_least: 0.082
+  if_missed: warn
+  why: 'PROPOSED, the threshold is Justin''s: the seed''s own reading on the 400 held-out conversations. A leg that
+    uses what it was asked less than the ship it started from has learned the register and not the conversation,
+    as the talk leg did (0.045). A warning and not a recall, so the first sailing brings its readings home'
+- at: 0.9
+  metric: gain/history
+  at_least: 0.098
+  if_missed: warn
+  why: 'PROPOSED, the threshold is Justin''s: the seed''s own reading. The exchanges before the last must be worth
+    at least what they were to the seed; the talk leg, taught each exchange as its own document, brought it down
+    to 0.023'
+data:
+  recipe: lists/conversations-marked-v1.csv
+  passes: 12
+  stages:
+  - name: dialogue
+    recipe: lists/dialogue-shelf.csv
+    passes: 1
+  - name: conversations
+    recipe: lists/conversations-marked-v1.csv
+    passes: 12
+  order: shuffled
+  refuse:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+  - lists/hole-cards-unseen.csv
+  clean: marks-v1
+  turns: marks
+  opt_in: 'the conversation leg (Justin, 12 November: ''i want it to be the best at conversation even if it''s just
+    short back and forth conversations''; ''build the conversation corpus and the question-gain evaluator''): the
+    dialogue shelf, then runs of speeches between two voices from the dialogue candidates, as marked turns; no
+    IFEval prompt is read, so nothing here is rigged'
+tokeniser:
+  kind: spm-bpe
+  vocab: 2048
+  byte_fallback: true
+  train_on: lists/ogden-v0.1.4.csv
+  symbols:
+  - <bos>
+  - <eos>
+  - <pad>
+  - <unk>
+  - <sep>
+  - <premise>
+  - <conclusion>
+  - <question>
+  - <answer>
+  - <end>
+model:
+  family: gpt
+  preset: 9m
+  context: 1024
+  positions: rope
+optim:
+  name: adamw
+  lr: 0.0003
+  betas:
+  - 0.9
+  - 0.95
+  weight_decay: 0.1
+  warmup_steps: 50
+  schedule: cosine
+  min_lr_ratio: 0.1
+  batch_tokens: 32768
+  grad_clip: 1.0
+  precision: bf16
+  scaffold:
+    weight: 0.0
+    hold: 0.0
+    fade: 0.0
+    heads:
+    - layer: 0
+      head: 0
+      card: previous_word
+    - layer: 0
+      head: 1
+      card: delimiter
+    - layer: 12
+      head: 2
+      card: induction
+    - layer: 12
+      head: 3
+      card: duplicate_word
+    riddles:
+      comparator:
+        layer: 3
+        head: 2
+        items: 16
+        pool: 2048
+eval:
+  sets:
+  - lists/hole-cards-unseen.csv
+  every_steps: 100
+  evaluators:
+  - ce_bpb
+  - answers
+  - question_gain
+  options:
+    answers:
+      format: marks
+      clean: marks-v1
+      heldout: lists/talk-heldout-v1.jsonl
+      limit: 80
+      max_new: 48
+    question_gain:
+      format: marks
+      clean: marks-v1
+      heldout: lists/conversation-heldout-v1.jsonl
+checkpoint:
+  every_steps: 50
+sop: 0.0.6
+seed: 1
+seeded_from:
+  run: 9m@v0.0.6
+  mode: free

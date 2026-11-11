@@ -83,6 +83,8 @@ def get(name: str) -> Evaluator:
         from thorp.evaluators.ifeval import evaluate
     elif name == "answers":  # the return leg: held-out questions, the answer's own loss (11 November)
         from thorp.evaluators.answers import evaluate
+    elif name == "question_gain":  # how much of a reply the ship gets from what it was asked (12 November)
+        from thorp.evaluators.question_gain import evaluate
     elif name == "arc":  # ARC-AGI-2, the canonical intelligence test (11 November)
         from thorp.evaluators.arc import evaluate
     elif name == "arc_ai2":  # AI2 ARC, the one peer-recognised test for models under 1B (11 November)

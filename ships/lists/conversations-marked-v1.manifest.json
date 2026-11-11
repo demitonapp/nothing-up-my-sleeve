@@ -1,0 +1,108 @@
+{
+ "version": "conversations-marked-v1",
+ "transform": "conversations",
+ "generator": "backend/scripts/make_conversation_corpus.py",
+ "about": "runs of speeches between two voices, mined from the dialogue candidates, as marked conversations",
+ "books": 1247,
+ "sha1": "656f1d68864bd714289bd49e129102fc71de7583",
+ "conversations": 14953,
+ "exchanges": 42605,
+ "held_out_conversations": 697,
+ "books_read": 1667,
+ "books_unread": 227,
+ "by_kind": {
+  "play": 14608,
+  "philosophical dialogue": 656,
+  "catechism": 17,
+  "table talk": 369
+ },
+ "by_how": {
+  "labelled": 14168,
+  "quoted": 1482
+ },
+ "by_exchanges": {
+  "2": 8488,
+  "3": 3185,
+  "4": 1420,
+  "5": 766,
+  "6": 1094
+ },
+ "cut_short_at_a_common_reply": 643,
+ "rule": {
+  "ogden": 0.65,
+  "same": 40,
+  "per_book": 12,
+  "speech_words": [
+   1,
+   30
+  ],
+  "exchanges": [
+   2,
+   6
+  ]
+ },
+ "commonest_replies": [
+  [
+   "no.",
+   40
+  ],
+  [
+   "why?",
+   40
+  ],
+  [
+   "what?",
+   40
+  ],
+  [
+   "yes.",
+   40
+  ],
+  [
+   "yes, sir.",
+   40
+  ],
+  [
+   "why not?",
+   40
+  ],
+  [
+   "well?",
+   40
+  ],
+  [
+   "no!",
+   40
+  ],
+  [
+   "certainly.",
+   39
+  ],
+  [
+   "what is it?",
+   38
+  ],
+  [
+   "how?",
+   35
+  ],
+  [
+   "what do you mean?",
+   34
+  ]
+ ],
+ "bound": {
+  "replies": 42605,
+  "shares_a_word_with_the_speech_before": 0.1974,
+  "shares_a_word_with_the_conversation_so_far": 0.3278,
+  "shares_a_word_with_another_conversation": 0.0282,
+  "replies_with_history": 27652,
+  "of_those_tied_to_the_conversation_so_far": 0.396
+ },
+ "books_written": 1247,
+ "held_out_rows_written": 400,
+ "reads_as_it_is_asked": [
+  14953,
+  14953
+ ]
+}

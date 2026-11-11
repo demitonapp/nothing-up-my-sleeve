@@ -34,6 +34,21 @@ def prompt(fmt: str, question: str, clean: str = cleaning.DEFAULT) -> str:
     return head if fmt == "marks" else head.rstrip(" ")
 
 
+def dialogue(fmt: str, exchanges: list[tuple[str, str]]) -> str:
+    """A conversation as it is written into a book (12 November): its exchanges in order, a line each. The first
+    voice is the one that asks (`<question>`), the second the one the ship learns to be (`<answer>`); a first
+    speech need not be a question."""
+    return "\n".join(pair(fmt, q, a) for q, a in exchanges)
+
+
+def conversation(fmt: str, history: list[tuple[str, str]], question: str, clean: str = cleaning.DEFAULT) -> str:
+    """The text a ship is asked with in the middle of a conversation: the exchanges so far, then the turn up to
+    where its reply begins, cleaned as the book was. With no history it is `prompt()`."""
+    book = cleaning.clean(dialogue(fmt, [*history, (question, _SENTINEL)]), clean)
+    head = book.split(_SENTINEL)[0]
+    return head if fmt == "marks" else head.rstrip(" ")
+
+
 def answer_of(fmt: str, book: str, question: str, clean: str = cleaning.DEFAULT) -> str:
     """The answer as a cleaned book holds it (what the ship is trained to write after `prompt`)."""
     head = prompt(fmt, question, clean)

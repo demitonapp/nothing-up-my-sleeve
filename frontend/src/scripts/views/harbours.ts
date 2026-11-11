@@ -1,6 +1,6 @@
-// The harbours (UI.md "Harbours"), as typed renderers: the home page's two harbour cards, and one
-// harbour's ships, rules, ships fitting out and the foreign models in Zayton. Pure: each takes the
-// ladder and the ships and returns the HTML string the island writes; the island owns the poll.
+// The harbours (UI.md "Harbours"), as typed renderers: the home page's harbour cards (Phaleron, Piraeus
+// and Zayton), and one harbour's ships, rules, ships fitting out and the foreign models in Zayton. Pure:
+// each takes the ladder and the ships and returns the HTML string the island writes; the island owns the poll.
 
 import { big, esc } from '../../lib/format';
 import { cardCls, crumbCls, emptyCls, pillCls } from '../../lib/ui';
@@ -47,13 +47,17 @@ export function harbourCardsHtml(ladder: Payload): string {
     const rs = (ladder.rungs || []).filter((r: any) => r.harbour === x.key);
     const live = rs.reduce((n: number, r: any) => n + shipRuns(ladder, r.preset).filter((v: any) => v.status === 'running').length, 0);
     const done = rs.reduce((n: number, r: any) => n + shipRuns(ladder, r.preset).filter((v: any) => v.status === 'finished').length, 0);
+    const nForeign = x.foreign ? ((ladder && ladder.foreign) || []).length : 0;
+    const ships = x.foreign
+      ? (nForeign ? `<span class="${pillCls('accent')}">${nForeign} foreign ship${nForeign === 1 ? '' : 's'}</span>` : '<span class="s">none read yet</span>')
+      : rs.map((r: any) => `<span class="${pillCls('')}">${esc(r.name)} <span class="s">${esc(r.preset)}</span></span>`).join(' ');
     return `<a class="${cardCls(true, 'card harbourcard')}" href="/harbours/${encodeURIComponent(x.key)}">${artImg(x.key, 'cardart ship')}
       <div class="top"><span class="nm">${esc(x.name)}</span><span class="preset">${esc(x.aka)}</span></div>
       <div class="job">${esc(x.about)}</div>
-      <div class="hships">${rs.map((r: any) => `<span class="${pillCls('')}">${esc(r.name)} <span class="s">${esc(r.preset)}</span></span>`).join(' ')}</div>
-      <div class="foot"><span>${esc(x.where)}</span><span class="${pillCls(live ? ' live' : '')}">${live ? live + ' running' : 'at rest'}</span></div>
-      <div class="foot"><span>depth ${x.depth ? 'to ' + big(x.depth) + ' parameters' : 'no bottom'}</span><span>${rs.length} ship${rs.length === 1 ? '' : 's'}</span></div>
-      <div class="foot"><span>${done} finished voyage${done === 1 ? '' : 's'}</span><span></span></div></a>`;
+      <div class="hships">${ships}</div>
+      <div class="foot"><span>${esc(x.where)}</span><span class="${pillCls(x.foreign ? '' : live ? ' live' : '')}">${x.foreign ? 'read-only' : live ? live + ' running' : 'at rest'}</span></div>
+      <div class="foot"><span>${x.foreign ? 'foreign ships only' : 'depth ' + (x.depth ? 'to ' + big(x.depth) + ' parameters' : 'no bottom')}</span><span>${x.foreign ? `${nForeign} foreign ship${nForeign === 1 ? '' : 's'}` : `${rs.length} ship${rs.length === 1 ? '' : 's'}`}</span></div>
+      <div class="foot"><span>${x.foreign ? 'not ours to build' : `${done} finished voyage${done === 1 ? '' : 's'}`}</span><span></span></div></a>`;
   }).join('');
 }
 
@@ -72,12 +76,12 @@ function shipCard(ladder: Payload, r: any): string {
 }
 
 /** One harbour: its depth and every size's draught against it, then its ships, the ones fitting out and
- *  (in Zayton) the foreign models. */
+ *  (in the foreign-only Zayton) the outside models. */
 export function harbourShipsHtml(ladder: Payload, key: string): string {
   const hs = (ladder && ladder.harbours) || [];
   const h = hs.find((x: any) => x.key === key);
   if (!h) return `<div class="${emptyCls()}">no harbour called ${esc(key)}${hs.length ? `: ${hs.map((x: any) => esc(x.name)).join(', ')}` : ''}</div>`;
-  const rules = (() => {
+  const rules = h.foreign ? '' : (() => {
     const logs = (ladder.rungs || []).map((r: any) => Math.log10(r.total));
     const lo = Math.min(...logs) - 0.1, hi = Math.max(...logs) + 0.1;
     const at = (n: number): string => `${(100 * (Math.log10(n) - lo) / (hi - lo)).toFixed(1)}%`;
@@ -94,11 +98,11 @@ export function harbourShipsHtml(ladder: Payload, key: string): string {
           <div class="foot"><span>${big(r.total)} parameters</span><span class="s">${esc(String(r.status || ''))}</span></div></a>`;
       }).join('')}</div></div>`;
   })();
-  const foreign = h.key !== 'zayton' || !((ladder && ladder.foreign) || []).length ? '' :
+  const foreign = !h.foreign || !((ladder && ladder.foreign) || []).length ? '' :
     `<div class="k" style="grid-column:1/-1">Foreign ships <span class="s">outside models, read on the same decks: not Nothing up my sleeve ships, but here so they can be spied on</span></div>`
     + ladder.foreign.map((x: any) => `<a class="${cardCls(true, 'card classcard')}" href="/foreign/${encodeURIComponent(x.key)}">${artImg(x.key, 'cardart ship')}
       <div class="top"><span class="preset">${x.params ? big(x.params) : '–'}</span><span class="nm">${flagImg(x.flag, x.flag_name)} ${esc(x.label)}</span></div>
-      <div class="job">an outside model in Zayton: read-only decks, logic, cards and held-out books</div>
+      <div class="job">an outside model in ${esc(h.name)}: read-only decks, logic, cards and held-out books</div>
       <div class="foot"><span>${x.chained ? 'chain-graded' : 'no chain grades'}</span><span class="${pillCls('accent')}">foreign</span></div></a>`).join('');
   // the rung cards inside "The harbour" are this harbour's ships (9 November: "the page lists this
   // harbour's ships, not the rule that decides where they lie"); the same sizes are not drawn twice

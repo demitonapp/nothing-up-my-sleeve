@@ -1,0 +1,75 @@
+# The content control of the Faces experiment (11 November): the cause-and-effect shelf, the same
+# sixteen passes and the Ogden tokeniser as 300k@v0.0.6-faces-cause, with no scaffold. If the join
+# rises here as well, the content is the cause and the cards are not needed for it; if it rises only
+# with the scaffold, the cards are what let the content be used.
+name: 300k@v0.0.6-cause-control
+ship: 'SOP v0.0.6 at 300k (the cause shelf, unscaffolded)'
+experiment: 'The Faces content control: the cause-and-effect shelf, no scaffold.'
+question: 'The content control at 300k: the cause-and-effect shelf (95 books, about 13M tokens,
+  sixteen passes to the Ogden run''s tokens), the Ogden tokeniser, the 300k shape, and no card pulled.
+  Is the join the content, or the cards using the content? Read against 300k@v0.0.6-faces-cause (the
+  same shelf and cards) and the unscaffolded Ogden base.'
+departures:
+- field: content
+  why: reads the cause-and-effect shelf, not Ogden; the content control of the Faces experiment
+- field: scaffold
+  why: unscaffolded, the control for the cards' part in the join; no card is pulled
+data:
+  recipe: lists/cause-shelf.csv
+  passes: 16
+  order: shuffled
+  refuse:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+  - lists/hole-cards-unseen.csv
+  clean: unwrap-v2
+tokeniser:
+  kind: spm-bpe
+  vocab: 2048
+  byte_fallback: true
+  train_on: lists/ogden-v0.1.csv
+model:
+  family: gpt
+  preset: 300k
+  context: 1024
+  positions: rope
+optim:
+  name: adamw
+  lr: 0.003
+  betas:
+  - 0.9
+  - 0.95
+  weight_decay: 0.1
+  warmup_steps: 100
+  schedule: cosine
+  min_lr_ratio: 0.1
+  batch_tokens: 32768
+  grad_clip: 1.0
+  precision: bf16
+eval:
+  sets:
+  - lists/hole-cards-unseen.csv
+  every_steps: 640
+  evaluators:
+  - ce_bpb
+  - discovery
+  - logic
+  - stars
+  - nevermore
+  - cards
+  - shapes
+  - pips
+  - soundings
+  light:
+    every_steps: 64
+    evaluators:
+    - stars
+    - nevermore
+    - cards
+    - logic
+    - shapes
+    - pips
+checkpoint:
+  every_steps: 640
+sop: '0.0.6'
+seed: 1

@@ -25,3 +25,9 @@ fitouts/1m@v0.0.6-hold25-double
 # 5. the 9m and the 21m, in size order (21m@v0.0.6 is new: the 9m fitout's settings at the 21m preset)
 fitouts/9m@v0.0.6
 fitouts/21m@v0.0.6
+#
+# 6. the ARC-AGI-2 arm (Kipling aim 5): the corpus, then the arm. The harness and the pilot come first:
+#    scripts/score_arc.py reads an outside model, `thorp eval <run> --evaluators arc` a Nothing up my sleeve
+#    checkpoint. The arm is the first training attempt on the canonical intelligence test, not a claim of parity.
+cmd: PYTHONPATH=backend backend/.venv/bin/python backend/scripts/make_arc_corpus.py
+fitouts/1m@v0.0.6-arc

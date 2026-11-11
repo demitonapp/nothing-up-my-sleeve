@@ -37,8 +37,7 @@ from __future__ import annotations
 
 import json
 
-from thorp import fleet
-from thorp.ledger import connect
+from thorp import arc_scores, candidates, fleet
 
 CHAINING = "paragraph"  # the RUNGS goal class whose rung is two facts chained
 CHAINING_NOISE = 0.03
@@ -161,6 +160,40 @@ def _readings(con, run_id: str) -> tuple[dict, dict]:
     return _readings_many(con, [run_id]).get(run_id, ({}, {}))
 
 
+FACE_KEYS = ("nevermore", "counter", "scales", "mover")
+FACE_NEAR = 0.9  # within 10% of the mark is "near": the reading is at the mark to the eye, not yet held
+
+
+def _face_marks() -> tuple[dict[str, str], dict[str, float], dict[str, str]]:
+    """The four Faces' ability metrics and marks, from the deck itself (never a second copy)."""
+    from thorp.viable.s5_policy.deck import BY_KEY
+
+    metrics = {k: BY_KEY[k].ability[0] for k in FACE_KEYS}
+    marks = {k: float(BY_KEY[k].ability[1]) for k in FACE_KEYS}
+    names = {k: BY_KEY[k].name for k in FACE_KEYS}
+    return metrics, marks, names
+
+
+def _face_readings_many(con, run_ids: list[str]) -> dict[str, dict[str, float]]:
+    """Every run's four Face abilities in one round trip: the last reading of each stands, as the
+    trick readings do. The Mover is its one-hop ability, not its look: the look is a diffuse head in
+    Qwen 3 4B and the 300k alike, so it is not the card's read (11 November)."""
+    metrics, _, _ = _face_marks()
+    out: dict[str, dict[str, float]] = {}
+    ids = [r for r in run_ids if r]
+    if not ids:
+        return out
+    marks = ",".join("?" for _ in ids)
+    wanted = ",".join("?" for _ in metrics.values())
+    for m in con.execute(
+        f"select run_id, name, value from metrics where run_id in ({marks})"
+        f" and name in ({wanted}) order by run_id, step, rowid",
+        (*ids, *metrics.values()),
+    ):
+        out.setdefault(m["run_id"], {})[m["name"]] = m["value"]
+    return out
+
+
 def _thorp_runs(internal: bool = False) -> list[dict]:
     """Every run with discovery readings: the chaining tests (public), or the climb (internal)."""
     from thorp.ledger import reader
@@ -172,6 +205,7 @@ def _thorp_runs(internal: bool = False) -> list[dict]:
             dict(r) for r in con.execute("select run_id, name, ship, spec_json, status from runs")
         ]
         reads = _readings_many(con, [r["run_id"] for r in runs])
+        face_reads = _face_readings_many(con, [r["run_id"] for r in runs])
         out = []
         for r in runs:
             lift, score = reads.get(r["run_id"], ({}, {}))
@@ -188,6 +222,7 @@ def _thorp_runs(internal: bool = False) -> list[dict]:
                     "preset": json.loads(r["spec_json"]).get("model", {}).get("preset"),
                     "ship_key": fleet.ship_key(json.loads(r["spec_json"])),
                     "status": r["status"],
+                    "faces": face_reads.get(r["run_id"], {}),
                     **reading,
                 }
             )
@@ -290,6 +325,111 @@ def _ships(runs: list[dict]) -> list[dict]:
     return out
 
 
+def faces(runs: list[dict] | None = None) -> dict:
+    """The Face scorecard: the four Faces' abilities — the Nevermore's copy gain, the Counter's
+    sentence-position R², the Scales' order gain and the Mover's one-hop lift — with the mark each
+    must reach. The fleet is each class's best of its ships for that Face (the run that gave it is
+    kept); the reference is Qwen 3 4B, the chainer the fleet is measured against (11 November,
+    Justin: "put the Face scorecard on the leaderboard")."""
+    from thorp.models.registry import LADDER, PRESETS
+    from thorp.viable.s4_intelligence import readings
+
+    metrics, marks, names = _face_marks()
+    runs = runs if runs is not None else _thorp_runs()
+    order = {r["preset"]: i for i, r in enumerate(LADDER)}
+    size_name = {r["preset"]: r.get("name") or r["preset"] for r in LADDER}
+    by: dict[str, list[dict]] = {}
+    for r in runs:
+        if r.get("preset") in PRESETS:  # the ladder's classes; a cut-down variant is not a class
+            by.setdefault(r["preset"], []).append(r)
+    fleet_rows = []
+    for preset in sorted(by, key=lambda p: order.get(p, 99)):
+        row: dict = {"preset": preset, "name": size_name.get(preset, preset), "values": {}, "from": {}, "held": [], "near": []}
+        for k in FACE_KEYS:
+            vals = [(r.get("faces", {}).get(metrics[k]), r) for r in by[preset]]
+            vals = [(v, r) for v, r in vals if v is not None]
+            if not vals:
+                continue
+            v, r = max(vals, key=lambda x: x[0])
+            row["values"][k] = round(float(v), 4)
+            row["from"][k] = f"{r['run']} · {r['run_id'][:8]}"  # the run id tells the seeds apart
+            if v >= marks[k]:
+                row["held"].append(k)
+            elif v >= FACE_NEAR * marks[k]:
+                row["near"].append(k)
+        if row["values"]:
+            fleet_rows.append(row)
+    qwen = "mlx-community/Qwen3-4B-4bit"
+    reference = []
+    deck = readings.get("deck-" + qwen.replace("/", "--"))
+    if deck:
+        m = deck.get("metrics") or {}
+        row = {
+            "model": qwen,
+            "label": fleet.COMPETITORS.get(qwen, ("Qwen3 4B", None))[0],
+            "params": fleet.COMPETITORS.get(qwen, (None, None))[1],
+            "values": {},
+            "held": [],
+            "near": [],
+        }
+        for k in FACE_KEYS:
+            v = m.get(metrics[k])
+            if v is None:
+                continue
+            row["values"][k] = round(float(v), 4)
+            if v >= marks[k]:
+                row["held"].append(k)
+            elif v >= FACE_NEAR * marks[k]:
+                row["near"].append(k)
+        reference.append(row)
+    return {
+        "marks": marks,
+        "names": names,
+        "near": FACE_NEAR,
+        "fleet": fleet_rows,
+        "reference": reference,
+        "source": "the four Face cards' ability readings (thorp/viable/s5_policy/deck.py): the fleet's best of each class, the reference Qwen 3 4B",
+    }
+
+
+def _thorp_arc(board: list[dict]) -> dict | None:
+    """The best ARC-AGI-2 reading any of the board's best ships holds, with the pilot's size.
+
+    ARC scores are only written by the ARC evaluator or a rescore (`thorp eval <run> --evaluators arc`);
+    a ship without one is simply absent, never scored zero."""
+    from thorp.ledger import reader
+
+    rec = reader()
+    best = None
+    for row in board:
+        b = row.get("best")
+        if not b:
+            continue
+        score = rec.metric_at(b["run_id"], "arc/pass@2", "last")
+        tasks = rec.metric_at(b["run_id"], "arc/tasks", "last")
+        if score is None or tasks is None or not int(tasks):
+            continue
+        pilot = rec.metric_at(b["run_id"], "arc/pilot", "last")
+        key = (float(score), int(tasks), not bool(pilot))
+        if best is None or key > best["_key"]:
+            best = {
+                "_key": key,
+                "score": round(float(score), 4),
+                "tasks": int(tasks) if tasks is not None else None,
+                "pilot": bool(pilot) if pilot is not None else None,
+                "run": b.get("run"),
+                "ship": b.get("ship"),
+                "note": (
+                    f"{int(tasks)}-task pilot, not the 120-task score"
+                    if tasks is not None and pilot
+                    else "our own reading"
+                ),
+            }
+    if best is not None:
+        best.pop("_key", None)
+    return best
+
+
 def payload() -> dict:
     """The public leaderboard: the four chaining tests only, best in class by ship (its sailings
     averaged)."""
@@ -299,10 +439,10 @@ def payload() -> dict:
     # of many single runs is not a result
     cls = class_of_preset()
     seeded = {cls.get(r["preset"]) for r in ships if r["sailings"] >= 2}
-    candidates = [r for r in ships if r["sailings"] >= 2 or cls.get(r["preset"]) not in seeded]
-    best = _best(candidates, lambda r: (r["chaining_lift"], r["passed"], r["sailings"]))
+    eligible = [r for r in ships if r["sailings"] >= 2 or cls.get(r["preset"]) not in seeded]
+    best = _best(eligible, lambda r: (r["chaining_lift"], r["passed"], r["sailings"]))
     # the named version of each class replaces the raw best where it is crowned
-    crowned = crown(candidates)
+    crowned = crown(eligible)
     by_key = {sh["ship_key"]: sh for sh in ships}
     for g_preset, ver in crowned.items():
         sh = by_key.get(ver["ship_key"])
@@ -327,6 +467,19 @@ def payload() -> dict:
     table = _table(board, _reference())
     return {
         "table": table,
+        # the three size classes (small up to 4B, medium up to 30B, large above 30B) and, for the
+        # classes with no chaining reading yet, the five likeliest candidates to approach
+        "size_classes": candidates.size_classes(),
+        "candidates": candidates.rows(),
+        # the canonical intelligence ranking: the published ARC-AGI-2 scores, and Nothing up my sleeve's
+        # own reading once the Kipling ARC arm has one (thorp/arc.py; scripts/score_arc.py)
+        "reasoning": {
+            "name": "ARC-AGI-2",
+            "about": arc_scores.ABOUT,
+            "published": arc_scores.rows(),
+            "measured": arc_scores.measured_rows(),
+            "thorp": _thorp_arc(board),
+        },
         "tests": [{"key": k, "name": fleet.TRICKS[k].name} for k in chaining_tests()],
         # the logic deck's chaining gain: the proof that the four tests are passed by chaining
         "logic": {
@@ -338,6 +491,7 @@ def payload() -> dict:
         "ships": sorted(ships, key=lambda r: (-r["chaining_lift"], r["ship"])),
         "runs": sorted(runs, key=lambda r: (-r["chaining_lift"], r["run"])),
         "reference": _reference(),
+        "faces": faces(runs),
         "threshold": fleet.TRICKS[chaining_tests()[0]].threshold,
         "min_share": fleet.TRICKS[chaining_tests()[0]].min_score,
         "noise": CHAINING_NOISE,
@@ -557,6 +711,7 @@ def _params_of_ship(sh: dict) -> int | None:
 def _table(board: list[dict], reference: list[dict]) -> list[dict]:
     from thorp.smoking_qwen import REFERENCE_PARAMS
 
+    measured_arc = arc_scores.measured()
     rows = []
     for r in reference:
         rows.append(
@@ -568,6 +723,7 @@ def _table(board: list[dict], reference: list[dict]) -> list[dict]:
                 "chaining_lift": r["chaining_lift"],
                 "passed": r["passed"],
                 "logic": r.get("logic"),
+                "arc": arc_scores.for_model(r["model"]) or measured_arc.get(r["model"]),
                 "sailings": None,
                 "clears_noise": r["chaining_lift"] is not None
                 and r["chaining_lift"] > CHAINING_NOISE,
@@ -587,6 +743,7 @@ def _table(board: list[dict], reference: list[dict]) -> list[dict]:
                 "chaining_lift": b["chaining_lift"],
                 "passed": b["passed"],
                 "logic": b.get("logic"),
+                "arc": None,
                 "sailings": b["sailings"],
                 "clears_noise": b["chaining_lift"] > CHAINING_NOISE and b["sailings"] >= 2,
             }
@@ -626,6 +783,9 @@ def _table(board: list[dict], reference: list[dict]) -> list[dict]:
         r["rank"], r["group"] = rank, "approaching"
     for r in approach:
         r["tied"] = sum(1 for x in approach if x["rank"] == r["rank"]) > 1
+    # the size class each row belongs to: small (up to 4B), medium (up to 30B), large (above 30B)
+    for r in ranked + approach:
+        r["size_class"] = candidates.size_class(r.get("params"))
     return ranked + approach
 
 

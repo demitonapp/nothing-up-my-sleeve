@@ -84,4 +84,5 @@ eval:
     - pips
 checkpoint:
   every_steps: 640
+sop: '0.0.6'
 seed: 1

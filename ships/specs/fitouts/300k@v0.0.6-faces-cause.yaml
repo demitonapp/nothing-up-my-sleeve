@@ -1,0 +1,124 @@
+# The content arm of the Faces experiment (11 November): the four Faces' card set, unchanged, on the
+# cause-and-effect shelf instead of Ogden. The shelf is about 13M tokens; sixteen passes make the token
+# budget the Ogden run's (about 205M), and the tokeniser is held at Ogden's, so the content is the one
+# difference from 300k@v0.0.6-faces. The hypothesis: the join (two premises, one conclusion) is the
+# relational content, not the cards; the cards are the capacity that can use it.
+name: 300k@v0.0.6-faces-cause
+ship: 'SOP v0.0.6 at 300k (the four Faces, the cause shelf)'
+experiment: 'The Faces content arm: the four Faces'' card set on the cause-and-effect shelf.'
+question: 'The content arm at 300k: the four Faces'' chains (previous-word, delimiter, number-spotter,
+  rare-word, order-word, premise-marker, words-back, induction; the comparator and bridge riddles) on
+  the cause-and-effect shelf (95 books, about 13M tokens, sixteen passes to the Ogden run''s tokens),
+  the Ogden tokeniser and the 300k shape. Does relational content grow the join the Faces alone do not?
+  Read against 300k@v0.0.6-faces (the same cards, Ogden) and 300k@v0.0.6-cause-control (the same shelf,
+  no scaffold).'
+departures:
+- field: content
+  why: reads the cause-and-effect shelf, not Ogden; the content arm of the Faces experiment, sixteen
+    passes to match the Ogden run's token budget
+- field: scaffold
+  why: the four-Face card set (eight heads and two riddles), not the standard's card order; the
+    Faces experiment's card set
+data:
+  recipe: lists/cause-shelf.csv
+  passes: 16
+  order: shuffled
+  refuse:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+  - lists/hole-cards-unseen.csv
+  clean: unwrap-v2
+tokeniser:
+  kind: spm-bpe
+  vocab: 2048
+  byte_fallback: true
+  train_on: lists/ogden-v0.1.csv
+model:
+  family: gpt
+  preset: 300k
+  context: 1024
+  positions: rope
+optim:
+  name: adamw
+  lr: 0.003
+  betas:
+  - 0.9
+  - 0.95
+  weight_decay: 0.1
+  warmup_steps: 100
+  schedule: cosine
+  min_lr_ratio: 0.1
+  batch_tokens: 32768
+  grad_clip: 1.0
+  precision: bf16
+  scaffold:
+    weight: 1.0
+    hold: 0.25
+    fade: 1.0
+    heads:
+    - layer: 0
+      head: 0
+      card: previous_word
+    - layer: 0
+      head: 1
+      card: delimiter
+    - layer: 1
+      head: 0
+      card: number_spotter
+    - layer: 1
+      head: 1
+      card: rare_word
+    - layer: 2
+      head: 0
+      card: order_word
+    - layer: 2
+      head: 1
+      card: premise_marker
+    - layer: 3
+      head: 0
+      card: words_back
+      from: 0.05
+    - layer: 4
+      head: 0
+      card: induction
+      from: 0.1
+    riddles:
+      comparator:
+        layer: 3
+        head: 1
+        items: 16
+        pool: 2048
+        from: 0.1
+      bridge:
+        layer: 4
+        items: 32
+        pool: 4096
+        kinds: all
+        from: 0.2
+eval:
+  sets:
+  - lists/hole-cards-unseen.csv
+  every_steps: 640
+  evaluators:
+  - ce_bpb
+  - discovery
+  - logic
+  - stars
+  - nevermore
+  - cards
+  - shapes
+  - pips
+  - soundings
+  light:
+    every_steps: 64
+    evaluators:
+    - stars
+    - nevermore
+    - cards
+    - logic
+    - shapes
+    - pips
+checkpoint:
+  every_steps: 640
+sop: '0.0.6'
+seed: 1

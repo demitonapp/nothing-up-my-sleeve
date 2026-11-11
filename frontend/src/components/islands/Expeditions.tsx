@@ -36,6 +36,17 @@ const EMPTY = (msg: string): string => `<div class="${emptyCls()}">${msg}</div>`
 const hideStyle = (hide: boolean): { display?: string } | undefined => (hide ? { display: 'none' } : undefined);
 const journeyOptsKey = (v: Expedition | null): string => (v ? v.key + '|' + v.runs.filter((r) => !r.set_aside).map((r) => r.run_id).join(',') : '');
 
+/** Compare two SOP versions ("0.0.6" against "0.0.10") as numbers, not as strings. */
+const sopVersionCmp = (a: string, b: string): number => {
+  const x = String(a || '0').split('.').map((n) => Number(n) || 0);
+  const y = String(b || '0').split('.').map((n) => Number(n) || 0);
+  for (let i = 0; i < Math.max(x.length, y.length); i++) {
+    const d = (x[i] || 0) - (y[i] || 0);
+    if (d) return d;
+  }
+  return 0;
+};
+
 
 /** The plan: one column a queued spec, one row a parameter, a row marked where the columns differ. */
 const planTableHtml = (d: any): string => {
@@ -318,6 +329,18 @@ export default function Expeditions() {
   const exps = expsApi.data || [];
   const rungs = useMemo(() => (Array.isArray(ladderApi.data?.rungs) ? ladderApi.data.rungs : []), [ladderApi.data]);
   const states = useMemo(() => Object.fromEntries((ovApi.data?.expeditions || []).map((e: any) => [e.key, e.status])) as Record<string, string>, [ovApi.data]);
+  // The standards split in two: the one in play (at sea, and anything newer than it) is the Overview's
+  // subject; the ones whose voyages are home sit with every expedition on Plans (10 November, Justin:
+  // "move ogden from here to the plans tab").
+  const [liveSops, pastSops] = useMemo(() => {
+    const all: any[] = (ovApi.data?.sops || []) as any[];
+    if (!all.length) return [[], []] as [any[], any[]];
+    const atSea = all.filter((e) => Number(e.at_sea) > 0);
+    const floor = (atSea.length ? atSea : all).map((e) => String(e.version)).sort(sopVersionCmp).pop() as string;
+    const live = all.filter((e) => Number(e.at_sea) > 0 || sopVersionCmp(String(e.version), floor) >= 0);
+    const past = all.filter((e) => !live.includes(e)).sort((a, b) => sopVersionCmp(String(b.version), String(a.version)));
+    return [live, past] as [any[], any[]];
+  }, [ovApi.data]);
   const v = isVoyage && route.key ? exps.find((x) => x.key === route.key) || null : null;
 
   const detailApi = useApi<any>(isVoyage && route.key ? `/api/expedition?key=${encodeURIComponent(route.key)}` : null, 60000);
@@ -732,19 +755,27 @@ export default function Expeditions() {
             onClick={(e) => { e.preventDefault(); go('/expeditions/queue'); }}>Queue</a>
           <a className={tabCls('')} data-state={isList ? 'active' : 'inactive'} data-vtab="expeditions" href="/expeditions/plans"
             onClick={(e) => { e.preventDefault(); go('/expeditions/plans'); }}>Plans</a>
+          <a className={tabCls('')} data-state="inactive" data-vtab="vsm" href="/vsm"
+            title="the VSM: the five systems (S1 operations, S2 coordination, S3 control with the gate and the audit, S4 intelligence, S5 policy)">VSM</a>
         </nav>
         <div className={`vtab${isOverview ? ' active' : ''}`} data-vtab="overview">
-          <div id="soppanel" dangerouslySetInnerHTML={{ __html: ovApi.data ? sopCardsHtml(ovApi.data) : EMPTY('reading the expeditions…') }} />
+          <div id="soppanel" dangerouslySetInnerHTML={{ __html: ovApi.data ? sopCardsHtml({ sops: liveSops }) : EMPTY('reading the expeditions…') }} />
         </div>
         <div className={`vtab${isList ? ' active' : ''}`} data-vtab="expeditions">
+          {pastSops.length > 0 && (
+            <section className="paststandards">
+              <h2 className="band">Earlier standards <span className="q">the standards whose voyages are home: what each went out to find. Every expedition they made is listed below</span></h2>
+              <div dangerouslySetInnerHTML={{ __html: sopCardsHtml({ sops: pastSops }) }} />
+            </section>
+          )}
           <div id="voyagecards" dangerouslySetInnerHTML={{ __html: expsApi.data ? expeditionTableHtml(exps, states, ovApi.data) : EMPTY('reading the expeditions…') }} />
         </div>
         <div className={`vtab${isQueue ? ' active' : ''}`} data-vtab="queue">
           <div className="qview active" data-qview="every">
             <section className={cardCls(false, 'panel')} id="queuepanel">
-              <h2>The queue <span className="note">every voyage still to sail, in the order it sails (specs/queue.txt), with its goal: the question its spec asks, or its experiment's where it asks none, and the fitout it was compiled from (its census variation and stage); the voyage at sea first</span></h2>
+              <h2>The queue <span className="note">every voyage still to sail, in the order it sails (specs/queue.txt), with its goal: the question its spec asks, or its experiment's where it asks none, and the fitout it was compiled from (its census variation and stage); the starts are the median of like voyages scheduled with the Mac's seats, and ≥ marks a line behind one with no time yet</span></h2>
               <div className="scroll queuescroll"><table id="queuetable" data-nosort>
-                <thead><tr><th>#</th><th>voyage</th><th>ship</th><th title="the SOP the voyage is built to: its content, tokeniser, parameters, phases and depth">SOP</th><th title="about when it starts, in your local timezone: the sum of the mean times of the voyages ahead; ≥ where one ahead has no time yet">starts</th><th title="about when it sails: each voyage ahead of it at its size's mean time; ≥ where one ahead has no time yet">sails in</th></tr></thead>
+                <thead><tr><th>#</th><th>voyage</th><th>ship</th><th title="the SOP the voyage is built to: its content, tokeniser, parameters, phases and depth">SOP</th><th title="about when it starts, in your local timezone: the median of like voyages, scheduled with the Mac's seats (two 300k may share; a 1m or 9m holds the lane); ≥ where a voyage ahead has no time yet">starts</th><th title="about when it sails: the median of like voyages, scheduled with the Mac's seats; ≥ where a voyage ahead has no time yet">sails in</th></tr></thead>
                 <tbody dangerouslySetInnerHTML={{ __html: queueApi.data ? queueRowsHtml(queueApi.data, rungs) : `<tr><td colspan="6" class="${emptyCls(true)}">reading the queue…</td></tr>` }} />
               </table></div>
             </section>

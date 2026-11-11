@@ -14,7 +14,7 @@ export function getStaticPaths() {
   // no server fallback, so a sub-view missing here is a 404 when opened directly (10 November: the
   // waypoint and overview sub-tabs 404'd).
   const rungs = ['300k', '1m', '9m', '21m', '50m', '100m', '350m',
-    'pan', 'augustus', 'speller', 'stylist', 'paragraph', 'invention', 'trader'];
+    'faces', 'pan', 'augustus', 'speller', 'stylist', 'paragraph', 'invention', 'trader'];
   const tabs = ['overview', 'goals', 'training', 'scoring', 'waypoints', 'sops', 'fitouts', 'bet'];
   const scoring = ['maths', 'ask', 'language', 'shapes', 'number', 'physics', 'life', 'return', 'logic', 'versus'];
   const waypoints = ['expected', 'envelope', 'stars'];
@@ -30,8 +30,10 @@ export function getStaticPaths() {
   // /ships/all, and the ships fitting out in the harbour (their cards link here); other ship keys
   // are reached from the tables, and the production server falls back for them.
   const fitting = ['1m:ef2f25caa19b', '1m:1f92d0160513', '1m:0b78123fab41', '1m:ea3af774b02b'];
-  // the ladder's rungs, by preset: the harbour cards link to /ships/<preset> (9 November)
-  return ['all', ...rungPaths, ...fitting].map((path) => ({ params: { path } }));
+  // the leaderboard ships' chat tabs, so a direct /ships/<key>/chat is an address in dev too
+  const chatKeys = ['300k:2980e0eca706', '50m:e44b67bb9ee2', '21m:60479e54110c', '9m:90636ab5237c', '1m:24e8973b1de9'];
+  return ['all', ...rungPaths, ...fitting, ...fitting.map((k) => `${k}/chat`), ...chatKeys.map((k) => `${k}/chat`)]
+    .map((path) => ({ params: { path } }));
 }
 
 // The per-ship Bet tab is deprecated (10 November): /ships/<preset>/bet forwards to the ship's

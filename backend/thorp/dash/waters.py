@@ -1,10 +1,11 @@
 """The plan, and which waters each ship sails in (the Queue tab, /api/waters; Justin, 8 November: "so i can easily
 understand what's the plan and then within that plan which ships are in local waters (mac mini) and which are in
-foreign waters as per the coordinator").
+the hired waters as per the coordinator").
 
 Read only through the coordinator (thorp/viable/s2_coordination/lanes.py: which lane a line sails in, what it waits
 for, what each lane has out) and the charter (S3's spend: the ships hired and not released; S5's terms). **Local
-waters** are this Mac mini, the Mac lane; **foreign waters** are GPUs hired from Vast.ai, the Vast lane.
+waters** are this Mac mini, the Mac lane; **the hired waters** are GPUs hired from Vast.ai, the Vast lane. Zayton
+is neither: it is the foreign ships' harbour, where outside models are read, not sailed.
 
 The plan is the standing queue in its order, each line with its lane, about when it sails and for how long, and
 what it waits for. Times are guides: a voyage at its class's mean wall time on this Mac over finished voyages (on a
@@ -24,67 +25,74 @@ from thorp import paths
 WATERS = {
     # local waters are Phaleron (Justin, 8 November: "name it after a famous bay, perhaps that the greeks used to
     # train ships in"): Athens' first harbour, where its early fleet lay before Themistocles built Piraeus beside it
-    "mac": {"name": "Phaleron", "where": "this Mac mini", "how": "MLX, the Mac lane: internal waters"},
-    # outer waters are Zayton, the Market Harbour (Justin, 8 November: "the outer waters should be the first great trading
-    # harbour"): where the ships that need hired GPUs trade
-    "vast": {"name": "Zayton", "where": "a GPU hired from Vast.ai", "how": "torch on CUDA, the Vast lane: outer waters"},
+    "mac": {
+        "name": "Phaleron",
+        "where": "this Mac mini",
+        "how": "MLX, the Mac lane: internal waters",
+    },
+    # the hired waters are Piraeus (11 November): the deep harbour beside Phaleron, where our 50m, 100m and 350m
+    # lie; Zayton is the foreign ships' harbour now, not a lane of ours
+    "vast": {
+        "name": "Piraeus",
+        "where": "a GPU hired from Vast.ai",
+        "how": "torch on CUDA, the Vast lane: the deep waters",
+    },
 }
 
 # The harbours the Ships page opens on (Justin, 8 November: "on the ships pages, it's actually called harbours and then
-# when you open it, it's two tiles for the two harbours of today and then you click in the harbour to view its ships.
-# So Phaleron has Pan, Augustus, the 9m and the 21m and then the Market Harbour has the 50m up"; "the harbour rules is
-# how deep it is, so that determines what ships can be in that harbour"). **A harbour's depth** is the most parameters
-# (the ship's whole weight, tables included) a ship may carry and still lie in it: a ship lies in the shallowest
-# harbour deep enough for it, so the sizes sort themselves. Phaleron is 20M deep (the 21m, 15.4M, fits; the 50m, 46.7M,
-# does not); the Market Harbour has no bottom. The depths are Justin's to set; to be columns of a harbours table.
+# when you open it, it's two tiles for the two harbours of today and then you click in the harbour to view its ships";
+# 11 November: "our 50m, 100m, 350m need a new harbour sitting alongside Phaleron for our own ships, but a deeper
+# harbour and then Zayton is where all foreign ships are"). **A harbour's depth** is the most parameters (the ship's
+# whole weight, tables included) a ship may carry and still lie in it: a ship lies in the shallowest harbour deep
+# enough for it, so the sizes sort themselves. Phaleron is 20M deep (the 21m, 15.4M, fits; the 50m, 46.7M, does not);
+# Piraeus has no bottom and takes our deep ships; Zayton is `foreign_only` and takes no ship of ours at all. The
+# depths are Justin's to set; they are columns of the harbours table.
 _FALLBACK = (
     {"key": "phaleron", "name": "Phaleron", "aka": "internal waters", "lane": "mac", "where": "this Mac mini",
      "about": "Athens' first harbour, where its early fleet lay and sailed from: the youngest ships, trained on this Mac.",
-     "depth": 20_000_000, "ship_builder": "Justin"},
-    {"key": "zayton", "name": "Zayton", "aka": "outer waters", "lane": "vast", "where": "GPUs hired from Vast.ai",
-     "about": "Zayton (Quanzhou), the greatest trading harbour of the Silk Road's sea road: the ships too deep for Phaleron, which need hired GPUs.",
-     "depth": None, "ship_builder": ""},
+     "depth": 20_000_000, "ship_builder": "Justin", "foreign": False},
+    {"key": "piraeus", "name": "Piraeus", "aka": "the deep waters", "lane": "vast", "where": "GPUs hired from Vast.ai",
+     "about": "Themistocles' deep harbour beside Phaleron: our own 50m, 100m and 350m, the ships too deep for Phaleron and too big for this Mac.",
+     "depth": None, "ship_builder": "", "foreign": False},
+    {"key": "zayton", "name": "Zayton", "aka": "the Market Harbour", "lane": "foreign", "where": "the Market Harbour",
+     "about": "Zayton (Quanzhou), the greatest trading harbour of the Silk Road's sea road: every foreign ship, read on our decks, not ours to build.",
+     "depth": None, "ship_builder": "", "foreign": True},
 )  # fmt: skip
 
 
 def harbours() -> list[dict]:
-    """The harbours from `s1.harbours` (the table is the record); the two as they stood before the table, if it
-    cannot be read (a test without a store)."""
+    """The harbours from `s1.harbours` (the table is the record); the three as they stood before the table, if it
+    cannot be read (a test without a store). `foreign` is always present: an older row without the flag is ours."""
     try:
         from thorp import ship_store
 
         rows = ship_store.harbours()
     except Exception:  # noqa: BLE001
         rows = []
-    return rows or [dict(h) for h in _FALLBACK]
+    return [{**dict(h), "foreign": bool(h.get("foreign"))} for h in (rows or _FALLBACK)]
 
 
 HARBOURS = _FALLBACK  # older readers; the page and the rule read `harbours()`
 
 
 def harbour_for(parameters: int) -> str:
-    """The shallowest harbour deep enough for a ship of this many parameters."""
-    rows = harbours()
-    return next((h["key"] for h in rows if h["depth"] is None or parameters <= h["depth"]), rows[-1]["key"])
+    """The shallowest harbour deep enough for one of our ships; a `foreign_only` harbour is never one."""
+    rows = [h for h in harbours() if not h.get("foreign")]
+    return next(
+        (h["key"] for h in rows if h["depth"] is None or parameters <= h["depth"]),
+        rows[-1]["key"] if rows else "phaleron",
+    )
 
 
 def _wall_minutes() -> dict:
-    """Wall times (minutes) of voyages finished on this Mac: per class (the mean), and per corpus and class (the
-    latest), since a class's voyages on a bigger corpus take longer (the 9m on Ogden v0.2: 3.5 h; on v0.1: 1.2 h)."""
-    from thorp.ledger import reader
+    """Wall times (minutes) of finished voyages: the median of like voyages, not a mean over every run
+    (a 3-minute loop must not stand for a 179-minute 1m). Per corpus and class, then per class on the
+    full-budget voyages (thorp.dash.timing keeps the short arms out of the size fallback)."""
+    from thorp.dash.timing import RunTimes
 
-    out: dict = {}
     with contextlib.suppress(Exception):
-        mlx = "status='finished' and wall_minutes > 0 and coalesce(json_extract(spec_json,'$.model.backend'),'mlx')='mlx'"
-        rec = reader()
-        for r in rec.query(f"select json_extract(spec_json,'$.model.preset') p, avg(wall_minutes) m from runs where {mlx} group by p"):
-            out[r["p"]] = r["m"]
-        for r in rec.query(  # keyed by the corpus read (the ledger's spec keeps data.recipe, not the fitout label)
-            "select json_extract(spec_json,'$.model.preset') p, json_extract(spec_json,'$.data.recipe') f, wall_minutes m"
-            f" from runs where {mlx} and json_extract(spec_json,'$.data.recipe') is not null order by finished"
-        ):
-            out[(r["f"], r["p"])] = r["m"]  # the latest wins
-    return out
+        return RunTimes.from_reader().wall()
+    return {}
 
 
 def _step_minutes() -> dict:
@@ -92,7 +100,11 @@ def _step_minutes() -> dict:
     out, start = {}, {}
     pat = re.compile(r"^\[(\d\d):(\d\d):(\d\d)\] (?:\[\w+\] )?(starting (.*)|(.*) exited -?\d+)$")
     with contextlib.suppress(Exception):
-        for line in (paths.data_dir() / "runs" / "queue.out").read_text(encoding="utf-8", errors="replace").splitlines():
+        for line in (
+            (paths.data_dir() / "runs" / "queue.out")
+            .read_text(encoding="utf-8", errors="replace")
+            .splitlines()
+        ):
             m = pat.match(line)
             if not m:
                 continue
@@ -120,7 +132,12 @@ def _hold(cmd: str) -> dict | None:
     note = ""
     with contextlib.suppress(Exception):
         note = p.read_text(encoding="utf-8").strip()
-    return {"file": rel, "held": p.exists(), "max_min": round(int(n) * int(s) / 60) if n else None, "note": note}
+    return {
+        "file": rel,
+        "held": p.exists(),
+        "max_min": round(int(n) * int(s) / 60) if n else None,
+        "note": note,
+    }
 
 
 def _step_name(cmd: str) -> str:
@@ -177,7 +194,11 @@ def _like_run(recipe: str | None, preset: str | None) -> dict:
         )
         if rows:
             r = rows[0]
-            return {"steps": r["s"], "tokens": r["t"], "per_pass": int(r["t"] / r["p"]) if r["t"] and r["p"] else None}
+            return {
+                "steps": r["s"],
+                "tokens": r["t"],
+                "per_pass": int(r["t"] / r["p"]) if r["t"] and r["p"] else None,
+            }
     return {}
 
 
@@ -186,13 +207,25 @@ def _material(spec: dict) -> dict:
     d = spec.get("data") or {}
     f = spec.get("fitout") if isinstance(spec.get("fitout"), dict) else {}
     fo = _fitout(f.get("key"))
-    stages = d.get("stages") or ([{"name": "the reading", "recipe": d["recipe"], "passes": d.get("passes", 1)}] if d.get("recipe") else [])
+    stages = d.get("stages") or (
+        [{"name": "the reading", "recipe": d["recipe"], "passes": d.get("passes", 1)}]
+        if d.get("recipe")
+        else []
+    )
     like = _like_run(d.get("recipe"), (spec.get("model") or {}).get("preset"))
     return {
         "fitout": fo.get("name") or f.get("key"),
         "variation": f.get("variation"),
         "aim": fo.get("aim"),
-        "stages": [{"name": s.get("name"), "recipe": s.get("recipe"), "books": _books(s.get("recipe", "")), "passes": s.get("passes", 1)} for s in stages],
+        "stages": [
+            {
+                "name": s.get("name"),
+                "recipe": s.get("recipe"),
+                "books": _books(s.get("recipe", "")),
+                "passes": s.get("passes", 1),
+            }
+            for s in stages
+        ],
         "tokens_per_pass": like.get("per_pass"),
         "clean": d.get("clean"),
         "opt_in": bool(d.get("opt_in")),
@@ -219,23 +252,43 @@ def _training(spec: dict) -> dict:
     if sc:
         heads = sc.get("heads") or []
         cards = sorted({h["card"].replace("_", " ") for h in heads})
-        ph = [f"the pull on {len(heads)} heads ({', '.join(cards)})" + (f" and the {' and '.join(sc['riddles'])} riddle{'s' if len(sc['riddles']) > 1 else ''}" if sc.get("riddles") else "")]
-        if any("from" in h for h in heads) or any("from" in r for r in (sc.get("riddles") or {}).values()):
-            starts = sorted({float(x.get("from", 0)) for x in [*heads, *(sc.get("riddles") or {}).values()]})
-            ph.append("staged: " + ", ".join("from the start" if s == 0 else f"more from {s:.0%}" for s in starts))
+        ph = [
+            f"the pull on {len(heads)} heads ({', '.join(cards)})"
+            + (
+                f" and the {' and '.join(sc['riddles'])} riddle{'s' if len(sc['riddles']) > 1 else ''}"
+                if sc.get("riddles")
+                else ""
+            )
+        ]
+        if any("from" in h for h in heads) or any(
+            "from" in r for r in (sc.get("riddles") or {}).values()
+        ):
+            starts = sorted(
+                {float(x.get("from", 0)) for x in [*heads, *(sc.get("riddles") or {}).values()]}
+            )
+            ph.append(
+                "staged: "
+                + ", ".join("from the start" if s == 0 else f"more from {s:.0%}" for s in starts)
+            )
         if sc.get("fade") is not None:
-            ph.append(f"full weight to {float(sc.get('hold', 0)):.0%}, eased to {sc.get('floor', 0)} by {float(sc['fade']):.0%}")
+            ph.append(
+                f"full weight to {float(sc.get('hold', 0)):.0%}, eased to {sc.get('floor', 0)} by {float(sc['fade']):.0%}"
+            )
         if sc.get("release") is not None:
             ph.append(f"released (off) from {float(sc['release']):.0%}")
         if ((sc.get("riddles") or {}).get("bridge") or {}).get("kinds") == "all":
             ph.append("the Bridge in all four relations")
         plan["phases"] = ph
     if (o.get("copy_weight") or {}).get("alpha"):
-        plan["phases"].append(f"the copy tack ({o['copy_weight'].get('kind')}, alpha {o['copy_weight']['alpha']})")
+        plan["phases"].append(
+            f"the copy tack ({o['copy_weight'].get('kind')}, alpha {o['copy_weight']['alpha']})"
+        )
     if (o.get("teacher") or {}).get("run"):
         plan["phases"].append(f"taught by {o['teacher']['run']}")
     if (spec.get("seeded_from") or {}).get("run"):
-        plan["phases"].append(f"seeded from {spec['seeded_from']['run']} ({spec['seeded_from'].get('mode', 'free')})")
+        plan["phases"].append(
+            f"seeded from {spec['seeded_from']['run']} ({spec['seeded_from'].get('mode', 'free')})"
+        )
     return plan
 
 
@@ -249,7 +302,9 @@ def _voyage(ln, wall: dict) -> dict:
         "name": ln.name or ln.payload,
         "spec": ln.payload,
         "ship": spec.get("ship") or "",
-        "sop": spec.get("sop"),  # the standard the voyage is built to (9 November: size and SOP are the identity)
+        "sop": spec.get(
+            "sop"
+        ),  # the standard the voyage is built to (9 November: size and SOP are the identity)
         "material": _material(spec) if spec else None,
         "training": _training(spec) if spec else None,
         "goal": spec.get("question") or spec.get("experiment") or "",
@@ -258,7 +313,17 @@ def _voyage(ln, wall: dict) -> dict:
         "preset": m.get("preset"),
         "seed": spec.get("seed"),
         "missing": ln.spec is None,
-        "est_min": next((round(wall[k]) for k in (((spec.get("data") or {}).get("recipe"), m.get("preset")), m.get("preset")) if k in wall), None),
+        "est_min": next(
+            (
+                round(wall[k])
+                for k in (
+                    ((spec.get("data") or {}).get("recipe"), m.get("preset")),
+                    m.get("preset"),
+                )
+                if k in wall
+            ),
+            None,
+        ),
     }
 
 
@@ -323,7 +388,9 @@ def waters() -> dict:
         left = None if it.get("est_min") is None or gone is None else max(0.0, it["est_min"] - gone)
         at_sea[lane] = {**it, "since": r.get("since"), "pid": r.get("pid"), "elapsed_min": round(gone) if gone is not None else None,
                         "left_min": round(left) if left is not None else None}  # fmt: skip
-        if it.get("kind") == "spec":  # how far it has sailed: its last step on the ledger, of its like voyage's steps
+        if (
+            it.get("kind") == "spec"
+        ):  # how far it has sailed: its last step on the ledger, of its like voyage's steps
             at_sea[lane]["step"] = _step_now(it.get("name"))
         ahead[lane] = left or 0.0
 
@@ -339,14 +406,29 @@ def waters() -> dict:
                 "by_queue": bool(at_sea.get("vast")) and at_sea["vast"].get("spec") and h.get("name") == at_sea["vast"].get("name"),
             })  # fmt: skip
     if ships and not at_sea.get("vast"):
-        ahead["vast"] = max(s["left_min"] for s in ships)  # one ship out at a time: the next waits for it
+        ahead["vast"] = max(
+            s["left_min"] for s in ships
+        )  # one ship out at a time: the next waits for it
 
     # the plan: the queue in its order, each line in its lane at about its time
     plan, unknown = [], {lane: False for lane in lanes.LANES}
     for lane in lanes.LANES:  # what is at sea heads the plan: it sails now
         if at_sea[lane]:
-            plan.append({**at_sea[lane], "n": None, "at_sea": True, "starts_at": "now", "starts_in_min": 0, "at_least": False, "waits_for": None})
-    sea = {lane: (lanes.parse(st[lane]["line"], q.parent) if st.get(lane) else None) for lane in lanes.LANES}
+            plan.append(
+                {
+                    **at_sea[lane],
+                    "n": None,
+                    "at_sea": True,
+                    "starts_at": "now",
+                    "starts_in_min": 0,
+                    "at_least": False,
+                    "waits_for": None,
+                }
+            )
+    sea = {
+        lane: (lanes.parse(st[lane]["line"], q.parent) if st.get(lane) else None)
+        for lane in lanes.LANES
+    }
     for i, ln in enumerate(lines):
         it = _item(ln, wall, steps)
         why = lanes.blocked(ln, lines[:i], [x for x in sea.values() if x])

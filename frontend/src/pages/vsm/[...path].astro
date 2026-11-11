@@ -1,0 +1,18 @@
+---
+// The VSM's five system tabs, one page each so a tab survives a refresh: /vsm is S1, then /vsm/s2 …
+// /vsm/s5. The old /governance/control and /governance/acquisition addresses redirect to /vsm/s3 and
+// /vsm. The island reads the route (useRoute) and picks the system tab.
+import Layout from '../../layouts/Layout.astro';
+import Governance from '../../components/islands/Governance';
+import Reader from '../../components/Reader.astro';
+
+export function getStaticPaths() {
+  return ['s1', 's2', 's3', 's4', 's5', 'control', 'acquisition'].map((path) => ({ params: { path } }));
+}
+---
+<Layout>
+  <main>
+    <Governance client:load />
+  </main>
+  <Reader />
+</Layout>

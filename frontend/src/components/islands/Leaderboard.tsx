@@ -1,17 +1,21 @@
-// Leaderboard (UI.md "Leaderboard"), as a client island: the ranked chaining board, the approach
-// board, Smoking Qwen and the every-ship table. The competitor and lab sub-views are their own pages
-// for now (they keep the shared script); this page no longer loads dashboard.ts.
+// Leaderboard (UI.md "Leaderboard"), as a client island: the ranked chaining board and the
+// approach board, split into three size classes (small up to 4B, medium up to 30B, large above
+// 30B), then the four Faces' scorecard, Smoking Qwen and the every-ship table. A class with no
+// chaining reading yet carries the five likeliest candidates to approach instead. The competitor
+// and lab sub-views are their own pages for now (they keep the shared script); this page no longer
+// loads dashboard.ts.
 
 import { useEffect, useState } from 'react';
 import { cardCls, checkCls, emptyCls, selectCls } from '@/lib/ui';
 import { sectionProps, useApi } from '@/lib/useApi';
-import { boardHtml, drawSmokingChart, runsHtml, smokingHtml } from '@/scripts/views/leaderboard-main';
+import { boardHtml, candidatesHtml, drawSmokingChart, facesHtml, reasoningHtml, runsHtml, smokingHtml } from '@/scripts/views/leaderboard-main';
 
 export default function Leaderboard() {
   const lb = useApi<any>('/api/leaderboard', 60000);
   const sq = useApi<any>('/api/smoking_qwen', 60000);
   const ladder = useApi<any>('/api/ladder', 300000);
   const [want, setWant] = useState('');
+  const [sizeTab, setSizeTab] = useState<'small' | 'medium' | 'large'>('small');
   const [showFc, setShowFc] = useState(true);
   const [showPy, setShowPy] = useState(true);
 
@@ -20,43 +24,144 @@ export default function Leaderboard() {
   const presets = [...new Set<string>((lb.data?.ships || []).map((r: any) => r.preset).filter(Boolean))].sort((a, b) => order(a) - order(b));
   const nameOf = (p: string): string => (rungs.find((r) => r.preset === p) || { name: '' }).name;
 
+  // three size classes (11 November, Justin): small up to 4B, medium above 4B up to 30B, large
+  // above 30B. The payload carries the boundaries; the fallback keeps the tabs before it loads.
+  const sizeClasses: { key: 'small' | 'medium' | 'large'; label: string; range: string }[] = lb.data?.size_classes || [
+    { key: 'small', label: 'Small', range: 'up to 4B' },
+    { key: 'medium', label: 'Medium', range: 'above 4B to 30B' },
+    { key: 'large', label: 'Large', range: 'above 30B' },
+  ];
+  const table = lb.data?.table || [];
+  const isSmall = sizeTab === 'small';
+  const measured = table.filter((r: any) => (r.size_class || 'small') === sizeTab);
+  const cands = lb.data?.candidates?.[sizeTab] || [];
+  const countOf = (k: string): number => table.filter((r: any) => (r.size_class || 'small') === k).length + (lb.data?.candidates?.[k]?.length || 0);
+
   const runs = lb.data ? runsHtml(lb.data, want, rungs) : null;
-  const board = lb.data ? boardHtml(lb.data, sq.data || {}, rungs, showFc, showPy) : null;
+  const board = lb.data ? boardHtml(lb.data, sq.data || {}, rungs, showFc, showPy, sizeTab) : null;
+  const candidate = lb.data ? candidatesHtml(cands, sizeTab) : null;
+  const reasoning = lb.data?.reasoning ? reasoningHtml(lb.data.reasoning) : null;
+  const faces = lb.data?.faces ? facesHtml(lb.data.faces, rungs) : null;
   const smoking = sq.data ? smokingHtml(sq.data) : null;
 
   useEffect(() => {
     if (sq.data) void drawSmokingChart(sq.data);
   }, [sq.data]);
 
+  // the tab is linkable (?size=medium); read it after hydration so the server and client first
+  // render agree, then keep the address in step when the tab changes
+  useEffect(() => {
+    const s = new URLSearchParams(window.location.search).get('size');
+    if (s === 'medium' || s === 'large') setSizeTab(s);
+  }, []);
+  const pickSize = (k: 'small' | 'medium' | 'large') => {
+    setSizeTab(k);
+    const u = new URL(window.location.href);
+    if (k === 'small') u.searchParams.delete('size'); else u.searchParams.set('size', k);
+    window.history.replaceState(null, '', u);
+  };
+
   return (
     <div {...sectionProps('leaderboard')}>
-      <h1>Leaderboard <span className="q">two boards on chaining two facts: the models that chain, ranked by how well; and those not chaining yet, ranked by how close they are. The method is under <a href="/discoveries/tests?test=chaining">Discoveries, Tests: chaining two facts</a></span></h1>
+      <h1>Leaderboard <span className="q">the chaining boards by size — small up to 4B, medium above 4B up to 30B, large above 30B: the models that chain, ranked by how well; those not chaining yet, ranked by how close; the canonical intelligence ranking, ARC-AGI-2; and the four Faces — the Nevermore, Counter, Scales and Mover — beside Qwen 3 4B. The method is under <a href="/discoveries/tests?test=chaining">Discoveries, Tests: chaining two facts</a></span></h1>
+
+      <div className="tabs" role="tablist" aria-label="model size">
+        {sizeClasses.map((s) => {
+          const n = countOf(s.key);
+          return (
+            <button key={s.key} role="tab" aria-selected={sizeTab === s.key}
+              className={sizeTab === s.key ? 'tab on' : 'tab'}
+              onClick={() => pickSize(s.key)}>
+              {s.label} <span className="s">{s.range}{n ? ` · ${n}${s.key === 'small' ? '' : ` candidate${n === 1 ? '' : 's'}`}` : ''}</span>
+            </button>
+          );
+        })}
+      </div>
+
       <section className={cardCls(false, 'panel')}>
-        <h2>Chaining <span className="note">the models whose chaining lift clears the noise (+0.03), ranked by it: the mean lift on the four chaining tests</span></h2>
-        <div className="handtools">
-          <label><input className={checkCls('')} type="checkbox" checked={showFc} onChange={(e) => setShowFc(e.target.checked)} /> Nothing up my sleeve's forecasts</label>
-          <label><input className={checkCls('')} type="checkbox" checked={showPy} onChange={(e) => setShowPy(e.target.checked)} /> the reference ladder (Pythia, smaller Qwen)</label>
-          <span className="note" id="lbfcnote" dangerouslySetInnerHTML={{ __html: board?.note || '' }} />
-        </div>
-        <div className="scroll">
-          <table id="lbtable" data-nosort>
-            <thead dangerouslySetInnerHTML={{ __html: board?.head || '' }} />
-            <tbody dangerouslySetInnerHTML={{ __html: board?.body || '' }} />
-          </table>
-        </div>
-        <p className="note mt">The leaderboard is the four chaining tests only (Nature's breeder, the mill test, the between test, the pigeonhole test; 96 pairs), each cell its lift and share of pairs right, ✓ when performed (lift 0.1 and two in three right); Nothing up my sleeve's other tests are internal. The chaining gain is the logic deck's: invented words and counterfactual premises, each item asked with both premises and with one; the lift with both less the better single premise, the proof that a pass is chaining, not knowing or one premise. A Nothing up my sleeve size is its best ship, its voyages averaged. The 2–4B models (Qwen, Phi, Llama, Gemma, SmolLM, base checkpoints where one exists) are the competitors: Nothing up my sleeve must chain two facts as well as each at a tenth its size, and they never grade the chains (the reference ladder does). Forecast rows (italic) are Nothing up my sleeve's own sizes fitted against size, straight (conservative) and bending (probable), as Smoking Qwen fits them; while fewer than three sizes are above the noise (0.03) they are curves through noise, shown but not trusted. "Nothing up my sleeve matches it at" is the size where each fit reaches that model's lift; "a tenth its size" is each fit's reading there, with the probability it reaches that model's lift once forecastable. Performed at <b id="lbthr">{board?.thr || ''}</b>.</p>
-        {!lb.data && !lb.error ? <div className={emptyCls()}>reading the leaderboard…</div> : null}
-        {lb.error ? <div className={emptyCls()}>the leaderboard could not be read: {lb.error}</div> : null}
+        <h2>Chaining <span className="note">the models whose chaining lift clears the noise (+0.03), ranked by it: the mean lift on the four chaining tests. {isSmall ? 'The small class is the one measured so far.' : sizeTab === 'medium' ? 'The medium class is the next goal, and has no chaining reading yet.' : `The ${sizeTab} class has no chaining reading yet.`}</span></h2>
+        {!lb.data ? (
+          <div className={emptyCls()}>{lb.error ? `the leaderboard could not be read: ${lb.error}` : 'reading the leaderboard…'}</div>
+        ) : isSmall ? (
+          <>
+            <div className="handtools">
+              <label><input className={checkCls('')} type="checkbox" checked={showFc} onChange={(e) => setShowFc(e.target.checked)} /> Nothing up my sleeve's forecasts</label>
+              <label><input className={checkCls('')} type="checkbox" checked={showPy} onChange={(e) => setShowPy(e.target.checked)} /> the reference ladder (Pythia, smaller Qwen)</label>
+              <span className="note" id="lbfcnote" dangerouslySetInnerHTML={{ __html: board?.note || '' }} />
+            </div>
+            <div className="scroll">
+              <table id="lbtable" data-nosort>
+                <thead dangerouslySetInnerHTML={{ __html: board?.head || '' }} />
+                <tbody dangerouslySetInnerHTML={{ __html: board?.body || '' }} />
+              </table>
+            </div>
+            <p className="note mt">The leaderboard is the four chaining tests only (Nature's breeder, the mill test, the between test, the pigeonhole test; 96 pairs), each cell its lift and share of pairs right, ✓ when performed (lift 0.1 and two in three right); Nothing up my sleeve's other tests are internal. The chaining gain is the logic deck's: invented words and counterfactual premises, each item asked with both premises and with one; the lift with both less the better single premise, the proof that a pass is chaining, not knowing or one premise. A Nothing up my sleeve size is its best ship, its voyages averaged. The 2–4B models (Qwen, Phi, Llama, Gemma, SmolLM, base checkpoints where one exists) are the competitors: Nothing up my sleeve must chain two facts as well as each at a tenth its size, and they never grade the chains (the reference ladder does). Forecast rows (italic) are Nothing up my sleeve's own sizes fitted against size, straight (conservative) and bending (probable), as Smoking Qwen fits them; while fewer than three sizes are above the noise (0.03) they are curves through noise, shown but not trusted. "Nothing up my sleeve matches it at" is the size where each fit reaches that model's lift; "a tenth its size" is each fit's reading there, with the probability it reaches that model's lift once forecastable. Performed at <b id="lbthr">{board?.thr || ''}</b>.</p>
+          </>
+        ) : measured.some((r: any) => r.group === 'chaining') ? (
+          <>
+            <div className="scroll">
+              <table id="lbtable" data-nosort>
+                <thead dangerouslySetInnerHTML={{ __html: board?.head || '' }} />
+                <tbody dangerouslySetInnerHTML={{ __html: board?.body || '' }} />
+              </table>
+            </div>
+            <p className="note mt">A size class is measured on the four chaining tests only; a candidate is a target, not a result, and joins this board only once it has a chaining lift.</p>
+          </>
+        ) : (
+          <>
+            <div className={emptyCls()}>No {sizeTab} model has been scored on the four chaining tests yet. The five likeliest candidates to approach are on the board below.</div>
+            <p className="note mt">The four chaining tests are the only public measure. A candidate is a target, not a result: it joins this board only when it has a chaining lift on those tests. The small class's readings stay on their own tab.</p>
+          </>
+        )}
       </section>
+
       <section className={cardCls(false, 'panel')}>
-        <h2>Approaching chaining <span className="note">the closest to chaining: the cards every chainer holds, then following one premise. Models not chaining yet, ranked by how many of the four necessary cards they hold, then by the logic deck's one-hop lift</span></h2>
+        <h2>{isSmall ? 'Approaching chaining' : `The five likeliest ${sizeTab} candidates`} <span className="note">{isSmall
+          ? "the closest to chaining: the cards every chainer holds, then following one premise. Models not chaining yet, ranked by how many of the four necessary cards they hold, then by the logic deck's one-hop lift"
+          : `no ${sizeTab} model has a chaining reading yet; these are the targets to approach, most likely first`}</span></h2>
+        {!lb.data ? null : isSmall ? (
+          <>
+            <div className="scroll">
+              <table id="lbapproach" data-nosort>
+                <thead><tr><th>#</th><th>model</th><th>parameters</th><th>the necessary cards <span className="s">P♣ N♠ M♦ C♥</span></th><th title="the logic deck's lift on one-hop items: following one premise">one-hop lift</th><th title="the logic deck's chaining gain on its cause items; eight items: a strong reading counts, a small one is noise">cause and effect</th><th title="below +0.03 it is noise">chaining lift <span className="s">noise</span></th></tr></thead>
+                <tbody dangerouslySetInnerHTML={{ __html: board?.approach || '' }} />
+              </table>
+            </div>
+            <p className="note mt">Below the line nothing is ranked by chaining lift: below +0.03 it is noise. The four cards are the ones every model that chains plays (the card judge's necessary cards); one hop is following a single premise, the step before chaining two. One-hop lifts within 0.05 of each other are noise, so those rows tie and share a rank (=5), listed biggest first. Cause and effect, on both boards, is the logic deck's chaining gain on its cause items: eight items, so a strong reading counts and a small one is noise (the mark, 0.1, dotted).</p>
+          </>
+        ) : (
+          <>
+            <div className="scroll">
+              <table id="lbcandidates" data-nosort>
+                <thead dangerouslySetInnerHTML={{ __html: candidate?.head || '' }} />
+                <tbody dangerouslySetInnerHTML={{ __html: candidate?.body || '' }} />
+              </table>
+            </div>
+            <p className="note mt">The five are chosen on the evidence the board already has — the families that chain at 2–4B, the reasoning leaders of the open field, and one boundary case that fits a workstation — not on a chaining reading they do not have. Their order is a working order, not a result. The logic deck's gain and one-hop lift, where held, are the only evidence so far; the four chaining tests have not been run. A candidate enters the chaining board only when it has a chaining lift.</p>
+          </>
+        )}
+      </section>
+
+      <section className={cardCls(false, 'panel')}>
+        <h2>Reasoning <span className="note">the canonical intelligence ranking: ARC-AGI-2, pass@2 on the 120-task evaluation set. It is not comparable with the chaining lift — the chaining tests measure one skill on text, ARC-AGI-2 measures fluid intelligence on grids — so it stays a panel of its own. Published scores are the public leaderboard's, not our measurements; Nothing up my sleeve's reading is the Kipling ARC arm's.</span></h2>
         <div className="scroll">
-          <table id="lbapproach" data-nosort>
-            <thead><tr><th>#</th><th>model</th><th>parameters</th><th>the necessary cards <span className="s">P♣ N♠ M♦ C♥</span></th><th title="the logic deck's lift on one-hop items: following one premise">one-hop lift</th><th title="the logic deck's chaining gain on its cause items; eight items: a strong reading counts, a small one is noise">cause and effect</th><th title="below +0.03 it is noise">chaining lift <span className="s">noise</span></th></tr></thead>
-            <tbody dangerouslySetInnerHTML={{ __html: board?.approach || '' }} />
+          <table id="lbreasoning" data-nosort>
+            <thead dangerouslySetInnerHTML={{ __html: reasoning?.head || '' }} />
+            <tbody dangerouslySetInnerHTML={{ __html: reasoning?.body || '' }} />
           </table>
         </div>
-        <p className="note mt">Below the line nothing is ranked by chaining lift: below +0.03 it is noise. The four cards are the ones every model that chains plays (the card judge's necessary cards); one hop is following a single premise, the step before chaining two. One-hop lifts within 0.05 of each other are noise, so those rows tie and share a rank (=5), listed biggest first. Cause and effect, on both boards, is the logic deck's chaining gain on its cause items: eight items, so a strong reading counts and a small one is noise (the mark, 0.1, dotted).</p>
+        <p className="note mt">{lb.data?.reasoning?.about || ''} The chaining board remains the near-term measure; ARC-AGI-2 is the north star the Kipling ARC arm is built towards (<a href="https://arcprize.org/arc-agi">ARC Prize</a>).</p>
+      </section>
+
+      <section className={cardCls(false, 'panel')}>
+        <h2>The four Faces <span className="note">the four Face cards' abilities — the Nevermore's copy gain, the Counter's sentence-position R², the Scales' order gain and the Mover's one-hop lift — beside Qwen 3 4B, the reference chainer. ✓ at the mark, ≈ within 10% of it; a class's cell names the run that gave its best in the title</span></h2>
+        <div className="scroll">
+          <table id="lbfaces" data-nosort>
+            <thead dangerouslySetInnerHTML={{ __html: faces?.head || '' }} />
+            <tbody dangerouslySetInnerHTML={{ __html: faces?.body || '' }} />
+          </table>
+        </div>
+        <p className="note mt">A Face is earned, not pinned: its ability passing is the card (the Nevermore predicts a repeated passage better the second time, the Counter reads how far into a sentence it is, the Scales orders the logic deck, the Mover follows one premise). The Mover is read by its one-hop ability, not its look: in Qwen 3 4B the head that scores highest on the Mover's look is a diffuse, sink-and-delimiter head, and the 300k's is its induction head, so the look is not the card. The fleet's row is each class's best ship for that Face (the run is in the cell's title); the reference is Qwen 3 4B, which itself holds two of the four by the marks and sits a hair under the Counter's.</p>
       </section>
 
       <details className={cardCls(false, 'panel lbfold')} id="lbfoldsmoke" onToggle={(e) => { if (e.currentTarget.open && sq.data) void drawSmokingChart(sq.data); }}>

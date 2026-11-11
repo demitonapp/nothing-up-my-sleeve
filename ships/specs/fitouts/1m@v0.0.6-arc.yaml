@@ -1,0 +1,113 @@
+name: 1m@v0.0.6-arc
+ship: SOP v0.0.6 at 1m (ARC-AGI-2 arm)
+experiment: 'ARC-AGI-2 (Kipling aim 5): Ogden, then the 1,000 ARC training tasks as
+  a post-training stage; the 120-task evaluation set read at the end, pass@2 the outcome.'
+question: 'The ARC arm: can a 1m learn the ARC-AGI-2 form and any of its rules from
+  the 1,000 training tasks, and what does the ARC stage cost the Ogden language? The
+  score is pass@2 on the 120-task evaluation set; the chaining tests and the logic
+  deck stay on the same run so the two reasoning measures can be read side by side.'
+data:
+  recipe: lists/ogden-v0.1.csv
+  passes: 4
+  stages:
+  - name: ogden
+    recipe: lists/ogden-v0.1.csv
+    passes: 3
+  - name: arc
+    recipe: lists/arc-agi-2-train.csv
+    passes: 20
+  order: shuffled
+  refuse:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+  - lists/hole-cards-unseen.csv
+  clean: unwrap-v2
+  opt_in: 'ARC-AGI-2 arm (Justin, 11 November): the canonical intelligence test needs
+    its own training text; the ARC stage is not an Ogden shelf.'
+tokeniser:
+  kind: spm-bpe
+  vocab: 2048
+  byte_fallback: true
+  train_on: lists/ogden-v0.1.csv
+model:
+  family: gpt
+  preset: 1m
+  context: 1024
+  positions: rope
+optim:
+  name: adamw
+  lr: 0.002
+  betas:
+  - 0.9
+  - 0.95
+  weight_decay: 0.1
+  warmup_steps: 100
+  schedule: cosine
+  min_lr_ratio: 0.1
+  batch_tokens: 32768
+  grad_clip: 1.0
+  precision: bf16
+  scaffold:
+    weight: 1.0
+    hold: 0.1
+    fade: 0.6
+    heads:
+    - layer: 0
+      head: 0
+      card: previous_word
+    - layer: 0
+      head: 1
+      card: delimiter
+    - layer: 8
+      head: 2
+      card: induction
+    - layer: 8
+      head: 3
+      card: duplicate_word
+    riddles:
+      comparator:
+        layer: 4
+        head: 2
+        items: 16
+        pool: 2048
+eval:
+  sets:
+  - lists/hole-cards-unseen.csv
+  every_steps: 1000000000
+  evaluators:
+  - ce_bpb
+  - discovery
+  - logic
+  - stars
+  - nevermore
+  - cards
+  - shapes
+  - pips
+  - soundings
+  - arc
+  light:
+    every_steps: 640
+    evaluators:
+    - ce_bpb
+    - discovery
+    - logic
+    - stars
+    - nevermore
+    - cards
+    - shapes
+    - pips
+    - soundings
+  options:
+    arc:
+      split: evaluation
+      limit: 120
+      max_pairs: 2
+      max_output: 512
+      attempts: 2
+checkpoint:
+  every_steps: 640
+sop: 0.0.6
+departures:
+- 'ARC-AGI-2 arm (Kipling aim 5): the 1,000 training tasks are a second post-training
+  stage after Ogden; the 120-task evaluation set is read at the end, pass@2.'
+seed: 1

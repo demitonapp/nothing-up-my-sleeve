@@ -9,7 +9,7 @@ import RunsPage from '../../components/islands/RunsPage';
 import Reader from '../../components/Reader.astro';
 
 export function getStaticPaths() {
-  const harbours = ['phaleron', 'zayton'];
+  const harbours = ['phaleron', 'piraeus', 'zayton'];
   const paths: string[] = [];
   for (const h of harbours) {
     paths.push(h, `${h}/ships`, `${h}/shipbuilder`);

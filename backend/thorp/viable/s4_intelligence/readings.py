@@ -13,7 +13,7 @@ import math
 
 from thorp import store
 
-KINDS = ("chain-grades", "knockout-deck", "knockout", "deck", "logic", "math500")
+KINDS = ("chain-grades", "knockout-deck", "knockout", "deck", "logic", "math500", "arc")
 
 
 def kind_of(name: str) -> tuple[str, str | None]:

@@ -11,6 +11,17 @@ export default defineConfig({
   devToolbar: { enabled: false },
   server: { port: 4321 },
   integrations: [react()],
+  // the VSM moved to /vsm (11 November, Justin: "the url should be vsm"); the old addresses keep working
+  redirects: {
+    '/governance': '/vsm',
+    '/governance/s1': '/vsm',
+    '/governance/s2': '/vsm/s2',
+    '/governance/s3': '/vsm/s3',
+    '/governance/s4': '/vsm/s4',
+    '/governance/s5': '/vsm/s5',
+    '/governance/control': '/vsm/s3',
+    '/governance/acquisition': '/vsm',
+  },
   vite: {
     plugins: [tailwindcss()],
     // pre-bundled at startup, so a newly imported one never re-optimises under an open tab

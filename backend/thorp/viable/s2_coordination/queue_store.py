@@ -238,10 +238,13 @@ def take(text: str) -> bool:
     return False
 
 
-def record(text: str, started: str, status: str) -> None:
+def record(line: str, started: str, status: str) -> None:
     """Write a line that ended to queue_history (the queue-done.txt row, in the store)."""
     from thorp import store
 
+    # `line`, not `text`: a parameter named `text` shadowed sqlalchemy.text below and made every
+    # record fail with "'str' object is not callable" (10 November, after the sequence resync).
+    line = line.strip()
     with store.session() as s:
         # a backfill can leave the id sequence behind the table (10 November: the coordinator died on
         # queue_history_pkey, key id=1, max id 307), so resync before the insert. One record a finished
@@ -254,8 +257,8 @@ def record(text: str, started: str, status: str) -> None:
         )
         s.add(
             QueueHistory(
-                text=text.strip(),
-                lane=parse_line(text)["lane"],
+                text=line,
+                lane=parse_line(line)["lane"],
                 started=started,
                 status=str(status),
                 run=None,

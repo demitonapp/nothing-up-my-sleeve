@@ -286,7 +286,7 @@ def phase_char(name, context, log=print):
     nl, nh = len(pats), pats[0].shape[1]
     q = np.arange(1, T)
     out = {k: np.zeros((nl, nh)) for k in ("sink", "previous", "entropy", "concentration",
-                                           "number", "word", "operator", "command")}
+                                           "number", "word", "operator", "command", "ping", "ping_share")}
     pieces = [tok.decode([int(i)]) for i in nat[0]]
     masks = _mask_for(pieces)
     qi = np.arange(len(q))
@@ -297,12 +297,18 @@ def phase_char(name, context, log=print):
         s = w / np.maximum(w.sum(-1, keepdims=True), 1e-12)
         out["entropy"][li] = -(s * np.log(np.maximum(s, 1e-12))).sum(-1).mean(axis=(0, 2))
         out["concentration"][li] = (w.max(-1) - (1.0 / (q + 1))[None, None, :]).mean(axis=(0, 2))
+        # a ping: a query token on which the head puts at least half its attention on one key. The count
+        # is how often the head is used on the natural passages; the share makes the heads comparable.
+        # fired is (batch, heads, queries): sum over the batch and the queries, one number a head.
+        fired = w.max(-1) >= 0.5
+        out["ping"][li] = fired.sum(axis=(0, 2))
+        out["ping_share"][li] = fired.mean(axis=(0, 2))
         for k in ("number", "word", "operator", "command"):
             m = masks.get(k)
             if m is not None and m.any():
                 out[k][li] = (w @ m.astype(np.float32)).mean(axis=(0, 2)) / (m.sum() / T)
     _save(name, "char", {"model": name, **{k: v.tolist() for k, v in out.items()}})
-    log(f"  characteristics on {nl}x{nh} heads")
+    log(f"  characteristics and pings on {nl}x{nh} heads")
     return out
 
 
@@ -356,7 +362,8 @@ def assemble(name, context, log=print):
             for k, m in matrices.items():
                 if at(m, li, hi):
                     row[k] = _num(m[li][hi])
-            for k in ("sink", "previous", "entropy", "concentration", "number", "word", "operator", "command"):
+            for k in ("sink", "previous", "entropy", "concentration", "number", "word", "operator", "command",
+                      "ping", "ping_share"):
                 if at(char.get(k), li, hi):
                     row[k] = _num(char[k][li][hi])
             lit = [k for k in matrices if k in th and th[k] is not None and row.get(k) is not None

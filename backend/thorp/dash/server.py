@@ -1290,7 +1290,7 @@ def api_shipbuilder(harbour: str = "phaleron") -> dict:
     if h is None:
         raise LookupError(f"no harbour {harbour!r}")
     if not h.get("ship_builder"):
-        raise LookupError(f"{h['name']} has no ship builder: ships are built at Phaleron, Zayton only sails them")
+        raise LookupError(f"{h['name']} has no ship builder: ships are built at Phaleron; Piraeus and Zayton only sail them")
     vs = sop.versions()
     standards = {v: sop.standard(v) for v in vs}
     from thorp import paths
@@ -1344,7 +1344,7 @@ def api_shipbuilder_save(body: dict) -> dict:
     if h is None:
         raise LookupError(f"no harbour {key!r}")
     if not h.get("ship_builder"):
-        raise LookupError(f"{h['name']} has no ship builder: ships are built at Phaleron, Zayton only sails them")
+        raise LookupError(f"{h['name']} has no ship builder: ships are built at Phaleron; Piraeus and Zayton only sail them")
     standard = body.get("standard")
     if not isinstance(standard, dict):
         raise ValueError("standard is a JSON object")
@@ -1823,8 +1823,8 @@ def api_sieves() -> dict:
 
 
 # classes renamed (old address name -> new), so old addresses and names keep working (7 Nov, Justin)
-# 8 Nov (Justin): the 300k is Pan and the 1m Augustus; every older name maps straight to the current one
-CLASS_RENAMES = {"seedling": "pan", "keel": "pan", "proxy": "augustus", "pilot": "augustus", "bettor": "explorer", "explorer": "invention", "summit": "trader"}
+# 11 Nov (Justin): the 300k is Faces (was Pan); the 1m Augustus; every older name maps to the current one
+CLASS_RENAMES = {"seedling": "faces", "keel": "faces", "pan": "faces", "proxy": "augustus", "pilot": "augustus", "bettor": "explorer", "explorer": "invention", "summit": "trader"}
 
 
 def _class_names(preset: str) -> set[str]:
@@ -2957,7 +2957,7 @@ _WATERS_FALLBACK = {
         "mac": {"name": "Phaleron", "where": "this Mac mini", "how": "MLX, the Mac lane: internal waters",
                 "at_sea": None, "ships": [], "queued": 0, "voyages": 0, "hours_left": 0,
                 "at_least": False, "clear_at": "", "week": None},
-        "vast": {"name": "Zayton", "where": "GPUs hired from Vast.ai", "how": "torch on CUDA, the Vast lane: outer waters",
+        "vast": {"name": "Piraeus", "where": "GPUs hired from Vast.ai", "how": "torch on CUDA, the Vast lane: the deep waters",
                  "at_sea": None, "ships": [], "queued": 0, "voyages": 0, "hours_left": 0,
                  "at_least": False, "clear_at": "", "week": None, "key": None},
     },
@@ -3068,12 +3068,9 @@ def _api_queue() -> dict:
     root = paths.ROUTER
     all_runs = _runs_rows()
     status = {r["name"]: r["status"] for r in all_runs}
-    wall_sums: dict[str, list] = {}
-    for r in all_runs:
-        if r.get("status") == "finished" and (r.get("wall_minutes") or 0) > 0:
-            p = json.loads(r.get("spec_json") or "{}").get("model", {}).get("preset")
-            wall_sums.setdefault(p, []).append(r["wall_minutes"])
-    wall = {p: sum(v) / len(v) for p, v in wall_sums.items()}
+    from thorp.dash.timing import RunTimes
+
+    times = RunTimes(all_runs)
     # "at sea" means the voyage holds a helm seat now: a run killed with a signal never writes a finish, so
     # the ledger can say running for a voyage that stopped hours ago (9 November, the queue page showing
     # killed 9m arms as at sea). The seats are the authority, the ledger the record. Read every helm slot,
@@ -3089,12 +3086,24 @@ def _api_queue() -> dict:
     # One row a voyage, not one a run: a name that was launched, failed and relaunched has several ledger
     # rows still marked running (10 November: the fulldeck showed twice on the queue page), and the seat is
     # keyed by name, so every stale row on a live name passed the filter.
+    def _fresh(r: dict) -> bool:
+        """A running row with no helm but a live run log: a manually started voyage (or one the
+        coordinator adopted before a restart) is still at sea, and the page should show it."""
+        p = paths.data_dir() / "runs" / f"{r['run_id']}.log"
+        try:
+            return p.exists() and time.time() - p.stat().st_mtime < 900
+        except OSError:
+            return False
+
     newest: dict[str, dict] = {}
     for r in all_runs:
         # an empty helm means nothing is at sea, not every stale `running` row: when the queue is down the
         # seat set is empty, and `(seats and ...)` used to be False, so the killed 9m arms came back
-        # (10 November). Only a helm that could not be read falls back to the ledger.
-        if r["status"] != "running" or (helm_known and r["name"] not in seats):
+        # (10 November). Only a helm that could not be read falls back to the ledger. A live run log
+        # rescues a manual voyage the coordinator did not launch (11 November: the release-pins).
+        if r["status"] != "running":
+            continue
+        if helm_known and r["name"] not in seats and not _fresh(r):
             continue
         cur = newest.get(r["name"])
         if cur is None or str(r.get("started") or "") > str(cur.get("started") or ""):
@@ -3148,6 +3157,33 @@ def _api_queue() -> dict:
             "status": state,
         }
 
+    import time as _time
+    from datetime import datetime, timezone
+
+    from thorp.viable.s2_coordination import lanes as lane_mod
+
+    now = _time.time()
+
+    def _slots(lane: str) -> int:
+        try:
+            return lane_mod.slots_of(lane)
+        except Exception:  # noqa: BLE001  no store on a box: one seat
+            return 1
+
+    two = set(lane_mod.TWO_AT_ONCE)
+    # A lane's seat state: {end, kind}. On the Mac two 300k lines may share the GPU; a 1m or 9m takes
+    # the whole lane, which is the coordinator's capacity rule. This is a schedule, not a sum of means.
+    seat = {lane: [{"end": now, "kind": None} for _ in range(_slots(lane))] for lane in lane_mod.LANES}
+
+    def _started_min(started: str | None) -> float | None:
+        if not started:
+            return None
+        try:
+            d = datetime.fromisoformat(str(started).replace("Z", "+00:00"))
+        except ValueError:
+            return None
+        return max(0.0, (datetime.now(d.tzinfo or timezone.utc) - d).total_seconds() / 60)
+
     rows = []
     for name, ship, started, sj in sea:
         try:
@@ -3157,9 +3193,23 @@ def _api_queue() -> dict:
         if not spec.get("question"):  # the ledger's copy may not keep it; the spec file does
             f = next(iter((root / "specs").rglob(f"{name}.yaml")), None)
             spec = {**spec, **((yaml.safe_load(f.read_text()) or {}) if f else {})}
-        rows.append({**row(name, ship, spec, "at sea", None), "started": started})
+        r = {**row(name, ship, spec, "at sea", None), "started": started}
+        est, source = times.estimate(name, spec)
+        r["est_min"], r["est_source"] = est, source
+        rows.append(r)
+        if est is not None:
+            gone = _started_min(started)
+            left = max(0.0, est - (gone or 0.0))
+            preset = r.get("preset")
+            if preset in two:
+                s = min(seat["mac"], key=lambda x: x["end"])
+                s["end"], s["kind"] = now + left, preset
+            else:
+                for s in seat["mac"]:
+                    s["end"], s["kind"] = now + left, "other"
     lines = _queue_lines()
-    ahead, unknown = 0.0, 0
+    unknown = {lane: False for lane in lane_mod.LANES}  # a voyage ahead with no time yet
+    without_a_time = 0
     for i, ln in enumerate(lines, 1):
         if ln.startswith("cmd:"):
             cmd = ln[4:].strip()
@@ -3173,21 +3223,41 @@ def _api_queue() -> dict:
         p = root / "specs" / f"{ln}.yaml"
         spec = (yaml.safe_load(p.read_text()) or {}) if p.exists() else {}
         name = spec.get("name") or Path(ln).name
+        lane = "vast" if ln.startswith("vast:") else "mac"
         r = row(name, spec.get("ship"), spec, status.get(name) or "queued", i)
         if r["status"] == "running":
             r["status"] = "at sea"
         r["spec"] = ln
+        r["lane"] = lane
         r["missing"] = not p.exists()
-        r["starts_in_min"] = round(ahead)
-        # a voyage ahead of it has no time yet: it sails no sooner than this
-        r["at_least"] = unknown > 0
-        mins = wall.get(r["preset"])
-        if mins is None:
-            unknown += 1
+        est, source = times.estimate(name, spec)
+        r["est_min"], r["est_source"] = est, source
+        if est is None:
+            without_a_time += 1
+            r["starts_in_min"] = None
+            r["at_least"] = unknown[lane]
+            unknown[lane] = True
+            rows.append(r)
+            continue
+        seats = seat[lane]
+        if r["preset"] in two:
+            # only 300k shares a lane with another 300k; a 1m/9m or an unknown line ahead holds it
+            if any(s["kind"] not in (None, *two) for s in seats):
+                start = max(now, max(s["end"] for s in seats))
+                for s in seats:
+                    s["end"], s["kind"] = start, None
+            s = min(seats, key=lambda x: x["end"])
+            start = max(now, s["end"])
+            s["end"], s["kind"] = start + est, r["preset"]
         else:
-            ahead += mins
+            start = max(now, max(s["end"] for s in seats))
+            for s in seats:
+                s["end"], s["kind"] = start + est, "other"
+        r["starts_in_min"] = round(start - now)
+        r["at_least"] = unknown[lane]
         rows.append(r)
-    return {"rows": rows, "hours_left": round(ahead / 60, 1), "without_a_time": unknown}
+    end = max((s["end"] for v in seat.values() for s in v), default=now)
+    return {"rows": rows, "hours_left": round((end - now) / 60, 1), "without_a_time": without_a_time}
 
 
 def _where_of(aboard: dict) -> str:
@@ -4982,24 +5052,45 @@ def api_class_shapes(preset: str) -> dict:
     return {"preset": preset, "fine": list(taxonomy.FINE), "about": taxonomy.ABOUT, "voyages": out}
 
 
-def api_chat(q: dict) -> dict:
-    """One experimental answer from a finished run's latest checkpoint: the /chat page's call. The
-    model loads once per run (thorp.chat caches it); a run with no checkpoint says so in `error`."""
+def api_chat_models() -> dict:
+    """The chat page's list: Nothing up my sleeve's ships on the leaderboard, each resolved to a
+    finished run with a checkpoint, and the foreign ships whose MLX weights are cached. Read from
+    the same cached leaderboard payload as the board."""
     from thorp import chat
 
-    run = q.get("run", "9m@v0.0.6")
+    return {"models": chat.models(api_leaderboard()) + chat.foreign_models()}
+
+
+def api_chat(q: dict) -> dict:
+    """One experimental answer: from a finished Thorp run's latest checkpoint (the `run`), or from a
+    foreign ship's own MLX weights (the `model`). The Thorp model loads once per run (thorp.chat
+    caches it) and the reply carries the audit; a foreign answer is the model's own continuation and
+    has no audit. A run/model with no checkpoint or weights says so in `error`."""
+    from thorp import chat
+
+    run = str(q.get("run") or "")
+    model = str(q.get("model") or "")
     text = q.get("q", "")
+    if not run and not model:
+        return {"error": "no run or model", "run": run, "model": model}
     if not str(text).strip():
-        return {"error": "no question", "run": run}
+        return {"error": "no question", "run": run, "model": model}
     try:
+        tokens = max(1, min(int(q.get("tokens", 80)), 256))
+        temperature = max(0.0, min(float(q.get("temperature", 0.7)), 2.0))
+        if model:
+            return chat.foreign_answer(model, str(text), tokens=tokens, temperature=temperature)
+        step = q.get("step")
         return chat.answer(
             run,
             str(text),
-            tokens=int(q.get("tokens", 80)),
-            temperature=float(q.get("temperature", 0.7)),
+            tokens=tokens,
+            temperature=temperature,
+            step=int(step) if step not in (None, "", 0, "0") else None,
+            with_audit=str(q.get("audit", "1")) not in ("0", "false", "no"),
         )
     except Exception as e:  # noqa: BLE001  the page shows the reason (no checkpoint, no run)
-        return {"error": str(e), "run": run}
+        return {"error": str(e), "run": run, "model": model}
 
 
 def api_ask_questions(preset: str) -> dict:
@@ -5932,6 +6023,7 @@ class Handler(BaseHTTPRequestHandler):
             "/api/constraints": api_constraints_set,
             "/api/vast": api_vast_set,
             "/api/compute": api_compute_set,
+            "/api/chat": api_chat,
         }
         if u.path not in posts:
             return self._send(404, b"not found", "text/plain")
@@ -6067,6 +6159,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/class_deck": lambda: api_class_deck(q["preset"]),
                 "/api/ask_questions": lambda: api_ask_questions(q["preset"]),
                 "/api/chat": lambda: api_chat(q),
+                "/api/chat/models": api_chat_models,
                 "/api/maths_book": lambda: api_maths_book(),
                 "/api/class_subjects": lambda: api_class_subjects(q["preset"]),
                 "/api/class_shapes": lambda: api_class_shapes(q["preset"]),

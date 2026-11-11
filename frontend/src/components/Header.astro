@@ -4,23 +4,17 @@ import { tabCls, tabsCls } from '../lib/ui';
 // light the nav (the pages that keep dynamic sub-routes share their section's shell, so the top
 // path is enough).
 const path = Astro.url.pathname;
-const active = path.startsWith('/expeditions') ? 'expeditions'
+const active = path.startsWith('/expeditions') || path.startsWith('/vsm') || path.startsWith('/governance') ? 'expeditions'
   : path.startsWith('/discoveries') ? 'discoveries'
   : path.startsWith('/leaderboard') ? 'leaderboard'
-  : path.startsWith('/bet') ? 'bet'
-  : path.startsWith('/governance') ? 'governance'
   : path.startsWith('/library') || path.startsWith('/shelves') ? 'library'
-  : path.startsWith('/chat') ? 'chat'
   : 'ships';
 const tabs = [
   { key: 'ships', href: '/harbours', label: 'Places', title: 'the places: the harbours and the shipyard' },
-  { key: 'expeditions', href: '/expeditions', label: 'Expeditions', title: 'the expeditions: what each standard went out to find' },
+  { key: 'expeditions', href: '/expeditions', label: 'Expeditions', title: 'the expeditions: what each standard went out to find, and the VSM (the five systems)' },
   { key: 'discoveries', href: '/discoveries', label: 'Discoveries' },
   { key: 'leaderboard', href: '/leaderboard', label: 'Leaderboard' },
-  { key: 'bet', href: '/bet', label: '$100', title: 'the bet: a 350m for $100 on a rented H100 that bets the right way on quantum physics' },
-  { key: 'governance', href: '/governance', label: 'VSM' },
   { key: 'library', href: '/library', label: 'Library' },
-  { key: 'chat', href: '/chat', label: 'Chat', title: 'chat with a finished ship (experimental)' },
 ];
 ---
 <header>

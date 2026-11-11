@@ -836,6 +836,7 @@ def run_evaluators(spec, rid, step, model, prep, rec: Ledger, log) -> dict:
         languages={b: books[b].language for b in books},
         recipe=list(prep.recipe),
         init_model=lambda: init_model(spec, prep.tokeniser.vocab_size),
+        options=dict((spec.get("eval") or {}).get("options") or {}),
     )
     if "ce_bpb" in spec["eval"]["evaluators"]:  # the only evaluator that writes evals rows, so a
         # re-score with others alone (bpb_split, laws) leaves the step's scores in place

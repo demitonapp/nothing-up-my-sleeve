@@ -95,12 +95,15 @@ def _read_names() -> dict[str, list[tuple[str, str]]]:
 
 
 def models() -> list[dict]:
-    """Every outside model with a reading or a chain grade, biggest first, for the Market Harbour."""
+    """Every outside model with a reading or a chain grade, biggest first, for the Market Harbour. Our own
+    runs' readings are not foreign ships (the `thorp` lab): Zayton holds outside models only."""
     names = _read_names()
     graded = readings.chain_grades()
     params = _params()
     out = []
     for model in set(names) | set(graded):
+        if lab_of(model) == "thorp":
+            continue
         label = _label(model)
         out.append(
             {

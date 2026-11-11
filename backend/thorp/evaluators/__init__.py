@@ -18,6 +18,8 @@ class EvalContext:
     recipe: list[str] = field(default_factory=list)  # the books trained on (probes fit on these)
     # () -> the same architecture at initialisation, the run's own seed: the untrained floor
     init_model: Any = None
+    # evaluator-specific settings from the spec's eval.options (e.g. {"arc": {"limit": 12}})
+    options: dict = field(default_factory=dict)
 
 
 @dataclass
@@ -76,6 +78,8 @@ def get(name: str) -> Evaluator:
         from thorp.evaluators.primers import evaluate_francis as evaluate
     elif name == "ifeval":  # instruction following, the 25 official verifiers (SOP v1.3.0)
         from thorp.evaluators.ifeval import evaluate
+    elif name == "arc":  # ARC-AGI-2, the canonical intelligence test (11 November)
+        from thorp.evaluators.arc import evaluate
     else:
         raise KeyError(f"unknown evaluator {name!r}")
     return evaluate

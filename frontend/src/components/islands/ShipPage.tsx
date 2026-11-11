@@ -7,8 +7,9 @@ import { cardCls, crumbCls, pillCls, selectCls, tabCls, tabsCls } from '@/lib/ui
 import { sectionProps, useApi, useRoute } from '@/lib/useApi';
 import { shipHash } from '@/scripts/router';
 import { isShipPage, loadAboard, shipAddress, chooseShip, shipHeader, stageListHtml } from '@/scripts/views/ship-page';
+import Chat from './Chat';
 
-const TABS = ['betting', 'books', 'languages', 'sieves', 'attention', 'traits'];
+const TABS = ['betting', 'books', 'languages', 'sieves', 'attention', 'traits', 'chat'];
 
 export default function ShipPage() {
   const route = useRoute();
@@ -299,6 +300,15 @@ export default function ShipPage() {
           <section className={cardCls(false, 'panel')}><h2 id="samplesh">Samples</h2><div className="samples" id="samples" /></section>
           <section className={cardCls(false, 'panel')}><h2 id="top10h">Next token</h2><div className="chart" id="top10" /></section>
         </div>
+      </div>
+
+      <div className={`shiptab${tab === 'chat' ? ' active' : ''}`} id="chat">
+        {tab === 'chat' ? (
+          <>
+            <h1>Chat <span className="q">with this ship&apos;s latest checkpoint; experimental, and every answer is audited with the heads and cards that lit</span></h1>
+            <Chat shipKey={key} embedded />
+          </>
+        ) : null}
       </div>
     </div>
   );

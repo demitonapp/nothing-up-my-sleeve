@@ -2404,11 +2404,11 @@ EXPEDITIONS: dict[str, Expedition] = {
 EXPEDITIONS["two_bets"] = Expedition(
     key="two_bets",
     name="The two bets",
-    goal="Pan's word bet against its type bet on the same held-out points (Justin, 8 November: 'Pan must be the "
+    goal="Faces's word bet against its type bet on the same held-out points (Justin, 8 November: 'Pan must be the "
     "best at betting. so its current bet is the next word in a two word sequence. But the other bet should be "
     "about betting the type of the word too. and then we'd compare those scores'): the same model, two ways of "
     "reading its distribution, the next keyed word and the next word's type.",
-    ship="Pan",
+    ship="Faces",
     fleet="First Fleet",
     preset=NURSERY,
     outcomes=(
@@ -2416,11 +2416,11 @@ EXPEDITIONS["two_bets"] = Expedition(
         Outcome("shapes/type_top1_keyed", "higher", "the type bet on the same points"),
     ),
     levers=(Lever("bet", choices=("word", "type"), about="the same checkpoint, two bets"),),
-    stop=StopRule(2, "Pan's two seeds, both bets read from the same checkpoints"),
+    stop=StopRule(2, "Faces's two seeds, both bets read from the same checkpoints"),
     runner="thorp/evaluators/shapes.py",
     results="data/runs/",
     status="planned",
-    ships=("Pan",),
+    ships=("Faces",),
 )
 
 
@@ -2446,13 +2446,15 @@ TERMS = {
 EXPEDITIONS["kipling"] = Expedition(
     key="kipling",
     name="The Kipling Expedition",
-    goal="SOP v0.0.6 (Justin, 9 November), named for Kipling: six honest serving-men (What and Why and When and How and Where and Who) are the question answering, and \"If—\" is a poem of nothing but constraints, which is what instruction following is. Four aims on one standard. (1) Beat IFEval: a class trained to obey the "
+    goal="SOP v0.0.6 (Justin, 9 November), named for Kipling: six honest serving-men (What and Why and When and How and Where and Who) are the question answering, and \"If—\" is a poem of nothing but constraints, which is what instruction following is. Five aims on one standard. (1) Beat IFEval: a class trained to obey the "
     "25 verifiable instructions, scored prompt-level strict on the official 541. (2) Control tokens in our "
     "embeddings: the marked deck against the plain one. (3) Teach question answering to the 9m: the return leg on "
     "the dialogue shelf. (4) Test the probe phase in pretraining: pulse the scaffold down and measure whether the "
     "heads respond — the leak when the pull goes and the recovery when it returns — against the heads that do not "
-    "respond at all. The investigations sail before the learning ships: auditing Qwen3 4B's heads comes first, "
-    "because what the 300k, 1m and 9m are asked to grow is read off that map.",
+    "respond at all. (5) ARC-AGI-2 (11 November, Justin): build the text ARC harness, train an ARC arm on the "
+    "1,000 training tasks and read the 120-task evaluation set — the canonical intelligence ranking, and the test "
+    "the chaining skill is ultimately measured against. The investigations sail before the learning ships: "
+    "auditing Qwen3 4B's heads comes first, because what the 300k, 1m and 9m are asked to grow is read off that map.",
     ship="SOP v0.0.6",
     fleet="Star Fleet",
     preset="300k",
@@ -2460,15 +2462,16 @@ EXPEDITIONS["kipling"] = Expedition(
         Outcome("ifeval/prompt_strict", "higher", "IFEval, prompt-level strict, the official 541"),
         Outcome("ifeval/instruction_strict", "higher", "instruction-level strict, as the proof beside it"),
         Outcome("tricks/logic_test/lift_one_hop", "higher", "following one stated premise: the step before two"),
+        Outcome("arc/pass@2", "higher", "ARC-AGI-2, exact match on the 120-task evaluation set (the canonical intelligence ranking)"),
     ),
     levers=(
         Lever("control tokens", choices=("marked", "plain"), about="the deck's premise/question/answer/end as pieces"),
         Lever("scaffold control", choices=("fixed 10/60", "probe and equilibrium"), about="the dynamic schedule"),
         Lever("class", choices=("300k", "1m", "9m"), about="which learning ship reads the standard"),
     ),
-    stop=StopRule(6, "the investigations first (the Qwen3 4B head census, the control-token arm, the IFEval corpus "
-                     "and its verifiers), then the three learning ships in size order; nothing sails before the "
-                     "investigation it depends on is home"),
+    stop=StopRule(8, "the investigations first (the Qwen3 4B head census, the control-token arm, the IFEval corpus "
+                     "and its verifiers, the ARC harness), then the three learning ships in size order and the ARC "
+                     "arm; nothing sails before the investigation it depends on is home"),
     runner="thorp/train.py",
     results="data/runs/",
     status="planned",
@@ -2488,5 +2491,15 @@ EXPEDITIONS["kipling"] = Expedition(
         {"n": 4, "kind": "ship", "name": "300k@v0.0.6", "detail": "the first learning ship", "queue": "after 1-3"},
         {"n": 5, "kind": "ship", "name": "1m@v0.0.6", "detail": "the second, if the 300k clears its rung", "queue": "after 4"},
         {"n": 6, "kind": "ship", "name": "9m@v0.0.6", "detail": "the third, if the 1m does", "queue": "after 5"},
+        {"n": 7, "kind": "investigation", "name": "the ARC-AGI-2 harness and corpus",
+         "detail": "the 1,000 training tasks serialised as text (thorp/arc.py, scripts/make_arc_corpus.py) and the "
+                   "120-task evaluation set fetched; scripts/score_arc.py reads an outside model on the same form, "
+                   "and the evaluator 'arc' reads a Nothing up my sleeve checkpoint. The first pilot is a subset, "
+                   "labelled as one, never a published score.",
+         "queue": "after 3; the corpus is written and the pilot is run before the arm sails"},
+        {"n": 8, "kind": "ship", "name": "1m@v0.0.6-arc",
+         "detail": "the ARC arm: Ogden, then the ARC training episodes as a post-training stage, with eval.arc set "
+                   "to the 120-task evaluation set and pass@2 the outcome",
+         "queue": "after 7; the ARC corpus and its data.opt_in are written first"},
     ),
 )

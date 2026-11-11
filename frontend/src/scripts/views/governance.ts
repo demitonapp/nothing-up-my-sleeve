@@ -47,7 +47,7 @@ function libraryAudit(au: Payload, open: Set<string>, withCleaning = false): str
     <p class="s">Checked ${when(a.checked_at)}; recomputed in the background every five minutes.</p>`;
 }
 
-export function systemsHtml(d: Payload, voyageName: Record<string, string>, open: Set<string>): string {
+export function systemsHtml(d: Payload, voyageName: Record<string, string>, open: Set<string>, key?: string): string {
   const A = d.audit || {}, sys: Record<string, Payload> = Object.fromEntries((d.systems || []).map((x: any) => [x.key, x]));
   const pol = (A.S3 || {}).policies || {}, stmt = A.S5 || {}, breaking = A.breaking || {};
   const chips = (s: Payload) => (s.members || []).map((m: string) => `<span class="${pillCls('')} mono govchip">${esc(m)}</span>`).join('');
@@ -62,20 +62,27 @@ export function systemsHtml(d: Payload, voyageName: Record<string, string>, open
   const order = Object.keys(pol).sort((a, b) => (b === 'stores' ? 1 : 0) - (a === 'stores' ? 1 : 0) || (pol[b].queued_runs_breaking_it || 0) - (pol[a].queued_runs_breaking_it || 0));
   const s3 = `<div class="govstats">${order.map((k) => { const p = pol[k], n = p.queued_runs_breaking_it || 0, x = p.queued_runs_excepted || 0; return `<div class="govstat${k === 'stores' ? ' big' : ''}${n ? ' warn' : ' ok'}"><b>${n}</b><span>queued voyage${n === 1 ? '' : 's'} breaking <b>${esc(k)}</b> ${enforcedBadge(p.enforced)}${x ? `<br><b class="govexc">${x}</b> excepted${p.exception ? `: ${esc(p.exception)}` : ''}` : ''}</span></div>`; }).join('')}
       <div class="govstat"><b>${(A.S3 || {}).runs_not_finished ?? '–'}</b><span>voyages started and not finished</span></div></div>
-    <p class="s"><a href="/governance/control">S3 control →</a> the gate's latest decisions, the bargains and exceptions in force, the intake gate for books, and the audit (S3*)</p>
+    <p class="s"><a href="/vsm/s3">S3 control →</a> the gate's latest decisions, the bargains and exceptions in force, the intake gate for books, and the audit (S3*)</p>
     ${pol.stores && !pol.stores.enforced && pol.stores.queued_runs_breaking_it ? `<div class="${alertCls('open')}">The stores policy: ${pol.stores.queued_runs_breaking_it} of ${(A.S1 || {}).queued ?? '–'} queued voyages read outside the ship's stores. Whether to enforce it is the decision pending with Justin.</div>` : ''}
     ${order.filter((k) => (breaking[k] || []).length).map((k) => { const isOpen = open.has(k), lines = breaking[k];
       return `<div class="govbreak"><button class="${btnCls('ghost')}" data-gov="${esc(k)}">${isOpen ? '▾' : '▸'} the voyages breaking ${esc(k)} (${pol[k].queued_runs_breaking_it}${lines.length < pol[k].queued_runs_breaking_it ? `, the first ${lines.length} shown` : ''})</button>${isOpen ? `<div class="govlines">${lines.map((l: string) => `<span class="mono">${esc(l)}</span>`).join('')}</div>` : ''}</div>`; }).join('')}`;
   const lints = (A.S2 || {}).queue_lints || [], helmOf = (A.S2 || {}).helm;
   const helmLine = helmOf ? `<div><span class="${pillCls('good')}">at the helm</span> <b>${esc(helmOf.name || '')}</b> <span class="s">${esc(helmOf.kind || '')}${helmOf.pid ? ` · pid ${helmOf.pid}` : ''}${helmOf.since ? ` · since ${esc(String(helmOf.since).slice(11, 16))}` : ''}</span></div>` : '<div class="s">no voyage at the helm (S2 takes it with the next voyage to sail)</div>';
-  const s2 = helmLine + (lints.length ? `<div class="${alertCls('no')}"><ul class="govlints">${lints.map((l: string) => `<li>${esc(l)}</li>`).join('')}</ul></div>` : `<span class="${pillCls('good')}">no collisions</span> <span class="s">the queue lints clean: one GPU, one queue, no shared file written twice</span>`);
+  const s2 = `<div class="govstats"><div class="govstat"><b>${(A.S1 || {}).queued ?? '–'}</b><span>voyages queued</span></div></div>` + helmLine + (lints.length ? `<div class="${alertCls('no')}"><ul class="govlints">${lints.map((l: string) => `<li>${esc(l)}</li>`).join('')}</ul></div>` : `<span class="${pillCls('good')}">no collisions</span> <span class="s">the queue lints clean: one GPU, one queue, no shared file written twice</span>`);
   const vs = (A.S1 || {}).expeditions || (A.S1 || {}).voyages || {}, rank = (st: string) => STATES.indexOf(st);
   const present = STATES.filter((st) => Object.values(vs).includes(st));
   const acq = (A.S1 || {}).acquisition || {}, last = acq.last_intake;
-  const s1 = `<div class="govstats"><div class="govstat"><b>${(A.S1 || {}).queued ?? '–'}</b><span>voyages queued</span></div>${present.map((st) => `<div class="govstat${st === 'awaiting orders' ? ' warn' : ''}"><b>${Object.values(vs).filter((x) => x === st).length}</b><span>expeditions ${esc(st)}</span></div>`).join('')}</div>
+  const s1 = `<div class="govstats">${present.map((st) => `<div class="govstat${st === 'awaiting orders' ? ' warn' : ''}"><b>${Object.values(vs).filter((x) => x === st).length}</b><span>expeditions ${esc(st)}</span></div>`).join('')}</div>
     <div class="govvoy">${Object.entries(vs).sort((a: any, b: any) => rank(a[1]) - rank(b[1])).map(([k, st]: [string, any]) => `<a href="/expeditions/${esc(k)}">${esc(voyageName[k] || k)}</a> ${statePill(st)}`).join('<span class="govsep"></span>')}</div>
-    <div class="govacqline"><a href="/governance/acquisition"><b>Acquisition →</b></a> <span class="s">the books the voyages read, a viable system of its own: ${acq.books != null ? `${acq.books.toLocaleString()} books in the library, about ${big(acq.tokens_est)} tokens` : 'not read yet'}${acq.taking_in ? ` · <b>taking books in now</b> (${esc(acq.taking_in.id || '')})` : ''} · ${last ? `last intake ${esc(String(last.started || '').replace('T', ' ').slice(5, 16))} from ${esc(last.list || '')}` : 'no intake yet'}</span></div>`;
-  return band('S5', s5) + band('S4', s4) + band('S3', s3) + band('S2', s2) + band('S1', s1);
+    <div class="govacqline"><a href="/vsm"><b>Acquisition →</b></a> <span class="s">the books the voyages read, a viable system of its own: ${acq.books != null ? `${acq.books.toLocaleString()} books in the library, about ${big(acq.tokens_est)} tokens` : 'not read yet'}${acq.taking_in ? ` · <b>taking books in now</b> (${esc(acq.taking_in.id || '')})` : ''} · ${last ? `last intake ${esc(String(last.started || '').replace('T', ' ').slice(5, 16))} from ${esc(last.list || '')}` : 'no intake yet'}</span></div>`;
+  const bands: Record<string, string> = {
+    S5: band('S5', s5),
+    S4: band('S4', s4),
+    S3: band('S3', s3),
+    S2: band('S2', s2),
+    S1: band('S1', s1),
+  };
+  return key ? (bands[key] || '') : bands.S5 + bands.S4 + bands.S3 + bands.S2 + bands.S1;
 }
 
 export function controlHtml(g: Payload, q: Payload, au: Payload, open: Set<string>): string {
@@ -104,7 +111,7 @@ export function controlHtml(g: Payload, q: Payload, au: Payload, open: Set<strin
   const refusedBy = (q.S3 || {}).refused_by_rule || {}, observedBy = (q.S3 || {}).observed_breaking || {}, libRules = ((au || {}).audit || {}).rules || {};
   const intake = `<section class="${cardCls(false, 'panel')}"><h2>The intake gate <span class="note">acquisition's S3: the rules a book passes before it enters the library. A rule that serves one of Nothing up my sleeve's S5 policies refuses at an intake; a proposed rule is recorded only, until Justin adopts it. Refused: by intakes; observed: books that came in by thorp fetch or a voyage's preparation, logged with the verdict the gate would have given; in the library: the audit, every registered book</span> ${(q.S3 || {}).enforced ? `<span class="${pillCls('good')}">enforced at intakes</span>` : `<span class="${pillCls('accent')}">switched off (data/policies.json)</span>`}</h2>
     <div class="scroll"><table data-nosort><thead><tr><th>rule</th><th>statement</th><th></th><th>checked</th><th>refused</th><th>observed</th><th>in the library</th></tr></thead><tbody>${(q.S5 || []).map((r: any) => `<tr><td><b>${esc(r.key)}</b></td><td>${esc(r.statement)}</td><td>${r.adopted ? `<span class="${pillCls('good')}">serves ${esc(r.serves)}</span>` : `<span class="${pillCls('accent')}">proposed</span>`}</td><td class="s">${esc(r.when)}</td><td>${refusedBy[r.key] || 0}</td><td>${observedBy[r.key] || 0}</td><td class="${(libRules[r.key] || {}).breaking && r.adopted ? 'warn' : ''}">${libRules[r.key] ? libRules[r.key].breaking : '–'}</td></tr>`).join('')}</tbody></table></div>
-    <p class="s"><a href="/governance/acquisition">Acquisition →</a> its intakes, the log of every book's verdict, the sources and the legal ceiling</p></section>`;
+    <p class="s"><a href="/vsm">Acquisition →</a> its intakes, the log of every book's verdict, the sources and the legal ceiling</p></section>`;
   const audit = `<section class="${cardCls(false, 'panel')}"><h2>The audit (S3*) <span class="note">sporadic and independent of both gates: it reads the books, not the specs. The cleaning audit reads a few books of each store; the library audit reads every registered book against the intake rules</span></h2>
     <h3 class="govsub">Cleaning</h3>${cleaningTable((A['S3*'] || {}).cleaning)}
     <h3 class="govsub">The library</h3>${libraryAudit(au, open)}</section>`;
@@ -113,7 +120,7 @@ export function controlHtml(g: Payload, q: Payload, au: Payload, open: Set<strin
     ${gate}${decisions}<div class="row">${bargains}${exceptions}</div>${intake}${audit}`;
 }
 
-export function acquisitionHtml(q: Payload, au: Payload, open: Set<string>): string {
+export function acquisitionHtml(q: Payload, au: Payload, open: Set<string>, key?: string): string {
   const sys: Record<string, Payload> = Object.fromEntries((q.systems || []).map((x: any) => [x.key, x]));
   const band = (k: string, live: string) => govBand(sys[k] || { key: k }, k, live);
   const s5 = `<div class="scroll"><table data-nosort><thead><tr><th>rule</th><th>statement</th><th>serves</th><th>checked</th></tr></thead><tbody>${(q.S5 || []).map((r: any) => `<tr><td><b>${esc(r.key)}</b></td><td>${esc(r.statement)}</td><td>${r.adopted ? `<span class="${pillCls('good')}">${esc(r.serves)}</span> <span class="s">adopted ${esc(r.policy_adopted || '')}</span>` : `<span class="${pillCls('accent')}">proposed</span> <span class="s">recorded only, until Justin adopts it</span>`}</td><td class="s">${esc(r.when)}</td></tr>`).join('')}</tbody></table></div>
@@ -129,7 +136,7 @@ export function acquisitionHtml(q: Payload, au: Payload, open: Set<string>): str
   const s3a = q.S3 || {}, verdicts = s3a.verdicts || {}, refusedBy = s3a.refused_by_rule || {};
   const s3 = `<div class="govstats">${s3a.enforced ? `<div class="govstat ok"><b>on</b><span>the intake gate refuses on adopted rules</span></div>` : `<div class="govstat warn"><b>off</b><span>the intake gate only records (data/policies.json "intake")</span></div>`}${['admitted', 'refused', 'known', 'observed', 'failed', 'unresolved', 'would fetch'].filter((v) => verdicts[v]).map((v) => `<div class="govstat${v === 'refused' || v === 'failed' ? ' warn' : ''}"><b>${verdicts[v].toLocaleString()}</b><span>${esc(v)}</span></div>`).join('') || `<div class="govstat"><b>0</b><span>verdicts logged</span></div>`}</div>
     ${Object.keys(refusedBy).length ? `<p class="s">Refused at intakes, by rule: ${Object.entries(refusedBy).map(([k, n]) => `<b>${esc(k)}</b> ${n}`).join(' · ')}</p>` : ''}
-    <p class="s"><a href="/governance/control">S3 control →</a> the intake gate beside the voyage gate</p>
+    <p class="s"><a href="/vsm/s3">S3 control →</a> the intake gate beside the voyage gate</p>
     <h3 class="govsub">The audit (S3*)</h3>${libraryAudit(au, open, true)}`;
   const s2a = q.S2 || {}, inn = s2a.intake, h = s2a.helm;
   const s2 = `${inn ? `<div><span class="${pillCls('good')}">taking books in</span> <b class="mono">${esc(inn.id || '')}</b> <span class="s">${esc(inn.list || '')}${inn.since ? ` · since ${esc(String(inn.since).slice(11, 16))}` : ''}</span></div>` : `<div class="s">no intake taking books in: one at a time, by the intake lock (data/acquisition/intake.lock)</div>`}
@@ -142,5 +149,12 @@ export function acquisitionHtml(q: Payload, au: Payload, open: Set<string>): str
       : `<div class="${emptyCls()}">no intake yet: <span class="mono">uv run thorp acquire lists/&lt;list&gt;.csv</span> (add <span class="mono">--dry-run</span> to see the gate's verdicts without fetching)</div>`)
     + `<h3 class="govsub">Every book's verdict, newest first</h3>` + (log.length ? `<div class="scroll ctlscroll"><table data-nosort><thead><tr><th>when</th><th>book</th><th>title</th><th>how</th><th>verdict</th><th>why</th></tr></thead><tbody>${log.map((e: any) => `<tr><td class="s mono">${when(e.at)}</td><td class="mono">${e.book_id ? `<a href="#" data-book="${esc(e.book_id)}">${esc(e.book_id)}</a>` : '–'}</td><td>${esc(cut(e.title, 60))}</td><td class="s">${esc(e.intake || e.how || '')}</td><td>${verdictPill(e.verdict)}</td><td>${why(e) || '<span class="s">–</span>'}</td></tr>`).join('')}</tbody></table></div>`
       : `<div class="${emptyCls()}">no book's verdict logged yet: an intake logs every row, and thorp fetch or a voyage's preparation logs each book new to the library</div>`);
-  return `<div class="govbands">${band('S5', s5)}${band('S4', s4)}${band('S3', s3)}${band('S2', s2)}${band('S1', s1)}</div>`;
+  const bands: Record<string, string> = {
+    S5: band('S5', s5),
+    S4: band('S4', s4),
+    S3: band('S3', s3),
+    S2: band('S2', s2),
+    S1: band('S1', s1),
+  };
+  return key ? (bands[key] || '') : `<div class="govbands">${bands.S5}${bands.S4}${bands.S3}${bands.S2}${bands.S1}</div>`;
 }

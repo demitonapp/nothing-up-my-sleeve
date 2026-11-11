@@ -9,9 +9,13 @@ import foreign from '../../data/foreign.json';
 // that builds the harbour's cards — by `python -m thorp.dash.foreign_keys`: a JSON import works where a
 // Python one cannot, and the harbour and the routes are one list, so a card cannot link a missing page
 export function getStaticPaths() {
-  // keyed by label, so two checkpoints of one model share a page (qwen3-0-6b)
+  // keyed by label, so two checkpoints of one model share a page (qwen3-0-6b); each ship also has
+  // its chat tab at /foreign/<key>/chat (the same island reads the third path segment)
   const keys: string[] = foreign.keys;
-  return keys.map((path: string) => ({ params: { path } }));
+  return keys.flatMap((path: string) => [
+    { params: { path } },
+    { params: { path: `${path}/chat` } },
+  ]);
 }
 ---
 <Layout>

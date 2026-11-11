@@ -258,7 +258,7 @@ export function queueRowsHtml(d: any, rungs: Rung[]): string {
         return rung ? `<a href="${modelHash(rung, 'training')}" title="open ${esc(String(rung.name).toLowerCase().replace(/^the\s+/, '').replace(/[^a-z0-9]+/g, '-'))}'s training page">${label}</a>` : label;
       })()}${r.missing ? ` <span class="${pillCls('bad')}">no spec</span>` : ''}</td>
       <td>${r.sop ? `<span class="${pillCls('accent')}">v${esc(r.sop)}</span>` : '<span class="s">–</span>'}</td>
-      <td class="s">${startsAt(r)}</td>
+      <td class="s" title="${r.est_min == null ? 'no time yet' : `about ${Math.round(r.est_min)} min · ${esc(r.est_source || '')}`}">${startsAt(r)}</td>
       <td class="s">${r.status === 'at sea' ? `<span class="${pillCls('running')}">at sea</span>` : sailsIn(r.starts_in_min, !!r.at_least)}</td></tr>`;
   }).join('')
     || `<tr><td colspan="6" class="${emptyCls(true)}">the queue is empty</td></tr>`;

@@ -43,7 +43,7 @@ export default function SizePage({ initialPath = '/' }: { initialPath?: string }
   const addr = sizeAddress(path);
   const rung = useMemo(() => (ladder.data ? rungFor(ladder.data, addr.key) : null), [ladder.data, addr.key]);
   const tab = MTABS.includes(addr.tab) ? addr.tab : 'overview';
-  // one size, one address: a class slug ('pan') or an old /sizes link is rewritten to the size's preset
+  // one size, one address: a class slug ('faces', or the old 'pan') or an old /sizes link is rewritten to the size's preset
   // ('300k'), the canonical identifier, keeping the tab and sub-view (10 November)
   const canonical = useMemo(
     () => (rung ? modelHref(rung, tab, tab === 'scoring' ? addr.ssub : tab === 'waypoints' ? addr.wsub : addr.osub) : null),

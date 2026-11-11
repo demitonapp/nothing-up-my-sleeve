@@ -123,18 +123,21 @@ def _harbours() -> tuple[dict, ...]:
                 "about": h.about,
                 "depth": h.depth,
                 "ship_builder": h.ship_builder,
+                "foreign": bool(h.foreign_only),
             }
             for h in rows
         )
 
 
 def harbours() -> list[dict]:
-    """Every harbour, shallowest first, as the dashboard and `waters.harbour_for` read it."""
-    return [dict(h) for h in _harbours()]
+    """Every harbour, shallowest first, as the dashboard and `waters.harbour_for` read it. `foreign` is
+    always present: a store's papers row from before the flag is ours, not a foreign harbour."""
+    return [{**dict(h), "foreign": bool(h.get("foreign"))} for h in _harbours()]
 
 
 def harbour(key: str) -> dict | None:
-    return next((dict(h) for h in _harbours() if h["key"] == key), None)
+    h = next((dict(h) for h in _harbours() if h["key"] == key), None)
+    return {**h, "foreign": bool(h.get("foreign"))} if h else None
 
 
 def journeys() -> list[dict]:

@@ -72,14 +72,18 @@ Nevermore above it, no previous-word head below, or still forming. A line says w
 formed and names the nearest heads; a table beneath gives every head's two scores as bars against
 the marks. Play runs the readings in order; the slider and live as on the chart. With none of its voyages at sea, the deck says
 where its next one stands in the queue, and which voyage is at sea instead.
-The Expeditions page opens on **the queue at a glance** (`/api/expeditions/overview`): the voyage at
-sea, a bar of the voyages still to sail coloured by expedition with about how many hours, the queue's
-lints, and per expedition its voyages at sea, queued, its next at #n, finished and failed. An
+The Expeditions page has four tabs, and the fourth keeps them when it opens. **Overview** (`/expeditions`) is the standard in play: one
+**SOP card** per standard at sea and per newer one (`/api/expeditions/overview` `.sops`), with its
+art, version, voyages out and home, and its goals. **Queue** (`/expeditions/queue`) is every voyage
+still to sail, in order, with its goal and about when it sails. **Plans** (`/expeditions/plans`) is
+the standards whose voyages are home, kept as cards under **Earlier standards** (10 November,
+Justin: "move ogden from here to the plans tab"), above a table of **every expedition**: its fleet,
+class, state, voyages at sea, finished, failed and queued, and what it found. An
 expedition's **state** is S2's view (since 16:35), worked out from the helm and the queue, never the
 hand-set word (`declared`, on hover): at sea (at most one), under way, in port, home, paused, and
 **awaiting orders** in the warning colour (declared running with nothing at sea or queued: stalled,
 or done and not closed). The voyage at the **helm** (name, kind, pid, since) shows beside the voyage
-at sea, and in Governance's S2. A ship's
+at sea, and in the VSM's S2. A ship's
 page shows its voyage's **library aboard** (`/api/voyage/<run_id>/library`: each library's stage,
 where it came from, books and hash; its opt-in and refusals), and each voyage chip carries where its
 reading came from (`/api/voyages/where`).
@@ -88,7 +92,12 @@ reading came from (`/api/voyages/where`).
 
 The site is organised the way the project is: classes of ship (model sizes), the ships of each
 class (runs), the voyages they sail on, and the discoveries followed across all of them. The header
-holds the ways in, always:
+holds five ways in, always: **Places** (the classes and ships; the old "Classes"), **Expeditions**
+(the standards, queue and plans; the old "Voyages"), **Discoveries**, **Leaderboard** (the chaining
+boards, the four Faces and the outside ships) and **Library** (the shelves and books). **VSM**
+(the five systems S1–S5, the gate and the audit) is a tab under **Expeditions**; **Chat** is not a
+header tab but an action on a ship's page, Nothing up my sleeve and foreign alike (`/chat?ship=` and
+`/chat?model=`). The five were consolidated from seven on 11 November (the $100 tab went first).
 
 - **Classes** (`#/classes`, home): one card per class of ship, each a model size with one job.
   A class opens its page (`#/classes/<class>`, below), whose first tab is its **fleet**: every
@@ -202,7 +211,19 @@ holds the ways in, always:
   tokens and seconds. Ships not trained on the Q:/A: form don't converse yet, and the page says so.
 - **Leaderboard** (`#/leaderboard`): two boards on chaining two facts, from one table
   (`leaderboard.payload()["table"]`, outside models and Thorp versions together), split by the
-  noise. **Chaining**: the rows whose chaining lift clears +0.03, ranked by it, with the chaining
+  noise and by **size class**: **small** up to 4B, **medium** above 4B up to 30B, **large** above
+  30B, as three tabs (the tab is linkable, `?size=medium`). The small class is the one with
+  readings. A class with no chaining reading yet carries its **five likeliest candidates to
+  approach** (`leaderboard.payload()["candidates"]`, `thorp/candidates.py`), most likely first, each
+  with its published size, why it is likely (the families that chain at 2–4B, the reasoning leaders
+  of the open field, one boundary case that fits a workstation), the evidence held so far (the logic
+  deck's gain and one-hop lift where read), and a **candidate** pill. A candidate is a target, not a
+  result: it enters the chaining board only when it has a chaining lift. Below the two boards is
+  **Reasoning**: ARC-AGI-2, the canonical intelligence ranking (pass@2 on the 120-task evaluation
+  set) — the published scores of the board's models, and Nothing up my sleeve's own reading once the
+  Kipling ARC arm has one. It is a panel of its own because ARC percentages and chaining lift are
+  different scales; a published score is never presented as our measurement, and a pilot is labelled
+  with its task count. **Chaining**: the rows whose chaining lift clears +0.03, ranked by it, with the chaining
   gain (logic deck), passed of 4, each test's lift and share, and what Thorp must match each
   competitor at; Thorp's forecasts join only when they clear the noise too. **Approaching
   chaining** ("the closest to chaining: the cards every chainer holds, then following one premise"):
@@ -308,18 +329,24 @@ holds the ways in, always:
   **its chain**, one rung per class; **where the $100 goes** (the H100 sitting, step by step); **the
   gates** before the $100 is spent, each an open or passed Badge, beside **the risks**. A server
   without `/api/bet` shows an Empty state saying to restart `thorp dash`.
-- **Governance** (`#/governance`, after $100; `thorp/vsm.py`, `/api/governance`): Thorp's rules
+- **VSM** (`/vsm`, a tab under Expeditions; `thorp/vsm.py`, `/api/governance`): Thorp's rules
   as Beer's Viable System Model, five Card bands from S5 at the top to S1, each with its name, purpose,
   its code as Badge chips and its live numbers from `vsm.audit()`. S5 policy: each policy's
   statement, when Justin adopted it, and an enforced or advisory Badge. S4 intelligence: the
   competitors and the reference ladder, linked to the leaderboard. S3 control: per policy, the
   queued runs breaking it and those excepted with the exception's reason (the stores policy large;
-  an Alert while it is advisory and runs break it), each list one ghost Button open. S2 coordination: the queue's lints in an Alert, or a
-  green "no collisions". S1 operations: the runs queued and every voyage with its status, linked, and
-  a line for **acquisition** (its books, tokens and last intake) opening its tab.
+  an Alert while it is advisory and runs break it), each list one ghost Button open. S2 coordination: the voyages queued, the queue's lints in an Alert, or a
+  green "no collisions". S1 operations: every voyage with its status, linked, and
+  acquisition's S1 below it: the library by source and set, the intakes (a dry run marked), and every
+  book's verdict newest first with why.
   Read-only: a policy is switched in `s5.policy_switches` (`thorp s5 switch`), by Justin.
-  Three tabs (a line Tabs nav, `#govnav`): **The five systems** (`#/governance`, the bands above),
-  **S3 control** (`#/governance/control`) and **Acquisition** (`#/governance/acquisition`).
+  The Expeditions sub-tabs stay on the page (`#vnav`: Overview, Queue, Plans, VSM active), then five
+  system tabs (a line Tabs nav, `#govnav`), one per system: **S1 Operations** (`/vsm`, the S1 band and
+  acquisition's S1 below), **S2 Coordination** (`/vsm/s2`, the band and acquisition's S2), **S3
+  Control** (`/vsm/s3`, the band, the control detail and acquisition's S3), **S4 Intelligence**
+  (`/vsm/s4`, the band and acquisition's S4) and **S5 Policy** (`/vsm/s5`, the band and acquisition's
+  S5). The old `/governance` addresses redirect to `/vsm` (`/governance/control` to `/vsm/s3`,
+  `/governance/acquisition` to `/vsm`).
   - **S3 control** builds out the S3 band: a summary band (policies enforced, queued voyages an enforced
     policy would refuse, bargains, decisions recorded and refusals among them); **the gate** (a table per
     policy: statement and adoption, enforced or advisory, whether it admits an opt-in, and over the queue
@@ -333,18 +360,20 @@ holds the ways in, always:
     (S3\*)**: the cleaning audit (per store, words per line break and the share of breaks inside a
     paragraph, raw → cleaned, and whether cleaning gives the same text every time) and the library audit.
   - **Acquisition** is the books the voyages read as a viable system one level down
-    (`thorp/acquisition.py`, `/api/acquisition`, its audit `/api/acquisition/audit` kept warm), five
-    bands like Thorp's own. S5: the rules (serves which policy and when adopted, or proposed). S4: the
-    legal Gutenberg against what is in the library (big numbers and a meter), what is reachable beyond
-    it, and the sources table (holds, after Thorp's rule, licence, access, the wall where there is one,
-    and a status Badge: admitted, gated, walled, or what S5 it awaits), with the gather pipeline's
-    line (how many books from scanned sources, and the command that adds more). S3: the intake gate on or off, the verdicts logged, refusals by rule,
-    and the library audit (each rule's breaking books by set, one ghost Button opening them full width
-    beneath the row, each book opening in the reader; duplicates, missing files, a sample re-hashed and
-    checked for boilerplate) with the cleaning audit. S2: the intake lock's holder, the helm (acquisition
-    never takes it), the request interval, each source's cache. S1: the library by source and set, the
-    intakes (a dry run marked), and every book's verdict newest first with why. Empty states name the
-    command: `uv run thorp acquire lists/<list>.csv [--dry-run]` for a list, and
+    (`thorp/acquisition.py`, `/api/acquisition`, its audit `/api/acquisition/audit` kept warm). Its five
+    systems sit in the VSM's same-numbered tabs, below each band: **S5** the rules (which policy each
+    serves and when adopted, or proposed); **S4** the legal Gutenberg against what is in the library
+    (big numbers and a meter), what is reachable beyond it, and the sources table (holds, after Thorp's
+    rule, licence, access, the wall where there is one, and a status Badge: admitted, gated, walled, or
+    what S5 it awaits) with the gather pipeline's line; **S3** the intake gate on or off, the verdicts
+    logged, refusals by rule, and the library audit (each rule's breaking books by set, one ghost
+    Button opening them full width beneath the row, each book opening in the reader; duplicates, missing
+    files, a sample re-hashed and checked for boilerplate) with the cleaning audit; **S2** the intake
+    lock's holder, the helm (acquisition never takes it), the request interval, each source's cache;
+    **S1** the library by source and set, the intakes (a dry run marked), and every book's verdict
+    newest first with why. There is no acquisition tab of its own: the whole acquisition is the VSM's
+    five systems at the next level down (Beer's recursion). Empty states name the command:
+    `uv run thorp acquire lists/<list>.csv [--dry-run]` for a list, and
     `uv run thorp gather SOURCE [--limit N] [--dry-run]` for a bulk corpus (`thorp gather --list`).
 - **Shelves** (`#/shelves`) opens on **Fitouts** (`thorp.shelves.fitouts`, kept warm like the
   shelves): a fitout is the training material matched to its stages. Every fitout, curated

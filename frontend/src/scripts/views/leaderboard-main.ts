@@ -50,7 +50,7 @@ export function smokingHtml(sq: any): { head: string; backtest: string; rule: st
   return { head: head + head2, backtest, rule: 'Claimed when forecastable (three classes above the noise) and P ≥ 0.9 on the straight line for every competitor in the range; "probable" when only the bending curve reaches 0.9.' };
 }
 
-export function boardHtml(lb: any, sq: any, rungs: Rung[], showFc: boolean, showPy: boolean): { head: string; body: string; approach: string; thr: string; note: string } {
+export function boardHtml(lb: any, sq: any, rungs: Rung[], showFc: boolean, showPy: boolean, sizeClass = 'small'): { head: string; body: string; approach: string; thr: string; note: string } {
   const thr = lb.threshold ?? 0.1, tests = lb.tests || [];
   const rankOf = classRankOf(rungs);
   const pts = ((sq.thorp || {}).points || []).filter((p: any) => p.params && p.chaining_lift != null);
@@ -73,10 +73,10 @@ export function boardHtml(lb: any, sq: any, rungs: Rung[], showFc: boolean, show
     return { kind: 'outside', model: r.model, name: r.name, maker: makerOf(r.model), competitor: r.kind === 'competitor', params: r.params ?? (range[r.model] || {}).params ?? null,
       lift: r.chaining_lift, passed: r.passed, tests: testsOf(r), logic: r.logic, tenth: range[r.model], src: r };
   };
-  const table = lb.table || [];
+  const table = (lb.table || []).filter((r: any) => (r.size_class || 'small') === sizeClass);
   const rows = table.filter((r: any) => r.group === 'chaining' && (showPy || r.kind !== 'ladder')).sort((a: any, b: any) => a.rank - b.rank).map(asRow);
   const seen = new Set(table.map((r: any) => r.model).filter(Boolean));
-  for (const c of sq.range || []) if (!seen.has(c.model)) rows.push({ kind: 'outside', name: c.label, maker: makerOf(c.model), competitor: true, params: c.params, lift: null, pending: true });
+  if (sizeClass === 'small') for (const c of sq.range || []) if (!seen.has(c.model)) rows.push({ kind: 'outside', name: c.label, maker: makerOf(c.model), competitor: true, params: c.params, lift: null, pending: true });
   // the approaching board
   const approachRows = table.filter((r: any) => r.group === 'approaching').sort((a: any, b: any) => a.rank - b.rank).map((r: any) => ({ ...asRow(r), src: r }));
   const approach = approachRows.map((r: any) => {
@@ -93,7 +93,7 @@ export function boardHtml(lb: any, sq: any, rungs: Rung[], showFc: boolean, show
   }).join('');
   // forecasts
   let fcNoise = 0;
-  if (showFc && (fits.straight || fits.bending)) {
+  if (showFc && sizeClass === 'small' && (fits.straight || fits.bending)) {
     const measured = new Set(table.filter((r: any) => r.kind === 'thorp').map((r: any) => (r.ship_key || '').split(':')[0]));
     const at = rungs.filter((r) => !measured.has(r.preset) && r.total).map((r) => ({ cls: r.preset, params: r.total }));
     if (sq.smoke_at && !at.some((a) => Math.abs(a.params - sq.smoke_at) / sq.smoke_at < 0.1)) at.push({ label: `Nothing up my sleeve ${fmtParams(sq.smoke_at)}`, params: sq.smoke_at, smoke: true } as any);
@@ -134,6 +134,71 @@ export function boardHtml(lb: any, sq: any, rungs: Rung[], showFc: boolean, show
   return { head, body, approach, thr: String(thr), note: note2 };
 }
 
+
+/** The candidates to approach in a size class with no chaining reading yet: five targets, most
+ *  likely first, with the reason each is likely and the evidence held so far. A candidate is not
+ *  ranked on a chaining lift it does not have; its logic-deck reading, where one exists, is shown
+ *  beside. */
+export function candidatesHtml(cands: any[], sizeClass: string): { head: string; body: string; count: string } {
+  const label = sizeClass === 'medium' ? 'medium' : 'large';
+  const head = '<tr><th>#</th><th>candidate</th><th>parameters</th><th>why it is likely</th><th>the evidence so far</th><th>status</th></tr>';
+  const body = (cands || []).map((c: any) => {
+    const params = `${fmtParams(c.params)}${c.active ? `<div class="s">${fmtParams(c.active)} active</div>` : ''}`;
+    const arc = c.arc ? `ARC-AGI-2 <b>${Number(c.arc.score).toFixed(1)}</b> <span class="s">pass@2</span><div class="s">${esc(c.arc.source)}</div>` : '';
+    const logic = c.logic
+      ? `logic deck <b>${signed(c.logic.gain)}</b> gain, ${signed(c.logic.one_hop)} one-hop<div class="s">${Math.round(100 * c.logic.score)}% of items right</div>`
+      : '';
+    const evidence = [arc, logic].filter(Boolean).join('<div class="s">·</div>') || '<span class="s">not read yet</span>';
+    const link = c.source ? ` · <a href="${esc(c.source)}" target="_blank" rel="noopener">model card</a>` : '';
+    return `<tr class="lb-candidate"><td>${c.rank}</td>
+      <td><b>${esc(c.label)}</b><div class="s">${esc(c.lab)}${link}</div></td>
+      <td>${params}</td><td class="candwhy">${esc(c.why)}</td><td>${evidence}</td>
+      <td><span class="${pillCls('accent')}">candidate</span>${c.note ? `<div class="s">${esc(c.note)}</div>` : ''}</td></tr>`;
+  }).join('') || `<tr><td colspan="6" class="${emptyCls(true)}">no ${esc(label)} candidates</td></tr>`;
+  return { head, body, count: `${(cands || []).length} candidate${(cands || []).length === 1 ? '' : 's'}` };
+}
+
+/** The canonical intelligence ranking: the published ARC-AGI-2 scores (pass@2 on the 120-task
+ *  evaluation set), and Nothing up my sleeve's own reading once the Kipling ARC arm has one. It is a
+ *  separate panel because ARC percentages and chaining lift are different scales, not two columns of
+ *  one table. */
+export function reasoningHtml(r: any): { head: string; body: string; count: string } {
+  const head = '<tr><th>model</th><th>ARC-AGI-2 <span class="s">pass@2</span></th><th>the reading</th></tr>';
+  const published = (r?.published || []).map((x: any) => `<tr class="lb-outside"><td><b>${esc(x.label)}</b><div class="s">${esc(x.model)}</div></td>
+    <td><b>${Number(x.score).toFixed(1)}</b></td><td class="s">${esc(x.source)} · ${esc(x.date)}${x.url ? ` · <a href="${esc(x.url)}" target="_blank" rel="noopener">leaderboard</a>` : ''}</td></tr>`).join('');
+  const measured = (r?.measured || []).map((x: any) => `<tr class="lb-candidate"><td><b>${esc(x.label)}</b><div class="s">${esc(x.model)}</div></td>
+    <td><b>${Number(x.score).toFixed(1)}</b><div class="s">${x.tasks || 0} tasks${x.cell_accuracy != null ? ` · ${Math.round(100 * x.cell_accuracy)}% cells` : ''}</div></td><td class="s">${esc(x.source)}${x.mode ? ` · ${esc(x.mode)}` : ''}</td></tr>`).join('');
+  const earlier = measured ? `<tr class="lb-group"><td colspan="3" class="s">our readings — pilots, not published scores</td></tr>${measured}` : '';
+  const thorp = r?.thorp
+    ? `<tr class="lb-thorp"><td><b>Nothing up my sleeve</b><div class="s">${esc(r.thorp.ship || r.thorp.run || '')}</div></td><td><b>${Number(r.thorp.score).toFixed(1)}</b></td><td class="s">${esc(r.thorp.note || 'our own reading')}</td></tr>`
+    : `<tr class="lb-thorp"><td><b>Nothing up my sleeve</b><div class="s">no ARC-AGI-2 reading yet</div></td><td><span class="s">not yet run</span></td><td class="s">the Kipling ARC arm is the first attempt; <b>scripts/score_arc.py</b> scores an outside model today</td></tr>`;
+  return { head, body: published + earlier + thorp, count: `${(r?.published || []).length} published` };
+}
+
+/** The Face scorecard (11 November): the four Faces' abilities, the mark each must reach, Qwen 3 4B
+ *  the reference, and the fleet's best of each class. A ✓ is at or above the mark, ≈ within 10% of it;
+ *  the cell's title names the run that gave a class's reading. The Mover is its one-hop ability: its
+ *  look is a diffuse head in Qwen and the 300k alike, so it is not the card's read. */
+export function facesHtml(f: any, rungs: Rung[]): { head: string; body: string } {
+  const keys = ['nevermore', 'counter', 'scales', 'mover'];
+  const cols: Record<string, string> = { nevermore: 'copy gain', counter: 'sentence-position R²', scales: 'order gain', mover: 'one-hop lift' };
+  const marks = f.marks || {};
+  const cell = (v: number | undefined, k: string, held: boolean, near: boolean, from?: string) => {
+    if (v == null) return '<span class="s">–</span>';
+    const m = marks[k];
+    const title = `${from ? `the run: ${from}. ` : ''}${held ? 'at or above' : near ? 'within 10% of' : 'below'} the mark (${m})`;
+    return `<span class="${held ? 'good' : near ? 'accent' : ''}" title="${esc(title)}">${v.toFixed(3)}${held ? ' ✓' : near ? ' ≈' : ''}</span>`;
+  };
+  const heldCell = (held: string[], near: string[]) => `${held.length} of ${keys.length}${near.length ? ` <span class="s">${near.length} near</span>` : ''}`;
+  const head = `<tr><th>model</th>${keys.map((k) => `<th>${esc(f.names?.[k] || k)}<div class="s">${cols[k]} · ${marks[k]}</div></th>`).join('')}<th>Faces held</th></tr>`;
+  const refRows = (f.reference || []).map((r: any) => `<tr class="lb-outside"><td><a href="/leaderboard/competitor/${encodeURIComponent(r.model)}"><b>${esc(r.label)}</b></a> <span class="${pillCls('blue')}">2–4B</span><div class="s">the reference</div></td>
+    ${keys.map((k) => `<td>${cell(r.values?.[k], k, (r.held || []).includes(k), (r.near || []).includes(k))}</td>`).join('')}<td>${heldCell(r.held || [], r.near || [])}</td></tr>`).join('');
+  const fleetRows = (f.fleet || []).map((r: any) => `<tr class="lb-thorp"><td>${classLink(rungs, r.preset)}<div class="s">best of its ships</div></td>
+    ${keys.map((k) => `<td>${cell(r.values?.[k], k, (r.held || []).includes(k), (r.near || []).includes(k), r.from?.[k])}</td>`).join('')}<td>${heldCell(r.held || [], r.near || [])}</td></tr>`).join('');
+  const body = refRows + (fleetRows ? `<tr class="lb-group"><td colspan="${keys.length + 2}" class="s">the fleet — each class's best of its ships for that Face</td></tr>${fleetRows}` : '')
+    || `<tr><td colspan="${keys.length + 2}" class="${emptyCls(true)}">no Face readings yet</td></tr>`;
+  return { head, body };
+}
 
 export async function drawSmokingChart(sq: any): Promise<void> {
   if (!sq || !document.getElementById('sqchart')) return;

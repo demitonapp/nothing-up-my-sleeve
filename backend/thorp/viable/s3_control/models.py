@@ -359,15 +359,16 @@ class Harbour(Base):
     __tablename__ = "harbours"
     __table_args__ = {"schema": SHIP_SCHEMA}
 
-    key: Mapped[str] = mapped_column(Text, primary_key=True)  # phaleron, zayton
+    key: Mapped[str] = mapped_column(Text, primary_key=True)  # phaleron, piraeus, zayton
     ordinal: Mapped[int] = mapped_column(Integer, unique=True)
     name: Mapped[str] = mapped_column(Text, unique=True)
     aka: Mapped[str] = mapped_column(Text, default="", server_default="")
-    lane: Mapped[str] = mapped_column(Text)  # mac or vast
+    lane: Mapped[str] = mapped_column(Text)  # mac, vast, or foreign
     location: Mapped[str] = mapped_column(Text, default="", server_default="")
     about: Mapped[str] = mapped_column(Text, default="", server_default="")
     depth: Mapped[int | None] = mapped_column(BigInteger)  # the most parameters that may lie here; None: no bottom
     ship_builder: Mapped[str] = mapped_column(Text, default="", server_default="")  # who builds and signs the supplies
+    foreign_only: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")  # outside models, not ours
 
 
 class Size(Base):

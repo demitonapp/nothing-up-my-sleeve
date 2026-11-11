@@ -15,15 +15,15 @@ export const slugOf = (r: { name: string }): string =>
 // classes renamed (old address name -> new; server.py CLASS_RENAMES): either name opens the size,
 // and the address is rewritten to the size's current name
 export const CLASS_RENAMES: Record<string, string> = {
-  seedling: 'pan', keel: 'pan', proxy: 'augustus', pilot: 'augustus', bettor: 'explorer', summit: 'trader',
-}; // 8 Nov: the 300k Pan, the 1m Augustus
+  seedling: 'faces', keel: 'faces', pan: 'faces', proxy: 'augustus', pilot: 'augustus', bettor: 'explorer', summit: 'trader',
+}; // 11 Nov: the 300k is Faces (was Pan); 8 Nov: the 1m Augustus
 export const CLASS_ALIASES: Record<string, string> = Object.fromEntries(
   Object.entries(CLASS_RENAMES).flatMap(([a, b]) => [[a, b], [b, a]]),
 );
 
 export const MTABS = ['overview', 'fleet', 'goals', 'training', 'scoring', 'waypoints', 'sops', 'fitouts', 'bet'];
-export const STABS = ['betting', 'books', 'languages', 'sieves', 'attention', 'traits'];
-export const STAB_EL: Record<string, string> = { betting: 'betting', books: 'books', languages: 'languages', sieves: 'sieves', attention: 'attention', traits: 'traits-section' };
+export const STABS = ['betting', 'books', 'languages', 'sieves', 'attention', 'traits', 'chat'];
+export const STAB_EL: Record<string, string> = { betting: 'betting', books: 'books', languages: 'languages', sieves: 'sieves', attention: 'attention', traits: 'traits-section', chat: 'chat' };
 export const OLD_SHIP: Record<string, string> = { betting: 'betting', books: 'books', languages: 'languages', sieves: 'sieves', attention: 'attention', 'traits-section': 'traits' };
 export const SECTION_NAV: Record<string, string> = { sizes: 'ships', rung: 'ships', ship: 'ships', 'runs-section': 'ships', foreign: 'ships', voyages: 'expeditions', voyage: 'expeditions', table: 'expeditions', discoveries: 'discoveries', leaderboard: 'leaderboard', competitor: 'leaderboard', lab: 'leaderboard', governance: 'governance', bet: 'bet', shelves: 'library' };
 // an expedition page's tabs (UI.md, "Expeditions"): the same five for every expedition; one that doesn't apply is hidden
@@ -46,7 +46,7 @@ export interface Route {
 // A rung is addressed by its preset (its size, the canonical identifier) or by its class slug (an old
 // alias the page resolves and rewrites to the preset); both live on the ships page.
 const RUNG_PRESETS = new Set(['300k', '1m', '9m', '21m', '50m', '100m', '350m',
-  'pan', 'augustus', 'speller', 'stylist', 'paragraph', 'invention', 'trader']);
+  'faces', 'pan', 'augustus', 'speller', 'stylist', 'paragraph', 'invention', 'trader']); // 'pan' is the old address
 
 export function route(h: string): Route {
   if (h.startsWith('/')) {

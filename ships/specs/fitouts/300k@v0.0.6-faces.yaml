@@ -1,0 +1,121 @@
+# The first faces candidate (11 November): the four Faces' chains pinned and riddled, on Ogden v0.1,
+# the standard's content. The card set is the one the audit points at: the four chains' Basics and
+# Stage 1s (previous-word, delimiter, number-spotter, rare-word, order-word, premise-marker,
+# words-back, induction), the comparator riddle and the bridge riddle (all four relations). The
+# ten-pin arm is the control: does the chain-shaped set hold the Faces better than the ten pins, or
+# crowd them? The content arms test the join separately.
+name: 300k@v0.0.6-faces
+ship: 'SOP v0.0.6 at 300k (the four Faces, Ogden)'
+experiment: 'The four Faces at 300k: the card set chosen for the Face chains, on Ogden v0.1, the standard content.'
+question: 'The first faces candidate at 300k: the four Faces'' chains — previous-word, delimiter,
+  number-spotter, rare-word, order-word, premise-marker, words-back and induction, with the comparator
+  and bridge riddles — on Ogden v0.1, the ten-pin arm''s content and tokeniser. Do the four Faces hold
+  together on the chain-shaped card set, and does the join appear? Read against 300k@v0.0.6-pins (the
+  ten pins) and the cause arms (the content experiment).'
+departures:
+- field: scaffold
+  why: the four-Face card set (eight heads and two riddles), not the standard's card order; the
+    Faces experiment's card set
+data:
+  recipe: lists/ogden-v0.1.csv
+  passes: 4
+  order: shuffled
+  refuse:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+  - lists/hole-cards-unseen.csv
+  clean: unwrap-v2
+tokeniser:
+  kind: spm-bpe
+  vocab: 2048
+  byte_fallback: true
+  train_on: lists/ogden-v0.1.csv
+model:
+  family: gpt
+  preset: 300k
+  context: 1024
+  positions: rope
+optim:
+  name: adamw
+  lr: 0.003
+  betas:
+  - 0.9
+  - 0.95
+  weight_decay: 0.1
+  warmup_steps: 100
+  schedule: cosine
+  min_lr_ratio: 0.1
+  batch_tokens: 32768
+  grad_clip: 1.0
+  precision: bf16
+  scaffold:
+    weight: 1.0
+    hold: 0.25
+    fade: 1.0
+    heads:
+    - layer: 0
+      head: 0
+      card: previous_word
+    - layer: 0
+      head: 1
+      card: delimiter
+    - layer: 1
+      head: 0
+      card: number_spotter
+    - layer: 1
+      head: 1
+      card: rare_word
+    - layer: 2
+      head: 0
+      card: order_word
+    - layer: 2
+      head: 1
+      card: premise_marker
+    - layer: 3
+      head: 0
+      card: words_back
+      from: 0.05
+    - layer: 4
+      head: 0
+      card: induction
+      from: 0.1
+    riddles:
+      comparator:
+        layer: 3
+        head: 1
+        items: 16
+        pool: 2048
+        from: 0.1
+      bridge:
+        layer: 4
+        items: 32
+        pool: 4096
+        kinds: all
+        from: 0.2
+eval:
+  sets:
+  - lists/hole-cards-unseen.csv
+  every_steps: 640
+  evaluators:
+  - ce_bpb
+  - discovery
+  - logic
+  - stars
+  - nevermore
+  - cards
+  - shapes
+  - pips
+  - soundings
+  light:
+    every_steps: 64
+    evaluators:
+    - stars
+    - nevermore
+    - cards
+    - logic
+    - shapes
+    - pips
+checkpoint:
+  every_steps: 640
+sop: '0.0.6'
+seed: 1

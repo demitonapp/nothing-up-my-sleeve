@@ -73,12 +73,16 @@ CLASSES: dict[str, str] = {
     "throwing hard shadows across the board",
 }
 
-# The harbours (Justin, 8 November: "i want two fal images for them"): Phaleron, Athens' first harbour, and the Market Harbour,
-# the first great trading harbour. Landscape, for the harbour tiles.
+# The harbours (Justin, 8 November: "i want two fal images for them"; 11 November: Piraeus beside Phaleron): Phaleron,
+# Athens' first harbour, Piraeus, Themistocles' deep harbour beside it, and Zayton, the Market Harbour where the foreign
+# ships lie. Landscape, for the harbour tiles.
 HARBOURS: dict[str, str] = {
     "phaleron": "the ancient Greek harbour of Phaleron at night, a sheltered curved bay of calm black water, a row of "
     "small beached wooden triremes and young ships drawn up on the shingle, shipwrights and trainee oarsmen with "
     "torches, a stone breakwater, the lamplit hills of Athens and the Acropolis faint on the dark horizon",
+    "piraeus": "the ancient deep harbour of Piraeus at night, a great circular naval basin ringed by long stoas and "
+    "dry docks, deep water and tall stone moles, large war galleys and deep-draught merchant ships moored in rows, "
+    "lanterns along the quays, ship sheds and arsenals behind, the dark sea beyond the harbour mouth",
     "zayton": "a vast ancient trading harbour at night, lantern-lit quays crowded with bales of silk and sacks of "
     "spice, merchants of many nations bargaining, dhows, junks and tall merchantmen moored in rows with their "
     "sails furled, a camel caravan arriving down to the water, countless lamps reflected in the black harbour",

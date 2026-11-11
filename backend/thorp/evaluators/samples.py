@@ -28,15 +28,20 @@ NEW_TOKENS = 60
 TEMPERATURE = 0.8
 
 
-def generate(model, tok, prompt: str, temperature: float, n: int, context: int, key) -> str:
+def generate(model, tok, prompt: str, temperature: float, n: int, context: int, key, stop_at_eos: bool = False) -> str:
     """`key` is an MLX random key for an MLX model, an integer seed for a torch one (whose draws are
-    numpy's, so the two backends' samples differ even from the same weights)."""
+    numpy's, so the two backends' samples differ even from the same weights). With `stop_at_eos`,
+    generation ends at the model's end-of-text mark (ARC-AGI-2 reads the answer, not the padding)."""
     ids = tok.encode(prompt)
     out = []
+    eos = getattr(tok, "eos_id", None)
     if ops.is_torch(model):
         rng = np.random.default_rng(key)
         for _ in range(n):
-            out.append(_pick(ops.last_logits(model, [(ids + out)[-context:]])[0], temperature, rng))
+            nxt = _pick(ops.last_logits(model, [(ids + out)[-context:]])[0], temperature, rng)
+            if stop_at_eos and eos is not None and nxt == eos:
+                break
+            out.append(nxt)
         return tok.decode(out)
     import mlx.core as mx
 
@@ -47,7 +52,10 @@ def generate(model, tok, prompt: str, temperature: float, n: int, context: int, 
             nxt = mx.argmax(logits)
         else:
             nxt = mx.random.categorical(logits / temperature, key=mx.random.split(key, n)[i])
-        out.append(int(nxt.item()))
+        token = int(nxt.item())
+        if stop_at_eos and eos is not None and token == eos:
+            break
+        out.append(token)
     return tok.decode(out)
 
 

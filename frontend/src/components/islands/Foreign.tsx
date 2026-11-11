@@ -3,8 +3,9 @@
 // panel converted from dashboard.ts to a typed client island (the rest follow it).
 
 import { big } from '@/lib/format';
-import { crumbCls, emptyCls, pillCls } from '@/lib/ui';
+import { btnCls, crumbCls, emptyCls, pillCls, tabCls, tabsCls } from '@/lib/ui';
 import { sectionProps, useApi, useRoute } from '@/lib/useApi';
+import Chat from './Chat';
 
 interface ForeignLogic {
   [k: string]: number | null | undefined;
@@ -36,8 +37,11 @@ const Stat = ({ k, v, s }: { k: string; v: string; s?: string }) => (
 
 export default function Foreign() {
   const route = useRoute();
-  const key = decodeURIComponent((route.split('/')[2] || '').trim());
+  const parts = route.split('/').filter(Boolean); // ['foreign', key, tab?]
+  const key = decodeURIComponent((parts[1] || '').trim());
+  const tab = parts[2] === 'chat' ? 'chat' : 'readings';
   const { data: d, error } = useApi<ForeignData>(key ? `/api/foreign?key=${encodeURIComponent(key)}` : null);
+  const href = (t: string): string => `/foreign/${encodeURIComponent(key)}${t === 'chat' ? '/chat' : ''}`;
 
   return (
     <div {...sectionProps('foreign')}>
@@ -60,7 +64,23 @@ export default function Foreign() {
       ) : !d ? (
         <div className={emptyCls()}>reading the foreign ship…</div>
       ) : (
-        <ForeignBody d={d} />
+        <>
+          <nav className={tabsCls('line', 'subnav')} data-orientation="horizontal" data-variant="line" id="foreignnav">
+            <a className={tabCls('')} data-state={tab === 'readings' ? 'active' : 'inactive'} href={href('readings')}>Readings</a>
+            <a className={tabCls('')} data-state={tab === 'chat' ? 'active' : 'inactive'} href={href('chat')}>Chat</a>
+          </nav>
+          <div className={`shiptab${tab === 'readings' ? ' active' : ''}`}>
+            <ForeignBody d={d} />
+          </div>
+          <div className={`shiptab${tab === 'chat' ? ' active' : ''}`}>
+            {tab === 'chat' ? (
+              <>
+                <h1>Chat <span className="q">with this foreign ship&apos;s own weights; its answer is a continuation, with no head audit (the audit reads our own GPT)</span></h1>
+                <Chat modelKey={d.key} embedded />
+              </>
+            ) : null}
+          </div>
+        </>
       )}
     </div>
   );
@@ -77,6 +97,10 @@ function ForeignBody({ d }: { d: ForeignData }) {
   return (
     <>
       <img className="foreignart" src={`/art/${encodeURIComponent(d.key)}.png`} alt="" loading="lazy" onError={(e) => e.currentTarget.remove()} />
+      <p style={{ margin: '8px 0 14px' }}>
+        <a className={btnCls()} href={`/foreign/${encodeURIComponent(d.key)}/chat`}>Chat with this ship</a>{' '}
+        <span className="note">experimental: the foreign ship&apos;s own MLX weights answer, if they are cached; no head audit on an outside model.</span>
+      </p>
       <div className="harbourrules">
         <div className="k">
           A spyglass, not a ship of ours{' '}

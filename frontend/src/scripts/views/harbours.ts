@@ -117,9 +117,10 @@ export function harbourCardsHtml(ladder: Payload): string {
   }).join('');
 }
 
-/** A class's art key where it differs from its name: the 300k's class is called Faces and its plate is Pan
- *  (the 300k is Pan, playing cards with the universe), so the card had drawn no frame at all. */
-const CLASS_ART: Record<string, string> = { faces: 'pan' };
+/** A class's art key where it differs from its name. None does today: the 300k is the towing tank and its
+ *  plate is `towing-tank` (it was Faces wearing Pan's plate, which is why this table exists); the 1m is the
+ *  measured mile and wears `measured-mile`. */
+const CLASS_ART: Record<string, string> = {};
 const classArt = (name: string): string => CLASS_ART[classSlug(name)] || classSlug(name);
 
 function shipCard(ladder: Payload, r: any): string {
@@ -229,7 +230,7 @@ export function harbourShipsHtml(ladder: Payload, key: string, band: SizeBand | 
         return `<a class="${cardCls(true, 'card classcard rungcard')}" href="/ships/${encodeURIComponent(r.preset)}">
           ${art ? `<img class="cardart" src="/art/${art}.png" alt="" loading="lazy">` : ''}
           <div class="top"><span class="preset">${esc(r.preset)}</span><span class="nm">${esc(rungName(r.preset, r.name))}</span></div>
-          <div class="job">${esc(r.name || '')}${r.role ? ` · ${esc(r.role)}` : ''}</div>
+          <div class="job">${[sameName(rungName(r.preset, r.name), r.name) ? '' : esc(r.name || ''), r.role ? esc(r.role) : ''].filter(Boolean).join(' · ')}</div>
           <div class="foot"><span>${big(r.total)} parameters</span><span class="s">${esc(String(r.status || ''))}</span></div></a>`;
       }).join('')}</div></div>`;
   })();
@@ -269,15 +270,21 @@ export const harbourTabs = (ladder: Payload, key: string | null): { ships: strin
 
 /** The shipyard's three sections, as cards like the harbours' (the landing at /shipyard). */
 /** The ladder in the soundings' language (9 November, Justin: "I like set two"): each rung's role, not its
- *  ship name. The keys (preset) stay what the ledger names; this is what the page calls them. */
+ *  ship name. The keys (preset) stay what the ledger names; this is what the page calls them. The two
+ *  smallest left that set on 11 November (Justin: "i like towing tank, please update the fal images and the
+ *  naming"; "Yes, rename 1m"): they were the sounding and the survey, and are now what their classes are
+ *  called, so the card says one name, not two. */
 export const RUNG_METAPHOR: Record<string, string> = {
-  '300k': 'the sounding', '1m': 'the survey', '9m': 'the landfall',
+  '300k': 'the towing tank', '1m': 'the measured mile', '9m': 'the landfall',
   '21m': 'the passage', '50m': 'the crossing', '100m': 'the ocean', '350m': 'the new world',
 };
 export const rungName = (preset: string, fallback = ''): string => RUNG_METAPHOR[preset] || fallback || preset;
-/** The fal image each rung wears (backend/thorp/dash/art/generate_art.py, LADDER). */
+/** A rung called what its class is called says the name once (the card's title), not again before its job. */
+const sameName = (a: string, b: string): boolean => (a || '').trim().toLowerCase() === (b || '').trim().toLowerCase();
+/** The fal image each rung wears (backend/thorp/dash/art/generate_art.py, LADDER; the two smallest wear
+ *  their class plates, CLASSES). */
 export const RUNG_ART: Record<string, string> = {
-  '300k': 'sounding', '1m': 'survey', '9m': 'landfall',
+  '300k': 'towing-tank', '1m': 'measured-mile', '9m': 'landfall',
   '21m': 'passage', '50m': 'crossing', '100m': 'ocean', '350m': 'new_world',
 };
 

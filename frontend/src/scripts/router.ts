@@ -15,8 +15,9 @@ export const slugOf = (r: { name: string }): string =>
 // classes renamed (old address name -> new; server.py CLASS_RENAMES): either name opens the size,
 // and the address is rewritten to the size's current name
 export const CLASS_RENAMES: Record<string, string> = {
-  seedling: 'faces', keel: 'faces', pan: 'faces', proxy: 'augustus', pilot: 'augustus', bettor: 'explorer', summit: 'trader',
-}; // 11 Nov: the 300k is Faces (was Pan); 8 Nov: the 1m Augustus
+  seedling: 'towing-tank', keel: 'towing-tank', pan: 'towing-tank', faces: 'towing-tank',
+  proxy: 'measured-mile', pilot: 'measured-mile', augustus: 'measured-mile', bettor: 'explorer', summit: 'trader',
+}; // 11 Nov: the 300k is the towing tank (was Faces, and Pan before it), the 1m the measured mile (was Augustus)
 export const CLASS_ALIASES: Record<string, string> = Object.fromEntries(
   Object.entries(CLASS_RENAMES).flatMap(([a, b]) => [[a, b], [b, a]]),
 );
@@ -46,7 +47,7 @@ export interface Route {
 // A rung is addressed by its preset (its size, the canonical identifier) or by its class slug (an old
 // alias the page resolves and rewrites to the preset); both live on the ships page.
 const RUNG_PRESETS = new Set(['300k', '1m', '9m', '21m', '50m', '100m', '350m',
-  'faces', 'pan', 'augustus', 'speller', 'stylist', 'paragraph', 'invention', 'trader']); // 'pan' is the old address
+  'towing-tank', 'measured-mile', 'faces', 'pan', 'augustus', 'speller', 'stylist', 'paragraph', 'invention', 'trader']); // 'faces', 'pan' and 'augustus' are old addresses
 
 export function route(h: string): Route {
   if (h.startsWith('/')) {

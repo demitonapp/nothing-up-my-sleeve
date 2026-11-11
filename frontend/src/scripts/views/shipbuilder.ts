@@ -304,7 +304,7 @@ export async function mountShipbuilder(
           return `<tr><td>${name}</td><td>${sh.layers}</td><td>${sh.width}</td><td>${sh.heads}</td><td>${hd == null ? '–' : Math.round(hd * 10) / 10}</td></tr>`; }).join('')
       }</tbody></table></div>`;
   };
-  const SHIP_NAMES: Record<string, string> = { '300k': 'Faces', '1m': 'Augustus', '9m': 'The speller', '21m': 'The stylist', '50m': 'Paragraph', '100m': 'Invention', '350m': 'Trader' };
+  const SHIP_NAMES: Record<string, string> = { '300k': 'The towing tank', '1m': 'The measured mile', '9m': 'The speller', '21m': 'The stylist', '50m': 'Paragraph', '100m': 'Invention', '350m': 'Trader' };
   const drawEmbeddings = (on: boolean): void => {
     const box = document.getElementById('sopembed'); if (!box) return;
     box.hidden = !on; if (!on) return;

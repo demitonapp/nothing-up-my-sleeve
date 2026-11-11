@@ -756,7 +756,7 @@ The page speaks the project's metaphor, consistently. Each word means one thing:
 
 | word | means |
 |---|---|
-| class | a model size with one job (300k the keel, 1m the pilot, 9m the speller…) |
+| class | a model size with one job (300k the towing tank, 1m the measured mile, 9m the speller…) |
 | ship | a class fitted out one way: its training material and settings (the fitout) |
 | sailing | one run of a ship, one per seed |
 | fleet | the ships of a class; the First Fleet is everything fitted out before 7 November, archived |

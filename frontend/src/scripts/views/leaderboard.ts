@@ -32,7 +32,7 @@ export const CHAIN_SHORT: Record<string, string> = {
   mendeleev_gaps: 'Mendeleev',
   recurrence_test: 'return',
 };
-export const RUNG_CLASS = ['faces', 'augustus', 'speller', 'stylist', '50m'];
+export const RUNG_CLASS = ['towing-tank', 'measured-mile', 'speller', 'stylist', '50m'];
 
 // The four necessary cards (the deck's mark): previous-word, Nevermore, mover, comparator.
 export const NEEDED: [string, string][] = [['previous_word', 'Previous-word'], ['nevermore', 'Nevermore'], ['mover', 'Mover'], ['comparator', 'Comparator']];

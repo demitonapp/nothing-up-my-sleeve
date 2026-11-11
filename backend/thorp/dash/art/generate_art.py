@@ -28,7 +28,7 @@ file the Atlas generators read, or from the FAL_KEY environment variable. It is 
 
 Usage:
   python3 thorp/dash/art/generate_art.py              # every image not made yet
-  python3 thorp/dash/art/generate_art.py keel bridge  # these, made again
+  python3 thorp/dash/art/generate_art.py towing-tank bridge  # these, made again
 """
 
 from __future__ import annotations
@@ -103,6 +103,30 @@ CLASSES: dict[str, str] = {
     "augustus": "a Victorian mathematics master in a frock coat teaching arithmetic by gaslight, chalk in hand "
     "at a blackboard of simple sums, a row of small pupils seen from behind at their desks, a single lamp "
     "throwing hard shadows across the board",
+    # 11 Nov, night (Justin: "we mix a bunch of combinations there and then measure it to see what comes out";
+    # "i like towing tank, please update the fal images and the naming"): the 300k is the towing tank, where a
+    # shipwright draws one small hull after another down the same water and times each. Froude's tank is
+    # Victorian and the world is Drake's, so it is drawn as a yard of that age would build it: a timber trough,
+    # a falling weight on a line, a sandglass and a ledger. It replaces Pan's plate on the class card.
+    "towing-tank": "a shipwright's towing tank inside a dark timber shipyard shed at night: a long narrow "
+    "wooden trough of still black water running the whole length of the shed toward an open door, one small "
+    "carved wooden hull model no longer than a forearm afloat in the middle of the trough, drawn along the "
+    "water by a taut line to a lead weight falling over a brass pulley, a thin V-shaped wake behind it, a "
+    "rack of other small hull models of different shapes waiting on the boards beside the trough, a "
+    "shipwright in a leather apron and Elizabethan breeches crouched at the water's "
+    "edge holding a sandglass, a clerk behind him writing the reading in a ledger, one hanging lantern "
+    "throwing hard shadows along the water, a small silver drone at rest on a beam above the tank, and "
+    "through the open door a thin luminous ring arcing across the night sky",
+    # The 1m follows it (Justin: "Also what should the 1m be?"; "Yes, rename 1m"): the measured mile, the
+    # marked water where a real hull is timed between two posts to check what the tank predicted. It
+    # replaces Augustus's plate on the class card; Augustus the position keeps his.
+    "measured-mile": "under a vast thin ring of pale light arcing across the whole night sky where a moon "
+    "would be, the measured mile seen from a rocky headland: two tall rough timber poles "
+    "like ship's masts planted in the rocks, an iron fire basket burning at the top of each, one near in "
+    "the foreground and one small and far away along the dark coast, a small wooden galleon of "
+    "Drake's kind under sail running a straight course on black water from one beacon toward the other, "
+    "her long straight wake behind her, in the foreground a figure in a sea-cloak on the rocks holding up "
+    "a sandglass to the firelight to time her, a clerk beside him with an open ledger",
 }
 
 # The harbours (Justin, 8 November: "i want two fal images for them"; 11 November: "naming must change and

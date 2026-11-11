@@ -52,7 +52,7 @@ export default function SizePage({ initialPath = '/' }: { initialPath?: string }
     ? ((chatModels.data && chatModels.data.models) || []).find((m: any) => m.kind === 'thorp' && m.available && String(m.ship_key || '').startsWith(rung.preset + ':'))
     : null;
   const tab = MTABS.includes(addr.tab) ? addr.tab : 'overview';
-  // one size, one address: a class slug ('faces', or the old 'pan') or an old /sizes link is rewritten to the size's preset
+  // one size, one address: a class slug ('towing-tank', 'measured-mile', or an old one such as 'faces' or 'augustus') or an old /sizes link is rewritten to the size's preset
   // ('300k'), the canonical identifier, keeping the tab and sub-view (10 November)
   const canonical = useMemo(
     () => (rung ? modelHref(rung, tab, tab === 'scoring' ? addr.ssub : tab === 'waypoints' ? addr.wsub : addr.osub) : null),

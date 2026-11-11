@@ -2162,14 +2162,19 @@ def api_sieves() -> dict:
 
 
 # classes renamed (old address name -> new), so old addresses and names keep working (7 Nov, Justin)
-# 11 Nov (Justin): the 300k is Faces (was Pan); the 1m Augustus; every older name maps to the current one
-CLASS_RENAMES = {"seedling": "faces", "keel": "faces", "pan": "faces", "proxy": "augustus", "pilot": "augustus", "bettor": "explorer", "explorer": "invention", "summit": "trader"}
+# 11 Nov (Justin): the 300k is the towing tank (was Faces, and Pan before it) and the 1m the measured mile
+# (was Augustus); every older name maps to the current one
+CLASS_RENAMES = {"seedling": "towing-tank", "keel": "towing-tank", "pan": "towing-tank", "faces": "towing-tank", "proxy": "measured-mile", "pilot": "measured-mile", "augustus": "measured-mile", "bettor": "explorer", "explorer": "invention", "summit": "trader"}
 
 
 def _class_names(preset: str) -> set[str]:
     """A size's names, the current one and every older one (CLASS_RENAMES), for code that keys a size by name."""
+    import re
+
     slug = _slug(preset)
-    return {slug} | {old for old, new in CLASS_RENAMES.items() if new == slug}
+    # CLASS_RENAMES is keyed by address slugs, and a two-word name's has a hyphen ("towing tank" is "towing-tank")
+    key = re.sub(r"[^a-z0-9]+", "-", slug)
+    return {slug, key} | {old for old, new in CLASS_RENAMES.items() if new == key}
 
 
 def _known_heads() -> list[dict]:

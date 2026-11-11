@@ -3651,16 +3651,87 @@ def _api_queue() -> dict:
             return Path(scripts[0]).name, "step"
         return (words[-1] if words else cmd), "step"
 
+    # A step's length (12 November, Justin: "when scheduling tasks like investigations they should also have an
+    # estimated length so the queue is accurate"). An investigation: its last finished run, else its spec's
+    # `estimate:`, else its deadline as an upper bound (thorp.investigate.estimate). Any other command: how
+    # long it took the last time the queue ran it (data/runs/queue.out). Until then a step took no time at
+    # all here, so every line behind the 8-hour Qwen reading was shown starting at once.
+    from thorp import investigate as _inv
+    from thorp.dash import waters as _waters
+
+    try:
+        last_steps = _waters._step_minutes()
+    except Exception:  # noqa: BLE001  (no queue log: no command has a time of its own yet)
+        last_steps = {}
+
+    def _cmd_estimate(line: str) -> tuple[float | None, str, bool]:
+        spec_ = _inv.of_line(line)
+        if spec_ is not None:
+            try:
+                return _inv.estimate(spec_)
+            except ValueError:
+                return None, "no time", False
+        last = last_steps.get(line.strip())
+        if last is not None:
+            return float(last), "its last run", False
+        return None, "no time", False
+
+    def _since_min(since) -> float | None:
+        """Minutes since a lane's `since` (this Mac's local time, as s2.lanes writes it)."""
+        try:
+            return max(0.0, (now - datetime.fromisoformat(str(since)).timestamp()) / 60)
+        except (TypeError, ValueError):
+            return None
+
+    # a command at sea holds the lane's seat too: the ledger has no run for it, so it is read from the lane's
+    # own row (s2.lanes), and what it has left is its estimate less the time it has been out
+    try:
+        lane_now = lane_mod.state()
+    except Exception:  # noqa: BLE001  (no store on a box)
+        lane_now = {}
+    for lane, out_ in (lane_now or {}).items():
+        line = str((out_ or {}).get("line") or "")
+        if not line.startswith("cmd:") or lane not in seat:
+            continue
+        est, source, is_max = _cmd_estimate(line)
+        label, what = _cmd_label(line[4:].strip())
+        gone = _since_min(out_.get("since"))
+        left = max(0.0, est - (gone or 0.0)) if est is not None else None
+        rows.insert(0, {"n": None, "kind": "step", "name": label, "what": what, "cmd": line[4:].strip(),
+                        "goal_id": line_goals.get(line), "status": "at sea", "lane": lane,
+                        "started": out_.get("since"), "est_min": est, "est_source": source, "est_is_max": is_max,
+                        "elapsed_min": round(gone) if gone is not None else None,
+                        "left_min": round(left) if left is not None else None})
+        for s in seat[lane]:
+            s["end"], s["kind"] = now + (left or 0.0), "other"
+
     unknown = {lane: False for lane in lane_mod.LANES}  # a voyage ahead with no time yet
+    for lane, out_ in (lane_now or {}).items():  # a command at sea with no time of its own: all behind it is ≥
+        if str((out_ or {}).get("line") or "").startswith("cmd:") and lane in unknown:
+            unknown[lane] = unknown[lane] or _cmd_estimate(str(out_["line"]))[0] is None
     without_a_time = 0
     for i, ln in enumerate(lines, 1):
         if ln.startswith("cmd:"):
             cmd = ln[4:].strip()
             label, what = _cmd_label(cmd)
-            rows.append(
-                {"n": i, "kind": "step", "name": label, "what": what, "cmd": cmd,
-                 "goal_id": line_goals.get(ln), "status": "queued"}
-            )
+            est, source, is_max = _cmd_estimate(ln)
+            r = {"n": i, "kind": "step", "name": label, "what": what, "cmd": cmd,
+                 "goal_id": line_goals.get(ln), "status": "queued", "lane": "mac",
+                 "est_min": est, "est_source": source, "est_is_max": is_max}
+            if est is None:
+                # a step with no time: it still holds the lane, so every line behind it starts no sooner
+                without_a_time += 1
+                r["starts_in_min"] = None
+                r["at_least"] = unknown["mac"]
+                unknown["mac"] = True
+            else:
+                seats = seat["mac"]  # a command takes the whole lane, as the coordinator gives it
+                start = max(now, max(s["end"] for s in seats))
+                for s in seats:
+                    s["end"], s["kind"] = start + est, "other"
+                r["starts_in_min"] = round(start - now)
+                r["at_least"] = unknown["mac"]
+            rows.append(r)
             continue
         p = root / "specs" / f"{ln}.yaml"
         spec = (yaml.safe_load(p.read_text()) or {}) if p.exists() else {}

@@ -168,6 +168,17 @@ def score_questions(
         read = all(not np.isnan(c) for c in ces)
         order = np.argsort(ces) if read else None
         pred = int(order[0]) if read else None
+        # the gradient under the right/wrong bit (12 November, the per-question audit): where the answer
+        # ranked among the options (0 is the bet), and its share of a softmax over the options' negative
+        # mean losses, so a ship at chance can still be read moving towards the answer
+        if read:
+            z = -np.asarray(ces, dtype=np.float64)
+            p = np.exp(z - z.max())
+            p /= p.sum()
+            rank = int(np.where(order == q["answer"])[0][0])
+            p_answer = float(p[q["answer"]])
+        else:
+            rank, p_answer = None, None
         rows.append(
             {
                 "id": q["id"],
@@ -180,9 +191,17 @@ def score_questions(
                 "prediction": pred,
                 "correct": bool(read and pred == q["answer"]),
                 "margin": float(ces[order[1]] - ces[order[0]]) if read and len(ces) > 1 else None,
+                "rank": rank,
+                "p_answer": p_answer,
             }
         )
     return rows
+
+
+def source_of(question_id: str) -> str:
+    """The exam a question was drawn from, as its id names it (`Mercury_7175875` -> Mercury,
+    `NYSEDREGENTS_2008_4_5` -> NYSEDREGENTS): the one grouping the files carry beside the split."""
+    return str(question_id).split("_", 1)[0]
 
 
 def summary(rows: list[dict]) -> dict:

@@ -9,7 +9,9 @@ is the bet, so a base checkpoint and an instruct checkpoint, and a large vocabul
 one, are all read the same way (thorp/arc_ai2.py). There is no generation and no chat template.
 
 The reading is kept in `s4.outside_readings` as `arc-ai2-<model>`: the accuracy on each split, how
-many questions could not be read, and the settings. Like score_blimp.py it takes S2's helm and waits
+many questions could not be read, and the settings. Every question is also kept, one row each, in
+`s4.arc_answers` (thorp/arc_audit.py, 12 November): the per-question audit compares readers on them.
+`--parts test,validation` reads the validation split too, into the rows only. Like score_blimp.py it takes S2's helm and waits
 in port while a voyage is at sea; `--no-helm` skips the wait (a reading this light can share the Mac
 with a training run).
 
@@ -27,7 +29,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # scripts/mlx_ports.py
 
-from thorp import arc_ai2  # noqa: E402
+from thorp import arc_ai2, arc_audit  # noqa: E402
 from thorp.viable.s4_intelligence import readings  # noqa: E402
 
 
@@ -45,7 +47,8 @@ def _load(model_id: str):
         return port()
 
 
-def score(model_id: str, configs: list[str], per_split: int | None, batch: int, save: bool, dtype: str = "native") -> dict:
+def score(model_id: str, configs: list[str], per_split: int | None, batch: int, save: bool, dtype: str = "native",
+          parts: tuple[str, ...] = ("test",)) -> dict:
     import mlx.core as mx
     import mlx.nn as nn
 
@@ -67,9 +70,24 @@ def score(model_id: str, configs: list[str], per_split: int | None, batch: int, 
 
     t0 = time.time()
     splits = {}
+    kept = 0
+    encode = lambda s: tok.encode(s, add_special_tokens=False)  # noqa: E731
+    # the other parts first (12 November, the per-question audit): kept question by question, never summed
+    # into the board's reading, which is the test split's alone
+    for part in [p for p in parts if p != "test"]:
+        for config in configs:
+            rows = arc_ai2.score_questions(ce, encode, start, arc_ai2.questions(config, part, per_split), batch=batch)
+            if save:
+                kept += arc_audit.record(model_id, "outside", rows)
+            s = arc_ai2.summary(rows)
+            print(f"{model_id} [{config}/{part}]: accuracy {s['accuracy']:.3f} over {s['questions']} questions")
     for config in configs:
+        if "test" not in parts:
+            break
         items = arc_ai2.questions(config, "test", per_split)
-        rows = arc_ai2.score_questions(ce, lambda s: tok.encode(s, add_special_tokens=False), start, items, batch=batch)
+        rows = arc_ai2.score_questions(ce, encode, start, items, batch=batch)
+        if save:
+            kept += arc_audit.record(model_id, "outside", rows)  # every question, one row (s4.arc_answers)
         s = arc_ai2.summary(rows)
         key = str(items[0]["config"]) if items else str(config)
         full = arc_ai2.COUNTS.get((key, "test"))
@@ -88,10 +106,11 @@ def score(model_id: str, configs: list[str], per_split: int | None, batch: int, 
         "scored": time.strftime("%Y-%m-%dT%H:%M:%S"),
         "seconds": round(time.time() - t0, 1),
         "splits": splits,
+        "questions_kept": kept,
     }
-    if save:
+    if save and splits:
         readings.put(f"arc-ai2-{model_id}", out)
-        print(f"kept as arc-ai2-{model_id} in s4.outside_readings")
+        print(f"kept as arc-ai2-{model_id} in s4.outside_readings; {kept} questions in s4.arc_answers")
     print(f"{out['seconds']:.0f}s")
     return out
 
@@ -105,16 +124,18 @@ def main() -> None:
     ap.add_argument("--no-helm", action="store_true", help="do not wait for a voyage at sea")
     ap.add_argument("--no-save", action="store_true")
     ap.add_argument("--dtype", choices=["native", "float32"], default="native", help="float32 casts the weights first")
+    ap.add_argument("--parts", default="test", help="test, validation, or test,validation (the board reads test only)")
     a = ap.parse_args()
     configs = ["easy", "challenge"] if a.config == "both" else [a.config]
     per = a.per_split or None
+    parts = tuple(x for x in a.parts.split(",") if x)
     if a.no_helm:
-        score(a.model, configs, per, a.batch, not a.no_save, a.dtype)
+        score(a.model, configs, per, a.batch, not a.no_save, a.dtype, parts)
         return
     from thorp import vsm
 
     with vsm.at_sea(f"score {a.model} on AI2 ARC", kind="score"):
-        score(a.model, configs, per, a.batch, not a.no_save, a.dtype)
+        score(a.model, configs, per, a.batch, not a.no_save, a.dtype, parts)
 
 
 if __name__ == "__main__":

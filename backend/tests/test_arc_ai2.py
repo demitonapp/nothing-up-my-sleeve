@@ -116,3 +116,23 @@ def test_the_downloaded_splits_are_the_published_sizes():
     # a handful carry three or five options, so the floor is 25% to a tenth, not to a decimal place
     assert sum(1 for q in easy if len(q["options"]) != 4) == 11
     assert sum(1 for q in challenge if len(q["options"]) != 4) == 7
+
+
+def test_each_row_carries_the_answers_rank_and_its_share():
+    """The audit's gradient (12 November): a wrong bet still says how near the answer came."""
+    items = [
+        {"id": "Mercury_1", "config": "easy", "part": "test", "question": "Pick?", "options": ["alpha", "beta"], "answer": 1},
+        {"id": "MCAS_2000_4_6", "config": "easy", "part": "test", "question": "Pick?", "options": ["alpha", "beta"], "answer": 0},
+    ]
+    right, wrong = arc_ai2.score_questions(cheap_seven, encode, 0, items)
+    assert right["rank"] == 0 and wrong["rank"] == 1
+    # beta at 0.1 nats against alpha at 1.0: beta's share is e^-0.1 / (e^-0.1 + e^-1)
+    want = np.exp(-0.1) / (np.exp(-0.1) + np.exp(-1.0))
+    assert abs(right["p_answer"] - want) < 1e-9 and abs(wrong["p_answer"] - (1 - want)) < 1e-9
+    assert arc_ai2.source_of(items[0]["id"]) == "Mercury" and arc_ai2.source_of(items[1]["id"]) == "MCAS"
+
+
+def test_an_unread_question_has_no_rank():
+    items = [{"id": "q", "config": "easy", "part": "test", "question": "Pick?", "options": ["alpha", "!!"], "answer": 0}]
+    (row,) = arc_ai2.score_questions(cheap_seven, lambda s: [] if "!!" in s else [7], 0, items)
+    assert row["read"] is False and row["rank"] is None and row["p_answer"] is None

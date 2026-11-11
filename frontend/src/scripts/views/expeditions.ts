@@ -244,11 +244,18 @@ const sailsIn = (m: number | null | undefined, atLeast: boolean): string => (m =
 const clock = (d: Date): string => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 const startsAt = (r: any): string => {
   if (r.status === 'at sea') return r.started ? `<span class="s">since ${clock(new Date(r.started))}</span>` : '<span class="s">at sea</span>';
-  if (r.kind === 'step') return '<span class="s">–</span>';
   if (r.starts_in_min == null) return '<span class="s">no time yet</span>';
   const d = new Date(Date.now() + Number(r.starts_in_min) * 60000);
   const day = d.toDateString() === new Date().toDateString() ? '' : ` ${d.toLocaleDateString(undefined, { weekday: 'short' })}`;
   return `${r.at_least ? '≥ ' : ''}<b>${clock(d)}</b>${day ? `<span class="s">${day}</span>` : ''}`;
+};
+/** A step's length on its row (12 November): about how long it takes and where that came from, an upper bound
+ *  said as one, and for a step at sea what it has left. */
+const stepLength = (r: any): string => {
+  if (r.est_min == null) return 'no time of its own yet: the lines behind it start no sooner than shown';
+  const len = `${r.est_is_max ? 'up to ' : 'about '}${mins(Number(r.est_min))}`;
+  const left = r.status === 'at sea' && r.left_min != null ? ` · about ${mins(Number(r.left_min))} left` : '';
+  return `${len} · ${esc(r.est_source || '')}${left}`;
 };
 /** The queue names the voyage, not only its class (10 November: three 300k lines read as "300k" and
  *  nothing else). The goal is the spec's question, cut to one line; the full text is in the title. */
@@ -263,7 +270,9 @@ export function queueRowsHtml(d: any, rungs: Rung[]): string {
   const rows = (d.rows || []).map((r: any, i: number) => {
     seq += 1;
     return r.kind === 'step'
-      ? `<tr class="qstep"><td class="s">${seq}</td><td colspan="5" class="s" title="${esc(r.cmd)}">↳ then ${r.what === 'investigation' ? 'an investigation' : 'a step'}: <b>${esc(r.name)}</b>${r.goal_id ? ` <span class="${pillCls('accent')}" title="the goal this step serves">${esc(r.goal_id)}</span>` : ''}</td></tr>`
+      ? `<tr class="qstep"><td class="s">${seq}</td><td colspan="3" class="s" title="${esc(r.cmd)}">${r.status === 'at sea' ? '' : '↳ then '}${r.what === 'investigation' ? 'an investigation' : 'a step'}: <b>${esc(r.name)}</b>${r.goal_id ? ` <span class="${pillCls('accent')}" title="the goal this step serves">${esc(r.goal_id)}</span>` : ''}<div class="s">${stepLength(r)}</div></td>
+      <td class="s" title="${r.est_min == null ? 'no time yet' : `about ${Math.round(r.est_min)} min · ${esc(r.est_source || '')}`}">${startsAt(r)}</td>
+      <td class="s">${r.status === 'at sea' ? `<span class="${pillCls('running')}">at sea</span>` : sailsIn(r.starts_in_min, !!r.at_least)}</td></tr>`
       : `<tr data-qi="${i}" tabindex="0" aria-label="show the card for ${esc(r.name)}" title="show this voyage's card"${r.status === 'at sea' ? ' class="sel"' : ''}><td class="s">${seq}</td>
       <td><b>${esc(r.name)}</b>${r.goal_id ? ` <span class="${pillCls('accent')}" title="the goal this voyage serves">${esc(r.goal_id)}</span>` : ''}<div class="s" title="${esc(r.goal || '')}">${esc(queueGoal(r))}</div></td>
       <td>${(() => {

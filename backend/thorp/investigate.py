@@ -13,6 +13,7 @@ does the reading, a deadline, and where the reading lands:
     question: ...
     subject: mlx-community/Qwen3-4B-4bit
     run: [backend/scripts/score_arc.py, "{subject}", --limit, "0", --thinking, both]
+    estimate: 8h        # about how long it takes: the queue's clock (its last run's time wins once it has one)
     timeout: 14h
     readings: ["arc-{subject}", "arc-{subject}@thinking"]
 
@@ -91,11 +92,38 @@ def check(spec: dict, name: str | None = None) -> list[str]:
         out.append("run must be a list: a script or -m module, then its arguments")
     if not spec.get("question"):
         out.append("question: say what it settles")
-    try:
-        seconds(spec.get("timeout"))
-    except ValueError as e:
-        out.append(str(e))
+    for key in ("timeout", "estimate"):
+        try:
+            seconds(spec.get(key))
+        except ValueError as e:
+            out.append(f"{key}: {e}")
     return out
+
+
+def estimate(spec: dict, rec: dict | None = None) -> tuple[float | None, str, bool]:
+    """About how many minutes an investigation takes, where that came from, and whether it is only an upper
+    bound (12 November, Justin: "when scheduling tasks like investigations they should also have an
+    estimated length so the queue is accurate").
+
+    In order: its own last finished run (the store's standing, `wall_minutes`); the spec's `estimate:`
+    (`10m`, `8h`), written by whoever queues it; its `timeout:`, which the runner enforces, so the line cannot
+    run longer, marked as a bound. None when it states neither."""
+    if rec is None:
+        try:
+            from thorp.viable.s4_intelligence import readings
+
+            rec = readings.get(_store_name(str(spec.get("name") or ""))) or {}
+        except Exception:  # noqa: BLE001 - no store (a box, a test): the spec still answers
+            rec = {}
+    if rec.get("status") == "finished" and (rec.get("wall_minutes") or 0) > 0:
+        return float(rec["wall_minutes"]), "its last run", False
+    est = seconds(spec.get("estimate"))
+    if est:
+        return est / 60, "its spec's estimate", False
+    lim = seconds(spec.get("timeout"))
+    if lim:
+        return lim / 60, "its deadline (an upper bound)", True
+    return None, "no time", False
 
 
 def argv(spec: dict) -> list[str]:
@@ -237,8 +265,10 @@ def listing() -> list[dict]:
             out.append({"name": n, "status": "broken", "why": str(e)})
             continue
         st = standing(n)
+        est, source, is_max = estimate(spec, st)
         out.append({"name": n, "expedition": spec["expedition"], "subject": spec.get("subject"),
                     "question": spec.get("question"), "timeout": spec.get("timeout"),
+                    "est_min": est, "est_source": source, "est_is_max": is_max,
                     "status": st.get("status"), "started": st.get("started"), "finished": st.get("finished"),
                     "wall_minutes": st.get("wall_minutes"), "exit": st.get("exit"),
                     "readings": readings_of(spec)})
@@ -254,7 +284,9 @@ def main(args: list[str]) -> int:
     if args[:1] in ([], ["list"]):
         for r in listing():
             extra = f"  {r.get('wall_minutes')} min" if r.get("wall_minutes") is not None else ""
-            print(f"{r['name']:34} {str(r.get('expedition') or ''):18} {r['status']}{extra}")
+            est = r.get("est_min")
+            about = (f"  ~{est:.0f} min ({r.get('est_source')})" if est is not None else "  no time") if "est_min" in r else ""
+            print(f"{r['name']:34} {str(r.get('expedition') or ''):18} {r['status']}{extra}{about}")
         return 0
     print("python -m thorp.investigate [list | run NAME | line NAME]", file=sys.stderr)
     return 2

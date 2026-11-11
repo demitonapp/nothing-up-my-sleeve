@@ -25,6 +25,9 @@ run:
   - "6"            # every example pair a task has (the scorer's default shows three)
   - --context
   - "16384"
+# about how long it takes (12 November, from its own log): thinking off read the 120 tasks in 45 minutes; with the
+# thinking on a task takes about 226 seconds (66 tasks in 14,911 s), so the 120 take about 7.5 hours more
+estimate: 500m
 timeout: 16h
 readings:
   - "arc-{subject}"

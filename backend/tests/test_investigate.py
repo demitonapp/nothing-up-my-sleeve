@@ -79,3 +79,22 @@ def test_the_deadline_stops_it(specs):
     )
     assert investigate.run("tiny") == 124
     assert seen[-1]["status"] == "timed out"
+
+
+def test_its_length_is_its_last_run_then_its_estimate_then_its_deadline(specs):
+    """The queue's clock for a step (12 November): what it took, else what its spec says, else its deadline
+    (an upper bound, said as one); a failed run is not a length."""
+    (specs / "tiny.yaml").write_text(GOOD.replace("timeout: 30s", "estimate: 12m\ntimeout: 2h"))
+    s = investigate.load("tiny")
+    assert investigate.estimate(s, {"status": "finished", "wall_minutes": 7.5}) == (7.5, "its last run", False)
+    assert investigate.estimate(s, {"status": "failed", "wall_minutes": 0.5}) == (12.0, "its spec's estimate", False)
+    del s["estimate"]
+    assert investigate.estimate(s, {}) == (120.0, "its deadline (an upper bound)", True)
+    del s["timeout"]
+    assert investigate.estimate(s, {}) == (None, "no time", False)
+
+
+def test_an_estimate_that_is_not_a_length_is_refused(specs):
+    (specs / "tiny.yaml").write_text(GOOD.replace("timeout: 30s", "estimate: soon\ntimeout: 30s"))
+    with pytest.raises(ValueError, match="estimate"):
+        investigate.load("tiny")

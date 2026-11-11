@@ -125,9 +125,11 @@ def _wall_minutes() -> dict:
 
 
 def _step_minutes() -> dict:
-    """How long each queue command took the last time it ran (data/runs/queue.out's starting and exited lines)."""
+    """How long each queue command took the last time it ran and finished (data/runs/queue.out's starting and
+    exited lines). A command that failed is not a length (12 November: the probe reading died in 30 seconds on
+    11 November and the queue then showed it taking no time at all), so only an exit 0 is kept."""
     out, start = {}, {}
-    pat = re.compile(r"^\[(\d\d):(\d\d):(\d\d)\] (?:\[\w+\] )?(starting (.*)|(.*) exited -?\d+)$")
+    pat = re.compile(r"^\[(\d\d):(\d\d):(\d\d)\] (?:\[\w+\] )?(starting (.*)|(.*) exited (-?\d+))$")
     with contextlib.suppress(Exception):
         for line in (
             (paths.data_dir() / "runs" / "queue.out")
@@ -143,7 +145,9 @@ def _step_minutes() -> dict:
             else:
                 text = m.group(6).strip()
                 if text in start:
-                    out[text] = (t - start.pop(text)) % (24 * 60)
+                    took = (t - start.pop(text)) % (24 * 60)
+                    if m.group(7) == "0":
+                        out[text] = took
     return out
 
 
@@ -367,6 +371,15 @@ def _item(ln, wall: dict, steps: dict | None = None) -> dict:
         last = (steps or {}).get(ln.text)
         out.update(name=_step_name(ln.payload), hold=h, est_is_max=bool(h),
                    est_min=(h or {}).get("max_min") if h else (round(last) if last is not None else None))  # fmt: skip
+        if not h:  # an investigation knows its own length (12 November: its last run, its estimate, its deadline)
+            from thorp import investigate
+
+            inv = investigate.of_line(ln.text)
+            if inv is not None:
+                with contextlib.suppress(ValueError):
+                    est, _source, is_max = investigate.estimate(inv)
+                    if est is not None:
+                        out.update(name=inv.get("ship") or inv["name"], est_min=round(est), est_is_max=is_max)
         if h:
             out["kind"] = "hold"
             out["name"] = f"hold: {h['file'].split('/')[-1]}"

@@ -1,10 +1,10 @@
 {
- "version": "talk-turns-marked-v1",
+ "version": "talk-turns-marked-v2",
  "transform": "talk-turns",
  "generator": "backend/scripts/make_talk_corpus.py",
  "about": "questions and the replies that followed them, mined from the dialogue candidates, as marked turns",
  "books": 1490,
- "sha1": "e67fa727a02a28c8a275d5b6d64460fe2d56baf6",
+ "sha1": "272f90c28668ba1e9fea26680be180be11e8eb01",
  "turns": 37244,
  "held_out_turns": 1538,
  "books_read": 1667,
@@ -85,5 +85,16 @@
   ]
  ],
  "books_written": 1490,
+ "return_mix": {
+  "books": 1490,
+  "talk_turns": 37244,
+  "instruction_turns": 499,
+  "instruction_turns_a_book": 28,
+  "copies_of_each_instruction_turn": [
+   82,
+   84
+  ],
+  "instruction_turns_missing": 0
+ },
  "held_out_pairs_written": 400
 }

@@ -20,8 +20,18 @@ at least OGDEN of their words are Ogden's (thorp/ogden.py; the bar the dialogue 
 at most SAME times, so "Yes." does not become the answer to everything. One book in HELD is held out whole:
 its turns go to `lists/talk-heldout-v1.jsonl` (the `answers` evaluator's pairs) and are never trained on.
 
-The turns are local books of PER turns each (`talk-m-<n>`, a blank line between turns, so the cleaning keeps
-each a paragraph), listed in `lists/talk-turns-marked-v1.csv`.
+The turns are local books of PER turns each (`talk2-m-<n>`), listed in `lists/talk-turns-marked-v2.csv`. Between
+two turns stands SEP, an end-of-text mark and a beginning-of-text mark on their own lines, so that through
+`marks-v1` every turn reads `<bos>\n<question>Q<answer>A<end>\n<eos>`: exactly what the chat and the evaluators
+ask with (turns.prompt), and exactly how the rigged pilot's one-turn books read. (v1 put a blank line between
+turns, so only a book's first turn followed `<bos>`.)
+
+**The return mix** (`lists/return-mix-marked-v1.csv`, books `retmix-m-<n>`): the same talk turns, PER a book, and
+with them the return leg's 499 instruction turns (`ifp-m-<key>`, make_return_corpus.py), MIX_PER a book, each
+instruction turn about MIX_PER x books / 499 times in all, shuffled together. Read twelve times it gives the
+instruction turns the rigged pilot's dose (about a thousand readings each) and the talk turns the talk leg's
+(twelve), in every batch rather than one after the other: the pilot read the instruction turns alone and came
+home answering every question with their filler. A voyage that reads this list is still **rigged** for IFEval.
 
     PYTHONPATH=backend backend/.venv/bin/python backend/scripts/make_talk_corpus.py [--dry-run]
 """
@@ -45,11 +55,14 @@ from thorp import manifest, ogden, paths, turns  # noqa: E402
 from thorp.sources import load_text  # noqa: E402
 
 KINDS = "lists/dialogue-candidates-kinds.csv"
-LIST = "lists/talk-turns-marked-v1.csv"
+LIST = "lists/talk-turns-marked-v2.csv"
 HELD = "lists/talk-heldout-v1.jsonl"
 OGDEN = 0.65  # the share of a turn's words that must be Ogden's: the dialogue stage's own bar for a book (62 to 68%)
 SAME = 25  # an identical reply is kept at most this many times
 PER = 25  # turns a book
+SEP = "\n<eos>\n<bos>\n"  # between two turns in a book: each turn then reads as its own document (see above)
+MIX_LIST = "lists/return-mix-marked-v1.csv"
+MIX_PER = 28  # instruction turns a book of the return mix: x 1,490 books / 499 turns = 84 copies of each, x 12 passes
 HELD_OF = 20  # one book in this many is held out whole
 HELD_PAIRS = 400  # the held-out pairs the evaluator reads
 Q_WORDS, A_WORDS = (2, 30), (1, 30)
@@ -221,8 +234,8 @@ def build(dry_run: bool, limit: int | None = None) -> dict:
     train.sort(key=lambda t: hashlib.sha1((t[2] + "\x00" + t[3]).encode()).hexdigest())
     rows = []
     for i in range(0, len(train), PER):
-        bid = f"talk-m-{i // PER + 1:05d}"
-        text = "\n\n".join(turns.pair("marks", q, a) for _, _, q, a in train[i : i + PER]) + "\n"
+        bid = f"talk2-m-{i // PER + 1:05d}"
+        text = SEP.join(turns.pair("marks", q, a) for _, _, q, a in train[i : i + PER]) + "\n"
         (d / f"{bid}.txt").write_text(text, encoding="utf-8")
         title = f"talk turns {i // PER + 1} (marked)"
         manifest.upsert(
@@ -242,14 +255,69 @@ def build(dry_run: bool, limit: int | None = None) -> dict:
         for i, (b, how, q, a) in enumerate(held[:HELD_PAIRS]):
             f.write(json.dumps({"key": f"talk-{i + 1}", "prompt": q, "response": a, "book": b, "how": how}) + "\n")
     out["books_written"] = len(rows)
+    out["return_mix"] = write_mix(train, d, now)
     out["held_out_pairs_written"] = min(len(held), HELD_PAIRS)
     sha = hashlib.sha1(paths.resolve(LIST).read_bytes()).hexdigest()
     meta = {
-        "version": "talk-turns-marked-v1", "transform": "talk-turns", "generator": "backend/scripts/make_talk_corpus.py",
+        "version": "talk-turns-marked-v2", "transform": "talk-turns", "generator": "backend/scripts/make_talk_corpus.py",
         "about": "questions and the replies that followed them, mined from the dialogue candidates, as marked turns",
         "books": len(rows), "sha1": sha, **{k: v for k, v in out.items() if k != "sample"},
     }  # fmt: skip
     paths.resolve(LIST).with_suffix(".manifest.json").write_text(json.dumps(meta, indent=1, default=list), encoding="utf-8")
+    return out
+
+
+def _book(d, bid: str, title: str, author: str, text: str, now: str) -> dict:
+    (d / f"{bid}.txt").write_text(text, encoding="utf-8")
+    manifest.upsert(
+        manifest.Book(
+            id=bid, source="local", title=title, author=author, language="en", family="Germanic", text="original",
+            chars=len(text), bytes=len(text.encode()), sha1=hashlib.sha1(text.encode()).hexdigest(),
+            fetched_at=now, set="recipe",
+        )  # fmt: skip
+    )
+    return {"title": title, "author": author, "language": "en", "family": "Germanic", "text": f"local:{bid}"}
+
+
+def write_mix(train: list, d, now: str) -> dict:
+    """The return mix: each book PER talk turns and MIX_PER instruction turns, no instruction turn twice in a book,
+    every one of them the same number of times over the list, the order within a book fixed by a hash."""
+    import numpy as np
+
+    keys = [r["text"].split(":", 1)[1] for r in csv.DictReader(open(paths.resolve("lists/ifeval-pairs-marked-all-v1.csv"), encoding="utf-8"))]
+    instr = [(k, (d / f"{k}.txt").read_text(encoding="utf-8").rstrip("\n")) for k in keys]
+    n = len(instr)
+    rows, used, g = [], collections.Counter(), 0
+    perms: dict[int, list[int]] = {}
+    for i in range(0, len(train), PER):
+        mine: list[int] = []
+        while len(mine) < MIX_PER:
+            r = g // n
+            if r not in perms:
+                perms[r] = [int(x) for x in np.random.default_rng([11, r]).permutation(n)]
+            j = perms[r][g % n]
+            g += 1
+            if j not in mine:  # the same turn from the next round's order: skipped, so no book holds it twice
+                mine.append(j)
+        used.update(mine)
+        items = [turns.pair("marks", q, a) for _, _, q, a in train[i : i + PER]] + [instr[j][1] for j in mine]
+        items.sort(key=lambda t: hashlib.sha1((str(i) + "\x00" + t).encode()).hexdigest())
+        bid = f"retmix-m-{i // PER + 1:05d}"
+        rows.append(_book(d, bid, f"return mix {i // PER + 1} (marked)", "the return leg", SEP.join(items) + "\n", now))
+    with open(paths.resolve(MIX_LIST), "w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=["title", "author", "language", "family", "text"])
+        w.writeheader()
+        w.writerows(rows)
+    out = {
+        "books": len(rows), "talk_turns": len(train), "instruction_turns": n, "instruction_turns_a_book": MIX_PER,
+        "copies_of_each_instruction_turn": [min(used.values()), max(used.values())], "instruction_turns_missing": n - len(used),
+    }  # fmt: skip
+    meta = {
+        "version": "return-mix-marked-v1", "transform": "talk-turns+ifeval-pairs", "generator": "backend/scripts/make_talk_corpus.py",
+        "about": "the talk turns and the return leg's instruction turns in the same books; RIGGED for IFEval (every provable official prompt is in it)",
+        "sha1": hashlib.sha1(paths.resolve(MIX_LIST).read_bytes()).hexdigest(), **out,
+    }  # fmt: skip
+    paths.resolve(MIX_LIST).with_suffix(".manifest.json").write_text(json.dumps(meta, indent=1), encoding="utf-8")
     return out
 
 

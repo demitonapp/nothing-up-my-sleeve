@@ -1,0 +1,16 @@
+{
+ "version": "return-mix-marked-v1",
+ "transform": "talk-turns+ifeval-pairs",
+ "generator": "backend/scripts/make_talk_corpus.py",
+ "about": "the talk turns and the return leg's instruction turns in the same books; RIGGED for IFEval (every provable official prompt is in it)",
+ "sha1": "051d20de5c76d82ac1e85552fd3a8b38f3918dc8",
+ "books": 1490,
+ "talk_turns": 37244,
+ "instruction_turns": 499,
+ "instruction_turns_a_book": 28,
+ "copies_of_each_instruction_turn": [
+  82,
+  84
+ ],
+ "instruction_turns_missing": 0
+}

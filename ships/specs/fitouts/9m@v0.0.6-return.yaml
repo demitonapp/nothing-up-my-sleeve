@@ -1,32 +1,54 @@
 # The first ship we can talk to (11 November 2026): the return leg on 9m@v0.0.6 — Kipling's third aim.
 # Marked turns (<question> .. <answer> .. <end>), because the v0.0.6 9m was trained with the ten control
-# pieces. Modelled on the pilot (9m@v0.0.5-return-rigged, 89.6% prompt-strict on the 541); RIGGED, and said
-# so: every provable official prompt is in the training turns.
+# pieces. RIGGED, and said so: every provable official prompt is in the training turns.
+# Changed that night (Justin: "fix it i don't want to waste a trip"): the instruction turns are no longer read
+# alone. The pilot (9m@v0.0.5-return-rigged) read them alone a thousand times and came home answering every
+# question "The man was in the house." They are now mixed, in the same books and at the pilot's dose, with
+# the talk leg's 37,244 real exchanges (lists/return-mix-marked-v1.csv, backend/scripts/make_talk_corpus.py),
+# and the leg is read on the way (held-out exchanges and the hole cards every 250 steps), not only at the end.
 name: 9m@v0.0.6-return
-ship: 'SOP v0.0.6 at 9m (the return leg, the first ship to chat to)'
+ship: SOP v0.0.6 at 9m (the return leg, the first ship to chat to)
 experiment: 'The return leg (Kipling): can the ship answer when it is asked, and obey what it is told?'
-question: 'The return leg at 9m, on the v0.0.6 ship: one pass over the dialogue shelf, then the provable IFEval
-  prompts as turns a thousand times over, the pull off, seeded from the finished 9m@v0.0.6. RIGGED: the official
-  prompts are the training turns. This is the 9m we talk to — the Chat tab reads it directly, and the IFEval
-  number (the pilot read 89.6% prompt-strict against a 65% mark) is the headline beside the conversation.'
+question: 'The return leg at 9m, on the v0.0.6 ship: one pass over the dialogue shelf, then twelve passes over the
+  return mix (lists/return-mix-marked-v1.csv): the 499 provable IFEval prompts as turns, each about a thousand times
+  as in the pilot, in the same books as 37,244 real exchanges (a question and the reply that followed it, from the
+  dialogue candidates), the pull off, seeded from the finished 9m@v0.0.6. RIGGED: the official prompts are the training
+  turns. Can one 9m keep the pilot''s IFEval (89.6% prompt-strict against a 65% mark) and still answer a new question
+  in its own words? The pilot read the instruction turns alone and came home answering every question with their
+  filler (''The man was in the house.''), its language gone from 2.09 to 4.75 bits a byte. Read every 250 steps
+  on held-out exchanges and the hole cards, a checkpoint each time; IFEval on the 541 once, when it docks.'
 departures:
-- field: content
-  why: the return leg reads the dialogue shelf and the instruction turns, not Ogden
 - field: training
   why: 'seeded from 9m@v0.0.6, the pull off: a leg after pretraining, not a fresh voyage'
 - field: tokeniser
   why: 'the seed''s: the ten control tokens as single pieces'
+- field: content
+  why: the return leg reads the dialogue shelf and the return mix (instruction turns and real exchanges together),
+    not Ogden
 goal: 3
+milestones:
+- at: 0.4
+  metric: eval/hole-cards-unseen/bpb_mean
+  at_most: 2.2
+  if_missed: warn
+  why: 'the language it kept, on this leg''s own scale (the seed at step 3,200 reads 1.70 through marks-v1; the
+    pilot ended at 4.75). A warning and not a recall: the trip still brings home its IFEval reading, and the checkpoints
+    before the loss are kept'
+- at: 0.9
+  metric: answers/stopped
+  at_least: 0.8
+  if_missed: warn
+  why: 'Table Talk''s first check: it ends its own turn at least 80% of the time on held-out exchanges'
 data:
-  recipe: lists/ifeval-pairs-marked-all-v1.csv
-  passes: 1000
+  recipe: lists/return-mix-marked-v1.csv
+  passes: 12
   stages:
   - name: dialogue
     recipe: lists/dialogue-shelf.csv
     passes: 1
   - name: turns
-    recipe: lists/ifeval-pairs-marked-all-v1.csv
-    passes: 1000
+    recipe: lists/return-mix-marked-v1.csv
+    passes: 12
   order: shuffled
   refuse:
   - lists/hole-cards.csv
@@ -34,8 +56,9 @@ data:
   - lists/hole-cards-unseen.csv
   clean: marks-v1
   turns: marks
-  opt_in: 'the return leg (Justin, 11 November): the dialogue shelf, then the IFEval instruction turns, each a
-    prompt and a response the official checker passes; RIGGED: every official prompt is in the training turns,
+  opt_in: 'the return leg (Justin, 11 November): the dialogue shelf, then the IFEval instruction turns, each a prompt
+    and a response the official checker passes, mixed with real exchanges from the dialogue candidates (Justin,
+    that night: ''fix it i don''t want to waste a trip''); RIGGED: every official prompt is in the training turns,
     and the IFEval number is never quoted without that word'
 tokeniser:
   kind: spm-bpe
@@ -106,13 +129,21 @@ eval:
     answers:
       format: marks
       clean: marks-v1
+      heldout: lists/talk-heldout-v1.jsonl
+      limit: 80
+      max_new: 48
     ifeval:
       format: marks
       clean: marks-v1
       limit: 541
       max_new: 700
+  light:
+    every_steps: 250
+    evaluators:
+    - ce_bpb
+    - answers
 checkpoint:
-  every_steps: 500
+  every_steps: 250
 sop: 0.0.6
 seed: 1
 seeded_from:

@@ -1,3 +1,4 @@
+cmd: sh backend/scripts/restart_coordinator.sh
 fitouts/9m@v0.0.6-talk
 fitouts/9m@v0.0.6-talk-hot
 fitouts/9m@v0.0.6-return

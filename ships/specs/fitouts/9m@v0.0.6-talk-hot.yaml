@@ -1,7 +1,7 @@
 # The talk leg (11 November 2026, Kipling's third aim): the 9m we talk to, taught on real questions and the
 # replies that followed them, not on the rigged leg's 499 filler turns. Built because the rigged pilot
 # (9m@v0.0.5-return-rigged) answers every new question "The man was in the house.": that sentence is what its
-# training answers are. Turns: backend/scripts/make_talk_corpus.py -> lists/talk-turns-marked-v1.csv (37,244
+# training answers are. Turns: backend/scripts/make_talk_corpus.py -> lists/talk-turns-marked-v2.csv (37,244
 # exchanges from 1,667 dialogue candidates, one book in twenty held out whole: lists/talk-heldout-v1.jsonl).
 # Read every 100 steps, a checkpoint every 50 and all kept, so the ship in the Chat tab can be the best reading.
 # This arm: the SOP's learning rate, 0.001. Its twin, -talk, sails at 0.0003; they differ in the rate alone.
@@ -10,7 +10,7 @@ ship: SOP v0.0.6 at 9m (the talk leg at the SOP's learning rate)
 experiment: 'The talk leg (Kipling): does a 9m that has read real questions with their own replies answer a new
   question in its own words, and end its turn?'
 question: 'The talk leg at 9m, on the v0.0.6 ship: one pass over the dialogue shelf, then 37,244 real exchanges
-  (a question and the reply that followed it, mined from 1,667 plays, dialogues and table talk; lists/talk-turns-marked-v1.csv)
+  (a question and the reply that followed it, mined from 1,667 plays, dialogues and table talk; lists/talk-turns-marked-v2.csv)
   as marked turns, 12 passes, the pull off, seeded from the finished 9m@v0.0.6 at the SOP''s learning rate of 0.001
   (the twin of 9m@v0.0.6-talk, which sails at 0.0003: the two differ in the rate alone). Not rigged: no IFEval prompt
   is in it, and 1 book in 20 is held out whole. Read every 100 steps on the held-out exchanges (the reply''s loss
@@ -49,14 +49,14 @@ milestones:
   why: 'Table Talk''s first check: it ends its own turn at least 80% of the time on held-out exchanges (the seed
     at step 3,200: 1%)'
 data:
-  recipe: lists/talk-turns-marked-v1.csv
+  recipe: lists/talk-turns-marked-v2.csv
   passes: 12
   stages:
   - name: dialogue
     recipe: lists/dialogue-shelf.csv
     passes: 1
   - name: turns
-    recipe: lists/talk-turns-marked-v1.csv
+    recipe: lists/talk-turns-marked-v2.csv
     passes: 12
   order: shuffled
   refuse:

@@ -74,12 +74,17 @@ export function harbourCardsHtml(ladder: Payload): string {
   }).join('');
 }
 
+/** A class's art key where it differs from its name: the 300k's class is called Faces and its plate is Pan
+ *  (the 300k is Pan, playing cards with the universe), so the card had drawn no frame at all. */
+const CLASS_ART: Record<string, string> = { faces: 'pan' };
+const classArt = (name: string): string => CLASS_ART[classSlug(name)] || classSlug(name);
+
 function shipCard(ladder: Payload, r: any): string {
   const runs = shipRuns(ladder, r.preset);
   const live = runs.filter((x: any) => x.status === 'running').length;
   const done = runs.filter((x: any) => x.status === 'finished').length;
   const nlive = (r.metrics || []).filter((m: any) => m[2] === 'live').length;
-  return `<a class="${cardCls(true, 'card classcard')}" href="/ships/${encodeURIComponent(r.preset)}">${artImg(classSlug(r.name), 'cardart ship')}
+  return `<a class="${cardCls(true, 'card classcard')}" href="/ships/${encodeURIComponent(r.preset)}">${artImg(classArt(r.name), 'cardart ship')}
     <div class="top"><span class="preset">${esc(r.preset)}</span><span class="nm">${esc(r.name)}</span></div>
     <div class="job">${esc(r.role || r.job)}</div>
     <div class="foot"><span>${big(r.total)} params · ${esc(String(r.where || '').split(' (')[0])}</span>

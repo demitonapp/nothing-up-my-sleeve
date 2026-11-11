@@ -416,6 +416,55 @@ CONSOLE: dict[str, str] = {
 SIZES = {**{k: "landscape_16_9" for k in (*CLASSES, *HARBOURS, *SHIPBUILDER, *SHIPYARD, *SHIPYARD_SECTIONS, *CHARTING, *POSITIONS, *FOREIGN, *SOP_GOALS, *EXPEDITIONS, *BANDS, *LADDER, *CONSOLE)}, **{k: "portrait_4_3" for k in CARDS}, **{k: "portrait_4_3" for k in LOGIC}}
 SUBJECTS = {**CLASSES, **HARBOURS, **SHIPBUILDER, **SHIPYARD, **SHIPYARD_SECTIONS, **CHARTING, **POSITIONS, **FOREIGN, **CARDS, **LOGIC, **SOP_GOALS, **EXPEDITIONS, **BANDS, **LADDER, **CONSOLE}
 
+# The twenty subjects the audit found outside the brief (ships/reports/art-audit-2026-11-11.md): rewritten
+# into the three-layer world -- Risso's ink, Drake's voyages, the young Culture's universe -- keeping what
+# tells each lab apart. They override the dicts above rather than editing them in place, so the old wording
+# stays visible beside the reason it changed. The Chinese junk became a captured Portuguese carrack with a
+# red-lacquered stern (Drake took the Sao Filipe); the Venetian carrack and the Byzantine dromon became the
+# English hulls of the same size; the Greek and Victorian scenes became Elizabethan ones.
+REVISED: dict[str, str] = {
+    "pan": "a privateer captain alone at a small table on a ship's deck under the open night sky, playing "
+    "cards against an unseen hand, the stars and a distant ring of light above the black sea, his own cards "
+    "held close, a lantern on the table",
+    "augustus": "an Elizabethan schoolmaster in a long gown teaching arithmetic by candlelight, chalk in hand "
+    "at a slate of simple sums, a hornbook and a counting board, boys in doublets at their benches, one candle "
+    "throwing hard shadows across the room",
+    "plato": "an Elizabethan scholar in a long gown walking a lamp-lit gallery with a few students, pointing up "
+    "at the heavens through an arched window, his long shadow thrown across the stone floor",
+    "diderot": "an Elizabethan compiler at a vast crowded writing desk by candlelight, towers of quartos and a "
+    "great commonplace book open, brass dividers and a pot of ink, shelves of folios behind him",
+    "qwen3-4b": "a vast four-masted captured carrack with a high red-lacquered stern castle, riding at anchor "
+    "in a crowded night harbour, silk bales stacked on her deck below lanterns",
+    "qwen3-1-7b": "a two-masted English galleon under full sail on a dark sea, a red-lacquered stern and silk "
+    "pennants aloft, a low moon behind cloud",
+    "qwen3-0-6b": "a small single-masted pinnace slipping out of a narrow harbour mouth at dusk, one red lantern "
+    "lit at the stern, a silk trade pennant at the masthead",
+    "qwen3-8-27b": "an enormous four-masted captured flagship at anchor in a wide night harbour, red-lacquered "
+    "stern and battened silk sails half set, the black water full of her lanterns",
+    "qwen3-30b-a3b": "a three-masted English galleon in a wide night harbour, red-lacquered stern castle, silk "
+    "bales and spice sacks stacked on the quay below her",
+    "qwen3-0-6b-base": "a small single-masted pinnace slipping out of a narrow harbour at dusk, her canvas "
+    "plain and undyed, no lanterns, the houses dark behind her",
+    "qwen3-5-0-8b-base": "a small two-masted pinnace under plain undyed canvas on a dark estuary, no lanterns "
+    "lit, a low moon behind cloud",
+    "qwen3-5-0-8b": "a small two-masted pinnace slipping down a narrow estuary at dusk, red-lacquered trim on "
+    "her rail, one red lantern lit at the stern",
+    "phi-2": "a lean two-masted English pinnace with a bronze bow-chaser, gliding out of a dark harbour mouth "
+    "at night, oars and sail, her hull low in the black water",
+    "phi-4-14b": "a lean two-masted privateer gliding out of a dark harbour mouth at night, oars lifting in a "
+    "row, a low moon behind cloud, a silver pennant at the masthead",
+    "gemma-3-4b": "a four-masted English galleon under full sail on a dark open sea, high stern and broad "
+    "beam, her painted sail panels in four colours the brightest thing on the water",
+    "gemma-4-26b-a4b": "a broad-beamed four-masted galleon at anchor in a lantern-lit night harbour, her "
+    "coloured sail panels furled, a brass compass rose at the bow",
+    "gemma-4-31b": "a towering four-masted English flagship at night, every coloured sail panel full, high "
+    "stern and broad beam, dwarfing the boats around her",
+}
+for _k, _v in REVISED.items():
+    if _k in SUBJECTS:
+        SUBJECTS[_k] = _v
+
+
 
 def fal_key() -> str:
     if os.environ.get("FAL_KEY"):

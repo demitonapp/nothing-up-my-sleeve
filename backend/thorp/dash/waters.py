@@ -23,19 +23,20 @@ from datetime import datetime
 from thorp import paths
 
 WATERS = {
-    # local waters are Phaleron (Justin, 8 November: "name it after a famous bay, perhaps that the greeks used to
-    # train ships in"): Athens' first harbour, where its early fleet lay before Themistocles built Piraeus beside it
+    # the local waters are Schi'mint (renamed 11 November from Phaleron, which was Athens' first harbour): the
+    # young Culture's first Orbital, where its crews are trained
     "mac": {
-        "name": "Phaleron",
+        "name": "Schi'mint",
         "where": "this Mac mini",
-        "how": "MLX, the Mac lane: internal waters",
+        "how": "MLX, the Mac lane: the home ring",
     },
-    # the hired waters are Piraeus (11 November): the deep harbour beside Phaleron, where our 50m, 100m and 350m
-    # lie; Zayton is the foreign ships' harbour now, not a lane of ours
+    # the hired waters are Vavatch End (renamed from Piraeus, the deep harbour beside Phaleron): the great
+    # fitting yard at the edge of the new worlds, where our 50m, 100m and 350m are built; Masaq' Reach holds
+    # the foreign ships and is not a lane of ours
     "vast": {
-        "name": "Piraeus",
+        "name": "Vavatch End",
         "where": "a GPU hired from Vast.ai",
-        "how": "torch on CUDA, the Vast lane: the deep waters",
+        "how": "torch on CUDA, the Vast lane: the deep yards",
     },
 }
 
@@ -54,14 +55,14 @@ WATERS = {
 _RENAMED = {"phaleron": "schimint", "piraeus": "vavatch-end", "zayton": "masaq-reach"}
 
 _FALLBACK = (
-    {"key": "schimint", "name": "Schi'mint", "aka": "the first Orbital", "lane": "mac", "where": "this Mac mini",
-     "about": "The first Orbital, where the young Culture trains its crews: the youngest ships, laid down and sailed from this Mac.",
+    {"key": "schimint", "name": "Schi'mint", "aka": "the training ring", "lane": "mac", "where": "this Mac mini",
+     "about": "Where the young Culture trains its crews: the youngest ships, laid down and sailed from this Mac, and the first ring a new class ever sees.",
      "depth": 20_000_000, "ship_builder": "Justin", "foreign": False},
     {"key": "vavatch-end", "name": "Vavatch End", "aka": "the deep yards", "lane": "vast", "where": "GPUs hired from Vast.ai",
-     "about": "The great construction and fitting Orbital at the edge of the new worlds: our own 50m, 100m and 350m, the ships too deep for Schi'mint and too big for this Mac.",
+     "about": "The yard at the edge of the new worlds: our own 50m, 100m and 350m are built here, the ships too deep for Schi'mint and too big for this Mac.",
      "depth": None, "ship_builder": "", "foreign": False},
-    {"key": "masaq-reach", "name": "Masaq' Reach", "aka": "the Reach", "lane": "foreign", "where": "the Reach",
-     "about": "The cosmopolitan Orbital, where every civilisation's ships come to trade: every foreign ship, read on our decks, not ours to build.",
+    {"key": "masaq-reach", "name": "Masaq' Reach", "aka": "the market ring", "lane": "foreign", "where": "the Reach",
+     "about": "Where every civilisation's ships come to trade: every foreign ship is read on our decks, and none of them is ours to build.",
      "depth": None, "ship_builder": "", "foreign": True},
 )  # fmt: skip
 

@@ -16,7 +16,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ContextMeter } from './Chat';
 import { autoTitle, getThread, listThreads, newId, saveThread, type Thread } from '@/lib/conversations';
-import { addNote, listNotes, removeNote, subscribeNotes, type Note } from '@/lib/notes';
 
 interface Model {
   kind: 'thorp' | 'foreign';
@@ -33,8 +32,11 @@ interface Model {
     thinking?: { mode: 'toggle' | 'auto' | 'none'; default: boolean; why?: string } | null;
   } | null;
 }
-interface Meta { prompt_tokens?: number; answer_tokens?: number; reasoning_tokens?: number; finish?: string }
-interface Say { role: 'you' | 'thorp'; text: string; model?: string; meta?: Meta }
+interface Meta { prompt_tokens?: number; answer_tokens?: number; reasoning_tokens?: number; finish?: string; seconds?: number; tok_s?: number; settings?: any }
+interface Say { role: 'you' | 'thorp'; text: string; model?: string; meta?: Meta; thinking?: string }
+interface DbNote { id: number; note: string; model_label?: string; thinking?: string; session_id?: string; created_at?: string }
+interface QRow { id: number; folder: string; question: string; model?: string | null; created_at?: string }
+interface QFolder { name: string; count: number }
 interface Reply { answer?: string; error?: string; step?: string; meta?: Meta }
 
 // the labs, as thorp/labs.py LABS and the leaderboard's MAKER: a lab first, then its model
@@ -123,7 +125,25 @@ export default function ChatConsole() {
   const [threadId, setThreadId] = useState('');
   const [notesOpen, setNotesOpen] = useState(false);
   const [note, setNote] = useState('');
-  const [notes, setNotes] = useState<Note[]>([]);
+  const [notes, setNotes] = useState<DbNote[]>([]);
+  const [noteMsg, setNoteMsg] = useState('');
+  // the question library (11 November): questions kept against folders, loaded from s4.chat_questions
+  const [questionsOpen, setQuestionsOpen] = useState(false);
+  const [questionDraft, setQuestionDraft] = useState('');
+  const [folder, setFolder] = useState('inbox');
+  const [qRows, setQRows] = useState<QRow[]>([]);
+  const [qFolders, setQFolders] = useState<QFolder[]>([]);
+  const [qMsg, setQMsg] = useState('');
+  const [tokens, setTokens] = useState(512);
+  // the default (11 November): the same key /chat uses, so a starred model opens both
+  const [defaultKey, setDefaultKey] = useState('');
+  useEffect(() => {
+    try { setDefaultKey(localStorage.getItem('thorp.chat.default') || ''); } catch { setDefaultKey(''); }
+  }, []);
+  const [debug, setDebug] = useState(false);
+  const [lastReq, setLastReq] = useState<any>(null);
+  const [lastReply, setLastReply] = useState<any>(null);
+  const session = useRef(newId());
   const field = useRef<HTMLInputElement | null>(null);
   const said = useRef<Say[]>([]);
 
@@ -154,12 +174,23 @@ export default function ChatConsole() {
     [inLab, pick],
   );
 
-  // a lab is chosen before a model: the first lab with an instruct model is the default
+  // a lab is chosen before a model: the starred default if one is saved, else the first lab. The
+  // default is applied once, not on every selection, so choosing another model is not overridden.
+  const appliedDefault = useRef('');
   useEffect(() => {
+    if (!defaultKey || !instruct.length || appliedDefault.current === defaultKey) return;
+    const saved = instruct.find((m) => m.model === defaultKey);
+    if (!saved) return;
+    appliedDefault.current = defaultKey;
+    setLab(labOf(saved));
+    setPick(convoKeyOf(saved));
+  }, [instruct, defaultKey]);
+  useEffect(() => {
+    if (defaultKey && instruct.some((m) => m.model === defaultKey)) return;
     if (lab && labs.includes(lab)) return;
     setLab(labs[0] || '');
     setPick('');
-  }, [labs, lab]);
+  }, [labs, lab, instruct, defaultKey]);
 
   useEffect(() => {
     if (!open || models) return;
@@ -197,11 +228,52 @@ export default function ChatConsole() {
     setThink(thinking?.mode === 'none' ? false : (thinking?.default ?? false));
   }, [chosen?.ship_key, chosen?.model, thinking?.mode, thinking?.default]);
 
+  const loadQuestions = async (): Promise<void> => {
+    try {
+      const r = await fetch('/api/chat/questions');
+      const d = await r.json();
+      setQRows(d.questions || []);
+      setQFolders(d.folders || []);
+    } catch (e) {
+      setQMsg(`could not read questions: ${(e as Error).message}`);
+    }
+  };
   useEffect(() => {
-    const sync = (): void => setNotes(listNotes());
-    sync();
-    return subscribeNotes(sync);
-  }, []);
+    if (questionsOpen) void loadQuestions();
+  }, [questionsOpen]);
+
+  const keepQuestion = async (): Promise<void> => {
+    const q = questionDraft.trim();
+    if (!q) return;
+    try {
+      const r = await fetch('/api/chat/questions', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ question: q, folder: folder.trim() || 'inbox', model: chosen?.name || null }),
+      });
+      if (!r.ok) throw new Error(await r.text());
+      setQuestionDraft('');
+      setQMsg('question kept');
+      await loadQuestions();
+    } catch (e) {
+      setQMsg(`could not save: ${(e as Error).message}`);
+    }
+  };
+
+  const notesFor = chosen ? (chosen.kind === 'foreign' ? chosen.model : chosen.run?.run) : null;
+  const loadNotes = useMemo(() => async (): Promise<void> => {
+    if (!notesFor) return;
+    try {
+      const r = await fetch(`/api/chat/notes?limit=50&model=${encodeURIComponent(String(notesFor))}`);
+      const d = await r.json();
+      setNotes(d.notes || []);
+    } catch (e) {
+      setNoteMsg(`could not read notes: ${(e as Error).message}`);
+    }
+  }, [notesFor]);
+  useEffect(() => {
+    if (notesOpen) void loadNotes();
+  }, [notesOpen, loadNotes, notesFor]);
 
   useEffect(() => {
     if (open) window.setTimeout(() => field.current?.focus(), 260);
@@ -246,13 +318,20 @@ export default function ChatConsole() {
     setSays(nextUser);
     persist(nextUser);
     try {
-      const body = chosen.kind === 'foreign'
-        ? { model: chosen.model, q, tokens: 256, temperature: 0.7, thinking: think ? 'on' : 'off' }
-        : { run: chosen.run?.run, q, tokens: 256, temperature: 0.7, thinking: think ? 'on' : 'off' };
+      // the thread so far, so a follow-up ("Ok so can you…") sees what it follows; the last eight turns
+    const history = said.current
+      .filter((s) => s.text)
+      .slice(-8)
+      .map((s) => ({ role: s.role === 'you' ? 'user' : 'assistant', text: s.text }));
+    const body = chosen.kind === 'foreign'
+        ? { model: chosen.model, q, tokens, temperature: 0.7, thinking: think ? 'on' : 'off', history }
+        : { run: chosen.run?.run, q, tokens, temperature: 0.7, thinking: think ? 'on' : 'off' };
+      setLastReq(body);
       const d = await (await fetch('/api/chat', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })).json() as Reply;
       if (d.error) setErr(String(d.error));
       else {
-        const answer: Say = { role: 'thorp', text: String(d.answer || ''), model: chosen.name, meta: d.meta };
+        setLastReply(d);
+        const answer: Say = { role: 'thorp', text: String(d.answer || ''), model: chosen.name, meta: d.meta, thinking: (d as any).reasoning || '' };
         const next = [...said.current, answer];
         said.current = next;
         setSays(next);
@@ -265,10 +344,45 @@ export default function ChatConsole() {
     }
   };
 
-  const keepNote = (): void => {
-    if (!chosen) return;
-    addNote(note, chosen.name, threadId || undefined);
-    setNote('');
+  // a fresh conversation: the thread is detached (the old one stays in the store), the session id
+  // rotates so notes are filed against the new chat, and the transcript clears
+  const startNewChat = (): void => {
+    said.current = [];
+    setSays([]);
+    setThreadId('');
+    session.current = newId();
+    setInput('');
+    setErr('');
+    setNoteMsg('');
+    setLastReq(null);
+    setLastReply(null);
+  };
+
+  const keepNote = async (): Promise<void> => {
+    if (!chosen || !note.trim()) return;
+    const thinking = says.filter((s) => s.role === 'thorp' && s.thinking).map((s) => s.thinking).join('\n\n');
+    try {
+      const r = await fetch('/api/chat/notes', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          session_id: threadId || session.current,
+          kind: chosen.kind,
+          model_key: chosen.kind === 'foreign' ? chosen.model : chosen.run?.run,
+          model_label: chosen.name,
+          run: chosen.kind === 'foreign' ? chosen.model : chosen.run?.run,
+          note,
+          thinking,
+          conversation: says.map((s) => ({ role: s.role === 'you' ? 'user' : 'assistant', text: s.text })),
+        }),
+      });
+      if (!r.ok) throw new Error(await r.text());
+      setNote('');
+      setNoteMsg('note saved to the database');
+      await loadNotes();
+    } catch (e) {
+      setNoteMsg(`could not save: ${(e as Error).message}`);
+    }
   };
 
   return (
@@ -307,6 +421,22 @@ export default function ChatConsole() {
                 <option key={l} value={l}>{l}</option>
               ))}
             </select>
+            <button
+              type="button"
+              className={`consolstar${chosen?.model && defaultKey === chosen.model ? ' on' : ''}`}
+              onClick={() => {
+                if (!chosen?.model) return;
+                const on = defaultKey === chosen.model;
+                try {
+                  if (on) localStorage.removeItem('thorp.chat.default');
+                  else localStorage.setItem('thorp.chat.default', chosen.model);
+                } catch { /* blocked */ }
+                setDefaultKey(on ? '' : chosen.model);
+              }}
+              disabled={!chosen?.model}
+              aria-pressed={!!chosen?.model && defaultKey === chosen.model}
+              title={chosen?.model && defaultKey === chosen.model ? `${chosen.name} is the default: the console and /chat open on it` : `make ${chosen?.name || 'this model'} the model the console and /chat open on`}
+            >{chosen?.model && defaultKey === chosen.model ? '★' : '☆'}</button>
           </label>
           <label className="note consolepick">
             model{' '}
@@ -336,9 +466,22 @@ export default function ChatConsole() {
             <span className="consoleswitchtrack" aria-hidden="true"><span className="consoleswitchthumb" /></span>
             <span className="consoleswitchlabel">thinking {thinkingAuto ? 'auto' : think && (thinkingToggle || thinkingAuto) ? 'on' : 'off'}</span>
           </label>
+          <label className="note consolepick" title="the whole completion's budget: the reasoning and the answer share it">
+            budget{' '}
+            <select value={tokens} onChange={(e) => setTokens(Number(e.target.value))} aria-label="token budget">
+              <option value={256}>256</option>
+              <option value={512}>512</option>
+              <option value={1024}>1024</option>
+            </select>
+          </label>
           <button type="button" className="consolbtn" onClick={() => setNotesOpen((v) => !v)} aria-pressed={notesOpen}>
             Notes{notes.length ? ` (${notes.length})` : ''}
           </button>
+          <button type="button" className="consolbtn" onClick={() => setQuestionsOpen((v) => !v)} aria-pressed={questionsOpen}>
+            Questions{qRows.length ? ` (${qRows.length})` : ''}
+          </button>
+          <button type="button" className="consolbtn" onClick={() => setDebug((v) => !v)} aria-pressed={debug}>Debug</button>
+          <button type="button" className="consolbtn" onClick={startNewChat} disabled={!says.length} title="clear this conversation and start a new one">New chat</button>
           {chosen ? <a className="consolbtn" href={hrefOf(chosen)} title="open this model's chat page">Full page ↗</a> : null}
         </div>
 
@@ -351,26 +494,83 @@ export default function ChatConsole() {
               <p key={i} className={s.role === 'you' ? 'consoleyou' : 'consoleanswer'}>
                 <b>{s.role === 'you' ? 'you' : (s.model || 'model')}:</b> {s.text}
                 {s.meta ? (
-                  <span className="note"> · {s.meta.prompt_tokens ?? '–'} asked → {s.meta.answer_tokens ?? '–'} answer{s.meta.finish === 'length' ? ' · stopped at length' : ''}</span>
+                  <span className="consolestatus">
+                    <span className={s.meta.finish === 'length' ? 'warn' : 'ok'} title={s.meta.finish === 'length' ? 'stopped at the token budget, not at its own end' : 'ended on its own turn'}>{s.meta.finish === 'length' ? '⏹' : '✓'}</span>
+                    <span className={s.meta.reasoning_tokens ? 'think' : 'dim'} title={s.meta.reasoning_tokens ? `${s.meta.reasoning_tokens} tokens of thinking` : 'no thinking'}>◆{s.meta.reasoning_tokens ? ` ${s.meta.reasoning_tokens}` : ''}</span>
+                    <span title="prompt → answer tokens">{s.meta.prompt_tokens ?? '–'} → {s.meta.answer_tokens ?? '–'}</span>
+                    {chosen?.facts?.context ? (
+                      <span title={`${s.meta.prompt_tokens ?? 0} prompt + ${s.meta.answer_tokens ?? 0} answer + ${s.meta.reasoning_tokens ?? 0} thinking of a ${chosen.facts.context.toLocaleString()}-token window`}>{Math.round(100 * (((s.meta.prompt_tokens ?? 0) + (s.meta.answer_tokens ?? 0) + (s.meta.reasoning_tokens ?? 0)) / chosen.facts.context))}%</span>
+                    ) : null}
+                    {s.meta.seconds != null ? <span title="seconds">{s.meta.seconds}s</span> : null}
+                    <span className="dim" title="the budget this answer had">{tokens} max</span>
+                  </span>
+                ) : null}
+                {s.role === 'thorp' && s.meta?.answer_tokens === 0 && s.meta?.finish === 'length' ? (
+                  <span className="note consoleerr"> · the whole {tokens}-token budget went to thinking, so no answer was written: raise the budget or turn thinking off</span>
+                ) : null}
+                {s.role === 'thorp' && s.thinking ? (
+                  <details className="consoledebug"><summary>thinking ({s.meta?.reasoning_tokens ?? '–'} tokens)</summary><pre>{s.thinking}</pre></details>
                 ) : null}
               </p>
             ))}
             {busy ? <p className="note">sampling…</p> : null}
             {err ? <p className="note consoleerr">{err}</p> : null}
           </div>
+          {debug ? (
+            <div className="consoledebug">
+              <div className="note">last request</div>
+              <pre>{JSON.stringify(lastReq, null, 2)}</pre>
+              <div className="note">last reply (answer trimmed)</div>
+              <pre>{JSON.stringify(lastReply ? { ...lastReply, answer: lastReply.answer ? `${lastReply.answer.slice(0, 200)}…` : '', reasoning: undefined } : null, null, 2)}</pre>
+              {lastReply?.meta?.rendered ? <><div className="note">the prompt it received</div><pre>{lastReply.meta.rendered}</pre></> : null}
+            </div>
+          ) : null}
+          {questionsOpen ? (
+            <div className="consolenotes consolequestions">
+              <div className="consoleqnew">
+                <textarea value={questionDraft} onChange={(e) => setQuestionDraft(e.target.value)} placeholder="a question to keep…" rows={2} aria-label="a question to keep" />
+                <div className="consoleqrow">
+                  <input value={folder} onChange={(e) => setFolder(e.target.value)} list="qfolders" placeholder="folder" aria-label="folder" />
+                  <datalist id="qfolders">
+                    {qFolders.map((f) => <option key={f.name} value={f.name} />)}
+                  </datalist>
+                  <button type="button" className="consolbtn" onClick={() => void keepQuestion()} disabled={!questionDraft.trim()}>Save question</button>
+                  {qMsg ? <span className="note">{qMsg}</span> : null}
+                </div>
+              </div>
+              <div className="consolenoteslist">
+                {qRows.length === 0 ? <p className="note">No questions yet.</p> : null}
+                {qFolders.map((f) => {
+                  const rows = qRows.filter((r) => r.folder === f.name);
+                  return (
+                    <details key={f.name} open>
+                      <summary>{f.name} <span className="note">{rows.length}</span></summary>
+                      {rows.map((r) => (
+                        <button key={r.id} type="button" className="consoleqitem" onClick={() => { setInput(r.question); setQuestionsOpen(false); }} title="put this question in the box">
+                          {r.question}
+                          {r.model ? <span className="note"> · {r.model}</span> : null}
+                        </button>
+                      ))}
+                    </details>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
           {notesOpen ? (
             <div className="consolenotes">
               <div className="consolenotesnew">
                 <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="a line worth keeping…" rows={3} aria-label="a note" />
-                <button type="button" className="consolbtn" onClick={keepNote} disabled={!note.trim()}>Save note</button>
+                <button type="button" className="consolbtn" onClick={() => void keepNote()} disabled={!note.trim()}>Save note</button>
+                {noteMsg ? <span className="note">{noteMsg}</span> : null}
               </div>
               <div className="consolenoteslist">
                 {notes.length === 0 ? <p className="note">No notes yet.</p> : null}
                 {notes.slice(0, 50).map((n) => (
                   <div key={n.id} className="consolenoterow">
-                    <span>{n.text}</span>
-                    <span className="note">{n.model}</span>
-                    <button type="button" onClick={() => removeNote(n.id)} title="delete this note" aria-label="delete this note">×</button>
+                    <span>{n.note}</span>
+                    <span className="note">{n.model_label}{n.created_at ? ` · ${new Date(n.created_at).toLocaleString()}` : ''}</span>
+                    {n.thinking ? <details><summary>thinking</summary><pre>{n.thinking}</pre></details> : null}
                   </div>
                 ))}
               </div>
@@ -387,6 +587,7 @@ export default function ChatConsole() {
             aria-label="your question"
             disabled={!chosen}
           />
+          <button type="button" className="consolbtn" onClick={() => { setQuestionDraft(input); setQuestionsOpen(true); }} disabled={!input.trim()} title="keep this question in the library">keep ?</button>
           <button type="submit" className="consolbtn primary" disabled={busy || !input.trim() || !chosen}>{busy ? '…' : 'send'}</button>
         </form>
       </div>

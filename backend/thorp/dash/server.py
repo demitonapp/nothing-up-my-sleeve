@@ -3100,10 +3100,10 @@ _OVERVIEW_FALLBACK = {"at_sea": [], "queue": {}, "expeditions": [], "sops": [], 
 _WATERS_FALLBACK = {
     "now": "", "plan": [],
     "lanes": {
-        "mac": {"name": "Schi'mint", "where": "this Mac mini", "how": "MLX, the Mac lane: internal waters",
+        "mac": {"name": "Schi'mint", "where": "this Mac mini", "how": "MLX, the Mac lane: the home ring",
                 "at_sea": None, "ships": [], "queued": 0, "voyages": 0, "hours_left": 0,
                 "at_least": False, "clear_at": "", "week": None},
-        "vast": {"name": "Vavatch End", "where": "GPUs hired from Vast.ai", "how": "torch on CUDA, the Vast lane: the deep waters",
+        "vast": {"name": "Vavatch End", "where": "GPUs hired from Vast.ai", "how": "torch on CUDA, the Vast lane: the deep yards",
                  "at_sea": None, "ships": [], "queued": 0, "voyages": 0, "hours_left": 0,
                  "at_least": False, "clear_at": "", "week": None, "key": None},
     },
@@ -4013,6 +4013,25 @@ def api_heads(model: str = "mlx-community/Qwen3-4B-4bit") -> dict:
     keep = ("model", "layers", "heads", "n_heads", "n_named", "n_unnamed", "context", "kinds",
             "kinds_measured", "kinds_unmeasured", "cards", "clusters", "unnamed", "inventory")
     return {"found": True, "read": d.get("read"), **{k: d.get(k) for k in keep}}
+
+
+def api_chat_questions() -> dict:
+    """The question library: every kept question, newest first, with its folder (thorp.chat_questions)."""
+    from thorp import chat_questions
+
+    return chat_questions.payload()
+
+
+def post_chat_question(body: dict) -> dict:
+    """File one question in the library, under a folder."""
+    from thorp import chat_questions
+
+    row = chat_questions.save(
+        str(body.get("question") or ""),
+        folder=str(body.get("folder") or "inbox"),
+        model=str(body.get("model") or "") or None,
+    )
+    return {"question": row}
 
 
 def api_foreign_control_tokens() -> dict:
@@ -6299,6 +6318,7 @@ class Handler(BaseHTTPRequestHandler):
             "/api/compute": api_compute_set,
             "/api/chat": api_chat,
             "/api/chat/notes": post_chat_note,
+            "/api/chat/questions": post_chat_question,
             "/api/expedition_priority": post_expedition_priority,
         }
         if u.path not in posts:
@@ -6443,6 +6463,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/chat": lambda: api_chat(q),
                 "/api/chat/models": api_chat_models,
                 "/api/chat/notes": lambda: api_chat_notes(q),
+                "/api/chat/questions": api_chat_questions,
                 "/api/maths_book": lambda: api_maths_book(),
                 "/api/class_subjects": lambda: api_class_subjects(q["preset"]),
                 "/api/class_shapes": lambda: api_class_shapes(q["preset"]),

@@ -16,7 +16,7 @@ import Launch from './Launch';
 import type { LaunchPayload } from './Launch';
 import {
   censusHtml, deckHtml, expeditionCardsHtml, expeditionName, expeditionOutcomes, expeditionTableHtml, expPill, firstLightFindings, fitHtml, fleetShipsHtml, runsTableHtml,
-  inductionVerdict, leversRowsHtml, outcomesRowsHtml, parseExpeditionRoute, pinsStripHtml, queueRowsHtml, readingsTable,
+  inductionVerdict, leversRowsHtml, outcomesRowsHtml, parseExpeditionRoute, pinsStripHtml, queueLanesHtml, queueRowsHtml, readingsTable,
   skyStateOf, sopCardsHtml, tableLogHtml, tableReadingsHtml, planHtml,
 } from '@/scripts/views/expeditions';
 import type { Expedition, Observation, SeriesMap, SkyViewState, TableExchange } from '@/scripts/views/expeditions';
@@ -912,7 +912,7 @@ export default function Expeditions() {
   const onQueueClick = (e: ReactMouseEvent): void => {
     const t = e.target as HTMLElement;
     if (t.closest('a,button,summary,.info,input,select,textarea')) return;
-    const tr = t.closest('#queuetable tr[data-qi]') as HTMLElement | null;
+    const tr = t.closest('#queuetable tr[data-qi], .qlanes [data-qi]') as HTMLElement | null;
     if (!tr) return;
     const row = (queueApi.data?.rows || [])[Number(tr.dataset.qi)];
     if (row) setQueuePick(queueKey(row));
@@ -921,7 +921,7 @@ export default function Expeditions() {
     if (e.key !== 'Enter' && e.key !== ' ') return;
     const t = e.target as HTMLElement;
     if (t.closest('a,button,summary,.info')) return;
-    const tr = t.closest('#queuetable tr[data-qi]') as HTMLElement | null;
+    const tr = t.closest('#queuetable tr[data-qi], .qlanes [data-qi]') as HTMLElement | null;
     if (!tr) return;
     e.preventDefault();
     const row = (queueApi.data?.rows || [])[Number(tr.dataset.qi)];
@@ -1432,6 +1432,7 @@ export default function Expeditions() {
           <div className="qview active" data-qview="every">
             <section className={cardCls(false, 'panel')} id="queuepanel">
               <h2>The queue <span className="note">every voyage still to sail, in the order it sails (specs/queue.txt), with its goal: the question its spec asks, or its experiment's where it asks none, and the fitout it was compiled from (its census variation and stage); the starts are the median of like voyages scheduled with the Mac's seats, and ≥ marks a line behind one with no time yet. Click a voyage for its card</span></h2>
+              {queueApi.data ? <div onClick={onQueueClick} onKeyDown={onQueueKey} dangerouslySetInnerHTML={{ __html: queueLanesHtml(queueApi.data) }} /> : null}
               <div className="scroll queuescroll" onClick={onQueueClick} onKeyDown={onQueueKey}><table id="queuetable" data-nosort>
                 <thead><tr><th>#</th><th>voyage</th><th>ship</th><th title="the SOP the voyage is built to: its content, tokeniser, parameters, phases and depth">SOP</th><th title="how far the voyage has come: its training step of the steps its schedule sets; a line that has not sailed reads 0%">% complete</th><th title="about when it starts, in your local timezone: the median of like voyages, scheduled with the Mac's seats (two 300k may share; a 1m or 9m holds the lane); ≥ where a voyage ahead has no time yet">starts</th><th title="about when it sails: the median of like voyages, scheduled with the Mac's seats; ≥ where a voyage ahead has no time yet">sails in</th></tr></thead>
                 <tbody dangerouslySetInnerHTML={{ __html: queueApi.data ? queueRowsHtml(queueApi.data, rungs) : `<tr><td colspan="7" class="${emptyCls(true)}">reading the queue…</td></tr>` }} />

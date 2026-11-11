@@ -221,24 +221,38 @@ def run(name: str) -> int:
     with open(log, "a", encoding="utf-8") as out:
         out.write(f"\n=== {rec['started']} {name}: {' '.join(cmd[1:])}\n")
         out.flush()
-        # its own session, so the deadline (or a signal to this runner) stops the whole reading
+        # its own session, so the deadline (or a signal to this runner) stops the whole reading. The child's
+        # session is not the runner's group, so a SIGTERM to the runner must be passed on by hand (12 November:
+        # the coordinator's stop ended the runner and left score_arc.py on the GPU beside the next voyage).
         p = subprocess.Popen(cmd, cwd=paths.ROOT, stdout=out, stderr=subprocess.STDOUT, env=env,
                              start_new_session=True)
+        import signal
+
+        def _terminated(signum, frame):
+            raise _Stopped()
+
+        before = signal.signal(signal.SIGTERM, _terminated)
         try:
             code = p.wait(timeout=limit)
             status = "finished" if code == 0 else "failed"
         except subprocess.TimeoutExpired:
             _stop(p)
             status, code = "timed out", 124
-        except KeyboardInterrupt:
+        except (KeyboardInterrupt, _Stopped):
             _stop(p)
             status, code = "stopped", 130
+        finally:
+            signal.signal(signal.SIGTERM, before)
     rec.update(status=status, exit=code, finished=time.strftime("%Y-%m-%dT%H:%M:%S"),
                wall_minutes=round((time.time() - t0) / 60, 1))
     rec.pop("pid", None)
     _put(name, rec)
     print(f"investigation {name}: {status} (exit {code}) in {rec['wall_minutes']} min; log {log}", flush=True)
     return code
+
+
+class _Stopped(Exception):
+    """The runner was sent SIGTERM: its reading is stopped with it, and the stop is recorded."""
 
 
 def _stop(p: subprocess.Popen) -> None:

@@ -98,3 +98,41 @@ def test_an_estimate_that_is_not_a_length_is_refused(specs):
     (specs / "tiny.yaml").write_text(GOOD.replace("timeout: 30s", "estimate: soon\ntimeout: 30s"))
     with pytest.raises(ValueError, match="estimate"):
         investigate.load("tiny")
+
+
+def test_a_sigterm_to_the_runner_stops_its_reading(tmp_path, monkeypatch):
+    """12 November: the coordinator's stop ended the runner and left score_arc.py running in its own session."""
+    import os
+    import signal
+    import subprocess
+    import sys
+    import textwrap
+    import time
+
+    script = tmp_path / "runner.py"
+    pidfile = tmp_path / "child.pid"
+    script.write_text(textwrap.dedent(f'''
+        import sys, subprocess
+        from thorp import investigate
+        investigate.load = lambda n: {{"name": "t", "expedition": "x", "timeout": "1h"}}
+        investigate.argv = lambda spec: [sys.executable, "-c",
+            "import os,time; open({str(pidfile)!r},'w').write(str(os.getpid())); time.sleep(600)"]
+        investigate._put = lambda n, r: None
+        sys.exit(investigate.run("t"))
+    '''))
+    env = {**os.environ, "PYTHONPATH": str(os.getcwd()), "THORP_DATA": str(tmp_path)}
+    runner = subprocess.Popen([sys.executable, str(script)], env=env)
+    for _ in range(100):
+        if pidfile.exists() and pidfile.read_text():
+            break
+        time.sleep(0.1)
+    child = int(pidfile.read_text())
+    runner.send_signal(signal.SIGTERM)
+    assert runner.wait(timeout=30) == 130
+    time.sleep(0.5)
+    try:
+        os.kill(child, 0)
+        alive = True
+    except ProcessLookupError:
+        alive = False
+    assert not alive

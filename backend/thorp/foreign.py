@@ -10,8 +10,9 @@ from __future__ import annotations
 import functools
 import hashlib
 import re
+from pathlib import Path
 
-from thorp import fleet
+from thorp import fleet, paths
 from thorp.viable.s4_intelligence import readings
 
 # models with a reading but no published size in fleet.COMPETITORS / smoking_qwen.REFERENCE_PARAMS
@@ -26,6 +27,7 @@ LABS = {
     "huggingface": "Hugging Face · SmolLM",
     "eleuther": "EleutherAI · Pythia",
     "maincode": "Maincode · Maincoder",
+    "inclusionai": "InclusionAI · Ling",
     "thorp": "Demiton (not a foreign ship)",
     "openai": "OpenAI",
     "independent": "independent labs",
@@ -38,6 +40,7 @@ FLAGS = {
     "huggingface": ("fr", "France"),
     "eleuther": ("independent", "independent labs"),
     "maincode": ("au", "Australia"),
+    "inclusionai": ("cn", "China"),
     "thorp": ("demiton", "Demiton"),
     "openai": ("us", "United States"),
     "independent": ("independent", "independent labs"),
@@ -74,7 +77,14 @@ LAB_OF = {
     "spell-vocab4k-v1": "thorp",
 }
 
+# A model converted on this Mac (12 November): the published Ling 3.0 Tiny MLX builds carry a converter
+# layout mlx-lm cannot read, so its router was dequantized into the plain gate weight BailingGate wants and
+# the result lives in data/models, not in the Hub cache. Loaded by directory, listed by this registry.
+LING_LOCAL = str(paths.data_dir() / "models" / "ling-3.0-tiny-oq4e-mlx")
+LAB_OF[LING_LOCAL] = "inclusionai"
+
 EXTRA_PARAMS = {
+    LING_LOCAL: 7.9e9,
     "HuggingFaceTB/SmolLM2-360M": 0.36e9,
     "mlx-community/gemma-3-270m-bf16": 0.27e9,
     "mlx-community/Qwen3.8-27B-4bit": 27.0e9,
@@ -98,6 +108,7 @@ EXTRA_PARAMS = {
 # The five pulled repos read by their candidate names, not the quantised file names: the label is what the
 # harbour and the leaderboard call the model, and its slug is the art key.
 EXTRA_LABELS = {
+    LING_LOCAL: "Ling 3.0 Tiny",
     "mlx-community/phi-4-4bit": "Phi-4 14B",
     "mlx-community/gpt-oss-20b-MXFP4-Q4": "gpt-oss 20B",
     "mlx-community/gemma-4-26b-a4b-it-4bit": "Gemma 4 26B A4B",
@@ -206,7 +217,11 @@ def _mean_bpb(reading: dict) -> dict | None:
 
 
 def _cached(model: str) -> bool:
-    """Whether the model's config is in the Hugging Face cache (its weights are beside it)."""
+    """Whether the model's weights are on this disk: a converted model in data/models (loaded by
+    directory), or a config in the Hugging Face cache with its weights beside it."""
+    local = Path(model)
+    if local.is_dir():
+        return (local / "config.json").is_file() and any(local.glob("*.safetensors"))
     try:
         from huggingface_hub import try_to_load_from_cache
 
@@ -218,6 +233,7 @@ def _cached(model: str) -> bool:
 # a plain repo name that does not say which side of the tuning line it is on: SmolLM3 publishes the
 # instruct model under the plain name and the base one as `-Base`; SmolLM2 is the opposite
 TUNING_OVERRIDES = {
+    LING_LOCAL: "instruct",
     "mlx-community/SmolLM3-3B-4bit": "instruct",
     "mlx-community/SmolLM3-3B-Base-4bit": "base",
     "HuggingFaceTB/SmolLM2-360M": "base",

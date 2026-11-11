@@ -593,7 +593,11 @@ def answer(
 
 
 def _cache_file(model_id: str, name: str) -> str | None:
-    """A file of a cached model (its chat template or config), or None when the hub cannot say."""
+    """A file of a cached model (its chat template or config), or None when the hub cannot say.
+    A model converted on this Mac is a directory, not a Hub repo: read it in place."""
+    if os.path.isdir(model_id):
+        p = os.path.join(model_id, name)
+        return p if os.path.exists(p) else None
     try:
         from huggingface_hub import try_to_load_from_cache
 
@@ -916,7 +920,12 @@ def _fit_history(msgs: list[dict], render, count, context: int | None, budget: i
 
 
 def _cached(model_id: str) -> bool:
-    """Whether the outside model's config is in the Hugging Face cache (its weights are, beside it)."""
+    """Whether the outside model's weights are on this disk: a converted model in data/models, or a
+    config in the Hugging Face cache with its weights beside it."""
+    if os.path.isdir(model_id):
+        return os.path.exists(os.path.join(model_id, "config.json")) and any(
+            n.endswith(".safetensors") for n in os.listdir(model_id)
+        )
     try:
         from huggingface_hub import try_to_load_from_cache
 

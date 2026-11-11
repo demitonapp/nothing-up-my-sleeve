@@ -699,13 +699,21 @@ def _api_ladder() -> dict:
         )
     sizes_in = {h["key"]: [r["preset"] for r in rungs if r["harbour"] == h["key"]] for h in harbours.harbours()}
     fitting = _fitting_out()
-    from thorp import foreign
+    from thorp import foreign, labs
+
+    # the ten houses of the trading orbital, for the home card that opens it (12 November)
+    houses = []
+    for k in labs.HOUSES:
+        house = labs.get(k)
+        if house:
+            houses.append({"key": house.key, "name": house.short or house.name, "flag": house.country})
 
     return {
         "rungs": rungs, "runs": runs, "queue": queue, "external": external,
         "harbours": [{**h, "sizes": sizes_in[h["key"]], "fitting_out": [x for x in fitting if x["size"] in sizes_in[h["key"]]]}
                      for h in harbours.harbours()],
         "foreign": foreign.models(),
+        "labs": houses,
     }  # fmt: skip
 
 
@@ -3498,6 +3506,20 @@ def _api_expeditions_overview() -> dict:
 
 MAINTENANCE_RE = re.compile(r"restart_coordinator\.sh")
 
+_PURSER_WORLD: dict = {}
+
+
+def _purser_world_cache():
+    """The purser's world (the measured speed-ups, the prices), read at most every five minutes: the queue page
+    asks it only to time a line that sails abroad."""
+    import time as _t
+
+    from thorp.viable.s3_control import purser as _purser
+
+    if not _PURSER_WORLD or _t.monotonic() - _PURSER_WORLD["at"] > 300:
+        _PURSER_WORLD.update(world=_purser.world()[0], at=_t.monotonic())
+    return _PURSER_WORLD["world"]
+
 
 def _api_queue() -> dict:
     """The queue as a table (Justin, 17:05: "view the queue so each voyage with its goal"): the voyage at
@@ -3637,6 +3659,7 @@ def _api_queue() -> dict:
         _sea_rows = []
     sea_goal_by_name = {r["name"]: r.get("goal_id") for r in _sea_rows if r.get("name") and r.get("goal_id")}
     sea_goal_by_text = {r["text"]: r.get("goal_id") for r in _sea_rows if r.get("goal_id")}
+    sea_lane_by_name = {r["name"]: r.get("lane") or "mac" for r in _sea_rows if r.get("name")}
 
     rows = []
     for run in sea:
@@ -3659,6 +3682,7 @@ def _api_queue() -> dict:
         r = {**row(name, ship, spec, "at sea", None), "started": started, "run_id": run["run_id"],
              "spec": spec_path, "detail": _spec_detail(spec, run)}
         r["goal_id"] = sea_goal_by_name.get(name)
+        r["lane"] = sea_lane_by_name.get(name) or ("vast" if (spec.get("model") or {}).get("backend") == "torch" else "mac")
         if not r["goal_id"] and spec_path:  # a voyage sailed outside the queue: its spec's own `goal:`
             with contextlib.suppress(Exception):
                 r["goal_id"] = _qs._goal_of_spec(spec_path)
@@ -3669,11 +3693,13 @@ def _api_queue() -> dict:
             gone = _started_min(started)
             left = max(0.0, est - (gone or 0.0))
             preset = r.get("preset")
-            if preset in two:
-                s = min(seat["mac"], key=lambda x: x["end"])
+            r["left_min"] = round(left)
+            lane_seats = seat.get(r["lane"]) or seat["mac"]
+            if preset in two and r["lane"] == "mac":
+                s = min(lane_seats, key=lambda x: x["end"])
                 s["end"], s["kind"] = now + left, preset
             else:
-                for s in seat["mac"]:
+                for s in lane_seats:
                     s["end"], s["kind"] = now + left, "other"
     lines = _queue_lines()
     # the goal a line serves, so the page can say what each row is for (s2.queue_lines.goal_id, and for a
@@ -3829,6 +3855,14 @@ def _api_queue() -> dict:
         for s in seat[lane]:
             s["end"], s["kind"] = now + (left or 0.0), "other"
 
+    purser_mode = None
+    try:
+        from thorp.viable.s3_control import purser as _purser
+
+        purser_mode = _purser.mode()
+        kept = _purser.latest()
+    except Exception:  # noqa: BLE001  (a store before the table: the rows still show)
+        kept = {}
     unknown = {lane: False for lane in lane_mod.LANES}  # a voyage ahead with no time yet
     for lane, out_ in (lane_now or {}).items():  # a command at sea with no time of its own: all behind it is ≥
         if str((out_ or {}).get("line") or "").startswith("cmd:") and lane in unknown:
@@ -3857,10 +3891,16 @@ def _api_queue() -> dict:
                 r["at_least"] = unknown["mac"]
             rows.append(r)
             continue
-        p = root / "specs" / f"{ln}.yaml"
+        lane, payload = lane_mod.split_lane(ln)
+        p = root / "specs" / f"{payload}.yaml"
         spec = (yaml.safe_load(p.read_text()) or {}) if p.exists() else {}
-        name = spec.get("name") or Path(ln).name
-        lane = "vast" if ln.startswith("vast:") else "mac"
+        name = spec.get("name") or Path(payload).name
+        if lane == "mac" and not lane_mod.pinned(ln) and (spec.get("model") or {}).get("backend") == "torch":
+            lane = "vast"  # a voyage written for CUDA sails on a hired GPU (lanes.parse)
+        call = kept.get(ln) or {}
+        routed = purser_mode == "routing" and call.get("waters") == "foreign" and call.get("applied") and lane == "mac"
+        if routed:
+            lane = "vast"
         r = row(name, spec.get("ship"), spec, status.get(name) or "queued", i)
         if r["status"] == "running":
             r["status"] = "at sea"
@@ -3870,6 +3910,14 @@ def _api_queue() -> dict:
         r["missing"] = not p.exists()
         r["detail"] = _spec_detail(spec)
         est, source = times.estimate(name, spec)
+        if routed and call.get("foreign_min"):
+            est, source = float(call["foreign_min"]), "the purser's estimate abroad"
+        elif lane == "vast" and est is not None:
+            with contextlib.suppress(Exception):  # abroad: its time here over the class's measured lead
+                w_ = _purser_world_cache()
+                sp = max((v for (g, pr), v in w_.speedups.items() if pr == r.get("preset")), default=None)
+                if sp:
+                    est, source = est / sp + 60 * _purser._setup_hours(), f"abroad at {sp:.1f}x this Mac"
         r["est_min"], r["est_source"] = est, source
         if est is None:
             without_a_time += 1
@@ -3878,8 +3926,8 @@ def _api_queue() -> dict:
             unknown[lane] = True
             rows.append(r)
             continue
-        seats = seat[lane]
-        if r["preset"] in two:
+        seats = seat.get(lane) or seat["mac"]
+        if r["preset"] in two and lane == "mac":
             # only 300k shares a lane with another 300k; a 1m/9m or an unknown line ahead holds it
             if any(s["kind"] not in (None, *two) for s in seats):
                 start = max(now, max(s["end"] for s in seats))
@@ -3908,23 +3956,34 @@ def _api_queue() -> dict:
             r["serves"] = words[r["goal_id"]]
     # the purser's latest call on each queued line, as the coordinator kept it (s3.allocations, 12 November):
     # its waters, the class abroad, both homecomings, the cost and the reason in words
-    purser_mode = None
-    try:
-        from thorp.viable.s3_control import purser as _purser
-
-        purser_mode = _purser.mode()
-        kept = _purser.latest()
-    except Exception:  # noqa: BLE001  (a store before the table: the rows still show)
-        kept = {}
     for r in rows:
         k = kept.get(r.get("line") or (r.get("spec") if r.get("kind") == "voyage" else None) or "")
         if k and r.get("status") == "queued":
             r["purser"] = {key: k.get(key) for key in ("waters", "gpu", "local_home_min", "foreign_home_min",
-                                                       "cost", "reason", "mode", "applied")}  # fmt: skip
+                                                       "foreign_min", "cost", "reason", "mode", "applied")}  # fmt: skip
             r["purser"]["at"] = k["at"].isoformat() if k.get("at") else None
     end = max((s["end"] for v in seat.values() for s in v), default=now)
+    # the lanes, for the queue's swimlanes (12 November, Justin: "in the queue I'd be expecting to see the lane")
+    lanes_out = []
+    try:
+        defs = lane_mod.lane_defs()
+        key_ok = lane_mod.has_key()
+        for k, d in defs.items():
+            lanes_out.append({"lane": k, "kind": d.kind, "seats": _slots(k), "enabled": bool(d.enabled),
+                              "note": d.note, "can_hire": bool(d.kind != "charter" or key_ok)})  # fmt: skip
+    except Exception:  # noqa: BLE001  (no store: the two lanes as they always were)
+        lanes_out = [{"lane": k, "kind": "local" if k == "mac" else "charter", "seats": _slots(k), "enabled": True}
+                     for k in lane_mod.LANES]  # fmt: skip
+    foreign = [k.get("line") for k in kept.values() if k.get("waters") == "foreign"]
+    try:
+        from thorp.viable.s5_policy import charter as _s5
+
+        abroad = list(_s5.terms().get("foreign_expeditions") or [])
+    except Exception:  # noqa: BLE001
+        abroad = []
     return {"rows": rows, "hours_left": round((end - now) / 60, 1), "without_a_time": without_a_time,
-            "purser": purser_mode}
+            "purser": {"mode": purser_mode, "foreign_expeditions": abroad, "called_foreign": len(foreign)},
+            "lanes": lanes_out}
 
 
 def _where_of(aboard: dict) -> str:
@@ -4669,6 +4728,14 @@ def api_lab(key: str) -> dict:
     from thorp import labs
 
     return labs.payload(key)
+
+
+def api_labs() -> dict:
+    """The Labs page (thorp.labs): the ten houses that made the outside models, their profiles and what the
+    Reach holds of each, with the other houses the leaderboard keeps named beneath them."""
+    from thorp import labs
+
+    return labs.houses()
 
 
 CENSUS_CARDS = ("previous_word", "nevermore", "mover", "comparator")
@@ -7107,6 +7174,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/competitor": lambda: api_competitor(q["model"]),
                 "/api/thorp": lambda: api_thorp(q["ship"]),
                 "/api/lab": lambda: api_lab(q["lab"]),
+                "/api/labs": api_labs,
                 "/api/bridge": api_bridge,
                 "/api/leaderboard/internal": api_leaderboard_internal,
                 "/api/smoking_qwen": api_smoking_qwen,

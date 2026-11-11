@@ -9,7 +9,6 @@ import { BANDS, BAND, bandCardHtml, bandOf, sizeOf, type SizeBand } from './band
 
 type Payload = any;
 
-const classSlug = (name: string): string => (name || '').toLowerCase().replace(/^the\s+/, '').replace(/[^a-z0-9]+/g, '-');
 
 /** The harbours are Orbitals now (11 November, Justin: "naming must change and art style accordingly"); the
  *  three old keys stay as aliases so an old address lands on the right one. */
@@ -78,63 +77,78 @@ export const HARBOUR_VIEWS: Record<string, HarbourView[]> = {
   ],
 };
 
+/** The home page's two orbitals (12 November, Justin: "the analogy is orbitals for the homepage. The
+ *  demiton orbital and then the trading orbital where all the other labs and their ships reside").
+ *  Demiton is our own: the lab and every ship it builds, with the training ring and the deep yards as its
+ *  berths. The trading orbital is Masaq' Reach, where every other lab and its ships reside; its card opens
+ *  the Labs tab. The old harbour pages stay reachable from Demiton's berth links. */
+export const DEMITON = {
+  key: 'demiton',
+  name: 'Demiton',
+  aka: 'our orbital',
+  about: 'our own orbital: the lab and the fleet it builds, from the 300k to the 350m. The shipyard draws them; the training ring and the deep yards are its berths.',
+  where: 'this Mac mini and the hired yards',
+  depth: null,
+  lane: 'mac',
+  ship_builder: '',
+  foreign: false,
+  flag: 'demiton',
+};
+
+/** The five views on Demiton's own card, in the same order as a harbour's: the ring, then the two berths
+ *  where our ships are built, then the tank and the mile where a hull is measured. */
+export const DEMITON_VIEWS: HarbourView[] = [
+  { img: 'demiton', label: 'the ring', note: 'Our own Orbital: the ring where the lab builds and sails its fleet, from the 300k to the 350m.' },
+  { img: 'schimint', label: 'the training ring', note: 'The first berth: where the youngest ships are laid down and the first class is learned.' },
+  { img: 'vavatch-end', label: 'the deep yards', note: 'The second berth: the 50m, 100m and 350m are built on hired ground, too deep for the Mac.' },
+  { img: 'towing-tank', label: 'the towing tank', note: 'One small hull after another drawn down the same water, and every reading written in the ledger.' },
+  { img: 'measured-mile', label: 'the measured mile', note: 'The marked water where a real hull is timed between two posts, to check what the tank predicted.' },
+];
+
 /** The back of a harbour card: the first view large, the five as thumbnails. Images carry `data-src` and are
  *  fetched on the first flip (`views/harbourflip.ts`), so the home page does not load fifteen plates up front. */
-const harbourBackHtml = (key: string, name: string, views: HarbourView[]): string =>
+const harbourBackHtml = (key: string, name: string, views: HarbourView[], href = `/harbours/${encodeURIComponent(key)}`): string =>
   `<div class="${cardCls(false, 'card harbourcard hface hback')}" inert aria-label="${esc(name)}: five views">
     <div class="hshotbox"><img class="hshot" data-src="${esc(artSrc(views[0].img))}" alt="${esc(views[0].label)}"></div>
     <div class="hcap"><b class="hcaplabel">${esc(views[0].label)}</b><span class="hcapnote">${esc(views[0].note)}</span></div>
     <div class="hthumbs" role="group" aria-label="${esc(name)} views">${views.map((v, i) =>
       `<button type="button" class="hthumb${i === 0 ? ' on' : ''}" data-hview="${i}" aria-label="${esc(v.label)}" aria-pressed="${i === 0}"><img data-src="${esc(artSrc(v.img))}" alt=""></button>`).join('')}</div>
-    <div class="hbackfoot"><a href="/harbours/${encodeURIComponent(key)}">open ${esc(name)} →</a></div></div>`;
+    <div class="hbackfoot"><a href="${esc(href)}">open ${esc(name)} →</a></div></div>`;
 
-/** The home page: one card per harbour, its sizes, its depth and how many voyages are running. */
+/** The home page: the two orbitals, each a card that flips to its five views. Demiton carries our own fleet
+ *  and opens our orbital; the trading orbital carries the ten houses and opens the Labs tab. */
 export function harbourCardsHtml(ladder: Payload): string {
   const hs = (ladder && ladder.harbours) || [];
-  if (!hs.length) {
-    // a server not yet restarted sends no harbours: show every size as one plain group
-    return (ladder.rungs || []).map((r: any) => shipCard(ladder, r)).join('');
+  const rungs = (ladder && ladder.rungs) || [];
+  if (!rungs.length && !hs.length) {
+    return `<div class="${emptyCls()}">the orbitals could not be read. Restart <span class="mono">thorp dash</span> if it was just changed.</div>`;
   }
-  return hs.map((x: any) => {
-    const rs = (ladder.rungs || []).filter((r: any) => r.harbour === x.key);
-    const live = rs.reduce((n: number, r: any) => n + shipRuns(ladder, r.preset).filter((v: any) => v.status === 'running').length, 0);
-    const done = rs.reduce((n: number, r: any) => n + shipRuns(ladder, r.preset).filter((v: any) => v.status === 'finished').length, 0);
-    const nForeign = x.foreign ? ((ladder && ladder.foreign) || []).length : 0;
-    const ships = x.foreign
-      ? (nForeign ? `<span class="${pillCls('accent')}">${nForeign} foreign ship${nForeign === 1 ? '' : 's'}</span>` : '<span class="s">none read yet</span>')
-      : rs.map((r: any) => `<span class="${pillCls('')}">${esc(r.name)} <span class="s">${esc(r.preset)}</span></span>`).join(' ');
-    const views = HARBOUR_VIEWS[x.key];
-    const front = `<a class="${cardCls(true, views ? 'card harbourcard hface hfront' : 'card harbourcard')}" href="/harbours/${encodeURIComponent(x.key)}">${artImg(x.key, 'cardart ship')}
-      <div class="top"><span class="nm">${esc(x.name)}</span><span class="preset">${esc(x.aka)}</span></div>
-      <div class="job">${esc(x.about)}</div>
-      <div class="hships">${ships}</div>
-      <div class="foot"><span>${esc(x.where)}</span><span class="${pillCls(x.foreign ? '' : live ? ' live' : '')}">${x.foreign ? 'read-only' : live ? live + ' running' : 'at rest'}</span></div>
-      <div class="foot"><span>${x.foreign ? 'foreign ships only' : 'depth ' + (x.depth ? 'to ' + big(x.depth) + ' parameters' : 'no bottom')}</span><span>${x.foreign ? `${nForeign} foreign ship${nForeign === 1 ? '' : 's'}` : `${rs.length} ship${rs.length === 1 ? '' : 's'}`}</span></div>
-      <div class="foot"><span>${x.foreign ? 'not ours to build' : `${done} finished voyage${done === 1 ? '' : 's'}`}</span><span></span></div></a>`;
-    if (!views) return front;
-    return `<div class="hflip" data-harbour="${esc(x.key)}"><div class="hflip-inner">${front}${harbourBackHtml(x.key, x.name, views)}</div>`
-      + `<button type="button" class="hflipbtn" data-hflip aria-pressed="false" aria-label="Flip ${esc(x.name)} to see five views"><span class="hflipicon" aria-hidden="true">⟲</span><span class="hfliptext">5 views</span></button></div>`;
-  }).join('');
-}
-
-/** A class's art key where it differs from its name. None does today: the 300k is the towing tank and its
- *  plate is `towing-tank` (it was Faces wearing Pan's plate, which is why this table exists); the 1m is the
- *  measured mile and wears `measured-mile`. */
-const CLASS_ART: Record<string, string> = {};
-const classArt = (name: string): string => CLASS_ART[classSlug(name)] || classSlug(name);
-
-function shipCard(ladder: Payload, r: any): string {
-  const runs = shipRuns(ladder, r.preset);
-  const live = runs.filter((x: any) => x.status === 'running').length;
-  const done = runs.filter((x: any) => x.status === 'finished').length;
-  const nlive = (r.metrics || []).filter((m: any) => m[2] === 'live').length;
-  return `<a class="${cardCls(true, 'card classcard')}" href="/ships/${encodeURIComponent(r.preset)}">${artImg(classArt(r.name), 'cardart ship')}
-    <div class="top"><span class="preset">${esc(r.preset)}</span><span class="nm">${esc(r.name)}</span></div>
-    <div class="job">${esc(r.role || r.job)}</div>
-    <div class="foot"><span>${big(r.total)} params · ${esc(String(r.where || '').split(' (')[0])}</span>
-    <span class="${pillCls(live ? ' live' : '')}">${live ? live + ' running' : esc(r.status)}</span></div>
-    <div class="foot"><span>${done} finished voyage${done === 1 ? '' : 's'}</span><span>${nlive} of ${(r.metrics || []).length} metrics live</span></div>
-    <div class="foot cscore" data-cscore="${esc(r.preset)}">${scorePlaceholder}</div></a>`;
+  const live = rungs.reduce((n: number, r: any) => n + shipRuns(ladder, r.preset).filter((v: any) => v.status === 'running').length, 0);
+  const done = rungs.reduce((n: number, r: any) => n + shipRuns(ladder, r.preset).filter((v: any) => v.status === 'finished').length, 0);
+  const nForeign = ((ladder && ladder.foreign) || []).length;
+  const houses = (ladder && ladder.labs) || [];
+  const labPills = houses.length
+    ? houses.map((l: any) => `<span class="${pillCls('')}">${flagImg(l.flag, l.name)} ${esc(l.name)}</span>`).join(' ')
+    : `<span class="${pillCls('')}">ten houses</span>`;
+  const demitonFront = `<a class="${cardCls(true, 'card harbourcard hface hfront')}" href="/harbours/demiton">${artImg('demiton', 'cardart ship')}
+    <div class="top"><span class="nm">Demiton</span><span class="preset">${flagImg('demiton', 'Demiton · Drake’s arms')} our orbital</span></div>
+    <div class="job">${esc(DEMITON.about)}</div>
+    <div class="hships">${rungs.map((r: any) => `<span class="${pillCls('')}">${esc(r.name)} <span class="s">${esc(r.preset)}</span></span>`).join(' ')}</div>
+    <div class="foot"><span>${esc(DEMITON.where)}</span><span class="${pillCls(live ? 'live' : '')}">${live ? live + ' running' : 'at rest'}</span></div>
+    <div class="foot"><span>${rungs.length} ship${rungs.length === 1 ? '' : 's'}</span><span>${done} finished voyage${done === 1 ? '' : 's'}</span></div>
+    <div class="foot"><span>the training ring and the deep yards</span><span>our lab</span></div></a>`;
+  const tradingFront = `<a class="${cardCls(true, 'card harbourcard hface hfront')}" href="/labs">${artImg('masaq-reach', 'cardart ship')}
+    <div class="top"><span class="nm">Masaq' Reach</span><span class="preset">the trading orbital</span></div>
+    <div class="job">Where every other lab and its ships reside: the ten houses, their fleets, and every outside model read on our decks. None of them is ours to build.</div>
+    <div class="hships">${labPills}</div>
+    <div class="foot"><span>the Reach</span><span class="${pillCls('accent')}">${houses.length || 10} house${(houses.length || 10) === 1 ? '' : 's'}</span></div>
+    <div class="foot"><span>${nForeign} foreign ship${nForeign === 1 ? '' : 's'}</span><span>read-only</span></div>
+    <div class="foot"><span>every one of them read on our decks</span><span>not ours to build</span></div></a>`;
+  const flip = (key: string, name: string, front: string, views: HarbourView[], href: string): string =>
+    `<div class="hflip" data-harbour="${esc(key)}"><div class="hflip-inner">${front}${harbourBackHtml(key, name, views, href)}</div>`
+    + `<button type="button" class="hflipbtn" data-hflip aria-pressed="false" aria-label="Flip ${esc(name)} to see five views"><span class="hflipicon" aria-hidden="true">⟲</span><span class="hfliptext">5 views</span></button></div>`;
+  return flip('demiton', 'Demiton', demitonFront, DEMITON_VIEWS, '/harbours/demiton')
+    + flip('masaq-reach', "Masaq' Reach", tradingFront, HARBOUR_VIEWS['masaq-reach'], '/labs');
 }
 
 /** Masaq' Reach's outside models, one per model key: the registry holds two files for Qwen3-0.6B (one with a
@@ -205,17 +219,34 @@ export function candidateCardsHtml(cands: any[], band: SizeBand, read: any[]): s
       const key = String(c.label || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
       const p = sizeOf(c);
       const why = String(c.why || '').replace(/\s+/g, ' ').trim();
-      return `<a class="${cardCls(true, 'card classcard candidatecard')}" href="/leaderboard/competitor/${encodeURIComponent(c.model)}">
-        ${artImg(key, 'cardart ship')}
+      // a candidate has no competitor page yet (it has no reading): its card opens its model card, not a 404
+      const body = `${artImg(key, 'cardart ship')}
         <div class="top"><span class="preset">${p ? big(p) : '–'}</span><span class="nm">${esc(c.label)}</span></div>
         <div class="job">${esc(c.lab || 'a candidate')}${why ? `: ${esc(why.length > 150 ? why.slice(0, 149).trimEnd() + '…' : why)}` : ''}</div>
-        <div class="foot"><span>not read yet</span><span class="${pillCls('accent')}">candidate</span></div></a>`;
+        <div class="foot"><span>not read yet</span><span class="${pillCls('accent')}">candidate</span></div>`;
+      const cls = cardCls(true, 'card classcard candidatecard');
+      return c.source
+        ? `<a class="${cls}" href="${esc(c.source)}" target="_blank" rel="noreferrer">${body}</a>`
+        : `<div class="${cls}">${body}</div>`;
     }).join('');
+}
+
+/** Demiton, our own orbital: its two berths and every rung we build, from the 300k to the 350m. The two
+ *  berth pages (Schi'mint's training ring and Vavatch End's deep yards) stay reachable from the links; the
+ *  blocks beneath them are the same harbour pages' own ship lists, so the fleet is not written twice. */
+export function demitonShipsHtml(ladder: Payload): string {
+  const hs = (ladder && ladder.harbours) || [];
+  const berths = ['schimint', 'vavatch-end'].map((k) => hs.find((x: any) => x.key === k)).filter(Boolean);
+  const links = `<div class="harbourrules" style="grid-column:1/-1"><div class="k">Demiton's yards <span class="s">the shipyard that draws a ship, and the two rings our fleet is built and sailed from</span></div>
+    <div class="hrule"><b>The shipyard</b> <a href="/shipyard">where a ship is drawn before it is built: the SOP it reads, the stages it must build, and the standard it is held to</a></div>
+    <div class="hrule"><b>The berths</b> ${berths.map((h: any) => `<a href="/harbours/${encodeURIComponent(h.key)}">${esc(h.name)} · ${esc(h.aka)}</a>`).join(' · ') || 'the training ring and the deep yards'}</div></div>`;
+  return links + berths.map((h: any) => harbourShipsHtml(ladder, h.key)).join('');
 }
 
 /** One harbour: its depth and every size's draught against it, then its ships, the ones fitting out and
  *  (in the foreign-only Masaq' Reach) the three size bands or the outside models in one of them. */
 export function harbourShipsHtml(ladder: Payload, key: string, band: SizeBand | null = null): string {
+  if (key === DEMITON.key) return demitonShipsHtml(ladder);
   const hs = (ladder && ladder.harbours) || [];
   const h = hs.find((x: any) => x.key === key);
   if (!h) return `<div class="${emptyCls()}">no harbour called ${esc(key)}${hs.length ? `: ${hs.map((x: any) => esc(x.name)).join(', ')}` : ''}</div>`;
@@ -250,13 +281,15 @@ export function classScoreHtml(s: Payload, preset: string): { html: string; titl
 }
 
 export const harbourTitle = (ladder: Payload, key: string | null): string => {
-  if (!key) return 'Harbours';
+  if (!key) return 'Orbitals';
+  if (key === DEMITON.key) return DEMITON.name;
   const h = ((ladder && ladder.harbours) || []).find((x: any) => x.key === key);
   return h ? h.name : key;
 };
 
 export const harbourAbout = (ladder: Payload, key: string | null): string => {
   if (!key) return '';
+  if (key === DEMITON.key) return DEMITON.about;
   const h = ((ladder && ladder.harbours) || []).find((x: any) => x.key === key);
   return h ? `${h.aka || ''}: ${h.about || ''}` : '';
 };

@@ -71,10 +71,21 @@ export default function Competitor() {
   }
 
   if (comp.error) {
+    // a model with no reading has no competitor payload (404): say so and point at its card, rather
+    // than the reader's error. Anything else is a real failure and keeps its message.
+    const noReading = /\b404\b/.test(comp.error);
+    const card = `https://huggingface.co/${key}`;
     return (
       <div {...sectionProps('competitor')}>
         <h1><a className={crumbCls('back')} href="/leaderboard">← leaderboard</a> <span>{key || 'competitor'}</span></h1>
-        <div className={emptyCls()}>this model could not be read: {comp.error}</div>
+        {noReading ? (
+          <section className={cardCls(false, 'panel')}>
+            <h2>No reading yet <span className="note">a candidate, not a result: this model has no chaining reading on our decks</span></h2>
+            <p className="note">The weights are here; the four chaining tests have not been run on it. Its published benchmarks are on <a href="/leaderboard/medium">the leaderboard's tests</a>, and its own card is at <a href={card} target="_blank" rel="noreferrer">{card}</a>.</p>
+          </section>
+        ) : (
+          <div className={emptyCls()}>this model could not be read: {comp.error}</div>
+        )}
       </div>
     );
   }

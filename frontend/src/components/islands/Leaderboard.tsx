@@ -10,6 +10,7 @@ import { useEffect, useState } from 'react';
 import { cardCls, checkCls, crumbCls, emptyCls, selectCls } from '@/lib/ui';
 import { TabNav } from '@/components/TabNav';
 import { StepsBoard } from '@/components/islands/StepsBoard';
+import { BenchBoard } from '@/components/islands/BenchBoard';
 import { sectionProps, useApi } from '@/lib/useApi';
 import { bandCardsHtml, boardHtml, candidatesHtml, drawSmokingChart, facesHtml, reasoningHtml, runsHtml, smokingHtml } from '@/scripts/views/leaderboard-main';
 import { BAND, BANDS, bandOf, sizeOf, type SizeBand } from '@/scripts/views/bands';
@@ -147,6 +148,8 @@ export default function Leaderboard({ band }: { band?: SizeBand }) {
           </>
         )}
       </section>
+
+      {band === 'medium' && <BenchBoard band={sizeTab} />}
 
       </>}
 

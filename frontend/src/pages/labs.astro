@@ -1,0 +1,13 @@
+---
+// The Labs tab under Places: the ten houses that build the outside ships, each with its fal plate in
+// the dashboard's one ink (backend/thorp/dash/art/generate_art.py, LABS). It answers /labs; the island
+// reads /api/labs and opens a house's lab page, or its own door when the Reach has no readings yet.
+import Layout from '../layouts/Layout.astro';
+import Labs from '../components/islands/Labs';
+---
+
+<Layout>
+  <main>
+    <Labs client:load />
+  </main>
+</Layout>

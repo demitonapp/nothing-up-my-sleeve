@@ -20,6 +20,8 @@ export function getStaticPaths() {
   for (const old of aliases) {
     paths.push(old, `${old}/ships`, `${old}/shipbuilder`);
   }
+  // Demiton, our own orbital (12 November): its fleet page, and its two berths are the other harbour pages
+  paths.push('demiton', 'demiton/ships');
   // the Reach's four size bands open the outside ships in each
   for (const band of ['xsmall', 'small', 'medium', 'large']) {
     paths.push(`masaq-reach/${band}`);

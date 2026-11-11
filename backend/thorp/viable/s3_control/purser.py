@@ -516,7 +516,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--keep", action="store_true", help="keep the changed calls in s3.allocations")
     ap.add_argument("--all", action="store_true", help="every line, not only the voyages it may move")
     a = ap.parse_args(argv)
-    lines = [lanes.parse(t) for t in lanes.pending(lanes.paths.resolve("specs") / "queue.txt")]
+    from thorp.viable.s2_coordination import queue_read
+
+    lines = [lanes.parse(t) for t in queue_read.pending()]
     calls = calls_for(lines)
     m = mode()
     print(f"purser: {m}")

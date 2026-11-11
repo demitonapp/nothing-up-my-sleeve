@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 40">
+  <!-- Demiton's house flag: Sir Francis Drake's arms, a wavy silver fess between two estoiles on a dark
+       ground, with the dashboard's gold for a border. Drake's own crest carried a ship on a globe; the
+       arms are what reads at a flag's size, and the wave is the water the voyage crossed. -->
+  <rect width="60" height="40" fill="#14171c"/>
+  <path d="M0 21C7 16 13 16 20 21S33 26 40 21 53 16 60 21v5c-7-5-13-5-20 0s-13 5-20 0-13-5-20 0z" fill="#c9cdd4"/>
+  <g fill="#c9cdd4">
+    <path d="M30 4l1.7 4.3 4.6.4-3.5 3 1 4.5-3.8-2.4-3.8 2.4 1-4.5-3.5-3 4.6-.4z"/>
+    <path d="M30 31l1.7 4.3 4.6.4-3.5 3 1 4.5-3.8-2.4-3.8 2.4 1-4.5-3.5-3 4.6-.4z" opacity=".9"/>
+  </g>
+  <rect x=".75" y=".75" width="58.5" height="38.5" fill="none" stroke="#e3b341" stroke-width="1.5"/>
+</svg>

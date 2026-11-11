@@ -556,6 +556,10 @@ def command(ln: Line) -> list[str] | str:
             f"lane {ln.lane!r} is of kind {kind!r}, which has no launcher (have: {', '.join(KINDS)}): "
             "teach lanes.command to launch it"
         )
+    if kind == "charter" and os.environ.get("THORP_LAUNCH") == "local":
+        # the venv's python, as the Mac lane under launchd (12 November: the purser's first routed voyages; uv
+        # has failed on its cache under launchd, and the venv already carries the torch group)
+        return [sys.executable, "-m", "thorp", "charter", "sail", spec]
     if kind == "charter":
         return [
             "uv",

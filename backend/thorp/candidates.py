@@ -78,6 +78,17 @@ class Candidate:
 # add the reasoning leaders of the open field.
 MEDIUM: tuple[Candidate, ...] = (
     Candidate(
+        model="inclusionAI/Ling-3.0-tiny",
+        label="Ling 3.0 Tiny",
+        params=7.9e9,
+        active=1.3e9,
+        lab="InclusionAI · Ling",
+        why="The band's agentic leader on the published tests (GDPval 772, TAU3 20.8, BFCL 62.7), "
+        "7.9B with 1.3B active; pulled, awaiting a reading.",
+        note="the 4-bit checkpoint is on this Mac",
+        source="https://huggingface.co/inclusionAI/Ling-3.0-tiny",
+    ),
+    Candidate(
         model="mlx-community/Qwen3.8-27B-4bit",
         label="Qwen3.8 27B",
         params=27e9,

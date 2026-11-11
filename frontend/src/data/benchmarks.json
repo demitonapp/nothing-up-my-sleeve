@@ -1,0 +1,329 @@
+{
+  "source": {
+    "name": "Artificial Analysis",
+    "href": "https://artificialanalysis.ai/",
+    "note": "Published readings, November 2026. Not our measurement: no model of this band has been read on these tests by this harness."
+  },
+  "models": [
+    {
+      "key": "ling",
+      "label": "Ling 3.0 Tiny",
+      "params": 7900000000,
+      "maker": "InclusionAI · Ling"
+    },
+    {
+      "key": "qwen35-4b",
+      "label": "Qwen3.5 4B",
+      "params": 4660000000,
+      "maker": "Alibaba · Qwen"
+    },
+    {
+      "key": "qwen35-9b",
+      "label": "Qwen3.5 9B",
+      "params": 9653000000,
+      "maker": "Alibaba · Qwen"
+    },
+    {
+      "key": "gemma4-e4b",
+      "label": "Gemma 4 E4B",
+      "params": 7996000000,
+      "maker": "Google · Gemma"
+    },
+    {
+      "key": "gemma4-12b",
+      "label": "Gemma 4 12B",
+      "params": 11960000000,
+      "maker": "Google · Gemma"
+    }
+  ],
+  "tests": [
+    {
+      "key": "ifbench",
+      "name": "IFBench",
+      "group": "Instruction following",
+      "unit": "%",
+      "about": "300+ verifiable instructions, each prompt's orders checked by a program rather than a judge: the closest published measure to following a house convention exactly.",
+      "link": {
+        "href": "https://arxiv.org/abs/2503.07536",
+        "label": "IFBench (Pyatkin et al., 2025)"
+      },
+      "values": {
+        "ling": 63.61,
+        "qwen35-4b": 52.0,
+        "qwen35-9b": 66.7,
+        "gemma4-e4b": 44.2,
+        "gemma4-12b": 73.5
+      }
+    },
+    {
+      "key": "multi-if",
+      "name": "Multi-IF",
+      "group": "Instruction following",
+      "unit": "%",
+      "about": "Instruction following carried across a multi-turn conversation in several languages: whether the orders from turn one still hold at turn five.",
+      "link": {
+        "href": "https://arxiv.org/abs/2410.15553",
+        "label": "Multi-IF (He et al., 2024)"
+      },
+      "values": {
+        "ling": 83.15,
+        "qwen35-4b": 79.84,
+        "qwen35-9b": 83.03,
+        "gemma4-e4b": 80.92,
+        "gemma4-12b": 88.44
+      }
+    },
+    {
+      "key": "life-bench",
+      "name": "LIFE-Bench",
+      "group": "Instruction following",
+      "unit": "%",
+      "about": "Long-form instruction following on real writing tasks: a page of prose under constraints, not a one-line answer.",
+      "link": {
+        "href": "https://artificialanalysis.ai/",
+        "label": "Artificial Analysis, LIFE-Bench"
+      },
+      "values": {
+        "ling": 62.3,
+        "qwen35-4b": 63.3,
+        "qwen35-9b": 63.9,
+        "gemma4-e4b": 52.8,
+        "gemma4-12b": 65.3
+      }
+    },
+    {
+      "key": "artifactsbench",
+      "name": "ArtifactsBench",
+      "group": "Coding",
+      "unit": "%",
+      "about": "The code a model writes is rendered as a working artifact, then graded on what it looks like and does: the published test closest to React and Astro component work.",
+      "link": {
+        "href": "https://artificialanalysis.ai/",
+        "label": "Artificial Analysis, ArtifactsBench"
+      },
+      "values": {
+        "ling": 47.93,
+        "qwen35-4b": 30.61,
+        "qwen35-9b": 38.8,
+        "gemma4-e4b": 45.14,
+        "gemma4-12b": 48.08
+      }
+    },
+    {
+      "key": "terminal-bench-2-1",
+      "name": "Terminal-Bench 2.1",
+      "group": "Coding agent",
+      "unit": "%",
+      "about": "A shell, a task and no hints: the agent runs commands until the task passes. The measure of editing files on a real machine, not of writing a function.",
+      "link": {
+        "href": "https://www.tbench.ai/",
+        "label": "Terminal-Bench"
+      },
+      "values": {
+        "ling": 27.7,
+        "qwen35-4b": 25.8,
+        "qwen35-9b": 29.2,
+        "gemma4-e4b": 1.9,
+        "gemma4-12b": 27.3
+      }
+    },
+    {
+      "key": "scicode",
+      "name": "SciCode",
+      "group": "Coding",
+      "unit": "%",
+      "about": "Scientific computing written as code and run against its own tests: the harder end of 'basic Python', where arithmetic and units have to be right.",
+      "link": {
+        "href": "https://scicode-bench.github.io/",
+        "label": "SciCode (Tian et al., 2024)"
+      },
+      "values": {
+        "ling": 24.2,
+        "qwen35-4b": 16.1,
+        "qwen35-9b": 27.5,
+        "gemma4-e4b": 24.4,
+        "gemma4-12b": 38.2
+      }
+    },
+    {
+      "key": "bfcl-v4",
+      "name": "BFCL v4",
+      "group": "Agentic",
+      "unit": "%",
+      "about": "Picking the right tool, filling its arguments and declining when no tool fits: the function-calling board, which is how a config assistant reaches the filesystem.",
+      "link": {
+        "href": "https://gorilla.cs.berkeley.edu/leaderboard.html",
+        "label": "Berkeley Function Calling Leaderboard"
+      },
+      "values": {
+        "ling": 62.72,
+        "qwen35-4b": 62.47,
+        "qwen35-9b": 65.83,
+        "gemma4-e4b": 41.64,
+        "gemma4-12b": 59.68
+      }
+    },
+    {
+      "key": "tau3-banking",
+      "name": "TAU3-Banking",
+      "group": "Agentic",
+      "unit": "%",
+      "about": "A banking assistant's multi-step tasks with tools and a policy: whether the agent finishes the errand, not whether it answers one turn well.",
+      "link": {
+        "href": "https://artificialanalysis.ai/",
+        "label": "Artificial Analysis, TAU3-Banking"
+      },
+      "values": {
+        "ling": 20.8,
+        "qwen35-4b": 6.8,
+        "qwen35-9b": 7.0,
+        "gemma4-e4b": 5.4,
+        "gemma4-12b": 8.7
+      }
+    },
+    {
+      "key": "gdpval-v2",
+      "name": "GDPval v2",
+      "group": "Agentic",
+      "unit": "Elo",
+      "about": "Real work tasks judged against a human baseline, scored Elo-style: the general-agent board, where a higher number is a better professional answer.",
+      "link": {
+        "href": "https://artificialanalysis.ai/",
+        "label": "Artificial Analysis, GDPval-AA"
+      },
+      "values": {
+        "ling": 772,
+        "qwen35-4b": null,
+        "qwen35-9b": 644,
+        "gemma4-e4b": 228,
+        "gemma4-12b": 645
+      }
+    },
+    {
+      "key": "aa-lcr",
+      "name": "AA-LCR",
+      "group": "Long context",
+      "unit": "%",
+      "about": "Long-context reasoning over documents: finding and combining facts across a context far longer than a config file, which is the headroom a schema dump uses.",
+      "link": {
+        "href": "https://artificialanalysis.ai/",
+        "label": "Artificial Analysis, AA-LCR"
+      },
+      "values": {
+        "ling": 58.7,
+        "qwen35-4b": 61.0,
+        "qwen35-9b": 65.3,
+        "gemma4-e4b": 33.0,
+        "gemma4-12b": 61.7
+      }
+    },
+    {
+      "key": "omniscience-accuracy",
+      "name": "AA-Omniscience accuracy",
+      "group": "Knowledge",
+      "unit": "%",
+      "about": "Factual recall across a broad question set. Low is not fatal for config work — the schema is in the prompt — but it is why a model should be given the docs rather than asked to remember them.",
+      "link": {
+        "href": "https://artificialanalysis.ai/",
+        "label": "Artificial Analysis, Omniscience"
+      },
+      "values": {
+        "ling": 8.52,
+        "qwen35-4b": 15.12,
+        "qwen35-9b": 16.42,
+        "gemma4-e4b": 8.58,
+        "gemma4-12b": 15.62
+      }
+    },
+    {
+      "key": "omniscience-honesty",
+      "name": "AA-Omniscience non-hallucination",
+      "group": "Knowledge",
+      "unit": "%",
+      "about": "The share of questions the model declines rather than guesses at: the rate that matters when an invented key would be worse than 'I don't know'.",
+      "link": {
+        "href": "https://artificialanalysis.ai/",
+        "label": "Artificial Analysis, Omniscience"
+      },
+      "values": {
+        "ling": 69.54,
+        "qwen35-4b": 13.45,
+        "qwen35-9b": 16.39,
+        "gemma4-e4b": 69.06,
+        "gemma4-12b": 19.02
+      }
+    },
+    {
+      "key": "gpqa-diamond",
+      "name": "GPQA Diamond",
+      "group": "Reasoning",
+      "unit": "%",
+      "about": "Graduate-level science questions written to resist search: a broad reasoning floor, not a coding test.",
+      "link": {
+        "href": "https://github.com/idavidrein/gpqa",
+        "label": "GPQA (Rein et al., 2023)"
+      },
+      "values": {
+        "ling": 73.4,
+        "qwen35-4b": 77.1,
+        "qwen35-9b": 80.6,
+        "gemma4-e4b": 57.6,
+        "gemma4-12b": 75.3
+      }
+    },
+    {
+      "key": "hle",
+      "name": "HLE",
+      "group": "Reasoning",
+      "unit": "%",
+      "about": "Humanity's Last Exam without tools: the hardest closed-book questions in the field, where every model here is near the floor.",
+      "link": {
+        "href": "https://lastexam.ai/",
+        "label": "Humanity's Last Exam"
+      },
+      "values": {
+        "ling": 9.3,
+        "qwen35-4b": 9.9,
+        "qwen35-9b": 14.9,
+        "gemma4-e4b": 3.8,
+        "gemma4-12b": 15.7
+      }
+    },
+    {
+      "key": "hmmt-feb-26",
+      "name": "HMMT Feb 2026",
+      "group": "Reasoning",
+      "unit": "%",
+      "about": "Competition mathematics from the February 2026 Harvard–MIT tournament: a long chain of exact steps, the discipline a schema migration also needs.",
+      "link": {
+        "href": "https://www.hmmt.org/",
+        "label": "HMMT"
+      },
+      "values": {
+        "ling": 70.31,
+        "qwen35-4b": 72.87,
+        "qwen35-9b": 71.21,
+        "gemma4-e4b": 33.85,
+        "gemma4-12b": 67.95
+      }
+    },
+    {
+      "key": "imo-answerbench",
+      "name": "IMO-AnswerBench",
+      "group": "Reasoning",
+      "unit": "%",
+      "about": "Olympiad problems answered rather than proved: a short, exact final answer, which is the same shape as a config diff.",
+      "link": {
+        "href": "https://artificialanalysis.ai/",
+        "label": "Artificial Analysis, IMO-AnswerBench"
+      },
+      "values": {
+        "ling": 71.03,
+        "qwen35-4b": 63.69,
+        "qwen35-9b": 70.0,
+        "gemma4-e4b": 31.75,
+        "gemma4-12b": 64.09
+      }
+    }
+  ]
+}

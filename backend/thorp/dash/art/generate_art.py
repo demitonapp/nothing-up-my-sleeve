@@ -147,6 +147,15 @@ HARBOURS: dict[str, str] = {
     "ships of many worlds moored along a quay, bales of goods and brass instruments, ropes and canvas "
     "beside surfaces that are not of our century, figures in sea-cloaks bargaining, the Reach's lights "
     "reflected in black water",
+    # The two orbitals the home page opens on (12 November, Justin: "the analogy is orbitals for the
+    # homepage. The demiton orbital and then the trading orbital where all the other labs and their ships
+    # reside"). Demiton is our own orbital: the training ring and the deep yards are its berths, and every
+    # ship we build and sail lies there. The trading orbital wears the Reach's own plate above.
+    "demiton": "a vast ring-shaped Orbital seen from the deck of one of our own ships at night: the ring "
+    "curving up across the sky where a moon would be, its inner face lit in long bands, below it a shipyard "
+    "and a training basin along the rim, our own wooden ships of several sizes at anchor under lanterns, one "
+    "great keel laid on the stocks, a small silver drone at rest on the rigging, the young Culture's first "
+    "orbital, hopeful and expanding",
 }
 
 # The harbour cards flip (11 November, Justin: "the cards to harbours to flip so each harbour has 5 images
@@ -264,9 +273,14 @@ LAB_LOOK = {
     "hand-painted on the main sail; she carries no house colours",
     "openai": "her hull is matte black, her single sail is pale unbleached canvas with a thin green stripe along the "
     "leech, and a small brass lamp burns at the masthead",
+    "inclusionai": "her sails are dove-grey with a thin gold band along the leech, her hull is dark teak, and a pale "
+    "silver ring is painted on the main sail",
 }
 
 FOREIGN: dict[str, str] = {
+    "ling-3-0-tiny": "a narrow three-masted clipper running before a night wind, her few crew small on the deck, "
+    "overtaking a far larger galleon in the dark, a low moon and a thin ring of light standing in the sky; "
+    + LAB_LOOK["inclusionai"],
     "qwen3-4b": "a vast four-masted Chinese treasure ship with a high stern castle, riding at anchor in a crowded "
     "lantern-lit trading harbour at night, junks and dhows around her, merchants on the quay unloading bales of "
     "silk, the largest and deepest ship in the harbour; " + LAB_LOOK["alibaba"],
@@ -511,8 +525,49 @@ TESTS: dict[str, str] = {
     "ovoid drone with no propellers resting on a yard above, a thin ring of light arcing across the sky",
 }
 
-SIZES = {**{k: "landscape_16_9" for k in (*CLASSES, *TESTS, *HARBOURS, *HARBOUR_VIEWS, *SHIPBUILDER, *SHIPYARD, *SHIPYARD_SECTIONS, *CHARTING, *POSITIONS, *FOREIGN, *SOP_GOALS, *EXPEDITIONS, *BANDS, *LADDER, *CONSOLE)}, **{k: "portrait_4_3" for k in CARDS}, **{k: "portrait_4_3" for k in LOGIC}}
-SUBJECTS = {**TESTS, **CLASSES, **HARBOURS, **HARBOUR_VIEWS, **SHIPBUILDER, **SHIPYARD, **SHIPYARD_SECTIONS, **CHARTING, **POSITIONS, **FOREIGN, **CARDS, **LOGIC, **SOP_GOALS, **EXPEDITIONS, **BANDS, **LADDER, **CONSOLE}
+# The ten houses that build the outside ships (12 November, Justin: "a new tab on the homepage for labs
+# with the fal images ... the ten top producers of models as of today"). One plate per house, 16:9, for
+# the Labs tab. A house is drawn as its yard or its hall at night, not as a model: the ship on the stocks
+# carries the look its ships already wear in the Reach (LAB_LOOK above), so the card reads as its maker.
+LABS: dict[str, str] = {
+    "lab-google": "a great timber observatory-yard on a headland above a black sea at night: a four-masted "
+    "ship stands on the stocks, her sails divided into four broad coloured panels, deep blue, red, yellow and "
+    "green, a brass compass rose mounted at her bow, astronomers in long coats on a gallery of brass "
+    "instruments, one hanging lantern, a thin ring of light standing where a moon would be",
+    "lab-openai": "a stark black-timbered workshop on a dark quay: a fast black-hulled sloop on the stocks, one "
+    "pale unbleached sail with a thin green stripe along the leech, a small brass lamp burning at the masthead, "
+    "shipwrights in dark coats around a drafting table, black water beyond, one distant ring of light in the sky",
+    "lab-anthropic": "a low hall of fired-clay stone built into a cliff at night, open to the wind: a long ship "
+    "with three tall sails of burnt orange terracotta canvas, each crossed by a single dark seam, drawn up in the "
+    "cove below, scholars in long coats reading at a lamplit table on the cliff edge, a brass telescope, the black "
+    "sea and one thin ring of light in the sky",
+    "lab-meta": "a great circular hall of dark stone at night open to the sky, a flooded ring basin at its "
+    "centre: a ship at anchor there, her hull dark blue and her pale sail painted with an endless loop, figures "
+    "in sea-cloaks along the encircling gallery, lanterns, one thin ring of light above",
+    "lab-alibaba": "a red-lacquered boatyard on a dark river at night: a vast four-masted ship with red battened "
+    "sails and jade-green trim, a gold circular medallion nailed to her stern, red paper lanterns along the rail, "
+    "silk bales and spice sacks stacked on the wet quay, a low moon and one thin ring of light in the sky",
+    "lab-microsoft": "a slate-blue timber yard on a dark harbour at night: a lean ship with a broad square sail "
+    "clearly divided into four pale panes by heavy dark seams, her hull slate blue, a small silver pennant at the "
+    "masthead, a great glowing four-paned window in the yard wall, a hooded figure with a lantern on the quay, one "
+    "thin ring of light in the sky",
+    "lab-deepseek": "a deep-water cove at night: a long low ship with a dark teal hull and a pale whale painted "
+    "large on her black sail, lanterns on the black water, a whale's back breaking the surface beyond her, a low "
+    "moon and one distant ring of light in the sky, an uncropped clean image with no watermark, no signature, no "
+    "text and no logo",
+    "lab-antgroup": "a small instrument-maker's hall at night: a swift black-lacquered two-masted cutter on the "
+    "stocks, her sails deep indigo with a single silver ring on the main sail, red paper lanterns along the rail, "
+    "brass instruments and a great astrolabe on a bench, a thin silver ring of light standing in the sky beyond",
+    "lab-mistral": "a wind-swept boatyard on a dark Provencal coast at night: a lean lateen-rigged ship with sails "
+    "striped ochre and white, a north-wind emblem on the main sail, cypress trees and a stone tower, a mistral "
+    "blowing, lanterns, one thin ring of light in the sky",
+    "lab-xai": "a black forge on a dark plain at night: a stark black-hulled sloop on the stocks, a single white X "
+    "painted on her pale sail, an iron furnace throwing sparks, a lone figure in a long coat, one thin ring of "
+    "light in the sky, an uncropped clean image with no watermark, no signature, no text and no logo",
+}
+
+SIZES = {**{k: "landscape_16_9" for k in (*CLASSES, *TESTS, *LABS, *HARBOURS, *HARBOUR_VIEWS, *SHIPBUILDER, *SHIPYARD, *SHIPYARD_SECTIONS, *CHARTING, *POSITIONS, *FOREIGN, *SOP_GOALS, *EXPEDITIONS, *BANDS, *LADDER, *CONSOLE)}, **{k: "portrait_4_3" for k in CARDS}, **{k: "portrait_4_3" for k in LOGIC}}
+SUBJECTS = {**TESTS, **LABS, **CLASSES, **HARBOURS, **HARBOUR_VIEWS, **SHIPBUILDER, **SHIPYARD, **SHIPYARD_SECTIONS, **CHARTING, **POSITIONS, **FOREIGN, **CARDS, **LOGIC, **SOP_GOALS, **EXPEDITIONS, **BANDS, **LADDER, **CONSOLE}
 
 # The twenty subjects the audit found outside the brief (ships/reports/art-audit-2026-11-11.md): rewritten
 # into the three-layer world -- Risso's ink, Drake's voyages, the young Culture's universe -- keeping what

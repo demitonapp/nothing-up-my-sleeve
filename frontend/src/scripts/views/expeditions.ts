@@ -295,7 +295,7 @@ export function queueRowsHtml(d: any, rungs: Rung[]): string {
       <td class="s" title="${r.est_min == null ? 'no time yet' : `about ${Math.round(r.est_min)} min · ${esc(r.est_source || '')}`}">${startsAt(r)}</td>
       <td class="s">${r.status === 'at sea' ? `<span class="${pillCls('running')}">at sea</span>` : sailsIn(r.starts_in_min, !!r.at_least)}</td></tr>`
       : `<tr data-qi="${i}" tabindex="0" aria-label="show the card for ${esc(r.name)}" title="show this voyage's card"${r.status === 'at sea' ? ' class="sel"' : ''}><td class="s">${seq}</td>
-      <td><b>${esc(r.name)}</b>${r.goal_id ? ` <span class="${pillCls('accent')}" title="the goal this voyage serves">${esc(r.goal_id)}</span>` : ` <span class="${pillCls('bad')}" title="every line serves an expedition's goal: thorp queue goal LINE --goal EXPEDITION:N">no goal</span>`}<div class="s" title="${esc(r.goal || '')}">${esc(queueGoal(r))}</div></td>
+      <td><b>${esc(r.name)}</b>${r.lane && r.lane !== 'mac' ? ` <span class="${pillCls('blue')}" title="sails on the ${esc(r.lane)} lane">${esc(r.lane)}</span>` : ''}${r.purser?.waters === 'foreign' && !r.purser.applied ? ` <span class="${pillCls('')}" title="${esc(r.purser.reason || '')}">purser: abroad</span>` : ''}${r.goal_id ? ` <span class="${pillCls('accent')}" title="the goal this voyage serves">${esc(r.goal_id)}</span>` : ` <span class="${pillCls('bad')}" title="every line serves an expedition's goal: thorp queue goal LINE --goal EXPEDITION:N">no goal</span>`}<div class="s" title="${esc(r.goal || '')}">${esc(queueGoal(r))}</div></td>
       <td>${(() => {
         const rung = rungs.find((x) => x.preset === r.preset);
         const label = `<span class="mono">${esc(r.preset || r.name)}</span>`;
@@ -814,4 +814,84 @@ export function expeditionTableHtml(exps: Expedition[], states: Record<string, s
     <th title="voyages that failed or were stopped">failed</th><th title="its lines still in the queue, and where its next one stands">queued</th>
     <th title="voyages sailed of the stop rule's maximum">voyages</th><th>what it found</th>
   </tr></thead><tbody>${rows || `<tr><td colspan="10" class="${emptyCls()}">no expeditions yet</td></tr>`}</tbody></table></div>`;
+}
+
+// ---- the queue as swimlanes (12 November, Justin: "in the queue I'd be expecting to see the lane. So
+// something like a swimlane perhaps?"): one track a lane, this Mac and the hired GPU, each line a block from
+// when it starts to when it is home, on one clock from now to the queue's last homecoming. The purser's advice
+// (a voyage it would send abroad, while it only advises) is drawn on the Vast lane as an outline.
+const LANE_NAME: Record<string, string> = { mac: 'This Mac', vast: 'Vast.ai' };
+const PRESET_TONE: Record<string, string> = { '300k': 'p300k', '1m': 'p1m', '9m': 'p9m', '21m': 'p21m', '50m': 'p21m' };
+
+function laneShort(r: any): string {
+  return String(r.name || '').replace(/@v\d+(\.\d+)*/, '').replace(/^fitouts\//, '');
+}
+
+function clockAt(minFromNow: number): string {
+  const d = new Date(Date.now() + minFromNow * 60000);
+  return `${d.toLocaleDateString(undefined, { weekday: 'short' })} ${d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}`;
+}
+
+export function queueLanesHtml(d: any): string {
+  const rows: any[] = d?.rows || [];
+  if (!rows.length) return '';
+  const lanes: any[] = d.lanes && d.lanes.length
+    ? d.lanes
+    : [{ lane: 'mac', kind: 'local', seats: 1, enabled: true }, { lane: 'vast', kind: 'charter', seats: 1, enabled: true }];
+  const span = (r: any): [number, number] | null => {
+    if (r.status === 'at sea') {
+      const left = r.left_min != null ? Number(r.left_min) : null;
+      return left == null ? null : [0, Math.max(left, 1)];
+    }
+    if (r.starts_in_min == null || r.est_min == null) return null;
+    return [Number(r.starts_in_min), Number(r.starts_in_min) + Math.max(Number(r.est_min), 1)];
+  };
+  const advice = rows
+    .map((r, i) => ({ r, i }))
+    .filter(({ r }) => r.purser && r.purser.waters === 'foreign' && !r.purser.applied && r.purser.foreign_home_min != null);
+  const ends = rows.map(span).filter((x): x is [number, number] => !!x).map((x) => x[1])
+    .concat(advice.map(({ r }) => Number(r.purser.foreign_home_min)));
+  const total = Math.max(60, ...ends, Number(d.hours_left || 0) * 60);
+  const pct = (m: number): string => `${Math.min(100, Math.max(0, (m / total) * 100)).toFixed(3)}%`;
+  const step = total <= 12 * 60 ? 120 : total <= 36 * 60 ? 360 : 720;
+  const tickAt: number[] = [];
+  for (let m = step; m < total * 0.9; m += step) tickAt.push(m); // clear of the end's own label
+  const block = (r: any, i: number, a: number, b: number, ghost = false): string => {
+    const tone = r.kind === 'step' ? 'pstep' : (PRESET_TONE[r.preset] || 'pother');
+    const sea = r.status === 'at sea';
+    const p = r.purser || {};
+    const tip = ghost
+      ? `${r.name}: the purser would sail it abroad (${p.gpu || 'a hired GPU'}, about ${Math.round(p.foreign_min || 0)} min, $${Number(p.cost || 0).toFixed(2)}), home ${clockAt(b)}. Advice only: it sails on this Mac unless the purser is routing.`
+      : `${r.name}${r.goal_id ? ` · ${r.goal_id}` : ''}${sea ? ' · at sea now' : ` · starts ${clockAt(a)}`} · about ${Math.round(b - a)} min · home ${clockAt(b)}${p.reason ? ` · purser: ${p.reason}` : ''}`;
+    return `<span class="qlblock ${tone}${sea ? ' sea' : ''}${ghost ? ' ghost' : ''}" data-qi="${i}" tabindex="0" role="button" style="left:${pct(a)};width:max(3px, calc(${pct(b)} - ${pct(a)}))" title="${esc(tip)}" aria-label="${esc(tip)}">${esc(r.kind === 'step' ? '' : laneShort(r))}</span>`;
+  };
+  const tracks = lanes.map((ln: any) => {
+    const mine = rows.map((r, i) => ({ r, i })).filter(({ r }) => (r.lane || 'mac') === ln.lane);
+    const blocks = mine.map(({ r, i }) => { const s = span(r); return s ? block(r, i, s[0], s[1]) : ''; }).join('');
+    const ghosts = ln.kind === 'charter'
+      ? advice.map(({ r, i }) => block(r, i, Number(r.purser.foreign_home_min) - Number(r.purser.foreign_min || 0), Number(r.purser.foreign_home_min), true)).join('')
+      : '';
+    const atSea = mine.filter(({ r }) => r.status === 'at sea').map(({ r }) => r.name);
+    const queued = mine.filter(({ r }) => r.status !== 'at sea').length;
+    const lastEnd = Math.max(0, ...mine.map(({ r }) => (span(r) || [0, 0])[1]));
+    const n = Number(ln.seats || 1);
+    const seats = ln.kind === 'charter' ? `${n} ship${n === 1 ? '' : 's'} out at once` : `${n} seat${n === 1 ? '' : 's'}`;
+    let sub: string;
+    if (!ln.enabled) sub = 'switched off';
+    else if (mine.length) sub = `${atSea.length ? `at sea: ${esc(atSea.join(', '))} · ` : ''}${queued} queued · clear ${esc(clockAt(lastEnd))}`;
+    else if (ln.kind === 'charter' && ln.can_hire === false) sub = 'idle: no Vast.ai key';
+    else {
+      const pm = d.purser && typeof d.purser === 'object' ? d.purser : {};
+      const abroad = (pm.foreign_expeditions || []).map((x: string) => x.replace(/_/g, ' ')).join(', ');
+      sub = `idle: no line is written <span class="mono">vast:</span>, and the purser (${esc(pm.mode || 'off')}) ${abroad ? `lets only ${esc(abroad)} sail abroad` : 'lets no expedition sail abroad'}`
+        + (advice.length ? ` · it would send ${advice.length} here (outlined)` : '');
+    }
+    const empty = !blocks && !ghosts ? `<span class="qlempty">${ln.kind === 'charter' ? 'nothing sailing abroad' : 'nothing queued'}</span>` : '';
+    const grid = tickAt.map((m) => `<span class="qlgrid" style="left:${pct(m)}"></span>`).join('');
+    return `<div class="qlane"><div class="qlhead"><b>${esc(LANE_NAME[ln.lane] || ln.lane)}</b> <span class="s">${esc(ln.lane)} lane · ${seats}</span><div class="s">${sub}</div></div><div class="qltrack">${grid}${blocks}${ghosts}${empty}</div></div>`;
+  }).join('');
+  const axis = tickAt.map((m) => `<span class="qltick" style="left:${pct(m)}">${esc(clockAt(m))}</span>`).join('');
+  const legend = [['p300k', '300k'], ['p1m', '1m'], ['p9m', '9m'], ['p21m', '21m and up'], ['pstep', 'a step']]
+    .map(([c, l]) => `<span><i class="qlswatch ${c}"></i>${l}</span>`).join('');
+  return `<div class="qlanes" aria-label="the queue by lane"><div class="qlane qlaxisrow"><div class="qlhead"></div><div class="qlaxis"><span class="qltick qlnow">now</span>${axis}<span class="qltick qlend">${esc(clockAt(total))}</span></div></div>${tracks}<div class="qllegend s">${legend}<span><i class="qlswatch p9m sea"></i>at sea</span><span><i class="qlswatch p9m ghost"></i>the purser's advice</span></div></div>`;
 }

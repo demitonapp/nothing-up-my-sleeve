@@ -5,9 +5,10 @@
 // which rank by a chaining lift that is noise under 1B. The renderers are
 // views/leaderboard-steps.ts; the readings are thorp/arc_ai2.py and thorp/steps.py.
 
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState } from 'react';
 import { cardCls, emptyCls, selectCls } from '@/lib/ui';
 import { arcAi2Html, arcBandHtml, drawStepsChart, ifevalHtml, STEP_METRICS, stepsHtml, tenTimesHtml } from '@/scripts/views/leaderboard-steps';
+import { TestCard } from '@/components/TestCard';
 import type { SizeBand } from '@/scripts/views/bands';
 
 export function StepsBoard({ lb, error, band }: { lb: any; error: string | null; band: SizeBand }) {
@@ -131,47 +132,5 @@ export function StepsBoard({ lb, error, band }: { lb: any; error: string | null;
         <p className="note mt">No model under 1B is expected to score when prompted cold; the column says whether it writes a grid at all. The published ARC-AGI-2 scores on the larger boards are prompted readings. The way a model this size competes is the second column, and nothing here has been trained on the ARC tasks yet. Our readings are pilots unless they say 120 tasks, and a pilot is never compared with a published score.</p>
       </section>
     </>
-  );
-}
-
-/** One test's card (12 November, Justin: "cards for each test ... with fal images the user must click and
- *  then they flip over with the leaderboard, but the card must have a picture that represents the test in
- *  our style and a link and description to the test"). The face is the plate, the test's name, what it reads
- *  and where it is published; a click turns it over, and the turned card takes the whole row for its board. */
-function TestCard({ id, open, setOpen, art, name, tag, about, link, stat, children }: {
-  id: string; open: string | null; setOpen: (v: string | null) => void; art: string; name: string; tag: string;
-  about: string; link: { href: string; label: string }; stat?: string; children: ReactNode;
-}) {
-  const on = open === id;
-  const turn = () => setOpen(on ? null : id);
-  return (
-    <div className={`tflip${on ? ' on' : ''}`} id={`test-${id}`}>
-      <div className="tflip-inner">
-        <div
-          className="tface tfront"
-          role="button"
-          tabIndex={on ? -1 : 0}
-          aria-pressed={on}
-          aria-label={`Turn the ${name} card over for its board`}
-          onClick={turn}
-          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); turn(); } }}
-        >
-          <div className="tart"><img src={art} alt="" loading="lazy" onError={(e) => { (e.currentTarget.parentElement as HTMLElement).style.display = 'none'; }} /><span className="ttag">{tag}</span></div>
-          <div className="tcap">
-            <div className="tname">{name}</div>
-            <p className="tabout">{about}</p>
-            {stat && <div className="tstat sqhead" dangerouslySetInnerHTML={{ __html: stat.split('</div>')[0] + '</div>' }} />}
-            <div className="tfoot">
-              <a href={link.href} target={link.href.startsWith('http') ? '_blank' : undefined} rel="noreferrer" onClick={(e) => e.stopPropagation()}>{link.label} ↗</a>
-              <span className="tturn" aria-hidden="true">⟲ the board</span>
-            </div>
-          </div>
-        </div>
-        <div className="tface tback" aria-hidden={!on}>
-          <button type="button" className="hflipbtn tbackbtn" onClick={turn} aria-label={`Turn the ${name} card back`}><span className="hflipicon" aria-hidden="true">⟲</span><span>the card</span></button>
-          {children}
-        </div>
-      </div>
-    </div>
   );
 }

@@ -111,16 +111,32 @@ reading came from (`/api/voyages/where`).
 
 The site is organised the way the project is: classes of ship (model sizes), the ships of each
 class (runs), the voyages they sail on, and the discoveries followed across all of them. The header
-holds five ways in, always: **Places** (the classes and ships; the old "Classes"), **Expeditions**
+holds five ways in, always: **Places** (the classes and ships, the shipyard and the labs; the old
+"Classes"), **Expeditions**
 (the standards, queue and plans; the old "Voyages"), **Discoveries**, **Leaderboard** (the chaining
 boards, the four Faces and the outside ships) and **Library** (the shelves and books). **VSM**
 (the five systems S1–S5, the gate and the audit) is a tab under **Expeditions**; **Chat** is not a
 header tab but an action on a ship's page, Nothing up my sleeve and foreign alike (`/chat?ship=` and
 `/chat?model=`). The five were consolidated from seven on 11 November (the $100 tab went first).
+Places' own row is **Orbitals · Shipyard · Labs**.
 
+- **Orbitals** (`/harbours`, home): the two orbitals (12 November, Justin: "the analogy is orbitals for
+  the homepage. The demiton orbital and then the trading orbital where all the other labs and their
+  ships reside"). **Demiton** is our own: the lab and every ship it builds, from the 300k to the 350m,
+  with **Schi'mint** (the training ring) and **Vavatch End** (the deep yards) as its berths. **Masaq'
+  Reach** is the trading orbital: every other lab and its ships, none of them ours to build. Each is a
+  card that flips to five views; Demiton opens `/harbours/demiton` (its fleet, with its berth links), the
+  trading orbital opens `/labs`. The old harbour pages stay reachable from Demiton's berths.
 - **Classes** (`#/classes`, home): one card per class of ship, each a model size with one job.
   A class opens its page (`#/classes/<class>`, below), whose first tab is its **fleet**: every
   ship of that class. A ship opens its own page.
+- **Labs** (`/labs`, the third tab under Places): **the trading orbital**. The ten houses that build the
+  outside ships (`thorp/labs.py` `HOUSES`), one card each: its fal plate in the one Risso/Drake/Culture
+  brief (`LABS` in `thorp/dash/art/generate_art.py`), the country flag, the models it had shipped by
+  12 November 2026, and what the Reach holds of it. A house with readings opens its lab page
+  (`/leaderboard/lab/<key>`); one without opens its own site, so no card lands on an empty page.
+  EleutherAI and Hugging Face are named beneath as also in the Reach. The order is a reading of the
+  reach of each house's releases, not a score; the Reach keeps the only scores.
 - **Voyages** (`#/voyages`): the campaigns several ships sail on to find something
   (`thorp/fleet.py` `VOYAGES`): one card each with its goal, status, fleet and headline. A voyage
   (`#/voyages/<key>`) has one template: what it is and what it found (a finished voyage's

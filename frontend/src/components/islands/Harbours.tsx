@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import { crumbCls, emptyCls } from '@/lib/ui';
 import { sectionProps, useApi, useRoute } from '@/lib/useApi';
 import SectionNav from '../SectionNav';
-import { candidateCardsHtml, classScoreHtml, harbourAbout, harbourCardsHtml, harbourKey, harbourRoute, harbourShipsHtml, harbourTitle, isOldHarbour, shipyardCardsHtml } from '@/scripts/views/harbours';
+import { DEMITON, candidateCardsHtml, classScoreHtml, harbourAbout, harbourCardsHtml, harbourKey, harbourRoute, harbourShipsHtml, harbourTitle, isOldHarbour, shipyardCardsHtml } from '@/scripts/views/harbours';
 import { applyHarbourFlips, wireHarbourFlip } from '@/scripts/views/harbourflip';
 import { BAND } from '@/scripts/views/bands';
 import { mountShipbuilder } from '@/scripts/views/shipbuilder';
@@ -88,7 +88,7 @@ export default function Harbours() {
   const shipyardLanding = !section && (path.split('?')[0].replace(/^#/, '') === '/shipyard' || path.split('?')[0].replace(/^#/, '') === '/shipyard/');
   const data = ladder.data;
   const hs = (data && data.harbours) || [];
-  const h = harbour ? hs.find((x: any) => x.key === harbour) || null : null;
+  const h = harbour ? (harbour === DEMITON.key ? DEMITON : hs.find((x: any) => x.key === harbour) || null) : null;
   const hasBuilder = !!(h && h.ship_builder) && sub === 'shipbuilder' && !shipyardLanding;
 
   useEffect(() => {
@@ -182,9 +182,11 @@ export default function Harbours() {
   return (
     <div {...sectionProps('sizes')}>
       <SectionNav />
-      {home || (shipyard && !sectionName) ? null : (
+      {home ? (
+        <h1>The orbitals <span className="q">Demiton, our own orbital, and the trading orbital where every other lab and its ships reside</span></h1>
+      ) : shipyard && !sectionName ? null : (
         <h1>
-          {harbour ? <><a className={crumbCls('back')} href={sectionName ? '/shipyard' : bandInfo ? `/harbours/${encodeURIComponent(harbour)}` : '/harbours'}>{sectionName ? '← shipyard' : bandInfo ? `← ${harbourTitle(data, harbour)}` : shipyard ? '← places' : '← harbours'}</a> </> : null}
+          {harbour ? <><a className={crumbCls('back')} href={sectionName ? '/shipyard' : bandInfo ? `/harbours/${encodeURIComponent(harbour)}` : '/harbours'}>{sectionName ? '← shipyard' : bandInfo ? `← ${harbourTitle(data, harbour)}` : shipyard ? '← places' : '← orbitals'}</a> </> : null}
           {title}{' '}
           <span className="q">{about}</span>
         </h1>

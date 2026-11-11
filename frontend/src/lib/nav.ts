@@ -34,8 +34,8 @@ export interface SectionNav {
 export const MAIN_TABS: MainTab[] = [
   {
     key: 'places', label: 'Places', href: '/harbours',
-    title: 'the places: the harbours and the shipyard',
-    match: ['/harbours', '/harbors', '/ships', '/sizes', '/classes', '/rung', '/foreign', '/shipyard'],
+    title: 'the places: Demiton\'s orbital and the trading orbital, where every other lab and its ships reside',
+    match: ['/harbours', '/harbors', '/ships', '/sizes', '/classes', '/rung', '/foreign', '/shipyard', '/labs'],
   },
   {
     key: 'expeditions', label: 'Expeditions', href: '/expeditions',
@@ -87,15 +87,17 @@ export function mainTabFor(path: string): MainKey {
 }
 
 const placesSection = (p: string): SectionNav => {
-  // the ship builder is a shipyard page even when it keeps its harbour address
-  // (/harbours/phaleron/shipbuilder), as it marked Shipyard in the old row
-  const shipyard = at(p, '/shipyard') || /^\/harbours?\/[^/]+\/shipbuilder\/?$/.test(p);
+  // The shipyard is not a way in of its own (12 November, Justin: "the shipyard is only within demiton's
+  // orbital"): it is a page under Demiton, reached from /harbours/demiton's yards, and /shipyard keeps
+  // Orbitals lit. The old harbour shipbuilder addresses are Demiton's too.
+  const labs = at(p, '/labs');
   return {
     key: 'places',
     label: 'Places',
     items: [
-      { key: 'harbours', label: 'Harbours', href: '/harbours', active: !shipyard },
-      { key: 'shipyard', label: 'Shipyard', href: '/shipyard', active: shipyard },
+      { key: 'harbours', label: 'Orbitals', href: '/harbours', active: !labs },
+      // the houses that build the outside ships: the labs page (12 November, Justin)
+      { key: 'labs', label: 'Labs', href: '/labs', active: labs },
     ],
   };
 };
@@ -162,7 +164,7 @@ const discoveriesSection = (p: string): SectionNav => {
 export function sectionNavFor(path: string): SectionNav | null {
   const p = navPath(path);
   if (p === '/' || at(p, '/shipyard') || at(p, '/harbours') || at(p, '/harbors') || at(p, '/ships')
-    || at(p, '/sizes') || at(p, '/classes') || at(p, '/rung') || at(p, '/foreign')) return placesSection(p);
+    || at(p, '/sizes') || at(p, '/classes') || at(p, '/rung') || at(p, '/foreign') || at(p, '/labs')) return placesSection(p);
   if (at(p, '/expeditions') || at(p, '/voyages') || at(p, '/vsm') || at(p, '/governance')) return expeditionsSection(p);
   if (at(p, '/discoveries')) return discoveriesSection(p);
   return null;

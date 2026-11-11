@@ -29,19 +29,101 @@ class Lab:
     name: str
     families: tuple[str, ...]  # the model families it makes, as they appear in model names
     url: str = ""
+    # The Labs page (12 November 2026): the house's own profile, kept beside the family match so the
+    # page, the leaderboard and the chat's lab picker all read one list. A house with no profile
+    # still answers its lab page; only the ten featured houses wear a card.
+    short: str = ""  # the name on the card, where it is longer than the lab key's name
+    country: str = ""  # the flag key in frontend/public/flags
+    country_name: str = ""
+    hq: str = ""
+    founded: str = ""
+    site: str = ""  # the house's own door; url above stays its model org
+    blurb: str = ""  # one sentence on what the house makes, in this world
+    flagship: tuple[str, ...] = ()  # the models it had shipped by 12 November 2026
 
     def makes(self, model: str) -> bool:
         return any(re.search(f, model, re.I) for f in self.families)
 
+    @property
+    def door(self) -> str:
+        """The link a card opens when it is not a lab page."""
+        return self.site or self.url
+
 
 LABS: tuple[Lab, ...] = (
-    Lab("alibaba", "Alibaba", ("qwen",), "https://huggingface.co/Qwen"),
-    Lab("meta", "Meta", ("llama",), "https://huggingface.co/meta-llama"),
-    Lab("microsoft", "Microsoft", ("phi",), "https://huggingface.co/microsoft"),
+    Lab("alibaba", "Alibaba", ("qwen",), "https://huggingface.co/Qwen",
+        short="Alibaba · Qwen", country="cn", country_name="China", hq="Hangzhou",
+        founded="2023", site="https://huggingface.co/Qwen",
+        blurb="the red-sail house: Qwen, the open-weight family with a size for every deck, from 0.8B to the frontier.",
+        flagship=("Qwen3.8 27B", "Qwen3.8 Flash", "Qwen3.5 0.8B")),
+    Lab("meta", "Meta", ("llama", "muse"), "https://huggingface.co/meta-llama",
+        short="Meta AI", country="us", country_name="United States", hq="Menlo Park",
+        founded="2013", site="https://ai.meta.com",
+        blurb="the ring house: Llama's open weights and the Muse Spark line behind Meta's consumer agent.",
+        flagship=("Muse Spark 1.3", "Llama 4")),
+    Lab("microsoft", "Microsoft", ("phi", r"^mai-", "microsoft/"), "https://huggingface.co/microsoft",
+        short="Microsoft AI", country="us", country_name="United States", hq="Redmond",
+        founded="2024", site="https://ai.microsoft.com",
+        blurb="the paned house: the Phi line's small, sharp models, and the MAI foundation now on the stocks behind them.",
+        flagship=("Phi-4 14B", "Phi-4 mini", "MAI-1")),
     Lab("eleutherai", "EleutherAI", ("pythia",), "https://huggingface.co/EleutherAI"),
-    Lab("google", "Google", ("gemma",), "https://huggingface.co/google"),
+    Lab("google", "Google", ("gemma", "gemini"), "https://huggingface.co/google",
+        short="Google DeepMind", country="us", country_name="United States", hq="Mountain View",
+        founded="2010", site="https://deepmind.google",
+        blurb="the four-coloured house: the Gemini frontier and the open Gemma weights, the fleet the rest of the Reach is measured against.",
+        flagship=("Gemini 4 Argon", "Gemma 4")),
     Lab("huggingface", "Hugging Face", ("smollm",), "https://huggingface.co/HuggingFaceTB"),
+    # The six houses the Reach had not named by 12 November 2026. Each carries a profile now, so the
+    # Labs page is one list and the lab pages fill as their models are pulled and read.
+    Lab("openai", "OpenAI", ("gpt", "openai"), "https://openai.com",
+        short="OpenAI", country="us", country_name="United States", hq="San Francisco",
+        founded="2015", site="https://openai.com",
+        blurb="the black house: the GPT-6 frontier and the open gpt-oss weights, the yard that set the pace the others answer.",
+        flagship=("GPT-6 Astra", "GPT-6.1 Sol", "gpt-oss-20b")),
+    Lab("anthropic", "Anthropic", ("claude", "anthropic"), "https://www.anthropic.com",
+        short="Anthropic", country="us", country_name="United States", hq="San Francisco",
+        founded="2021", site="https://www.anthropic.com",
+        blurb="the cliff house: the Claude line, built for long context and careful work, from Fable down to Haiku.",
+        flagship=("Claude Fable 5.1", "Claude Opus 5.5", "Claude Haiku 5.5")),
+    Lab("deepseek", "DeepSeek", ("deepseek",), "https://www.deepseek.com",
+        short="DeepSeek", country="cn", country_name="China", hq="Hangzhou",
+        founded="2023", site="https://www.deepseek.com",
+        blurb="the whale house: the V4 line, the open-weight challenge that made frontier reasoning cheap.",
+        flagship=("DeepSeek V4 Pro", "DeepSeek V4 Flash")),
+    Lab("antgroup", "Ant Group", (r"\bling", "ant-ling"), "https://www.ant-ling.com",
+        short="Ant Group · Ling", country="cn", country_name="China", hq="Hangzhou",
+        founded="2014", site="https://www.ant-ling.com",
+        blurb="the silver-ring house: the Ling line, sparse MoE models built for a long context, tools and the work of agents.",
+        flagship=("Ling-3.2-flash", "Ling-3.1-flash", "Ling-3.0-tiny")),
+    Lab("mistral", "Mistral AI", ("mistral", "magistral", "codestral", "leanstral", "robostral"), "https://mistral.ai",
+        short="Mistral AI", country="fr", country_name="France", hq="Paris",
+        founded="2023", site="https://mistral.ai",
+        blurb="the wind house: a European yard that turned from the general chase to narrow, sharp tools — OCR, search, lean reasoning.",
+        flagship=("Mistral OCR 4", "Leanstral 1.5", "Robostral Navigate")),
+    Lab("xai", "xAI", ("grok",), "https://x.ai",
+        short="xAI", country="us", country_name="United States", hq="Palo Alto",
+        founded="2023", site="https://x.ai",
+        blurb="the black-X house: the Grok line on a 1.5T foundation, quick to the live conversation and the open wire.",
+        flagship=("Grok 4.6", "Grok 4.5")),
 )
+
+# The ten houses the Labs page shows, in the order it shows them: the frontier, the open-weight yards
+# and the two platform makers, by the reach of their releases on 12 November 2026. A reading, not a
+# score; the Reach keeps the only scores. The rest of LABS (EleutherAI, Hugging Face) stays on the
+# leaderboard and is named under the cards.
+HOUSES: tuple[str, ...] = (
+    "google",
+    "openai",
+    "anthropic",
+    "meta",
+    "alibaba",
+    "microsoft",
+    "deepseek",
+    "antgroup",
+    "mistral",
+    "xai",
+)
+AS_OF = "2026-11-12"
 TOP = 5
 
 
@@ -122,6 +204,64 @@ def standings(lab: Lab, rows: list[dict] | None = None) -> list[dict]:
     return sorted(out, key=lambda r: -r["standing"])
 
 
+def _profile(lab: Lab, rank: int | None = None) -> dict:
+    """The card's facts, shared by the Labs index and one lab's own page."""
+    return {
+        "key": lab.key,
+        "name": lab.name,
+        "short": lab.short or lab.name,
+        "rank": rank,
+        "url": lab.url,
+        "site": lab.door,
+        "country": lab.country,
+        "country_name": lab.country_name,
+        "hq": lab.hq,
+        "founded": lab.founded,
+        "blurb": lab.blurb,
+        "flagship": list(lab.flagship),
+        "art": f"lab-{lab.key}" if lab.key in HOUSES else "",
+        "families": list(lab.families),
+    }
+
+
+def houses() -> dict:
+    """The Labs page (12 November 2026): the ten houses, each with its profile and what the Reach holds of
+    it, then the other houses whose models the leaderboard keeps (EleutherAI's Pythias, Hugging Face's
+    SmolLMs). The facts are the house's releases by AS_OF; the readings are the store's, as every lab page
+    reads them."""
+    graded = _grades()
+    rows = readings(graded)
+    out = []
+    for rank, key in enumerate(HOUSES, 1):
+        lab = get(key)
+        if not lab:
+            continue
+        mine = [r for r in rows if r["lab"] == lab.key]
+        read = sorted({r["label"] for r in mine})
+        out.append({
+            **_profile(lab, rank),
+            "readings": len(mine),
+            "models_read": len(read),
+            "read": read,
+        })
+    next_houses = []
+    for lab in LABS:
+        if lab.key in HOUSES:
+            continue
+        mine = [r for r in rows if r["lab"] == lab.key]
+        next_houses.append({
+            **_profile(lab),
+            "readings": len(mine),
+            "models_read": len({r["label"] for r in mine}),
+        })
+    return {
+        "as_of": AS_OF,
+        "as_of_label": "12 November 2026",
+        "houses": out,
+        "next": next_houses,
+    }
+
+
 def payload(key: str) -> dict:
     lab = get(key)
     if not lab:
@@ -133,11 +273,9 @@ def payload(key: str) -> dict:
         from thorp.smoking_qwen import REFERENCE_PARAMS as sizes
     except ImportError:
         sizes = {}
+    rank = HOUSES.index(lab.key) + 1 if lab.key in HOUSES else None
     return {
-        "key": lab.key,
-        "name": lab.name,
-        "url": lab.url,
-        "families": list(lab.families),
+        **_profile(lab, rank),
         "models": [
             {
                 "model": m,

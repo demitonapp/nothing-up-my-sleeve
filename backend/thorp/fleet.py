@@ -2584,10 +2584,20 @@ EXPEDITIONS["kipling"] = Expedition(
         {"text": "Teach question answering to the 9m: the first instruct model we can use",
          "detail": "a 9m that answers when it is asked and that the dashboard's Chat tab can drive: the "
                    "160M-token return leg on the dialogue shelf and the instruction turns, with Table Talk's "
-                   "period-English recipe folded in (11 November). As many voyages as it takes",
+                   "period-English recipe folded in (11 November). As many voyages as it takes. It is judged on "
+                   "one kind of question it answers incredibly well, not on being decent at ten. The question: "
+                   "given a short description of something that happened that day, it writes the diary entry, a "
+                   "personal letter about the day, in a writing style chosen by name. Description and entry "
+                   "together fit the 1,024-piece context, about 550 words. The styles to start with are Twain "
+                   "and Dickens, both in the library; Bryson is not (his books are in copyright), and Dickens "
+                   "takes his place (Justin, 11 November). The bar is not chosen yet",
          "why": "high priority (Justin, 11 November: \"chat 9m is high priority. I want an instruct model that "
                 "I can use the UI to test\"). It is the first model we can talk to, and talking to it is a kind "
-                "of test that controlled runs alone cannot give"},
+                "of test that controlled runs alone cannot give. Narrow on purpose (Justin, 11 November: \"I'd "
+                "much rather have a small model that is incredibly good at one question than a small model "
+                "that's decent or average at 10 questions\"; and the question: \"A personal letter describing "
+                "something that happened that day. So I give it a description and it writes me a diary entry "
+                "and I'm able to choose different writing styles such as Bryson, Twain and others\")"},
         {"text": "Test the probe phase in pretraining",
          "detail": "pulse the pull off and read each pinned head's leak when it goes and its recovery when it "
                    "returns, against the heads that do not respond at all",

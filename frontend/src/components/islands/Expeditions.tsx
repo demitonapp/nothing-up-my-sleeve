@@ -12,6 +12,8 @@ import { esc, fmt } from '@/lib/format';
 import { starHeadline } from '@/scripts/views/helpers';
 import SectionNav from '../SectionNav';
 import { TabNav } from '../TabNav';
+import Launch from './Launch';
+import type { LaunchPayload } from './Launch';
 import {
   censusHtml, deckHtml, expeditionCardsHtml, expeditionName, expeditionOutcomes, expeditionTableHtml, expPill, firstLightFindings, fitHtml, fleetShipsHtml, runsTableHtml,
   inductionVerdict, leversRowsHtml, outcomesRowsHtml, parseExpeditionRoute, pinsStripHtml, queueRowsHtml, readingsTable,
@@ -763,6 +765,12 @@ export default function Expeditions() {
   const ladderApi = useApi<any>(isQueue || isList || isVoyage || isTable ? '/api/ladder' : null, 300000);
   // the overview tab needs this payload too, or it sits on 'reading the expeditions…' for ever
   const ovApi = useApi<any>(isOverview || isQueue || isList || isVoyage ? '/api/expeditions/overview' : null, 15000);
+  // the one expedition the open ones prepare: its fleet, its master charter and every goal's part
+  // (12 November). A signature answers with the payload again; that copy stands until the next poll.
+  const launchApi = useApi<LaunchPayload>(isOverview || isList ? '/api/launch' : null, 30000);
+  const [launchSigned, setLaunchSigned] = useState<LaunchPayload | null>(null);
+  useEffect(() => { setLaunchSigned(null); }, [launchApi.data]);
+  const launch = launchSigned || launchApi.data;
   const queueApi = useApi<any>(isQueue ? '/api/queue' : null, 15000);
   const prioApi = useApi<any>(isQueue ? '/api/expedition_priority' : null, 0);
   // the queue row whose card is open: its identity, so a poll that reorders the queue cannot swap it
@@ -826,14 +834,14 @@ export default function Expeditions() {
     return [
       {
         key: 'open',
-        title: 'Open',
-        note: `${open.length} still running, under way or awaiting orders · ${stateTally(open)}`,
+        title: 'Preparation',
+        note: `${open.length} still settling the charter · ${stateTally(open)}`,
         list: open,
         open: true,
       },
       {
         key: 'retired',
-        title: 'Retired',
+        title: 'Settled preparation',
         note: `${retired.length} closed, every goal settled · open one to read what it learned`,
         list: retired,
         open: false,
@@ -1247,24 +1255,27 @@ export default function Expeditions() {
       <div className={`section${isOverview || isQueue || isList ? ' active' : ''}`} id="voyages">
         <h1>{isQueue
           ? <>The queue <span className="q">what sails next, in order, as the S2 coordinator takes it from the Mac lane; open a ship to follow its training</span></>
-          : <>Overview <span className="q">every expedition: the ships it has sailed, its goal, how it is steered, and what it found</span></>}</h1>
+          : <>Overview <span className="q">one expedition: the fleet it launches, the master charter it sails under, and the preparation that settles it</span></>}</h1>
         <div className={`vtab${isOverview || isList ? ' active' : ''}`} data-vtab="expeditions">
-          {pastSops.length > 0 && (
-            <details className="expgroup paststandards" id="paststandards">
-              <summary><h2 className="band">Earlier standards <span className="q">{pastSops.map((s: any) => `${s.name}${s.expedition_name ? ` · ${s.expedition_name}` : ''}`).join(', ')} — the standards whose voyages are home: what each went out to find. Every expedition they made is listed below</span></h2></summary>
-              <div dangerouslySetInnerHTML={{ __html: sopCardsHtml({ sops: pastSops }) }} />
-            </details>
-          )}
+          {launch ? <Launch data={launch} onChange={setLaunchSigned} /> : launchApi.error ? (
+            <div dangerouslySetInnerHTML={{ __html: EMPTY(`the launch could not be read: ${esc(launchApi.error)}`) }} />
+          ) : null}
           {expsApi.data ? (
             <>
               {planGroups.map((g) => (
                 <details key={g.key} className="expgroup" id={`plans-${g.key}`} open={g.open}>
                   <summary><h2 className="band">{g.title} <span className="q">{g.note}</span></h2></summary>
-                  <div dangerouslySetInnerHTML={{ __html: expeditionCardsHtml(g.list, states, ovApi.data) }} />
+                  <div dangerouslySetInnerHTML={{ __html: expeditionCardsHtml(g.list, states, ovApi.data, launch?.preparations) }} />
                 </details>
               ))}
+              {pastSops.length > 0 && (
+                <details className="expgroup paststandards" id="paststandards">
+                  <summary><h2 className="band">Earlier drafts <span className="q">{pastSops.map((s: any) => `${s.name}${s.expedition_name ? ` · ${s.expedition_name}` : ''}`).join(', ')} — the rework so far: the standards whose voyages are home, and what each went out to find</span></h2></summary>
+                  <div dangerouslySetInnerHTML={{ __html: sopCardsHtml({ sops: pastSops }) }} />
+                </details>
+              )}
               <details className="archive" id="expeditiontableref">
-                <summary>The same expeditions as a table <span className="note">one row each, for scanning the counts and statuses</span></summary>
+                <summary>The preparations as a table <span className="note">one row each, for scanning the counts and statuses</span></summary>
                 <div dangerouslySetInnerHTML={{ __html: expeditionTableHtml(exps, states, ovApi.data) }} />
               </details>
             </>

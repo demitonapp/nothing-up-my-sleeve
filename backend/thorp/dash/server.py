@@ -1724,6 +1724,31 @@ def post_expedition_priority(body: dict) -> dict:
     return {"order": order, "reordered": True, "dropped": [k for k in keys if k not in kept]}
 
 
+def api_launch() -> dict:
+    """The one expedition (12 November, Justin: the open expeditions "are all preparation for the expedition"):
+    its phases, the fleet it launches, the master charter and every goal's part in the launch. The charter's
+    rows are read by `_spec_detail`, the voyage card's own reader, so the two cannot disagree."""
+    from thorp import launch
+
+    return launch.payload(_spec_detail)
+
+
+def post_charter_sign(body: dict) -> dict:
+    """Sign a parameter of the master charter off, or take a signature back. The values signed are the ones
+    the charter shows now, read here and never taken from the page."""
+    from thorp import launch
+
+    param = str(body.get("param") or "")
+    if param not in launch.PARAMS:
+        raise KeyError(f"the charter has no parameter called {param!r}")
+    if body.get("sign") is False:
+        launch.unsign(param)
+    else:
+        launch.sign(param, launch.current_values(_spec_detail)[param], str(body.get("by") or "Justin"),
+                    str(body.get("note") or ""))  # fmt: skip
+    return launch.payload(_spec_detail)
+
+
 def api_journeys() -> dict:
     """Every journey as its nested plan (`pretraining.stage[]` outbound, `posttraining.stage[]` the return)."""
     from thorp import ship_store
@@ -6798,6 +6823,7 @@ class Handler(BaseHTTPRequestHandler):
             "/api/chat/threads": post_chat_thread,
             "/api/chat/threads/delete": post_chat_thread_delete,
             "/api/expedition_priority": post_expedition_priority,
+            "/api/charter/sign": post_charter_sign,
         }
         if u.path not in posts:
             return self._send(404, b"not found", "text/plain")
@@ -6897,6 +6923,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/expedition": lambda: api_voyage_series(q["key"]),
                 "/api/expeditions/overview": api_expeditions_overview,
                 "/api/expedition_priority": api_expedition_priority,
+                "/api/launch": api_launch,
                 "/api/deck_atlas": api_deck_atlas,
                 "/api/lanes": api_lanes,
                 "/api/constraints": api_constraints,

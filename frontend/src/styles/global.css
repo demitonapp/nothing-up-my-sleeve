@@ -2319,3 +2319,58 @@ ol.goaltext { padding-left: 22px; }
 .consoletoolres { color: var(--muted); overflow-wrap: anywhere; }
 .consoletool.bad { border-color: rgba(248, 81, 73, .55); }
 .consoletool.bad .consoletoolres { color: var(--bad); }
+
+/* ---- the one expedition on the Expeditions landing (Launch.tsx, 12 November): its phases, the fleet, the
+   master charter signed off row by row, and every goal's part. The page's own ink, brass and bone. */
+.launch { display: grid; gap: 16px; margin-top: 14px; }
+.launchtitle { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 10px 24px; }
+.launchname { color: #f2e6cf; font-size: var(--fs-2xl); font-weight: 700; letter-spacing: .01em; }
+.launchver { color: #c9a24a; font-variant-numeric: tabular-nums; }
+.launchtally { display: flex; flex-wrap: wrap; gap: 4px 18px; color: #a8977a; font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
+.launchtally b { color: #f2e6cf; font-weight: 600; }
+.phases { list-style: none; margin: 14px 0 0; padding: 0; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0; }
+.phase { display: grid; gap: 3px; padding: 9px 12px 2px; border-top: 2px solid #3a2a12; min-width: 0; }
+.phase .phasename { text-transform: uppercase; letter-spacing: .12em; font-size: 11px; font-weight: 700; color: #8f7d5f; }
+.phase .phasenote { color: #8f7d5f; font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
+.phase.active { border-top-color: #c9a24a; }
+.phase.active .phasename { color: #c9a24a; }
+.phase.active .phasenote { color: #e9e2d3; }
+.phase.done { border-top-color: #4d7a3c; }
+.phase.done .phasename { color: #9bbf7f; }
+@media (max-width: 900px) { .phases { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 0; } }
+#voyages .panel table.fleettable th[scope=row], #voyages .panel table.chartertable th[scope=row] {
+  text-transform: uppercase; letter-spacing: .08em; font-size: 11px; font-weight: 600; color: #a8977a;
+  text-align: left; white-space: nowrap; vertical-align: top; border-bottom: 1px solid #2a1d0d; padding: 7px 10px 7px 8px;
+}
+.fleettable thead th { text-align: left; }
+.fleettable thead th .s, .chartertable thead th .s { text-transform: none; letter-spacing: 0; font-weight: 400; }
+.fleettable td.fleetcell { vertical-align: top; min-width: 170px; padding: 8px 10px; }
+.fleettable td.fleetcell.none { vertical-align: middle; }
+.fleetship { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; color: #f2e6cf; }
+.rehearsals { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 2px; font-size: var(--fs-xs); color: #a8977a; }
+.rehearsals .rstate { color: #8f7d5f; }
+.rehearsals .rstate.home { color: #9bbf7f; }
+.rehearsals .rstate.queued, .rehearsals .rstate.at-sea { color: #d8b566; }
+.chartertable { width: 100%; }
+.chartertable thead th { vertical-align: bottom; text-align: left; }
+.chartertable thead th .mono { font-size: 10px; color: #8f7d5f; line-height: 1.35; margin-top: 2px; }
+.chartertable td { vertical-align: top; padding: 7px 10px 7px 8px; overflow-wrap: anywhere; }
+.chartertable td.same b { font-weight: 500; color: #e9e2d3; }
+#voyages .panel table.chartertable td.odd { color: #d8b566; }
+#voyages .panel table.chartertable tr.chartergroup th {
+  text-align: left; padding: 16px 8px 6px; color: #c9a24a; letter-spacing: .14em; font-size: 11px; border-bottom: 1px solid #3a2a12;
+}
+.chartertable tr.chartergroup th .s { letter-spacing: 0; text-transform: none; font-weight: 400; margin-left: 10px; }
+.chartertable tbody:first-of-type tr.chartergroup th { padding-top: 8px; }
+.chartertable tr.charterrow.signed th[scope=row] { color: #9bbf7f; }
+.chartertable tr.charterrow.drifted th[scope=row] { color: var(--bad); }
+.chartertable td.decided { white-space: nowrap; min-width: 150px; }
+.chartertable td.decided > div + div { margin-top: 3px; }
+.chartertable td.signoff { white-space: nowrap; min-width: 170px; }
+.chartertable td.signoff button { margin-left: 4px; }
+.partstable td { vertical-align: top; line-height: 1.5; }
+.partstable td.partname { color: #c9a24a; text-transform: uppercase; letter-spacing: .1em; font-size: 11px; font-weight: 700; white-space: nowrap; }
+.partstable tr.first td { border-top: 1px solid #3a2a12; }
+#launchparts > section { margin-top: 12px; }
+#voyages .expcard .foot.prepline { border-top: 1px solid #2a1d0d; margin-top: 8px; padding-top: 8px; }
+#voyages .expcard .foot.prepline .blocking { color: #d8b566; }

@@ -117,7 +117,7 @@ const toggleClsLocal = (extra = ''): string => shadcnToggleCls(extra);
 // EXPEDITIONS), its aim, what it found and the same counts the table carried, so the page reads as one
 // grid of like cards rather than a table of names with no picture.
 const cut = (t: string, n: number): string => (t.length > n ? t.slice(0, n - 1).trimEnd() + '…' : t);
-export function expeditionCardsHtml(exps: Expedition[], states: Record<string, string>, overview?: any): string {
+export function expeditionCardsHtml(exps: Expedition[], states: Record<string, string>, overview?: any, prep?: Record<string, any>): string {
   const ov: Record<string, any> = {};
   for (const e of (overview && overview.expeditions) || []) ov[e.key] = e;
   const cards = exps.map((v) => {
@@ -127,6 +127,11 @@ export function expeditionCardsHtml(exps: Expedition[], states: Record<string, s
     const ships = (v.ships || []).length;
     const queued = Number(o.queued || 0);
     const counts = `${Number(o.at_sea || 0)} at sea · ${Number(o.finished || 0)} home · ${Number(o.failed || 0)} failed · ${queued} queued`;
+    // its part in the launch (12 November): research or test voyages, the charter rows it decides, and how
+    // many of its goals still stand between the charter and a signature
+    const pr = prep && prep[v.key];
+    const decides: string[] = (pr && pr.decides) || [];
+    const prepLine = pr ? `<div class="foot prepline"><span>${esc(pr.kind)}${decides.length ? ` · <span title="${esc(decides.join('; '))}">decides ${decides.length} charter row${decides.length === 1 ? '' : 's'}</span>` : ' · decides no charter row'}</span><span class="${pr.blocking ? 'blocking' : ''}">${pr.blocking ? `${pr.blocking} goal${pr.blocking === 1 ? '' : 's'} before the launch` : 'nothing before the launch'}</span></div>` : '';
     return `<a class="${cardCls(true, 'card expcard')}" href="/expeditions/${esc(v.key)}" data-expedition="${esc(v.key)}">
       ${artImg(`exp-${v.key}`, 'cardart ship')}
       <div class="top"><span class="preset">${esc(v.name)}</span>${expPill(states[v.key], v)}</div>
@@ -134,6 +139,7 @@ export function expeditionCardsHtml(exps: Expedition[], states: Record<string, s
       <div class="ov" title="${esc(found)}">${esc(cut(found, 240) || 'nothing written up yet: what it found is written when it comes home')}</div>
       <div class="foot"><span>${esc(v.fleet || '')}${v.preset ? ` · ${esc(v.preset)}` : ''}</span><span>${valid} of ${v.stop.max_runs} voyages</span></div>
       <div class="foot"><span class="expcounts">${counts} · ${ships} ship${ships === 1 ? '' : 's'}</span></div>
+      ${prepLine}
     </a>`;
   }).join('');
   return cards ? `<div class="cards expcards">${cards}</div>` : `<div class="${emptyCls()}">no expeditions yet</div>`;

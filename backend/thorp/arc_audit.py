@@ -172,6 +172,9 @@ SHIPS = (
     "7436bab9726d",  # fu-ogden-v0-1@9m-pre-s1
     "d7ec47e4d3e9",  # fu-ogden-v0-1@9m-pre-s2
     "136246a7ff04",  # 9m@v0.0.6
+    "a749ae17eaa6",  # 300k@v0.0.6-pins (the best keel's leader), the subject of the queue's arc-ai2-300k
+    "8d078f62cc63",  # 1m@v0.0.5, the subject of arc-ai2-1m
+    "edc36bbbd9fc",  # 9m@v0.0.5, the subject of arc-ai2-9m
     "cdc3da8540e3",  # fu-ogden-v0-1@21m-pre-s1
     "55eec445a5e7",  # 21m@v0.0.5
     "c353647dc22c",  # the first 50m (fu-ogden-v0-2~table-talk-reading@50m-pre-s1)

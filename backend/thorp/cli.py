@@ -331,12 +331,13 @@ def cmd_queue(a) -> int:
     if a.what == "show":
         rows = queue_store.lines()
         for i, r in enumerate(rows, 1):
-            print(f"{i:>3}  {r['text']}")
+            goal = f"  [{r['goal_id']}]" if r.get("goal_id") else ""
+            print(f"{i:>3}  {r['text']}{goal}")
         print(f"{len(rows)} line(s)")
         return 0
     if a.what == "add":
         if not a.line:
-            print("thorp queue add LINE [--top]", file=sys.stderr)
+            print("thorp queue add LINE [--top] [--goal GOAL_ID]", file=sys.stderr)
             return 2
         line = a.line
         if line.startswith("investigations/"):
@@ -345,7 +346,7 @@ def cmd_queue(a) -> int:
             from thorp import investigate
 
             line = investigate.queue_line(line)
-        queue_store.add(line, top=a.top)
+        queue_store.add(line, top=a.top, goal_id=a.goal)
         queue_store.export()
         print(f"queued: {line}")
         return 0
@@ -374,6 +375,90 @@ def cmd_queue(a) -> int:
         print(("dropped: " if ok else "not queued: ") + a.line)
         return 0 if ok else 1
     return 2
+
+
+def cmd_goals(a) -> int:
+    """An expedition's goals as rows in the store (thorp/expedition_goals.py): show them, or record a
+    verdict. `thorp goals sync` copies the words from fleet.py; the verdict is the store's."""
+    from thorp import expedition_goals
+
+    if a.what == "sync":
+        print(f"goals: synced {expedition_goals.sync()}")
+        return 0
+    if a.what == "set":
+        if not a.goal_id or not a.status:
+            print("thorp goals set GOAL_ID STATUS [--evidence TEXT] [--words TEXT]", file=sys.stderr)
+            return 2
+        try:
+            ok = expedition_goals.set_verdict(
+                a.goal_id, a.status, evidence=a.evidence or "", words=a.words or ""
+            )
+        except ValueError as e:
+            print(str(e), file=sys.stderr)
+            return 2
+        if not ok:
+            print(f"no goal {a.goal_id!r}", file=sys.stderr)
+            return 1
+        print(f"{a.goal_id}: {a.status}")
+        return 0
+    # show (the default)
+    rows = expedition_goals.read(a.expedition)
+    if not rows:
+        print("no goals; thorp goals sync copies them from fleet.py", file=sys.stderr)
+        return 1
+    key = None
+    for r in rows:
+        if r["expedition_key"] != key:
+            key = r["expedition_key"]
+            open_n = sum(
+                1 for x in rows if x["expedition_key"] == key and x["status"] in ("open", "partly")
+            )
+            print(f"\n{key}  ({r['name']})  {open_n} open")
+        mark = {"done": "x", "dropped": "-", "partly": "~", "open": " "}.get(r["status"], " ")
+        print(f"  [{mark}] {r['goal_id']:<20} {r['text'][:90]}")
+        if a.verbose and r["evidence"]:
+            print(f"        evidence: {r['evidence']}")
+    print()
+    retired = expedition_goals.retireable()
+    print(f"{len(retired)} expedition(s) with every goal settled: "
+          + (", ".join(x["key"] for x in retired) if retired else "none"))
+    return 0
+
+
+def cmd_milestones(a) -> int:
+    """A voyage's milestones as the ledger recorded them (thorp/milestones.py): each one's step, its value
+    and whether it was met. A missed one with `if_missed: recall` is why a voyage came back early."""
+    from sqlalchemy import text
+
+    from thorp import ledger_store, store
+
+    if a.run:
+        row = ledger_store.find_run(a.run)
+        if not row:
+            print(f"no run {a.run!r}", file=sys.stderr)
+            return 1
+        rid, name = row["run_id"], row.get("name") or row["run_id"]
+    else:
+        with store.session() as s:
+            row = s.execute(
+                text("select run_id, name from s1.runs order by started desc nulls last limit 1")
+            ).fetchone()
+        if not row:
+            print("no runs in the ledger", file=sys.stderr)
+            return 1
+        rid, name = row[0], row[1] or row[0]
+    rows = ledger_store.metrics_matching(rid, "milestone/")
+    if not rows:
+        print(f"{name}: no milestones judged")
+        return 0
+    seen: dict[str, dict] = {}
+    for r in rows:
+        _, n, field = r["name"].split("/", 2)
+        seen.setdefault(n, {"step": r["step"]})[field] = r["value"]
+    for n, d in sorted(seen.items(), key=lambda kv: int(kv[0])):
+        met = "met" if d.get("met") else "MISSED"
+        print(f"  {n}. at step {d.get('step')}: {met}  value {d.get('value'):.4g}")
+    return 0
 
 
 def cmd_s5(a) -> int:
@@ -672,7 +757,30 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("line", nargs="?")
     s.add_argument("to", nargs="?", type=int)
     s.add_argument("--top", action="store_true", help="add: put the line at the top")
+    s.add_argument(
+        "--goal",
+        default=None,
+        help="add: the goal the line serves (kipling:3); default: the spec's own `goal:`",
+    )
     s.set_defaults(fn=cmd_queue)
+    s = sub.add_parser(
+        "goals",
+        help="an expedition's goals as rows in the store: show them, sync from code, or record a verdict",
+    )
+    s.add_argument("what", nargs="?", choices=["show", "sync", "set"], default="show")
+    s.add_argument("goal_id", nargs="?", help="set: the goal id (e.g. kipling:3)")
+    s.add_argument("status", nargs="?", help="set: open | partly | done | dropped")
+    s.add_argument("--expedition", default=None, help="show: one expedition only")
+    s.add_argument("--evidence", default="", help="set: where the reading is (run, metric, value)")
+    s.add_argument("--words", default="", help="set: why it is settled, in whose words")
+    s.add_argument("-v", "--verbose", action="store_true", help="show: print each goal's evidence")
+    s.set_defaults(fn=cmd_goals)
+    s = sub.add_parser(
+        "milestones",
+        help="a voyage's milestones as the ledger recorded them: each one's step, value and verdict",
+    )
+    s.add_argument("run", nargs="?", help="a run id, a unique prefix, or a name (default: the latest run)")
+    s.set_defaults(fn=cmd_milestones)
     s = sub.add_parser(
         "s5",
         help="an S5 decision: switch a policy on or off, change a charter term, or except runs",

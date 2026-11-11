@@ -3,6 +3,7 @@
 # broken up into phases, the insertion of the metre topics and then normal training on content"): the plain keel's
 # own spec (its control, fu-ogden-v0-1@300k-pre-s1/s2, already home) with optim.scaffold (thorp/train.py) and pips.
 name: 9m@v0.0.6
+goal: 3  # the instruct 9m: kipling:3, and its return leg carries the same goal
 ship: 'SOP v0.0.6 at 9m'
 experiment: 'The 9m on the bigger Ogden set: the 1m''s v0.1.4 corpus, the marked tokeniser, and the same
   four-card pull, so the 9m is both the next rung and the first size that can rehearse a chat format.'
@@ -111,4 +112,10 @@ checkpoint:
 sop: '0.0.6'
 departures:
 - "the post-training SOP: the deck stage read after the four pretraining passes, with the pull off"
+- field: content
+  why: 'reads Ogden v0.1.4 (the bigger corpus: 592 books plus the logic tutor at 5% of the words) and keeps
+    it raw on purpose, so the question/answer and premise/conclusion pieces are exercised'
+- field: tokeniser
+  why: 'the ten control tokens as single pieces (the marked tokeniser), which SOP v0.0.6''s pieces-2048 does
+    not declare: the chat turns need them whole'
 seed: 1

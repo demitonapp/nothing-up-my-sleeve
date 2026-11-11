@@ -2,8 +2,8 @@
 # (11 November, Justin: "we need a new instrument for the 48 before we do the audit").
 kind: investigation
 name: deltanet-check-qwen3.8-27b
-expedition: arc_de_triomphe
-ship: "Arc de Triomphe: the linear-attention instrument, checked on Qwen3.8 27B"
+expedition: knockout
+ship: "Knockout: the linear-attention instrument, checked on Qwen3.8 27B"
 question: >-
   Does the instrument for the 48 linear-attention layers hold on the 27B itself? It passed on the 0.8B of the
   same family (18 linear layers, one value head to a key head). The 27B has three value heads to a key head

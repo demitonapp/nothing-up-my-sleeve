@@ -4,6 +4,21 @@ experiment: 'Fitout ogden-v0-1: one fixed Ogden corpus for every class; what car
   and stars form at each size?'
 question: 'The marks arm at 300k: the control-tokenised library: books wrapped, the
   turns of catechisms marked. Same corpus, seed and ladder as 300k@v0.0.6.'
+# every voyage carries milestones (12 November): a gate at a checkpoint, judged once, and a missed one
+# that asks for a recall calls the voyage back rather than spending the rest of the night on a dead arm
+milestones:
+- at: 0.5
+  metric: stars/previous_word/max_score
+  at_least: 0.5
+  if_missed: recall
+  why: 'the previous-word card lights in five of the sixteen 300k census arms and reads 1.0 on the plain
+    300k; a marked arm that has not lit it by halfway is not the arm the proof needs'
+- at: 0.75
+  metric: eval/hole-cards-unseen/bpb_mean
+  at_most: 2.6
+  if_missed: recall
+  why: 'the plain 300k reads 2.197; 2.6 is a catastrophe guard, not a target (the rigged 9m pilot ended
+    at 4.75, and a broken cleaning or tokeniser lands there)'
 data:
   recipe: lists/ogden-v0.1.csv
   passes: 4

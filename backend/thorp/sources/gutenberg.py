@@ -213,33 +213,75 @@ def resolve_list(path: str | Path) -> list[Resolution]:
     return out
 
 
+_RESOLUTION_FIELDS = [
+    "list",
+    "title",
+    "author",
+    "language",
+    "chosen",
+    "how",
+    "n_candidates",
+    "candidates",
+]
+
+
+def _kept_resolution_rows(out: Path, list_name: str) -> list[dict]:
+    """Every row of `data/resolution.csv` but this list's, skipping a torn one.
+
+    The file is read with `errors="replace"`: a build before the lock (11 November) could tear a row
+    mid-write when two lanes fetched a list in the same minute, and one bad byte used to take the whole
+    file — and therefore every voyage that reads a `refuse` list — down with a UnicodeDecodeError."""
+    if not out.exists():
+        return []
+    keep = []
+    with open(out, newline="", encoding="utf-8", errors="replace") as f:
+        for r in csv.DictReader(f):
+            if not r or None in r or any(r.get(k) is None for k in _RESOLUTION_FIELDS):
+                continue  # a torn row: too few fields, extra fields, or fields merged across two lines
+            if r["list"] == list_name:
+                continue
+            keep.append(r)
+    return keep
+
+
 def write_resolution_csv(list_path: str | Path, resolutions: list[Resolution]) -> Path:
-    """data/resolution.csv holds every list fetched so far; rows for this list are replaced."""
+    """data/resolution.csv holds every list fetched so far; rows for this list are replaced.
+
+    The whole read-replace-write runs under an exclusive lock and the file is replaced atomically:
+    two lanes (the Mac and a Vast seat) fetch lists at the same time, and until 11 November they could
+    interleave two writers into one file, tearing rows across each other."""
+    import fcntl
+    import os
+    import tempfile
+
     out = paths.data_dir() / "resolution.csv"
     list_name = str(list_path)
-    keep = []
-    if out.exists():
-        with open(out, newline="", encoding="utf-8") as f:
-            keep = [r for r in csv.DictReader(f) if r["list"] != list_name]
-    fields = ["list", "title", "author", "language", "chosen", "how", "n_candidates", "candidates"]
-    rows = keep + [
-        {
-            "list": list_name,
-            "title": r.row.title,
-            "author": r.row.author,
-            "language": r.row.language,
-            "chosen": r.chosen or "",
-            "how": r.how,
-            "n_candidates": len(r.candidates),
-            "candidates": " | ".join(f"{i}: {t} / {a}" for i, t, a in r.candidates[:25]),
-        }
-        for r in resolutions
-    ]
     out.parent.mkdir(parents=True, exist_ok=True)
-    with open(out, "w", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=fields)
-        w.writeheader()
-        w.writerows(rows)
+    with open(out.with_suffix(".lock"), "w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        try:
+            keep = _kept_resolution_rows(out, list_name)
+            rows = keep + [
+                {
+                    "list": list_name,
+                    "title": r.row.title,
+                    "author": r.row.author,
+                    "language": r.row.language,
+                    "chosen": r.chosen or "",
+                    "how": r.how,
+                    "n_candidates": len(r.candidates),
+                    "candidates": " | ".join(f"{i}: {t} / {a}" for i, t, a in r.candidates[:25]),
+                }
+                for r in resolutions
+            ]
+            fd, tmp = tempfile.mkstemp(dir=out.parent, prefix=".resolution-", suffix=".csv")
+            with os.fdopen(fd, "w", newline="", encoding="utf-8") as f:
+                w = csv.DictWriter(f, fieldnames=_RESOLUTION_FIELDS)
+                w.writeheader()
+                w.writerows(rows)
+            os.replace(tmp, out)
+        finally:
+            fcntl.flock(lock, fcntl.LOCK_UN)
     unresolved = [r for r in resolutions if r.chosen is None]
     if unresolved:
         up = paths.data_dir() / "unresolved.csv"

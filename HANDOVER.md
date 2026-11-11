@@ -180,3 +180,55 @@ probe phase), `tokeniser.py`, `turns.py`, `probe_phase.py`, `evaluators/answers.
 
 **Known, not fixed:** 14 tests in `test_scaffold.py`, `test_sop.py`, `test_resume.py` and `test_spec.py` fail on
 `ae0fe12b` too (the `standard` policy refuses the test spec; the `tiny` preset is gone). The new tests pass.
+
+## 11 November, evening: goals in the store, 13 expeditions retired, and the queue started
+
+**The queue is live and the 9m is training.** `kipling-candidate.hold` was released and the coordinator restarted
+(it had the old store module in memory and would have written the queue back without the goal tags). It is
+running `9m@v0.0.6` (8732 steps), then `9m@v0.0.6-return` — the first instruct model the Chat tab can drive.
+The coordinator is **not under launchd** at archive: to make it survive a restart,
+
+    cp backend/scripts/com.thorp.queue.plist ~/Library/LaunchAgents/
+    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.thorp.queue.plist
+
+(the plist has `AbandonProcessGroup`, so a voyage outlives its coordinator). Without it, a reaped coordinator
+means nothing launches the return leg when the 9m finishes — the 9m itself keeps training.
+
+**Goals are rows, and a queue line names the goal it serves.** `s1.expeditions`, `s1.expedition_goals`
+(verdict: status/evidence/words/settled_at) and `s2.queue_lines.goal_id`; migrations `v3q6r9s2t5u8` and
+`w4r7s0t3u6v9`. `thorp goals [sync|show|set]`, `thorp queue add --goal`, and the coordinator re-syncs the
+words from `fleet.py` on every state refresh — a sync never overwrites a verdict. A goal carries its own
+`position`, so deleting one does not renumber the rest (that is what kept `knockout:3` when its first two
+goals went).
+
+**Seventeen expeditions became four** (open: kipling 6 goals, knockout 7, card_census 2, seedling 2). Closed
+on their readings: book_value, apprentice (already), two_bets, induction, ogden, best_keel, first_light, and
+arc_de_triomphe (its four goals are now knockout:4–7). Merged: Table Talk into kipling:3, the two-facts aim
+into knockout:8, the logic tutor into knockout:9, the Smallest Bridge into card_census:2, Apprentice II into
+seedling:2. The audit, the evidence and the reasoning are in `ships/reports/expedition-audit-2026-11-11.md`;
+the plan is `ships/specs/queue-proposed-2026-11-11.txt`, which is now the live queue.
+
+**The order is Justin's, in Postgres** (`s1.expedition_priority`; it was a JSON file): the instruct 9m
+(kipling:3) → the SmolLM2 smoke (knockout:3) → the AI2 ARC audit (knockout:7) → the probe (kipling:4) → the
+control tokens (kipling:2) → IFEval (kipling:1) → the reasoning budget (knockout:2, low, not dropped) → the
+reasoning model → the arch → chaining → the census and seedling work → the 21m (kipling:5) held last.
+
+**Milestones** (`thorp/milestones.py`, `thorp milestones RUN`): a spec's `milestones:` are judged once at the
+first evaluation at or after their step; a miss with `if_missed: recall` stops the voyage at that checkpoint
+and writes `recalled: milestone N missed …` as the run's status. The first to carry them is the queued
+`300k@v0.0.6-marks`. A recall keeps its checkpoint and its numbers; the revised parameters are a new spec,
+and nothing relaunches itself.
+
+**The 300k failure is fixed.** Every 300k ship had been dying in 30 seconds: `data/resolution.csv` was torn by
+two lanes writing it unlocked, and `prepare()` raised `UnicodeDecodeError`. The writer now locks and replaces
+atomically, the cache was repaired, and `prepare()` passes on the plain, marks and probe specs.
+
+**The pages.** `/expeditions` is filtered by status: Open (4, at sea first) expanded, Retired (13) collapsed at
+the bottom. The queue page labels an investigation by its title (it used to show `PYTHONPATH=backend`, the
+command's first word) and every row carries its goal chip. `9m@v0.0.6.yaml` declares its departures so it
+conforms to SOP v0.0.6.
+
+**Open.** The 21m at 8,192 context is not written (knockout:3 needs it); the honest split-trained return leg
+has never run; milestones are on one spec — the thresholds are per voyage and Justin's; the return leg's eval
+runs only at the end, so a mid-leg milestone would need its cadence lowered; the ships' pages do not draw
+milestone markers.

@@ -733,45 +733,6 @@ export default function Expeditions() {
     const past = all.filter((e) => !live.includes(e)).sort((a, b) => sopVersionCmp(String(b.version), String(a.version)));
     return [live, past] as [any[], any[]];
   }, [ovApi.data]);
-  // The plans page's three ages (11 November, Justin: "collapsible sections ... currently sailing,
-  // recently finished, older ones"), played into S2's states: at sea or under way is sailing now;
-  // anything whose latest voyage finished within the week has just finished; the rest is older.
-  // A finish is read from the ledger (`/api/runs`), not the declared status, which can be stale:
-  // Ogden is declared planned though its last voyage came home on 9 November.
-  const finRunsApi = useApi<any[]>(isList || isOverview ? '/api/runs' : null, 120000);
-  const lastHome = useMemo(() => {
-    const fin: Record<string, number> = {};
-    for (const r of finRunsApi.data || []) if (r.finished) fin[r.run_id] = Date.parse(r.finished) || 0;
-    const out: Record<string, number> = {};
-    for (const e of exps) {
-      for (const r of e.runs || []) {
-        const t = fin[r.run_id];
-        if (t) out[e.key] = Math.max(out[e.key] || 0, t);
-      }
-    }
-    return out;
-  }, [finRunsApi.data, exps]);
-  const planAges = useMemo(() => {
-    const week = 7 * 24 * 3600 * 1000;
-    const now = Date.now();
-    const sailing: Expedition[] = [];
-    const recent: Expedition[] = [];
-    const older: Expedition[] = [];
-    for (const e of exps) {
-      const st = states[e.key];
-      // only S2's own view: at sea now, or under way with voyages queued. A declared status is what the
-      // fleet meant when it was written, not what is sailing (11 November, Justin: "first light and two
-      // fact problem are not currently sailing" — both carried a stale declared `running`)
-      if (st === 'at sea' || st === 'under way') sailing.push(e);
-      else if (lastHome[e.key] && now - lastHome[e.key] <= week) recent.push(e);
-      else older.push(e);
-    }
-    // the helm first, then what is queued; the latest home first among the recent (the rest keep the
-    // order they were written, as the page always read)
-    sailing.sort((a, b) => (states[a.key] === 'at sea' ? 0 : 1) - (states[b.key] === 'at sea' ? 0 : 1));
-    recent.sort((a, b) => (lastHome[b.key] || 0) - (lastHome[a.key] || 0));
-    return { sailing, recent, older };
-  }, [exps, states, lastHome]);
   // the state enums (S2's view) said plainly under each band's heading
   const stateTally = (list: Expedition[]): string => {
     const n: Record<string, number> = {};
@@ -781,29 +742,34 @@ export default function Expeditions() {
     }
     return Object.entries(n).map(([st, c]) => `${c} ${st}`).join(' · ');
   };
-  const planGroups = [
-    {
-      key: 'sailing',
-      title: 'Currently sailing',
-      note: `at sea now, or under way with voyages queued · ${stateTally(planAges.sailing)}`,
-      list: planAges.sailing,
-      open: true,
-    },
-    {
-      key: 'recent',
-      title: 'Recently finished',
-      note: `${planAges.recent.length} whose latest voyage finished in the last seven days, the latest first`,
-      list: planAges.recent,
-      open: true,
-    },
-    {
-      key: 'older',
-      title: 'Older ones',
-      note: `${planAges.older.length} whose latest voyage finished longer ago, or which have not sailed yet`,
-      list: planAges.older,
-      open: false,
-    },
-  ].filter((g) => g.list.length);
+  // The landing is filtered by status, not by recency: what is still open is the page, and what is
+  // retired is folded away at the bottom (Justin, 11 November: "i only want it filtered by open and then
+  // retired minimised at the bottom"). Retired is the fleet's own word (`status: done`), which is set
+  // only when every goal is settled — so the folded group is the record, not a work list.
+  const planGroups = useMemo(() => {
+    const open = exps.filter((e) => e.status !== 'done');
+    const retired = exps.filter((e) => e.status === 'done');
+    // at sea first, then under way, then in port: the same order the coordinator reads
+    const rank = (k: string): number => (states[k] === 'at sea' ? 0 : states[k] === 'under way' ? 1 : 2);
+    open.sort((a, b) => rank(a.key) - rank(b.key));
+    retired.sort((a, b) => a.name.localeCompare(b.name));
+    return [
+      {
+        key: 'open',
+        title: 'Open',
+        note: `${open.length} still running, under way or awaiting orders · ${stateTally(open)}`,
+        list: open,
+        open: true,
+      },
+      {
+        key: 'retired',
+        title: 'Retired',
+        note: `${retired.length} closed, every goal settled · open one to read what it learned`,
+        list: retired,
+        open: false,
+      },
+    ].filter((g) => g.list.length);
+  }, [exps, states]);
   const v = isVoyage && route.key ? exps.find((x) => x.key === route.key) || null : null;
 
   const detailApi = useApi<any>(isVoyage && route.key ? `/api/expedition?key=${encodeURIComponent(route.key)}` : null, 60000);

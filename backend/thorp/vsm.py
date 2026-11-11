@@ -971,10 +971,14 @@ def _compute_expedition_states() -> dict[str, str]:
 
 def refresh_expedition_states() -> dict[str, str]:
     """Compute the states and write them to s1.expedition_status: the coordinator's one write."""
-    from thorp import expedition_status
+    from thorp import expedition_goals, expedition_status
 
     states = _compute_expedition_states()
     expedition_status.write(states)
+    # the goals are rows too (11 November): the words come from fleet.py on every refresh, the
+    # verdicts in the store are kept
+    with contextlib.suppress(Exception):  # a fresh store before the migration still shows states
+        expedition_goals.sync()
     return states
 
 

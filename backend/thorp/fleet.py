@@ -1815,7 +1815,7 @@ EXPEDITIONS: dict[str, Expedition] = {
             runner="scripts/make_first_light.py",
             results="specs/first-light/",
             steering="thorp-first-light",
-            status="running",
+            status="done",
             learned="The pathfinder (twice the reading) won at 1.693 bpb; vocabulary 16,384 next (1.705); "
             "the baseline 1.781/1.797 across seeds (a 0.016 error bar); 2,048 and the 1e-3 learning rate "
             "were the worst arms and verse the worst shelf (1.92-1.93). No single head lit previous-word; "
@@ -1864,6 +1864,17 @@ EXPEDITIONS: dict[str, Expedition] = {
             runner="scripts/make_seedling.py",
             results="specs/seedling/",
             status="planned",
+            goals=(
+                {"text": "Does a 1m grown from a keel reach its stars sooner than one built from nothing?", "position": 1,
+                 "detail": "a rehearsal of Great Expectations at a few minutes a run: the pilot grown from the "
+                           "300k's foundation against the same pilot from scratch",
+                 "why": "it decides whether the cheap rung can be inherited rather than retrained"},
+                {"text": "The first apprentice's five next steps, at the pilot", "position": 2,
+                 "detail": "hand the deck over with the trick; hand over within one lineage; a word-level trick "
+                           "(the Nevermore); all at the pilot; and teach rather than transplant",
+                 "why": "the same question as Laying the keel — what a pilot really inherits from the rung "
+                       "below — asked by the apprentice's own recipes"},
+            ),
             stars=("previous_word", "duplicate_word", "nevermore"),
         ),
         Expedition(
@@ -1975,7 +1986,8 @@ EXPEDITIONS: dict[str, Expedition] = {
                 "two seeds of the chosen recipe, and one of the alternative growth, then the conversation",
             ),
             runner="",
-            status="planned",
+            status="done",
+            learned='Merged into kipling as goal 7, 11 November: the same deliverable (a 9m we can talk to) under the period-English recipe.',
             stars=("previous_word", "nevermore"),
         ),
         Expedition(
@@ -2025,7 +2037,8 @@ EXPEDITIONS: dict[str, Expedition] = {
             stop=StopRule(14, "two donors, then six experiments with two seeds each"),
             runner="scripts/make_apprentice2.py",
             results="specs/apprentice2/",
-            status="planned",
+            status="done",
+            learned='Merged into seedling as goal 2, 11 November: both ask what a pilot inherits from the rung below.',
             stars=("previous_word", "nevermore"),
         ),
         Expedition(
@@ -2067,7 +2080,7 @@ EXPEDITIONS: dict[str, Expedition] = {
             ),
             runner="scripts/make_best_keel.py",
             results="data/runs/best-keel.md",
-            status="planned",
+            status="done", learned='Closed 11 November: the four rungs are already held by 15 of 55 300k runs; 300k@v0.0.6-pins leads at mean lift 0.573 at its final reading (kin 0.592, fire 0.620, counting 0.680, again 0.402). The kb-* sweep never sailed and the question is answered by ranking runs the fleet already has.',
         ),
         Expedition(
             key="two_facts",
@@ -2124,7 +2137,8 @@ EXPEDITIONS: dict[str, Expedition] = {
             ),
             runner="scripts/make_two_facts.py",
             results="thorp/leaderboard.py",
-            status="running",
+            status="done",
+            learned="Merged into the knockout as goal 8, 11 November: chaining rising with class is the knockout's question one rung up.",
             stars=("nevermore", "mover"),
         ),
         Expedition(
@@ -2184,6 +2198,18 @@ EXPEDITIONS: dict[str, Expedition] = {
             runner="scripts/make_card_census.py",
             results="data/runs/cards/census-<class>.md",
             status="running",
+            goals=(
+                {"text": "Which of the four necessary cards can each class draw?", "position": 1,
+                 "detail": "the census: 17 keel variations at 300k, 21 pilot variations at 1m; previous-word, the "
+                           "Nevermore, the mover and the comparator",
+                 "why": "it is the inventory the other card questions draw on"},
+                {"text": "The smallest ship that plays the Bridge, the Mover and the Counter", "position": 2,
+                 "detail": "each voyage in three stages: the Basics pinned from the first step, the Bridge as a "
+                           "riddle pulled on composed items, the Faces earned; the ships descend 9m, 1m, the "
+                           "three-layer keel and the keel, each carrying the last one's recipe",
+                 "why": "it is a card census one size down: the same four cards, asked as 'how small can they "
+                       "still be drawn'"},
+            ),
             stars=("previous_word", "nevermore", "mover", "comparator"),
         ),
         Expedition(
@@ -2231,35 +2257,70 @@ EXPEDITIONS: dict[str, Expedition] = {
             status="running",
             stars=("previous_word", "nevermore", "mover", "comparator"),
             goals=(
-                {"text": "Are the four cards causally necessary for chaining?",
-                 "detail": "in each model that chains, silence a card's 8 strongest heads and measure what "
-                           "the logic deck's cause gain and the four chaining tests lose, against 8 random "
-                           "heads from no card, three draws. A card is necessary when the drop beats twice "
-                           "the largest random drop and at least 0.1",
-                 "why": "five models that chain hold all four cards, but that is co-occurrence: if the cards "
-                        "are not causal, pinning them in our ships is teaching the shadow and not the thing"},
+                # Justin, 11 November: goal 1 (the four cards causally necessary) is answered — no card is
+                # necessary in any of the six models read — and goal 2 (a reasoning budget in the return
+                # legs) is dropped ("for the 21m smoke smolm2, we don't need reasoning"). Both are kept in
+                # the store as settled records; the position is carried explicitly so the one remaining
+                # goal keeps the id it has always had (`knockout:3`).
                 {"text": "Give the return legs a reasoning budget",
-                 "detail": "a thinking segment in the return leg's turns (`<think>…</think>` in the marked "
-                           "deck, plain markers otherwise), declared as two more control pieces in a new "
-                           "tokeniser version, and a two-phase inference budget: generate up to a reasoning "
-                           "allowance until `</think>`, then continue with a separate answer allowance, so a "
-                           "long trace can never eat the answer. Record reasoning tokens, answer tokens and "
-                           "the finish reason in the chat receipt and in the notes.",
-                 "why": "the knockout shows which cards a model actually uses; the next question is what a "
-                        "ship does with them when it has room to think. Every Thorp ship is pretrained only "
-                        "today: its chat continues text, and one max-tokens cap makes the trace and the "
-                        "answer compete (a 0.6B spent all 128 tokens thinking and never answered). The "
-                        "foreign thinking models already have the mode; this is the harness that gives ours "
-                        "a budget for it, and it is what the causal cards need to be exercised at test time"},
+                 "position": 2,
+                 "detail": "a thinking segment in the return leg's turns, declared as two more control pieces in "
+                           "a new tokeniser version, and a two-phase inference budget: a reasoning allowance "
+                           "until the end of the trace, then a separate answer allowance",
+                 "why": "low priority (Justin, 11 November: \"not drop, just low priority\"). The instruct 9m and "
+                       "the SmolLM2-360M smoke come first; SmolLM2-360M does not reason, so this is built after "
+                       "them rather than before"},
                 {"text": "Make the 21m smoke SmolLM2-360M",
-                 "detail": "read SmolLM2-360M (the best model under 1B on AI2 ARC: 64.8% Easy at 360M, "
-                           "against 52.5% for the 600M Qwen3 and 45.5% for the 410M pythia) the way the "
-                           "knockout reads a model that chains: silence the heads its own cards name, and "
-                           "measure what its ARC-Easy reading loses, against random heads; then carry what "
-                           "holds into the 21m as a goal of its own",
-                 "why": "the 21m is 17 times smaller than the model the board now ranks first, so the only "
-                        "way to beat it is to know which of its components the reading depends on. A size "
-                        "curve cannot get there; a causal census can say what to transplant or to train"},
+                 "position": 3,
+                 "detail": "first the audit this goal absorbed (Justin, 11 November: \"this is part of :3, "
+                           "fold it into it\"): why Qwen3.8 27B reads 42.4 on ARC-AGI-2 with its reasoning off "
+                           "and on, the 27B taken apart layer by layer until each stated cause is held or "
+                           "refuted. Then beat SmolLM2-360M (HuggingFaceTB/SmolLM2-360M, 360M) on ARC-AGI-2 "
+                           "and match its context window (8,192) in the 21m: read the heads its own cards name, "
+                           "silence them against random heads, and carry what holds into the 21m",
+                 "why": "the 21m is 17 times smaller than the model the board ranks first, so the only way to "
+                        "beat it is to know which of its components the reading depends on. A size curve "
+                        "cannot get there; a causal census can say what to transplant or to train, and the "
+                        "context window is half of what makes the comparison fair"},
+                # Arc de Triomphe's four goals, moved here on 11 November ("all the arc de triomphe goals can
+                # be migrated to the knockout and we can cancel the arc de triomphe"). Positions 4 to 7 keep
+                # every id stable; the expedition is closed and its own rows stay in the store as records.
+                {"text": "The arch: the smallest ship above 5",
+                 "position": 5,
+                 "detail": "what the audit says transfers is written into the standard and sailed at 300k, 1m, 9m and 21m, "
+                           "each rung earning the next, to pass@2 above 5 (7 of 120) on the public evaluation set",
+                 "why": "so we know the theoretical lowest size of our kind that can hold the mark, not whether the size is "
+                        "possible at all"},
+                {"text": "Our first reasoning model",
+                 "position": 6,
+                 "detail": "a ship that thinks before it answers and answers better for it: the same ship with its thinking "
+                           "off against on, the first to hold a reasoning gain above zero on two seeds",
+                 "why": "because at this size the whole difference between a model that composes and one that recalls may be "
+                        "the written trace, and we want that inside our own ships, not borrowed from Qwen's"},
+                {"text": "The AI2 ARC audit: where our best ship stands against SmolLM2-360M",
+                 "position": 7,
+                 "detail": "the nine outside AI2 ARC readings taken apart — a per-question receipt for every reading, a "
+                           "determinism re-run, the format ablations (sum against mean loss, options shuffled, the question "
+                           "stripped, a no-model baseline) and an answer-swap contamination probe — and then our own five "
+                           "ships read on the same test, the same format and the same normalisation (pieces against bits per "
+                           "byte), with SmolLM2-360M also read on the chaining deck so both stand on two measures",
+                 "why": "because ARC-AGI-2 gives nothing under 1B, so the band's ranking rests entirely on this test: the "
+                        "board now leads with it (64.8% SmolLM2-360M, 58.8% gemma-3-270m, 55.3% Qwen3.5-0.8B, 52.5% "
+                        "Qwen3-0.6B, 45.5% down to 29.0% for the pythias), and a ranking that has not been audited is a "
+                        "claim. It is also the only reading that can put our 50m at 41M beside a model 8.8 times its size "
+                        "and say where it stands"},
+                {"text": "Every class climbs closer to chaining two facts than the class beneath", "position": 8,
+                 "detail": "the ladder's first major voyage: each class's best run by its climb, so the 50m can "
+                           "attempt the four chaining rungs (Nature's breeder, the mill test, the between test, "
+                           "the pigeonhole test). Even if the 50m fails, the climb is the result",
+                 "why": "the knockout asks whether the cards are causal for chaining; this asks whether chaining "
+                       "itself rises with class, which is the same question one rung up"},
+                {"text": "Can chaining two facts be taught to an Ogden speller", "position": 9,
+                 "detail": "from each Ogden 9m seed's last checkpoint, a 16M-token stage: the same skeletons of "
+                           "invented facts (order, cause, membership, proportion) written by a tutor (Qwen 3.8 "
+                           "27B) or in fixed frames, half and half with Ogden replay, against replay alone",
+                 "why": "if the cards are what chaining needs, the next question is whether the trick can be "
+                       "taught on purpose rather than read into the corpus"},
             ),
         ),
         Expedition(
@@ -2303,7 +2364,7 @@ EXPEDITIONS: dict[str, Expedition] = {
             stop=StopRule(4, "round 1: the trigram engine and its random twin, two seeds each"),
             runner="thorp/fitouts.py",
             results="data/runs/fitouts/",
-            status="running",
+            status="done", learned='Closed 11 November, answered negative: the trigram engine never beat its random-book twin on the Nevermore (0.0087/0.0071 against 0.0103/0.0077, four runs home, mark 0.3). The Nevermore was later lit at 9m by the metre scaffold (0.608), so the mechanism exists but repetition is not what grows it.',
             stars=("nevermore", "previous_word"),
         ),
         Expedition(
@@ -2346,7 +2407,7 @@ EXPEDITIONS: dict[str, Expedition] = {
             ),
             runner="thorp/fitouts.py",
             results="data/runs/fitouts/",
-            status="planned",
+            status="done", learned='Closed 11 November: the corpus is fixed (592 books, 2,048 pieces, four passes) and read at every class, two seeds each. previous-word rises 0.344-0.396 to 0.528-0.633 and the comparator 0.106-0.181 to 0.477-0.675 from 300k to 9m, two seeds; the Nevermore and the mover do not (0.147 and 0.077 at 9m). Ogden v0.2 carries the next goals.',
             stars=("nevermore", "previous_word", "mover", "comparator"),
         ),
         Expedition(
@@ -2385,7 +2446,8 @@ EXPEDITIONS: dict[str, Expedition] = {
             ),
             runner="thorp/fitouts.py",
             results="data/runs/fitouts/",
-            status="running",
+            status="done",
+            learned='Merged into card_census as goal 2, 11 November: it asks how small the four cards can still be drawn.',
             stars=("bridge", "mover", "nevermore"),
         ),
         Expedition(
@@ -2434,7 +2496,8 @@ EXPEDITIONS: dict[str, Expedition] = {
             ),
             runner="thorp/fitouts.py",
             results="data/runs/fitouts/",
-            status="planned",
+            status="done",
+            learned='Merged into the knockout as goal 9, 11 November: whether chaining can be taught is what the causal cards are for.',
             stars=("nevermore", "mover", "comparator"),
             next_steps=(
                 "Write the skeleton generator: two facts and a checked conclusion over fresh invented words, four "
@@ -2470,7 +2533,7 @@ EXPEDITIONS["two_bets"] = Expedition(
     stop=StopRule(2, "Faces's two seeds, both bets read from the same checkpoints"),
     runner="thorp/evaluators/shapes.py",
     results="data/runs/",
-    status="planned",
+    status="done", learned='Closed 11 November: the type bet beats the word bet on both Pan seeds (shapes/type_top1_keyed 0.3314/0.3145 against shapes/keyed_top1 0.2159/0.2141, +0.12 and +0.11, over the 0.10 prediction).',
     ships=("Faces",),
 )
 
@@ -2518,10 +2581,13 @@ EXPEDITIONS["kipling"] = Expedition(
                    "questions, seed for seed",
          "why": "to learn how control tokens work and how we can use them for reasoning and functionality, and "
                 "for possibly better logic and performance"},
-        {"text": "Teach question answering to the 9m",
-         "detail": "a 9m that can be chatted to: the return leg on the dialogue shelf and the instruction turns",
-         "why": "so we can start talking to the models. That is a kind of test that is more art than science: "
-                "without talking to a model it is very hard to see it through controlled tests alone"},
+        {"text": "Teach question answering to the 9m: the first instruct model we can use",
+         "detail": "a 9m that answers when it is asked and that the dashboard's Chat tab can drive: the "
+                   "160M-token return leg on the dialogue shelf and the instruction turns, with Table Talk's "
+                   "period-English recipe folded in (11 November). As many voyages as it takes",
+         "why": "high priority (Justin, 11 November: \"chat 9m is high priority. I want an instruct model that "
+                "I can use the UI to test\"). It is the first model we can talk to, and talking to it is a kind "
+                "of test that controlled runs alone cannot give"},
         {"text": "Test the probe phase in pretraining",
          "detail": "pulse the pull off and read each pinned head's leak when it goes and its recovery when it "
                    "returns, against the heads that do not respond at all",
@@ -2689,36 +2755,11 @@ EXPEDITIONS["arc_de_triomphe"] = Expedition(
                       "it may run at any time and blocks no ship."),
     runner="thorp/train.py",
     results="data/runs/",
-    status="planned",
-    goals=(
-        {"text": "The audit: why Qwen3.8 27B reads 42.4",
-         "detail": "Qwen on ARC-AGI-2 with its reasoning off and on, starting with Qwen3 4B, then the 27B taken "
-                   "apart — the reasoning ladder, the same-shape predecessor and the same-size peers, the traces, "
-                   "and a causal census of every component — until each of four stated causes is held or refuted",
-         "why": "so we know which cause is the cause before anything is copied into a ship; a score without a cause "
-                "is a coincidence we would be imitating"},
-        {"text": "The arch: the smallest ship above 5",
-         "detail": "what the audit says transfers is written into the standard and sailed at 300k, 1m, 9m and 21m, "
-                   "each rung earning the next, to pass@2 above 5 (7 of 120) on the public evaluation set",
-         "why": "so we know the theoretical lowest size of our kind that can hold the mark, not whether the size is "
-                "possible at all"},
-        {"text": "Our first reasoning model",
-         "detail": "a ship that thinks before it answers and answers better for it: the same ship with its thinking "
-                   "off against on, the first to hold a reasoning gain above zero on two seeds",
-         "why": "because at this size the whole difference between a model that composes and one that recalls may be "
-                "the written trace, and we want that inside our own ships, not borrowed from Qwen's"},
-        {"text": "The AI2 ARC audit: where our best ship stands against SmolLM2-360M",
-         "detail": "the nine outside AI2 ARC readings taken apart — a per-question receipt for every reading, a "
-                   "determinism re-run, the format ablations (sum against mean loss, options shuffled, the question "
-                   "stripped, a no-model baseline) and an answer-swap contamination probe — and then our own five "
-                   "ships read on the same test, the same format and the same normalisation (pieces against bits per "
-                   "byte), with SmolLM2-360M also read on the chaining deck so both stand on two measures",
-         "why": "because ARC-AGI-2 gives nothing under 1B, so the band's ranking rests entirely on this test: the "
-                "board now leads with it (64.8% SmolLM2-360M, 58.8% gemma-3-270m, 55.3% Qwen3.5-0.8B, 52.5% "
-                "Qwen3-0.6B, 45.5% down to 29.0% for the pythias), and a ranking that has not been audited is a "
-                "claim. It is also the only reading that can put our 50m at 41M beside a model 8.8 times its size "
-                "and say where it stands"},
-    ),
+    status="done",
+    learned="Merged into the knockout, 11 November (Justin: 'all the arc de triomphe goals can be migrated to "
+    "the knockout and we can cancel the arc de triomphe'). Its four goals are the knockout's goals 4 to 7, "
+    "position for position; this expedition trains nothing of its own and is closed. The plan, the marks and "
+    "the pre-registered reads below stand as the record of what was designed.",
     plan=(
         {"n": 1, "kind": "investigation", "name": "Qwen3 4B on ARC-AGI-2, reasoning off and on",
          "detail": "the start (Justin, 11 November): the 120 public evaluation tasks read twice on the model whose "

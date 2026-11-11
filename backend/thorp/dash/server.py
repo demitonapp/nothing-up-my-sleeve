@@ -1491,26 +1491,33 @@ def api_expedition_priority() -> dict:
     """The expeditions in priority order, one row a goal where an expedition states goals: the rank
     Justin set (thorp.priorities), the name, the goal and the status, and the queue's own order after it
     was applied. An expedition that is closed is not a rankable row and never appears here."""
-    from thorp import fleet, priorities
+    from thorp import expedition_goals, fleet, priorities
 
     ord_ = priorities.order()
+    # the verdicts live in the store (11 November): a priority row is a goal row, so its key is the
+    # goal id and its state comes back with it
+    try:
+        verdicts = {g["goal_id"]: g for g in expedition_goals.read()}
+    except Exception:  # noqa: BLE001  (a store before the goal tables: the page still lists the rows)
+        verdicts = {}
     rows = []
     for i, k in enumerate(ord_):
         exp, _, goal = k.partition(":")
         e = fleet.EXPEDITIONS.get(exp)
         if not e or priorities.closed(exp):
             continue
-        goals = priorities.goals_of(exp)
         n = int(goal) if goal else None
+        v = verdicts.get(k) or {}
         rows.append(
             {
                 "key": k,
+                "goal_id": k,
                 "expedition": exp,
                 "name": e.name,
                 "goal": n,
-                "goal_text": goals[n - 1]
-                if n and 0 < n <= len(goals)
-                else ("" if goals else e.goal),
+                "goal_text": priorities.goal_text(exp, n),
+                "goal_status": v.get("status", "open"),
+                "goal_evidence": v.get("evidence", ""),
                 "status": e.status,
                 "priority": i + 1,
             }
@@ -3364,16 +3371,44 @@ def _api_queue() -> dict:
                 for s in seat["mac"]:
                     s["end"], s["kind"] = now + left, "other"
     lines = _queue_lines()
+    # the goal a line serves, so the page can say what each row is for (s2.queue_lines.goal_id)
+    from thorp.viable.s2_coordination import queue_store as _qs
+
+    try:
+        line_goals = {r["text"]: r.get("goal_id") for r in _qs.lines()}
+    except Exception:  # noqa: BLE001  (a store before the goal column: the queue still shows)
+        line_goals = {}
+
+    def _cmd_label(cmd: str) -> tuple[str, str]:
+        """A step's words, not its command line: an investigation says which investigation, and any other
+        step says which script or module it runs (11 November: rows 3 and 4 read `PYTHONPATH=backend`)."""
+        m = re.search(r"-m\s+thorp\.investigate\s+run\s+(\S+)", cmd)
+        if m:
+            name = m.group(1)
+            f = root / "specs" / "investigations" / f"{name}.yaml"
+            try:
+                spec = yaml.safe_load(f.read_text()) or {}
+            except (OSError, ValueError):
+                spec = {}
+            return (spec.get("ship") or spec.get("name") or name), "investigation"
+        m = re.search(r"-m\s+([\w.]+)", cmd)
+        if m:
+            return m.group(1), "step"
+        words = cmd.split()
+        scripts = [w for w in words if w.endswith((".py", ".sh"))]
+        if scripts:
+            return Path(scripts[0]).name, "step"
+        return (words[-1] if words else cmd), "step"
+
     unknown = {lane: False for lane in lane_mod.LANES}  # a voyage ahead with no time yet
     without_a_time = 0
     for i, ln in enumerate(lines, 1):
         if ln.startswith("cmd:"):
             cmd = ln[4:].strip()
-            words = cmd.split()
-            scripts = [w for w in words if w.endswith((".py", ".sh"))] or words[:1]
-            script = scripts[0] if scripts else ""
+            label, what = _cmd_label(cmd)
             rows.append(
-                {"n": i, "kind": "step", "name": Path(script).name, "cmd": cmd, "status": "queued"}
+                {"n": i, "kind": "step", "name": label, "what": what, "cmd": cmd,
+                 "goal_id": line_goals.get(ln), "status": "queued"}
             )
             continue
         p = root / "specs" / f"{ln}.yaml"
@@ -3385,6 +3420,7 @@ def _api_queue() -> dict:
             r["status"] = "at sea"
         r["spec"] = ln
         r["lane"] = lane
+        r["goal_id"] = line_goals.get(ln)
         r["missing"] = not p.exists()
         r["detail"] = _spec_detail(spec)
         est, source = times.estimate(name, spec)

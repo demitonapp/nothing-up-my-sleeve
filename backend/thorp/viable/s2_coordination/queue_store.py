@@ -47,6 +47,10 @@ class QueueLine(Base):
     lane: Mapped[str] = mapped_column(Text)  # mac or vast
     added_by: Mapped[str | None] = mapped_column(Text)
     added_at: Mapped[str | None] = mapped_column(Text)
+    # which of its expedition's goals this line serves (s1.expedition_goals, 11 November): a spec's
+    # `goal: kipling:3` becomes this column when the line is queued, so an expedition's retirement can
+    # be read off the queue rather than inferred from run names
+    goal_id: Mapped[str | None] = mapped_column(Text)
 
 
 class QueueHistory(Base):
@@ -194,7 +198,14 @@ def _rows(s) -> list[dict]:
     """The pending lines, in order, inside an open session."""
     rows = s.scalars(select(QueueLine).order_by(QueueLine.position)).all()
     return [
-        {"position": r.position, "text": r.text, "kind": r.kind, "payload": r.payload, "lane": r.lane}
+        {
+            "position": r.position,
+            "text": r.text,
+            "kind": r.kind,
+            "payload": r.payload,
+            "lane": r.lane,
+            "goal_id": r.goal_id,
+        }
         for r in rows
     ]
 
@@ -227,6 +238,7 @@ def _write(rows: list[dict], s) -> None:
                         "lane": r["lane"],
                         "added_by": r.get("added_by"),
                         "added_at": r.get("added_at"),
+                        "goal_id": r.get("goal_id"),
                     }
                     for i, r in enumerate(rows)
                 ]
@@ -234,20 +246,65 @@ def _write(rows: list[dict], s) -> None:
         )
 
 
-def add(text: str, top: bool = False) -> None:
-    """Queue one line (at the end, or at the top when `top`). Refuses a line already queued."""
+def _goal_of_spec(payload: str) -> str | None:
+    """A spec's `goal:` as a goal id: `goal: 4` on an Arc de Triomphe ship is `arc_de_triomphe:4`.
+
+    The queue does not import the spec's trainer; the YAML is read directly, and a spec that names no
+    goal returns None (a line with no goal still sails, in expedition order)."""
+    import yaml
+
+    from thorp import fleet, paths
+
+    for p in (paths.resolve(f"specs/{payload}.yaml"), paths.resolve(f"specs/{payload}")):
+        if not p.is_file():
+            continue
+        try:
+            spec = yaml.safe_load(p.read_text(encoding="utf-8")) or {}
+        except (OSError, ValueError):
+            return None
+        g = spec.get("goal")
+        if isinstance(g, int):
+            exp = fleet.expedition_of_label(spec.get("name"), spec.get("ship"))
+            return f"{exp}:{g}" if exp else None
+        if isinstance(g, str) and g.strip():
+            return g.strip()
+        return None
+    return None
+
+
+def add(text: str, top: bool = False, goal_id: str | None = None) -> None:
+    """Queue one line (at the end, or at the top when `top`). Refuses a line already queued.
+
+    `goal_id` is the goal the line serves (`kipling:3`, or a bare expedition key where it states none);
+    it is checked against the store, so a typo cannot orphan a line. A spec line that names no goal on
+    the command line takes the one its spec declares."""
     import time
 
-    from thorp import store
+    from thorp import expedition_goals, store
 
     text = text.strip()
     if not text:
         return
+    parsed = parse_line(text)
+    if goal_id is None and parsed["kind"] == "spec":
+        goal_id = _goal_of_spec(parsed["payload"])
+    if goal_id:
+        known = {g["goal_id"] for g in expedition_goals.read()}
+        if known and goal_id not in known:
+            raise ValueError(f"no goal {goal_id!r}; thorp goals show lists them")
+        if not known:
+            goal_id = None  # a store with no goals synced yet: nothing for the FK to point at
     with store.session() as s:
         rows = _rows(s)
         if any(r["text"] == text for r in rows):
             raise ValueError(f"{text!r} is already queued")
-        row = {"text": text, **parse_line(text), "added_by": "thorp queue", "added_at": time.strftime("%Y-%m-%dT%H:%M:%S")}
+        row = {
+            "text": text,
+            **parsed,
+            "added_by": "thorp queue",
+            "added_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+            "goal_id": goal_id,
+        }
         _write(([row] + rows) if top else (rows + [row]), s)
 
 

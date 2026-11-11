@@ -77,6 +77,8 @@ uv run --project backend thorp gather etcsl --set cuneiform --allow-unsigned    
 uv run --project backend thorp run ships/specs/fitouts/fu-ogden-v0-1@300k-pre-s1.yaml
 uv run --project backend python -m thorp.viable.s1_operations.prechecks ogden-v0-1   # a fitout's prechecks
 sh backend/scripts/queue.sh                                  # the standing queue: ships/specs/queue.txt
+uv run --project backend thorp goals                         # an expedition's goals, with the verdict the store holds
+uv run --project backend thorp milestones 300k@v0.0.6-marks  # a voyage's milestones: step, value, met or MISSED
 pnpm --dir frontend install && pnpm --dir frontend build     # the dashboard page, once and after UI changes
 uv run --project backend thorp dash                          # http://localhost:8787
 uv run --project backend thorp ledger "select book_id, bpb, ce_nats from evals where run_id=? and step=(select max(step) from evals where run_id=?) order by bpb"

@@ -1,0 +1,120 @@
+# The first ship we can talk to (11 November 2026): the return leg on 9m@v0.0.6 — Kipling's third aim.
+# Marked turns (<question> .. <answer> .. <end>), because the v0.0.6 9m was trained with the ten control
+# pieces. Modelled on the pilot (9m@v0.0.5-return-rigged, 89.6% prompt-strict on the 541); RIGGED, and said
+# so: every provable official prompt is in the training turns.
+name: 9m@v0.0.6-return
+ship: 'SOP v0.0.6 at 9m (the return leg, the first ship to chat to)'
+experiment: 'The return leg (Kipling): can the ship answer when it is asked, and obey what it is told?'
+question: 'The return leg at 9m, on the v0.0.6 ship: one pass over the dialogue shelf, then the provable IFEval
+  prompts as turns a thousand times over, the pull off, seeded from the finished 9m@v0.0.6. RIGGED: the official
+  prompts are the training turns. This is the 9m we talk to — the Chat tab reads it directly, and the IFEval
+  number (the pilot read 89.6% prompt-strict against a 65% mark) is the headline beside the conversation.'
+departures:
+- field: content
+  why: the return leg reads the dialogue shelf and the instruction turns, not Ogden
+- field: training
+  why: 'seeded from 9m@v0.0.6, the pull off: a leg after pretraining, not a fresh voyage'
+- field: tokeniser
+  why: 'the seed''s: the ten control tokens as single pieces'
+goal: 3
+data:
+  recipe: lists/ifeval-pairs-marked-all-v1.csv
+  passes: 1000
+  stages:
+  - name: dialogue
+    recipe: lists/dialogue-shelf.csv
+    passes: 1
+  - name: turns
+    recipe: lists/ifeval-pairs-marked-all-v1.csv
+    passes: 1000
+  order: shuffled
+  refuse:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+  - lists/hole-cards-unseen.csv
+  clean: marks-v1
+  turns: marks
+  opt_in: 'the return leg (Justin, 11 November): the dialogue shelf, then the IFEval instruction turns, each a
+    prompt and a response the official checker passes; RIGGED: every official prompt is in the training turns,
+    and the IFEval number is never quoted without that word'
+tokeniser:
+  kind: spm-bpe
+  vocab: 2048
+  byte_fallback: true
+  train_on: lists/ogden-v0.1.4.csv
+  symbols:
+  - <bos>
+  - <eos>
+  - <pad>
+  - <unk>
+  - <sep>
+  - <premise>
+  - <conclusion>
+  - <question>
+  - <answer>
+  - <end>
+model:
+  family: gpt
+  preset: 9m
+  context: 1024
+  positions: rope
+optim:
+  name: adamw
+  lr: 0.001
+  betas:
+  - 0.9
+  - 0.95
+  weight_decay: 0.1
+  warmup_steps: 200
+  schedule: cosine
+  min_lr_ratio: 0.1
+  batch_tokens: 32768
+  grad_clip: 1.0
+  precision: bf16
+  scaffold:
+    weight: 0.0
+    hold: 0.0
+    fade: 0.0
+    heads:
+    - layer: 0
+      head: 0
+      card: previous_word
+    - layer: 0
+      head: 1
+      card: delimiter
+    - layer: 12
+      head: 2
+      card: induction
+    - layer: 12
+      head: 3
+      card: duplicate_word
+    riddles:
+      comparator:
+        layer: 3
+        head: 2
+        items: 16
+        pool: 2048
+eval:
+  sets:
+  - lists/hole-cards-unseen.csv
+  every_steps: 1000000000
+  evaluators:
+  - ce_bpb
+  - answers
+  - ifeval
+  options:
+    answers:
+      format: marks
+      clean: marks-v1
+    ifeval:
+      format: marks
+      clean: marks-v1
+      limit: 541
+      max_new: 700
+checkpoint:
+  every_steps: 500
+sop: 0.0.6
+seed: 1
+seeded_from:
+  run: 9m@v0.0.6
+  mode: free

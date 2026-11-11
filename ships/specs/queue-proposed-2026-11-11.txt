@@ -1,0 +1,63 @@
+# The queue, by goal (11 November 2026). This began as a proposal; it is now the live queue — the store's
+# `s2.queue_lines` carries these lines in this order, each tagged with its goal (`thorp queue show`).
+# The queue now has four expeditions and seventeen open goals (13 are settled and retired):
+#   kipling (7 goals: 1 done (GQA), 1 partly (IFEval), 5 open), knockout (9: 1 done, 2 dropped, 3-9 open),
+#   card_census (2), seedling (2).
+# Each line below carries the goal it serves; add it with `thorp queue add <line> --goal <goal_id>`.
+#
+# Costs, from the ledger (finished runs, wall minutes): 300k median 78, 1m 179, 9m 220, 21m 751.
+# An `eval` reading is minutes. Every line is on the Mac lane.
+
+# ---------------------------------------------------------------- A. free readings (no voyage)
+# knockout:7 — the AI2 ARC audit. The nine outside readings are already in s4.outside_readings; our five
+# ships are not read at all. `thorp eval <ship>` with arc_ai2 in its fitout, ~10 minutes a ship, then the
+# per-question receipts. This is the one goal that can be closed this week without training anything.
+#   (not a queue line)
+# knockout:4 — the Qwen3 4B audit, already queued as investigations:
+cmd: PYTHONPATH=backend backend/.venv/bin/python -m thorp.investigate run arc-qwen3-4b
+cmd: PYTHONPATH=backend backend/.venv/bin/python -m thorp.investigate run deltanet-check-qwen3.8-27b
+
+# ---------------------------------------------------------------- B. the 300k sweep (~2h a line, ~12h)
+# kipling:2 (control tokens) — the plain second seed the failed batch never produced, the marked arm, then
+# the four return legs that carry the proof (answers/bpb on the 139 held-out prompts).
+fitouts/300k@v0.0.6-s2
+fitouts/300k@v0.0.6-marks
+fitouts/300k@v0.0.6-marks-s2
+fitouts/300k@v0.0.6-return
+fitouts/300k@v0.0.6-return-s2
+fitouts/300k@v0.0.6-marks-return
+fitouts/300k@v0.0.6-marks-return-s2
+# kipling:4 (the probe phase) — the pair, then the reading that gives each pinned head its word.
+fitouts/300k@v0.0.6-probe
+fitouts/300k@v0.0.6-probe-s2
+cmd: PYTHONPATH=backend backend/.venv/bin/python -m thorp.probe_phase 300k@v0.0.6-probe 300k@v0.0.6-probe-s2
+
+# ---------------------------------------------------------------- C. the first ship we can talk to (~5h)
+# kipling:3 and kipling:7 (the absorbed Table Talk aim) — one deliverable serves both: the 9m pretrains,
+# the return leg teaches it to answer and obey, and the Chat tab reads it. The pilot read 89.6%
+# prompt-strict on the 541 against a 65% mark but cost the language (bpb 2.09 -> 4.75), so the marks are
+# kept in the reading and the honest held-out split is the next line when we want it.
+fitouts/9m@v0.0.6
+fitouts/9m@v0.0.6-return
+
+# ---------------------------------------------------------------- D. the cheaper closures (1m, ~3h a line)
+# card_census:2 (the absorbed Smallest Bridge) — the descent 9m, 1m, three-layer keel, keel, each carrying
+# the last one's recipe. The Bridge is already lit (2.269 at 9m); this asks how small it still forms.
+# seedling:1 and seedling:2 (the absorbed Apprentice II) — the pilot grown from a keel against one from
+# scratch, and the apprentice's five next steps at the pilot. Four to six 1m lines, seeded in pairs.
+# knockout:8 (the absorbed two-facts aim) — the speller and stylist baselines its ladder is missing, then
+# each class's best run by its climb (four runs, the ladder is the reading).
+# knockout:9 (the absorbed logic tutor) — the 16M-token taught stages on the Ogden 9m checkpoints:
+# about an hour of Mac once the skeleton generator and the two writers exist (they do not yet).
+# card_census:1 — the 1m half of the census: 0 of 21 arms have ever sailed. The 300k half is answered.
+
+# ---------------------------------------------------------------- E. the 21m (~12.5h)
+# kipling:5 (the final Kipling ship) and knockout:3 (beat SmolLM2-360M on ARC-AGI-2 and match its 8,192
+# context). The most expensive line in the plan; everything above makes its reading possible.
+# fitouts/21m@v0.0.6
+
+# ---------------------------------------------------------------- not queued, and why
+# knockout:5 (the arch: the smallest ship above 5) waits on knockout:4's verdict.
+# knockout:6 (our first reasoning model) needs the thinking-span harness, not a voyage.
+# kipling:1 is met at 9m (89.6% against the 65% mark); only the 21m's final reading and the honest split
+#   remain, so it is finished after E rather than given a line of its own.

@@ -14,22 +14,74 @@ does is *order the queue*: on save, the pending spec lines are stably sorted by 
 (cmd and wait lines keep their places), so the highest-priority expedition's earliest line is first and
 the coordinator schedules it next without a new scheduling rule.
 
-The order lives in `data/expedition-priority.json` (`{"order": [keys]}`), beside the other operational
-choices (`data/policies.json`), and is Justin's: nothing here invents a priority, it only records and
-applies one. An expedition missing from the file sits after the ranked ones, in fleet.py's own order.
+The order lives in `s1.expedition_priority` (one row a rank: `position`, `key`), and is Justin's:
+nothing here invents a priority, it only records and applies one. An expedition missing from the table
+sits after the ranked ones, in fleet.py's own order. (It was `data/expedition-priority.json` until
+11 November: "it shouldn't be saved in json it should be saved in postgres". The file is imported once,
+on the first read of an empty table, and then left alone.)
 """
 
 from __future__ import annotations
 
 import json
-import time
 from pathlib import Path
 
-from thorp import fleet, paths
+from sqlalchemy import text
+
+from thorp import fleet, paths, store
+
+_DDL = (
+    "create table if not exists s1.expedition_priority ("
+    "position integer primary key, "
+    "key text not null unique, "
+    "updated_at timestamptz not null default now())"
+)
 
 
 def _path() -> Path:
+    """The legacy file: read once, when the table is empty, and never written again."""
     return paths.data_dir() / "expedition-priority.json"
+
+
+def ensure() -> None:
+    with store.session() as s:
+        s.execute(text(_DDL))
+
+
+def _write(keys: list[str]) -> None:
+    """Replace the stored order with `keys`, highest priority at position 0."""
+    ensure()
+    with store.session() as s:
+        s.execute(text("delete from s1.expedition_priority"))
+        for i, k in enumerate(keys):
+            s.execute(
+                text(
+                    "insert into s1.expedition_priority (position, key, updated_at) "
+                    "values (:p, :k, now())"
+                ),
+                {"p": i, "k": k},
+            )
+
+
+def _import_legacy() -> list[str]:
+    """The order written before the table existed, imported once and then deleted."""
+    try:
+        raw = json.loads(_path().read_text(encoding="utf-8")).get("order") or []
+    except (OSError, ValueError):
+        return []
+    keys = [str(x) for x in raw]
+    if keys:
+        _write(keys)
+        _path().unlink(missing_ok=True)
+    return keys
+
+
+def stored() -> list[str]:
+    """The ranked keys as the store holds them, highest first."""
+    ensure()
+    with store.session() as s:
+        rows = [r[0] for r in s.execute(text("select key from s1.expedition_priority order by position"))]
+    return rows
 
 
 def goals_of(key: str) -> list[str]:
@@ -39,9 +91,29 @@ def goals_of(key: str) -> list[str]:
 
 
 def keys_for(key: str) -> list[str]:
-    """The priority rows an expedition owns: one a goal where it states goals, else the expedition."""
-    n = len(goals_of(key))
-    return [f"{key}:{i + 1}" for i in range(n)] if n else [key]
+    """The priority rows an expedition owns: one a goal where it states goals, else the expedition.
+
+    A goal's own `position` wins over its place in the tuple, so deleting an earlier goal does not
+    renumber the ones after it (11 November: the knockout kept `knockout:3`)."""
+    e = fleet.EXPEDITIONS.get(key)
+    goals = [g for g in getattr(e, "goals", ()) if g.get("text")] if e else []
+    if not goals:
+        return [key]
+    return [f"{key}:{int(g.get('position') or i)}" for i, g in enumerate(goals, 1)]
+
+
+def goal_text(key: str, position: int | None) -> str:
+    """A goal's text by the position it is ranked at ("" when the expedition states no goals)."""
+    e = fleet.EXPEDITIONS.get(key)
+    if not e:
+        return ""
+    goals = [g for g in getattr(e, "goals", ()) if g.get("text")]
+    if not goals:
+        return e.goal
+    for i, g in enumerate(goals, 1):
+        if int(g.get("position") or i) == position:
+            return str(g.get("text"))
+    return ""
 
 
 def known() -> list[str]:
@@ -64,10 +136,7 @@ def order() -> list[str]:
 
     A bare expedition key saved before goals were ranked expands to its goals in place, so an order
     written under the old shape keeps its meaning."""
-    try:
-        raw = json.loads(_path().read_text(encoding="utf-8")).get("order") or []
-    except (OSError, ValueError):
-        raw = []
+    raw = stored() or _import_legacy()
     every = known()
     out: list[str] = []
     for k in (str(x) for x in raw):
@@ -107,11 +176,7 @@ def set_order(keys: list[str]) -> list[str]:
             if want in every and want not in ranked:
                 ranked.append(want)
     ranked += [k for k in every if k not in ranked]
-    _path().parent.mkdir(parents=True, exist_ok=True)
-    _path().write_text(
-        json.dumps({"order": ranked, "updated": time.strftime("%Y-%m-%dT%H:%M:%S")}, indent=2) + "\n",
-        encoding="utf-8",
-    )
+    _write(ranked)
     apply_queue()
     return ranked
 

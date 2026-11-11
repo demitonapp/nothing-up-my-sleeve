@@ -2,8 +2,8 @@
 # on the Arc tests then. We'll need to test with both reasoning and no reasoning").
 kind: investigation
 name: arc-qwen3-4b
-expedition: arc_de_triomphe
-ship: "Arc de Triomphe: Qwen3 4B on ARC-AGI-2, reasoning off and on"
+expedition: knockout
+ship: "Knockout: Qwen3 4B on ARC-AGI-2, reasoning off and on"
 question: >-
   What does reasoning buy a 4B on ARC-AGI-2? The same model, the same 120 public evaluation tasks, read once
   with its thinking switched off and once with it on. Qwen3.8 27B goes from 1.5 to 42.4 between the two; the 4B

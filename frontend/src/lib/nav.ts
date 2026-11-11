@@ -56,6 +56,22 @@ export const navPath = (path: string): string => {
   return p || '/';
 };
 
+/** The branch a Library address names: `/library/ogden` opens Ogden, `/library` is the branches'
+ *  own page. The old `/shelves` address answers the same way. */
+export const libraryBranchOf = (path: string): string | null => {
+  const m = /^\/(?:library|shelves)\/([^/]+)$/.exec(navPath(path));
+  if (!m) return null;
+  try {
+    return decodeURIComponent(m[1]);
+  } catch {
+    return m[1];
+  }
+};
+
+/** One branch's own address. A branch key is a slug already; encode so a custom key with a space or
+ *  a slash still lands on its page. */
+export const libraryBranchHref = (key: string): string => `/library/${encodeURIComponent(key)}`;
+
 /** True for the base address itself or anything below it. */
 const at = (p: string, base: string): boolean => p === base || p.startsWith(base + '/');
 

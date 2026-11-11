@@ -1327,6 +1327,12 @@ def train(
     every_eval = spec["eval"]["every_steps"]
     light = spec["eval"].get("light")  # {"every_steps": N, "evaluators": [...]}, optional
     every_ckpt = spec["checkpoint"]["every_steps"]
+    # per-voyage milestones (12 November): judged at the first evaluation at or after their step, and a
+    # missed one that asks for a recall stops the voyage here, at a checkpoint
+    from thorp import milestones as milestones_mod
+
+    ms = milestones_mod.declared(spec, total)
+    judged_milestones: set[int] = set()
     t_run = time.time()
 
     step = start
@@ -1446,12 +1452,13 @@ def train(
             )
         rec.metrics(rid, step, vals)
 
+        latest: dict | None = None
         if step % every_eval == 0 or step == total:
-            run_evaluators(spec, rid, step, model, prep, rec, log)
+            latest = run_evaluators(spec, rid, step, model, prep, rec, log)
         elif light and step % light["every_steps"] == 0:
             # a light eval between full ones (eval.light, 2026-11-07): only the cheap evaluators,
             # such as the Nevermores, so a lean run can still be watched forming
-            run_evaluators(
+            latest = run_evaluators(
                 {**spec, "eval": {**spec["eval"], "evaluators": light["evaluators"]}},
                 rid,
                 step,
@@ -1460,7 +1467,18 @@ def train(
                 rec,
                 log,
             )
-        if step % every_ckpt == 0 or step == total:
+        recall_reason = None
+        if ms and latest:
+            # a bug in a milestone must never cost a night's training: it is reported and the voyage
+            # sails on (the gate that stops a run is policy, not bookkeeping)
+            try:
+                verdicts = milestones_mod.check(ms, step, latest, judged_milestones)
+                if verdicts:
+                    milestones_mod.record(verdicts, rid, rec, log)
+                    recall_reason = milestones_mod.recall_reason(verdicts)
+            except Exception as e:  # noqa: BLE001
+                log(f"milestones: {e.__class__.__name__}: {e}")
+        if step % every_ckpt == 0 or step == total or recall_reason:
             wall = wall_before + time.time() - t_run
             d = save_checkpoint(
                 rid,
@@ -1477,6 +1495,20 @@ def train(
                 },
             )
             rec.artifact(rid, step, "checkpoint", str(d), "", "")
+        if recall_reason:
+            wall = wall_before + time.time() - t_run
+            rec.run(
+                {
+                    "run_id": rid,
+                    "finished": now(),
+                    "status": f"recalled: {recall_reason}",
+                    "tokens_seen": tokens_seen,
+                    "wall_minutes": wall / 60,
+                    "commit": git_commit(),
+                }
+            )
+            log(f"recalled at step {step}: {recall_reason}")
+            return {"run_id": rid, "step": step, "status": "recalled", "reason": recall_reason}
         if stop_after is not None and step >= stop_after:
             log(f"stopping at step {step} (stop_after)")
             return {"run_id": rid, "step": step, "status": "running"}

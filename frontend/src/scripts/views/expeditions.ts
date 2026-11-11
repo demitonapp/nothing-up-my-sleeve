@@ -263,9 +263,9 @@ export function queueRowsHtml(d: any, rungs: Rung[]): string {
   const rows = (d.rows || []).map((r: any, i: number) => {
     seq += 1;
     return r.kind === 'step'
-      ? `<tr class="qstep"><td class="s">${seq}</td><td colspan="5" class="s" title="${esc(r.cmd)}">↳ then a step: <span class="mono">${esc(r.name)}</span></td></tr>`
+      ? `<tr class="qstep"><td class="s">${seq}</td><td colspan="5" class="s" title="${esc(r.cmd)}">↳ then ${r.what === 'investigation' ? 'an investigation' : 'a step'}: <b>${esc(r.name)}</b>${r.goal_id ? ` <span class="${pillCls('accent')}" title="the goal this step serves">${esc(r.goal_id)}</span>` : ''}</td></tr>`
       : `<tr data-qi="${i}" tabindex="0" aria-label="show the card for ${esc(r.name)}" title="show this voyage's card"${r.status === 'at sea' ? ' class="sel"' : ''}><td class="s">${seq}</td>
-      <td><b>${esc(r.name)}</b><div class="s" title="${esc(r.goal || '')}">${esc(queueGoal(r))}</div></td>
+      <td><b>${esc(r.name)}</b>${r.goal_id ? ` <span class="${pillCls('accent')}" title="the goal this voyage serves">${esc(r.goal_id)}</span>` : ''}<div class="s" title="${esc(r.goal || '')}">${esc(queueGoal(r))}</div></td>
       <td>${(() => {
         const rung = rungs.find((x) => x.preset === r.preset);
         const label = `<span class="mono">${esc(r.preset || r.name)}</span>`;

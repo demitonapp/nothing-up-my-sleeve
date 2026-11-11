@@ -1,0 +1,23 @@
+---
+// One branch of the Library at its own address (/library/ogden, /library/scanned, ...). The page is
+// the same shell; the island reads the address and opens that branch, so a link, a bookmark and a
+// reload all land in the same place. The defaults are enumerated here for the static build; a branch
+// added in the store still answers through the dash's section fallback (and on its own address as
+// soon as its key is added here, which the server fallback makes unnecessary in production).
+import Layout from '../../layouts/Layout.astro';
+import Library from '../../components/islands/Library';
+import Reader from '../../components/Reader.astro';
+
+export function getStaticPaths() {
+  // the defaults in thorp/library_branches.py; the island reads the address, so the key itself is
+  // the only thing this list has to know
+  const branches = ['ogden', 'library', 'scanned', 'ancient', 'decks', 'content', 'levers', 'early'];
+  return branches.map((path) => ({ params: { path } }));
+}
+---
+<Layout>
+  <main>
+    <Library client:load initialPath={Astro.url.pathname} />
+  </main>
+  <Reader />
+</Layout>

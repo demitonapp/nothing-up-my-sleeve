@@ -3,8 +3,10 @@
 // reader. Converted from dashboard.ts (loadShelves / drawShelves / drawShelfDetail / loadBrowse /
 // drawBrowse / drawSelection).
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { MouseEvent as ReactMouseEvent } from 'react';
 import { big, periodOf } from '@/lib/format';
+import { libraryBranchHref, libraryBranchOf } from '@/lib/nav';
 import { cardCls, emptyCls, fieldCls, pillCls, selectCls } from '@/lib/ui';
 import { familyBar } from '@/scripts/views/helpers';
 import { selCounts, selDeclared } from '@/scripts/views/fitouts';
@@ -15,6 +17,14 @@ import { sectionProps, useApi } from '@/lib/useApi';
 const openInReader = async (id: string): Promise<void> => {
   const { openBook } = await import('@/lib/reader');
   await openBook(id);
+};
+
+/** A left click follows the branch without a page load (the address still changes); a modified click
+ *  keeps the browser's own behaviour, so a branch can be opened in a new tab. */
+const plainClick = (e: ReactMouseEvent<HTMLAnchorElement>, run: () => void): void => {
+  if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+  e.preventDefault();
+  run();
 };
 
 type Dim = 'kind' | 'language' | 'voice' | 'source' | 'period' | 'collection';
@@ -117,9 +127,26 @@ const FamilyBar = ({ fam }: { fam: Record<string, number> | null }) => (
   <span dangerouslySetInnerHTML={{ __html: familyBar(fam) }} />
 );
 
-export default function Library() {
+export default function Library({ initialPath = '/library' }: { initialPath?: string }) {
   const browse = useApi<BrowseData>('/api/library_browse', 30000);
   const library = useApi<LibraryData>('/api/library', 5000);
+
+  // One address a branch: /library is the branches' page, /library/<key> is a branch's own page.
+  // The path is read after mount (the island is server-rendered too) and kept current through
+  // pushState and the browser's back/forward.
+  const [path, setPath] = useState(initialPath);
+  useEffect(() => {
+    const read = (): void => setPath(location.hash && location.hash.startsWith('#/') ? location.hash.slice(1) : location.pathname);
+    read();
+    window.addEventListener('popstate', read);
+    window.addEventListener('hashchange', read);
+    return () => { window.removeEventListener('popstate', read); window.removeEventListener('hashchange', read); };
+  }, []);
+  const go = useCallback((next: string) => {
+    history.pushState(null, '', next);
+    setPath(next);
+  }, []);
+  const branchKey = libraryBranchOf(path);
 
   return (
     <div {...sectionProps('shelves')}>
@@ -133,7 +160,7 @@ export default function Library() {
             const why = browse.error || (b && b.error);
             if (why) return <div className={emptyCls()}>the library could not be read: {why}</div>;
             if (!ready) return <div className={emptyCls()}>{b && b.computing ? 'reading the library (a few seconds)…' : 'reading the library…'}</div>;
-            return <Browser br={b} />;
+            return <Browser br={b} branchKey={branchKey} go={go} />;
           })()}
         </div>
       </section>
@@ -260,29 +287,48 @@ function ShelfDetail({ x }: { x: Shelf }) {
   );
 }
 
-function Browser({ br }: { br: BrowseData }) {
-  const [branchKey, setBranchKey] = useState<string | null>(null);
+function Browser({ br, branchKey, go }: { br: BrowseData; branchKey: string | null; go: (p: string) => void }) {
   const [vars, setVars] = useState<Set<string>>(new Set());
   const [sizes, setSizes] = useState<Set<string>>(new Set());
   const [f, setF] = useState<Filters>(blankFilters);
   const branch = branchKey ? (br.branches || []).find((b) => b.key === branchKey) || null : null;
 
   useEffect(() => {
-    // a new branch resets the facet filters, as the old renderer did
+    // a new branch (or the branches' own page) resets the facet filters and the variation picks
     setF(blankFilters());
+    setVars(new Set());
   }, [branchKey]);
 
-  if (!branch) {
+  if (!branchKey) {
     return (
-      <Branches br={br} sizes={sizes} setSizes={setSizes} onOpen={(k) => { setBranchKey(k); setVars(new Set()); }} />
+      <Branches br={br} sizes={sizes} setSizes={setSizes} onOpen={(k) => go(libraryBranchHref(k))} />
     );
+  }
+  if (!branch) {
+    return <MissingBranch branchKey={branchKey} go={go} />;
   }
   return (
     <BranchView
       br={br} branch={branch} vars={vars} sizes={sizes} f={f}
       setVars={setVars} setF={setF}
-      onBack={() => { setBranchKey(null); setVars(new Set()); }}
+      onBack={() => go('/library')}
     />
+  );
+}
+
+/** A branch address the payload does not name: a typo, or a branch saved in the store after this
+ *  build. It says so and offers the branches rather than pretending the address is /library. */
+function MissingBranch({ branchKey, go }: { branchKey: string; go: (p: string) => void }) {
+  return (
+    <>
+      <div className="bcrumb">
+        <a className="selchip" href="/library" onClick={(e) => plainClick(e, () => go('/library'))}>Library</a>
+        <span className="s">›</span> <b>{branchKey}</b>
+      </div>
+      <div className={emptyCls()}>
+        no branch is called “{branchKey}”. <a href="/library" onClick={(e) => plainClick(e, () => go('/library'))}>see every branch</a>
+      </div>
+    </>
   );
 }
 
@@ -308,7 +354,10 @@ function Branches({ br, sizes, setSizes, onOpen }: { br: BrowseData; sizes: Set<
           const sz = (b.sizes || []).map(sizeName).join(', ') || 'no size has read it yet';
           const worked = !sizes.size || (b.sizes || []).some((p) => sizes.has(p));
           return (
-            <button key={b.key} type="button" className={`bbranch${worked ? '' : ' none'}`} data-branch={b.key} onClick={() => onOpen(b.key)}>
+            <a
+              key={b.key} className={`bbranch${worked ? '' : ' none'}`} href={libraryBranchHref(b.key)} data-branch={b.key}
+              onClick={(e) => plainClick(e, () => onOpen(b.key))}
+            >
               <span className="bbname">{b.name}</span>
               <span className="bbpurpose">{b.purpose}</span>
               <span className="bbnum"><b>{vars.length}</b> variation{vars.length === 1 ? '' : 's'} · <b>{t.n.toLocaleString()}</b> books · {big(t.w)} words</span>
@@ -317,7 +366,7 @@ function Branches({ br, sizes, setSizes, onOpen }: { br: BrowseData; sizes: Set<
                 {vars.slice(0, 6).map((v) => <span key={v.key} className="selchip">{v.name}</span>)}{' '}
                 {vars.length > 6 ? <span className="s">+{vars.length - 6} more</span> : null}
               </span>
-            </button>
+            </a>
           );
         })}
       </div>
@@ -425,7 +474,7 @@ function BranchView({ br, branch, vars, sizes, f, setVars, setF, onBack }: {
   return (
     <>
       <div className="bcrumb">
-        <button type="button" className="selchip" onClick={onBack}>Library</button> <span className="s">›</span> <b>{branch.name}</b>
+        <a className="selchip" href="/library" onClick={(e) => plainClick(e, onBack)}>Library</a> <span className="s">›</span> <b>{branch.name}</b>
       </div>
       <p className="foaim">{branch.purpose}</p>
       <div className="k">Variations <span className="s">pick one or more to look at just those; none picked is all of them together{sizes.size ? `; dimmed: not read at ${[...sizes].map(sizeName).join(' or ')}` : ''}</span></div>

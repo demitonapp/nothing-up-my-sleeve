@@ -106,26 +106,70 @@ def load(run_name: str, step: int | None = None):
 DECODING = {"top_k": 40, "top_p": 0.9, "repetition_penalty": 1.15}
 
 
-def prompt_for(spec: dict, question: str) -> tuple[str, str]:
+def prompt_for(spec: dict, question: str, history: list[tuple[str, str]] | None = None) -> tuple[str, str]:
     """The question wrapped the way the voyage was taught: the v0.1.4 marks where it read them, else
-    plain prose. Returns (prompt, format)."""
+    plain prose. With `history` (the conversation's earlier exchanges, oldest first) the question is asked
+    after them, each exchange written as the voyage's turns were (12 November: the conversation leg reads
+    whole conversations, and a ship asked its last line alone has lost what the line answers). Returns
+    (prompt, format)."""
     q = question.strip()
-    # a return leg (11 November) says which turn format it was taught: ask it exactly as its turns were written
     from thorp import cleaning, turns
 
+    exchanges = [(a.strip(), b.strip()) for a, b in history or []]
+    # a return leg (11 November) says which turn format it was taught: ask it exactly as its turns were written
     fmt = turns.format_of(spec)
     if fmt:
-        return turns.prompt(fmt, q, cleaning.version_of(spec)), fmt
+        return turns.conversation(fmt, exchanges, q, cleaning.version_of(spec)), fmt
     recipe = str((spec.get("data") or {}).get("recipe") or "")
-    if "ogden-v0.1.4" in recipe or "chat" in recipe.lower() or "dialogue" in recipe.lower():
-        return f"<question>{q}<answer>", "marks"
-    return f"Question: {q}\nAnswer:", "plain"
+    fmt = "marks" if "ogden-v0.1.4" in recipe or "chat" in recipe.lower() or "dialogue" in recipe.lower() else "plain"
+    return turns.conversation(fmt, exchanges, q, "raw"), fmt
+
+
+def exchanges_of(history: list | None) -> list[tuple[str, str]]:
+    """A saved thread's messages as exchanges, oldest first: each question with the answer that followed it. A
+    question left unanswered (a failed or stopped ask) is not an exchange and is left out, and so is an answer
+    with no question before it; the roles are the console's (`you`, `thorp`) or a chat API's (`user`,
+    `assistant`), the words in `text` or `content`."""
+    out: list[tuple[str, str]] = []
+    asked = None
+    for h in history or []:
+        role = str((h or {}).get("role") or "")
+        text = str((h or {}).get("text") or (h or {}).get("content") or "").strip()
+        if role in ("you", "user"):
+            asked = text or None
+        elif role in ("thorp", "assistant"):
+            if asked and text:
+                out.append((asked, text))
+            asked = None
+    return out
+
+
+def fit_exchanges(spec: dict, tok, question: str, exchanges: list[tuple[str, str]], context: int,
+                  budget: int) -> tuple[str, str, int]:
+    """The prompt with the oldest exchanges dropped, whole, until it and `budget` pieces of answer fit the
+    window. The writer keeps only the last `context` pieces, so an overlong prompt would otherwise lose its
+    opening mid-turn. Returns (prompt, format, exchanges dropped); the question itself is always kept."""
+    dropped = 0
+    while True:
+        prompt, fmt = prompt_for(spec, question, exchanges[dropped:])
+        if dropped >= len(exchanges) or len(tok.encode(prompt)) + budget <= context:
+            return prompt, fmt, dropped
+        dropped += 1
+
+
+# the answer's room when a conversation is fitted to the window: a Thorp ship's replies are a sentence or two,
+# and the console asks for a share of the window that would leave no room for the thread at all
+ANSWER_ROOM = 160
 
 
 def _ask(
-    model, tok, spec: dict, question: str, temperature: float, tokens: int, seed: int
-) -> tuple[str, str, str]:
-    prompt, fmt = prompt_for(spec, question)
+    model, tok, spec: dict, question: str, temperature: float, tokens: int, seed: int,
+    exchanges: list[tuple[str, str]] | None = None,
+) -> tuple[str, str, str, int]:
+    """(answer, prompt, format, exchanges dropped to fit the window)."""
+    prompt, fmt, dropped = fit_exchanges(
+        spec, tok, question, exchanges or [], int(spec["model"]["context"]), min(tokens, ANSWER_ROOM)
+    )
     key = seed if ops.is_torch(model) else _mx_key(seed)
     # a marked ship ends its own turn: stop at <end> when it is one piece, rather than write on and cut the text
     end = tok.encode("<end>") if fmt == "marks" else []
@@ -139,7 +183,7 @@ def _ask(
     else:
         for end in ("\nQuestion:", "\nQ:", "\nq:", "<question>"):
             out = out.split(end)[0]
-    return out.strip(), prompt, fmt
+    return out.strip(), prompt, fmt, dropped
 
 
 def _mx_key(seed: int):
@@ -506,12 +550,16 @@ def answer(
     step: int | None = None,
     with_audit: bool = True,
     thinking: bool | None = None,
+    history: list | None = None,
 ) -> dict:
-    """One answer from the run's latest checkpoint (or `step`), with the heads and cards audit."""
+    """One answer from the run's latest checkpoint (or `step`), with the heads and cards audit. `history` is
+    the thread so far (the console's messages): its exchanges are written before the question as the voyage's
+    turns were, the oldest dropped whole when they no longer fit the window."""
+    exchanges = exchanges_of(history)
     with _LOCK:
         model, tok, spec, ckpt = load(run_name, step)
         started = time.perf_counter()
-        text, prompt, fmt = _ask(model, tok, spec, question, temperature, tokens, seed)
+        text, prompt, fmt, dropped = _ask(model, tok, spec, question, temperature, tokens, seed, exchanges)
         seconds = time.perf_counter() - started
         prompt_tokens = _own_tokens(tok, prompt)
         answer_tokens = _own_tokens(tok, text)
@@ -528,6 +576,8 @@ def answer(
                 "prompt_tokens": prompt_tokens,
                 "answer_tokens": answer_tokens,
                 "reasoning_tokens": 0,
+                "exchanges": len(exchanges) - dropped,
+                "exchanges_dropped": dropped,
                 "seconds": round(seconds, 2),
                 "tok_s": round(answer_tokens / seconds, 1) if seconds > 0 else None,
                 "finish": "length" if answer_tokens >= tokens else "stop",
@@ -623,6 +673,11 @@ def _quant(model_id: str) -> str:
 def _own_tokens(tok, text: str) -> int:
     try:
         return len(tok.encode(text, add_special_tokens=False))
+    except TypeError:  # our own tokeniser takes no such switch and adds nothing: every Thorp answer counted 0
+        try:
+            return len(tok.encode(text))
+        except Exception:  # noqa: BLE001
+            return 0
     except Exception:  # noqa: BLE001  a tokeniser that cannot count must not fail an answer
         return 0
 

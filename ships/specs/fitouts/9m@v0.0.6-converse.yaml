@@ -9,8 +9,8 @@
 # twenty held out whole, the talk corpus's own books: lists/conversation-heldout-v1.jsonl).
 # Read every 100 steps, a checkpoint every 50 and all kept, as the talk leg was. The same learning rate, 0.0003:
 # the talk pair read it against 0.001 and it kept the language at no cost to the replies.
-# The console does not yet send a conversation's history (backend/thorp/chat.py asks each question alone), so
-# until that is wired this ship can be read on conversations and talked to only one exchange at a time.
+# The console sends the thread's history (12 November), written as these turns, so the ship can be talked to
+# as it was taught: whole conversations, the oldest exchanges dropped when the window is full.
 name: 9m@v0.0.6-converse
 ship: 'SOP v0.0.6 at 9m (the conversation leg: two voices taking turns)'
 experiment: 'The conversation leg (Kipling): does a 9m that has read whole conversations use what it was asked

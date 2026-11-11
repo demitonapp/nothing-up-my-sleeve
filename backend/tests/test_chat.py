@@ -120,3 +120,58 @@ def test_the_thinking_is_closed_at_its_cap_only_when_it_is_still_open():
     # it closed its own thinking before the cap, or never thought: nothing is forced
     assert run([1, 5, 2, 5, 5, 5]) == ([None] * 6, False)
     assert run([5, 5, 5, 5, 5, 5]) == ([None] * 6, False)
+
+
+# ---------------------------------------------------------------- a Thorp ship asked mid-conversation (12 November)
+
+MARKED = {"data": {"recipe": "lists/conversations-marked-v1.csv", "clean": "marks-v1", "turns": "marks"},
+          "model": {"context": 1024}}  # fmt: skip
+
+
+def test_a_thread_becomes_its_exchanges():
+    thread = [
+        {"role": "you", "text": "Is the water cold?"}, {"role": "thorp", "text": "It is."},
+        {"role": "you", "text": "Why?"},  # asked, and never answered (a failed or stopped ask)
+        {"role": "user", "content": " Will you go in? "}, {"role": "assistant", "content": "Not I."},
+        {"role": "thorp", "text": "An answer to nothing."},
+        {"role": "you", "text": ""}, {"role": "thorp", "text": "Nor to an empty line."},
+    ]
+    assert chat.exchanges_of(thread) == [("Is the water cold?", "It is."), ("Will you go in?", "Not I.")]
+    assert chat.exchanges_of(None) == []
+
+
+def test_a_conversation_is_asked_as_the_voyage_read_it():
+    from thorp import turns
+
+    history = [("Is the water cold?", "It is."), ("Will you go in?", "Not I.")]
+    prompt, fmt = chat.prompt_for(MARKED, " Then who will? ", history)
+    assert fmt == "marks"
+    assert prompt == turns.conversation("marks", history, "Then who will?", "marks-v1")
+    assert prompt == "<bos>\n<question>Is the water cold?<answer>It is.<end>\n<question>Will you go in?<answer>Not I.<end>\n<question>Then who will?<answer>"
+    # with no history it is the question alone, as before
+    assert chat.prompt_for(MARKED, "Then who will?", []) == chat.prompt_for(MARKED, "Then who will?")
+    # a ship taught no turns keeps its old prose, the history written the same way
+    plain, fmt = chat.prompt_for({"data": {"recipe": "lists/ogden-v0.1.csv"}}, "And now?", [("Is it late?", "It is.")])
+    assert fmt == "plain" and plain == "Question: Is it late?\nAnswer: It is.\nQuestion: And now?\nAnswer:"
+
+
+class _Tok:
+    def encode(self, text):
+        return list(text)  # a piece a character
+
+
+def test_the_oldest_exchanges_are_dropped_whole_to_fit_the_window():
+    history = [(f"Question number {i}?", f"Answer number {i}.") for i in range(10)]
+    whole, _ = chat.prompt_for(MARKED, "Last?", history)
+    prompt, _, dropped = chat.fit_exchanges(MARKED, _Tok(), "Last?", history, context=len(whole) + 40, budget=100)
+    assert 0 < dropped < 10 and len(prompt) + 100 <= len(whole) + 40
+    assert prompt == chat.prompt_for(MARKED, "Last?", history[dropped:])[0]  # whole exchanges, the newest kept
+    assert prompt.startswith("<bos>\n<question>Question number") and prompt.endswith("<question>Last?<answer>")
+    # the question is kept even when nothing else fits; a thread that fits is sent whole
+    assert chat.fit_exchanges(MARKED, _Tok(), "Last?", history, context=5, budget=100)[2] == 10
+    assert chat.fit_exchanges(MARKED, _Tok(), "Last?", history, context=10_000, budget=100)[2] == 0
+
+
+def test_our_tokeniser_counts_an_answer():
+    # encode() takes no add_special_tokens: every Thorp answer used to be counted as 0 pieces
+    assert chat._own_tokens(_Tok(), "four") == 4

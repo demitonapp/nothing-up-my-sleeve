@@ -5659,6 +5659,7 @@ def _chat_own_answer(run: str, text: str, q: dict) -> dict:
         temperature=temperature,
         step=int(step) if step not in (None, "", 0, "0") else None,
         with_audit=str(q.get("audit", "1")) not in ("0", "false", "no"),
+        history=q.get("history") or [],  # the thread so far, asked as the voyage's turns (12 November)
     )
 
 

@@ -503,9 +503,12 @@ ${m.reasoning}` : ''))
     setBusy(true);
     setNote('');
     try {
+      // the thread so far goes to every ship: a foreign one renders it in its own template, a Thorp ship has
+      // it written as the turns its voyage read (thorp.chat.prompt_for), the oldest dropped when it no longer fits
+      const history = (historyArg ?? msgsRef.current.slice(0, -1)).map((h) => ({ role: h.role === 'you' ? 'user' : 'assistant', text: h.text }));
       const body = selected.kind === 'foreign'
-        ? { model: selected.model, q, tokens: maxTokens, temperature: 0.7, thinking: thinkingMode, history: (historyArg ?? msgsRef.current.slice(0, -1)).map((h) => ({ role: h.role === 'you' ? 'user' : 'assistant', text: h.text })) }
-        : { run: selected.run!.run, q, tokens: maxTokens, temperature: 0.7, thinking: thinkingMode };
+        ? { model: selected.model, q, tokens: maxTokens, temperature: 0.7, thinking: thinkingMode, history }
+        : { run: selected.run!.run, q, tokens: maxTokens, temperature: 0.7, thinking: thinkingMode, history };
       const d = await postJSON<ChatReply>('/api/chat', body);
       if (d.error) setNote(String(d.error));
       else {

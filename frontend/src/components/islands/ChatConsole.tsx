@@ -373,7 +373,7 @@ export default function ChatConsole() {
         .map((s) => ({ role: s.role === 'you' ? 'user' : 'assistant', text: s.text }));
       const body = chosen.kind === 'foreign'
         ? { model: chosen.model, q, tokens, temperature: 0.7, thinking: think ? 'on' : 'off', think_tokens: thinkCap, history }
-        : { run: chosen.run?.run, q, tokens, temperature: 0.7, ...(step ? { step } : {}) };
+        : { run: chosen.run?.run, q, tokens, temperature: 0.7, history, ...(step ? { step } : {}) };
       setLastReq(body);
       // the answer comes a line an event (/api/chat/stream): shown as it is written, and stoppable
       const ctl = new AbortController();

@@ -61,8 +61,9 @@ export const ART_CARDS = new Set(['previous_word', 'nevermore', 'mover', 'compar
 // takes the query string so a regeneration is seen on the next load. Bump it when the art is regenerated
 // (python -m thorp.dash.art.generate_art), and every plate is fetched again once.
 export const ART_V = '2026-11-11-theme';
+export const artSrc = (key: string): string => `/art/${encodeURIComponent(key)}.png?v=${ART_V}`;
 export const artImg = (key: string | null | undefined, cls = 'cardart'): string =>
-  key ? `<img class="${cls}" src="/art/${encodeURIComponent(key)}.png?v=${ART_V}" alt="" loading="lazy" onerror="this.remove()">` : '';
+  key ? `<img class="${cls}" src="${artSrc(key)}" alt="" loading="lazy" onerror="this.remove()">` : '';
 export const cardArt = (key: string): string => (ART_CARDS.has(key) ? artImg(key, 'cardart face') : '');
 export const flagImg = (flag: string | null | undefined, name?: string, cls = 'flag'): string => {
   if (!flag) return '';

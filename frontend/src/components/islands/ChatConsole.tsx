@@ -32,7 +32,7 @@ interface Model {
     thinking?: { mode: 'toggle' | 'auto' | 'none'; default: boolean; why?: string } | null;
   } | null;
 }
-interface Meta { prompt_tokens?: number; answer_tokens?: number; reasoning_tokens?: number; finish?: string; seconds?: number; tok_s?: number; settings?: any }
+interface Meta { prompt_tokens?: number; answer_tokens?: number; reasoning_tokens?: number; cached_tokens?: number; cache_pct?: number; dropped_turns?: number; finish?: string; seconds?: number; tok_s?: number; settings?: any }
 interface Say { role: 'you' | 'thorp'; text: string; model?: string; meta?: Meta; thinking?: string }
 interface DbNote { id: number; note: string; model_label?: string; thinking?: string; session_id?: string; created_at?: string }
 interface QRow { id: number; folder: string; question: string; model?: string | null; created_at?: string }
@@ -319,11 +319,14 @@ export default function ChatConsole() {
     setSays(nextUser);
     persist(nextUser);
     try {
-      // the thread so far, so a follow-up ("Ok so can you…") sees what it follows; the last eight turns
-    const history = said.current
-      .filter((s) => s.text)
-      .slice(-8)
-      .map((s) => ({ role: s.role === 'you' ? 'user' : 'assistant', text: s.text }));
+      // the thread so far, so a follow-up ("Ok so can you…") sees what it follows. The whole thread: the
+      // server drops the oldest turns only when it no longer fits the window, so the prompt keeps the same
+      // opening turn to turn and the model's KV cache can reuse it (a sliding window would miss every time).
+      // The question just asked is `q`, not history.
+      const history = said.current
+        .slice(0, -1)
+        .filter((s) => s.text)
+        .map((s) => ({ role: s.role === 'you' ? 'user' : 'assistant', text: s.text }));
     const body = chosen.kind === 'foreign'
         ? { model: chosen.model, q, tokens, temperature: 0.7, thinking: think ? 'on' : 'off', history }
         : { run: chosen.run?.run, q, tokens, temperature: 0.7, thinking: think ? 'on' : 'off' };
@@ -512,6 +515,12 @@ export default function ChatConsole() {
                     <span className={s.meta.finish === 'length' ? 'warn' : 'ok'} title={s.meta.finish === 'length' ? 'stopped at the token budget, not at its own end' : 'ended on its own turn'}>{s.meta.finish === 'length' ? '⏹' : '✓'}</span>
                     <span className={s.meta.reasoning_tokens ? 'think' : 'dim'} title={s.meta.reasoning_tokens ? `${s.meta.reasoning_tokens} tokens of thinking` : 'no thinking'}>◆{s.meta.reasoning_tokens ? ` ${s.meta.reasoning_tokens}` : ''}</span>
                     <span title="prompt → answer tokens">{s.meta.prompt_tokens ?? '–'} → {s.meta.answer_tokens ?? '–'}</span>
+                    {s.meta.cache_pct != null ? (
+                      <span className={s.meta.cached_tokens ? 'ok' : 'dim'} title={`${s.meta.cached_tokens ?? 0} of the prompt's tokens read from the KV cache, not evaluated again`}>⚡ {s.meta.cache_pct}% cached</span>
+                    ) : null}
+                    {s.meta.dropped_turns ? (
+                      <span className="warn" title={`the ${s.meta.dropped_turns} oldest turns were left out so the thread fits the window`}>−{s.meta.dropped_turns} turns</span>
+                    ) : null}
                     {chosen?.facts?.context ? (
                       <span title={`${s.meta.prompt_tokens ?? 0} prompt + ${s.meta.answer_tokens ?? 0} answer + ${s.meta.reasoning_tokens ?? 0} thinking of a ${chosen.facts.context.toLocaleString()}-token window`}>{Math.round(100 * (((s.meta.prompt_tokens ?? 0) + (s.meta.answer_tokens ?? 0) + (s.meta.reasoning_tokens ?? 0)) / chosen.facts.context))}%</span>
                     ) : null}

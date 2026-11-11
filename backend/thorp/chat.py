@@ -737,6 +737,45 @@ def models(leaderboard: dict | None = None) -> list[dict]:
 _FOREIGN: dict[str, tuple] = {}
 _FOREIGN_MAX = 2
 
+# The prompt cache (11 November): each loaded foreign model keeps the KV state of its last few
+# conversations, keyed by their tokens, so a follow-up only evaluates the turns that are new rather than
+# re-reading the whole thread from the first token. One cache a model, dropped with the model's weights.
+_KV: dict[str, object] = {}
+_KV_THREADS = 4  # conversations kept a model
+_KV_BYTES = 1 << 30  # and at most 1 GiB of KV state a model
+
+
+def _kv_for(key: str):
+    from mlx_lm.models.cache import LRUPromptCache
+
+    got = _KV.get(key)
+    if got is None:
+        _KV[key] = got = LRUPromptCache(max_size=_KV_THREADS, max_bytes=_KV_BYTES)
+    return got
+
+
+def _encode_prompt(tok, prompt: str) -> list[int]:
+    """The prompt's ids as mlx_lm's own stream_generate encodes a string: the BOS added unless the
+    rendered template already starts with it, so a cached prefix matches what generation would read."""
+    bos = getattr(tok, "bos_token", None)
+    return list(tok.encode(prompt, add_special_tokens=bos is None or not prompt.startswith(bos)))
+
+
+def _fit_history(msgs: list[dict], render, count, context: int | None, budget: int) -> tuple[str, int]:
+    """The rendered prompt, with the oldest turns dropped until it and the answer budget fit the
+    model's window. Returns (prompt, turns dropped). The newest user turn is always kept."""
+    dropped = 0
+    prompt = render(msgs)
+    if not context:
+        return prompt, 0
+    while len(msgs) > 1 and count(prompt) + budget > context:
+        # drop a whole exchange (user and its answer) so the thread still alternates
+        cut = 2 if len(msgs) > 2 and msgs[1]["role"] == "assistant" else 1
+        msgs = msgs[cut:]
+        dropped += cut
+        prompt = render(msgs)
+    return prompt, dropped
+
 
 def _cached(model_id: str) -> bool:
     """Whether the outside model's config is in the Hugging Face cache (its weights are, beside it)."""
@@ -800,7 +839,8 @@ def foreign_answer(
     m = foreign.get_any(key)
     if m is None:
         raise LookupError(f"no foreign ship {key!r}")
-    from mlx_lm import generate, load
+    from mlx_lm import load, stream_generate
+    from mlx_lm.models.cache import can_trim_prompt_cache, make_prompt_cache, trim_prompt_cache
     from mlx_lm.sample_utils import make_sampler
 
     with _LOCK:
@@ -809,7 +849,9 @@ def foreign_answer(
             model, tok = load(m["model"])
             _FOREIGN[key] = hit = (model, tok)
             while len(_FOREIGN) > _FOREIGN_MAX:
-                _FOREIGN.pop(next(iter(_FOREIGN)))
+                gone = next(iter(_FOREIGN))
+                _FOREIGN.pop(gone)
+                _KV.pop(gone, None)  # its KV state is no use without its weights
         model, tok = hit
     support = thinking_support(m["model"])
     state, kwargs = "none", {}
@@ -828,21 +870,44 @@ def foreign_answer(
         if text and role in ("you", "user", "thorp", "assistant"):
             msgs.append({"role": "user" if role in ("you", "user") else "assistant", "content": text})
     msgs.append({"role": "user", "content": question})
-    prompt = question
     try:  # an instruct model's own template; a base model continues the raw prompt
-        prompt = tok.apply_chat_template(msgs, add_generation_prompt=True, tokenize=False, **kwargs)
+        tok.apply_chat_template(msgs[-1:], add_generation_prompt=True, tokenize=False, **kwargs)
+        render = lambda ms: tok.apply_chat_template(ms, add_generation_prompt=True, tokenize=False, **kwargs)  # noqa: E731
     except TypeError:  # a template that takes no thinking switch: ask it the old way
-        prompt = tok.apply_chat_template(msgs, add_generation_prompt=True, tokenize=False)
+        render = lambda ms: tok.apply_chat_template(ms, add_generation_prompt=True, tokenize=False)  # noqa: E731
         state = "auto" if support["mode"] != "none" else "none"
     except Exception:  # noqa: BLE001  no template: the raw prompt
-        prompt = question
+        render = lambda ms: question  # noqa: E731
         state = "none"
-    started = time.perf_counter()
-    text = generate(
-        model, tok, prompt=prompt, max_tokens=tokens, sampler=make_sampler(temp=temperature), verbose=False
-    )
-    seconds = time.perf_counter() - started
-    answer = text[len(prompt) :] if isinstance(text, str) and text.startswith(prompt) else text
+    # the whole thread comes in; the oldest turns go only when the thread no longer fits the window
+    prompt, dropped = _fit_history(msgs, render, lambda p: len(_encode_prompt(tok, p)), _context(m["model"]), tokens)
+    ids = _encode_prompt(tok, prompt)
+    with _LOCK:  # one generation at a time: the KV cache, like the GPU, is shared
+        kv = _kv_for(key)
+        cache, rest = kv.fetch_nearest_cache(key, ids)
+        if cache is None:
+            cache, rest = make_prompt_cache(model), ids
+        elif not rest:
+            # the very same prompt again: re-read its last token so there are logits to sample from
+            if can_trim_prompt_cache(cache):
+                trim_prompt_cache(cache, 1)
+                rest = ids[-1:]
+            else:
+                cache, rest = make_prompt_cache(model), ids
+        cached_tokens = len(ids) - len(rest)
+        seen = list(ids)
+        pieces: list[str] = []
+        finish = None
+        started = time.perf_counter()
+        for r in stream_generate(
+            model, tok, prompt=rest, max_tokens=tokens, sampler=make_sampler(temp=temperature), prompt_cache=cache
+        ):
+            pieces.append(r.text)
+            seen.append(int(r.token))
+            finish = r.finish_reason
+        seconds = time.perf_counter() - started
+        kv.insert_cache(key, seen, cache)
+    answer = "".join(pieces)
     # the model's own turn end, when its template has one: a finished turn stops there rather than
     # running on to the token cap (the control token is already in its embeddings)
     ended = False
@@ -872,7 +937,12 @@ def foreign_answer(
             "reasoning_tokens": reasoning_tokens,
             "seconds": round(seconds, 2),
             "tok_s": round(total_tokens / seconds, 1) if seconds > 0 else None,
-            "finish": "stop" if ended else ("length" if total_tokens >= tokens else "stop"),
+            "finish": "stop" if ended or finish == "stop" else ("length" if total_tokens >= tokens else "stop"),
             "rendered": prompt,
+            # how much of the prompt was read from the KV cache rather than evaluated again
+            "cached_tokens": cached_tokens,
+            # the same, as a share of the prompt as it was matched (its ids, BOS included)
+            "cache_pct": round(100 * cached_tokens / len(ids)) if ids else 0,
+            "dropped_turns": dropped,
         },
     }

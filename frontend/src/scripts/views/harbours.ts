@@ -4,7 +4,7 @@
 
 import { big, esc } from '../../lib/format';
 import { cardCls, crumbCls, emptyCls, pillCls } from '../../lib/ui';
-import { artImg, flagImg } from './helpers';
+import { artImg, artSrc, flagImg } from './helpers';
 import { BANDS, BAND, bandCardHtml, bandOf, sizeOf, type SizeBand } from './bands';
 
 type Payload = any;
@@ -49,6 +49,45 @@ const shipRuns = (ladder: Payload, preset: string): any[] =>
 
 const scorePlaceholder = `<span>Chaining –</span><span>Qwen 0.54</span>`;
 
+export interface HarbourView { img: string; label: string; note: string }
+
+/** The five views on the back of each harbour's card (11 November, Justin: "the cards to harbours to flip so
+ *  each harbour has 5 images showing the different aspects of the harbour"): the harbour's own plate first,
+ *  then four more from `HARBOUR_VIEWS` in backend/thorp/dash/art/generate_art.py, which makes the images. */
+export const HARBOUR_VIEWS: Record<string, HarbourView[]> = {
+  schimint: [
+    { img: 'schimint', label: 'the ring', note: 'The first Orbital rising over black water, where a young crew meets its first class.' },
+    { img: 'schimint-drill', label: 'the drill', note: 'Crews learn the plainest skills first: rope before sail, the 300k before the 21m.' },
+    { img: 'schimint-school', label: 'the chart school', note: 'Where the SOP is taught: the content, the fade, and the content by heart.' },
+    { img: 'schimint-berth', label: 'the fitting-out berth', note: 'Augustus, Plato, Francis and Diderot lie half-rigged, each with its own lantern and its own job.' },
+    { img: 'schimint-launch', label: 'the first voyage', note: 'A crew pulls away from the rim for its first run: one seed, one voyage, read at the end.' },
+  ],
+  'vavatch-end': [
+    { img: 'vavatch-end', label: 'the yards', note: 'Half-built hulls cradled along the ring: the 50m, 100m and 350m are built here.' },
+    { img: 'vavatch-end-slip', label: 'the slip', note: 'A keel as long as a street: the deepest ships are laid down on hired ground.' },
+    { img: 'vavatch-end-forge', label: 'the forge', note: 'Heat and hammers for the heavy fittings, the work too hard for the Mac mini.' },
+    { img: 'vavatch-end-launch', label: 'the launch', note: 'Down the ways at last: the one moment the whole yard stops to watch.' },
+    { img: 'vavatch-end-gate', label: 'the hiring gate', note: 'Gangs are taken on by the hour: the GPUs are hired from Vast.ai and let go when the voyage ends.' },
+  ],
+  'masaq-reach': [
+    { img: 'masaq-reach', label: 'the market', note: 'The Reach by lantern: ships of many worlds trading under one curved hull.' },
+    { img: 'masaq-reach-quay', label: 'the quay', note: 'Foreign hulls of every build lie side by side: Qwen, Gemma, Phi and the rest.' },
+    { img: 'masaq-reach-scales', label: 'the scales', note: 'Each outside ship is weighed on our decks: logic, cards and held-out books.' },
+    { img: 'masaq-reach-exchange', label: 'the exchange', note: 'Where the readings are bargained over; none of these ships is ours to build.' },
+    { img: 'masaq-reach-gauge', label: 'the gauge post', note: 'Ships are measured by size, small, medium and large, against our own fleet.' },
+  ],
+};
+
+/** The back of a harbour card: the first view large, the five as thumbnails. Images carry `data-src` and are
+ *  fetched on the first flip (`views/harbourflip.ts`), so the home page does not load fifteen plates up front. */
+const harbourBackHtml = (key: string, name: string, views: HarbourView[]): string =>
+  `<div class="${cardCls(false, 'card harbourcard hface hback')}" inert aria-label="${esc(name)}: five views">
+    <div class="hshotbox"><img class="hshot" data-src="${esc(artSrc(views[0].img))}" alt="${esc(views[0].label)}"></div>
+    <div class="hcap"><b class="hcaplabel">${esc(views[0].label)}</b><span class="hcapnote">${esc(views[0].note)}</span></div>
+    <div class="hthumbs" role="group" aria-label="${esc(name)} views">${views.map((v, i) =>
+      `<button type="button" class="hthumb${i === 0 ? ' on' : ''}" data-hview="${i}" aria-label="${esc(v.label)}" aria-pressed="${i === 0}"><img data-src="${esc(artSrc(v.img))}" alt=""></button>`).join('')}</div>
+    <div class="hbackfoot"><a href="/harbours/${encodeURIComponent(key)}">open ${esc(name)} →</a></div></div>`;
+
 /** The home page: one card per harbour, its sizes, its depth and how many voyages are running. */
 export function harbourCardsHtml(ladder: Payload): string {
   const hs = (ladder && ladder.harbours) || [];
@@ -64,13 +103,17 @@ export function harbourCardsHtml(ladder: Payload): string {
     const ships = x.foreign
       ? (nForeign ? `<span class="${pillCls('accent')}">${nForeign} foreign ship${nForeign === 1 ? '' : 's'}</span>` : '<span class="s">none read yet</span>')
       : rs.map((r: any) => `<span class="${pillCls('')}">${esc(r.name)} <span class="s">${esc(r.preset)}</span></span>`).join(' ');
-    return `<a class="${cardCls(true, 'card harbourcard')}" href="/harbours/${encodeURIComponent(x.key)}">${artImg(x.key, 'cardart ship')}
+    const views = HARBOUR_VIEWS[x.key];
+    const front = `<a class="${cardCls(true, views ? 'card harbourcard hface hfront' : 'card harbourcard')}" href="/harbours/${encodeURIComponent(x.key)}">${artImg(x.key, 'cardart ship')}
       <div class="top"><span class="nm">${esc(x.name)}</span><span class="preset">${esc(x.aka)}</span></div>
       <div class="job">${esc(x.about)}</div>
       <div class="hships">${ships}</div>
       <div class="foot"><span>${esc(x.where)}</span><span class="${pillCls(x.foreign ? '' : live ? ' live' : '')}">${x.foreign ? 'read-only' : live ? live + ' running' : 'at rest'}</span></div>
       <div class="foot"><span>${x.foreign ? 'foreign ships only' : 'depth ' + (x.depth ? 'to ' + big(x.depth) + ' parameters' : 'no bottom')}</span><span>${x.foreign ? `${nForeign} foreign ship${nForeign === 1 ? '' : 's'}` : `${rs.length} ship${rs.length === 1 ? '' : 's'}`}</span></div>
       <div class="foot"><span>${x.foreign ? 'not ours to build' : `${done} finished voyage${done === 1 ? '' : 's'}`}</span><span></span></div></a>`;
+    if (!views) return front;
+    return `<div class="hflip" data-harbour="${esc(x.key)}"><div class="hflip-inner">${front}${harbourBackHtml(x.key, x.name, views)}</div>`
+      + `<button type="button" class="hflipbtn" data-hflip aria-pressed="false" aria-label="Flip ${esc(x.name)} to see five views"><span class="hflipicon" aria-hidden="true">⟲</span><span class="hfliptext">5 views</span></button></div>`;
   }).join('');
 }
 

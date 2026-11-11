@@ -71,6 +71,7 @@ interface Msg {
 interface ChatMeta {
   settings?: { temperature?: number; max_tokens?: number; thinking?: string };
   prompt_tokens?: number; answer_tokens?: number; reasoning_tokens?: number;
+  cached_tokens?: number; cache_pct?: number; dropped_turns?: number;
   seconds?: number; tok_s?: number; finish?: string; rendered?: string;
 }
 interface ChatReply { run?: string; model?: string; step: string; prompt: string; format: string; answer: string; reasoning?: string; thinking?: string; meta?: ChatMeta; audit?: Audit; error?: string }
@@ -492,7 +493,7 @@ ${m.reasoning}` : ''))
     setNote('');
     try {
       const body = selected.kind === 'foreign'
-        ? { model: selected.model, q, tokens: maxTokens, temperature: 0.7, thinking: thinkingMode, history: (historyArg ?? msgsRef.current).map((h) => ({ role: h.role === 'you' ? 'user' : 'assistant', text: h.text })) }
+        ? { model: selected.model, q, tokens: maxTokens, temperature: 0.7, thinking: thinkingMode, history: (historyArg ?? msgsRef.current.slice(0, -1)).map((h) => ({ role: h.role === 'you' ? 'user' : 'assistant', text: h.text })) }
         : { run: selected.run!.run, q, tokens: maxTokens, temperature: 0.7, thinking: thinkingMode };
       const d = await postJSON<ChatReply>('/api/chat', body);
       if (d.error) setNote(String(d.error));
@@ -727,6 +728,8 @@ ${m.reasoning}` : ''))
                     <div className="note chatmeta">
                       {m.meta.prompt_tokens ?? '–'} prompt → {m.meta.answer_tokens ?? '–'} answer
                       {m.meta.reasoning_tokens ? ` + ${m.meta.reasoning_tokens} reasoning` : ''}
+                      {m.meta.cache_pct != null ? ` · ${m.meta.cache_pct}% cached (${m.meta.cached_tokens ?? 0} prompt tokens from the KV cache)` : ''}
+                      {m.meta.dropped_turns ? <> · <span className="accent">{m.meta.dropped_turns} oldest turns left out to fit the window</span></> : ''}
                       {m.meta.seconds != null ? ` · ${m.meta.seconds}s` : ''}
                       {m.meta.tok_s != null ? ` · ${m.meta.tok_s} tok/s` : ''}
                       {' · '}{m.meta.finish === 'length' ? <span className="accent">stopped at length</span> : 'stopped at the end'}

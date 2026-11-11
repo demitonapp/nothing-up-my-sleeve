@@ -7,6 +7,7 @@ import { crumbCls, emptyCls } from '@/lib/ui';
 import { sectionProps, useApi, useRoute } from '@/lib/useApi';
 import SectionNav from '../SectionNav';
 import { candidateCardsHtml, classScoreHtml, harbourAbout, harbourCardsHtml, harbourKey, harbourRoute, harbourShipsHtml, harbourTitle, isOldHarbour, shipyardCardsHtml } from '@/scripts/views/harbours';
+import { applyHarbourFlips, wireHarbourFlip } from '@/scripts/views/harbourflip';
 import { BAND } from '@/scripts/views/bands';
 import { mountShipbuilder } from '@/scripts/views/shipbuilder';
 
@@ -28,6 +29,9 @@ export default function Harbours() {
   const scoreAsked = useRef<Record<string, number>>({});
   const candCache = useRef<any[] | null>(null);
   const builderFor = useRef<string | null>(null);
+
+  // on the document, not the cards' container: the island drops its markup off the harbours' addresses
+  useEffect(() => wireHarbourFlip(document.documentElement), []);
 
   useEffect(() => {
     const read = (): void => setPath(location.hash && location.hash.startsWith('#/') ? location.hash.slice(1) : location.pathname);
@@ -92,7 +96,9 @@ export default function Harbours() {
       return;
     }
     if (!harbour) {
+      // the poll rewrites the cards, so a turned card is painted back from the kept flip state
       cards.innerHTML = harbourCardsHtml(data);
+      applyHarbourFlips(cards);
     } else if (!h) {
       cards.innerHTML = `<div class="${emptyCls()}">no harbour called ${harbour}</div>`;
     } else {

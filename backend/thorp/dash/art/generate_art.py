@@ -125,6 +125,50 @@ HARBOURS: dict[str, str] = {
     "reflected in black water",
 }
 
+# The harbour cards flip (11 November, Justin: "the cards to harbours to flip so each harbour has 5 images
+# showing the different aspects of the harbour based upon our image style, themes and world"). Each Orbital
+# has its own plate above as the first view and four more here, named <harbour>-<view>: what is done there,
+# who does it, and the Culture's trace in the sky. The frontend lists the five in HARBOUR_VIEWS
+# (frontend/src/scripts/views/harbours.ts); a view is added there and here together.
+HARBOUR_VIEWS: dict[str, str] = {
+    "schimint-drill": "cadets drilling on the inner deck of a great Orbital at night: a row of young sailors "
+    "in sea-cloaks splicing rope and hauling on a practice rigging set up on the ring's curved floor, a stern "
+    "master holding a lantern and a knotted cord, the lit bands of the ring curving up overhead",
+    "schimint-school": "a long lamplit chart school inside an Orbital at night: apprentices on benches bent "
+    "over charts with dividers and parallel rules, a master pointing with a rod at a great slate of sums and "
+    "star lines, a small silver drone perched on a hanging lamp, hard shadows from one lamp",
+    "schimint-berth": "a fitting-out berth at night: four small wooden hulls on cradles, half-rigged, a "
+    "different coloured lantern hung at each bow, riggers up in the masts, a foreman with a ledger counting "
+    "the hulls, the curved inner wall of the ring beyond",
+    "schimint-launch": "a ship's boat of a first crew pulling away from the rim of an Orbital at night: young "
+    "sailors at the oars, a lantern in the stern, instructors watching from a stone stair on the rim, the "
+    "vast ring curving overhead, black water ahead",
+    "vavatch-end-slip": "an immense keel being laid on a great slipway at an Orbital's construction yard at "
+    "night: hundreds of tiny shipwrights on scaffolding along a keel as long as a street, torches and "
+    "lanterns, adzes and mallets, the dark curve of the ring rising above",
+    "vavatch-end-forge": "a great shipyard forge at night: a smith in silhouette hammering a glowing brass "
+    "fitting on an anvil, sparks flying, molten metal poured into a mould, heavy chains and ships' anchors "
+    "hung in the dark, the furnace the only light",
+    "vavatch-end-launch": "a finished wooden hull sliding down the ways into black water at night, "
+    "shipwrights along the slip with lanterns raised, spray and ropes snapping taut, the lights of the ring "
+    "reflected on the water",
+    "vavatch-end-gate": "the hiring gate of an Orbital's shipyard before dawn: a line of shipwrights and "
+    "riggers with tool-bags queuing at an iron gate lit by lanterns, a foreman with a ledger and a clerk with "
+    "brass scales taking on hired gangs, the yard's cranes beyond",
+    "masaq-reach-quay": "a long quay at a cosmopolitan Orbital at night where ships of many worlds lie "
+    "moored side by side: a captured Portuguese carrack, English galleons and one strange silver-hulled "
+    "visitor, gangplanks and lanterns, stevedores unloading chests",
+    "masaq-reach-scales": "a customs table at night where a clerk reads a foreign ship: a great brass "
+    "balance with a small model hull on one pan and weights on the other, open ledgers and a ship's plan "
+    "pinned flat, a magnifying glass, one lamp, a small silver drone watching from a shelf",
+    "masaq-reach-exchange": "a crowded merchants' exchange under a lantern-lit vault of an Orbital: traders "
+    "in cloaks and doublets bargaining across tables heaped with charts, ledgers and coin, two hands "
+    "clasped on a deal, a small silver drone hovering above the crowd",
+    "masaq-reach-gauge": "three ships lined up at anchor to be measured against a great carved brass gauge "
+    "post on the quay: a small cutter, a mid-sized brig and a towering galleon, a harbour-master with a "
+    "brass rule at the post, the ring of light overhead",
+}
+
 
 # The ship builder (9 November, Justin: "give me a fal image representing the shipbuilder and SOP"): the drafting
 # loft where the standard operating procedure is written, rather than a finished ship at sea. Landscape, for the
@@ -417,8 +461,8 @@ CONSOLE: dict[str, str] = {
     "polished smooth by hands, the edge of the ship's wheel and dark rigging just visible at the sides",
 }
 
-SIZES = {**{k: "landscape_16_9" for k in (*CLASSES, *HARBOURS, *SHIPBUILDER, *SHIPYARD, *SHIPYARD_SECTIONS, *CHARTING, *POSITIONS, *FOREIGN, *SOP_GOALS, *EXPEDITIONS, *BANDS, *LADDER, *CONSOLE)}, **{k: "portrait_4_3" for k in CARDS}, **{k: "portrait_4_3" for k in LOGIC}}
-SUBJECTS = {**CLASSES, **HARBOURS, **SHIPBUILDER, **SHIPYARD, **SHIPYARD_SECTIONS, **CHARTING, **POSITIONS, **FOREIGN, **CARDS, **LOGIC, **SOP_GOALS, **EXPEDITIONS, **BANDS, **LADDER, **CONSOLE}
+SIZES = {**{k: "landscape_16_9" for k in (*CLASSES, *HARBOURS, *HARBOUR_VIEWS, *SHIPBUILDER, *SHIPYARD, *SHIPYARD_SECTIONS, *CHARTING, *POSITIONS, *FOREIGN, *SOP_GOALS, *EXPEDITIONS, *BANDS, *LADDER, *CONSOLE)}, **{k: "portrait_4_3" for k in CARDS}, **{k: "portrait_4_3" for k in LOGIC}}
+SUBJECTS = {**CLASSES, **HARBOURS, **HARBOUR_VIEWS, **SHIPBUILDER, **SHIPYARD, **SHIPYARD_SECTIONS, **CHARTING, **POSITIONS, **FOREIGN, **CARDS, **LOGIC, **SOP_GOALS, **EXPEDITIONS, **BANDS, **LADDER, **CONSOLE}
 
 # The twenty subjects the audit found outside the brief (ships/reports/art-audit-2026-11-11.md): rewritten
 # into the three-layer world -- Risso's ink, Drake's voyages, the young Culture's universe -- keeping what

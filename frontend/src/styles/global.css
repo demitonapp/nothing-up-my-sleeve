@@ -1354,6 +1354,36 @@ button[aria-busy="true"] { cursor: progress; opacity: .7; }
 .harbourcard .nm { font-size: var(--fs-xl, 1.5rem); font-weight: 700; color: var(--accent); }
 .harbourcard .job { line-height: 1.5; color: var(--muted); }
 .hships { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* the harbour cards flip to five views (views/harbourflip.ts): front and back share one grid cell, so the card
+   is as tall as the taller face, and turn together on a Y axis */
+.hflip { position: relative; perspective: 1600px; min-width: 0; }
+.hflip-inner { display: grid; height: 100%; transform-style: preserve-3d; transition: transform .75s cubic-bezier(.3, .7, .2, 1); }
+.hflip.on .hflip-inner { transform: rotateY(180deg); }
+.hflip .hface { grid-area: 1 / 1; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+.hflip .hback { transform: rotateY(180deg); padding: 0; gap: 0; overflow: hidden; align-content: start; }
+.hflipbtn { position: absolute; top: 10px; right: 10px; z-index: 3; display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 999px; border: 1px solid rgba(227, 179, 65, .55); background: rgba(14, 17, 22, .72); backdrop-filter: blur(6px); color: var(--accent); font: inherit; font-size: var(--fs-sm); letter-spacing: .04em; cursor: pointer; transition: background .2s, border-color .2s; }
+.hflipbtn:hover, .hflipbtn:focus-visible { background: rgba(14, 17, 22, .92); border-color: var(--accent); outline: none; }
+.hflipicon { font-size: 1.1em; line-height: 1; transition: transform .75s cubic-bezier(.3, .7, .2, 1); }
+.hflip.on .hflipicon { transform: rotate(-180deg); }
+.hflip .hback { display: flex; flex-direction: column; }
+.hshotbox { flex: 1 1 auto; min-height: 190px; position: relative; background: #000; overflow: hidden; }
+.hshot { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: cover; animation: hshotin .45s ease; }
+@keyframes hshotin { from { opacity: 0; transform: scale(1.04); } to { opacity: 1; transform: none; } }
+.hcap { display: grid; gap: 3px; padding: 12px 20px 10px; min-height: 4.6em; align-content: start; }
+.hcaplabel { color: var(--accent); font-size: var(--fs-md, 1rem); letter-spacing: .02em; text-transform: lowercase; }
+.hcapnote { color: var(--muted); line-height: 1.45; font-size: var(--fs-sm); }
+.hthumbs { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; padding: 0 20px; }
+.hthumb { padding: 0; border: 1px solid var(--line); border-radius: 5px; overflow: hidden; background: #000; cursor: pointer; aspect-ratio: 16 / 9; opacity: .55; transition: opacity .2s, border-color .2s, transform .2s; }
+.hthumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.hthumb:hover { opacity: .9; }
+.hthumb.on { opacity: 1; border-color: var(--accent); transform: translateY(-2px); }
+.hthumb:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; opacity: 1; }
+.hbackfoot { padding: 12px 20px 16px; font-size: var(--fs-sm); }
+/* !important: the page's own `main a:not(.card)…` link rule out-weighs any class selector */
+.hflip .hbackfoot a { color: var(--accent) !important; text-decoration: none; }
+.hflip .hbackfoot a:hover { text-decoration: underline; }
+@media (prefers-reduced-motion: reduce) { .hflip-inner, .hflipicon { transition: none; } .hshot { animation: none; } }
 .harbourrules { border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; background: var(--raise); display: grid; gap: 8px; }
 .hrule { font-size: var(--fs-sm); }
 .hdraught { display: grid; gap: 4px; }

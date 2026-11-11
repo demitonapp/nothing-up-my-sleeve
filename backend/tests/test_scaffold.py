@@ -269,6 +269,8 @@ def test_a_probing_voyage_records_each_heads_distance(library, spec, tmp_thorp, 
     # this test is the probe's, not the gate's: the standard rule is advisory here
     monkeypatch.setitem(vsm.POLICIES, "standard", dataclasses.replace(vsm.POLICIES["standard"], enforced=False))
     spec["model"]["preset"] = "300k"  # the smallest class the registry still builds
+    for k in ("layers", "width", "heads"):  # its own six layers: the riddle sits at layer 2
+        spec["model"].pop(k, None)
     spec["optim"]["scaffold"] = {"weight": 1.0, "hold": 0.5, "fade": 1.0,
                                  "probes": [{"at": 0.2, "steps": 6}],
                                  "riddles": {"comparator": {"layer": 2, "head": 1, "items": 4, "pool": 64}},

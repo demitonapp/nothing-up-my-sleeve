@@ -40,7 +40,8 @@ def test_manifest_set_for_lists():
     assert set_for_list("lists/pool-400.csv") == "recipe"
 
 
-def test_rescore_on_a_new_list_keeps_the_old_scores(library, spec, tmp_thorp):
+def test_rescore_on_a_new_list_keeps_the_old_scores(library, spec, tmp_thorp, monkeypatch):
+    monkeypatch.setenv("THORP_LEDGER_PG", "0")  # the runs it rescores are written to its SQLite ledger
     import mlx.core as mx
 
     from tests.conftest import make_text, register_local

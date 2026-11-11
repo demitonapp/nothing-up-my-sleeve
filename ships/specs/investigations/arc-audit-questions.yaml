@@ -1,0 +1,24 @@
+# ships/specs/investigations: the knockout's seventh goal, question by question (12 November, Justin: "audit all
+# the questions on the test and then check which of the foreign ships vs our ships score and from there we can
+# determine the hardest tests"; "can't all those arc re-reads just be put on the queue").
+kind: investigation
+name: arc-audit-questions
+expedition: knockout
+ship: "Knockout: AI2 ARC question by question, nine outside models and our ships"
+question: >-
+  Which AI2 ARC questions does each reader answer, and which are hardest? The nine outside models on the board
+  (test and validation) and our ships from 300k to 50m at their last checkpoint (test), every answer kept as a
+  row in s4.arc_answers with the bet, whether it was right, the answer's rank and its share of the options.
+  Then the report, ships/reports/arc-audit-<date>.md: the questions banded by how many outside models answer
+  them, what only SmolLM2-360M answers, what none answers, by exam, with our ships beside each band. A reader
+  already whole is skipped, so a stopped run picks up where it stopped. The board's own readings are left as
+  they were. Trains nothing.
+run:
+  - -m
+  - thorp.arc_audit
+  - reread
+# about how long it takes (12 November, from the stopped run beside the Qwen reading): an outside model is one to
+# four minutes for test and validation and five are left; a ship is under a minute, the 50m a few
+estimate: 40m
+timeout: 2h
+readings: []

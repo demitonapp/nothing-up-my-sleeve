@@ -1,3 +1,4 @@
+cmd: PYTHONPATH=backend backend/.venv/bin/python -m thorp.investigate run arc-audit-questions
 cmd: PYTHONPATH=backend backend/.venv/bin/python -m thorp.investigate run deltanet-check-qwen3.8-27b
 cmd: PYTHONPATH=backend backend/.venv/bin/python -m thorp.investigate run arc-ai2-300k
 cmd: PYTHONPATH=backend backend/.venv/bin/python -m thorp.investigate run arc-ai2-1m

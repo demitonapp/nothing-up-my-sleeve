@@ -17,6 +17,7 @@ Who writes it:
   rows (reader = the run's name). It writes nothing to the ledger: no metric, eval row or artifact moves, so
   the ships' board readings stay as they were recorded.
 
+    python -m thorp.arc_audit reread                 # every reader not yet whole, then the report (queued)
     python -m thorp.arc_audit ship RUN [RUN ...]     # read our ships, rows only
     python -m thorp.arc_audit report [--part test]   # the report: ships/reports/arc-audit-<date>.md
     python -m thorp.arc_audit readers                # who has been read, and on what
@@ -154,6 +155,81 @@ def read_ship(run: str, configs=("easy", "challenge"), parts=("test",), batch: i
     return out
 
 
+# The readers the audit compares (12 November): the nine outside models on the board, and our ships from 300k to
+# 50m at their last checkpoint, two seeds where there are two. A queued investigation reads them all
+# (specs/investigations/arc-audit-questions.yaml); one that is already whole is skipped, so a stopped re-read
+# picks up where it stopped.
+OUTSIDE = (
+    "EleutherAI/pythia-14m", "EleutherAI/pythia-31m", "EleutherAI/pythia-70m", "EleutherAI/pythia-160m",
+    "EleutherAI/pythia-410m", "mlx-community/gemma-3-270m-bf16", "Qwen/Qwen3-0.6B",
+    "mlx-community/Qwen3.5-0.8B-bf16", "HuggingFaceTB/SmolLM2-360M",
+)
+SHIPS = (
+    "dba348d4d097",  # 300k@v0.0.6-control
+    "c45525729620",  # 300k@v0.0.6-control-s2
+    "30cab184a259",  # fu-ogden-v0-1@1m-pre-s1
+    "f24faf8620ad",  # fu-ogden-v0-1@1m-pre-s2
+    "7436bab9726d",  # fu-ogden-v0-1@9m-pre-s1
+    "d7ec47e4d3e9",  # fu-ogden-v0-1@9m-pre-s2
+    "136246a7ff04",  # 9m@v0.0.6
+    "cdc3da8540e3",  # fu-ogden-v0-1@21m-pre-s1
+    "55eec445a5e7",  # 21m@v0.0.5
+    "c353647dc22c",  # the first 50m (fu-ogden-v0-2~table-talk-reading@50m-pre-s1)
+)
+
+
+def whole(reader: str, part: str = "test") -> bool:
+    """Whether a reader has a row for every question of `part` (both splits)."""
+    ensure()
+    want = sum(n for (_, p), n in arc_ai2.COUNTS.items() if p == part)
+    with store.session() as s:
+        got = s.execute(
+            text("select count(*) from s4.arc_answers where reader = :r and part = :p"), {"r": reader, "p": part}
+        ).scalar()
+    return int(got or 0) >= want
+
+
+def reread(outside=OUTSIDE, ships=SHIPS, log=print) -> int:
+    """Read every reader not yet whole, then write the report. Returns the number that failed.
+
+    Outside models through scripts/score_arc_ai2.py (test and validation, questions only: the board's own
+    reading is left as it was), each in its own process so one that cannot load does not stop the rest; our
+    ships through read_ship (test). The queue gives the seat, so neither waits for a helm."""
+    import subprocess
+    import sys
+
+    from thorp.ledger import reader as ledger_reader
+
+    failed = 0
+    for m in outside:
+        if whole(m, "test") and whole(m, "validation"):
+            log(f"{m}: already whole, skipped")
+            continue
+        log(f"=== {time.strftime('%H:%M:%S')} {m}")
+        code = subprocess.call(
+            [sys.executable, str(paths.resolve("scripts/score_arc_ai2.py")), m, "--no-helm", "--no-board",
+             "--parts", "test,validation", "--batch", "32"],
+            cwd=paths.ROOT,
+        )
+        failed += code != 0
+        log(f"{m}: exit {code}")
+    for r in ships:
+        row = ledger_reader().find_run(r)
+        name = row["name"] if row else r
+        if whole(name, "test"):
+            log(f"{name}: already whole, skipped")
+            continue
+        log(f"=== {time.strftime('%H:%M:%S')} ship {name}")
+        try:
+            read_ship(r, log=log)
+        except Exception as e:  # noqa: BLE001 - one ship that cannot be read does not stop the rest
+            failed += 1
+            log(f"{name}: failed ({e!r})")
+    report("test")
+    log(f"report written; {failed} reader(s) failed")
+    return failed
+
+
 def readers(part: str = "test") -> list[dict]:
     """Every reader with rows, its kind, and its accuracy a split on `part`."""
     ensure()
@@ -282,10 +358,12 @@ def report(part: str = "test", path=None) -> str:
             band = [r for r in sub if len(r["solved_by"]) == k]
             if not band:
                 continue
-            anc = sum(1 for r in band if r["anchor"])
+            read_anchor = [r for r in band if r["anchor"] is not None]
+            anc = sum(1 for r in read_anchor if r["anchor"])
+            anc_cell = f"{anc} ({100 * anc / len(read_anchor):.0f}%)" if read_anchor else "–"
             sp = [r["ship_p"] for r in band if r["ship_p"] is not None]
             sa = [len(r["ships_right"]) / r["ships"] for r in band if r["ships"]]
-            lines.append(f"| {k} of {n_out} | {len(band)} | {anc} ({100 * anc / len(band):.0f}%) | "
+            lines.append(f"| {k} of {n_out} | {len(band)} | {anc_cell} | "
                          f"{(sum(sp) / len(sp)) if sp else float('nan'):.3f} | "
                          f"{(100 * sum(sa) / len(sa)) if sa else float('nan'):.1f}% |")
         lines.append("")
@@ -349,7 +427,10 @@ def main(argv: list[str]) -> int:
     r.add_argument("--part", default="test")
     r.add_argument("--out", default=None)
     sub.add_parser("readers").add_argument("--part", default="test")
+    sub.add_parser("reread", help="read every outside model and ship not yet whole, then write the report")
     a = ap.parse_args(argv)
+    if a.what == "reread":
+        return 1 if reread() else 0
     if a.what == "ship":
         for run in a.runs:
             read_ship(run, parts=tuple(x for x in a.parts.split(",") if x))

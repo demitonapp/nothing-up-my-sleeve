@@ -48,7 +48,7 @@ def _load(model_id: str):
 
 
 def score(model_id: str, configs: list[str], per_split: int | None, batch: int, save: bool, dtype: str = "native",
-          parts: tuple[str, ...] = ("test",)) -> dict:
+          parts: tuple[str, ...] = ("test",), board: bool = True) -> dict:
     import mlx.core as mx
     import mlx.nn as nn
 
@@ -108,9 +108,11 @@ def score(model_id: str, configs: list[str], per_split: int | None, batch: int, 
         "splits": splits,
         "questions_kept": kept,
     }
-    if save and splits:
+    if save and splits and board:
         readings.put(f"arc-ai2-{model_id}", out)
         print(f"kept as arc-ai2-{model_id} in s4.outside_readings; {kept} questions in s4.arc_answers")
+    elif save:
+        print(f"{kept} questions in s4.arc_answers; the board's reading arc-ai2-{model_id} left as it was")
     print(f"{out['seconds']:.0f}s")
     return out
 
@@ -125,17 +127,20 @@ def main() -> None:
     ap.add_argument("--no-save", action="store_true")
     ap.add_argument("--dtype", choices=["native", "float32"], default="native", help="float32 casts the weights first")
     ap.add_argument("--parts", default="test", help="test, validation, or test,validation (the board reads test only)")
+    ap.add_argument("--no-board", action="store_true",
+                    help="keep the questions only; leave the board's reading as it was (a re-read at another batch
+                    size can move the last digit in reduced precision, 12 November)")
     a = ap.parse_args()
     configs = ["easy", "challenge"] if a.config == "both" else [a.config]
     per = a.per_split or None
     parts = tuple(x for x in a.parts.split(",") if x)
     if a.no_helm:
-        score(a.model, configs, per, a.batch, not a.no_save, a.dtype, parts)
+        score(a.model, configs, per, a.batch, not a.no_save, a.dtype, parts, not a.no_board)
         return
     from thorp import vsm
 
     with vsm.at_sea(f"score {a.model} on AI2 ARC", kind="score"):
-        score(a.model, configs, per, a.batch, not a.no_save, a.dtype, parts)
+        score(a.model, configs, per, a.batch, not a.no_save, a.dtype, parts, not a.no_board)
 
 
 if __name__ == "__main__":

@@ -16,6 +16,7 @@ import os
 import re
 import socket
 import sqlite3
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
@@ -5611,23 +5612,73 @@ def api_chat(q: dict) -> dict:
     if not str(text).strip():
         return {"error": "no question", "run": run, "model": model}
     try:
-        tokens = max(1, min(int(q.get("tokens", 512)), 1024))
-        temperature = max(0.0, min(float(q.get("temperature", 0.7)), 2.0))
-        raw_thinking = q.get("thinking")
-        thinking = None if raw_thinking is None else str(raw_thinking).strip().lower() not in ("0", "false", "off", "no", "")
         if model:
-            return chat.foreign_answer(model, str(text), tokens=tokens, temperature=temperature, thinking=thinking, history=q.get("history") or [])
-        step = q.get("step")
-        return chat.answer(
-            run,
-            str(text),
-            tokens=tokens,
-            temperature=temperature,
-            step=int(step) if step not in (None, "", 0, "0") else None,
-            with_audit=str(q.get("audit", "1")) not in ("0", "false", "no"),
-        )
+            return chat.foreign_answer(model, str(text), **_chat_foreign_args(q))
+        return _chat_own_answer(run, str(text), q)
     except Exception as e:  # noqa: BLE001  the page shows the reason (no checkpoint, no run)
         return {"error": str(e), "run": run, "model": model}
+
+
+def _chat_tokens(q: dict) -> tuple[int, float]:
+    tokens = max(1, min(int(q.get("tokens", 512)), 1 << 20))  # the console sends a share of the model's window
+    return tokens, max(0.0, min(float(q.get("temperature", 0.7)), 2.0))
+
+
+def _chat_foreign_args(q: dict) -> dict:
+    """A foreign ship's settings from the request. The thinking has its own cap (`think_tokens`): not
+    sent, it is the whole budget, which thorp.chat.think_cap holds to half so an answer has room; 0
+    is no cap."""
+    tokens, temperature = _chat_tokens(q)
+    raw_thinking = q.get("thinking")
+    thinking = None if raw_thinking is None else str(raw_thinking).strip().lower() not in ("0", "false", "off", "no", "")
+    raw_cap = q.get("think_tokens")
+    think_tokens = tokens if raw_cap in (None, "") else max(0, int(raw_cap))
+    return {
+        "tokens": tokens,
+        "temperature": temperature,
+        "thinking": thinking,
+        "history": q.get("history") or [],
+        "think_tokens": think_tokens or None,
+    }
+
+
+def _chat_own_answer(run: str, text: str, q: dict) -> dict:
+    from thorp import chat
+
+    tokens, temperature = _chat_tokens(q)
+    step = q.get("step")
+    return chat.answer(
+        run,
+        text,
+        tokens=tokens,
+        temperature=temperature,
+        step=int(step) if step not in (None, "", 0, "0") else None,
+        with_audit=str(q.get("audit", "1")) not in ("0", "false", "no"),
+    )
+
+
+def api_chat_stream(q: dict):
+    """The same answer as api_chat, as it is written: a generator of events, each sent as one line of
+    JSON (POST /api/chat/stream). A foreign ship's are thorp.chat.foreign_stream's (start, delta,
+    done); a Thorp run answers whole, so its one event is `done`. A failure is an `error` event."""
+    from thorp import chat
+
+    run = str(q.get("run") or "")
+    model = str(q.get("model") or "")
+    text = q.get("q", "")
+    if not run and not model:
+        yield {"event": "error", "error": "no run or model", "run": run, "model": model}
+        return
+    if not str(text).strip():
+        yield {"event": "error", "error": "no question", "run": run, "model": model}
+        return
+    try:
+        if model:
+            yield from chat.foreign_stream(model, str(text), **_chat_foreign_args(q))
+        else:
+            yield {"event": "done", "reply": _chat_own_answer(run, str(text), q)}
+    except Exception as e:  # noqa: BLE001  the page shows the reason (no checkpoint, no run)
+        yield {"event": "error", "error": str(e), "run": run, "model": model}
 
 
 def api_ask_questions(preset: str) -> dict:
@@ -6544,6 +6595,34 @@ class Handler(BaseHTTPRequestHandler):
     def _json(self, code: int, obj) -> None:
         self._send(code, json.dumps(_finite(obj), default=str).encode(), "application/json")
 
+    def _chat_stream(self) -> None:
+        """A chat answer as it is written: one line of JSON an event, flushed as it comes, the
+        connection closed at the end (no length is known ahead). A reader that goes away stops the
+        generation: the next write fails, and closing the generator ends the sampling and frees the
+        one-at-a-time lock."""
+        try:
+            n = int(self.headers.get("Content-Length") or 0)
+            body = json.loads(self.rfile.read(min(n, 1_000_000)) or b"{}")
+        except ValueError as e:
+            return self._json(400, {"error": str(e)})
+        events = api_chat_stream(body)
+        try:
+            self.send_response(200)
+            self.send_header("Content-Type", "application/x-ndjson; charset=utf-8")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("X-Accel-Buffering", "no")
+            self.end_headers()
+            for ev in events:
+                self.wfile.write(json.dumps(_finite(ev), default=str).encode() + b"\n")
+                self.wfile.flush()
+        except (BrokenPipeError, ConnectionResetError):
+            pass  # the reader stopped it
+        finally:
+            events.close()
+            from thorp.ledger import close_reader
+
+            close_reader()
+
     def _onboard_page(self, path: str) -> None:
         """The first-run page and its two files, from thorp/onboard/web. It does not need the Astro
         build: a fresh clone must be able to run setup before it has a dashboard."""
@@ -6612,6 +6691,8 @@ class Handler(BaseHTTPRequestHandler):
         u = urlparse(self.path)
         if u.path.startswith("/api/onboard/") or u.path == "/api/store/switch":
             return self._onboard_post(u.path)
+        if u.path == "/api/chat/stream":
+            return self._chat_stream()
         posts = {
             "/api/table/reply": api_table_reply,
             "/api/library_config/preview": api_library_config_preview,

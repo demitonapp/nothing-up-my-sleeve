@@ -379,6 +379,13 @@ export default function Chat({ shipKey, modelKey, embedded = false }: { shipKey?
   // `msgs` (an effect would write the previous model's messages under the new model's key).
   const convoKey = selected ? convoKeyOf(selected) : '';
   const [threadId, setThreadId] = useState('');
+  // the thread's id as it is now, not as of the last render: a send saves twice (the question, then the
+  // answer), and the second save must find the thread the first one started rather than start another
+  // (11 November: every new chat left a one-message twin in the list)
+  const threadRef = useRef('');
+  useEffect(() => {
+    threadRef.current = threadId;
+  }, [threadId]);
   const msgsRef = useRef<Msg[]>([]);
   useEffect(() => {
     msgsRef.current = msgs;
@@ -393,7 +400,8 @@ export default function Chat({ shipKey, modelKey, embedded = false }: { shipKey?
   /** Write the messages into this model's thread, starting one on the first message of a chat. */
   const persist = (next: Msg[]): void => {
     if (!convoKey || !selected || !next.length) return;
-    const base: Thread = threadId ? (getThread(threadId) as Thread) : {
+    const id = threadRef.current;
+    const base: Thread = id && getThread(id) ? (getThread(id) as Thread) : {
       id: newId(),
       key: convoKey,
       name: selected.name,
@@ -409,7 +417,10 @@ export default function Chat({ shipKey, modelKey, embedded = false }: { shipKey?
     };
     const messages = next as unknown as StoredMessage[];
     saveThread({ ...base, title: base.title || autoTitle(messages), messages });
-    if (!threadId) setThreadId(base.id);
+    if (id !== base.id) {
+      threadRef.current = base.id;
+      setThreadId(base.id);
+    }
   };
 
   // the context meter: every turn's own reading, summed; the window is the model's own

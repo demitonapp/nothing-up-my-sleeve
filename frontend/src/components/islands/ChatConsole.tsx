@@ -32,12 +32,14 @@ interface Model {
     thinking?: { mode: 'toggle' | 'auto' | 'none'; default: boolean; why?: string } | null;
   } | null;
 }
-interface Meta { prompt_tokens?: number; answer_tokens?: number; reasoning_tokens?: number; cached_tokens?: number; cache_pct?: number; dropped_turns?: number; finish?: string; seconds?: number; tok_s?: number; settings?: any }
+interface Meta { prompt_tokens?: number; answer_tokens?: number; reasoning_tokens?: number; cached_tokens?: number; cache_pct?: number; dropped_turns?: number; finish?: string; seconds?: number; tok_s?: number; settings?: any; think_capped?: boolean }
 interface Say { role: 'you' | 'thorp'; text: string; model?: string; meta?: Meta; thinking?: string }
 interface DbNote { id: number; note: string; model_label?: string; thinking?: string; session_id?: string; created_at?: string }
 interface QRow { id: number; folder: string; question: string; model?: string | null; created_at?: string }
 interface QFolder { name: string; count: number }
 interface Reply { answer?: string; error?: string; step?: string; meta?: Meta }
+// the answer while it is being written: what has arrived of the reasoning and of the answer, and how many tokens
+interface Live { text: string; thinking: string; n: number }
 
 // the labs, as thorp/labs.py LABS and the leaderboard's MAKER: a lab first, then its model
 const LABS: [RegExp, string][] = [
@@ -123,6 +125,13 @@ export default function ChatConsole() {
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const [threadId, setThreadId] = useState('');
+  // the thread's id as it is now, not as of the last render: a send saves twice (the question, then the
+  // answer), and the second save must find the thread the first one started rather than start another
+  // (11 November: every new chat left a one-message twin in the list)
+  const threadRef = useRef('');
+  useEffect(() => {
+    threadRef.current = threadId;
+  }, [threadId]);
   const [notesOpen, setNotesOpen] = useState(false);
   const [note, setNote] = useState('');
   const [notes, setNotes] = useState<DbNote[]>([]);
@@ -135,7 +144,17 @@ export default function ChatConsole() {
   const [qRows, setQRows] = useState<QRow[]>([]);
   const [qFolders, setQFolders] = useState<QFolder[]>([]);
   const [qMsg, setQMsg] = useState('');
-  const [tokens, setTokens] = useState(512);
+  // the budget is a share of the model's context window (11 November), so it means the same thing for a
+  // 1k-window ship and a 262k-window Qwen; with no known window it falls back to a fixed 4096
+  const [budgetShare, setBudgetShare] = useState(0.1);
+  // the thinking has its own cap (11 November, Justin: "let's cap thinking separately"): the reasoning is
+  // closed there and the answer written in the rest. 0 is no cap. The server holds it to half the budget.
+  const [thinkCap, setThinkCap] = useState(1024);
+  // the answer as it arrives (11 November, Justin: "stream the tokens"), and the handle that stops it
+  const [live, setLive] = useState<Live | null>(null);
+  const stopper = useRef<AbortController | null>(null);
+  const chatBox = useRef<HTMLDivElement | null>(null);
+  const thinkBox = useRef<HTMLPreElement | null>(null);
   // the default (11 November): the same key /chat uses, so a starred model opens both
   const [defaultKey, setDefaultKey] = useState('');
   useEffect(() => {
@@ -174,6 +193,9 @@ export default function ChatConsole() {
     () => inLab.find((m) => convoKeyOf(m) === pick) || inLab[0] || null,
     [inLab, pick],
   );
+  const contextWindow = chosen?.facts?.context ?? null;
+  const tokens = contextWindow ? Math.max(1, Math.round(budgetShare * contextWindow)) : 4096;
+  const thinkCapNow = thinkCap > 0 ? Math.max(1, Math.min(thinkCap, Math.floor(tokens / 2))) : 0;
 
   // a lab is chosen before a model: the starred default if one is saved, else the first lab. The
   // default is applied once, not on every selection, so choosing another model is not overridden.
@@ -243,6 +265,8 @@ export default function ChatConsole() {
     if (questionsOpen) void loadQuestions();
   }, [questionsOpen]);
 
+  const lastAsked = useMemo(() => [...says].reverse().find((s) => s.role === 'you')?.text.trim() || '', [says]);
+
   const keepQuestion = async (): Promise<void> => {
     const q = questionDraft.trim();
     if (!q) return;
@@ -293,18 +317,30 @@ export default function ChatConsole() {
     return () => window.removeEventListener('keydown', onKey);
   }, [open]);
 
+  useEffect(() => {
+    if (!live) return;
+    const el = chatBox.current;
+    if (el && el.scrollHeight - el.scrollTop - el.clientHeight < 160) el.scrollTop = el.scrollHeight;
+    const t = thinkBox.current;
+    if (t) t.scrollTop = t.scrollHeight;
+  }, [live]);
+
   const last = [...says].reverse().find((s) => s.meta)?.meta;
   const used = says.reduce((n, s) => n + (s.meta?.prompt_tokens ?? 0) + (s.meta?.answer_tokens ?? 0) + (s.meta?.reasoning_tokens ?? 0), 0);
 
   const persist = (next: Say[]): void => {
     if (!chosen || !next.length) return;
-    const base: Thread = threadId && getThread(threadId) ? (getThread(threadId) as Thread) : {
+    const id = threadRef.current;
+    const base: Thread = id && getThread(id) ? (getThread(id) as Thread) : {
       id: newId(), key: convoKeyOf(chosen), name: chosen.name, kind: chosen.kind,
       model: chosen.model ?? null, shipKey: chosen.ship_key, href: hrefOf(chosen),
       title: '', saved: false, createdAt: Date.now(), updatedAt: Date.now(), messages: [],
     };
     saveThread({ ...base, title: base.title || autoTitle(next as never), messages: next as never });
-    if (!threadId) setThreadId(base.id);
+    if (id !== base.id) {
+      threadRef.current = base.id;
+      setThreadId(base.id);
+    }
   };
 
   const send = async (): Promise<void> => {
@@ -327,11 +363,59 @@ export default function ChatConsole() {
         .slice(0, -1)
         .filter((s) => s.text)
         .map((s) => ({ role: s.role === 'you' ? 'user' : 'assistant', text: s.text }));
-    const body = chosen.kind === 'foreign'
-        ? { model: chosen.model, q, tokens, temperature: 0.7, thinking: think ? 'on' : 'off', history }
+      const body = chosen.kind === 'foreign'
+        ? { model: chosen.model, q, tokens, temperature: 0.7, thinking: think ? 'on' : 'off', think_tokens: thinkCap, history }
         : { run: chosen.run?.run, q, tokens, temperature: 0.7, thinking: think ? 'on' : 'off' };
       setLastReq(body);
-      const d = await (await fetch('/api/chat', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })).json() as Reply;
+      // the answer comes a line an event (/api/chat/stream): shown as it is written, and stoppable
+      const ctl = new AbortController();
+      stopper.current = ctl;
+      const acc: Live = { text: '', thinking: '', n: 0 };
+      let painting = 0;
+      const paint = (): void => {
+        if (painting) return;
+        painting = window.requestAnimationFrame(() => { painting = 0; setLive({ ...acc }); });
+      };
+      setLive({ ...acc });
+      let d: Reply | null = null;
+      try {
+        const r = await fetch('/api/chat/stream', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), signal: ctl.signal });
+        if (r.status === 404) throw new Error('this dashboard has no /api/chat/stream yet: restart thorp dash');
+        if (!r.ok || !r.body) throw new Error(`the dashboard answered ${r.status}`);
+        const reader = r.body.getReader();
+        const dec = new TextDecoder();
+        let buf = '';
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buf += dec.decode(value, { stream: true });
+          for (let nl = buf.indexOf('\n'); nl >= 0; nl = buf.indexOf('\n')) {
+            const line = buf.slice(0, nl).trim();
+            buf = buf.slice(nl + 1);
+            if (!line) continue;
+            const ev = JSON.parse(line);
+            if (ev.event === 'delta') {
+              if (ev.kind === 'reasoning') acc.thinking += ev.text;
+              else acc.text += ev.text;
+              acc.n = ev.n ?? acc.n + 1;
+              paint();
+            } else if (ev.event === 'done') d = ev.reply as Reply;
+            else if (ev.event === 'error') d = { error: String(ev.error) };
+          }
+        }
+        if (!d) throw new Error('the answer ended before it was finished');
+      } catch (e) {
+        if (!ctl.signal.aborted) throw e;
+        // stopped by the reader: what had arrived is kept, and said to be unfinished
+        d = { answer: acc.text.trim(), meta: { finish: 'stopped', settings: { max_tokens: tokens } } };
+        (d as any).reasoning = acc.thinking.trim();
+        if (!acc.text.trim() && !acc.thinking.trim()) d = null;
+      } finally {
+        if (painting) window.cancelAnimationFrame(painting);
+        stopper.current = null;
+        setLive(null);
+      }
+      if (!d) return;
       if (d.error) setErr(String(d.error));
       else {
         setLastReply(d);
@@ -476,12 +560,23 @@ export default function ChatConsole() {
           </label>
           <label className="note consolepick" title="the whole completion's budget: the reasoning and the answer share it">
             budget{' '}
-            <select value={tokens} onChange={(e) => setTokens(Number(e.target.value))} aria-label="token budget">
-              <option value={256}>256</option>
-              <option value={512}>512</option>
-              <option value={1024}>1024</option>
+            <select value={budgetShare} onChange={(e) => setBudgetShare(Number(e.target.value))} aria-label="token budget" title={contextWindow ? `a share of the ${contextWindow.toLocaleString()}-token window: ${tokens.toLocaleString()} tokens` : 'this model\'s window is not known, so the budget is a fixed 4096 tokens'}>
+              {[0.1, 0.25, 0.5, 0.75].map((p) => (
+                <option key={p} value={p}>{Math.round(p * 100)}%{contextWindow ? ` · ${Math.max(1, Math.round(p * contextWindow)).toLocaleString()}` : ''}</option>
+              ))}
             </select>
           </label>
+          {thinkingAuto || (thinkingToggle && think) ? (
+            <label className="note consolepick" title={thinkCapNow ? `the reasoning is closed at ${thinkCapNow.toLocaleString()} tokens and the answer written in the rest of the budget (never more than half the budget)` : 'no cap: the reasoning and the answer share the budget as they fall'}>
+              thinking ≤{' '}
+              <select value={thinkCap} onChange={(e) => setThinkCap(Number(e.target.value))} aria-label="thinking cap">
+                {[256, 512, 1024, 2048, 4096, 8192].map((n) => (
+                  <option key={n} value={n}>{Math.min(n, Math.floor(tokens / 2)).toLocaleString()}</option>
+                ))}
+                <option value={0}>no cap</option>
+              </select>
+            </label>
+          ) : null}
           <button type="button" className="consolbtn" onClick={() => setNotesOpen((v) => !v)} aria-pressed={notesOpen}>
             Notes{notes.length ? ` (${notes.length})` : ''}
           </button>
@@ -506,7 +601,7 @@ export default function ChatConsole() {
         </div>
 
         <div className="consolebody">
-          <div className="consolechat" aria-live="polite">
+          <div className="consolechat" aria-live="polite" ref={chatBox}>
             {says.length === 0 ? (
               <p className="note">{chosen ? `Ask ${chosen.name} something. The answer is its own continuation; the console keeps the thread, and notes beside it.` : 'reading the models…'}</p>
             ) : null}
@@ -515,8 +610,8 @@ export default function ChatConsole() {
                 <b>{s.role === 'you' ? 'you' : (s.model || 'model')}:</b> {s.text}
                 {s.meta ? (
                   <span className="consolestatus">
-                    <span className={s.meta.finish === 'length' ? 'warn' : 'ok'} title={s.meta.finish === 'length' ? 'stopped at the token budget, not at its own end' : 'ended on its own turn'}>{s.meta.finish === 'length' ? '⏹' : '✓'}</span>
-                    <span className={s.meta.reasoning_tokens ? 'think' : 'dim'} title={s.meta.reasoning_tokens ? `${s.meta.reasoning_tokens} tokens of thinking` : 'no thinking'}>◆{s.meta.reasoning_tokens ? ` ${s.meta.reasoning_tokens}` : ''}</span>
+                    <span className={s.meta.finish === 'length' ? 'warn' : s.meta.finish === 'stopped' ? 'dim' : 'ok'} title={s.meta.finish === 'length' ? 'stopped at the token budget, not at its own end' : s.meta.finish === 'stopped' ? 'stopped by you: what had arrived is kept' : 'ended on its own turn'}>{s.meta.finish === 'length' ? '⏹' : s.meta.finish === 'stopped' ? '◼ stopped' : '✓'}</span>
+                    <span className={s.meta.reasoning_tokens ? 'think' : 'dim'} title={s.meta.reasoning_tokens ? `${s.meta.reasoning_tokens} tokens of thinking${s.meta.think_capped ? ': closed at its cap, not by the model' : ''}` : 'no thinking'}>◆{s.meta.reasoning_tokens ? ` ${s.meta.reasoning_tokens}` : ''}{s.meta.think_capped ? ' capped' : ''}</span>
                     <span title="prompt → answer tokens">{s.meta.prompt_tokens ?? '–'} → {s.meta.answer_tokens ?? '–'}</span>
                     {s.meta.cache_pct != null ? (
                       <span className={s.meta.cached_tokens ? 'ok' : 'dim'} title={`${s.meta.cached_tokens ?? 0} of the prompt's tokens read from the KV cache, not evaluated again`}>⚡ {s.meta.cache_pct}% cached</span>
@@ -528,18 +623,29 @@ export default function ChatConsole() {
                       <span title={`${s.meta.prompt_tokens ?? 0} prompt + ${s.meta.answer_tokens ?? 0} answer + ${s.meta.reasoning_tokens ?? 0} thinking of a ${chosen.facts.context.toLocaleString()}-token window`}>{Math.round(100 * (((s.meta.prompt_tokens ?? 0) + (s.meta.answer_tokens ?? 0) + (s.meta.reasoning_tokens ?? 0)) / chosen.facts.context))}%</span>
                     ) : null}
                     {s.meta.seconds != null ? <span title="seconds">{s.meta.seconds}s</span> : null}
-                    <span className="dim" title="the budget this answer had">{tokens} max</span>
+                    <span className="dim" title="the budget this answer had">{s.meta.settings?.max_tokens ?? tokens} max</span>
                   </span>
                 ) : null}
                 {s.role === 'thorp' && s.meta?.answer_tokens === 0 && s.meta?.finish === 'length' ? (
-                  <span className="note consoleerr"> · the whole {tokens}-token budget went to thinking, so no answer was written: raise the budget or turn thinking off</span>
+                  <span className="note consoleerr"> · the whole {s.meta.settings?.max_tokens ?? tokens}-token budget went to thinking, so no answer was written: raise the budget or turn thinking off</span>
                 ) : null}
                 {s.role === 'thorp' && s.thinking ? (
                   <details className="consoledebug"><summary>thinking ({s.meta?.reasoning_tokens ?? '–'} tokens)</summary><pre>{s.thinking}</pre></details>
                 ) : null}
               </p>
             ))}
-            {busy ? <p className="note">sampling…</p> : null}
+            {live ? (
+              <p className="consoleanswer">
+                <b>{chosen?.name || 'model'}:</b> {live.text}
+                <span className="consolestatus">
+                  <span className="think">{live.text ? 'writing' : live.thinking ? 'thinking' : 'reading the prompt'}…</span>
+                  {live.n ? <span className="dim">{live.n.toLocaleString()} tokens</span> : null}
+                </span>
+                {live.thinking ? (
+                  <details className="consoledebug" open={!live.text}><summary>thinking…</summary><pre ref={thinkBox}>{live.thinking}</pre></details>
+                ) : null}
+              </p>
+            ) : busy ? <p className="note">sampling…</p> : null}
             {err ? <p className="note consoleerr">{err}</p> : null}
           </div>
           {debug ? (
@@ -613,8 +719,14 @@ export default function ChatConsole() {
             aria-label="your question"
             disabled={!chosen}
           />
-          <button type="button" className="consolbtn" onClick={() => { setQuestionDraft(input); setQuestionsOpen(true); }} disabled={!input.trim()} title="keep this question in the library">keep ?</button>
-          <button type="submit" className="consolbtn primary" disabled={busy || !input.trim() || !chosen}>{busy ? '…' : 'send'}</button>
+          {/* an empty box keeps the last question asked: sending clears the box, so otherwise the button is dead
+              exactly when someone wants to keep what they just asked */}
+          <button type="button" className="consolbtn" onClick={() => { setQuestionDraft(input.trim() || lastAsked); setQuestionsOpen(true); }} disabled={!input.trim() && !lastAsked} title={input.trim() || !lastAsked ? 'keep this question in the library' : 'keep your last question in the library'}>keep ?</button>
+          {busy && live ? (
+            <button type="button" className="consolbtn primary" onClick={() => stopper.current?.abort()} title="stop this answer: what has arrived is kept">stop</button>
+          ) : (
+            <button type="submit" className="consolbtn primary" disabled={busy || !input.trim() || !chosen}>{busy ? '…' : 'send'}</button>
+          )}
         </form>
       </div>
     </div>

@@ -822,7 +822,150 @@ def foreign_models() -> list[dict]:
     return out
 
 
-def foreign_answer(
+# The thinking marks an outside model's template may use: (the opening mark, the closing mark).
+_THINK_MARKS = (
+    ("<think>", "</think>"),
+    ("<|begin_of_thought|>", "<|end_of_thought|>"),
+    ("<|channel>", "<channel|>"),
+)
+# A turn's own end, as text: a finished turn stops there rather than running on to the token cap.
+_TURN_ENDS = ("<|im_end|>", "<|endoftext|>", "<end_of_turn>", "<|eot_id|>", "<|end|>", "</s>")
+
+
+def think_cap(tokens: int, think_tokens: int | None) -> int | None:
+    """The thinking's own cap (11 November, Justin: "let's cap thinking separately"): the most tokens
+    the reasoning may take before it is closed and the answer begins. It is never more than half the
+    whole budget, so an answer always has room. None is no cap: the reasoning and the answer share
+    the budget as they fall."""
+    if think_tokens is None or int(think_tokens) <= 0 or tokens < 2:
+        return None
+    return max(1, min(int(think_tokens), tokens // 2))
+
+
+def _think_marks(model_id: str, tok) -> tuple[str, str, list[int]] | None:
+    """(opening mark, closing mark, the closing mark's ids) for a model, from its own template; None
+    when the model's closing mark cannot be told, so its thinking cannot be closed for it."""
+    text = _template_text(model_id)
+    for opening, closing in _THINK_MARKS:
+        if closing in text:
+            # a thinking cut mid-line carries on as if nothing closed: the blank line the template
+            # itself puts after the mark is written with it, so the answer starts as an answer
+            written = closing + "\n\n" if closing == "</think>" else closing
+            try:
+                ids = list(tok.encode(written, add_special_tokens=False))
+            except Exception:  # noqa: BLE001
+                return None
+            return (opening, closing, ids) if ids else None
+    try:  # a template that does not spell its mark: only a mark that is one token of its own is safe
+        ids = list(tok.encode("</think>", add_special_tokens=False))
+    except Exception:  # noqa: BLE001
+        return None
+    return ("<think>", "</think>", ids) if len(ids) == 1 else None
+
+
+class _ThinkCap:
+    """Closes the thinking at its cap. A logits processor (mlx_lm calls it once a generated token,
+    with every token so far): at the cap it looks once at what was written, and if the thinking is
+    open and not yet closed it leaves the closing mark as the only token that can be sampled. The
+    model then writes its answer in the rest of the budget."""
+
+    def __init__(self, decode, cap: int, opening: str, closing: str, close_ids: list[int], opened: bool):
+        self.decode = decode
+        self.cap = cap
+        self.opening = opening
+        self.closing = closing
+        self.close_ids = list(close_ids)
+        self.opened = opened  # the template itself opened the thinking (the prompt ends on the mark)
+        self.n = 0
+        self.checked = False
+        self.pending: list[int] = []
+        self.forced = False
+
+    def __call__(self, tokens, logits):
+        k = self.n  # how many tokens were generated before this one
+        self.n += 1
+        if self.pending:
+            return self._only(logits, self.pending.pop(0))
+        if self.checked or k < self.cap:
+            return logits
+        self.checked = True
+        text = self.decode(tokens.tolist()[-k:]) if k else ""
+        if not (self.opened or self.opening in text) or self.closing in text:
+            return logits  # it never thought, or closed its thinking itself
+        self.forced = True
+        self.pending = list(self.close_ids)
+        return self._only(logits, self.pending.pop(0))
+
+    @staticmethod
+    def _only(logits, token: int):
+        import mlx.core as mx
+
+        return mx.where(mx.arange(logits.shape[-1]) == token, logits, float("-inf"))
+
+
+def _held_back(text: str, marks: tuple[str, ...]) -> int:
+    """How many of the text's last characters could be the start of a mark still arriving."""
+    best = 0
+    for m in marks:
+        for n in range(min(len(m) - 1, len(text)), best, -1):
+            if text.endswith(m[:n]):
+                best = n
+                break
+    return best
+
+
+class _Live:
+    """The continuation as it arrives, told apart for the reader: the reasoning before the closing
+    mark, the answer after it, and nothing past the turn's own end. A mark split across two pieces is
+    held back until it is whole, so half a mark is never shown. The finished reply is still split
+    once from the whole text (_split_reasoning); this is only what is shown while it is written."""
+
+    def __init__(self, thinking: bool):
+        self.thinking = thinking
+        self.held = ""
+        self.fresh = False  # the answer has just begun: its leading blank lines are not shown
+        self.ended = False
+
+    def _emit(self, out: list[tuple[str, str]], text: str) -> None:
+        kind = "reasoning" if self.thinking else "answer"
+        if kind == "answer" and self.fresh:
+            text = text.lstrip()
+            self.fresh = not text
+        if text:
+            out.append((kind, text))
+
+    def feed(self, piece: str) -> list[tuple[str, str]]:
+        out: list[tuple[str, str]] = []
+        if self.ended:
+            return out
+        self.held += piece
+        closes = tuple(c for _, c in _THINK_MARKS)
+        while True:
+            marks = (closes if self.thinking else ()) + _TURN_ENDS
+            hits = [(self.held.find(m), m) for m in marks if m in self.held]
+            if not hits:
+                break
+            at, mark = min(hits)
+            self._emit(out, self.held[:at])
+            self.held = self.held[at + len(mark) :]
+            if mark in _TURN_ENDS:
+                self.ended, self.held = True, ""
+                return out
+            self.thinking, self.fresh = False, True
+        keep = _held_back(self.held, marks)
+        self._emit(out, self.held[: len(self.held) - keep])
+        self.held = self.held[len(self.held) - keep :]
+        return out
+
+    def flush(self) -> list[tuple[str, str]]:
+        out: list[tuple[str, str]] = []
+        if not self.ended and self.held:
+            self._emit(out, self.held)
+        self.held = ""
+        return out
+
+
+def foreign_stream(
     key: str,
     question: str,
     *,
@@ -830,10 +973,18 @@ def foreign_answer(
     temperature: float = 0.7,
     thinking: bool | None = None,
     history: list | None = None,
-) -> dict:
-    """One answer from a foreign ship's own MLX weights: the model's continuation, not a Thorp
-    checkpoint. The weights load once per model (cached, two at a time); a model not in the cache
-    says so. The reply has no audit: the heads/cards trace (thorp.chat._audit) is our GPT's."""
+    think_tokens: int | None = None,
+):
+    """One answer from a foreign ship's own MLX weights, as it is written (11 November, Justin:
+    "stream the tokens"): the model's continuation, not a Thorp checkpoint. A generator of events:
+
+      {"event": "start", ...}                          once the prompt is rendered and matched
+      {"event": "delta", "kind": "reasoning" | "answer", "text": ..., "n": tokens so far}
+      {"event": "done", "reply": {...}}                the same reply foreign_answer returns
+
+    The weights load once per model (cached, two at a time); a model not in the cache says so. The
+    reply has no audit: the heads/cards trace (thorp.chat._audit) is our GPT's. Closing the generator
+    early (the reader stopped it) ends the generation and keeps what was read in the KV cache."""
     from thorp import foreign
 
     m = foreign.get_any(key)
@@ -882,6 +1033,19 @@ def foreign_answer(
     # the whole thread comes in; the oldest turns go only when the thread no longer fits the window
     prompt, dropped = _fit_history(msgs, render, lambda p: len(_encode_prompt(tok, p)), _context(m["model"]), tokens)
     ids = _encode_prompt(tok, prompt)
+    # the thinking's own cap: closed for the model when it is still open at the cap (think_cap)
+    cap = think_cap(tokens, think_tokens) if state in ("on", "auto") else None
+    capper = None
+    if cap is not None:
+        marks = _think_marks(m["model"], tok)
+        if marks is not None:
+            opening, closing, close_ids = marks
+            capper = _ThinkCap(tok.decode, cap, opening, closing, close_ids, prompt.rstrip().endswith(opening))
+        else:
+            cap = None  # no mark to close it with: said in the reply rather than pretended
+    live = _Live(state in ("on", "auto"))
+    pieces: list[str] = []
+    finish = None
     with _LOCK:  # one generation at a time: the KV cache, like the GPU, is shared
         kv = _kv_for(key)
         cache, rest = kv.fetch_nearest_cache(key, ids)
@@ -895,23 +1059,51 @@ def foreign_answer(
             else:
                 cache, rest = make_prompt_cache(model), ids
         cached_tokens = len(ids) - len(rest)
+        cache_pct = round(100 * cached_tokens / len(ids)) if ids else 0
+        yield {
+            "event": "start",
+            "model": key,
+            "thinking": state,
+            "prompt_tokens": len(ids),
+            "cached_tokens": cached_tokens,
+            "cache_pct": cache_pct,
+            "max_tokens": tokens,
+            "think_tokens": cap,
+        }
         seen = list(ids)
-        pieces: list[str] = []
-        finish = None
         started = time.perf_counter()
-        for r in stream_generate(
-            model, tok, prompt=rest, max_tokens=tokens, sampler=make_sampler(temp=temperature), prompt_cache=cache
-        ):
-            pieces.append(r.text)
-            seen.append(int(r.token))
-            finish = r.finish_reason
-        seconds = time.perf_counter() - started
-        kv.insert_cache(key, seen, cache)
+        keep = False  # whether the KV state is a true prefix worth keeping
+        try:
+            for r in stream_generate(
+                model,
+                tok,
+                prompt=rest,
+                max_tokens=tokens,
+                sampler=make_sampler(temp=temperature),
+                prompt_cache=cache,
+                logits_processors=[capper] if capper is not None else None,
+            ):
+                pieces.append(r.text)
+                seen.append(int(r.token))
+                finish = r.finish_reason
+                for kind, text in live.feed(r.text):
+                    yield {"event": "delta", "kind": kind, "text": text, "n": len(pieces)}
+                if live.ended:
+                    break  # the turn's own end, as text: nothing after it is the answer
+            keep = True
+        except GeneratorExit:
+            keep = bool(pieces)  # the reader stopped it: what was read is still what the cache holds
+            raise
+        finally:
+            seconds = time.perf_counter() - started
+            if keep:
+                kv.insert_cache(key, seen, cache)
+    for kind, text in live.flush():
+        yield {"event": "delta", "kind": kind, "text": text, "n": len(pieces)}
     answer = "".join(pieces)
-    # the model's own turn end, when its template has one: a finished turn stops there rather than
-    # running on to the token cap (the control token is already in its embeddings)
+    # the model's own turn end, when its template has one: the text stops there
     ended = False
-    for end in ("<|im_end|>", "<|endoftext|>", "<end_of_turn>", "<|eot_id|>", "<|end|>", "</s>"):
+    for end in _TURN_ENDS:
         if end in str(answer):
             answer = str(answer).split(end)[0]
             ended = True
@@ -921,28 +1113,55 @@ def foreign_answer(
     reasoning_tokens = _own_tokens(tok, reasoning)
     answer_tokens = _own_tokens(tok, reply)
     total_tokens = reasoning_tokens + answer_tokens
-    return {
-        "model": key,
-        "run": m["model"],
-        "step": "",
-        "prompt": question,
-        "format": "the model's own continuation",
-        "answer": reply,
-        "reasoning": reasoning,
-        "thinking": state,
-        "meta": {
-            "settings": {"temperature": temperature, "max_tokens": tokens, "thinking": state},
-            "prompt_tokens": prompt_tokens,
-            "answer_tokens": answer_tokens,
-            "reasoning_tokens": reasoning_tokens,
-            "seconds": round(seconds, 2),
-            "tok_s": round(total_tokens / seconds, 1) if seconds > 0 else None,
-            "finish": "stop" if ended or finish == "stop" else ("length" if total_tokens >= tokens else "stop"),
-            "rendered": prompt,
-            # how much of the prompt was read from the KV cache rather than evaluated again
-            "cached_tokens": cached_tokens,
-            # the same, as a share of the prompt as it was matched (its ids, BOS included)
-            "cache_pct": round(100 * cached_tokens / len(ids)) if ids else 0,
-            "dropped_turns": dropped,
+    yield {
+        "event": "done",
+        "reply": {
+            "model": key,
+            "run": m["model"],
+            "step": "",
+            "prompt": question,
+            "format": "the model's own continuation",
+            "answer": reply,
+            "reasoning": reasoning,
+            "thinking": state,
+            "meta": {
+                "settings": {"temperature": temperature, "max_tokens": tokens, "thinking": state, "think_tokens": cap},
+                "prompt_tokens": prompt_tokens,
+                "answer_tokens": answer_tokens,
+                "reasoning_tokens": reasoning_tokens,
+                "seconds": round(seconds, 2),
+                "tok_s": round(total_tokens / seconds, 1) if seconds > 0 else None,
+                # the generator's own word for it: the budget ran out ("length") unless the turn ended.
+                # (It was recounted from the text before, which read a budget spent on thinking as a stop.)
+                "finish": "stop" if ended or live.ended or finish == "stop" else "length",
+                "rendered": prompt,
+                # how much of the prompt was read from the KV cache rather than evaluated again
+                "cached_tokens": cached_tokens,
+                # the same, as a share of the prompt as it was matched (its ids, BOS included)
+                "cache_pct": cache_pct,
+                "dropped_turns": dropped,
+                # whether the thinking was closed at its cap rather than by the model
+                "think_capped": bool(capper is not None and capper.forced),
+            },
         },
     }
+
+
+def foreign_answer(
+    key: str,
+    question: str,
+    *,
+    tokens: int = 80,
+    temperature: float = 0.7,
+    thinking: bool | None = None,
+    history: list | None = None,
+    think_tokens: int | None = None,
+) -> dict:
+    """One answer from a foreign ship's own MLX weights, whole: foreign_stream read to its end."""
+    reply: dict = {}
+    for ev in foreign_stream(
+        key, question, tokens=tokens, temperature=temperature, thinking=thinking, history=history, think_tokens=think_tokens
+    ):
+        if ev["event"] == "done":
+            reply = ev["reply"]
+    return reply

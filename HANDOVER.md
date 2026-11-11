@@ -112,3 +112,42 @@ Added in the evening session, all in the one store:
 - **Specs**: `21m@v0.0.6.yaml` (copied from 9m; its `lr: 0.001` is not tuned), `ships/specs/queue-kipling.txt`, and 310 specs gained `soundings` (wide diff, review before trusting).
 - **Open**: the foreign/competitor page consolidation is diagnosed, not merged; Qwen3.5 0.8B is unread and has no fal image (`FAL_KEY` absent); compute fit is a forward-pass proxy; caps are stored, not enforced; the 9m/21m specs still need the 300k/1m learnings applied before they sail.
 - **Running at archive**: coordinator 5292 (in port, two 300k trainers 85927/89449 at sea), dash 8787, Astro dev 4321. The queue (12 lines) is in Postgres; run the coordinator under launchd (`backend/scripts/com.thorp.queue.plist`) so the harness cannot reap it.
+
+## 11 November: chat on the ship pages, the audit, Piraeus and the foreign harbour
+
+**Chat is a tab on the ship, not a separate page.** `/foreign/<key>` has **Readings** and **Chat** (the tab's
+address is `/foreign/<key>/chat`); our ship pages' existing **Chat** tab now embeds the same panel instead of
+linking away. The `Chat` island takes `shipKey`/`modelKey`/`embedded` and pins the target; `/chat` remains only
+as the full-list fallback. `STABS` in `frontend/src/scripts/router.ts` now includes `chat`, and the chat tab
+paths are in the ships/foreign static paths.
+
+**The audit.** `thorp.chat._audit` traces every head at the positions that chose each answer token: the top
+heads, the content-aimed heads (sink heads removed), the per-token lookups (the question-side token each answer
+token read hardest), the star tests read on the prompt (previous word, two back, sink, duplicate word,
+induction, delimiter), and the card hand — held from the ship's own readings, and live for the tests that fit a
+prompt. Foreign answers have no audit: the trace is our GPT's. The loader repairs pre-deep-ladder checkpoint
+shapes (`ladder.repair_spec`) and reads the torch 50m through `train_torch`; the prompt uses the v0.1.4 marks
+only for a voyage that read them, plain prose otherwise. APIs: `GET /api/chat/models`, `POST /api/chat`
+(`{run|model, q}`; GET still works). Tests: `backend/tests/test_chat.py`.
+
+**Piraeus, and Zayton is foreign-only.** Migration `p7l0m3n6o9q2` (after `o6k9l2m4n7p1`) adds
+`s1.harbours.foreign_only`, inserts **Piraeus** (ordinal 1, no bottom, the Vast lane) for our 50m, 100m and
+350m, and moves **Zayton** to ordinal 2 as the foreign ships' harbour. `harbour_for` skips `foreign_only`;
+Phaleron is unchanged at 20M (300k/1m/9m/21m). The home page has three harbour cards; `/harbours/piraeus` lists
+our deep ships and `/harbours/zayton` lists the 20 outside models and no rung cards. Our own readings
+(`fl-pathfinder`, `sl-pathfinder`, `spell-vocab4k-v1`) were filtered out of `thorp.foreign.models()` and
+`frontend/src/data/foreign.json` regenerated. The Vast lane is labelled Piraeus in `/api/waters` and the queue.
+The Piraeus art is `frontend/public/art/piraeus.png`, generated with fal (`generate_art.py` has the prompt and
+reads the key from `~/Source/monorepo/packages/api/.env.local`).
+
+**Applied and committed.** The migration is at the local Alembic head (`p7l0m3n6o9q2`); the tree is clean at
+`991f8ddd` (the art commit; the code and migrations are in `68104216`). `/api/ladder` and
+`data/ladder-cache.json` were refreshed for the three harbours.
+
+**Open.** The Piraeus image is an ancient torchlit basin but not a trireme close-up — regenerate if a stricter
+one is wanted. `/api/ships` is very slow cold (~25–30 s), so a ship page's header can lag; the chat tab still
+resolves its ship through `/api/chat/models`. `/harbours/piraeus/shipbuilder` exists as a static route but the
+page correctly falls back to the ships (no builder there). Some old data tests already fail in
+`test_harbours_journeys.py` (journey/SOP rows missing from the store) and `test_fleet.py` (First Fleet/Star
+Fleet label); the chat, foreign and harbour tests pass.
+

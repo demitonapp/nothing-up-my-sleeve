@@ -1523,6 +1523,8 @@ def expedition_of_label(name: str | None, label: str | None) -> str | None:
         return "induction"
     if (label or "").startswith("Logic tutor"):
         return "logic_tutor"
+    if (label or "").startswith("Arc de Triomphe"):
+        return "arc_de_triomphe"
     if (label or "").startswith("SOP v"):
         # the standard launches (9 November): short-name ships, "SOP v0.0.5 at 21m (24 layers)". v0.0.6
         # (and the IFEval standard) are the instruction expedition; the rest are the ladder on Ogden.
@@ -2501,5 +2503,128 @@ EXPEDITIONS["kipling"] = Expedition(
          "detail": "the ARC arm: Ogden, then the ARC training episodes as a post-training stage, with eval.arc set "
                    "to the 120-task evaluation set and pass@2 the outcome",
          "queue": "after 7; the ARC corpus and its data.opt_in are written first"},
+    ),
+)
+
+
+# Arc de Triomphe (11 November, Justin): the expedition after Kipling. Leg 1 reads Qwen3.8 27B on
+# ARC-AGI-2 and audits it until the score has a cause; leg 2 carries what transfers down the ladder
+# to find the smallest ship that scores above 5. The plan and its pre-registered marks are in
+# ships/plans/arc-de-triomphe.md; the decision is in DECISIONS.md under the same name.
+ARC_FLOOR = 5.0  # the mark: pass@2 above 5% on the 120-task public evaluation set, i.e. 7 tasks or more
+
+EXPEDITIONS["arc_de_triomphe"] = Expedition(
+    key="arc_de_triomphe",
+    name="Arc de Triomphe",
+    goal="The expedition after Kipling (Justin, 11 November: 'reverse engineer Qwen's 27B architecture against the "
+    "ARC-AGI-2 score ... a deep audit of every head, card, whatever that then indicates how it's working when "
+    "asked the question and to determine definitely why Qwen 27 is the only model of its size that scores so high "
+    "on that test'; then 'taking the findings from auditing Qwen 27B and applying them against 300k, 1m, 9, and "
+    "then the 21m to try get a 21m to score on ARC-AGI-2 ... we need to understand what the theoretical lowest "
+    "size model is that can score above 5'). Two legs on one question. Leg 1, the audit: reproduce Qwen3.8 27B's "
+    "ARC-AGI-2 reading on our own harness, then take it apart — the reasoning ladder (ARC Prize verified 42.4 at "
+    "xhigh, 22.8 low, 13.2 medium, 1.5 with reasoning off), the same-shape predecessor and the same-size peers, "
+    "the reasoning traces, and a causal census of every component (16 full-attention layers of 24 heads, 48 Gated "
+    "DeltaNet layers that have no attention map to read) — until each of four stated causes is held or refuted. "
+    "Leg 2, the arch: what the audit says transfers is written into the standard and sailed at 300k, 1m, 9m and "
+    "21m, each rung earning the next, to find the smallest ship that scores above 5 on the 120-task public "
+    "evaluation set. The outside markers are already below the 21m: a 7M recursive model is reported at about 8 "
+    "and a model with no pretraining at about 4, neither of them a language model, so the open question is the "
+    "smallest ship of our kind, not whether the size is possible.",
+    ship="Arc de Triomphe",
+    fleet="Star Fleet",
+    preset="300k",
+    outcomes=(
+        Outcome("arc/pass@2", "higher", "ARC-AGI-2, exact match in two attempts on the 120-task public evaluation "
+                                        "set; the mark is above 5 (7 tasks or more)"),
+        Outcome("arc/cell_accuracy", "higher", "the partial reading beside it, never a substitute for exact"),
+        Outcome("arc/format_rate", "higher", "the share of answers that parse as a grid: the 300k's rung"),
+        Outcome("arc/held_out_train", "higher", "exact match on training tasks held out of the reading: the 1m's rung"),
+    ),
+    levers=(
+        Lever("reasoning effort", choices=("none", "low", "medium", "xhigh"),
+              about="leg 1: the template's instruction, not a budget; the dose-response on the same 120 tasks"),
+        Lever("subject", choices=("Qwen3.8 27B", "Qwen3.6 27B", "Gemma 4 26B A4B", "gpt-oss 20B", "Phi-4 14B"),
+              about="leg 1: the same harness on the same-shape predecessor and the same-size peers"),
+        Lever("weights", choices=("bf16", "4-bit MLX"), about="leg 1: the audit runs on whichever holds the score"),
+        Lever("class", choices=("300k", "1m", "9m", "21m"), about="leg 2: the rung; each sails only if the one below "
+                                                                 "clears its mark"),
+        Lever("model.context", choices=(1024, 4096, 8192),
+              about="leg 2: 2 of the 120 evaluation tasks fit 1,024 pieces whole, 87 fit 4,096, 118 fit 8,192"),
+        Lever("content", choices=("training tasks", "augmented", "generated"),
+              about="leg 2: the 1,000 training tasks, their rotations, flips and recolourings, then generated tasks"),
+        Lever("test-time reading", choices=("off", "on"),
+              about="leg 2: a short reading of the task's own example pairs before answering (ARC's rule allows "
+                    "it; every small entry that scores uses it)"),
+        Lever("scratchpad", choices=("none", "rule line"),
+              about="leg 2: the compact form of what Qwen's trace does, if leg 1 holds the trace as the cause"),
+        Lever("scaffold", choices=("off", "Qwen's map"),
+              about="leg 2: the components leg 1 finds causal, pinned as cards, against the same ship without them"),
+    ),
+    stop=StopRule(28, "leg 1's eight investigations in order, none skipped; then at most five voyages a rung. The "
+                      "expedition ends at the smallest rung that reads above 5 on two seeds, or with the 21m's "
+                      "best reading and the floor stated as above 21m for this method. No learning ship sails "
+                      "before leg 1's verdict is written and Justin has signed the standard it becomes."),
+    runner="thorp/train.py",
+    results="data/runs/",
+    status="planned",
+    plan=(
+        {"n": 1, "kind": "investigation", "name": "a harness that can reproduce the number",
+         "detail": "the ARC Prize prompt form and two attempts, the model's own chat template with the reasoning "
+                   "effort set, no output cap that cuts the thinking, the trace and its token count kept. The "
+                   "Kipling scorer cannot do this: it caps the answer at 256 pieces and asks for the grid only, "
+                   "which is reasoning off. The gate is task-by-task agreement with ARC Prize's published "
+                   "public-evaluation grid for xhigh.",
+         "queue": "to build: scripts/score_arc.py gains --effort, --max-thinking and the published prompt form"},
+        {"n": 2, "kind": "investigation", "name": "the reasoning ladder on all 120",
+         "detail": "Qwen3.8 27B at none, low, medium and xhigh on the 120 public evaluation tasks, every trace "
+                   "kept. bf16 weights on a hired 80 GB box or a hosted endpoint for the reading; the 4-bit MLX "
+                   "copy on this Mac is read on a 12-task subset first, and the audit uses it only if it holds "
+                   "the score.",
+         "queue": "after 1; a Piraeus job (Vast), not this Mac: xhigh is tens of thousands of pieces a task"},
+        {"n": 3, "kind": "investigation", "name": "is it the only one of its size",
+         "detail": "the same harness on Qwen3.6 27B (reported to share the configuration: the same shape, earlier "
+                   "weights) and on Gemma 4 26B A4B, gpt-oss 20B and Phi-4 14B. If the predecessor reads far "
+                   "lower, the cause is training, not architecture.",
+         "queue": "after 2"},
+        {"n": 4, "kind": "investigation", "name": "the anatomy of a trace",
+         "detail": "what the xhigh trace does that the low one does not: each trace cut into its moves (describe, "
+                   "propose a rule, check it against each example, revise, write the grid), length against "
+                   "success, and the same tasks with the thinking cut at fixed budgets. Failures are split into "
+                   "wrong rule and right rule written wrongly.",
+         "queue": "after 2; reads the stored traces, no new generation but the budget cuts"},
+        {"n": 5, "kind": "investigation", "name": "induction or recall",
+         "detail": "the solved tasks again under rotations, flips and recolourings that keep the rule. A score "
+                   "that survives is rule induction; one that falls is recall of public tasks.",
+         "queue": "after 2"},
+        {"n": 6, "kind": "investigation", "name": "the census of every component",
+         "detail": "on a contrast set (tasks solved at xhigh, read at the answer positions and at the rule-stating "
+                   "positions of the trace): the cards on the 384 attention heads; and for every component, "
+                   "attention head, DeltaNet head and MLP alike, what removing it does to exact match, against "
+                   "matched random removals. Then patching from the reasoning-off run into the xhigh run to find "
+                   "where the trace's work enters the answer.",
+         "queue": "after 4; needs the state-level instrument for the 48 DeltaNet layers, which is not built"},
+        {"n": 7, "kind": "investigation", "name": "the outside floor",
+         "detail": "the small entries that already score, read on our harness as markers: the 7M recursive model "
+                   "(reported about 8) and the no-pretraining model (reported about 4). They fix the floor the "
+                   "ladder is measured against.",
+         "queue": "any time after 1; independent of the Qwen audit"},
+        {"n": 8, "kind": "investigation", "name": "the verdict",
+         "detail": "the four causes each marked held or refuted with its evidence (the trace, the training, "
+                   "specific components, recall), and the list of what transfers to a small ship. It becomes the "
+                   "standard the learning ships sail under.",
+         "queue": "after 3, 5 and 6; Justin signs it"},
+        {"n": 9, "kind": "ship", "name": "300k", "detail": "the form: writes a grid of the right shape (format "
+                                                           "rate 0.9 or more) and beats copying the input on cell "
+                                                           "accuracy",
+         "queue": "after 8"},
+        {"n": 10, "kind": "ship", "name": "1m", "detail": "the first rules: exact on held-out training tasks "
+                                                          "above zero on two seeds",
+         "queue": "after 9, if the 300k clears its rung"},
+        {"n": 11, "kind": "ship", "name": "9m", "detail": "the first evaluation tasks: pass@2 of 2 or more of 120",
+         "queue": "after 10, if the 1m does"},
+        {"n": 12, "kind": "ship", "name": "21m", "detail": "the mark: pass@2 above 5 on the 120 (7 tasks or more), "
+                                                           "on two seeds",
+         "queue": "after 11, if the 9m does"},
     ),
 )

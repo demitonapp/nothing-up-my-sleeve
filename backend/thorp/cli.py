@@ -1,5 +1,5 @@
 """thorp fetch LIST · thorp acquire LIST · thorp gather SOURCE · thorp run SPEC · thorp eval RUN · thorp dash
-thorp ledger SQL · thorp id SPEC · thorp charter quote|sail SPEC · thorp charter audit · thorp charter terms"""
+thorp ledger SQL · thorp id SPEC · thorp charter quote|sail SPEC · thorp charter attach RUN · thorp charter audit · thorp charter terms"""
 
 from __future__ import annotations
 
@@ -157,6 +157,40 @@ def cmd_dash(a) -> int:
     return 0
 
 
+def cmd_onboard(a) -> int:
+    """The first run: serve the setup page on loopback and open the default browser."""
+    import socket
+
+    from thorp.dash import server
+
+    if a.reset:
+        from thorp.onboard import state
+
+        state.reset(archive=True)
+        print("onboarding: reset (the old answers were archived beside data/onboarding.json)")
+    port = a.port
+    if port <= 0:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.bind(("127.0.0.1", 0))
+            port = s.getsockname()[1]
+    else:
+        # a dashboard already on 8787 must not stop setup: take the next free port
+        for candidate in range(port, port + 40):
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                if s.connect_ex(("127.0.0.1", candidate)) != 0:
+                    port = candidate
+                    break
+        else:
+            print(f"no free port near {a.port}", file=sys.stderr)
+            return 2
+    try:
+        server.serve(port, onboard=True, open_browser=not a.no_browser)
+    except OSError as e:
+        print(f"thorp onboard could not listen on 127.0.0.1:{port}: {e}", file=sys.stderr)
+        return 1
+    return 0
+
+
 def cmd_ledger(a) -> int:
     from thorp.ledger import reader
 
@@ -203,10 +237,23 @@ def cmd_charter(a) -> int:
         print(json.dumps(audit.audit(Vast(), release_orphans=a.release_orphans), indent=1))
         return 0
     if not a.spec:
-        print(f"thorp charter {a.what} needs a spec", file=sys.stderr)
+        what = "a run id, an instance id or a voyage's name" if a.what == "attach" else "a spec"
+        print(f"thorp charter {a.what} needs {what}", file=sys.stderr)
         return 2
     from thorp.viable.s1_operations import charter
 
+    if a.what == "attach":
+        # a ship still hired whose charter died: take up its polling, pulls and release (11 November)
+        try:
+            out = charter.attach(a.spec)
+        except charter.NotAttachable as e:
+            print(f"thorp charter attach: {e}", file=sys.stderr)
+            return 2
+        except charter.Recalled as e:
+            print(f"thorp charter attach: recalled by {e}; its log says how the release went", file=sys.stderr)
+            return 143
+        print(json.dumps(out, indent=1, default=str))
+        return 0 if out.get("status") == "home" else 1
     if a.what == "quote":
         q = charter.quote(a.spec, gpu=a.gpu)
         p = q["plan"]
@@ -219,13 +266,17 @@ def cmd_charter(a) -> int:
                 f"  {x['gpu']:<10} ${x['dph']:.3f}/h  {x['hours']:6.2f} h  ${x['cost']:7.2f}  ({x['speed']})  {verdict}"
             )
         return 0
-    out = charter.sail(a.spec, gpu=a.gpu)
+    try:
+        out = charter.sail(a.spec, gpu=a.gpu)
+    except charter.Recalled as e:  # SIGTERM or SIGHUP with a ship hired: the charter's clean-up ran
+        print(f"thorp charter sail: recalled by {e}; its log says how the release went", file=sys.stderr)
+        return 143
     print(json.dumps(out, indent=1, default=str))
     return 0 if out.get("status") in ("home", "finished") else 1
 
 
 def cmd_store(a) -> int:
-    """The one store (Postgres): is it up, bring data/'s files into it, or backfill the ledger (thorp/store_import.py)."""
+    """The one store (Postgres): is it up, create the local cluster, bring data's files into it, or backfill the ledger (thorp/store_import.py)."""
     from thorp import store
 
     if a.what == "ping":
@@ -248,6 +299,16 @@ def cmd_store(a) -> int:
         runs = len({x["run_id"] for star in document.get("stars", []) for x in star.get("ships", [])})
         discoveries_store.put(document, runs=runs)
         print(f"discoveries: built and stored in s1.discoveries ({runs} runs)")
+        return 0
+    if a.what == "setup":
+        from thorp.onboard import store_setup
+
+        try:
+            out = store_setup.setup_local()
+        except store_setup.SetupError as e:
+            print(f"thorp store setup: {e}", file=sys.stderr)
+            return 1
+        print(f"the store is ready at {out['url']} (schema {out.get('schema') or 'unknown'})")
         return 0
     if a.what == "queue":
         from thorp.viable.s2_coordination import queue_store
@@ -277,9 +338,16 @@ def cmd_queue(a) -> int:
         if not a.line:
             print("thorp queue add LINE [--top]", file=sys.stderr)
             return 2
-        queue_store.add(a.line, top=a.top)
+        line = a.line
+        if line.startswith("investigations/"):
+            # an investigation is queued by name; its spec is checked now and its line is the command
+            # the coordinator already knows how to sail (thorp/investigate.py)
+            from thorp import investigate
+
+            line = investigate.queue_line(line)
+        queue_store.add(line, top=a.top)
         queue_store.export()
-        print(f"queued: {a.line}")
+        print(f"queued: {line}")
         return 0
     if a.what == "move":
         if not a.line or a.to is None:
@@ -288,6 +356,14 @@ def cmd_queue(a) -> int:
         queue_store.move(a.line, a.to)
         queue_store.export()
         print(f"moved: {a.line} -> {a.to}")
+        return 0
+    if a.what == "release":
+        line = queue_store.release(a.line)
+        if line is None:
+            print("no hold to release" + (f" named {a.line!r}" if a.line else ""), file=sys.stderr)
+            return 1
+        queue_store.export()
+        print(f"released: {line}")
         return 0
     if a.what == "drop":
         if not a.line:
@@ -551,6 +627,13 @@ def main(argv: list[str] | None = None) -> int:
     s = sub.add_parser("dash", help="serve the dashboard on http://localhost:8787")
     s.add_argument("--port", type=int, default=8787)
     s.set_defaults(fn=cmd_dash)
+    s = sub.add_parser(
+        "onboard", help="the first run: set up the store, models and dashboard in the browser"
+    )
+    s.add_argument("--port", type=int, default=8787, help="loopback port (0 chooses one)")
+    s.add_argument("--no-browser", action="store_true", help="print the URL instead of opening it")
+    s.add_argument("--reset", action="store_true", help="archive the answers and start again")
+    s.set_defaults(fn=cmd_onboard)
     s = sub.add_parser("ledger", help="query the ledger; each ? defaults to the latest run id")
     s.add_argument("sql")
     s.add_argument("params", nargs="*")
@@ -559,8 +642,12 @@ def main(argv: list[str] | None = None) -> int:
     s = sub.add_parser(
         "charter", help="sail a voyage on a GPU hired from Vast.ai, within the charter's terms"
     )
-    s.add_argument("what", choices=["quote", "sail", "audit", "terms"])
-    s.add_argument("spec", nargs="?")
+    s.add_argument("what", choices=["quote", "sail", "attach", "audit", "terms"])
+    s.add_argument(
+        "spec",
+        nargs="?",
+        help="the voyage's spec; for attach, the hired ship: its run id, instance id or voyage's name",
+    )
     s.add_argument("--gpu", help="hire this class only (a key of the terms' gpus, e.g. 'RTX 4090')")
     s.add_argument(
         "--release-orphans",
@@ -571,7 +658,7 @@ def main(argv: list[str] | None = None) -> int:
     s = sub.add_parser(
         "store", help="the one store (Postgres): ping it, import data/'s files, or backfill the ledger"
     )
-    s.add_argument("what", choices=["ping", "import", "ledger", "queue", "discoveries"])
+    s.add_argument("what", choices=["ping", "setup", "import", "ledger", "queue", "discoveries"])
     s.add_argument(
         "--retire",
         action="store_true",
@@ -581,7 +668,7 @@ def main(argv: list[str] | None = None) -> int:
     s = sub.add_parser(
         "queue", help="the standing queue (Postgres): show it, or add, move and drop a line"
     )
-    s.add_argument("what", choices=["show", "add", "move", "drop"])
+    s.add_argument("what", choices=["show", "add", "move", "drop", "release"])
     s.add_argument("line", nargs="?")
     s.add_argument("to", nargs="?", type=int)
     s.add_argument("--top", action="store_true", help="add: put the line at the top")

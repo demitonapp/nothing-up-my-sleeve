@@ -2,14 +2,25 @@
 // Harbour so it can be spied on. Read-only — no spec, no ledger run, no weights. This is the first
 // panel converted from dashboard.ts to a typed client island (the rest follow it).
 
+import { useEffect, useState } from 'react';
 import { big } from '@/lib/format';
-import { btnCls, crumbCls, emptyCls, pillCls, tabCls, tabsCls } from '@/lib/ui';
+import { btnCls, cardCls, crumbCls, emptyCls, pillCls, selectCls } from '@/lib/ui';
 import { sectionProps, useApi, useRoute } from '@/lib/useApi';
 import Chat from './Chat';
+import { BAND, bandOf, sizeOf } from '@/scripts/views/bands';
+import SectionNav from '../SectionNav';
+import { TabNav } from '../TabNav';
 
 interface ForeignLogic {
   [k: string]: number | null | undefined;
 }
+
+interface VersionRow {
+  key: string; label: string; model: string; params: number | null;
+  tuning: 'instruct' | 'base' | 'unknown'; cached: boolean; read: boolean; current: boolean;
+}
+
+interface TokenRow { token: string; id: number | null; single: boolean; embedding: boolean; roles: string[] }
 
 interface ForeignData {
   key: string;
@@ -25,6 +36,8 @@ interface ForeignData {
   knockout: { verdict?: Record<string, unknown>; layers?: number | null } | null;
   chaining: Record<string, number | null> | null;
   chaining_lift: number | null;
+  versions?: VersionRow[];
+  control_tokens?: TokenRow[];
 }
 
 const RELATIONS = ['gain', 'lift', 'score', 'gain_cause', 'gain_order', 'gain_membership', 'gain_proportion', 'gain_counterfactual'];
@@ -39,14 +52,20 @@ export default function Foreign() {
   const route = useRoute();
   const parts = route.split('/').filter(Boolean); // ['foreign', key, tab?]
   const key = decodeURIComponent((parts[1] || '').trim());
-  const tab = parts[2] === 'chat' ? 'chat' : 'readings';
+  const tab = parts[2] === 'chat' ? 'chat' : parts[2] === 'versions' ? 'versions' : 'readings';
   const { data: d, error } = useApi<ForeignData>(key ? `/api/foreign?key=${encodeURIComponent(key)}` : null);
-  const href = (t: string): string => `/foreign/${encodeURIComponent(key)}${t === 'chat' ? '/chat' : ''}`;
+  // the way back is the size band this ship sits in, not the harbour's landing (11 November, Justin)
+  const band = d ? BAND(bandOf(sizeOf(d))) : null;
+  // the chat tab can talk to either side of the family: the page's checkpoint, or its pulled base/instruct twin
+  const [chatKey, setChatKey] = useState<string | null>(null);
+  useEffect(() => { setChatKey(key || null); }, [key]);
+  const href = (t: string): string => `/foreign/${encodeURIComponent(key)}${t === 'chat' ? '/chat' : t === 'versions' ? '/versions' : ''}`;
 
   return (
     <div {...sectionProps('foreign')}>
+      <SectionNav />
       <h1>
-        <a className={crumbCls('back')} href="/harbours/zayton">← Zayton</a>{' '}
+        <a className={crumbCls('back')} href={band ? `/harbours/masaq-reach/${band.key}` : '/harbours/masaq-reach'} title={band ? `back to Masaq' Reach's ${band.name} band` : "back to Masaq' Reach"}>← {band ? band.name : "Masaq' Reach"}</a>{' '}
         <span>{d?.label || key || 'foreign ship'}</span>{' '}
         <span className="q">
           {d ? (
@@ -65,24 +84,75 @@ export default function Foreign() {
         <div className={emptyCls()}>reading the foreign ship…</div>
       ) : (
         <>
-          <nav className={tabsCls('line', 'subnav')} data-orientation="horizontal" data-variant="line" id="foreignnav">
-            <a className={tabCls('')} data-state={tab === 'readings' ? 'active' : 'inactive'} href={href('readings')}>Readings</a>
-            <a className={tabCls('')} data-state={tab === 'chat' ? 'active' : 'inactive'} href={href('chat')}>Chat</a>
-          </nav>
+          <TabNav
+            id="foreignnav"
+            ariaLabel="foreign ship sections"
+            items={[
+              { key: 'readings', label: 'Readings', href: href('readings'), active: tab === 'readings' },
+              { key: 'versions', label: 'Versions', href: href('versions'), active: tab === 'versions' },
+              { key: 'chat', label: 'Chat', href: href('chat'), active: tab === 'chat' },
+            ]}
+          />
           <div className={`shiptab${tab === 'readings' ? ' active' : ''}`}>
             <ForeignBody d={d} />
+          </div>
+          <div className={`shiptab${tab === 'versions' ? ' active' : ''}`}>
+            {tab === 'versions' ? <VersionsBody d={d} /> : null}
           </div>
           <div className={`shiptab${tab === 'chat' ? ' active' : ''}`}>
             {tab === 'chat' ? (
               <>
                 <h1>Chat <span className="q">with this foreign ship&apos;s own weights; its answer is a continuation, with no head audit (the audit reads our own GPT)</span></h1>
-                <Chat modelKey={d.key} embedded />
+                {d.versions && d.versions.length > 1 ? (
+                  <div className="handtools" data-filters>
+                    <label className="note" htmlFor="chatver">version</label>
+                    <select id="chatver" className={selectCls('')} value={chatKey || d.key} onChange={(e) => setChatKey(e.target.value)}>
+                      {d.versions.map((v) => (
+                        <option key={v.key} value={v.key} disabled={!v.cached}>
+                          {v.tuning} · {v.label}{v.cached ? '' : ' (not pulled)'}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="note">the base checkpoint continues text; its instruct twin was trained to answer</span>
+                  </div>
+                ) : null}
+                <Chat key={chatKey || d.key} modelKey={chatKey || d.key} embedded />
               </>
             ) : null}
           </div>
         </>
       )}
     </div>
+  );
+}
+
+function VersionsBody({ d }: { d: ForeignData }) {
+  const rows = d.versions || [];
+  const hasBoth = rows.some((r) => r.tuning === 'instruct') && rows.some((r) => r.tuning === 'base');
+  return (
+    <section className={cardCls(false, 'panel')}>
+      <h2>Base and instruct <span className="note">one family, both sides of the tuning line: a base checkpoint continues text; an instruct twin was trained to answer. “Read” means it has readings and its own page</span></h2>
+      <div className="scroll">
+        <table>
+          <thead><tr><th>version</th><th>checkpoint</th><th>parameters</th><th>weights</th><th>page</th></tr></thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.key}>
+                <td><span className={pillCls(r.tuning === 'instruct' ? 'good' : r.tuning === 'base' ? 'accent' : '')}>{r.tuning}</span></td>
+                <td><b>{r.label}</b>{r.current ? <span className="s"> · this page</span> : null}<div className="s mono">{r.model}</div></td>
+                <td>{r.params ? big(r.params) : '–'}</td>
+                <td>{r.cached ? 'pulled' : <span className="s">not pulled</span>}</td>
+                <td>{r.read ? <a href={`/foreign/${encodeURIComponent(r.key)}`}>read →</a> : <span className="s">not read yet</span>}</td>
+              </tr>
+            ))}
+            {rows.length ? null : <tr><td colSpan={5} className={emptyCls(true)}>no base or instruct checkpoint is in the registry</td></tr>}
+          </tbody>
+        </table>
+      </div>
+      {rows.length && !hasBoth ? (
+        <p className="note mt">No twin is in the registry: {d.label} was published as <b>{rows[0].tuning}</b> only, so there is no other side to compare.</p>
+      ) : null}
+    </section>
   );
 }
 
@@ -153,6 +223,58 @@ function ForeignBody({ d }: { d: ForeignData }) {
           </div>
         </div>
       </div>
+      <ControlTokens d={d} />
     </>
+  );
+}
+
+function ControlTokens({ d }: { d: ForeignData }) {
+  const [showAll, setShowAll] = useState(false);
+  const all = useApi<any>(showAll ? '/api/foreign_control_tokens' : null, 0);
+  const rows = d.control_tokens || [];
+  return (
+    <section className={cardCls(false, 'panel')} id="foreigncontroltokens" style={{ marginTop: 14 }}>
+      <h2>Control tokens <span className="note">the special pieces {d.label}&apos;s own tokeniser declares — bos/eos/unk/pad, its added specials and the markers its chat template uses — with the id, whether the token is a single piece, and whether that id is inside its embedding table (an added piece past the vocabulary has no row until the embeddings are resized)</span></h2>
+      {rows.length ? (
+        <div className="scroll">
+          <table className="lbtable">
+            <thead><tr><th>token</th><th>id</th><th>one piece</th><th>in the embeddings</th><th>role</th></tr></thead>
+            <tbody>
+              {rows.map((t) => (
+                <tr key={t.token}>
+                  <td className="mono">{t.token}</td>
+                  <td>{t.id ?? '–'}</td>
+                  <td>{t.single ? 'yes' : 'no'}</td>
+                  <td>{t.embedding ? 'yes' : <span className="accent">no — added past the vocabulary</span>}</td>
+                  <td className="s">{(t.roles || []).join(', ')}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : <div className={emptyCls()}>this ship&apos;s tokeniser is not in the MLX cache, so its control tokens cannot be read</div>}
+      <details className="archive" onToggle={(e) => { if ((e.target as HTMLDetailsElement).open) setShowAll(true); }}>
+        <summary>Every foreign ship&apos;s control tokens <span className="note">the same table across the Market Harbour: what each tokeniser declares and what is not in its embeddings</span></summary>
+        {!showAll ? null : !all.data ? <div className={emptyCls()}>reading the tokenisers…</div> : (
+          <div className="scroll">
+            <table className="lbtable">
+              <thead><tr><th>ship</th><th>control tokens</th><th>not in the embeddings</th></tr></thead>
+              <tbody>
+                {(all.data.models || []).map((m: any) => {
+                  const ts = m.tokens || [];
+                  return (
+                    <tr key={m.key}>
+                      <td><a href={`/foreign/${encodeURIComponent(m.key)}`}>{m.label}</a></td>
+                      <td className="s">{ts.length ? ts.map((t: TokenRow) => t.token).join(' ') : 'not cached'}</td>
+                      <td className="s">{ts.filter((t: TokenRow) => !t.embedding).map((t: TokenRow) => t.token).join(' ') || '–'}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </details>
+    </section>
   );
 }

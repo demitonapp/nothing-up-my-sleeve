@@ -78,8 +78,14 @@ def get(name: str) -> Evaluator:
         from thorp.evaluators.primers import evaluate_francis as evaluate
     elif name == "ifeval":  # instruction following, the 25 official verifiers (SOP v1.3.0)
         from thorp.evaluators.ifeval import evaluate
+    elif name == "answers":  # the return leg: held-out questions, the answer's own loss (11 November)
+        from thorp.evaluators.answers import evaluate
     elif name == "arc":  # ARC-AGI-2, the canonical intelligence test (11 November)
         from thorp.evaluators.arc import evaluate
+    elif name == "arc_ai2":  # AI2 ARC, the one peer-recognised test for models under 1B (11 November)
+        from thorp.evaluators.arc_ai2 import evaluate
+    elif name == "blimp":  # BLiMP, the grammatical reading; ARC is the capability one (11 November)
+        from thorp.evaluators.blimp import evaluate
     else:
         raise KeyError(f"unknown evaluator {name!r}")
     return evaluate

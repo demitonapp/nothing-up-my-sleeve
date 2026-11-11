@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>Thorp · first run</title>
+    <link rel="stylesheet" href="/onboard/app.css" />
+  </head>
+  <body>
+    <header class="top">
+      <div class="brand">
+        <span class="mark" aria-hidden="true"></span>
+        <span>Nothing up my sleeve</span>
+      </div>
+      <span class="sub">first run</span>
+      <span class="machine" id="machine"></span>
+    </header>
+
+    <main class="shell">
+      <aside class="rail" aria-label="Setup steps">
+        <ol id="steps">
+          <li data-step="welcome"><span>1</span> You</li>
+          <li data-step="sail"><span>2</span> Ships</li>
+          <li data-step="models"><span>3</span> Models</li>
+          <li data-step="store"><span>4</span> Records</li>
+          <li data-step="install"><span>5</span> Install</li>
+        </ol>
+        <div class="railnote">
+          <p>Nothing here leaves this Mac except the models you choose to download.</p>
+          <p class="s" id="tokenstate"></p>
+        </div>
+      </aside>
+
+      <section class="stage" aria-live="polite">
+        <div id="error" class="error" hidden></div>
+
+        <section class="step" data-step="welcome">
+          <div class="kicker">First run · 1 of 5</div>
+          <h1>Let’s get your ship in order.</h1>
+          <p class="lede">
+            A few decisions, then an install. You can change every one of them later; the page is here
+            so a fresh clone does not start with an empty dashboard and a terminal full of commands.
+          </p>
+          <div class="grid2">
+            <div class="panel">
+              <h2>This Mac</h2>
+              <dl class="kv" id="welcomecheck"><dt>reading…</dt><dd></dd></dl>
+            </div>
+            <div class="panel">
+              <h2>What setup does</h2>
+              <ol class="plain">
+                <li>Asks whether you’ll sail Thorp’s own ships, and which class.</li>
+                <li>Downloads the outside instruct models you pick.</li>
+                <li>Sets up the records store — local Postgres for now, hosted later.</li>
+                <li>Builds the dashboard, then hands you the keys.</li>
+              </ol>
+            </div>
+          </div>
+          <div class="actions">
+            <button type="button" class="primary" id="begin">Begin</button>
+            <a class="ghost" href="/">I’ve done this before — open the dashboard</a>
+          </div>
+        </section>
+
+        <section class="step" data-step="sail" hidden>
+          <div class="kicker">First run · 2 of 5</div>
+          <h1>Will you sail ships on this Mac?</h1>
+          <p class="lede">
+            Sailing means training one of Thorp’s own models — a voyage. It uses the GPU and can run for
+            minutes or hours. It is separate from the outside models you’ll chat to next.
+          </p>
+          <div class="choicegrid" id="sailchoice">
+            <button type="button" class="choice" data-sail="yes">
+              <b>Yes, I’ll sail</b>
+              <span>Train Thorp’s own classes here, starting with the keel.</span>
+            </button>
+            <button type="button" class="choice" data-sail="no">
+              <b>No, just chat</b>
+              <span>Skip the training pages for now; they stay one click away.</span>
+            </button>
+          </div>
+
+          <div id="classwrap" hidden>
+            <div class="sectionhead">
+              <h2>Which class will you sail?</h2>
+              <span class="note">A class sets your default; it does not start a voyage.</span>
+            </div>
+            <div class="classgrid" id="classcards"></div>
+            <p class="note" id="classnote"></p>
+          </div>
+
+          <div class="actions">
+            <button type="button" class="ghost" data-back="welcome">Back</button>
+            <button type="button" class="primary" id="sail-next" disabled>Continue</button>
+          </div>
+        </section>
+
+        <section class="step" data-step="models" hidden>
+          <div class="kicker">First run · 3 of 5</div>
+          <h1>What do you want to talk to?</h1>
+          <p class="lede">
+            These are outside instruct models, not Thorp’s own ships. Thorp’s models are built to be read;
+            these are built to answer. Pick a size band, then the models in it.
+          </p>
+          <div class="bandgrid" id="bandcards"></div>
+
+          <div id="modelwrap" class="modelwrap" hidden>
+            <div class="sectionhead">
+              <h2>Pick your instruct models</h2>
+              <span class="tools">
+                <button type="button" class="linkbtn" id="recommend">Select recommended</button>
+                <button type="button" class="linkbtn" id="clearmodels">Clear</button>
+              </span>
+            </div>
+            <div class="modellist" id="models"></div>
+            <div class="totalbar">
+              <span id="modeltotal">No models selected</span>
+              <span class="s" id="disknote"></span>
+            </div>
+          </div>
+
+          <div class="actions">
+            <button type="button" class="ghost" data-back="sail">Back</button>
+            <button type="button" class="linkbtn skip" id="skipmodels">Skip models for now</button>
+            <button type="button" class="primary" id="models-next" disabled>Continue</button>
+          </div>
+        </section>
+
+        <section class="step" data-step="store" hidden>
+          <div class="kicker">First run · 4 of 5</div>
+          <h1>Where should Thorp keep its records?</h1>
+          <p class="lede">
+            The ledger, the library, the queue and your settings live in Postgres. The store holds
+            records, not weights: checkpoints, books and model files stay on this Mac’s disk either way.
+          </p>
+
+          <div class="storegrid">
+            <button type="button" class="storecard selected" data-store="local">
+              <span class="tag">Recommended</span>
+              <b>Local Postgres</b>
+              <span>On this Mac · <code data-local-path>data/postgres</code> · localhost:5433 by default</span>
+              <span class="s">Works offline. The default for a fresh install.</span>
+            </button>
+            <button type="button" class="storecard" data-store="hosted" disabled>
+              <span class="tag">Coming later</span>
+              <b>Hosted Postgres</b>
+              <span>Hosted Thorp will point at a managed store.</span>
+              <span class="s">Not available yet; local is the way in for now.</span>
+            </button>
+          </div>
+
+          <div class="panel mt">
+            <h2>Local store <span class="note" id="storehead"></span></h2>
+            <div id="storestatus" class="checklist"></div>
+            <div class="storeactions">
+              <button type="button" class="secondary" id="storesetup">Set up local Postgres</button>
+              <span class="s" id="storemsg"></span>
+            </div>
+            <details class="fold">
+              <summary>Use an existing Postgres instead</summary>
+              <div class="rowline">
+                <input type="url" id="storeurl" placeholder="postgresql://user@host:5432/thorp" autocomplete="off" spellcheck="false" />
+                <button type="button" class="secondary" id="storetest">Test</button>
+                <button type="button" class="secondary" id="storeuse">Use this store</button>
+              </div>
+              <p class="note" id="storetestmsg"></p>
+            </details>
+            <p class="note" id="storelocked" hidden></p>
+          </div>
+
+          <div class="actions">
+            <button type="button" class="ghost" data-back="models">Back</button>
+            <button type="button" class="primary" id="store-next">Continue</button>
+          </div>
+        </section>
+
+        <section class="step" data-step="install" hidden>
+          <div class="kicker">First run · 5 of 5</div>
+          <h1>Installing</h1>
+          <p class="lede">
+            Keep this terminal open. Closing the tab is fine; closing the terminal stops the store and
+            the downloads. A model can finish after you open the dashboard.
+          </p>
+          <div id="installrows" class="installrows"></div>
+          <p class="note" id="installwarn"></p>
+          <div class="actions">
+            <button type="button" class="ghost" id="install-back">Back</button>
+            <a class="linkbtn skip" href="/settings" id="install-later" hidden>Open settings instead</a>
+            <button type="button" class="primary" id="finish" disabled>Finish setup</button>
+          </div>
+        </section>
+
+        <section class="step" data-step="done" hidden>
+          <div class="kicker">Ready</div>
+          <h1>You’re ready.</h1>
+          <p class="lede">
+            The keel is laid. Open the dashboard, or go straight to a chat.
+          </p>
+          <div class="donegrid" id="donecards"></div>
+          <div class="actions">
+            <a class="primary" id="chatlink" href="/chat">Chat to a model</a>
+            <a class="secondary" href="/">Open the dashboard</a>
+            <a class="ghost" id="queuelink" href="/expeditions/queue" hidden>Queue a voyage</a>
+          </div>
+          <p class="note" id="donewarn"></p>
+        </section>
+      </section>
+    </main>
+
+    <script src="/onboard/app.js"></script>
+  </body>
+</html>

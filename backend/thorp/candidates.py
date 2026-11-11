@@ -1,8 +1,8 @@
 """The leaderboard's three size classes and the candidates to approach next (11 November, Justin).
 
-The board is split by model size: **small** up to 4B, **medium** above 4B up to 30B, and
-**large** above 30B. The small class is the one with chaining readings; the medium and large
-classes have none yet, so each carries **five likeliest candidates** to approach.
+The board is split by model size: **extra small** under 1B, **small** 1B to 4B, **medium**
+above 4B up to 32B, and **large** above 32B. The small class is the one with chaining readings; the medium and large
+classes have none yet, so each carries the **likeliest candidates** to approach.
 
 A candidate is a target, not a result. It has no chaining lift until it is scored on the four
 chaining tests (`thorp/leaderboard.py`); its logic-deck reading, where one exists, is shown beside
@@ -11,7 +11,9 @@ the reasoning leaders of the open field, and one boundary case that can be read 
 on a chaining reading they do not have.
 
 Parameter counts are the models' published totals (active parameters for a mixture of experts).
-The 30B boundary is inclusive: a model published as 30B belongs to the medium class.
+The boundaries are inclusive at the top: a model published at 4B belongs to the small class and
+one at 32B to the medium class. A model under 1B is extra small; the missing-count fallback stays in
+the small class, where the board's readings are.
 """
 
 from __future__ import annotations
@@ -29,21 +31,27 @@ class SizeClass:
 
 
 SIZE_CLASSES: tuple[SizeClass, ...] = (
-    SizeClass("small", "Small", "up to 4B", 4e9),
-    SizeClass("medium", "Medium", "above 4B to 30B", 30e9),
-    SizeClass("large", "Large", "above 30B", None),
+    SizeClass("xsmall", "Extra small", "under 1B", 1e9),
+    SizeClass("small", "Small", "1B – 4B", 4e9),
+    SizeClass("medium", "Medium", "4B – 32B", 32e9),
+    SizeClass("large", "Large", "above 32B", None),
 )
 
 
 def size_class(params: float | None) -> str:
-    """A model's class by its total parameter count: small (<=4B), medium (<=30B), large (>30B).
+    """A model's class by its total parameter count: extra small (<1B), small (<=4B), medium (<=32B),
+    large (>32B).
 
     A missing count is treated as small: every reading the board holds without a published size is
     a small model, and a candidate always carries its published count."""
-    p = float(params or 0.0)
+    if params is None:
+        return "small"
+    p = float(params)
+    if p < 1e9:
+        return "xsmall"
     if p <= 4e9:
         return "small"
-    if p <= 30e9:
+    if p <= 32e9:
         return "medium"
     return "large"
 
@@ -109,6 +117,16 @@ MEDIUM: tuple[Candidate, ...] = (
         source="https://huggingface.co/microsoft/phi-4",
     ),
     Candidate(
+        model="google/gemma-4-31B-it",
+        label="Gemma 4 31B",
+        params=31e9,
+        lab="Google · Gemma",
+        why="The top of the medium band: 31B, just under the 32B line, and the likeliest medium "
+        "model that fits a workstation at 4-bit; Gemma 3 4B already chains (+0.254).",
+        note="the feasible first medium reading",
+        source="https://huggingface.co/google/gemma-4-31B-it",
+    ),
+    Candidate(
         model="openai/gpt-oss-20b",
         label="gpt-oss 20B",
         params=21e9,
@@ -159,16 +177,6 @@ LARGE: tuple[Candidate, ...] = (
         why="The top open-weight terminal/coding result; 744B total and 40B active, a second strong "
         "reasoning lineage.",
         source="https://huggingface.co/zai-org/GLM-5.3",
-    ),
-    Candidate(
-        model="google/gemma-4-31B-it",
-        label="Gemma 4 31B",
-        params=31e9,
-        lab="Google · Gemma",
-        why="The boundary case: 31B, one billion over the line, and the only large candidate that "
-        "fits a workstation at 4-bit; Gemma 3 4B already chains (+0.254).",
-        note="the feasible first large reading",
-        source="https://huggingface.co/google/gemma-4-31B-it",
     ),
 )
 

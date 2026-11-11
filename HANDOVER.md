@@ -151,3 +151,32 @@ page correctly falls back to the ships (no builder there). Some old data tests a
 `test_harbours_journeys.py` (journey/SOP rows missing from the store) and `test_fleet.py` (First Fleet/Star
 Fleet label); the chat, foreign and harbour tests pass.
 
+
+## 11 November, afternoon: closing Kipling
+
+Read DECISIONS.md, "Closing Kipling: four aims, the approved queue, three holds". The queue is approved and in the
+store through hold 1. Nothing is committed: the changes are `train.py` (control symbols reach the tokeniser; the
+probe phase), `tokeniser.py`, `turns.py`, `probe_phase.py`, `evaluators/answers.py`, `evaluators/ifeval.py`,
+`evaluators/samples.py` (`greedy`), `chat.py`, `lanes.py` and `queue_store.py` (the `hold:` line), `cli.py`
+(`thorp queue release`), `fleet.py` (Kipling's entry), `scripts/make_ifeval_corpus.py`,
+`scripts/make_return_corpus.py`, eleven new specs under `ships/specs/fitouts/`, four lists
+`ships/lists/ifeval-pairs-*-v1.csv`, `ships/lists/return-heldout-v1.jsonl`, and tests.
+
+**What to do as the lines dock, in order.**
+
+1. `9m@v0.0.5-return-rigged`: read `ifeval/prompt_strict` (the full 541; the mark is 0.65) and `ifeval/stopped`.
+   Chat to it on its ship page. If it is far under, the turns stage needs more passes or the long responses
+   are the loss: the `ifeval` artifact says which prompts failed.
+2. The four return legs: the proof is `answers/bpb`, `300k@v0.0.6-marks-return` against `300k@v0.0.6-return`
+   and the `-s2` pair. Proved only if marked is lower on both seeds and the arms' gap exceeds the plain seeds' gap.
+3. The probe reading is in `data/runs/cmd-*.out` and `data/runs/probe-phase-300k@v0.0.6-probe.json`.
+4. **At hold 1** (nothing at sea but the sleeping hold): restart the coordinator so it knows `hold:` lines; write
+   `300k@v0.0.6-kipling` and `-s2` from the ten-pin spec (per-head `release` for the pins read "by heart", the
+   pull kept on those that "need the pull", `kv_heads: 1`, `clean: marks-v1` and the symbols if the proof held),
+   then the 9m and 21m of the same shape and their return legs (seeded, as the 300k ones are); queue them with
+   `hold:` lines between, the rules as written in DECISIONS.md; then `rm ships/specs/kipling-candidate.hold`.
+5. The two Arc de Triomphe investigations at the end of the queue (`arc-qwen3-4b`, `deltanet-check-qwen3.8-27b`)
+   now sit behind hold 1 and the parked lines: move them forward if they should not wait for Kipling.
+
+**Known, not fixed:** 14 tests in `test_scaffold.py`, `test_sop.py`, `test_resume.py` and `test_spec.py` fail on
+`ae0fe12b` too (the `standard` policy refuses the test spec; the `tiny` preset is gone). The new tests pass.

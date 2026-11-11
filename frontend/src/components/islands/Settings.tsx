@@ -1,7 +1,7 @@
 // Settings (/settings, the cog in the header; /api/settings, thorp/dash/settings.py): what the dashboard
-// runs on. Read-only: the disk and what is kept on it, the store, the server and its machine, the
-// switches and keys, and the lanes. Each part is read on its own server-side, so one that failed says
-// why and the rest still stands.
+// runs on. Read-only except the store's edit form: the disk and what is kept on it, the store, the
+// server and its machine, the switches and keys, and the lanes. Each part is read on its own
+// server-side, so one that failed says why and the rest still stands.
 
 import { useState } from 'react';
 import { cardCls, btnCls, emptyCls, pillCls } from '@/lib/ui';
@@ -20,6 +20,7 @@ interface Storage {
 }
 interface Store {
   error?: string; url: string; ok: boolean; version?: string; bytes?: number; table_count?: number;
+  mode?: 'local' | 'hosted'; locked?: boolean; config_path?: string;
   holds: { ledger: boolean; library: boolean; queue: boolean } | null;
   tables?: { name: string; bytes: number; rows: number }[];
 }
@@ -65,6 +66,11 @@ function Failed({ what, error }: { what: string; error: string }) {
 
 export default function Settings() {
   const [fresh, setFresh] = useState(0);
+  const [storeEdit, setStoreEdit] = useState(false);
+  const [storeMode, setStoreMode] = useState<'local' | 'hosted'>('local');
+  const [hostedUrl, setHostedUrl] = useState('');
+  const [storeMsg, setStoreMsg] = useState('');
+  const [storeBusy, setStoreBusy] = useState(false);
   // the first read uses the server's minute-old sizes; "measure again" asks for them now
   const { data: d, error } = useApi<SettingsData>(fresh ? `/api/settings?fresh=1&n=${fresh}` : '/api/settings', 60000);
   const st = d?.storage, pg = d?.store, sv = d?.server, env = d?.environment;
@@ -75,7 +81,7 @@ export default function Settings() {
 
   return (
     <div {...sectionProps('settings')}>
-      <h1>Settings <span className="q">what this dashboard runs on: the disk and what is kept on it, the store, the server and its machine, the switches and the lanes. Nothing is changed from this page; each part says where it is set</span></h1>
+      <h1>Settings <span className="q">what this dashboard runs on: the disk and what is kept on it, the store, the server and its machine, the switches and the lanes. Only the store can be changed here; each part says where it is set</span></h1>
 
       {error && !d ? <div className={emptyCls()}>the settings could not be read: {error}. A server started before this page was added has no /api/settings: restart <code>thorp dash</code>.</div>
         : !d ? <div className={emptyCls()}>reading the settings…</div>
@@ -164,7 +170,7 @@ export default function Settings() {
 
             <div className="row">
               <section className={cardCls(false, 'panel')}>
-                <h2>The store <span className="note">Postgres: the ledger, the library, the queue and the VSM's records. Its address is <code>THORP_PG</code></span></h2>
+                <h2>The store <span className="note">Postgres: the ledger, the library, the queue and the VSM's records. Its address comes from <code>THORP_PG</code> or the install file; this one is {pg?.mode === 'hosted' ? 'hosted' : 'local'}</span></h2>
                 {!pg || (pg.error && !pg.url) ? <Failed what="the store" error={pg?.error || 'no answer'} /> : (
                   <>
                     <dl className="setlist">
@@ -176,6 +182,46 @@ export default function Settings() {
                         <span key={k} className={pillCls(pg.holds![k] ? 'good' : '')} title={pg.holds![k] ? `the ${k} is read from the store` : `the ${k} is still read from its file`}>{k}{pg.holds![k] ? '' : ': on file'}</span>
                       ))}</dd></> : null}
                     </dl>
+                    <div className="mt" style={{ borderTop: '1px solid var(--line)', paddingTop: 10 }}>
+                      <button type="button" className={btnCls('outline')} onClick={() => {
+                        setStoreEdit((v) => !v);
+                        setStoreMode(pg.mode === 'hosted' ? 'hosted' : 'local');
+                        setStoreMsg('');
+                      }}>{storeEdit ? 'Close' : 'Change store'}</button>
+                      {pg.locked ? <div className="s mt"><code>THORP_PG</code> controls this address; the environment wins over the file.</div> : null}
+                      {storeEdit ? (
+                        <div className="mt">
+                          <div className="note">A switch changes where new records go. It refuses while a voyage is at sea, and the dashboard and queue need a restart afterwards. Checkpoints and model weights stay on this Mac.</div>
+                          <label className="mt" style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
+                            <input type="radio" name="store-mode" checked={storeMode === 'local'} onChange={() => setStoreMode('local')} disabled={pg.locked} />
+                            <span><b>Local Postgres</b> <span className="s">on this Mac · <code>data/postgres</code></span></span>
+                          </label>
+                          <label style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
+                            <input type="radio" name="store-mode" checked={storeMode === 'hosted'} onChange={() => setStoreMode('hosted')} disabled={pg.locked} />
+                            <span><b>Hosted / existing Postgres</b> <span className="s">the hosted service is not built yet; this can point at a Postgres you run</span></span>
+                          </label>
+                          {storeMode === 'hosted' ? <input className="mt" style={{ width: '100%', padding: '7px 9px', background: 'var(--bg)', color: 'var(--text)', border: '1px solid var(--line)', borderRadius: 6 }} placeholder="postgresql://user@host:5432/thorp" value={hostedUrl} onChange={(e) => setHostedUrl(e.target.value)} spellCheck={false} /> : null}
+                          <div className="mt" style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                            <button type="button" className={btnCls('outline')} disabled={storeBusy || pg.locked || (storeMode === 'hosted' && !hostedUrl.trim())} onClick={async () => {
+                              setStoreBusy(true);
+                              setStoreMsg('');
+                              try {
+                                const r = await fetch('/api/store/switch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: storeMode, url: hostedUrl.trim() }) });
+                                const out = await r.json();
+                                if (!r.ok) throw new Error(out.error || `HTTP ${r.status}`);
+                                setStoreMsg(out.message || 'Switched. Restart thorp dash and the queue.');
+                                setFresh((n) => n + 1);
+                              } catch (e) {
+                                setStoreMsg(`Could not switch: ${(e as Error).message}`);
+                              } finally {
+                                setStoreBusy(false);
+                              }
+                            }}>{storeBusy ? 'Switching…' : 'Switch store'}</button>
+                            {storeMsg ? <span className="s">{storeMsg}</span> : null}
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
                     {pg.tables?.length ? (
                       <div className="scroll mt">
                         <table data-nosort>

@@ -74,7 +74,7 @@ export const tableCls = {
 
 /** Tabs: a nav of hash links. `line` for a page's own tabs under its title; the default for the header. */
 export function tabsCls(variant: 'default' | 'line' = 'default', extra = ''): string {
-  return cn('group/tabs', tabsListVariants({ variant }), 'h-8 flex-wrap', variant === 'line' && 'h-auto justify-start', extra);
+  return cn('group/tabs', tabsListVariants({ variant }), 'h-8 max-w-full min-w-0 flex-wrap', variant === 'line' && 'h-auto justify-start', extra);
 }
 /** One tab: active when it carries data-state="active" (setTab below). */
 export const tabCls = (extra = ''): string =>

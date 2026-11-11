@@ -12,11 +12,16 @@ What is the same as the MLX loop, by construction:
 - the optimiser: MLX's AdamW exactly (decoupled decay applied first, no bias correction), and MLX's
   clip_grad_norm (scale by max_norm / (norm + 1e-6) when above);
 - every loss term: cross-entropy, distillation from a teacher, the copy-weighted tack (induction,
-  duplicate, conclusion), the metre scaffold with its phases and starts, the comparator and bridge riddles;
+  duplicate, conclusion), the metre scaffold with its phases and starts, each head's own schedule, a teacher's
+  heads as targets and the probe phase, the comparator and bridge riddles;
 - checkpoints: the same files (model.safetensors, optimizer.safetensors, state.json) with the same names
   (MLX's optimizer layout: "<param>.m", "<param>.v", "step", "learning_rate"), so a checkpoint written by
   either backend resumes or is scored by the other;
 - the ledger rows: the same metric names every step and every METRICS_EVERY steps (the sieves).
+
+What this loop has not been taught it refuses (refuse_unsupported, below): a spec is read against the keys the loop
+honours before any work is done, so a key train.py learns and this file does not is an error here, never a voyage
+that quietly trains something else.
 
 What is not: the random initialisation (torch's generator, not MLX's, so a torch voyage starts from other
 weights unless it is seeded from a checkpoint) and the floating-point order of the kernels.
@@ -40,6 +45,113 @@ from thorp import data, paths
 from thorp import train as T
 from thorp.ledger import Ledger, reader, recorder
 from thorp.models import registry
+
+# ---------------------------------------------------------------- what this loop honours (refuse, never ignore)
+# The two loops are typed twice, so a key taught to train.py is not known here until someone types it again. Until
+# 11 November this loop passed over such keys in silence: a spec with shared key/value heads, a head's own fade or a
+# teacher's attention as the target trained another shape or another objective on a hired box than on the Mac, under
+# the same run id. So the loop now reads a spec against the list of what it honours before it does any work, and
+# refuses the voyage, naming every key, when the spec asks for something it would not do.
+#
+# HONOURED is every key this loop (and the shared code it calls) reads, dotted, a list's items as "[]". A key is added
+# here when the loop is taught it AND a test in tests/test_torch.py holds it to the MLX loop's numbers. UNSUPPORTED is
+# for a key the MLX loop honours and this one is known not to: the reason is given to whoever sails the spec.
+
+
+def _honoured() -> frozenset[str]:
+    def under(path: str, keys: str) -> list[str]:
+        return [f"{path}.{k}" for k in keys.split()]
+
+    riddle = "layer head weight items pool seed kinds from"
+    return frozenset(
+        # the top level: every key that is part of the run id (the labels, train.NOT_HASHED, are never refused)
+        "data tokeniser model optim eval checkpoint seed sop departures seeded_from transplant".split()
+        # (data.turns: the turn format the voyage was taught, read by thorp/turns.py for the evaluators, not here)
+        + under("data", "recipe passes order refuse clean opt_in first first_repeats stages turns")
+        + under("data.stages[]", "name recipe passes")
+        + under("eval", "sets every_steps evaluators light options")
+        + under("eval.light", "every_steps evaluators")
+        + under("checkpoint", "every_steps")
+        # cache_gb is MLX's free-buffer cache (train._run): there is nothing of it to honour here
+        + under("model", "family preset context positions backend layers width heads kv_heads cache_gb")
+        + under(
+            "optim",
+            "name lr betas weight_decay warmup_steps schedule min_lr_ratio batch_tokens grad_clip precision "
+            "copy_weight teacher scaffold",
+        )
+        + under("optim.copy_weight", "alpha kind")
+        + under("optim.teacher", "run alpha temperature")
+        + under("optim.scaffold", "weight hold fade floor release heads sample riddles probes")
+        + under("optim.scaffold.heads[]", "layer head card from hold fade floor release teacher_layer teacher_head")
+        + under("optim.scaffold.probes[]", "at steps to")
+        + under("optim.scaffold.sample", "windows length")
+        + under("optim.scaffold.riddles", " ".join(T.RIDDLES))
+        + [k for r in T.RIDDLES for k in under(f"optim.scaffold.riddles.{r}", riddle)]
+        + under("seeded_from", "run step mode lr_scale")
+        + under("transplant", "from_run star pos tok below ln")
+    )
+
+
+HONOURED = _honoured()
+# read by shared code only (the tokeniser, the evaluators' options, the declared departures): not this loop's to judge
+OPAQUE = frozenset({"tokeniser", "departures", "eval.options"})
+# key -> (why this loop cannot honour it, the values that leave it switched off). Empty since 11 November: the keys
+# it held that day (model.kv_heads, a head's own hold/fade/floor/release, a head's teacher_layer/teacher_head, the
+# scaffold's probes, and sop for the run row) were each taught to the loop and taken out as their tests passed.
+UNSUPPORTED: dict[str, tuple[str, tuple]] = {}
+
+
+class UnsupportedSpec(ValueError):
+    """A spec asks for something the torch loop does not do."""
+
+
+def _spec_keys(block: dict, path: str = ""):
+    """Every key of a spec with its value, dotted ("optim.scaffold.heads[].fade"): a dict's keys, and those of each
+    dict in a list. The labels and the blocks only shared code reads are single keys, not looked into."""
+    for k, v in block.items():
+        p = f"{path}.{k}" if path else str(k)
+        yield p, v
+        if p in OPAQUE or (not path and k in T.NOT_HASHED):
+            continue
+        if isinstance(v, dict):
+            yield from _spec_keys(v, p)
+        elif isinstance(v, list):
+            for item in v:
+                if isinstance(item, dict):
+                    yield from _spec_keys(item, p + "[]")
+
+
+def refuse_unsupported(spec: dict) -> None:
+    """Raise UnsupportedSpec, naming every key, when the spec asks for something this loop would not do: a key in
+    UNSUPPORTED that is switched on, a key this loop has never been taught (not in HONOURED), or a model family with
+    no torch model. A key that is absent, null or at its off value is never refused, nor is a label. Pure Python: it
+    reads the spec and nothing else, so the charter asks it before a box is hired."""
+    found: dict[str, str] = {}
+    for path, v in _spec_keys(spec):
+        if v is None or path in T.NOT_HASHED:
+            continue
+        if any(path.startswith((known + ".", known + "[]")) for known in found):
+            continue  # what lies under a key already refused needs no line of its own
+        if path in UNSUPPORTED:
+            why, off = UNSUPPORTED[path]
+            if v not in off and v != [] and v != {}:
+                found[path] = why
+        elif path not in HONOURED:
+            found[path] = "a key this loop has not been taught"
+    family = (spec.get("model") or {}).get("family")
+    if family is not None and family not in registry.TORCH_FAMILIES:
+        found["model.family"] = (
+            f"no torch model of the family {family!r} (have: {', '.join(sorted(registry.TORCH_FAMILIES))})"
+        )
+    if found:
+        raise UnsupportedSpec(
+            f"the torch loop cannot honour {spec.get('name') or 'this spec'}: "
+            + "; ".join(f"{k} ({why})" for k, why in found.items())
+            + ". The MLX loop (thorp/train.py) is the reference: sail it there, or teach thorp/train_torch.py the "
+            "key, hold it to MLX's numbers in tests/test_torch.py and add it to HONOURED (a key only shared code "
+            "reads, as the tokeniser's or an evaluator's, is added to HONOURED with a note of who reads it)."
+        )
+
 
 # ---------------------------------------------------------------- the device
 
@@ -82,6 +194,7 @@ def build_model(spec: dict, vocab: int, dev: torch.device | None = None):
         m["context"],
         m.get("positions", "learned"),
         backend="torch",
+        kv_heads=int(m.get("kv_heads") or 0),
         layers=m.get("layers"),
         width=m.get("width"),
         heads=m.get("heads"),
@@ -292,8 +405,9 @@ def metre_target(x, card: str, flags: dict | None = None):
     return hit / torch.clamp(n, min=1e-6)[..., None], n > 0
 
 
-def scaffold_loss(pats: dict, x, sc: dict, targets=None, flags=None, on=None):
-    """train.scaffold_loss: the mean cross-entropy from each scaffolded head's card to its attention."""
+def scaffold_head_losses(pats: dict, x, sc: dict, targets=None, flags=None) -> list:
+    """train.scaffold_head_losses: each scaffolded head's distance from its card (or from the target given for the
+    card: a teacher's attention), whatever the pull's weight."""
     out = []
     for h in sc["heads"]:
         card = h["card"]
@@ -302,9 +416,48 @@ def scaffold_loss(pats: dict, x, sc: dict, targets=None, flags=None, on=None):
         ce = -(tgt * torch.log(p + 1e-9)).sum(dim=-1)
         hf = has.float()
         out.append((ce * hf).sum() / torch.clamp(hf.sum(), min=1.0))
+    return out
+
+
+def scaffold_loss(
+    pats: dict, x, sc: dict, targets=None, flags=None, on=None, weights=None, per_head: list | None = None
+):
+    """train.scaffold_loss: the mean, over the scaffolded heads (those started, when `on` is given), of each head's
+    distance from its card. `weights` gives one weight a head (train.scaffold_weights: a head's own hold, fade, floor
+    and release), so a card can fade out while another holds; without it the heads weigh 1 and the caller scales."""
+    out = per_head if per_head is not None else scaffold_head_losses(pats, x, sc, targets, flags)
     if on is None:
-        return sum(out) / len(out)
-    return sum(on[i] * v for i, v in enumerate(out)) / torch.clamp(on[: len(out)].sum(), min=1.0)
+        if weights is None:
+            return sum(out) / len(out)
+        return sum(weights[i] * v for i, v in enumerate(out)) / len(out)
+    denom = torch.clamp(on[: len(out)].sum(), min=1.0)
+    if weights is None:
+        return sum(on[i] * v for i, v in enumerate(out)) / denom
+    return sum(weights[i] * on[i] * v for i, v in enumerate(out)) / denom
+
+
+def teacher_targets(teacher, x, sc: dict) -> dict | None:
+    """train.py's scaffold_targets: the teacher's own heads as the scaffold's targets. For each head that names a
+    `teacher_layer` and `teacher_head`, the attention the teacher's head puts on these tokens, with no gradient, every
+    query row counted; keyed by the head's card, as train.py keys it. None when there is no teacher or no head names
+    one, so every card falls back to its rule."""
+    if teacher is None:
+        return None
+    t_picks: dict[int, list[int]] = {}
+    for h in sc.get("heads") or []:
+        if h.get("teacher_head") is not None:
+            t_picks.setdefault(int(h["teacher_layer"]), []).append(int(h["teacher_head"]))
+    if not t_picks:
+        return None
+    with torch.no_grad():
+        _, tp = teacher.forward_attending(x, t_picks)
+    out = {}
+    for h in sc["heads"]:
+        if h.get("teacher_head") is None:
+            continue
+        a = tp[(int(h["teacher_layer"]), int(h["teacher_head"]))].detach().float()
+        out[h["card"]] = (a, torch.ones(a.shape[:-1], dtype=torch.float32, device=a.device))
+    return out
 
 
 def riddle_losses(model, rb: dict, riddle_cfg: dict) -> list:
@@ -493,6 +646,7 @@ def train(
     spec: dict, prep, rec: Ledger | None = None, stop_after: int | None = None, log=None
 ) -> dict:
     """train.train on PyTorch: train (or resume) the run this spec describes."""
+    refuse_unsupported(spec)  # before any work: a key this loop would pass over is a refusal, never a silent drift
     rid = T.run_id(spec)
     rec = rec or recorder()
     log = log or T.Log(paths.runs_dir() / f"{rid}.log")
@@ -569,6 +723,7 @@ def train(
             "name": spec.get("name"),
             "ship": spec.get("ship"),
             "spec_json": T.canonical(spec),
+            "sop_version": spec.get("sop"),
             "commit": T.git_commit(),
             "hardware": hardware(dev),
             "status": "running",
@@ -600,9 +755,11 @@ def train(
 
     sc = o.get("scaffold")
     picks, flags, sample, riddle_cfg, pools = None, None, None, {}, {}
+    probing = False  # the probe phase: the pull pulsed down, each pinned head's distance logged every step
     if sc:
         T.check_scaffold(sc, model.cfg.layers, model.cfg.heads)
         picks = T.scaffold_picks(sc) if sc.get("heads") else None
+        probing = bool(picks and sc.get("probes"))
         if any(h["card"] in T.KEYED or h["card"] == "rare_word" for h in sc.get("heads") or []):
             flags = metre_flags(tok, list(prep.recipe), dev)
         sample = sc.get("sample")
@@ -634,6 +791,8 @@ def train(
         until = f"faded out by {sc['fade']}" if sc.get("fade") is not None else "never released"
         if sc.get("floor"):
             until += f" to a floor of {sc['floor']}"
+        if sc.get("release") is not None:
+            until += f", released (weight 0) from {sc['release']}"
         log(f"metre scaffold: {where}; weight {sc.get('weight', 1.0)} to {sc.get('hold', 0)} of the voyage, {until}"
             + (f"; read on {sample['windows']} windows of {sample['length']}" if sample else "")
             + "".join(f"; riddle {k} on layer {r['layer']}" + (f" head {r['head']}" if "head" in r else " (logit lens)")
@@ -647,15 +806,18 @@ def train(
     # THORP_TORCH_COMPILE=1 compiles the plain forward pass (the scaffold's own passes stay eager)
     fwd = torch.compile(model) if os.environ.get("THORP_TORCH_COMPILE") == "1" else model
 
-    def loss_fn(x, y, sw: float, rb: dict, on):
+    def loss_fn(x, y, sw: float, hw, rb: dict, on):
+        dist = []  # each pinned head's distance from its card, whatever the weight (the probe phase reads it)
         if picks and not sample:
             logits, pats = model.forward_attending(x, picks)
-            sl = scaffold_loss(pats, x, sc, flags=flags, on=on if staged else None)
+            dist = scaffold_head_losses(pats, x, sc, teacher_targets(teacher, x, sc), flags)
+            sl = scaffold_loss(pats, x, sc, on=on if staged else None, weights=hw, per_head=dist)
         elif picks:
             logits = fwd(x)
             xs = x[: int(sample["windows"]), : int(sample["length"])]
             _, pats = model.forward_attending(xs, picks)
-            sl = scaffold_loss(pats, xs, sc, flags=flags, on=on if staged else None)
+            dist = scaffold_head_losses(pats, xs, sc, teacher_targets(teacher, xs, sc), flags)
+            sl = scaffold_loss(pats, xs, sc, on=on if staged else None, weights=hw, per_head=dist)
         else:
             logits, sl = fwd(x), zero
         riddle = riddle_losses(model, rb, riddle_cfg) if riddle_cfg else [zero, zero]
@@ -664,7 +826,9 @@ def train(
         parts = [sl] + riddle
         ce = F.cross_entropy(logits.float().transpose(1, 2), y, reduction="none")  # (batch, time)
         per_window = ce.mean(dim=1)
-        if teacher is not None:
+        # (alpha 0 is a teacher kept for its attention only, train.py's rule: no distillation, and the
+        # copy-weighted tack still applies)
+        if teacher is not None and float(teach.get("alpha", 0.5)) > 0:
             Tt, a = float(teach.get("temperature", 1.0)), float(teach.get("alpha", 0.5))
             with torch.no_grad():
                 t_lp = torch.log_softmax(teacher(x).float() / Tt, dim=-1)
@@ -675,8 +839,11 @@ def train(
             base = per_window.mean()
         else:
             base = copy_weighted(ce, x, y, cw, markers)
-        pull = parts[0] + parts[1] + parts[2] if riddle_cfg else parts[0]
-        return base + sw * pull, per_window, torch.stack([p.float() for p in parts])
+        # the heads carry their own weights (train.scaffold_weights), the riddles the voyage's
+        pull = parts[0] + sw * (parts[1] + parts[2]) if riddle_cfg else parts[0]
+        if probing:  # a probing voyage logs every pinned head's distance beside the three parts
+            parts = parts + [d.detach() for d in dist]
+        return base + pull, per_window, torch.stack([p.float() for p in parts])
 
     def riddle_batch(step: int) -> dict:
         from thorp import riddles
@@ -712,13 +879,19 @@ def train(
         opt.learning_rate = lr
         tokens = torch.as_tensor(np.asarray(batch.tokens), dtype=torch.long, device=dev)
         sw = T.scaffold_weight(step, total, sc) if sc else 0.0
+        hw_list = T.scaffold_weights(step, total, sc) if sc else []
         on = torch.as_tensor(
             T.scaffold_on(step, total, sc) if staged else [1.0], dtype=torch.float32, device=dev
         )
         for p in params.values():
             p.grad = None
         loss, per_window, sl = loss_fn(
-            tokens[:, :-1], tokens[:, 1:], sw, riddle_batch(step) if riddle_cfg else {}, on
+            tokens[:, :-1],
+            tokens[:, 1:],
+            sw,
+            torch.as_tensor(hw_list, dtype=torch.float32, device=dev),
+            riddle_batch(step) if riddle_cfg else {},
+            on,
         )
         loss.backward()
         grads = {
@@ -759,13 +932,19 @@ def train(
         }
         if sc:
             vals["scaffold/weight"] = sw
+            for h, w in zip(sc.get("heads") or [], hw_list, strict=True):
+                vals[f"scaffold/weight/{h['card']}"] = w
             if staged:
                 vals["scaffold/started"] = float(sum(T.scaffold_on(step - 1, total, sc)))
             parts = sl.detach().cpu().tolist()
             vals["scaffold/loss"] = parts[0]
-            for key, v in zip(("comparator", "bridge"), parts[1:], strict=True):
+            for key, v in zip(("comparator", "bridge"), parts[1:3], strict=True):
                 if key in riddle_cfg:
                     vals[f"scaffold/riddle/{key}"] = v
+            if probing:
+                vals["scaffold/probe"] = 1.0 if T.probe_at(step - 1, total, sc) else 0.0
+                for h, v in zip(sc.get("heads") or [], parts[3:], strict=True):
+                    vals[f"scaffold/distance/{h['card']}/l{h['layer']}h{h['head']}"] = v
             vals["scaffold/phase"] = float(
                 ("metre", "fade", "content", "release").index(T.scaffold_phase(step - 1, total, sc))
             )

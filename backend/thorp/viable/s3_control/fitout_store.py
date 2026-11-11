@@ -12,13 +12,14 @@ why), on `localhost:5433`, database `thorp` (override with THORP_PG). Started wi
 
 from __future__ import annotations
 
+import contextlib
 import functools
 import os
 
 from sqlalchemy import create_engine, select, text
 from sqlalchemy.orm import Session
 
-from thorp import paths
+from thorp import config, paths
 from thorp.viable.s3_control.models import (
     Composition,
     Fitout,
@@ -35,7 +36,18 @@ DEFAULT_URL = "postgresql://thorp@localhost:5433/thorp"
 
 
 def url() -> str:
-    return os.environ.get("THORP_PG", DEFAULT_URL)
+    """The store's address: THORP_PG first, then the install's own choice, then the local default."""
+    return os.environ.get("THORP_PG", "").strip() or config.store_url() or DEFAULT_URL
+
+
+def reset_engine() -> None:
+    """Forget the cached engine (the store was switched from the settings page or the first run).
+    A caller that still holds a session keeps it; new work opens the new store."""
+    old = engine.cache_info()
+    if old.currsize:
+        with contextlib.suppress(Exception):
+            engine().dispose()
+    engine.cache_clear()
 
 
 @functools.cache

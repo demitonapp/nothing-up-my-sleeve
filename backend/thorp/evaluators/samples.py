@@ -59,6 +59,30 @@ def generate(model, tok, prompt: str, temperature: float, n: int, context: int, 
     return tok.decode(out)
 
 
+def greedy(model, tok, ids: list[int], n: int, context: int, stop_ids=()) -> tuple[list[int], bool]:
+    """The model's own continuation of `ids`, most likely piece by most likely piece, for at most `n` pieces:
+    the pieces written, and whether it stopped itself (the end-of-text mark, or one of `stop_ids`, which is
+    not kept) rather than running into the cap. The same on both backends."""
+    stops = {int(i) for i in stop_ids}
+    eos = getattr(tok, "eos_id", None)
+    if eos is not None:
+        stops.add(int(eos))
+    out: list[int] = []
+    torch = ops.is_torch(model)
+    if not torch:
+        import mlx.core as mx
+    for _ in range(n):
+        window = (ids + out)[-context:]
+        if torch:
+            token = int(np.argmax(ops.last_logits(model, [window])[0]))
+        else:
+            token = int(mx.argmax(model(mx.array([window]))[0, -1].astype(mx.float32)).item())
+        if token in stops:
+            return out, True
+        out.append(token)
+    return out, False
+
+
 def _pick(logits: np.ndarray, temperature: float, rng) -> int:
     """The torch models' sampler: greedy at temperature 0, else a draw from softmax(logits / T)."""
     if temperature == 0:

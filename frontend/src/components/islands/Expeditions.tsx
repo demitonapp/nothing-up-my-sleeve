@@ -5,17 +5,155 @@
 // server-rendered and ECharts touches `document` when it loads.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { FormEvent, MouseEvent as ReactMouseEvent } from 'react';
-import { btnCls, cardCls, checkCls, crumbCls, emptyCls, fieldCls, hoverCardCls, rangeCls, selectCls, tabCls, tabsCls, toggleCls } from '@/lib/ui';
+import type { FormEvent, KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent, ReactNode } from 'react';
+import { btnCls, cardCls, checkCls, crumbCls, emptyCls, fieldCls, hoverCardCls, pillCls, rangeCls, selectCls, toggleCls } from '@/lib/ui';
 import { routePath, useApi, useRoute } from '@/lib/useApi';
-import { esc } from '@/lib/format';
+import { esc, fmt } from '@/lib/format';
 import { starHeadline } from '@/scripts/views/helpers';
+import SectionNav from '../SectionNav';
+import { TabNav } from '../TabNav';
 import {
   censusHtml, deckHtml, expeditionCardsHtml, expeditionName, expeditionOutcomes, expeditionTableHtml, expPill, firstLightFindings, fitHtml, fleetShipsHtml, runsTableHtml,
-  inductionVerdict, leversRowsHtml, outcomesRowsHtml, parseExpeditionRoute, queueRowsHtml, readingsTable,
+  inductionVerdict, leversRowsHtml, outcomesRowsHtml, parseExpeditionRoute, pinsStripHtml, queueRowsHtml, readingsTable,
   skyStateOf, sopCardsHtml, tableLogHtml, tableReadingsHtml, planHtml,
 } from '@/scripts/views/expeditions';
 import type { Expedition, Observation, SeriesMap, SkyViewState, TableExchange } from '@/scripts/views/expeditions';
+
+/** The expeditions' priority (11 November, Justin: "under goals ... choose their priority across all
+ *  the expeditions ... the coordinator can schedule accordingly"): the whole list in rank order, moved
+ *  up and down and saved. Saving writes the order and stably sorts the pending spec lines to it, so the
+ *  coordinator, which takes the first line, sails the highest-priority expedition's earliest voyage. */
+type GoalRow = {
+  key: string; expedition?: string; name: string; goal?: number | null; goal_text?: string;
+  status?: string; priority: number;
+};
+
+/** Priority by goal (11 November, Justin: "it should be a table that is filterable and sortable. For
+ *  example I only want to be able to plan current expeditions goals"): the rows are the goals across
+ *  every expedition, filtered by status/expedition/text and sortable by any column, while the priority
+ *  itself is the # cell — a number, 1 first — so sorting the view never changes the plan. */
+function PriorityPanel({ rows, highlight }: { rows: GoalRow[]; highlight?: string }) {
+  const [order, setOrder] = useState(rows);
+  const [msg, setMsg] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [status, setStatus] = useState('running');
+  const [exp, setExp] = useState('');
+  const [q, setQ] = useState('');
+  const [sort, setSort] = useState<{ key: 'priority' | 'goal' | 'expedition' | 'status'; dir: 1 | -1 }>({ key: 'priority', dir: 1 });
+  useEffect(() => { setOrder(rows); setMsg(''); }, [rows]);
+
+  const place = (key: string, n: number): void => {
+    const from = order.findIndex((r) => r.key === key);
+    if (from < 0) return;
+    const to = Math.max(0, Math.min(order.length - 1, n - 1));
+    const next = order.slice();
+    const [row] = next.splice(from, 1);
+    next.splice(to, 0, row);
+    setOrder(next);
+    setMsg('');
+  };
+  const sortBy = (key: 'priority' | 'goal' | 'expedition' | 'status'): void =>
+    setSort((s) => (s.key === key ? { key, dir: s.dir === 1 ? -1 : 1 } : { key, dir: 1 }));
+  const arrow = (key: string): string => (sort.key === key ? (sort.dir === 1 ? ' ↑' : ' ↓') : '');
+
+  const expeditions = Array.from(new Map(order.map((r) => [r.expedition || r.name, r.name])).entries());
+  const shown = order
+    .map((r, i) => ({ r, rank: i + 1 }))
+    .filter(({ r }) => {
+      const st = r.status || '';
+      if (status !== 'all' && st !== status) return false;
+      if (exp && (r.expedition || r.name) !== exp) return false;
+      if (q && !`${r.goal_text || ''} ${r.name}`.toLowerCase().includes(q.toLowerCase())) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      if (sort.key === 'priority') return (a.rank - b.rank) * sort.dir;
+      const va = sort.key === 'goal' ? (a.r.goal_text || a.r.name) : sort.key === 'expedition' ? a.r.name : a.r.status || '';
+      const vb = sort.key === 'goal' ? (b.r.goal_text || b.r.name) : sort.key === 'expedition' ? b.r.name : b.r.status || '';
+      return String(va).localeCompare(String(vb)) * sort.dir;
+    });
+
+  const save = async (): Promise<void> => {
+    setSaving(true);
+    setMsg('saving…');
+    try {
+      const r = await fetch('/api/expedition_priority', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ order: order.map((x) => x.key) }),
+      });
+      if (!r.ok) throw new Error(await r.text());
+      await r.json();
+      setMsg('saved: the queue is reordered and the coordinator takes the first line');
+    } catch (e) {
+      setMsg(`could not save: ${(e as Error).message}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <section className={cardCls(false, 'panel')} id="voyagepriority">
+      <h2>Priority <span className="note">the goals across every expedition, in the order the coordinator should take them: first is highest, and a goal of one expedition may sit between two goals of another. The # cell is the priority (1 first); filtering or sorting the view never changes it. Saving reorders the pending spec lines — a spec joins a goal by naming it (<code>goal: 4</code> in its YAML), a line with no goal sits with its expedition's first, and cmd/wait lines stay where they are</span></h2>
+      <div className="handtools priofilters">
+        <label className="note">show{' '}
+          <select className={selectCls('')} value={status} onChange={(e) => setStatus(e.target.value)}>
+            <option value="running">running (current)</option>
+            <option value="planned">planned</option>
+            <option value="paused">paused</option>
+            <option value="all">all</option>
+          </select>
+        </label>
+        <label className="note">expedition{' '}
+          <select className={selectCls('')} value={exp} onChange={(e) => setExp(e.target.value)}>
+            <option value="">all</option>
+            {expeditions.map(([key, name]) => <option key={key} value={key}>{name}</option>)}
+          </select>
+        </label>
+        <label className="note">search{' '}
+          <input className={fieldCls('')} type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="goal or expedition" style={{ width: 200 }} />
+        </label>
+        <span className="note">{shown.length} of {order.length} goals</span>
+      </div>
+      <div className="scroll priolist">
+        <table data-nosort>
+          <thead><tr>
+            <th className="sortable" onClick={() => sortBy('priority')} title="the priority; 1 sails first">#{arrow('priority')}</th>
+            <th className="sortable" onClick={() => sortBy('goal')}>goal{arrow('goal')}</th>
+            <th className="sortable" onClick={() => sortBy('expedition')}>expedition{arrow('expedition')}</th>
+            <th className="sortable" onClick={() => sortBy('status')}>status{arrow('status')}</th>
+            <th>move</th>
+          </tr></thead>
+          <tbody>
+            {shown.map(({ r, rank }) => (
+              <tr key={r.key} className={r.key === highlight ? 'sel' : ''}>
+                <td className="num">
+                  <input className="prioinput" type="number" min={1} max={order.length} value={rank}
+                    onChange={(e) => place(r.key, Number(e.target.value) || rank)} title="priority: 1 sails first" />
+                </td>
+                <td>
+                  <b>{r.goal_text || r.name}</b>
+                  {r.goal ? <span className="s"> · goal {r.goal}</span> : null}
+                </td>
+                <td className="s">{r.name}</td>
+                <td className="s">{r.status || ''}</td>
+                <td>
+                  <button type="button" className={btnCls('outline', '')} onClick={() => place(r.key, rank - 1)} disabled={rank === 1} title="move up">↑</button>{' '}
+                  <button type="button" className={btnCls('outline', '')} onClick={() => place(r.key, rank + 1)} disabled={rank === order.length} title="move down">↓</button>
+                </td>
+              </tr>
+            ))}
+            {shown.length ? null : <tr><td colSpan={5} className={emptyCls(true)}>no goals match this filter</td></tr>}
+          </tbody>
+        </table>
+      </div>
+      <div className="handtools mt">
+        <button type="button" className={btnCls('default', '')} onClick={save} disabled={saving}>{saving ? 'saving…' : 'Save priority'}</button>
+        <span className="note">{msg}</span>
+      </div>
+    </section>
+  );
+}
 
 /** The route, read after mount (as useRoute) and kept current through pushState and popstate. */
 function usePath(): [string, (p: string) => void] {
@@ -35,6 +173,8 @@ const EMPTY = (msg: string): string => `<div class="${emptyCls()}">${msg}</div>`
 // a panel that does not belong to this expedition: the card's flex would otherwise win over [hidden]
 const hideStyle = (hide: boolean): { display?: string } | undefined => (hide ? { display: 'none' } : undefined);
 const journeyOptsKey = (v: Expedition | null): string => (v ? v.key + '|' + v.runs.filter((r) => !r.set_aside).map((r) => r.run_id).join(',') : '');
+// the queue's row identity: the name, plus the spec or start that tells two attempts apart
+const queueKey = (r: any): string => `${r?.name || ''}|${r?.spec || r?.started || ''}`;
 
 /** Compare two SOP versions ("0.0.6" against "0.0.10") as numbers, not as strings. */
 const sopVersionCmp = (a: string, b: string): number => {
@@ -310,6 +450,234 @@ const scheduleLine = (sc: any): string => {
       <div class="s">Kept is the card's reading at the phase's end as a share of its reading at the start: how much of it survived that phase. A hold or fade that holds reads near 100%; one that doesn't shows which card fell.</div></div>
   </details>`;
 };
+
+/** A label/value row on a voyage card: the at-sea card's .armrow, reused in the queue's modal. */
+function VRow({ k, children }: { k: string; children: ReactNode }) {
+  return <div className="armrow"><span className="k">{k}</span><span>{children}</span></div>;
+}
+
+function VSection({ title, wide, children }: { title: string; wide?: boolean; children: ReactNode }) {
+  return <section className={`qvsec${wide ? ' wide' : ''}`}><h3>{title}</h3>{children}</section>;
+}
+
+/** One voyage in the queue, opened as a card: the same shape the at-sea cards use (embeddings, reads,
+ *  attention, pins, schedule, readings), plus the spec's question and its place in the queue. The data is
+ *  the row's `detail` from /api/queue; a voyage at sea also carries its latest readings. */
+function QueueVoyageDialog({ row, onClose }: { row: any; onClose: () => void }) {
+  const ref = useRef<HTMLDialogElement>(null);
+  const opener = useRef<HTMLElement | null>(null);
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    opener.current = document.activeElement as HTMLElement | null;
+    if (!el.open) el.showModal();
+    const cancel = (e: Event): void => { e.preventDefault(); closeRef.current(); };
+    el.addEventListener('cancel', cancel);
+    return () => {
+      el.removeEventListener('cancel', cancel);
+      if (el.open) el.close();
+      opener.current?.focus?.();
+    };
+  }, []);
+  const d = row?.detail || {};
+  const model = d.model || {};
+  const tok = d.tokeniser || {};
+  const data = d.data || {};
+  const optim = d.optim || {};
+  const sc = d.scaffold || {};
+  const content = d.content || {};
+  const readings = d.readings || null;
+  const stages: any[] = Array.isArray(data.stages) ? data.stages : [];
+  const symbols: string[] = Array.isArray(tok.symbols) ? tok.symbols : [];
+  const refuses: string[] = Array.isArray(data.refuse) ? data.refuse : [];
+  const pins: any[] = Array.isArray(sc.heads) ? sc.heads : [];
+  const riddles: [string, any][] = Object.entries(sc.riddles || {}) as [string, any][];
+  const params = model.params || {};
+  const layers = Number(model.layers || 0);
+  const num = (v: any, digits = 3): string => (v == null || v === '' ? '–' : Number.isFinite(Number(v)) ? fmt(Number(v), digits) : String(v));
+  const int = (v: any): string => (v == null || v === '' ? '–' : Number(v).toLocaleString());
+  const pct = (v: any): string => (v == null ? '–' : `${Math.round(Number(v) * 100)}%`);
+  const tone = row?.status === 'at sea' ? 'running' : row?.status === 'queued' ? '' : 'accent';
+  const when = row?.status === 'at sea'
+    ? row?.started ? `since ${new Date(row.started).toLocaleString()}` : 'at sea'
+    : row?.starts_in_min != null
+      ? `${row.at_least ? '≥ ' : '≈ '}${new Date(Date.now() + Number(row.starts_in_min) * 60000).toLocaleString()}`
+      : 'no time yet';
+  const estimate = row?.est_min != null ? `${Math.round(Number(row.est_min))} min${row.est_source ? ` · ${row.est_source}` : ''}` : 'no time yet';
+  const rcards: any[] = readings && Array.isArray(readings.cards) ? readings.cards : [];
+  const totalSteps = optim.steps ?? (d.schedule || {}).total ?? null;
+  const hasScaffold = pins.length > 0 || riddles.length > 0;
+  // how far the voyage is and when it should dock, from the steps it has written and its own start
+  const started = readings?.started || row?.started || null;
+  const step = readings?.step != null ? Number(readings.step) : null;
+  const total = totalSteps != null && Number(totalSteps) > 0 ? Number(totalSteps) : null;
+  const pctDone = step != null && total ? Math.max(0, Math.min(100, (100 * step) / total)) : null;
+  const startMs = started ? new Date(started).getTime() : null;
+  const elapsedMin = startMs != null && Number.isFinite(startMs) ? Math.max(0, (Date.now() - startMs) / 60000) : null;
+  const paceLeft = step != null && total && step > 0 && elapsedMin != null ? Math.max(0, ((total - step) * elapsedMin) / step) : null;
+  const queueLeft = row?.est_min != null && elapsedMin != null ? Math.max(0, Number(row.est_min) - elapsedMin) : null;
+  const queueFinish = startMs != null && Number.isFinite(startMs) && row?.est_min != null
+    ? new Date(startMs + Number(row.est_min) * 60000) : null;
+  const finishAt = paceLeft != null ? new Date(Date.now() + paceLeft * 60000) : queueFinish;
+  const leftMin = paceLeft ?? queueLeft;
+  const dur = (m: number): string => (m < 1 ? 'under a minute' : m < 90 ? `${Math.round(m)} min` : `${(m / 60).toFixed(1)} h`);
+  const clockAt = (d: Date): string => d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    + (d.toDateString() === new Date().toDateString() ? '' : ` ${d.toLocaleDateString(undefined, { weekday: 'short' })}`);
+  return (
+    <dialog ref={ref} className="qv-dialog" aria-labelledby="qvtitle"
+      onClick={(e) => { if (e.target === ref.current) onClose(); }}>
+      <div className="qvwrap" onClick={(e) => e.stopPropagation()}>
+        <header className="qvhead">
+          <div className="qvheadmain">
+            <h2 className="qvtitle" id="qvtitle">{row.name}</h2>
+            <p className="qvsub">
+              {row.ship || '–'}
+              {row.expedition ? <> · <a href={`/expeditions/${row.expedition}`}>{row.expedition_name || row.expedition}</a></> : null}
+            </p>
+          </div>
+          <div className="qvbadges">
+            <span className={pillCls(tone)}>{row.status || 'queued'}</span>
+            {row.sop ? <span className={pillCls('accent')}>SOP v{row.sop}</span> : null}
+            {row.preset ? <span className={pillCls('')}>{row.preset}</span> : null}
+            {row.seed != null ? <span className={pillCls('')}>seed {row.seed}</span> : null}
+          </div>
+        </header>
+        <button type="button" className="qvclose" onClick={onClose} aria-label="Close">×</button>
+          {row.missing ? <div className="qvmissing">The queue names this voyage but its spec file is missing: <span className="mono">{row.spec || '–'}</span></div> : null}
+          <div className="qvgrid">
+            <VSection title="The question" wide>
+              {row.goal ? <p className="qvtext">{row.goal}</p> : <p className="s">The spec states no question.</p>}
+              {row.experiment ? <p className="qvtext qvexp"><span className="k">experiment</span> {row.experiment}</p> : null}
+            </VSection>
+
+            <VSection title="The run">
+              <VRow k="expedition">{row.expedition ? <a href={`/expeditions/${row.expedition}`}>{row.expedition_name || row.expedition}</a> : '–'}</VRow>
+              <VRow k="ship">{row.ship || '–'}</VRow>
+              <VRow k="SOP">{row.sop ? `v${row.sop}` : '–'}</VRow>
+              <VRow k="class">{model.preset || row.preset || '–'}</VRow>
+              <VRow k="seed">{row.seed ?? '–'}</VRow>
+              {row.fitout?.key ? <VRow k="fitout">{row.fitout.name || row.fitout.key}{row.fitout.variation ? ` · ${row.fitout.variation}` : ''}{row.fitout.stage ? ` · ${row.fitout.stage}` : ''}</VRow> : null}
+              <VRow k="spec"><span className="mono">{row.spec || '–'}</span></VRow>
+              <VRow k="queue">{row.n != null ? `#${row.n}` : row.status === 'at sea' ? 'at sea now' : '–'}</VRow>
+              <VRow k="lane">{row.lane || (row.status === 'at sea' ? 'sailing' : '–')}</VRow>
+              <VRow k="starts">{when}</VRow>
+              <VRow k="about">{estimate}</VRow>
+            </VSection>
+
+            <VSection title="The ship">
+              <VRow k="layers">{model.layers ?? '–'}</VRow>
+              <VRow k="query heads">{model.heads ?? '–'}</VRow>
+              <VRow k="KV heads">{model.kv_heads ? model.kv_heads : 'one per query head'}</VRow>
+              <VRow k="width">{model.width ?? '–'}</VRow>
+              <VRow k="context">{model.context ? `${int(model.context)} pieces` : '–'}</VRow>
+              <VRow k="positions">{model.positions || '–'}</VRow>
+              <VRow k="parameters">{params.total != null ? int(params.total) : '–'}</VRow>
+              <VRow k="non-embedding">{params.non_embedding != null ? int(params.non_embedding) : '–'}</VRow>
+              <VRow k="embedding">{params.embedding != null ? int(params.embedding) : '–'}</VRow>
+            </VSection>
+
+            <VSection title="The tokeniser">
+              <VRow k="pieces">{tok.kind || '–'} · {tok.vocab != null ? `${int(tok.vocab)} pieces` : '–'}</VRow>
+              <VRow k="byte fallback">{tok.byte_fallback ? 'yes' : 'no'}</VRow>
+              <VRow k="trained on"><span className="mono">{tok.train_on || '–'}</span></VRow>
+              <VRow k="control symbols">{symbols.length ? symbols.map((s) => <span className="sym" key={s}>{s}</span>) : <span className="s">none declared</span>}</VRow>
+            </VSection>
+
+            <VSection title="What it reads">
+              <VRow k="recipe"><span className="mono">{data.recipe || '–'}</span></VRow>
+              <VRow k="passes">{data.passes ?? '–'} {data.passes === 1 ? 'pass' : 'passes'}</VRow>
+              <VRow k="clean">{data.clean || 'raw'}</VRow>
+              {data.order ? <VRow k="order">{data.order}</VRow> : null}
+              {content && (content.version || content.books != null) ? (
+                <VRow k="content">
+                  {content.version ? <b>{String(content.version).replace(/^ogden-/, 'Ogden ')}</b> : '–'}
+                  {content.books != null ? ` · ${int(content.books)} books` : ''}
+                  {content.marked ? ` · ${int(content.marked)} with turns marked` : ''}
+                  {content.transform ? ` · ${content.transform}` : ''}
+                  {content.stamped ? '' : ' · no stamped transform'}
+                </VRow>
+              ) : null}
+              {stages.length ? <VRow k="stages"><ul className="qvlist">{stages.map((s: any, i: number) => (
+                <li key={i}><b>{s.name || 'stage'}</b> · <span className="mono">{String(s.recipe || '').split('/').pop() || '–'}</span> · {s.books ?? '?'} books × {s.passes ?? '?'}</li>
+              ))}</ul></VRow> : null}
+              {refuses.length ? <VRow k="refuses"><ul className="qvlist">{refuses.map((x) => <li key={x} className="mono">{x}</li>)}</ul></VRow> : null}
+              {data.opt_in ? <VRow k="opt-in"><span className="qvtext">{data.opt_in}</span></VRow> : null}
+            </VSection>
+
+            <VSection title="The scaffold" wide>
+              {hasScaffold ? <>
+                <VRow k="weight">{sc.weight != null ? Number(sc.weight).toFixed(2) : '–'}</VRow>
+                <VRow k="hold">{pct(sc.hold)}</VRow>
+                <VRow k="fade">{pct(sc.fade)}</VRow>
+                <VRow k="release">{sc.release == null ? 'none' : pct(sc.release)}</VRow>
+                <VRow k="pins">{pins.length} head pin{pins.length === 1 ? '' : 's'}{riddles.length ? ` · ${riddles.length} riddle${riddles.length === 1 ? '' : 's'}` : ''}</VRow>
+                <div className="qvsubhead">where they sit</div>
+                <div className="pinstrip" dangerouslySetInnerHTML={{ __html: pinsStripHtml(pins, layers) }} />
+                {riddles.length ? <>
+                  <div className="qvsubhead">riddles</div>
+                  {riddles.map(([name, r]) => <VRow k={name} key={name}>layer {r.layer} · head {r.head} · {r.items} items · pool {r.pool}</VRow>)}
+                </> : null}
+                <div className="qvsubhead">the schedule</div>
+                <div dangerouslySetInnerHTML={{ __html: scheduleLine(d.schedule) }} />
+              </> : <p className="s">No scaffold: every head is left to the corpus, so the loss and the cards it forms are the measurement.</p>}
+            </VSection>
+
+            <VSection title="The training">
+              <VRow k="optimiser">{optim.name || '–'}</VRow>
+              <VRow k="learning rate">{optim.lr ?? '–'}</VRow>
+              <VRow k="warm-up">{optim.warmup_steps != null ? `${int(optim.warmup_steps)} steps` : '–'}</VRow>
+              <VRow k="batch">{optim.batch_tokens != null ? `${int(optim.batch_tokens)} tokens` : '–'}</VRow>
+              <VRow k="schedule">{optim.schedule || '–'}{optim.min_lr_ratio != null ? ` · min ${pct(optim.min_lr_ratio)}` : ''}</VRow>
+              <VRow k="grad clip">{optim.grad_clip ?? '–'}</VRow>
+              <VRow k="precision">{optim.precision || '–'}</VRow>
+              <VRow k="steps">{totalSteps != null ? int(totalSteps) : 'known once it sails'}</VRow>
+            </VSection>
+
+            <VSection title="Its readings" wide>
+              {readings ? <>
+                <VRow k="progress">
+                  <div className="qvprogress">
+                    {pctDone != null && total != null && step != null ? <progress className="qvbar" max={total} value={step} aria-label="voyage progress" /> : null}
+                    <b>{pctDone != null ? `${pctDone.toFixed(1)}%` : '–'}</b>
+                    <span className="s">{step != null ? `step ${int(step)}${total != null ? ` of ${int(total)}` : ''}` : 'not started'}</span>
+                  </div>
+                </VRow>
+                <VRow k="finish">
+                  {finishAt ? <><b>{clockAt(finishAt)}</b>{leftMin != null ? <span className="s"> · about {dur(leftMin)} left{paceLeft != null ? ' at this pace' : ''}</span> : null}</> : <span className="s">no estimate yet</span>}
+                </VRow>
+                {queueFinish && finishAt && paceLeft != null && queueLeft != null && Math.abs(queueFinish.getTime() - finishAt.getTime()) > 5 * 60000
+                  ? <VRow k="queue est."><span className="s">{clockAt(queueFinish)} · about {dur(queueLeft)} left by the queue's estimate</span></VRow>
+                  : null}
+                <VRow k="loss">{num(readings.loss)}</VRow>
+                <VRow k="bpb">{num(readings.bpb)}</VRow>
+                <VRow k="chaining">{readings.chaining == null ? '–' : `${readings.chaining > 0 ? '+' : ''}${num(readings.chaining)}`}</VRow>
+                <VRow k="tokens read">{readings.tokens_seen != null ? int(readings.tokens_seen) : '–'}</VRow>
+                <VRow k="started">{readings.started ? new Date(readings.started).toLocaleString() : '–'}</VRow>
+                <VRow k="shapes">parts of speech {num((readings.shapes || {}).upos)} · keyed words {num((readings.shapes || {}).keyed)}</VRow>
+                {rcards.length ? <>
+                  <div className="qvsubhead">the cards</div>
+                  <div className="qvcards">{rcards.map((c: any, i: number) => {
+                    const lit = c.now != null && c.mark != null && c.now >= c.mark;
+                    return <span key={`${c.card}-${c.layer}-${c.head}-${i}`} className={`cardlight${lit ? ' lit' : ''}`}
+                      title={`${c.card} at layer ${c.layer}, head ${c.head}: now ${num(c.now, 2)} against its mark ${num(c.mark, 2)}`}>
+                      <b>{c.card}</b> <i>L{c.layer} H{c.head}</i> {num(c.now, 2)}/{num(c.mark, 2)}
+                    </span>;
+                  })}</div>
+                </> : null}
+              </> : <p className="s">No readings yet: a queued voyage writes its readings once it sails.</p>}
+            </VSection>
+          </div>
+          <div className="qvfoot">
+            {row.expedition ? <a className={btnCls('outline', '')} href={`/expeditions/${row.expedition}/plan`}>the expedition's plan →</a> : null}
+            <span className="s">Spec: <span className="mono">{row.spec || '–'}</span></span>
+          </div>
+        </div>
+    </dialog>
+  );
+}
+
 export default function Expeditions() {
   const [path, go] = usePath();
   const route = parseExpeditionRoute(path);
@@ -318,21 +686,45 @@ export default function Expeditions() {
   const isList = route.kind === 'list';
   const isVoyage = route.kind === 'voyage';
   const isTable = route.kind === 'table';
-  const onPage = isQueue || isList || isVoyage || isTable;
+  const onPage = isOverview || isQueue || isList || isVoyage || isTable;
 
   // one route for the whole page, one poll for the expeditions (the cards and one expedition both read it)
   const expsApi = useApi<Expedition[]>(onPage ? '/api/expeditions' : null, 60000);
-  const ladderApi = useApi<any>(onPage ? '/api/ladder' : null, 300000);
+  const ladderApi = useApi<any>(isQueue || isList || isVoyage || isTable ? '/api/ladder' : null, 300000);
   // the overview tab needs this payload too, or it sits on 'reading the expeditions…' for ever
   const ovApi = useApi<any>(isOverview || isQueue || isList || isVoyage ? '/api/expeditions/overview' : null, 15000);
   const queueApi = useApi<any>(isQueue ? '/api/queue' : null, 15000);
+  const prioApi = useApi<any>(isQueue ? '/api/expedition_priority' : null, 0);
+  // the queue row whose card is open: its identity, so a poll that reorders the queue cannot swap it
+  const [queuePick, setQueuePick] = useState<string | null>(null);
+  const queueRow = useMemo(() => (queuePick ? (queueApi.data?.rows || []).find((r: any) => queueKey(r) === queuePick) || null : null), [queueApi.data, queuePick]);
+  useEffect(() => { if (!isQueue) setQueuePick(null); }, [isQueue]);
+  useEffect(() => { if (queuePick && queueApi.data && !queueRow) setQueuePick(null); }, [queuePick, queueApi.data, queueRow]);
+  const onQueueClick = (e: ReactMouseEvent): void => {
+    const t = e.target as HTMLElement;
+    if (t.closest('a,button,summary,.info,input,select,textarea')) return;
+    const tr = t.closest('#queuetable tr[data-qi]') as HTMLElement | null;
+    if (!tr) return;
+    const row = (queueApi.data?.rows || [])[Number(tr.dataset.qi)];
+    if (row) setQueuePick(queueKey(row));
+  };
+  const onQueueKey = (e: ReactKeyboardEvent): void => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const t = e.target as HTMLElement;
+    if (t.closest('a,button,summary,.info')) return;
+    const tr = t.closest('#queuetable tr[data-qi]') as HTMLElement | null;
+    if (!tr) return;
+    e.preventDefault();
+    const row = (queueApi.data?.rows || [])[Number(tr.dataset.qi)];
+    if (row) setQueuePick(queueKey(row));
+  };
   const exps = expsApi.data || [];
   const rungs = useMemo(() => (Array.isArray(ladderApi.data?.rungs) ? ladderApi.data.rungs : []), [ladderApi.data]);
   const states = useMemo(() => Object.fromEntries((ovApi.data?.expeditions || []).map((e: any) => [e.key, e.status])) as Record<string, string>, [ovApi.data]);
   // The standards split in two: the one in play (at sea, and anything newer than it) is the Overview's
   // subject; the ones whose voyages are home sit with every expedition on Plans (10 November, Justin:
   // "move ogden from here to the plans tab").
-  const [liveSops, pastSops] = useMemo(() => {
+  const [, pastSops] = useMemo(() => {
     const all: any[] = (ovApi.data?.sops || []) as any[];
     if (!all.length) return [[], []] as [any[], any[]];
     const atSea = all.filter((e) => Number(e.at_sea) > 0);
@@ -341,6 +733,77 @@ export default function Expeditions() {
     const past = all.filter((e) => !live.includes(e)).sort((a, b) => sopVersionCmp(String(b.version), String(a.version)));
     return [live, past] as [any[], any[]];
   }, [ovApi.data]);
+  // The plans page's three ages (11 November, Justin: "collapsible sections ... currently sailing,
+  // recently finished, older ones"), played into S2's states: at sea or under way is sailing now;
+  // anything whose latest voyage finished within the week has just finished; the rest is older.
+  // A finish is read from the ledger (`/api/runs`), not the declared status, which can be stale:
+  // Ogden is declared planned though its last voyage came home on 9 November.
+  const finRunsApi = useApi<any[]>(isList || isOverview ? '/api/runs' : null, 120000);
+  const lastHome = useMemo(() => {
+    const fin: Record<string, number> = {};
+    for (const r of finRunsApi.data || []) if (r.finished) fin[r.run_id] = Date.parse(r.finished) || 0;
+    const out: Record<string, number> = {};
+    for (const e of exps) {
+      for (const r of e.runs || []) {
+        const t = fin[r.run_id];
+        if (t) out[e.key] = Math.max(out[e.key] || 0, t);
+      }
+    }
+    return out;
+  }, [finRunsApi.data, exps]);
+  const planAges = useMemo(() => {
+    const week = 7 * 24 * 3600 * 1000;
+    const now = Date.now();
+    const sailing: Expedition[] = [];
+    const recent: Expedition[] = [];
+    const older: Expedition[] = [];
+    for (const e of exps) {
+      const st = states[e.key];
+      // only S2's own view: at sea now, or under way with voyages queued. A declared status is what the
+      // fleet meant when it was written, not what is sailing (11 November, Justin: "first light and two
+      // fact problem are not currently sailing" — both carried a stale declared `running`)
+      if (st === 'at sea' || st === 'under way') sailing.push(e);
+      else if (lastHome[e.key] && now - lastHome[e.key] <= week) recent.push(e);
+      else older.push(e);
+    }
+    // the helm first, then what is queued; the latest home first among the recent (the rest keep the
+    // order they were written, as the page always read)
+    sailing.sort((a, b) => (states[a.key] === 'at sea' ? 0 : 1) - (states[b.key] === 'at sea' ? 0 : 1));
+    recent.sort((a, b) => (lastHome[b.key] || 0) - (lastHome[a.key] || 0));
+    return { sailing, recent, older };
+  }, [exps, states, lastHome]);
+  // the state enums (S2's view) said plainly under each band's heading
+  const stateTally = (list: Expedition[]): string => {
+    const n: Record<string, number> = {};
+    for (const e of list) {
+      const st = states[e.key] || e.status || 'unknown';
+      n[st] = (n[st] || 0) + 1;
+    }
+    return Object.entries(n).map(([st, c]) => `${c} ${st}`).join(' · ');
+  };
+  const planGroups = [
+    {
+      key: 'sailing',
+      title: 'Currently sailing',
+      note: `at sea now, or under way with voyages queued · ${stateTally(planAges.sailing)}`,
+      list: planAges.sailing,
+      open: true,
+    },
+    {
+      key: 'recent',
+      title: 'Recently finished',
+      note: `${planAges.recent.length} whose latest voyage finished in the last seven days, the latest first`,
+      list: planAges.recent,
+      open: true,
+    },
+    {
+      key: 'older',
+      title: 'Older ones',
+      note: `${planAges.older.length} whose latest voyage finished longer ago, or which have not sailed yet`,
+      list: planAges.older,
+      open: false,
+    },
+  ].filter((g) => g.list.length);
   const v = isVoyage && route.key ? exps.find((x) => x.key === route.key) || null : null;
 
   const detailApi = useApi<any>(isVoyage && route.key ? `/api/expedition?key=${encodeURIComponent(route.key)}` : null, 60000);
@@ -396,8 +859,10 @@ export default function Expeditions() {
   }, [isVoyage, route.key, route.tab, tabOk]);
 
   // the queue's subtab survives a trip to the cards and back
-  const [qview, setQview] = useState<'glance' | 'every'>(route.qview);
-  useEffect(() => { if (isQueue) setQview(route.qview); }, [isQueue, route.qview]);
+  const [qview, setQview] = useState<'glance' | 'every'>(route.qview === 'every' ? 'every' : 'glance');
+  const [qtab, setQtab] = useState<'queue' | 'planning'>(route.qview === 'planning' ? 'planning' : 'queue');
+  useEffect(() => { if (isQueue) setQtab(route.qview === 'planning' ? 'planning' : 'queue'); }, [isQueue, route.qview]);
+  useEffect(() => { if (isQueue) setQview(route.qview === 'every' ? 'every' : 'glance'); }, [isQueue, route.qview]);
 
   // ---- the table's state (the #table section)
   const tableKey = isTable ? route.key || 'table_talk' : null;
@@ -649,7 +1114,7 @@ export default function Expeditions() {
     void (async () => {
       const { mountShipbuilder } = await import('@/scripts/views/shipbuilder');
       if (!live) return;
-      await mountShipbuilder(el, { key: 'phaleron', name: 'Phaleron', ship_builder: 'the ship builder' } as any, expTab, true, v.sop);
+      await mountShipbuilder(el, { key: 'schimint', name: "Schi'mint", ship_builder: 'the ship builder' } as any, expTab, true, v.sop);
     })();
     return () => { live = false; };
   }, [v, expTab]);
@@ -741,45 +1206,61 @@ export default function Expeditions() {
   // ---- the shell
   return (
     <div onClick={onBookClick}>
+      <SectionNav />
       {/* ------------------------------------------------ the queue and the expeditions */}
       <div className={`section${isOverview || isQueue || isList ? ' active' : ''}`} id="voyages">
         <h1>{isQueue
           ? <>The queue <span className="q">what sails next, in order, as the S2 coordinator takes it from the Mac lane; open a ship to follow its training</span></>
-          : isList
-          ? <>Plans <span className="q">every expedition: the ships it has sailed, its goal, how it is steered, and what it found</span></>
-          : <>Expeditions <span className="q">what each standard went out to find, and how far it has got</span></>}</h1>
-        <nav className={tabsCls('line', 'subnav')} data-orientation="horizontal" data-variant="line" id="vnav">
-          <a className={tabCls('')} data-state={isOverview ? 'active' : 'inactive'} data-vtab="overview" href="/expeditions"
-            onClick={(e) => { e.preventDefault(); go('/expeditions'); }}>Overview</a>
-          <a className={tabCls('')} data-state={isQueue ? 'active' : 'inactive'} data-vtab="queue" href="/expeditions/queue"
-            onClick={(e) => { e.preventDefault(); go('/expeditions/queue'); }}>Queue</a>
-          <a className={tabCls('')} data-state={isList ? 'active' : 'inactive'} data-vtab="expeditions" href="/expeditions/plans"
-            onClick={(e) => { e.preventDefault(); go('/expeditions/plans'); }}>Plans</a>
-          <a className={tabCls('')} data-state="inactive" data-vtab="vsm" href="/vsm"
-            title="the VSM: the five systems (S1 operations, S2 coordination, S3 control with the gate and the audit, S4 intelligence, S5 policy)">VSM</a>
-        </nav>
-        <div className={`vtab${isOverview ? ' active' : ''}`} data-vtab="overview">
-          <div id="soppanel" dangerouslySetInnerHTML={{ __html: ovApi.data ? sopCardsHtml({ sops: liveSops }) : EMPTY('reading the expeditions…') }} />
-        </div>
-        <div className={`vtab${isList ? ' active' : ''}`} data-vtab="expeditions">
+          : <>Overview <span className="q">every expedition: the ships it has sailed, its goal, how it is steered, and what it found</span></>}</h1>
+        <div className={`vtab${isOverview || isList ? ' active' : ''}`} data-vtab="expeditions">
           {pastSops.length > 0 && (
-            <section className="paststandards">
-              <h2 className="band">Earlier standards <span className="q">the standards whose voyages are home: what each went out to find. Every expedition they made is listed below</span></h2>
+            <details className="expgroup paststandards" id="paststandards">
+              <summary><h2 className="band">Earlier standards <span className="q">{pastSops.map((s: any) => `${s.name}${s.expedition_name ? ` · ${s.expedition_name}` : ''}`).join(', ')} — the standards whose voyages are home: what each went out to find. Every expedition they made is listed below</span></h2></summary>
               <div dangerouslySetInnerHTML={{ __html: sopCardsHtml({ sops: pastSops }) }} />
-            </section>
+            </details>
           )}
-          <div id="voyagecards" dangerouslySetInnerHTML={{ __html: expsApi.data ? expeditionTableHtml(exps, states, ovApi.data) : EMPTY('reading the expeditions…') }} />
+          {expsApi.data ? (
+            <>
+              {planGroups.map((g) => (
+                <details key={g.key} className="expgroup" id={`plans-${g.key}`} open={g.open}>
+                  <summary><h2 className="band">{g.title} <span className="q">{g.note}</span></h2></summary>
+                  <div dangerouslySetInnerHTML={{ __html: expeditionCardsHtml(g.list, states, ovApi.data) }} />
+                </details>
+              ))}
+              <details className="archive" id="expeditiontableref">
+                <summary>The same expeditions as a table <span className="note">one row each, for scanning the counts and statuses</span></summary>
+                <div dangerouslySetInnerHTML={{ __html: expeditionTableHtml(exps, states, ovApi.data) }} />
+              </details>
+            </>
+          ) : (
+            <div dangerouslySetInnerHTML={{ __html: EMPTY('reading the expeditions…') }} />
+          )}
         </div>
         <div className={`vtab${isQueue ? ' active' : ''}`} data-vtab="queue">
+          <TabNav
+            id="queuenav"
+            ariaLabel="queue sections"
+            tablist
+            items={[
+              { key: 'queue', label: 'Queue', href: '/expeditions/queue', active: qtab === 'queue', onClick: () => go('/expeditions/queue') },
+              { key: 'planning', label: 'Planning', href: '/expeditions/queue/planning', active: qtab === 'planning', onClick: () => go('/expeditions/queue/planning') },
+            ]}
+          />
+          {qtab === 'planning' ? (
+            prioApi.data
+              ? <PriorityPanel rows={prioApi.data.expeditions || []} />
+              : <div className={emptyCls()}>reading the priorities…</div>
+          ) : (
           <div className="qview active" data-qview="every">
             <section className={cardCls(false, 'panel')} id="queuepanel">
-              <h2>The queue <span className="note">every voyage still to sail, in the order it sails (specs/queue.txt), with its goal: the question its spec asks, or its experiment's where it asks none, and the fitout it was compiled from (its census variation and stage); the starts are the median of like voyages scheduled with the Mac's seats, and ≥ marks a line behind one with no time yet</span></h2>
-              <div className="scroll queuescroll"><table id="queuetable" data-nosort>
+              <h2>The queue <span className="note">every voyage still to sail, in the order it sails (specs/queue.txt), with its goal: the question its spec asks, or its experiment's where it asks none, and the fitout it was compiled from (its census variation and stage); the starts are the median of like voyages scheduled with the Mac's seats, and ≥ marks a line behind one with no time yet. Click a voyage for its card</span></h2>
+              <div className="scroll queuescroll" onClick={onQueueClick} onKeyDown={onQueueKey}><table id="queuetable" data-nosort>
                 <thead><tr><th>#</th><th>voyage</th><th>ship</th><th title="the SOP the voyage is built to: its content, tokeniser, parameters, phases and depth">SOP</th><th title="about when it starts, in your local timezone: the median of like voyages, scheduled with the Mac's seats (two 300k may share; a 1m or 9m holds the lane); ≥ where a voyage ahead has no time yet">starts</th><th title="about when it sails: the median of like voyages, scheduled with the Mac's seats; ≥ where a voyage ahead has no time yet">sails in</th></tr></thead>
                 <tbody dangerouslySetInnerHTML={{ __html: queueApi.data ? queueRowsHtml(queueApi.data, rungs) : `<tr><td colspan="6" class="${emptyCls(true)}">reading the queue…</td></tr>` }} />
               </table></div>
             </section>
           </div>
+          )}
         </div>
       </div>
 
@@ -789,32 +1270,57 @@ export default function Expeditions() {
           <span id="voyagetitle">{v ? v.name : expsApi.data ? `no expedition called ${route.key}` : 'loading…'}</span>{' '}
           <span id="voyagestatus" dangerouslySetInnerHTML={{ __html: v ? expPill(states[v.key], v) : '' }} />{' '}
           </h1>
-        <nav className={tabsCls('line', 'subnav')} data-orientation="horizontal" data-variant="line" id="expnav">
-          {[
+        <TabNav
+          id="expnav"
+          ariaLabel="expedition sections"
+          items={[
             ['overview', 'Overview'], ['at-sea', 'At sea'], ['findings', 'Findings'], ['fleet', 'Fleet'], ['runs', 'Runs'],
             ['plan', 'Plan'], ['training', 'Training'], ['fitting', 'Fitting Out'], ['inside', 'Inside'],
-          ].map(([k, label]) => (
-            <a key={k} className={tabCls('')} data-state={expTab === k ? 'active' : 'inactive'} data-etab={k} hidden={tabOk[k] === false}
-              href={`/expeditions/${route.key}${k === 'overview' ? '' : '/' + k}`}
-              onClick={(e) => { e.preventDefault(); go(`/expeditions/${route.key}${k === 'overview' ? '' : '/' + k}`); }}>{label}</a>
-          ))}
-        </nav>
+          ].map(([k, label]) => ({
+            key: k,
+            label,
+            href: `/expeditions/${route.key}${k === 'overview' ? '' : '/' + k}`,
+            active: expTab === k,
+            hidden: tabOk[k] === false,
+            data: { 'data-etab': k },
+            onClick: () => go(`/expeditions/${route.key}${k === 'overview' ? '' : '/' + k}`),
+          }))}
+        />
 
         {/* Overview */}
         <div className={`etab${expTab === 'overview' ? ' active' : ''}`} data-etab="overview">
           {/* the goal first (11 November, Justin: "where should i see goals for the expeditions"): it was on
               the cards that open this page and nowhere on the page itself */}
           <section className={cardCls(false, 'panel')} id="voyagegoal" hidden={!v?.goal}>
-            <h2>The goal <span className="note">what the expedition went out to find, as it was set (fleet.py)</span></h2>
+            <h2>The goal <span className="note">what the expedition went out to find and why, as it was set (fleet.py)</span></h2>
             {(() => {
-              // numbered aims in the text, "(1) ... (2) ...", read as a list under what comes before them
+              // numbered aims in the text, "(1) ... (2) ...", read as a list under what comes before them;
+              // an expedition that lists its goals one by one (fleet.py `goals`) shows them as a table
+              // instead, each with why it is wanted
               const parts = String(v?.goal || '').split(/\s*\((\d+)\)\s+/);
               const aims: string[] = [];
               for (let i = 1; i + 1 < parts.length; i += 2) aims.push(parts[i + 1]);
+              const goals = v?.goals || [];
               return (
                 <>
                   <p className="goaltext">{parts[0]}</p>
-                  {aims.length > 1 ? <ol className="sopgoals goaltext">{aims.map((a, i) => <li key={i}>{a}</li>)}</ol> : aims.length ? <p className="goaltext">(1) {aims[0]}</p> : null}
+                  {goals.length ? (
+                    <div className="scroll">
+                      <table id="voyagegoals" className="goaltable" data-nosort>
+                        <thead><tr><th>#</th><th>goal</th><th>what it is</th><th>why we want it</th></tr></thead>
+                        <tbody>
+                          {goals.map((g, i) => (
+                            <tr key={g.text}>
+                              <td className="s">{i + 1}</td>
+                              <td><b>{g.text}</b></td>
+                              <td className="s">{g.detail || '–'}</td>
+                              <td>{g.why || <span className="s">not written down yet</span>}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : aims.length > 1 ? <ol className="sopgoals goaltext">{aims.map((a, i) => <li key={i}>{a}</li>)}</ol> : aims.length ? <p className="goaltext">(1) {aims[0]}</p> : null}
                 </>
               );
             })()}
@@ -998,6 +1504,7 @@ export default function Expeditions() {
           </section>
         </div>
       </div>
+      {queueRow ? <QueueVoyageDialog row={queueRow} onClose={() => setQueuePick(null)} /> : null}
     </div>
   );
 }

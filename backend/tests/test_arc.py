@@ -96,3 +96,44 @@ def test_tasks_loads_from_a_checkout(tmp_path):
     got = arc.tasks("evaluation", base=tmp_path)
     assert len(got) == 1 and got[0]["id"] == "a"
     assert arc.count("training", base=tmp_path) == 1
+
+
+def test_answer_text_reads_only_what_follows_the_thinking():
+    # a grid quoted while thinking is not the answer; the one after </think> is
+    text = "<think>the first row is 2x2:99/99, so...</think>\n1x1:7"
+    assert arc.parse_grid(arc.answer_text(text)) == ([[7]], True)
+    assert arc.answer_text("1x1:7") == "1x1:7"  # no thinking: the whole text
+
+
+def test_answer_text_is_none_when_the_thinking_never_ended():
+    # cut off at the token cap mid-thought: no answer, not a wrong grid
+    assert arc.answer_text("<think>the output is 2x2:01/10 because") is None
+    # a template that opens the thinking in the prompt: the output has no opening tag
+    assert arc.answer_text("the output is 2x2:01/10 because", opened=True) is None
+    assert arc.answer_text("so it flips.</think>1x1:7", opened=True) == "1x1:7"
+    assert arc.answer_text("", opened=True) is None
+
+
+def test_a_thinking_reading_has_its_own_name_and_the_same_model():
+    from thorp.viable.s4_intelligence import readings
+
+    assert arc.reading_name("org/m") == "arc-org/m" == arc.reading_name("org/m", "off")
+    assert arc.reading_name("org/m", "on") == "arc-org/m@thinking"
+    assert readings.kind_of("arc-org/m@thinking") == ("arc", "org/m") == readings.kind_of("arc-org/m")
+
+
+def test_the_board_lists_both_readings_and_keeps_the_better_for_the_model(monkeypatch):
+    from thorp import arc_scores
+    from thorp.viable.s4_intelligence import readings
+
+    stored = [
+        ("arc-org/m", {"pass@2": 0.0, "tasks": 5, "pilot": True, "thinking": "off", "format_rate": 1.0}),
+        ("arc-org/m@thinking", {"pass@2": 0.2, "tasks": 5, "pilot": True, "thinking": "on",
+                                "max_output": 512, "max_thinking": 4096, "thinking_unfinished": 2}),
+    ]
+    monkeypatch.setattr(readings, "glob", lambda pattern: stored)
+    rows = arc_scores.measured_rows()
+    assert [(r["model"], r["thinking"], r["score"]) for r in rows] == [("org/m", "on", 20.0), ("org/m", "off", 0.0)]
+    assert rows[0]["source"] == "our reading, 5-task pilot, 512-token cap, 4096 to think"
+    assert rows[0]["thinking_unfinished"] == 2
+    assert arc_scores.measured()["org/m"]["thinking"] == "on"

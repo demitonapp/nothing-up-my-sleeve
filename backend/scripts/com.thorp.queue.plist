@@ -11,7 +11,13 @@
 
      KeepAlive SuccessfulExit=false: a clean exit (the queue empty) stays down; a crash (non-zero) is
      relaunched after ThrottleInterval. caffeinate -dimsu holds idle sleep, the disk and the user assertion
-     for as long as the coordinator lives; on a laptop on battery, -s does not hold, so keep it on power. -->
+     for as long as the coordinator lives; on a laptop on battery, -s does not hold, so keep it on power.
+
+     AbandonProcessGroup (11 November): when a job ends, launchd kills what is left in its process group.
+     A voyage must outlive its coordinator, which now launches each line in its own session and adopts what
+     it finds at sea when it starts again (s2.at_sea); this key says the same to launchd. So stopping the
+     queue (bootout) no longer stops the voyage at sea: stop that by its own pid (s2.at_sea, or the helm).
+     The key is read when the job is loaded: copy this file and bootout/bootstrap again, in port. -->
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
@@ -46,6 +52,8 @@
   </dict>
   <key>ThrottleInterval</key>
   <integer>30</integer>
+  <key>AbandonProcessGroup</key>
+  <true/>
   <key>StandardOutPath</key>
   <string>/Users/justintrollip/Source/Thorp/data/runs/queue.out</string>
   <key>StandardErrorPath</key>

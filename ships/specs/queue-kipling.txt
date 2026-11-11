@@ -1,33 +1,29 @@
-# The Kipling queue, SOP v0.0.6, through the 21m.
-# Order is the plan's: the investigations first, then the 300k and 1m legs (the eleven-line batch that is
-# still at sea or stopped), then the 9m and the 21m. Nothing below 9m sails before the 300k and 1m are home.
+# The Kipling queue, closing order (approved by Justin, 11 November 2026). The live queue is the store's
+# (s2.queue_lines; `thorp queue show`); this file is the plan in words. DECISIONS.md, "Closing Kipling".
 #
-# 1. the investigation the plan names first: the census of all 1,152 heads of Qwen3 4B
-cmd: PYTHONPATH=backend backend/.venv/bin/python -m thorp.head_census mlx-community/Qwen3-4B-4bit --phase assemble
-# 2. the IFEval corpus and its verifiers (release ships/specs/ifeval-ready.hold when they are home)
-cmd: PYTHONPATH=backend backend/.venv/bin/python backend/scripts/make_ifeval_corpus.py
+# 1. the pilot: the return leg on the finished 9m (rigged IFEval; the first 9m to chat to)
+fitouts/9m@v0.0.5-return-rigged
+# 2. the plain base, two seeds
+fitouts/300k@v0.0.6
+fitouts/300k@v0.0.6-s2
+# 3. the marked ship, two seeds (the control tokens in the text, as single pieces)
+fitouts/300k@v0.0.6-marks
+fitouts/300k@v0.0.6-marks-s2
+# 4. the control-token proof: the return leg on each, read on answers/bpb
+fitouts/300k@v0.0.6-return
+fitouts/300k@v0.0.6-marks-return
+fitouts/300k@v0.0.6-return-s2
+fitouts/300k@v0.0.6-marks-return-s2
+# 5. the probe phase, two seeds, and its reading
+fitouts/300k@v0.0.6-probe
+fitouts/300k@v0.0.6-probe-s2
+cmd: PYTHONPATH=backend backend/.venv/bin/python -m thorp.probe_phase 300k@v0.0.6-probe 300k@v0.0.6-probe-s2
+# hold 1: Justin signs the candidate (ships/specs/kipling-candidate.hold)
+# 6. 300k@v0.0.6-kipling, two seeds            (written at hold 1)
+# hold 2: the candidate beats the ten-pin arm
+# 7. 9m@v0.0.6-kipling
+# 8. its return leg (the 9m that chats and is read on IFEval)
+# hold 3: the 9m chats; IFEval at 9m >= 65%; the control-token verdict is in; the pins hold
+# 9. 21m@v0.0.6-kipling and its return leg: the final Kipling ship
 #
-# 3. the 300k leg (the eleven-line batch: the control-token arms, the pins/release/post-qa variants)
-fitouts/300k@v0.0.6-pins-s2
-fitouts/300k@v0.0.6-release-s2
-fitouts/300k@v0.0.5-post-qa
-fitouts/300k@v0.0.6-post-qa-pins
-fitouts/300k@v0.0.6-post-qa-control
-fitouts/300k@v0.0.6-release-induction-fade
-fitouts/300k@v0.0.6-release-pins
-fitouts/300k@v0.0.6-control
-fitouts/300k@v0.0.6-gqa
-#
-# 4. the 1m arms
-fitouts/1m@v0.0.6-early
-fitouts/1m@v0.0.6-hold25-double
-#
-# 5. the 9m and the 21m, in size order (21m@v0.0.6 is new: the 9m fitout's settings at the 21m preset)
-fitouts/9m@v0.0.6
-fitouts/21m@v0.0.6
-#
-# 6. the ARC-AGI-2 arm (Kipling aim 5): the corpus, then the arm. The harness and the pilot come first:
-#    scripts/score_arc.py reads an outside model, `thorp eval <run> --evaluators arc` a Nothing up my sleeve
-#    checkpoint. The arm is the first training attempt on the canonical intelligence test, not a claim of parity.
-cmd: PYTHONPATH=backend backend/.venv/bin/python backend/scripts/make_arc_corpus.py
-fitouts/1m@v0.0.6-arc
+# Moved to Arc de Triomphe: fitouts/1m@v0.0.6-arc

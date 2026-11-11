@@ -4,6 +4,7 @@
 // Without these paths a direct load of a competitor page is a 404 in dev (10 November).
 import Layout from '../../../layouts/Layout.astro';
 import Competitor from '../../../components/islands/Competitor';
+import foreign from '../../../data/foreign.json';
 
 
 
@@ -24,7 +25,10 @@ const MODELS = [
   'mlx-community/gemma-2-2b',
   'mlx-community/gemma-3-text-4b-pt-4bit',
 ];
-  return MODELS.map((m) => ({ params: { model: encodeURIComponent(m) } }));
+  // every foreign ship has this route too: the island sends a model with no chain tests on to its
+  // foreign page instead of 404ing (SmolLM2-360M, Gemma 3 270M, the base twins)
+  const all = [...new Set([...MODELS, ...Object.keys((foreign as any).models || {})])];
+  return all.map((m) => ({ params: { model: encodeURIComponent(m) } }));
 }
 ---
 <Layout>

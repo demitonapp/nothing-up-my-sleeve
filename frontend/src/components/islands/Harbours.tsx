@@ -3,9 +3,11 @@
 // under each card; the dense cards live in views/harbours.ts and the builder in views/shipbuilder.ts.
 
 import { useEffect, useRef, useState } from 'react';
-import { crumbCls, emptyCls, tabCls, tabsCls } from '@/lib/ui';
+import { crumbCls, emptyCls } from '@/lib/ui';
 import { sectionProps, useApi, useRoute } from '@/lib/useApi';
-import { classScoreHtml, harbourAbout, harbourCardsHtml, harbourRoute, harbourShipsHtml, harbourTitle, shipyardCardsHtml } from '@/scripts/views/harbours';
+import SectionNav from '../SectionNav';
+import { candidateCardsHtml, classScoreHtml, harbourAbout, harbourCardsHtml, harbourKey, harbourRoute, harbourShipsHtml, harbourTitle, isOldHarbour, shipyardCardsHtml } from '@/scripts/views/harbours';
+import { BAND } from '@/scripts/views/bands';
 import { mountShipbuilder } from '@/scripts/views/shipbuilder';
 
 /** Every address this island answers: the home page, the harbours, and their ships/builder pages. */
@@ -24,6 +26,7 @@ export default function Harbours() {
   const cardsRef = useRef<HTMLDivElement>(null);
   const builderRef = useRef<HTMLDivElement>(null);
   const scoreAsked = useRef<Record<string, number>>({});
+  const candCache = useRef<any[] | null>(null);
   const builderFor = useRef<string | null>(null);
 
   useEffect(() => {
@@ -36,7 +39,17 @@ export default function Harbours() {
   }, []);
 
   const home = !harbourRoute(path).harbour;
-  const { harbour, sub, section } = harbourRoute(path);
+  const { harbour, sub, section, band } = harbourRoute(path);
+  // an old harbour address (phaleron, piraeus, zayton) forwards to its Orbital, keeping the sub-path
+  useEffect(() => {
+    const m = /^\/harbours?\/([^/]+)(\/[^?#]*)?/.exec(path.split('?')[0].replace(/^#/, ''));
+    const asGiven = m ? decodeURIComponent(m[1]) : '';
+    if (asGiven && isOldHarbour(asGiven)) {
+      const rest = m && m[2] ? m[2] : '';
+      history.replaceState(null, '', `/harbours/${harbourKey(asGiven)}${rest}`);
+    }
+  }, [path]);
+  const bandInfo = BAND(band);
   const shipyardLanding = !section && (path.split('?')[0].replace(/^#/, '') === '/shipyard' || path.split('?')[0].replace(/^#/, '') === '/shipyard/');
   const data = ladder.data;
   const hs = (data && data.harbours) || [];
@@ -73,7 +86,7 @@ export default function Harbours() {
     builder.innerHTML = '';
     builder.dataset.built = '';
     cards.hidden = false;
-    cards.className = harbour ? 'cards' : 'harbours';
+    cards.className = harbour ? (h && h.foreign && !band ? 'cards bandcards' : 'cards') : 'harbours';
     if (!data.rungs) {
       cards.innerHTML = `<div class="${emptyCls()}">the ships could not be read. Restart <span class="mono">thorp dash</span> if it was just changed.</div>`;
       return;
@@ -83,7 +96,24 @@ export default function Harbours() {
     } else if (!h) {
       cards.innerHTML = `<div class="${emptyCls()}">no harbour called ${harbour}</div>`;
     } else {
-      cards.innerHTML = harbourShipsHtml(data, harbour);
+      cards.innerHTML = harbourShipsHtml(data, harbour, band);
+      // a band also shows the models we know in it but have not read yet (the leaderboard's candidates),
+      // so a pulled model is visible before its reading lands; the read ships stay first
+      if (h.foreign && band) {
+        const put = (cands: any[]): void => {
+          const html = candidateCardsHtml(cands, band, data.foreign || []);
+          if (html) cards.insertAdjacentHTML('beforeend', html);
+        };
+        if (candCache.current) put(candCache.current);
+        else
+          fetch('/api/leaderboard')
+            .then((r) => r.json())
+            .then((j) => {
+              candCache.current = Object.values(j.candidates || {}).flat() as any[];
+              if (harbourRoute(location.pathname).band === band) put(candCache.current!);
+            })
+            .catch(() => {});
+      }
     }
     // the current version's scores (the leaderboard's best of the size; /api/class_score), filled as they arrive
     cards.querySelectorAll<HTMLElement>('[data-cscore]').forEach((el) => {
@@ -105,24 +135,22 @@ export default function Harbours() {
   if (!mine) return null;
   const shipyard = path.split('?')[0].replace(/^#/, '').startsWith('/shipyard');
   const sectionName = section === 'training' ? 'Training' : section === 'fitting' ? 'Fitting Out' : section === 'charting' ? 'Charting' : null;
-  const title = sectionName || (shipyard ? 'Shipyard' : harbourTitle(data, harbour));
+  const title = sectionName || (shipyard ? 'Shipyard' : harbourTitle(data, harbour) + (bandInfo ? ` · ${bandInfo.name}` : ''));
   const about = sectionName === 'Training' ? 'the SOPing parties our models train on: the content, the fade, and the content by heart'
     : sectionName === 'Fitting Out' ? 'the embeddings, the training content and the scaffolding heads a ship is built from'
     : sectionName === 'Charting' ? 'sorting out the charts the voyage is planned on: the route, the stars, and the suits'
-    : shipyard ? 'where a ship is drawn before it is built: the SOP it reads, the stages it must build, and the standard it is held to' : harbourAbout(data, harbour);
+    : shipyard ? 'where a ship is drawn before it is built: the SOP it reads, the stages it must build, and the standard it is held to'
+    : bandInfo ? `${bandInfo.range}: the outside models in this band, read on our decks` : harbourAbout(data, harbour);
   return (
     <div {...sectionProps('sizes')}>
-      {home ? null : (
+      <SectionNav />
+      {home || (shipyard && !sectionName) ? null : (
         <h1>
-          {harbour ? <><a className={crumbCls('back')} href={sectionName ? '/shipyard' : '/harbours'}>{sectionName ? '← shipyard' : shipyard ? '← places' : '← harbours'}</a> </> : null}
+          {harbour ? <><a className={crumbCls('back')} href={sectionName ? '/shipyard' : bandInfo ? `/harbours/${encodeURIComponent(harbour)}` : '/harbours'}>{sectionName ? '← shipyard' : bandInfo ? `← ${harbourTitle(data, harbour)}` : shipyard ? '← places' : '← harbours'}</a> </> : null}
           {title}{' '}
           <span className="q">{about}</span>
         </h1>
       )}
-      <nav className={tabsCls('line', 'subnav')} data-orientation="horizontal" data-variant="line" id="harbourtabs">
-        <a className={tabCls('')} data-state={sub === 'shipbuilder' ? 'inactive' : 'active'} data-htab="harbours" href="/harbours">Harbours</a>
-        <a className={tabCls('')} data-state={sub === 'shipbuilder' ? 'active' : 'inactive'} data-htab="shipyard" href="/shipyard">Shipyard</a>
-      </nav>
       <div className="cards" id="rungcards" ref={cardsRef} />
       <div id="shipbuilder" ref={builderRef} hidden />
       {ladder.error ? <div className={emptyCls()}>the ships could not be read: {ladder.error}</div> : null}

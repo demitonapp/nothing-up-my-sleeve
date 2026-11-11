@@ -1,7 +1,7 @@
 """The GPT of gpt_mlx.py in PyTorch, for NVIDIA GPUs (CUDA) and, in the tests, the CPU.
 
 The same model in every particular: pre-norm, learned or rotary positions (MLX's non-traditional RoPE,
-base 10,000), the tanh-approximated GELU MLP at 4x, LayerNorm without a bias (eps 1e-5), tied embeddings,
+base 10,000), one K/V a head or grouped-query attention (kv_heads), the tanh-approximated GELU MLP at 4x, LayerNorm without a bias (eps 1e-5), tied embeddings,
 no biases, the same initialisation scheme. The parameters carry the same names as the MLX model's
 (tok.weight, pos.weight, layers.0.attn.qkv.weight, ...), each the same shape, so a checkpoint written by
 one backend loads in the other (tests/test_torch.py checks the logits agree).
@@ -65,18 +65,39 @@ class Attention(nn.Module):
     def __init__(self, cfg: GPTConfig):
         super().__init__()
         self.heads = cfg.heads
+        # grouped-query attention, as gpt_mlx.py's (11 November): kv_heads < heads means each K/V is shared by a
+        # group of queries, in three projections named as MLX names them (q_proj, k_proj, v_proj), so a grouped
+        # checkpoint loads in either backend. 0 keeps one K/V a head and the fused projection every other
+        # checkpoint was written with.
+        self.kv_heads = getattr(cfg, "kv_heads", 0) or cfg.heads
         self.head_dim = cfg.width // cfg.heads
-        self.qkv = nn.Linear(cfg.width, 3 * cfg.width, bias=False)
+        if self.kv_heads == cfg.heads:
+            self.qkv = nn.Linear(cfg.width, 3 * cfg.width, bias=False)
+        else:
+            assert cfg.heads % self.kv_heads == 0, "query heads must divide into KV groups"
+            self.q_proj = nn.Linear(cfg.width, cfg.heads * self.head_dim, bias=False)
+            self.k_proj = nn.Linear(cfg.width, self.kv_heads * self.head_dim, bias=False)
+            self.v_proj = nn.Linear(cfg.width, self.kv_heads * self.head_dim, bias=False)
         self.proj = nn.Linear(cfg.width, cfg.width, bias=False)
         self.rope = RoPE(self.head_dim) if getattr(cfg, "positions", "learned") == "rope" else None
 
     def qk(self, x):
-        """The queries, keys and values (batch, heads, time, head_dim), rotated when positions are rotary."""
+        """The queries, keys and values (batch, heads, time, head_dim), rotated when positions are rotary. In the
+        grouped case each key and value is repeated across its group of queries (heads g*i .. g*i + g - 1 read
+        K/V i, the grouping MLX's fused attention uses), so every caller indexes one head at a time plainly."""
         B, T, C = x.shape
-        q, k, v = self.qkv(x).split(C, dim=-1)
-        q, k, v = (t.reshape(B, T, self.heads, self.head_dim).transpose(1, 2) for t in (q, k, v))
+        if self.kv_heads == self.heads:
+            q, k, v = self.qkv(x).split(C, dim=-1)
+        else:
+            q, k, v = self.q_proj(x), self.k_proj(x), self.v_proj(x)
+        q = q.reshape(B, T, self.heads, self.head_dim).transpose(1, 2)
+        k = k.reshape(B, T, self.kv_heads, self.head_dim).transpose(1, 2)
+        v = v.reshape(B, T, self.kv_heads, self.head_dim).transpose(1, 2)
         if self.rope is not None:
             q, k = self.rope(q), self.rope(k)
+        if self.kv_heads != self.heads:
+            g = self.heads // self.kv_heads
+            k, v = k.repeat_interleave(g, dim=1), v.repeat_interleave(g, dim=1)
         return q, k, v
 
     def forward(self, x):
@@ -135,9 +156,11 @@ class GPT(nn.Module):
         if not self.rotary:
             nn.init.normal_(self.pos.weight, std=std)
         for b in self.layers:
+            a = b.attn
+            projs = [a.qkv] if a.kv_heads == a.heads else [a.q_proj, a.k_proj, a.v_proj]
             for lin, s in (
-                (b.attn.qkv, std),
-                (b.attn.proj, resid),
+                *((lin, std) for lin in projs),
+                (a.proj, resid),
                 (b.mlp.up, std),
                 (b.mlp.down, resid),
             ):

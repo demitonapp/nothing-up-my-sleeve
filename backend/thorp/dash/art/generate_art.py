@@ -1,9 +1,26 @@
 #!/usr/bin/env python3
 """The dashboard's art (2026-11-07): one image per class of ship and one per playing card.
 
-Eduardo Risso style, matching the monorepo's Atlas generators (packages/ui/apps/atlas/scripts/
-generate-*-art.py): noir, heavy black ink, stark chiaroscuro, a single light source, no text. Made with
-fal (fal-ai/flux/dev). Saved to frontend/public/art/<key>.png (since the split), which the build copies into the
+Two things at once, and both are the brief (11 November, Justin: "can you audit all the images and the
+instructions and memory to make sure that we use the Risso artstyle from 100 bullets but we now also have a
+time period and it's from the days of Drake. So all images, everything should be a homage to the heyday of
+Sir Francis Drake but drawn by risso's style"):
+
+- **Risso**: Eduardo Risso's noir comic art (100 Bullets), matching the monorepo's Atlas generators
+  (packages/ui/apps/atlas/scripts/generate-*-art.py): heavy black ink, stark chiaroscuro, a single light
+  source, deep shadows, near-black ground, no text.
+- **Drake**: the *inspiration* is Drake and the merchant ships that went looking for new worlds — great
+  wooden ships, chart tables, lanterns and brass, sea-cloaks and tallow, landfalls on unnamed coasts.
+- **The world is Iain M. Banks' Culture in its early days** (Justin, same day: "the style is rissos, the
+  inspiration is drake and the merchant ships exploring new worlds, the world is banks early days of the
+  culture"). The ships are of the age of sail and the universe is the young Culture's: an orbital ring
+  where a moon would be, a distant habitat, a small silver drone at rest on the chart or in the rigging.
+  Hopeful, expanding, first contact — not a later, settled Culture and not our own century.
+  An anachronism is a defect, not a mood: no Greek triremes, no Chinese junks, no Venetian carracks, no
+  Victorian gaslight (a ship of another nation's build is allowed only as a *prize*, as Drake took the
+  São Filipe — that is the trade of the period, not outside it).
+
+Made with fal (fal-ai/flux/dev). Saved to frontend/public/art/<key>.png (since the split), which the build copies into the
 dashboard; a class card or playing card shows its image when the file exists and draws none otherwise.
 
 The fal key is read from FAL_KEY in the monorepo's packages/api/.env.local (gitignored), the same
@@ -41,7 +58,18 @@ STYLE = (
     "stark chiaroscuro, single dramatic light source, deep shadows, high "
     "contrast, dark near-black background, graphic novel panel, clean bold "
     "composition, no text, no lettering, no words, "
-    "no signature, no border, no frame, full-bleed image"
+    "no signature, no border, no frame, full-bleed image, "
+    # The brief in three layers (11 November, Justin: "the style is rissos, the inspiration is drake and the
+    # merchant ships exploring new worlds, the world is banks early days of the culture"):
+    #   style      -- Risso's ink, above
+    #   inspiration-- Drake, and the merchant ships that went looking for new worlds
+    #   world      -- Iain M. Banks' Culture in its first days: a young, hopeful, expanding civilisation
+    "the scene is a merchant ship's voyage of discovery in the manner of Drake's, and the world it sails "
+    "in is Iain M. Banks' Culture in its early days: great wooden ships with lanterns, brass, chart "
+    "tables and sea-cloaks, landfalls on unnamed coasts and first contacts, while the sky and the water "
+    "hold the young Culture's own forms -- an orbital ring where a moon would be, a distant habitat, a "
+    "small silver drone at rest on the chart or in the rigging -- the exploration is the age of sail and "
+    "the universe is the Culture's, nothing modern of our own century, no anachronism from later history"
 )
 
 # The classes of ship, smallest first: each a sailing vessel a size up from the last (thorp/models/registry.py
@@ -73,22 +101,26 @@ CLASSES: dict[str, str] = {
     "throwing hard shadows across the board",
 }
 
-# The harbours (Justin, 8 November: "i want two fal images for them"; 11 November: Piraeus beside Phaleron): Phaleron,
-# Athens' first harbour, Piraeus, Themistocles' deep harbour beside it, and Zayton, the Market Harbour where the foreign
-# ships lie. Landscape, for the harbour tiles.
+# The harbours (Justin, 8 November: "i want two fal images for them"; 11 November: "naming must change and
+# art style accordingly"). They are Orbitals of the young Culture now, not the Greek and Chinese ports they
+# were first named for: the first Orbital where crews are trained, the great yard at the edge of the new
+# worlds, and the Reach where every civilisation trades. Landscape, for the harbour tiles. Their old keys
+# (phaleron, piraeus, zayton) survive only as aliases in thorp/dash/waters.py.
 HARBOURS: dict[str, str] = {
-    "phaleron": "the ancient Greek harbour of Phaleron at night, a sheltered curved bay of calm black water, a row of "
-    "small beached wooden triremes and young ships drawn up on the shingle, shipwrights and trainee oarsmen with "
-    "torches, a stone breakwater, the lamplit hills of Athens and the Acropolis faint on the dark horizon",
-    "piraeus": "the ancient Greek deep harbour of Piraeus in the 5th century BC, at night: a great circular naval "
-    "basin ringed by long stone stoas, ship sheds and arsenals, tall stone moles and deep black water, ancient "
-    "Greek war galleys (triremes) with rows of oars and deep-draught wooden merchant ships moored along the "
-    "quays, oil lamps and torches burning on the stone, no modern boats, no yachts, no cars, no electric lights, "
-    "no modern city, the dark sea beyond the harbour mouth",
-    "zayton": "a vast ancient trading harbour at night, lantern-lit quays crowded with bales of silk and sacks of "
-    "spice, merchants of many nations bargaining, dhows, junks and tall merchantmen moored in rows with their "
-    "sails furled, a camel caravan arriving down to the water, countless lamps reflected in the black harbour",
+    "schimint": "the first Orbital of a young civilisation at night, seen from a ship's deck: a vast ring "
+    "curving up across the sky where a moon should be, its inner face lit in long bands, a small wooden "
+    "sailing ship of Drake's kind crossing black water toward it, lanterns on the ship and along the "
+    "Orbital's rim, a place where crews are trained rather than a port",
+    "vavatch-end": "a great construction Orbital at the edge of the new worlds at night: the ring's "
+    "shipyards and docks seen from close alongside, half-built hulls of wooden ships cradled in scaffolds "
+    "that are not of this century, cranes and lanterns, brass instruments on the dock rail, the dark curve "
+    "of the ring rising beyond",
+    "masaq-reach": "a cosmopolitan Orbital's market at night: a lantern-lit concourse under a curved hull, "
+    "ships of many worlds moored along a quay, bales of goods and brass instruments, ropes and canvas "
+    "beside surfaces that are not of our century, figures in sea-cloaks bargaining, the Reach's lights "
+    "reflected in black water",
 }
+
 
 # The ship builder (9 November, Justin: "give me a fal image representing the shipbuilder and SOP"): the drafting
 # loft where the standard operating procedure is written, rather than a finished ship at sea. Landscape, for the
@@ -158,6 +190,8 @@ LAB_LOOK = {
     "compass rose is mounted on the bow",
     "independent": "her canvas sails are patched cream, her hull is dark tarred wood, and a single white star is "
     "hand-painted on the main sail; she carries no house colours",
+    "openai": "her hull is matte black, her single sail is pale unbleached canvas with a thin green stripe along the "
+    "leech, and a small brass lamp burns at the masthead",
 }
 
 FOREIGN: dict[str, str] = {
@@ -196,8 +230,34 @@ FOREIGN: dict[str, str] = {
     "sail, dark water and a far shore; " + LAB_LOOK["independent"],
     "pythia-160m": "a three-masted barquentine on a night sea, patched cream sails filled, a white star painted on "
     "the main canvas, a lantern at the stern; " + LAB_LOOK["independent"],
+    "qwen3-30b-a3b": "a three-masted Chinese treasure ship in a wide night harbour, red battened sails half set, a "
+    "high stern castle, smaller junks and dhows around her, lanterns on the water; " + LAB_LOOK["alibaba"],
+    "gemma-4-26b-a4b": "a broad-beamed four-masted Venetian carrack at anchor in a lantern-lit night harbour, her "
+    "coloured sail panels furled, a brass compass rose at the bow, the black water full of reflections; " + LAB_LOOK["google"],
+    "gemma-4-31b": "a towering four-masted Venetian flagship at night, every coloured sail panel full, high stern "
+    "and broad beam, a brass compass rose at the bow, dwarving the boats around her; " + LAB_LOOK["google"],
+    "phi-4-14b": "a lean two-masted Byzantine dromon gliding out of a dark harbour mouth at night, oars lifting in a "
+    "row, a low moon behind cloud, a silver pennant at the masthead; " + LAB_LOOK["microsoft"],
+    "gpt-oss-20b": "a fast black-hulled sloop running before a night wind on a dark sea, one pale sail drawing, a low "
+    "moon and a far shore; " + LAB_LOOK["openai"],
+    # the xsmall base/instruct twins: a base checkpoint wears plain canvas, its instruct twin the house colours
+    "qwen3-0-6b-base": "a small single-masted Chinese coastal junk slipping out of a narrow harbour at dusk, her "
+    "battened sails plain undyed canvas, no lanterns, the houses dark behind her; " + LAB_LOOK["alibaba"],
+    "qwen3-5-0-8b-base": "a small two-masted Chinese coastal junk under plain undyed sails on a dark estuary, no "
+    "lanterns lit, a low moon behind cloud",
+    "gemma-3-270m-instruct": "a small ketch with a single mast crossing a black harbour basin at night, her "
+    "four-coloured sail the brightest thing on the water, a brass compass glinting at her bow; " + LAB_LOOK["google"],
+    "smollm3-3b-instruct": "a three-masted coastal lugger running before a night wind, patched cream canvas full, a "
+    "lantern swinging at the mast and a single white star on the main sail; " + LAB_LOOK["independent"],
+    "smollm2-360m-instruct": "a small single-masted sloop nosing out of a rocky cove at night, one patched cream sail "
+    "with a single white star, a lantern at the bow; " + LAB_LOOK["independent"],
     "pythia-410m": "a large three-masted barque cresting a dark swell under a low moon, patched cream sails full, a "
     "white star on the main sail, a single lantern burning at the stern; " + LAB_LOOK["independent"],
+    # the two outside models read without art (11 November): Maincoder, a Melbourne port, and the small Qwen3.5
+    "maincoder-1b": "a lean Australian colonial cutter with a low dark hull and patched cream canvas, running before "
+    "a night wind past a black headland, one lantern at the bow and a single white star on the main sail",
+    "qwen3-5-0-8b": "a small two-masted Chinese coastal junk slipping down a narrow estuary at dusk, her red "
+    "battened sails half furled, jade-green trim on the rail, one red lantern lit at the stern; " + LAB_LOOK["alibaba"],
 }
 
 # The playing cards: the stars that do the trick# The playing cards: the stars that do the trick (fleet.STARS / fleet.METHODS["chaining"] cards). Portrait,
@@ -264,6 +324,67 @@ SOP_GOALS: dict[str, str] = {
     "ask a question, lamplight and long shadows, no text",
 }
 
+# The expeditions (11 November, Justin: "fal images for all the past expeditions ... and a consistent
+# representation of them on the page"): one image per expedition, its aim as a scene, keyed by the
+# expedition's own key with an `exp-` prefix so no image can collide with a ship, a card or an SOP. The plans
+# page wears them as 16:9 cards, the same treatment as the class and harbour cards.
+EXPEDITIONS: dict[str, str] = {
+    "exp-book_value": "a ship's hold at night lit by a single lantern, a navigator in a long coat weighing thick "
+    "leather books in a brass balance scale, one pan piled high and tipping, open ledgers and scattered coins on a "
+    "crate, stacks of books vanishing into shadow",
+    "exp-first_light": "the first light of dawn seen from the bow of a ship at sea, a lone lookout with a brass "
+    "telescope, the sun a thin burning line on the black horizon, rigging and bowsprit black against the glow, the "
+    "rest of the ship still in darkness",
+    "exp-seedling": "the keel of a new ship laid along heavy timber stocks in a dark shipyard at night, the spine and "
+    "first ribs rising, shipwrights with lanterns, wood shavings and tools, one lamp throwing long shadows",
+    "exp-apprentice": "a candlelit magician's workshop at night, a young apprentice in a dark coat receiving a small "
+    "glowing brass head from the hands of an older magician, shelves of other brass heads in shadow, tools and open "
+    "books, one light source",
+    "exp-table_talk": "a captain's cabin at night, two figures seated across a polished table in earnest "
+    "conversation, a candle between them, charts and a decanter, an empty third chair, deep shadows in the corners",
+    "exp-apprentice_2": "a long workbench in a dark workshop at night, four young apprentices in a row each handing "
+    "a small glowing brass head to the next, a relay of warm light down the bench into the shadows, one hanging "
+    "lamp above, tools and open books between them",
+    "exp-best_keel": "a shipyard at night with many ship's keels laid on stocks in rows, shipwrights walking between "
+    "them with lanterns inspecting the timber, one keel lit brightest and straightest, fog and deep shadows",
+    "exp-two_facts": "a counting house at night, a clerk at a tall desk joining two heavy ledgers with a red thread "
+    "stretched between two brass rings, a single lamp, columns of tallies and an iron padlock, everything else in "
+    "darkness",
+    "exp-card_census": "a long table at night covered in playing cards laid out in rows, a census-taker in a dark "
+    "coat with a ledger and a pencil counting them by lantern light, card drawers and shelves of files behind, one "
+    "light source",
+    "exp-knockout": "a bare-knuckle boxer at the instant of a knockout under a single hanging lamp in a dark hall, "
+    "the opponent falling back into shadow, sweat and dust in the light, a ring rope and a silent crowd in darkness",
+    "exp-induction": "a hall of tall mirrors at night, one lantern carried by a figure reflected again and again into "
+    "an endless receding line of lanterns, a repeating pattern, deep black shadows, a single light source",
+    "exp-ogden": "a village schoolroom at night, a schoolmaster at a blackboard drawing simple pictures of a cup, a "
+    "box and a man, a few pupils at wooden desks, one oil lamp, long shadows",
+    "exp-smallest_bridge": "a very small figure crossing a narrow rope bridge over a deep fog-filled chasm at night, "
+    "holding a lantern, the far cliff barely visible, the bridge the only way across, vast darkness around",
+    "exp-logic_tutor": "a tutor at a blackboard at night drawing three linked chalk circles and arrows, a single "
+    "pupil at a desk, an oil lamp, chalk dust in the light, the rest of the room in shadow",
+    "exp-two_bets": "a gambler at a green baize table at night placing two separate bets, two stacks of coins and "
+    "two face-down cards, a single overhead lamp, the chair opposite empty, deep shadows",
+    "exp-kipling": "a British Indian Ocean steamship at night, six lanterns burning in a row along her rail, a young "
+    "boy at the bow looking out at a dark coast, stars and a low moon, the sea black",
+    "exp-arc_de_triomphe": "the Arc de Triomphe in Paris at night, wet cobblestones reflecting a single streetlamp, "
+    "a lone figure in a long coat looking up at the arch, deep shadows and mist, no text",
+}
+
+# The Market Harbour's three size bands (11 November, Justin: "3 cards that determine size bands for models.
+# small 300k - 4B ... a medium band for 4 - 32B and then large is anything above 32B"): the harbour at three
+# scales of ship, so the band cards read as one ladder of water rather than three labels.
+BANDS: dict[str, str] = {
+    "band-xsmall": "a sheltered harbour at dusk crowded with tiny rowing boats, skiffs and dinghies no longer than "
+    "a man, drawn up on the mud and tied along the wet quay, lanterns just lit, one small sail out on the black water",
+    "band-small": "a crowded harbour at night seen from the quay: dozens of small boats, dinghies, pilot cutters "
+    "and fishing smacks packed along the wet stone, lanterns everywhere, one great ship far out on the dark water",
+    "band-medium": "a harbour at night with a line of medium ships at anchor: brigs, frigates and merchantmen, "
+    "their lanterns reflected in black water, a small rowing boat passing between them, the quay in shadow",
+    "band-large": "a deep harbour at night with one immense ship of the line towering over the quay, dwarfing the "
+    "smaller vessels around it, lanterns along its hull, moonlight on black water",
+}
+
 # The ladder in the soundings' language (9 November, Justin: "cards need to be updated with new fal images
 # ... and the new names"): one image per rung, its metaphor rather than its ship.
 LADDER: dict[str, str] = {
@@ -283,8 +404,17 @@ LADDER: dict[str, str] = {
     "standing, the ship anchored beyond them in the bay",
 }
 
-SIZES = {**{k: "landscape_16_9" for k in (*CLASSES, *HARBOURS, *SHIPBUILDER, *SHIPYARD, *SHIPYARD_SECTIONS, *CHARTING, *POSITIONS, *FOREIGN, *SOP_GOALS, *LADDER)}, **{k: "portrait_4_3" for k in CARDS}, **{k: "portrait_4_3" for k in LOGIC}}
-SUBJECTS = {**CLASSES, **HARBOURS, **SHIPBUILDER, **SHIPYARD, **SHIPYARD_SECTIONS, **CHARTING, **POSITIONS, **FOREIGN, **CARDS, **LOGIC, **SOP_GOALS, **LADDER}
+# The chat console's plate (11 November, Justin: "the chat modal needs to be in the style of risso"): a
+# merchantman's navigation panel, the carved oak and brass the console's rail is drawn from. Wide, for the bar.
+CONSOLE: dict[str, str] = {
+    "chat-console": "the navigation console of a merchantman at night: a wide panel of carved black oak set with "
+    "brass instruments, a binnacle and compass, dividers and a parallel rule lying on an open chart, a rack of "
+    "rolled sea charts, a small brass lantern lit at one end, rope lanyards and a worn handhold, the panel "
+    "polished smooth by hands, the edge of the ship's wheel and dark rigging just visible at the sides",
+}
+
+SIZES = {**{k: "landscape_16_9" for k in (*CLASSES, *HARBOURS, *SHIPBUILDER, *SHIPYARD, *SHIPYARD_SECTIONS, *CHARTING, *POSITIONS, *FOREIGN, *SOP_GOALS, *EXPEDITIONS, *BANDS, *LADDER, *CONSOLE)}, **{k: "portrait_4_3" for k in CARDS}, **{k: "portrait_4_3" for k in LOGIC}}
+SUBJECTS = {**CLASSES, **HARBOURS, **SHIPBUILDER, **SHIPYARD, **SHIPYARD_SECTIONS, **CHARTING, **POSITIONS, **FOREIGN, **CARDS, **LOGIC, **SOP_GOALS, **EXPEDITIONS, **BANDS, **LADDER, **CONSOLE}
 
 
 def fal_key() -> str:

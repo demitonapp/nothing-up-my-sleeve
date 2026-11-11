@@ -1187,6 +1187,7 @@ dependencies = [
     { name = "click" },
     { name = "huggingface-hub" },
     { name = "mlx" },
+    { name = "mlx-lm" },
     { name = "numpy" },
     { name = "psycopg", extra = ["binary"] },
     { name = "pyarrow" },
@@ -1198,9 +1199,6 @@ dependencies = [
 ]
 
 [package.dev-dependencies]
-compare = [
-    { name = "mlx-lm" },
-]
 dev = [
     { name = "pytest" },
     { name = "ruff" },
@@ -1219,6 +1217,7 @@ requires-dist = [
     { name = "click", specifier = ">=8.1" },
     { name = "huggingface-hub", specifier = ">=2.4.0" },
     { name = "mlx" },
+    { name = "mlx-lm", specifier = ">=0.32.2" },
     { name = "numpy" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2" },
     { name = "pyarrow", specifier = ">=26.0.1" },
@@ -1230,7 +1229,6 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-compare = [{ name = "mlx-lm", specifier = ">=0.32.2" }]
 dev = [
     { name = "pytest" },
     { name = "ruff" },

@@ -1,0 +1,5 @@
+Hold 1 (Kipling, 11 November 2026): Justin signs the best-in-class candidate before it sails.
+Waits for: the probe reading on 300k@v0.0.6-probe and -probe-s2 (which pins are held by heart, which need
+the pull), and the control-token verdict (300k@v0.0.6-marks against 300k@v0.0.6, two seeds, and their return legs).
+Decides: the per-pin release schedule of 300k@v0.0.6-kipling, and whether it reads the marked text.
+Release: rm ships/specs/kipling-candidate.hold

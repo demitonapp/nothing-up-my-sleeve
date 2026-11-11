@@ -2,13 +2,16 @@
 // The shells are JSX; the data renderers and charts are scripts/views/size-page.ts, loaded at run time.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { btnCls, cardCls, crumbCls, emptyCls, fieldCls, rangeCls, selectCls, tabCls, tabsCls } from '@/lib/ui';
+import { btnCls, cardCls, crumbCls, emptyCls, fieldCls, rangeCls, selectCls } from '@/lib/ui';
 import { sectionProps, useApi, useRoute } from '@/lib/useApi';
 import { initRunGrid } from '@/lib/rungrid';
 import { shipHash } from '@/scripts/router';
 import { isSizePage, modelHref, renderSizePage, rungFor, setSizeSelection, sizeAddress } from '@/scripts/views/size-page';
+import SectionNav from '../SectionNav';
+import { TabNav } from '../TabNav';
+import Chat from './Chat';
 
-const MTABS = ['overview', 'goals', 'training', 'scoring', 'waypoints', 'sops'];
+const MTABS = ['overview', 'goals', 'training', 'scoring', 'waypoints', 'sops', 'chat'];
 const SSUBS = ['maths', 'ask', 'language', 'shapes', 'number', 'physics', 'life', 'return', 'logic', 'versus'];
 const WSUBS = ['expected', 'envelope', 'stars'];
 
@@ -21,6 +24,7 @@ export default function SizePage({ initialPath = '/' }: { initialPath?: string }
   const mine = isSizePage(path);
   const ladder = useApi<any>('/api/ladder', 15000, mine);
   const exps = useApi<any>('/api/expeditions/overview', 300000, mine);
+  const chatModels = useApi<any>('/api/chat/models', 60000, mine);
   const wired = useRef(false);
 
   const readSelection = (): void => {
@@ -42,6 +46,11 @@ export default function SizePage({ initialPath = '/' }: { initialPath?: string }
 
   const addr = sizeAddress(path);
   const rung = useMemo(() => (ladder.data ? rungFor(ladder.data, addr.key) : null), [ladder.data, addr.key]);
+  // the chat tab talks to this size's best ship that has a reachable checkpoint (the chat models are the
+  // leaderboard's ships, best first); a size with none keeps the message
+  const chatShip = rung
+    ? ((chatModels.data && chatModels.data.models) || []).find((m: any) => m.kind === 'thorp' && m.available && String(m.ship_key || '').startsWith(rung.preset + ':'))
+    : null;
   const tab = MTABS.includes(addr.tab) ? addr.tab : 'overview';
   // one size, one address: a class slug ('faces', or the old 'pan') or an old /sizes link is rewritten to the size's preset
   // ('300k'), the canonical identifier, keeping the tab and sub-view (10 November)
@@ -110,12 +119,12 @@ export default function SizePage({ initialPath = '/' }: { initialPath?: string }
   if (!mine) return null;
   const keep = typeof window === 'undefined' ? '' : location.search;
   const href = (mt: string, sub?: string): string => (rung ? modelHref(rung, mt, sub || null) : `/ships/${encodeURIComponent(addr.key)}${mt === 'overview' ? '' : '/' + mt}`) + keep;
-  const mstate = (t: string): 'active' | 'inactive' => (tab === t ? 'active' : 'inactive');
   const isS = (s: string): boolean => tab === 'scoring' && addr.ssub === s;
   const isW = (w: string): boolean => tab === 'waypoints' && addr.wsub === w;
 
   return (
     <div {...sectionProps('rung')} id="rung">
+      <SectionNav />
       <h1 className="crumbs"><a className={crumbCls('back')} href="/harbours">Harbours</a> <span className="sep">/</span> <span className="here" id="rungtitle">{rung ? `${rung.preset} · ${rung.name}` : 'reading the ship…'}</span></h1>
       <div className="handtools" id="shipsel" style={{ margin: '2px 0 10px' }}>
         <label className="note" htmlFor="expsel">expedition</label>
@@ -130,9 +139,17 @@ export default function SizePage({ initialPath = '/' }: { initialPath?: string }
         </select>
         <span className="note" id="selnote">{sel.voyage ? `one voyage: ${selRun?.name || sel.voyage}` : sel.expedition ? `median of ${voyRuns.length} ${expName(sel.expedition)} voyage${voyRuns.length === 1 ? '' : 's'}` : 'every voyage at this size'}</span>
       </div>
-      <nav className={tabsCls('line', 'subnav')} data-orientation="horizontal" data-variant="line" id="modelnav">
-        {MTABS.map((t) => <a key={t} className={tabCls('')} data-state={mstate(t)} data-mtab={t} href={href(t)}>{t === 'sops' ? 'SOPs' : t[0].toUpperCase() + t.slice(1)}</a>)}
-      </nav>
+      <TabNav
+        id="modelnav"
+        ariaLabel="ship sections"
+        items={MTABS.map((t) => ({
+          key: t,
+          label: t === 'sops' ? 'SOPs' : t[0].toUpperCase() + t.slice(1),
+          href: href(t),
+          active: tab === t,
+          data: { 'data-mtab': t },
+        }))}
+      />
 
       <div className={`mtab${tab === 'goals' ? ' active' : ''}`} data-mtab="goals">
         <section className={cardCls(false, 'panel')} id="roadpanel">
@@ -219,9 +236,17 @@ export default function SizePage({ initialPath = '/' }: { initialPath?: string }
           <div className="s" id="bestship" />
         </section>
 
-        <nav className={tabsCls('line', 'subnav')} data-orientation="horizontal" data-variant="line" id="scnav">
-          {SSUBS.map((s) => <a key={s} className={tabCls('')} data-state={isS(s) ? 'active' : 'inactive'} data-ssub={s} href={href('scoring', s)}>{s[0].toUpperCase() + s.slice(1)}</a>)}
-        </nav>
+        <TabNav
+          id="scnav"
+          ariaLabel="scoring sections"
+          items={SSUBS.map((s) => ({
+            key: s,
+            label: s[0].toUpperCase() + s.slice(1),
+            href: href('scoring', s),
+            active: isS(s),
+            data: { 'data-ssub': s },
+          }))}
+        />
         <div className={`ssub${isS('ask') ? ' active' : ''}`} data-ssub="ask">
           <section className={cardCls(false, 'panel')} id="askpanel">
             <h2>Ask the best version <span className="note">type a line and read what it guesses comes next: its ten likeliest next words (or two words, or the raw pieces it actually predicts), no sampling; or let it answer; the rudimentary questions below each carry the answer we would hope for, and "run all" shows where that answer ranks among its guesses</span></h2>
@@ -284,9 +309,17 @@ export default function SizePage({ initialPath = '/' }: { initialPath?: string }
       </div>
 
       <div className={`mtab${tab === 'waypoints' ? ' active' : ''}`} data-mtab="waypoints">
-        <nav className={tabsCls('line', 'subnav')} data-orientation="horizontal" data-variant="line" id="wpnav">
-          {WSUBS.map((w, i) => <a key={w} className={tabCls('')} data-state={isW(w) ? 'active' : 'inactive'} data-wsub={w} href={href('waypoints', w)}>{`${i + 1} · ${w[0].toUpperCase() + w.slice(1)}`}</a>)}
-        </nav>
+        <TabNav
+          id="wpnav"
+          ariaLabel="waypoint sections"
+          items={WSUBS.map((w, i) => ({
+            key: w,
+            label: `${i + 1} · ${w[0].toUpperCase() + w.slice(1)}`,
+            href: href('waypoints', w),
+            active: isW(w),
+            data: { 'data-wsub': w },
+          }))}
+        />
         <section className={cardCls(false, 'panel')}><div className="wpsteps" id="wpsteps" />
           <div className="handtools mt" data-filters><label className="note" htmlFor="wpfilter">step to quantum physics</label><select className={selectCls('')} id="wpfilter" data-remember title="filter the tricks by waypoint"><option value="">all seven</option></select></div></section>
         {WSUBS.map((w) => (
@@ -320,6 +353,15 @@ export default function SizePage({ initialPath = '/' }: { initialPath?: string }
         <div className="row3">
           {['fiction', 'verse', 'first_person'].map((t) => <section key={t} className={cardCls(false, 'panel')}><h2>{t === 'first_person' ? 'First person' : t[0].toUpperCase() + t.slice(1)}</h2><div className="chart short" id={`trait-${t}`} /></section>)}
         </div>
+      </div>
+
+      <div className={`mtab${tab === 'chat' ? ' active' : ''}`} data-mtab="chat">
+        <section className={cardCls(false, 'panel')} id="sizechat">
+          <h2>Chat <span className="note">with the best ship at this size that has a checkpoint to talk to{chatShip ? `: ${chatShip.name}` : ''}; experimental, and every answer is audited with the heads and cards that lit</span></h2>
+          {chatShip
+            ? <Chat shipKey={chatShip.ship_key} embedded />
+            : <div className={emptyCls()}>{chatModels.data ? 'no ship at this size has a checkpoint the chat can reach yet' : 'reading the ships…'}</div>}
+        </section>
       </div>
 
       <div className={`mtab${tab === 'sops' ? ' active' : ''}`} data-mtab="sops">

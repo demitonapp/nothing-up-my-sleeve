@@ -51,7 +51,7 @@ def _load(run: str):
     if ckpt is None:
         raise LookupError(f"run {row['name']} has no checkpoint to talk to")
     spec = spec_of(row)
-    prep = train.prepare(spec, log=lambda *a: None)
+    prep = train.prepare(spec, log=lambda *a: None, sailed=row["run_id"])
     model = train.build_model(spec, prep.tokeniser.vocab_size)
     model.update(train.to_compute(train.load_master(ckpt), spec["optim"].get("precision", "bf16")))
     step = json.loads((ckpt / "state.json").read_text())["step"]

@@ -1,6 +1,6 @@
 name: 1m@v0.0.6-arc
-ship: SOP v0.0.6 at 1m (ARC-AGI-2 arm)
-experiment: 'ARC-AGI-2 (Kipling aim 5): Ogden, then the 1,000 ARC training tasks as
+ship: Arc de Triomphe at 1m (SOP v0.0.6, the first ARC-AGI-2 arm)
+experiment: 'ARC-AGI-2 (Arc de Triomphe; written under Kipling, moved 11 November): Ogden, then the 1,000 ARC training tasks as
   a post-training stage; the 120-task evaluation set read at the end, pass@2 the outcome.'
 question: 'The ARC arm: can a 1m learn the ARC-AGI-2 form and any of its rules from
   the 1,000 training tasks, and what does the ARC stage cost the Ogden language? The

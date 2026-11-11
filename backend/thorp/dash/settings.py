@@ -1,7 +1,8 @@
 """The settings page (/settings, the cog in the header; 11 November, Justin: "a settings cog in the top
 right hand of the UI that allows me to see things, like storage used").
 
-Read-only: what the dashboard runs on, in one payload (`payload`, served at /api/settings).
+Read-only, except for the store switch: this module reads what the dashboard runs on, in one payload
+(`payload`, served at /api/settings); the switch itself is `POST /api/store/switch` (thorp.onboard.api).
 
 - **storage**: the disk the data sits on, and what Nothing up my sleeve keeps on it, part by part (the
   checkpoints, the store's files, the texts, the outside models' cache, ...), measured with `du` so a size
@@ -76,7 +77,7 @@ SWITCHES = {
     "THORP_DATA": "where the runtime data lives (default: data/ at the repository root)",
     "THORP_LEDGER": "the SQLite ledger's file (default: ledger.sqlite at the repository root)",
     "THORP_SHIPS": "where the specs, lists and fitouts live (default: ships/)",
-    "THORP_PG": "the store's address (default: postgresql://thorp@localhost:5433/thorp)",
+    "THORP_PG": "the store's address; overrides the install file (default: postgresql://thorp@localhost:5433/thorp)",
     "THORP_LEDGER_PG": "1: the ledger is read from and written to Postgres",
     "THORP_LIBRARY_PG": "1: the library's register is read from Postgres",
     "THORP_QUEUE_PG": "1: the standing queue is the store's, not specs/queue.txt",
@@ -223,9 +224,15 @@ def storage() -> dict:
 
 
 def store_info() -> dict:
-    from thorp import store
+    from thorp import config, store
 
-    out: dict = {"url": store._safe(store.url()), "ok": False}
+    out: dict = {
+        "url": store._safe(store.url()),
+        "ok": False,
+        "mode": config.mode(),
+        "locked": config.locked(),
+        "config_path": str(config.path()),
+    }
     try:
         from thorp.ledger import _use_pg
         from thorp.viable.s2_coordination import queue_store

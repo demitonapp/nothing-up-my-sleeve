@@ -17,6 +17,9 @@ dependencies = [
     "click>=8.1",
     "huggingface-hub>=2.4.0",
     "pyarrow>=26.0.1",
+    # chat is a first-class page now, not only a comparison tool: a fresh `uv sync` must be able to
+    # load an instruct model without a second, optional group.
+    "mlx-lm>=0.32.2",
 ]
 
 [dependency-groups]
@@ -26,9 +29,6 @@ dependencies = [
 # half an hour and left a GPU idle. In its own group, `uv sync --group torch` never touches it.
 tagger = [
     "en-core-web-sm",
-]
-compare = [
-    "mlx-lm>=0.32.2",
 ]
 dev = ["pytest", "ruff"]
 torch = [

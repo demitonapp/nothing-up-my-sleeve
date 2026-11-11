@@ -21,8 +21,9 @@ import json
 import os
 import time
 
+from thorp import turns
 from thorp.evaluators import EvalContext, EvalResult
-from thorp.evaluators.samples import generate
+from thorp.evaluators.samples import greedy
 from thorp.paths import resolve
 
 # the punkt tokeniser the official checks need lives in the repo (ships/lists/nltk_data), so the
@@ -43,8 +44,17 @@ def _cases(limit: int) -> list[dict]:
     return rows[::step][:limit]
 
 
+def _steady() -> None:
+    """The language checks use langdetect, which draws at random unless seeded: seeded, a response reads the
+    same every time it is checked (11 November: the builder kept 482 turns on one run and 479 on the next)."""
+    from langdetect import DetectorFactory
+
+    DetectorFactory.seed = 0
+
+
 def _check(row: dict, response: str) -> list[dict]:
     from thorp.ifeval_eval import instructions_registry as registry
+    _steady()
 
     out = []
     for iid, kwargs in zip(row["instruction_id_list"], row["kwargs"], strict=True):
@@ -63,13 +73,29 @@ def _check(row: dict, response: str) -> list[dict]:
 def evaluate(ctx: EvalContext) -> EvalResult:
     import os
 
-    limit = int(os.environ.get("THORP_IFEVAL_LIMIT", LIMIT))
+    # eval.options.ifeval (11 November, the return leg): `format` asks each prompt as a turn in the form the
+    # voyage was taught (thorp/turns.py: marks or plain, through its `clean`), and the response ends where the
+    # turn does; `max_new` lifts the cap (the benchmark sets none: 256 was this reader's cost control, and it
+    # ruled out every prompt that asks for a few hundred words); `limit` is the prompts read. Without
+    # options the prompt is given bare, as before. Greedy, one sample, and the response always ends at the
+    # ship's own end-of-text mark: what it writes after that is not its answer.
+    opts = ((ctx.options or {}).get("ifeval") or {}) if isinstance(ctx.options, dict) else {}
+    fmt, clean = opts.get("format"), str(opts.get("clean") or "raw")
+    max_new = int(opts.get("max_new") or MAX_NEW)
+    limit = int(os.environ.get("THORP_IFEVAL_LIMIT", opts.get("limit") or LIMIT))
     cases = _cases(limit)
     t0 = time.time()
-    per_prompt, prompt_ok, instr_ok, instr_n = [], 0, 0, 0
-    key = ctx.step if isinstance(ctx.step, int) else 0
-    for i, row in enumerate(cases):
-        response = generate(ctx.model, ctx.tokeniser, row["prompt"], 0.0, MAX_NEW, ctx.context, key + i)
+    per_prompt, prompt_ok, instr_ok, instr_n, stopped_n = [], 0, 0, 0, 0
+    tok = ctx.tokeniser
+    end = tok.encode("<end>") if fmt == "marks" else []
+    stop_ids = end if len(end) == 1 else ()  # the end mark, when the voyage holds it as one piece
+    for row in cases:
+        asked = turns.prompt(fmt, row["prompt"], clean) if fmt else row["prompt"]
+        ids = ([tok.eos_id] if fmt else []) + tok.encode(asked)  # a taught turn follows the end-of-text mark
+        out, stopped = greedy(ctx.model, tok, ids, max_new, ctx.context, stop_ids)
+        response = tok.decode(out)
+        response = turns.cut(fmt, response) if fmt else response
+        stopped_n += int(stopped)
         checks = _check(row, response)
         passed = all(c["followed"] for c in checks)
         prompt_ok += int(passed)
@@ -92,6 +118,8 @@ def evaluate(ctx: EvalContext) -> EvalResult:
         "ifeval/n_instructions": float(instr_n),
         "ifeval/seconds": time.time() - t0,
         "ifeval/full_set": 1.0 if len(per_prompt) >= 541 else 0.0,
+        "ifeval/stopped": stopped_n / n,  # the share of responses the ship ended itself, inside the cap
+        "ifeval/max_new": float(max_new),
     }
     return EvalResult(
         metrics=metrics,
@@ -100,7 +128,8 @@ def evaluate(ctx: EvalContext) -> EvalResult:
                 "kind": "ifeval",
                 "path": "",
                 "sha1": "",
-                "text": json.dumps({"step": ctx.step, "n": len(per_prompt), "prompts": per_prompt}),
+                "text": json.dumps({"step": ctx.step, "n": len(per_prompt), "format": fmt or "bare",
+                                    "clean": clean, "max_new": max_new, "prompts": per_prompt}),
             }
         ],
     )

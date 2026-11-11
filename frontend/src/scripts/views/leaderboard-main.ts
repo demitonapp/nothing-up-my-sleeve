@@ -8,6 +8,7 @@ import { fitReachAt, polyfit, polyval } from '../../lib/analysis';
 import { modelHash, shipHash } from '../router';
 import { chainingCell, logicCell, testCell, makerOf, makerLink, minicards } from './leaderboard';
 import { causeCell } from './helpers';
+import { BANDS, bandCardHtml, bandOf, sizeOf, type SizeBand } from './bands';
 
 const CAUSE_NOTE = "the logic deck's chaining gain on its cause-and-effect items (when X, then Y; Y makes Z): eight items, so a strong reading counts and a small one is noise; the mark, 0.1, dotted";
 
@@ -20,6 +21,32 @@ const classRankOf = (rungs: Rung[]) => (p: string): number => {
   const i = rungs.findIndex((r) => r.preset === p);
   return i < 0 ? 99 : i;
 };
+
+/** The three size bands as the same cards the Market Harbour draws (11 November, Justin: "those three
+ *  cards should also be applied to the leaderboard"): the band, its range, what the board holds in it,
+ *  and the way in. Each opens its size's own page (/leaderboard/medium), as a band does in the harbour. */
+export function bandCardsHtml(lb: any): string {
+  const table: any[] = (lb && lb.table) || [];
+  const cands: any[] = Object.values((lb && lb.candidates) || {}).flat() as any[];
+  return BANDS.map((b) => {
+    const measured = table.filter((r) => bandOf(sizeOf(r)) === b.key);
+    const inBand = cands.filter((c) => bandOf(sizeOf(c)) === b.key);
+    const shown = measured.length ? measured : inBand;
+    const preview = shown.slice(0, 3).map((x) => esc(x.name || x.label || x.model || '')).join(' · ');
+    const more = shown.length > 3 ? ` and ${shown.length - 3} more` : '';
+    const counts = [
+      measured.length ? `<b>${measured.length}</b> measured` : '',
+      inBand.length ? `<b>${inBand.length}</b> candidate${inBand.length === 1 ? '' : 's'}` : '',
+    ].filter(Boolean).join(' · ') || 'nothing read yet';
+    const body = `<div>${counts}</div><div class="s">${preview}${more}</div>`;
+    return bandCardHtml(b, {
+      href: `/leaderboard/${b.key}`,
+      body,
+      feet: [[`${measured.length} on the board`, `${inBand.length} candidate${inBand.length === 1 ? '' : 's'}`]],
+      cta: 'open the band →',
+    });
+  }).join('');
+}
 
 export function runsHtml(lb: any, want: string, rungs: Rung[]): { head: string; body: string; count: string } {
   const thr = lb.threshold ?? 0.1, tests = lb.tests || [];
@@ -81,22 +108,26 @@ export function boardHtml(lb: any, sq: any, rungs: Rung[], showFc: boolean, show
   const approachRows = table.filter((r: any) => r.group === 'approaching').sort((a: any, b: any) => a.rank - b.rank).map((r: any) => ({ ...asRow(r), src: r }));
   const approach = approachRows.map((r: any) => {
     const name = r.kind === 'thorp'
-      ? `<a href="/leaderboard/thorp/${encodeURIComponent(r.ship.ship_key)}"><b>${esc(r.ship.name)}</b></a><div class="s">${r.ship.ship_key ? `<a href="${shipHash(r.ship.ship_key)}">${esc(r.ship.ship || '')}</a>` : esc(r.ship.ship || '')}${r.ship.sailings ? ` · ${r.ship.sailings} sailing${r.ship.sailings === 1 ? '' : 's'}` : ''}</div>`
+      ? `<a href="/leaderboard/thorp?ship=${encodeURIComponent(r.ship.ship_key)}"><b>${esc(r.ship.name)}</b></a><div class="s">${r.ship.ship_key ? `<a href="${shipHash(r.ship.ship_key)}">${esc(r.ship.ship || '')}</a>` : esc(r.ship.ship || '')}${r.ship.sailings ? ` · ${r.ship.sailings} sailing${r.ship.sailings === 1 ? '' : 's'}` : ''}</div>`
       : `<a href="/leaderboard/competitor/${encodeURIComponent(r.model)}"><b>${esc(r.name)}</b></a>${r.competitor ? ` <span class="${pillCls('blue')}">2–4B</span>` : ''}<div class="s">${makerLink(r.model || r.name)}</div>`;
     const held = r.src.cards_held;
     const rank = r.src.tied ? `<span title="tied within the noise: one-hop lifts within 0.05 of each other">=${r.src.rank}</span><div class="s tiehint">tied within the noise</div>` : r.src.rank;
     return `<tr class="lb-${r.kind}"><td>${rank}</td><td>${name}</td><td>${fmtParams(r.params)}</td>
       <td>${r.src.cards ? minicards(r.src.cards) : '<span class="miniset"><span class="s">unreadable</span></span>'} <span class="s">${held == null ? '' : `${held} of 4`}</span></td>
       <td>${r.src.one_hop != null ? signed(r.src.one_hop) : '–'}</td>
+      <td>${logicCell(r.logic, r.kind)}</td>
       <td>${causeCell(r.src.cause_gain)}</td>
-      <td class="noise" title="below +0.03 the chaining lift is noise">${r.lift != null ? signed(r.lift) : '–'}</td></tr>`;
+      <td>${r.passed != null ? `${r.passed} of ${tests.length}` : ''}</td>
+      ${r.src.clears_noise
+        ? `<td title="clears the noise, but with no chaining gain behind it: not yet shown to be chaining">${chainingCell(r.lift, thr)}<div class="s">no gain behind it</div></td>`
+        : `<td class="noise" title="below +0.03 the chaining lift is noise">${r.lift != null ? signed(r.lift) : '–'}</td>`}</tr>`;
   }).join('');
   // forecasts
   let fcNoise = 0;
   if (showFc && sizeClass === 'small' && (fits.straight || fits.bending)) {
     const measured = new Set(table.filter((r: any) => r.kind === 'thorp').map((r: any) => (r.ship_key || '').split(':')[0]));
     const at = rungs.filter((r) => !measured.has(r.preset) && r.total).map((r) => ({ cls: r.preset, params: r.total }));
-    if (sq.smoke_at && !at.some((a) => Math.abs(a.params - sq.smoke_at) / sq.smoke_at < 0.1)) at.push({ label: `Nothing up my sleeve ${fmtParams(sq.smoke_at)}`, params: sq.smoke_at, smoke: true } as any);
+    if (sq.smoke_at && !at.some((a) => Math.abs(a.params - sq.smoke_at) / sq.smoke_at < 0.1)) at.push({ label: `Demiton ${fmtParams(sq.smoke_at)}`, params: sq.smoke_at, smoke: true } as any);
     for (const a of at) {
       const x = Math.log10(a.params), st = fits.straight ? polyval(fits.straight, x) : null, be = fits.bending ? polyval(fits.bending, x) : null;
       const lift = be ?? st;
@@ -125,7 +156,7 @@ export function boardHtml(lb: any, sq: any, rungs: Rung[], showFc: boolean, show
   const head = `<tr><th>#</th><th>model</th><th>parameters</th><th>chaining lift</th><th title="the logic deck's chaining gain: the lift with both premises less the better single premise, on invented words and counterfactual premises; the proof that a pass is chaining, not knowing or one premise">chaining gain<div class="s">logic deck</div></th><th title="${CAUSE_NOTE}">cause and effect<div class="s">chaining gain</div></th><th>passed</th>${tests.map((t: any) => `<th class="tcol">${esc(t.name.replace(/^The /, ''))}</th>`).join('')}<th>Nothing up my sleeve must match it at</th></tr>`
   const body = rows.map((r: any) => {
       const ranked = r.kind !== 'forecast' && !r.pending; if (ranked) rank++;
-      const name = r.kind === 'thorp' ? `<a href="/leaderboard/thorp/${encodeURIComponent(r.ship.ship_key)}"><b>${esc(r.ship.name || `Nothing up my sleeve ${r.cls}`)}</b></a><div class="s">${r.ship.ship_key ? `<a href="${shipHash(r.ship.ship_key)}">${esc(r.ship.ship)}</a>` : esc(r.ship.ship || '')} · ${r.ship.sailings ?? 1} sailing${(r.ship.sailings ?? 1) === 1 ? '' : 's'}</div>`
+      const name = r.kind === 'thorp' ? `<a href="/leaderboard/thorp?ship=${encodeURIComponent(r.ship.ship_key)}"><b>${esc(r.ship.name || `Demiton ${r.cls}`)}</b></a><div class="s">${r.ship.ship_key ? `<a href="${shipHash(r.ship.ship_key)}">${esc(r.ship.ship)}</a>` : esc(r.ship.ship || '')} · ${r.ship.sailings ?? 1} sailing${(r.ship.sailings ?? 1) === 1 ? '' : 's'}</div>`
         : r.kind === 'forecast' ? `${r.cls ? classLink(rungs, r.cls) : `<b>${esc(r.name)}</b>`} <span class="${pillCls('accent')}">forecast</span>${r.smoke ? '<div class="s">a tenth of Qwen3 4B</div>' : ''}`
         : `${r.model && !r.pending ? `<a href="/leaderboard/competitor/${encodeURIComponent(r.model)}"><b>${esc(r.name)}</b></a>` : `<b>${esc(r.name)}</b>`}${r.competitor ? ` <span class="${pillCls('blue')}" title="a 2–4B competitor: Nothing up my sleeve must match it at a tenth its size">2–4B</span>` : ''}<div class="s">${makerLink(r.model || r.name)}</div>`;
       return `<tr class="lb-${r.kind}${r.kind === 'forecast' && !trusted ? ' untrusted' : ''}${r.pending ? ' pending' : ''}"><td>${ranked ? rank : ''}</td><td>${name}</td><td>${fmtParams(r.params)}</td>
@@ -142,7 +173,7 @@ export function boardHtml(lb: any, sq: any, rungs: Rung[], showFc: boolean, show
 export function candidatesHtml(cands: any[], sizeClass: string): { head: string; body: string; count: string } {
   const label = sizeClass === 'medium' ? 'medium' : 'large';
   const head = '<tr><th>#</th><th>candidate</th><th>parameters</th><th>why it is likely</th><th>the evidence so far</th><th>status</th></tr>';
-  const body = (cands || []).map((c: any) => {
+  const body = (cands || []).map((c: any, i: number) => {
     const params = `${fmtParams(c.params)}${c.active ? `<div class="s">${fmtParams(c.active)} active</div>` : ''}`;
     const arc = c.arc ? `ARC-AGI-2 <b>${Number(c.arc.score).toFixed(1)}</b> <span class="s">pass@2</span><div class="s">${esc(c.arc.source)}</div>` : '';
     const logic = c.logic
@@ -150,7 +181,7 @@ export function candidatesHtml(cands: any[], sizeClass: string): { head: string;
       : '';
     const evidence = [arc, logic].filter(Boolean).join('<div class="s">·</div>') || '<span class="s">not read yet</span>';
     const link = c.source ? ` · <a href="${esc(c.source)}" target="_blank" rel="noopener">model card</a>` : '';
-    return `<tr class="lb-candidate"><td>${c.rank}</td>
+    return `<tr class="lb-candidate"><td>${i + 1}</td>
       <td><b>${esc(c.label)}</b><div class="s">${esc(c.lab)}${link}</div></td>
       <td>${params}</td><td class="candwhy">${esc(c.why)}</td><td>${evidence}</td>
       <td><span class="${pillCls('accent')}">candidate</span>${c.note ? `<div class="s">${esc(c.note)}</div>` : ''}</td></tr>`;
@@ -166,8 +197,11 @@ export function reasoningHtml(r: any): { head: string; body: string; count: stri
   const head = '<tr><th>model</th><th>ARC-AGI-2 <span class="s">pass@2</span></th><th>the reading</th></tr>';
   const published = (r?.published || []).map((x: any) => `<tr class="lb-outside"><td><b>${esc(x.label)}</b><div class="s">${esc(x.model)}</div></td>
     <td><b>${Number(x.score).toFixed(1)}</b></td><td class="s">${esc(x.source)} · ${esc(x.date)}${x.url ? ` · <a href="${esc(x.url)}" target="_blank" rel="noopener">leaderboard</a>` : ''}</td></tr>`).join('');
-  const measured = (r?.measured || []).map((x: any) => `<tr class="lb-candidate"><td><b>${esc(x.label)}</b><div class="s">${esc(x.model)}</div></td>
-    <td><b>${Number(x.score).toFixed(1)}</b><div class="s">${x.tasks || 0} tasks${x.cell_accuracy != null ? ` · ${Math.round(100 * x.cell_accuracy)}% cells` : ''}</div></td><td class="s">${esc(x.source)}${x.mode ? ` · ${esc(x.mode)}` : ''}</td></tr>`).join('');
+  // a reading that wrote no grid at all is not a wrong answer: say so rather than "0% cells"
+  const cells = (x: any) => x.format_rate === 0 ? ' · no grid written' : x.cell_accuracy != null ? ` · ${Math.round(100 * x.cell_accuracy)}% cells` : '';
+  const ranOut = (x: any) => x.thinking_unfinished ? ` · thinking ran out on ${x.thinking_unfinished}` : '';
+  const measured = (r?.measured || []).map((x: any) => `<tr class="lb-candidate"><td><b>${esc(x.label)}</b>${x.thinking ? ` <span class="s">thinking ${esc(x.thinking)}</span>` : ''}<div class="s">${esc(x.model)}</div></td>
+    <td><b>${Number(x.score).toFixed(1)}</b><div class="s">${x.tasks || 0} tasks${cells(x)}</div></td><td class="s">${esc(x.source)}${x.mode ? ` · ${esc(x.mode)}` : ''}${ranOut(x)}</td></tr>`).join('');
   const earlier = measured ? `<tr class="lb-group"><td colspan="3" class="s">our readings — pilots, not published scores</td></tr>${measured}` : '';
   const thorp = r?.thorp
     ? `<tr class="lb-thorp"><td><b>Nothing up my sleeve</b><div class="s">${esc(r.thorp.ship || r.thorp.run || '')}</div></td><td><b>${Number(r.thorp.score).toFixed(1)}</b></td><td class="s">${esc(r.thorp.note || 'our own reading')}</td></tr>`

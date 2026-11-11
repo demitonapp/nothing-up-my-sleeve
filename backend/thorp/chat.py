@@ -9,7 +9,9 @@ attention heads and cards that lit while it was written.
 from __future__ import annotations
 
 import json
+import os
 import threading
+import time
 
 import numpy as np
 
@@ -102,6 +104,12 @@ def prompt_for(spec: dict, question: str) -> tuple[str, str]:
     """The question wrapped the way the voyage was taught: the v0.1.4 marks where it read them, else
     plain prose. Returns (prompt, format)."""
     q = question.strip()
+    # a return leg (11 November) says which turn format it was taught: ask it exactly as its turns were written
+    from thorp import cleaning, turns
+
+    fmt = turns.format_of(spec)
+    if fmt:
+        return turns.prompt(fmt, q, cleaning.version_of(spec)), fmt
     recipe = str((spec.get("data") or {}).get("recipe") or "")
     if "ogden-v0.1.4" in recipe or "chat" in recipe.lower() or "dialogue" in recipe.lower():
         return f"<question>{q}<answer>", "marks"
@@ -486,18 +494,178 @@ def answer(
     seed: int = 0,
     step: int | None = None,
     with_audit: bool = True,
+    thinking: bool | None = None,
 ) -> dict:
     """One answer from the run's latest checkpoint (or `step`), with the heads and cards audit."""
     with _LOCK:
         model, tok, spec, ckpt = load(run_name, step)
+        started = time.perf_counter()
         text, prompt, fmt = _ask(model, tok, spec, question, temperature, tokens, seed)
-        out = {"run": run_name, "step": ckpt.name, "prompt": prompt, "format": fmt, "answer": text}
+        seconds = time.perf_counter() - started
+        prompt_tokens = _own_tokens(tok, prompt)
+        answer_tokens = _own_tokens(tok, text)
+        out = {
+            "run": run_name,
+            "step": ckpt.name,
+            "prompt": prompt,
+            "format": fmt,
+            "answer": text,
+            "reasoning": "",
+            "thinking": "none",
+            "meta": {
+                "settings": {"temperature": temperature, "max_tokens": tokens, "thinking": "none"},
+                "prompt_tokens": prompt_tokens,
+                "answer_tokens": answer_tokens,
+                "reasoning_tokens": 0,
+                "seconds": round(seconds, 2),
+                "tok_s": round(answer_tokens / seconds, 1) if seconds > 0 else None,
+                "finish": "length" if answer_tokens >= tokens else "stop",
+                "rendered": prompt,
+            },
+        }
         if with_audit:
             try:
                 out["audit"] = _audit(model, tok, spec, ckpt.parent.name, prompt, text)
             except Exception as e:  # noqa: BLE001  the answer stands; say why the audit could not be read
                 out["audit"] = {"readable": False, "reason": str(e)}
         return out
+
+
+def _cache_file(model_id: str, name: str) -> str | None:
+    """A file of a cached model (its chat template or config), or None when the hub cannot say."""
+    try:
+        from huggingface_hub import try_to_load_from_cache
+
+        p = try_to_load_from_cache(model_id, name)
+        if isinstance(p, str) and os.path.exists(p):
+            return p
+    except Exception:  # noqa: BLE001  no hub, no cache
+        pass
+    return None
+
+
+def _template_text(model_id: str) -> str:
+    p = _cache_file(model_id, "chat_template.jinja") or _cache_file(model_id, "tokenizer_config.json")
+    if not p:
+        return ""
+    try:
+        with open(p, encoding="utf-8") as f:
+            return f.read()
+    except OSError:
+        return ""
+
+
+def thinking_support(model_id: str) -> dict:
+    """Whether an outside model can think, and whether the thinking can be turned off: the chat
+    template's `enable_thinking` is a toggle; a template that reasons without one is automatic; a
+    template with neither has no reasoning mode."""
+    text = _template_text(model_id)
+    low = text.lower()
+    if "enable_thinking" in text:
+        return {"mode": "toggle", "default": True, "why": "the chat template takes enable_thinking"}
+    if any(k in low for k in ("thinking", "reasoning", "think")):
+        return {"mode": "auto", "default": True, "why": "the chat template always reasons and has no off switch"}
+    return {"mode": "none", "default": False, "why": "the chat template has no reasoning mode"}
+
+
+def _tuning(model_id: str) -> str:
+    """Whether the weights are instruction-tuned or a base checkpoint: a chat template in the
+    tokeniser is not enough — a 270M base Gemma has one and still only continues text."""
+    name = model_id.lower()
+    if "-it" in name or "instruct" in name or "-chat" in name:
+        return "instruct"
+    if "base" in name or "-pt" in name or "pretrain" in name or "pythia" in name:
+        return "base"
+    if "qwen" in name or "phi-4" in name:
+        return "instruct"  # Qwen and Phi-4 publish the instruct model under the plain name
+    if any(k in name for k in ("gemma", "llama", "smollm", "phi-2")):
+        return "base"
+    return "unknown"
+
+
+def _context(model_id: str) -> int | None:
+    p = _cache_file(model_id, "config.json")
+    if not p:
+        return None
+    try:
+        with open(p, encoding="utf-8") as f:
+            cfg = json.load(f)
+        for k in ("max_position_embeddings", "text_config", "n_positions"):
+            v = cfg.get(k)
+            if isinstance(v, dict):
+                v = v.get("max_position_embeddings")
+            if isinstance(v, (int, float)):
+                return int(v)
+    except (OSError, ValueError):
+        pass
+    return None
+
+
+def _quant(model_id: str) -> str:
+    name = model_id.lower()
+    for q in ("mxfp4", "4bit", "8bit", "6bit", "5bit", "bf16", "fp16"):
+        if q in name:
+            return q
+    return "–"
+
+
+def _own_tokens(tok, text: str) -> int:
+    try:
+        return len(tok.encode(text, add_special_tokens=False))
+    except Exception:  # noqa: BLE001  a tokeniser that cannot count must not fail an answer
+        return 0
+
+
+def _split_reasoning(text: str, thinking: str) -> tuple[str, str]:
+    """(reasoning, answer) from a continuation: the trace is what came before the closing think
+    marker; with no marker and thinking on, the whole continuation is still reasoning."""
+    for marker in ("</think>", "<|end_of_thought|>", "<channel|>"):
+        if marker in text:
+            head, _, tail = text.rpartition(marker)
+            return head.strip(), tail.strip()
+    if thinking in ("on", "auto"):
+        return text.strip(), ""
+    return "", text.strip()
+
+
+def _facts(spec: dict, step: str | None = None) -> dict:
+    """The parameters the chat's sidebar reads: the shape, the tokeniser, and whether its control
+    tokens are in the embedding table. A declared control token is a single piece of the tokeniser's
+    vocabulary, and the embedding table is one row a piece, so declared means in the embeddings; a
+    corpus with no `symbols` (Ogden v0.1/v0.2) has none at all."""
+    from thorp import turns
+    from thorp.models import registry
+
+    tok = spec.get("tokeniser") or {}
+    model = spec.get("model") or {}
+    preset = model.get("preset")
+    shape = registry.PRESETS.get(str(preset)) or {}
+    symbols = [str(x) for x in (tok.get("symbols") or [])]
+    return {
+        "preset": preset,
+        "family": model.get("family"),
+        "layers": shape.get("layers"),
+        "width": shape.get("width"),
+        "heads": shape.get("heads"),
+        "context": model.get("context"),
+        "positions": model.get("positions"),
+        "backend": model.get("backend") or "mlx",
+        "precision": (spec.get("optim") or {}).get("precision"),
+        "vocab": tok.get("vocab"),
+        "tokeniser": tok.get("kind"),
+        "byte_fallback": tok.get("byte_fallback"),
+        "train_on": tok.get("train_on"),
+        "control_tokens": symbols,
+        "control_in_embeddings": bool(symbols),
+        "turns": turns.format_of(spec),
+        "tuning": "base",
+        "thinking": {"mode": "none", "default": False, "why": "a Nothing up my sleeve GPT has no reasoning mode"},
+        "recipe": (spec.get("data") or {}).get("recipe"),
+        "passes": (spec.get("data") or {}).get("passes"),
+        "clean": (spec.get("data") or {}).get("clean"),
+        "sop": spec.get("sop"),
+        "step": step,
+    }
 
 
 def models(leaderboard: dict | None = None) -> list[dict]:
@@ -521,6 +689,7 @@ def models(leaderboard: dict | None = None) -> list[dict]:
                 if n and n not in names:
                     names.append(n)
             chosen = None
+            facts = None
             for n in names:
                 r = con.get_run_by_name(n, finished=True)
                 if not r:
@@ -529,6 +698,7 @@ def models(leaderboard: dict | None = None) -> list[dict]:
                 if ck is None:
                     continue
                 chosen = {"run": n, "run_id": r["run_id"], "step": ck.name}
+                facts = _facts(spec_of(r), ck.name)
                 break
             out.append(
                 {
@@ -541,6 +711,7 @@ def models(leaderboard: dict | None = None) -> list[dict]:
                     "available": chosen is not None,
                     "run": chosen,
                     "runs": names,
+                    "facts": facts,
                     "why": None if chosen else "no finished run with a checkpoint",
                 }
             )
@@ -572,7 +743,7 @@ def foreign_models() -> list[dict]:
     from thorp import foreign
 
     out = []
-    for m in foreign.models():
+    for m in foreign.chat_targets():
         cached = _cached(m["model"])
         out.append(
             {
@@ -586,19 +757,36 @@ def foreign_models() -> list[dict]:
                 "available": cached,
                 "run": None,
                 "runs": [],
+                "facts": {
+                    "repo": m["model"],
+                    "params": m["params"],
+                    "context": _context(m["model"]),
+                    "quant": _quant(m["model"]),
+                    "chat_template": bool(_template_text(m["model"])),
+                    "tuning": foreign.tuning(m["model"]),
+                    "thinking": thinking_support(m["model"]),
+                },
                 "why": None if cached else "its weights are not in the MLX cache yet",
             }
         )
     return out
 
 
-def foreign_answer(key: str, question: str, *, tokens: int = 80, temperature: float = 0.7) -> dict:
+def foreign_answer(
+    key: str,
+    question: str,
+    *,
+    tokens: int = 80,
+    temperature: float = 0.7,
+    thinking: bool | None = None,
+    history: list | None = None,
+) -> dict:
     """One answer from a foreign ship's own MLX weights: the model's continuation, not a Thorp
     checkpoint. The weights load once per model (cached, two at a time); a model not in the cache
     says so. The reply has no audit: the heads/cards trace (thorp.chat._audit) is our GPT's."""
     from thorp import foreign
 
-    m = foreign.get(key)
+    m = foreign.get_any(key)
     if m is None:
         raise LookupError(f"no foreign ship {key!r}")
     from mlx_lm import generate, load
@@ -612,22 +800,68 @@ def foreign_answer(key: str, question: str, *, tokens: int = 80, temperature: fl
             while len(_FOREIGN) > _FOREIGN_MAX:
                 _FOREIGN.pop(next(iter(_FOREIGN)))
         model, tok = hit
+    support = thinking_support(m["model"])
+    state, kwargs = "none", {}
+    if support["mode"] == "toggle":
+        want = support["default"] if thinking is None else bool(thinking)
+        state = "on" if want else "off"
+        kwargs = {"enable_thinking": want}
+    elif support["mode"] == "auto":
+        state = "auto"
+    # the conversation so far, for a continuation: the model is asked with its own turns, so a second
+    # message can pick up where the first stopped instead of starting again
+    msgs = []
+    for h in history or []:
+        role = str(h.get("role") or "")
+        text = str(h.get("text") or h.get("content") or "")
+        if text and role in ("you", "user", "thorp", "assistant"):
+            msgs.append({"role": "user" if role in ("you", "user") else "assistant", "content": text})
+    msgs.append({"role": "user", "content": question})
     prompt = question
     try:  # an instruct model's own template; a base model continues the raw prompt
-        prompt = tok.apply_chat_template(
-            [{"role": "user", "content": question}], add_generation_prompt=True, tokenize=False
-        )
+        prompt = tok.apply_chat_template(msgs, add_generation_prompt=True, tokenize=False, **kwargs)
+    except TypeError:  # a template that takes no thinking switch: ask it the old way
+        prompt = tok.apply_chat_template(msgs, add_generation_prompt=True, tokenize=False)
+        state = "auto" if support["mode"] != "none" else "none"
     except Exception:  # noqa: BLE001  no template: the raw prompt
         prompt = question
+        state = "none"
+    started = time.perf_counter()
     text = generate(
         model, tok, prompt=prompt, max_tokens=tokens, sampler=make_sampler(temp=temperature), verbose=False
     )
+    seconds = time.perf_counter() - started
     answer = text[len(prompt) :] if isinstance(text, str) and text.startswith(prompt) else text
+    # the model's own turn end, when its template has one: a finished turn stops there rather than
+    # running on to the token cap (the control token is already in its embeddings)
+    ended = False
+    for end in ("<|im_end|>", "<|endoftext|>", "<end_of_turn>", "<|eot_id|>", "<|end|>", "</s>"):
+        if end in str(answer):
+            answer = str(answer).split(end)[0]
+            ended = True
+            break
+    reasoning, reply = _split_reasoning(str(answer), state)
+    prompt_tokens = _own_tokens(tok, prompt)
+    reasoning_tokens = _own_tokens(tok, reasoning)
+    answer_tokens = _own_tokens(tok, reply)
+    total_tokens = reasoning_tokens + answer_tokens
     return {
         "model": key,
         "run": m["model"],
         "step": "",
         "prompt": question,
         "format": "the model's own continuation",
-        "answer": str(answer).strip(),
+        "answer": reply,
+        "reasoning": reasoning,
+        "thinking": state,
+        "meta": {
+            "settings": {"temperature": temperature, "max_tokens": tokens, "thinking": state},
+            "prompt_tokens": prompt_tokens,
+            "answer_tokens": answer_tokens,
+            "reasoning_tokens": reasoning_tokens,
+            "seconds": round(seconds, 2),
+            "tok_s": round(total_tokens / seconds, 1) if seconds > 0 else None,
+            "finish": "stop" if ended else ("length" if total_tokens >= tokens else "stop"),
+            "rendered": prompt,
+        },
     }

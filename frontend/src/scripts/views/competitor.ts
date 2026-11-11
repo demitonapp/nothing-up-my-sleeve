@@ -34,7 +34,7 @@ export function competitorHtml(d: Payload, stars: Payload[]): CompetitorHtml {
   const read = chainingTests.filter((t: any) => t.lift != null), mean = read.length ? read.reduce((a: number, t: any) => a + t.lift, 0) / read.length : null;
   const passed = chainingTests.filter((t: any) => t.performed).length, t = d.tenth;
   const title = d.label || d.model || 'competitor';
-  const pills = d.thorp ? `<span class="${pillCls('good')}">Nothing up my sleeve</span>${d.current ? '' : ` <span class="${pillCls('')}">not the current version</span>`}`
+  const pills = d.thorp ? `<span class="${pillCls('good')}">Demiton</span>${d.current ? '' : ` <span class="${pillCls('')}">not the current version</span>`}`
     : `${d.competitor ? `<span class="${pillCls('blue')}">2–4B competitor</span> ` : ''}${d.ladder ? `<span class="${pillCls('')}">reference ladder</span>` : ''}`;
   const over = d.thorp
     ? [

@@ -12,8 +12,10 @@ internal measure and not public").
 - **logic** (the logic deck's chaining gain, invented words and single-premise controls): the proof
   beside the four, that a pass is chaining and not knowledge or copying.
 - **two boards in one table** (`payload()["table"]`, outside models and Nothing up my sleeve's versions together):
-  **chaining**, the readings that clear the noise (a Nothing up my sleeve ship on at least two sailings), ranked by
-  chaining lift; and **approaching**, the rest, ranked by how close they are: the necessary cards held
+  **chaining**, the readings through the door (thorp/steps.py: a lift that clears the noise, a Nothing up
+  my sleeve ship on at least two sailings, with a chaining gain above its noise and at least one test
+  performed, so a lift with no gain behind it is not ranked as chaining), ranked by chaining lift; and
+  **approaching**, the rest, ranked by how close they are: the necessary cards held
   (previous-word, the Nevermore, the mover, the comparator: every model that chains holds all four;
   thorp/card_check.py), then the one-hop lift on the logic deck (following one stated premise, the step
   before two), in steps of the noise (0.05): readings within it tie and share a rank, bigger first.
@@ -37,7 +39,7 @@ from __future__ import annotations
 
 import json
 
-from thorp import arc_scores, candidates, fleet
+from thorp import arc_scores, candidates, fleet, steps
 
 CHAINING = "paragraph"  # the RUNGS goal class whose rung is two facts chained
 CHAINING_NOISE = 0.03
@@ -414,7 +416,7 @@ def _thorp_arc(board: list[dict]) -> dict | None:
         if best is None or key > best["_key"]:
             best = {
                 "_key": key,
-                "score": round(float(score), 4),
+                "score": round(100.0 * float(score), 2),  # per cent, as the published scores are
                 "tasks": int(tasks) if tasks is not None else None,
                 "pilot": bool(pilot) if pilot is not None else None,
                 "run": b.get("run"),
@@ -467,7 +469,29 @@ def payload() -> dict:
     table = _table(board, _reference())
     return {
         "table": table,
-        # the three size classes (small up to 4B, medium up to 30B, large above 30B) and, for the
+        # AI2 ARC, the one peer-recognised test at this size, and the board the extra small band leads
+        # with: ARC-Easy (2,376 questions) is the anchor because it has a gradient under 1B, and
+        # ARC-Challenge (1,172) is the floor a bigger ship moves (thorp/arc_ai2.py, 11 November)
+        "arc_ai2": {
+            "name": "AI2 ARC",
+            "chance": 0.25,
+            "about": (
+                "grade-school science, four ways a question, from the AI2 Reasoning Challenge "
+                "(Clark et al., 2018). Read zero-shot with the option's own text as the continuation "
+                "of the question and the lowest mean loss a piece as the bet: no letters, so a ship "
+                "with a 2,048-word vocabulary and one with a 256k vocabulary are read the same way. "
+                "Not comparable with the papers' 25-shot letter reading."
+            ),
+            "splits": {
+                "easy": {"name": "ARC-Easy", "questions": 2376, "about": "the questions a retrieval baseline gets"},
+                "challenge": {"name": "ARC-Challenge", "questions": 1172, "about": "the questions it does not"},
+            },
+            "rows": _arc_ai2_rows(table),
+        },
+        # the steps to chaining and each ship beside the outside model ten times its size (thorp/steps.py)
+        "steps": steps.about(_one_hop_mark(), ONE_HOP_NOISE),
+        "ten_times": steps.ten_times(table, ONE_HOP_NOISE),
+        # the four size classes (extra small under 1B, small 1B–4B, medium 4B–32B, large above 32B) and, for the
         # classes with no chaining reading yet, the five likeliest candidates to approach
         "size_classes": candidates.size_classes(),
         "candidates": candidates.rows(),
@@ -566,7 +590,8 @@ def crown(ships: list[dict]) -> dict[str, dict]:
 
 
 def name_of(preset: str, v: int) -> str:
-    return f"Nothing up my sleeve {preset} v{v}"
+    # the lab is Demiton (11 November, Justin); the site is still Nothing up my sleeve
+    return f"Demiton {preset} v{v}"
 
 
 def thorp_entry(ship_key: str) -> dict | None:
@@ -708,6 +733,61 @@ def _params_of_ship(sh: dict) -> int | None:
     return _params(json.loads(r[0]))
 
 
+def _short_model(model: str) -> str:
+    """A model id as the board names it: no publisher, no quantisation suffix."""
+    name = model.rsplit("/", 1)[-1]
+    for suffix in ("-bf16", "-4bit", "-8bit", "-fp16"):
+        name = name.removesuffix(suffix)
+    return name
+
+
+def _arc_ai2_rows(table: list[dict]) -> list[dict]:
+    """One row a model with an AI2 ARC reading (s4.outside_readings, `arc-ai2-<model>`).
+
+    The one peer-recognised test at this size (11 November, Justin: "I'd prefer the ARC easy
+    challenge"): grade-school science, four ways a question, ARC-Easy and ARC-Challenge. Read
+    zero-shot with the option's text as the continuation, so a 2,048-word vocabulary and a 256k one
+    are read the same way, and not comparable with the papers' letter reading. The table's own name
+    and parameters are used where the model has a chaining row; a model read for this board and not
+    in the chaining ladder keeps its own id and its parameters from the reference map. One query, not
+    one a row; a model with no reading is absent, not zero."""
+    from thorp.smoking_qwen import REFERENCE_PARAMS
+    from thorp.viable.s4_intelligence import readings
+
+    known = {r.get("model"): r for r in table if r.get("model")}
+    rows = []
+    for name, doc in readings.glob("arc-ai2-*"):
+        model = name[len("arc-ai2-"):]
+        splits = (doc or {}).get("splits") or {}
+        easy = splits.get("easy") or {}
+        if easy.get("accuracy") is None:
+            continue
+        base = known.get(model) or {}
+
+        def split(key: str, splits: dict = splits) -> dict | None:
+            d = splits.get(key) or {}
+            if d.get("accuracy") is None:
+                return None
+            return {
+                "accuracy": d["accuracy"],
+                "questions": d.get("questions"),
+                "skipped": d.get("skipped"),
+                "pilot": bool(d.get("pilot")),
+            }
+
+        rows.append(
+            {
+                "kind": base.get("kind") or "ladder",
+                "name": base.get("name") or _short_model(model),
+                "model": model,
+                "params": base.get("params") or REFERENCE_PARAMS.get(model),
+                "easy": split("easy"),
+                "challenge": split("challenge"),
+            }
+        )
+    return sorted(rows, key=lambda r: (-(r["easy"] or {}).get("accuracy", 0.0), r["name"]))
+
+
 def _table(board: list[dict], reference: list[dict]) -> list[dict]:
     from thorp.smoking_qwen import REFERENCE_PARAMS
 
@@ -736,7 +816,7 @@ def _table(board: list[dict], reference: list[dict]) -> list[dict]:
         rows.append(
             {
                 "kind": "thorp",
-                "name": b.get("name") or f"Nothing up my sleeve {b['preset']}",
+                "name": b.get("name") or f"Demiton {b['preset']}",
                 "ship": b["ship"],
                 "ship_key": b["ship_key"],
                 "params": _params_of_ship(b),
@@ -761,7 +841,14 @@ def _table(board: list[dict], reference: list[dict]) -> list[dict]:
         )
         r["cards"] = cards
         r["one_hop"] = one_hop
-    ranked = sorted((r for r in rows if r["clears_noise"]), key=lambda r: -r["chaining_lift"])
+    # the door to the chaining board (11 November, Justin: "apply it"): a lift that clears the noise is
+    # not enough, because the logic deck's gain is the proof that a pass is chaining and not knowing
+    # or one premise. A row is ranked as chaining only with that gain above its noise and a test
+    # performed (steps.steps_of); a lift with no gain behind it goes to the approach board
+    mark = _one_hop_mark()
+    for r in rows:
+        r["through_door"] = bool(r["clears_noise"] and steps.steps_of(r, mark)["chains"])
+    ranked = sorted((r for r in rows if r["through_door"]), key=lambda r: -r["chaining_lift"])
 
     # below the line: cards held, then the one-hop lift in steps of ONE_HOP_NOISE, so readings within
     # the noise of each other tie (and share a rank, listed bigger first: a neutral order, not a claim)
@@ -770,26 +857,38 @@ def _table(board: list[dict], reference: list[dict]) -> list[dict]:
         return -9 if oh is None else round(oh / ONE_HOP_NOISE)
 
     approach = sorted(
-        (r for r in rows if not r["clears_noise"]),
+        (r for r in rows if not r["through_door"]),
         key=lambda r: (-(r["cards_held"] or 0), -band(r), -(r["params"] or 0)),
     )
-    for i, r in enumerate(ranked, 1):
-        r["rank"], r["group"], r["tied"] = i, "chaining", False
-    rank, prev = 0, None
-    for i, r in enumerate(approach, 1):
-        key = (r["cards_held"] or 0, band(r))
-        if key != prev:
-            rank, prev = i, key
-        r["rank"], r["group"] = rank, "approaching"
-    for r in approach:
-        r["tied"] = sum(1 for x in approach if x["rank"] == r["rank"]) > 1
-    # the size class each row belongs to: small (up to 4B), medium (up to 30B), large (above 30B)
+    # the size class each row belongs to: extra small (under 1B), small (1B–4B), medium (4B–32B),
+    # large (above 32B). Each class has its own page, so a row's rank is its place in its class: a
+    # tie is with a row on the same board, never with one a band away
     for r in ranked + approach:
         r["size_class"] = candidates.size_class(r.get("params"))
+    for cls in {r["size_class"] for r in ranked + approach}:
+        for i, r in enumerate((r for r in ranked if r["size_class"] == cls), 1):
+            r["rank"], r["group"], r["tied"] = i, "chaining", False
+        mine = [r for r in approach if r["size_class"] == cls]
+        rank, prev = 0, None
+        for i, r in enumerate(mine, 1):
+            key = (r["cards_held"] or 0, band(r))
+            if key != prev:
+                rank, prev = i, key
+            r["rank"], r["group"] = rank, "approaching"
+        for r in mine:
+            r["tied"] = sum(1 for x in mine if x["rank"] == r["rank"]) > 1
+    # the steps to chaining (thorp/steps.py): what each row holds, and its rank by them in its class.
+    # The extra small board is read this way, because under 1B a rank by chaining lift ranks noise
+    steps.rank(ranked + approach, mark, ONE_HOP_NOISE)
     return ranked + approach
 
 
 NECESSARY_CARDS = ("previous_word", "nevermore", "mover", "comparator")
+
+
+def _one_hop_mark() -> float:
+    """The one-hop lift a model must reach: the Mover's own mark, from the deck (never a second copy)."""
+    return _face_marks()[1]["mover"]
 
 
 def _inside_of(row: dict) -> tuple[dict | None, float | None, float | None]:

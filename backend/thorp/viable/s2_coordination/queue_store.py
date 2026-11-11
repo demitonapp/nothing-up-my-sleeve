@@ -1,5 +1,6 @@
 """The standing queue in Postgres (DECISIONS.md, "One store: Postgres, by the viable system", S2): `queue_lines`
-(the pending lines, in order) and `queue_history` (every line that started, from queue-done.txt).
+(the pending lines, in order), `at_sea` (each line that has been launched and has not yet ended) and
+`queue_history` (every line that started, from queue-done.txt). A line is in exactly one of the three.
 
 This is the store the queue cuts over to **in port, at a time agreed with Justin**; until then
 `specs/queue.txt` and `specs/queue-done.txt` stay the live files, and this module holds the tables they move
@@ -13,7 +14,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from sqlalchemy import BigInteger, Text, delete, func, select, text
+from sqlalchemy import BigInteger, Float, Integer, Text, delete, func, select, text
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -41,7 +42,7 @@ class QueueLine(Base):
 
     position: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     text: Mapped[str] = mapped_column(Text)
-    kind: Mapped[str] = mapped_column(Text)  # spec, cmd or wait
+    kind: Mapped[str] = mapped_column(Text)  # spec, cmd, wait or hold
     payload: Mapped[str] = mapped_column(Text)  # the spec path under specs/, the shell command, or the voyage waited for
     lane: Mapped[str] = mapped_column(Text)  # mac or vast
     added_by: Mapped[str | None] = mapped_column(Text)
@@ -60,6 +61,30 @@ class QueueHistory(Base):
     started: Mapped[str | None] = mapped_column(Text)
     status: Mapped[str | None] = mapped_column(Text)
     run: Mapped[str | None] = mapped_column(Text)
+
+
+class AtSea(Base):
+    """One line that has left the queue and has not yet ended (11 November). Until this table, what was at sea
+    lived only in the coordinator's memory: the line was deleted from `queue_lines` before the launch and
+    `queue_history` was written only when the coordinator saw the exit, so a coordinator that died took the
+    record of its voyages with it. The row is written in the step that takes the line, given its pid when the
+    process exists, and deleted in the step that writes the line's history; a restarted coordinator adopts
+    every row it finds (`lanes.run`)."""
+
+    __tablename__ = "at_sea"
+    __table_args__ = {"schema": S2}
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    text: Mapped[str] = mapped_column(Text)  # the line as it was queued
+    lane: Mapped[str] = mapped_column(Text)  # mac or vast
+    seat: Mapped[int] = mapped_column(Integer, default=0)  # the lane's seat (the helm slot on the Mac)
+    kind: Mapped[str] = mapped_column(Text)  # spec or cmd (a wait: never goes to sea)
+    name: Mapped[str | None] = mapped_column(Text)  # the voyage's name, when the line is a voyage
+    run_id: Mapped[str | None] = mapped_column(Text)  # its run id: where an adopted voyage's outcome is read
+    pid: Mapped[int | None] = mapped_column(Integer)  # null between the take and the launch
+    started: Mapped[str | None] = mapped_column(Text)  # as the coordinator writes it (ISO, its own clock)
+    started_ts: Mapped[float | None] = mapped_column(Float)  # the same moment in seconds: a cmd:'s deadline
+    coordinator: Mapped[int | None] = mapped_column(Integer)  # the pid of the coordinator that launched it
 
 
 def tables() -> list:
@@ -83,6 +108,8 @@ def parse_line(text: str) -> dict:
         return {"kind": "cmd", "payload": s[len("cmd:") :].strip(), "lane": lane}
     if s.startswith("wait:"):
         return {"kind": "wait", "payload": s[len("wait:") :].strip(), "lane": lane}
+    if s.startswith("hold:"):
+        return {"kind": "hold", "payload": s[len("hold:") :].strip(), "lane": lane}
     return {"kind": "spec", "payload": s, "lane": lane}
 
 
@@ -238,8 +265,84 @@ def take(text: str) -> bool:
     return False
 
 
-def record(line: str, started: str, status: str) -> None:
-    """Write a line that ended to queue_history (the queue-done.txt row, in the store)."""
+# ---------------------------------------------------------------- what is at sea (11 November)
+
+_SEA_FIELDS = ("lane", "seat", "kind", "name", "run_id", "pid", "started", "started_ts", "coordinator")
+
+
+def _sea_row(line: str, fields: dict) -> AtSea:
+    known = {k: fields[k] for k in _SEA_FIELDS if fields.get(k) is not None}
+    parsed = parse_line(line)
+    known.setdefault("lane", parsed["lane"])
+    known.setdefault("kind", parsed["kind"])
+    known.setdefault("seat", 0)
+    return AtSea(text=line.strip(), **known)
+
+
+def to_sea(line: str, **fields) -> int:
+    """Write the at-sea row of a line that is being launched; returns the row's id. For the file queue, and
+    for a process adopted from the old pid file, where there is no line to take in the same step."""
+    from thorp import store
+
+    with store.session() as s:
+        row = _sea_row(line, fields)
+        s.add(row)
+        s.flush()
+        return int(row.id)
+
+
+def take_to_sea(line: str, **fields) -> int | None:
+    """Take the first copy of this line from the queue and write its at-sea row, in one transaction: the line
+    is in `queue_lines` or in `at_sea`, never in neither. Returns the row's id, or None when the line is no
+    longer queued (edited away meanwhile)."""
+    from thorp import store
+
+    line = line.strip()
+    with store.session() as s:
+        rows = _rows(s)
+        for i, r in enumerate(rows):
+            if r["text"] == line:
+                _write(rows[:i] + rows[i + 1 :], s)
+                row = _sea_row(line, fields)
+                s.add(row)
+                s.flush()
+                return int(row.id)
+    return None
+
+
+def set_pid(row_id: int, pid: int) -> None:
+    """The launched process's pid, written to its at-sea row the moment the process exists."""
+    from thorp import store
+
+    with store.session() as s:
+        row = s.get(AtSea, int(row_id))
+        if row is not None:
+            row.pid = int(pid)
+
+
+def from_sea(row_id: int) -> None:
+    """Remove an at-sea row with no history: a launch that failed and is being requeued, or a row whose
+    history could only be kept in the file."""
+    from thorp import store
+
+    with store.session() as s:
+        s.execute(delete(AtSea).where(AtSea.id == int(row_id)))
+
+
+def at_sea() -> list[dict]:
+    """Every line at sea, oldest first, as the coordinator recorded it."""
+    from thorp import store
+
+    with store.session() as s:
+        return [
+            {"id": r.id, "text": r.text, **{k: getattr(r, k) for k in _SEA_FIELDS}}
+            for r in s.scalars(select(AtSea).order_by(AtSea.id))
+        ]
+
+
+def record(line: str, started: str, status: str, at_sea: int | None = None) -> None:
+    """Write a line that ended to queue_history (the queue-done.txt row, in the store). `at_sea` is the id of
+    the line's at-sea row, deleted in the same transaction: the line leaves the sea as it enters the history."""
     from thorp import store
 
     # `line`, not `text`: a parameter named `text` shadowed sqlalchemy.text below and made every
@@ -264,6 +367,23 @@ def record(line: str, started: str, status: str) -> None:
                 run=None,
             )
         )
+        if at_sea is not None:
+            s.execute(delete(AtSea).where(AtSea.id == int(at_sea)))
+
+
+def sort_specs(key) -> None:
+    """Stable-sort the pending spec lines by `key`, leaving cmd and wait lines in their places (the
+    expedition priority's one write to the queue). Within an expedition the order is kept."""
+    from thorp import store
+
+    with store.session() as s:
+        rows = _rows(s)
+        slots = [i for i, r in enumerate(rows) if r["kind"] == "spec"]
+        specs = [rows[i] for i in slots]
+        specs.sort(key=key)
+        for i, r in zip(slots, specs, strict=True):
+            rows[i] = r
+        _write(rows, s)
 
 
 def move(text: str, to: int) -> None:
@@ -280,6 +400,26 @@ def move(text: str, to: int) -> None:
         j = max(0, min(len(rows), int(to) - 1))
         rows.insert(j, row)
         _write(rows, s)
+
+
+def release(text: str | None = None) -> str | None:
+    """Release a hold: the named `hold:` line, or the first one in the queue. It leaves the queue and its
+    release is kept in the history (status `released`), so who let the lane go on, and when, can be read
+    back. Returns the line released, or None when there was no hold to release."""
+    import time
+
+    from thorp import store
+
+    with store.session() as s:
+        rows = _rows(s)
+        want = text.strip() if text else None
+        i = next((k for k, r in enumerate(rows) if r["kind"] == "hold" and (want is None or r["text"] == want)), None)
+        if i is None:
+            return None
+        line = rows[i]["text"]
+        _write(rows[:i] + rows[i + 1 :], s)
+    record(line, time.strftime("%Y-%m-%dT%H:%M:%S"), "released")
+    return line
 
 
 def drop(text: str) -> bool:

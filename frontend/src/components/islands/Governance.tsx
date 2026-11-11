@@ -5,9 +5,11 @@
 
 import { useEffect, useState } from 'react';
 import type { MouseEvent as ReactMouseEvent } from 'react';
-import { emptyCls, tabCls, tabsCls } from '@/lib/ui';
+import { emptyCls } from '@/lib/ui';
 import { routePath, sectionProps, useApi, useRoute } from '@/lib/useApi';
 import { acquisitionHtml, controlHtml, systemsHtml } from '@/scripts/views/governance';
+import SectionNav from '../SectionNav';
+import { TabNav } from '../TabNav';
 
 type View = 's1' | 's2' | 's3' | 's4' | 's5';
 const viewFrom = (p: string): View => {
@@ -83,19 +85,20 @@ export default function Governance() {
 
   return (
     <div {...sectionProps('governance')}>
+      <SectionNav />
       <h1>VSM <span className="q">Nothing up my sleeve's rules as Beer's Viable System Model, in five systems: S1 operations (the expeditions, and acquisition: the books they read), S2 coordination (one GPU, one queue), S3 control (the gate every voyage passes, and the audit), S4 intelligence (the outside world) and S5 policy (the identity, Justin's rules). Read-only: a policy is switched on or off by Justin in data/policies.json</span></h1>
-      <nav className={tabsCls('line', 'subnav')} data-orientation="horizontal" data-variant="line" id="vnav">
-        <a className={tabCls('')} data-state="inactive" data-vtab="overview" href="/expeditions">Overview</a>
-        <a className={tabCls('')} data-state="inactive" data-vtab="queue" href="/expeditions/queue">Queue</a>
-        <a className={tabCls('')} data-state="inactive" data-vtab="expeditions" href="/expeditions/plans">Plans</a>
-        <a className={tabCls('')} data-state="active" data-vtab="vsm" href="/vsm">VSM</a>
-      </nav>
-      <nav className={tabsCls('line', 'subnav')} data-orientation="horizontal" data-variant="line" id="govnav">
-        {TABS.map((t) => (
-          <a key={t.view} className={tabCls('')} data-state={view === t.view ? 'active' : 'inactive'} data-gview={t.view} href={hrefOf(t.view)}
-            onClick={(e) => { e.preventDefault(); go(t.view); }}>{t.label}</a>
-        ))}
-      </nav>
+      <TabNav
+        id="govnav"
+        ariaLabel="VSM systems"
+        items={TABS.map((t) => ({
+          key: t.view,
+          label: t.label,
+          href: hrefOf(t.view),
+          active: view === t.view,
+          data: { 'data-gview': t.view },
+          onClick: () => go(t.view),
+        }))}
+      />
       <div className="gview active" data-gview={view}>
         <p className="s gvintro">{INTRO[view]}</p>
         <div id="govbands">

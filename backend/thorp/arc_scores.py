@@ -55,54 +55,75 @@ def for_model(model: str) -> dict | None:
     return {**r, "kind": "published"} if r else None
 
 
-def measured() -> dict[str, dict]:
-    """Every ARC-AGI-2 reading we ran ourselves, keyed by model (s4.outside_readings `arc-*`).
+def _reading_row(model: str, reading: dict) -> dict | None:
+    """One stored ARC reading as a board row, or None when it holds no score."""
+    score = reading.get("pass@2")
+    if score is None:
+        return None
+    tasks = reading.get("tasks")
+    if isinstance(tasks, list):
+        tasks = len(tasks)
+    if not isinstance(tasks, int) or tasks <= 0:
+        tasks = int(reading.get("limit") or 0)
+    thinking = reading.get("thinking")  # "on", "off", or None: no switch, or read before it was kept
+    caps = [f"{reading.get('max_output')}-token cap"] if reading.get("max_output") else []
+    if thinking == "on" and reading.get("max_thinking"):
+        caps.append(f"{reading.get('max_thinking')} to think")
+    return {
+        "label": model.split("/")[-1],
+        "model": model,
+        "score": 100.0 * float(score),  # the store keeps a share; the board shows per cent, as published
+        "pass@1": reading.get("pass@1"),
+        "cell_accuracy": reading.get("cell_accuracy"),
+        "format_rate": reading.get("format_rate"),
+        "tasks": int(tasks) if tasks else 0,
+        "pilot": bool(reading.get("pilot")),
+        "mode": reading.get("mode"),
+        "thinking": thinking,
+        "thinking_unfinished": reading.get("thinking_unfinished"),
+        "scored": reading.get("scored"),
+        "kind": "measured",
+        "max_output": reading.get("max_output"),
+        "source": (f"our reading, {int(tasks) if tasks else 0}-task pilot" + "".join(f", {c}" for c in caps))
+        if reading.get("pilot")
+        else "our reading, 120-task set",
+    }
 
-    These are pilots unless the reading's `limit` is 120; the task count and the pilot flag stay on
-    the row so a pilot is never read as a published score."""
+
+def measured_rows() -> list[dict]:
+    """Every ARC-AGI-2 reading we ran ourselves (s4.outside_readings `arc-*`), biggest first.
+
+    A model read with thinking on and with it off has two rows (`arc-<model>` and
+    `arc-<model>@thinking`; scripts/score_arc.py). These are pilots unless the reading's `limit` is
+    120; the task count and the pilot flag stay on the row so a pilot is never read as a published
+    score."""
     from thorp.viable.s4_intelligence import readings
 
-    out: dict[str, dict] = {}
+    out: list[dict] = []
     try:
         for name, reading in readings.glob("arc-*"):
             kind, model = readings.kind_of(name)
             if kind != "arc" or not model or not isinstance(reading, dict):
                 continue
-            score = reading.get("pass@2")
-            if score is None:
-                continue
-            tasks = reading.get("tasks")
-            if isinstance(tasks, list):
-                tasks = len(tasks)
-            if not isinstance(tasks, int) or tasks <= 0:
-                tasks = int(reading.get("limit") or 0)
-            out[model] = {
-                "label": model.split("/")[-1],
-                "model": model,
-                "score": float(score),
-                "pass@1": reading.get("pass@1"),
-                "cell_accuracy": reading.get("cell_accuracy"),
-                "tasks": int(tasks) if tasks else 0,
-                "pilot": bool(reading.get("pilot")),
-                "mode": reading.get("mode"),
-                "scored": reading.get("scored"),
-                "kind": "measured",
-                "max_output": reading.get("max_output"),
-                "source": (
-                    f"our reading, {int(tasks) if tasks else 0}-task pilot"
-                    + (f", {reading.get('max_output')}-token cap" if reading.get("max_output") else "")
-                )
-                if reading.get("pilot")
-                else "our reading, 120-task set",
-            }
+            row = _reading_row(model, reading)
+            if row:
+                out.append(row)
     except Exception:  # noqa: BLE001 - the board still renders if the store is unreadable
         return out
+    return sorted(
+        out,
+        key=lambda r: (-float(r["score"]), -float(r.get("cell_accuracy") or 0.0), r["label"], r["thinking"] or ""),
+    )
+
+
+def measured() -> dict[str, dict]:
+    """Each model's best measured reading, keyed by model: the higher score, then the larger task set."""
+    out: dict[str, dict] = {}
+    for row in measured_rows():
+        held = out.get(row["model"])
+        if held is None or (row["score"], row["tasks"]) > (held["score"], held["tasks"]):
+            out[row["model"]] = row
     return out
-
-
-def measured_rows() -> list[dict]:
-    """The measured readings, biggest first."""
-    return sorted(measured().values(), key=lambda r: (-float(r["score"]), -float(r.get("cell_accuracy") or 0.0), r["label"]))
 
 
 def rows() -> list[dict]:

@@ -74,11 +74,28 @@ the marks. Play runs the readings in order; the slider and live as on the chart.
 where its next one stands in the queue, and which voyage is at sea instead.
 The Expeditions page has four tabs, and the fourth keeps them when it opens. **Overview** (`/expeditions`) is the standard in play: one
 **SOP card** per standard at sea and per newer one (`/api/expeditions/overview` `.sops`), with its
-art, version, voyages out and home, and its goals. **Queue** (`/expeditions/queue`) is every voyage
-still to sail, in order, with its goal and about when it sails. **Plans** (`/expeditions/plans`) is
+art, version, voyages out and home, and its goals. The same grid carries one card for each expedition
+open ahead of its own standard — Arc de Triomphe today: a launching order, no SOP signed yet — drawn
+with the same SOP card (16:9 art, head, aim list), so Kipling and Arc de Triomphe sit side by side and
+read alike. **Queue** (`/expeditions/queue`) is every voyage
+still to sail, in order, with its goal and about when it sails. **Click a voyage** to open its card: the
+spec's question and experiment, its place in the queue and estimated start, the ship's shape and
+parameters, its tokeniser and corpus, its optimiser, the scaffold's pins and schedule, and (for a voyage
+at sea) how far it has come as a progress bar with its percent and steps, when it should dock at its
+current pace (and the queue's own estimate when that differs), then its latest readings and card marks.
+The card is drawn from `/api/queue`'s per-row `detail`, read
+from the spec, so it is the same information the at-sea cards show without leaving the queue. It is a
+native `<dialog>` (Escape, the × or the backdrop closes it; the row is reachable by keyboard). **Plans** (`/expeditions/plans`) is
 the standards whose voyages are home, kept as cards under **Earlier standards** (10 November,
-Justin: "move ogden from here to the plans tab"), above a table of **every expedition**: its fleet,
-class, state, voyages at sea, finished, failed and queued, and what it found. An
+Justin: "move ogden from here to the plans tab"), folded shut and naming the standards inside, above
+**every expedition** as cards in three collapsible bands (11 November, Justin: "collapsible sections
+here ... currently sailing, recently finished, older ones"), read off the states below: **Currently
+sailing** (at sea, then under way, with the tally under its heading), **Recently finished** (whose
+latest voyage finished within seven days, the latest first, taken from the ledger so a stale
+`declared` word cannot hide it: Ogden is declared planned though its last voyage came home on 9
+November) and **Older ones** (finished longer ago, or not yet sailed). Under them, folded, the same
+expeditions as a table: fleet, class, state, voyages at sea, finished, failed and queued, and what
+it found. The bands keep their open state while the page polls. An
 expedition's **state** is S2's view (since 16:35), worked out from the helm and the queue, never the
 hand-set word (`declared`, on hover): at sea (at most one), under way, in port, home, paused, and
 **awaiting orders** in the warning colour (declared running with nothing at sea or queued: stalled,
@@ -211,14 +228,26 @@ header tab but an action on a ship's page, Nothing up my sleeve and foreign alik
   tokens and seconds. Ships not trained on the Q:/A: form don't converse yet, and the page says so.
 - **Leaderboard** (`#/leaderboard`): two boards on chaining two facts, from one table
   (`leaderboard.payload()["table"]`, outside models and Thorp versions together), split by the
-  noise and by **size class**: **small** up to 4B, **medium** above 4B up to 30B, **large** above
-  30B, as three tabs (the tab is linkable, `?size=medium`). The small class is the one with
-  readings. A class with no chaining reading yet carries its **five likeliest candidates to
+  noise and by **size band** (`views/bands.ts`, the Market Harbour's): **extra small** under 1B,
+  **small** 1B to 4B, **medium** 4B to 32B, **large** above 32B. `/leaderboard` is the way in: the
+  four band cards, then what is not one size's (Reasoning, the four Faces, Smoking the 2–4B range,
+  every ship). A card opens its size's own page (`/leaderboard/<band>`, e.g. `/leaderboard/medium`):
+  the two boards for that size, under a row of tabs to the other sizes and a way back. The old
+  `?size=medium` address forwards to it. A class with no chaining reading yet carries its **likeliest candidates to
   approach** (`leaderboard.payload()["candidates"]`, `thorp/candidates.py`), most likely first, each
   with its published size, why it is likely (the families that chain at 2–4B, the reasoning leaders
   of the open field, one boundary case that fits a workstation), the evidence held so far (the logic
   deck's gain and one-hop lift where read), and a **candidate** pill. A candidate is a target, not a
-  result: it enters the chaining board only when it has a chaining lift. Below the two boards is
+  result: it enters the chaining board only when it has a chaining lift. The **extra small** band is
+  read differently (`StepsBoard.tsx`, `views/leaderboard-steps.ts`, `thorp/steps.py`), because under
+  1B nothing chains and a rank by chaining lift ranks noise: **The steps to chaining** (the four
+  cards, one hop at the Mover's mark, the chaining gain above its noise, a chaining test performed;
+  ranked by steps held, a **chains** pill only with the gain and a test together), **At a tenth the
+  size** (`payload()["ten_times"]`: each of our ships beside the outside model nearest ten times its
+  size, each measure ahead, tie or behind), **Against size** (one reading against parameters, our
+  ships and the outside models as two lines) and **ARC-AGI-2 at this size** (prompted cold and
+  trained on ARC tasks as two columns, never one number). They are steps, not rungs: a rung is a
+  size class. Below the two boards is
   **Reasoning**: ARC-AGI-2, the canonical intelligence ranking (pass@2 on the 120-task evaluation
   set) — the published scores of the board's models, and Nothing up my sleeve's own reading once the
   Kipling ARC arm has one. It is a panel of its own because ARC percentages and chaining lift are
@@ -270,11 +299,22 @@ header tab but an action on a ship's page, Nothing up my sleeve and foreign alik
   (amber: the reading isn't valid yet), with the counts behind it on hover.
   The server never sends NaN: a failed reading (NaN or infinity) goes out as null, since one NaN
   makes a whole JSON response unreadable to the browser.
-  **The art** (`thorp/dash/art/generate_art.py`, the Atlas generators' Eduardo Risso style, made with
-  fal; saved to `web/public/art/<key>.png`): a ship across the top of each class card (keel to trader,
-  each a vessel a size up from the last) and a face on each playing card (previous-word, Nevermore,
-  mover, comparator, bridge) wherever the card appears: the star chart, the methodology and the
-  competitor pages. An image not made yet removes itself, so a card without art draws no frame.
+  **The art** (`thorp/dash/art/generate_art.py`, made with fal; saved to `frontend/public/art/<key>.png`):
+  a ship across the top of each class card (keel to trader, each a vessel a size up from the last) and a
+  face on each playing card (previous-word, Nevermore, mover, comparator, bridge) wherever the card
+  appears: the star chart, the methodology and the competitor pages. An image not made yet removes
+  itself, so a card without art draws no frame.
+  **The brief is three layers** (11 November, Justin: "the style is rissos, the inspiration is drake and the
+  merchant ships exploring new worlds, the world is banks early days of the culture"):
+  **style** — Eduardo Risso's noir, heavy black ink, stark chiaroscuro, one light source, near-black
+  ground, no text; **inspiration** — Drake and the merchant ships that went looking for new worlds, great
+  wooden ships, chart tables, lanterns and brass, landfalls on unnamed coasts; **world** — Iain M. Banks'
+  Culture in its first days, a young and hopeful expanding civilisation, whose own forms appear only as an
+  orbital ring where a moon would be, a distant habitat, a small silver drone at rest on the chart. The
+  age of sail is the ship, the Culture is the universe: nothing modern of our own century, and no
+  anachronism from later history (no Greek triremes, no Chinese junks, no Venetian carracks, no Victorian
+  gaslight; a ship of another nation's build only as a prize, as Drake took the São Filipe). The audit and
+  the twenty subjects that still cross it are `ships/reports/art-audit-2026-11-11.md`.
   **The deck** (`lib/deck.js`): on a competitor's or a Thorp version's page the five cards are a
   player's hand on a table: the cards it has lit are in its hand, face up and fanned (each with a
   corner rank and suit, P♣ previous-word, N♠ Nevermore, M♦ mover, C♥ comparator, B♠ bridge, and its

@@ -767,7 +767,9 @@ def api_expedition_plan(key: str = "kipling") -> dict:
             },
             "expedition": fleet.expedition_of_label(spec.get("name"), spec.get("ship")),
         })
-    return {"key": key, "queue": rows}
+    # only this expedition's launches: every expedition's Plan tab was showing the whole queue (found 11
+    # November, when Arc de Triomphe's tab listed Kipling's nine lines)
+    return {"key": key, "queue": [r for r in rows if r["expedition"] == key]}
 
 
 def api_compute() -> dict:
@@ -1222,6 +1224,106 @@ def _chaining(run_id: str):
     return sum(lifts) / len(lifts) if lifts else None
 
 
+_SHAPE_PARAMS: dict[tuple, dict] = {}
+
+
+def _shape_params(
+    family: str, preset: str | None, vocab: int, context: int, positions: str, kv_heads: int
+) -> dict:
+    """A preset's parameter counts for the shape a spec asks for, built once a shape and kept: the
+    queue page opens every voyage's card and all of a class's arms share a shape."""
+    key = (family, preset, vocab, context, positions, kv_heads)
+    if key not in _SHAPE_PARAMS:
+        try:
+            from thorp.models import registry
+
+            model = registry.build(family, preset, vocab, context, positions, kv_heads=kv_heads)
+            _SHAPE_PARAMS[key] = model.parameter_counts()
+        except Exception:  # noqa: BLE001  (no MLX on a box, or a preset this code does not know)
+            _SHAPE_PARAMS[key] = {}
+    return _SHAPE_PARAMS[key]
+
+
+def _spec_detail(spec: dict, run: dict | None = None) -> dict:
+    """Everything a voyage's spec fixes, for the card the queue opens (11 November): the model's shape,
+    its tokeniser, what it reads, its optimiser and schedule, the scaffold's pins and riddles, and, once
+    it has sailed, its latest readings. Read from the spec, never inferred from the page."""
+    from thorp.models import registry
+
+    m = spec.get("model") or {}
+    o = spec.get("optim") or {}
+    data = spec.get("data") or {}
+    tok = spec.get("tokeniser") or {}
+    sc = o.get("scaffold") or {}
+    preset = m.get("preset")
+    family = m.get("family") or "gpt"
+    vocab = int(tok.get("vocab") or 2048)
+    context = int(m.get("context") or 1024)
+    positions = m.get("positions") or "learned"
+    kv = int(m.get("kv_heads") or 0)
+    shape = registry.PRESETS.get(preset) or {}
+    run_id = (run or {}).get("run_id")
+    marks = _card_marks() if run_id else {}
+    classes = _deck_classes() if run_id else {}
+    cards = []
+    for h in sc.get("heads") or []:
+        card = h.get("card")
+        entry = {
+            "card": card, "layer": h.get("layer"), "head": h.get("head"),
+            "hold": h.get("hold"), "fade": h.get("fade"), "release": h.get("release"),
+        }
+        if run_id and card:
+            peak, now = _peak_final(run_id, _card_metric(card))
+            entry.update({
+                "mark": marks.get(card), "peak": peak, "now": now,
+                "stage": (classes.get(card) or {}).get("stage"),
+                "suit": (classes.get(card) or {}).get("suit"),
+            })
+        cards.append(entry)
+    readings = None
+    if run_id:
+        readings = {
+            "step": _latest_step(run_id), "loss": _latest(run_id, "loss"), "bpb": _latest_bpb(run_id),
+            "chaining": _chaining(run_id),
+            "tokens_seen": (run or {}).get("tokens_seen") or _latest(run_id, "tokens_seen"),
+            "started": (run or {}).get("started"),
+            "shapes": {
+                "upos": _latest(run_id, "shapes/upos_top1"),
+                "keyed": _latest(run_id, "shapes/keyed_top1"),
+            },
+            "cards": cards,
+        }
+    return {
+        "model": {
+            "family": family, "preset": preset, "kv_heads": kv, "context": context, "positions": positions,
+            "layers": shape.get("layers"), "heads": shape.get("heads"), "width": shape.get("width"),
+            "params": _shape_params(family, preset, vocab, context, positions, kv),
+        },
+        "tokeniser": {
+            "kind": tok.get("kind"), "vocab": vocab, "byte_fallback": tok.get("byte_fallback"),
+            "train_on": tok.get("train_on"), "symbols": tok.get("symbols") or [],
+        },
+        "data": {
+            "recipe": data.get("recipe"), "passes": data.get("passes"), "stages": data.get("stages") or [],
+            "order": data.get("order"), "refuse": data.get("refuse") or [], "clean": data.get("clean"),
+            "opt_in": data.get("opt_in"),
+        },
+        "optim": {
+            "name": o.get("name"), "lr": o.get("lr"), "warmup_steps": o.get("warmup_steps"),
+            "schedule": o.get("schedule"), "min_lr_ratio": o.get("min_lr_ratio"),
+            "batch_tokens": o.get("batch_tokens"), "grad_clip": o.get("grad_clip"),
+            "precision": o.get("precision"), "steps": o.get("steps"),
+        },
+        "scaffold": {
+            "weight": sc.get("weight"), "hold": sc.get("hold"), "fade": sc.get("fade"),
+            "release": sc.get("release"), "heads": cards, "riddles": sc.get("riddles") or {},
+        },
+        "content": _content_version(data.get("recipe")),
+        "schedule": _schedule(spec, run_id or ""),
+        "readings": readings,
+    }
+
+
 def api_hulls() -> dict:
     """Every rung's hull: layers, width, heads, and the head width that follows, read from Postgres
     (s1.sizes), not from the code's presets (9 November, Justin: "each model's layers, width, heads, head
@@ -1282,7 +1384,7 @@ def api_deck_atlas() -> dict:
     return value
 
 
-def api_shipbuilder(harbour: str = "phaleron") -> dict:
+def api_shipbuilder(harbour: str = "schimint") -> dict:
     """The ship builder's page: the harbour and every SOP version, so the variables can be read and edited."""
     from thorp import ship_store, sop, starchart
 
@@ -1290,7 +1392,7 @@ def api_shipbuilder(harbour: str = "phaleron") -> dict:
     if h is None:
         raise LookupError(f"no harbour {harbour!r}")
     if not h.get("ship_builder"):
-        raise LookupError(f"{h['name']} has no ship builder: ships are built at Phaleron; Piraeus and Zayton only sail them")
+        raise LookupError(f"{h['name']} has no ship builder: ships are built at Schi'mint; Vavatch End and Masaq' Reach only sail them")
     vs = sop.versions()
     standards = {v: sop.standard(v) for v in vs}
     from thorp import paths
@@ -1339,12 +1441,12 @@ def api_shipbuilder_save(body: dict) -> dict:
 
     from thorp import ship_store, sop
 
-    key = body.get("harbour") or "phaleron"
+    key = body.get("harbour") or "schimint"
     h = ship_store.harbour(key)
     if h is None:
         raise LookupError(f"no harbour {key!r}")
     if not h.get("ship_builder"):
-        raise LookupError(f"{h['name']} has no ship builder: ships are built at Phaleron; Piraeus and Zayton only sail them")
+        raise LookupError(f"{h['name']} has no ship builder: ships are built at Schi'mint; Vavatch End and Masaq' Reach only sail them")
     standard = body.get("standard")
     if not isinstance(standard, dict):
         raise ValueError("standard is a JSON object")
@@ -1383,6 +1485,50 @@ def api_foreign(key: str = "qwen3-4b") -> dict:
     if p is None:
         raise LookupError(f"no foreign ship {key!r}")
     return p
+
+
+def api_expedition_priority() -> dict:
+    """The expeditions in priority order, one row a goal where an expedition states goals: the rank
+    Justin set (thorp.priorities), the name, the goal and the status, and the queue's own order after it
+    was applied. An expedition that is closed is not a rankable row and never appears here."""
+    from thorp import fleet, priorities
+
+    ord_ = priorities.order()
+    rows = []
+    for i, k in enumerate(ord_):
+        exp, _, goal = k.partition(":")
+        e = fleet.EXPEDITIONS.get(exp)
+        if not e or priorities.closed(exp):
+            continue
+        goals = priorities.goals_of(exp)
+        n = int(goal) if goal else None
+        rows.append(
+            {
+                "key": k,
+                "expedition": exp,
+                "name": e.name,
+                "goal": n,
+                "goal_text": goals[n - 1]
+                if n and 0 < n <= len(goals)
+                else ("" if goals else e.goal),
+                "status": e.status,
+                "priority": i + 1,
+            }
+        )
+    return {"order": [r["key"] for r in rows], "expeditions": rows}
+
+
+def post_expedition_priority(body: dict) -> dict:
+    """Save the priority order and reorder the pending spec lines to it; the coordinator takes the
+    first line, so the highest-priority expedition's earliest voyage sails next."""
+    from thorp import priorities
+
+    keys = [str(k) for k in (body.get("order") or [])]
+    # a closed expedition cannot be planned, so its rows are dropped rather than refused: the rest of
+    # the order still saves, and the page never offers them in the first place
+    kept = [k for k in keys if not priorities.closed(k.split(":", 1)[0])]
+    order = priorities.set_order(kept)
+    return {"order": order, "reordered": True, "dropped": [k for k in keys if k not in kept]}
 
 
 def api_journeys() -> dict:
@@ -2954,10 +3100,10 @@ _OVERVIEW_FALLBACK = {"at_sea": [], "queue": {}, "expeditions": [], "sops": [], 
 _WATERS_FALLBACK = {
     "now": "", "plan": [],
     "lanes": {
-        "mac": {"name": "Phaleron", "where": "this Mac mini", "how": "MLX, the Mac lane: internal waters",
+        "mac": {"name": "Schi'mint", "where": "this Mac mini", "how": "MLX, the Mac lane: internal waters",
                 "at_sea": None, "ships": [], "queued": 0, "voyages": 0, "hours_left": 0,
                 "at_least": False, "clear_at": "", "week": None},
-        "vast": {"name": "Piraeus", "where": "GPUs hired from Vast.ai", "how": "torch on CUDA, the Vast lane: the deep waters",
+        "vast": {"name": "Vavatch End", "where": "GPUs hired from Vast.ai", "how": "torch on CUDA, the Vast lane: the deep waters",
                  "at_sea": None, "ships": [], "queued": 0, "voyages": 0, "hours_left": 0,
                  "at_least": False, "clear_at": "", "week": None, "key": None},
     },
@@ -3108,7 +3254,7 @@ def _api_queue() -> dict:
         cur = newest.get(r["name"])
         if cur is None or str(r.get("started") or "") > str(cur.get("started") or ""):
             newest[r["name"]] = r
-    sea = [(r["name"], r["ship"], r["started"], r["spec_json"]) for r in newest.values()]
+    sea = list(newest.values())
 
     fitout_names: dict[str, str | None] = {}
 
@@ -3185,15 +3331,25 @@ def _api_queue() -> dict:
         return max(0.0, (datetime.now(d.tzinfo or timezone.utc) - d).total_seconds() / 60)
 
     rows = []
-    for name, ship, started, sj in sea:
+    for run in sea:
+        name, ship, started = run["name"], run["ship"], run["started"]
         try:
-            spec = json.loads(sj or "{}")
+            spec = json.loads(run["spec_json"] or "{}")
         except ValueError:
             spec = {}
         if not spec.get("question"):  # the ledger's copy may not keep it; the spec file does
             f = next(iter((root / "specs").rglob(f"{name}.yaml")), None)
             spec = {**spec, **((yaml.safe_load(f.read_text()) or {}) if f else {})}
-        r = {**row(name, ship, spec, "at sea", None), "started": started}
+        else:
+            f = next(iter((root / "specs").rglob(f"{name}.yaml")), None)
+        spec_path = None
+        if f:
+            try:
+                spec_path = f.relative_to(root / "specs").with_suffix("").as_posix()
+            except ValueError:
+                spec_path = None
+        r = {**row(name, ship, spec, "at sea", None), "started": started, "run_id": run["run_id"],
+             "spec": spec_path, "detail": _spec_detail(spec, run)}
         est, source = times.estimate(name, spec)
         r["est_min"], r["est_source"] = est, source
         rows.append(r)
@@ -3230,6 +3386,7 @@ def _api_queue() -> dict:
         r["spec"] = ln
         r["lane"] = lane
         r["missing"] = not p.exists()
+        r["detail"] = _spec_detail(spec)
         est, source = times.estimate(name, spec)
         r["est_min"], r["est_source"] = est, source
         if est is None:
@@ -3858,6 +4015,46 @@ def api_heads(model: str = "mlx-community/Qwen3-4B-4bit") -> dict:
     return {"found": True, "read": d.get("read"), **{k: d.get(k) for k in keep}}
 
 
+def api_foreign_control_tokens() -> dict:
+    """Every read foreign ship's control tokens, for the comparison table on a foreign page."""
+    from thorp import foreign
+
+    return {"models": foreign.control_all()}
+
+
+def api_chat_notes(q: dict) -> dict:
+    """The notes taken in chats, newest first (thorp.chat_notes); by model or session when asked."""
+    from thorp import chat_notes
+
+    return {
+        "notes": chat_notes.notes(
+            model=q.get("model") or None,
+            session=q.get("session") or None,
+            limit=int(q.get("limit") or 100),
+        )
+    }
+
+
+def post_chat_note(body: dict) -> dict:
+    """Save one note with the model, the session and the session's whole reasoning trace."""
+    from thorp import chat_notes
+
+    note = str(body.get("note") or "").strip()
+    if not note:
+        raise ValueError("no note")
+    row = chat_notes.save(
+        note,
+        session_id=str(body.get("session_id") or "") or None,
+        kind=str(body.get("kind") or "") or None,
+        model_key=str(body.get("model_key") or "") or None,
+        model_label=str(body.get("model_label") or "") or None,
+        run=str(body.get("run") or "") or None,
+        thinking=str(body.get("thinking") or ""),
+        conversation=body.get("conversation") or [],
+    )
+    return {"note": row}
+
+
 def api_competitor(model: str) -> dict:
     """One outside model (a 2-4B competitor or a reference ladder model), as read on Nothing up my sleeve's tests
     (the chain grades, s4.outside_readings): the four chaining tests, the logic deck (variants, hops,
@@ -3869,6 +4066,18 @@ def api_competitor(model: str) -> dict:
     models = readings.chain_grades()
     comp = getattr(fleet, "COMPETITORS", {})
     if model not in models and model not in comp:
+        # a model read in the Market Harbour but not on the chain tests (a base checkpoint, or a ship
+        # read on the logic deck or hole cards): its page is the foreign ship's, not this one
+        from thorp import foreign
+
+        hit = next((m for m in foreign.models() if m["model"] == model), None)
+        if hit:
+            return {
+                "model": model,
+                "label": hit["label"],
+                "params": hit["params"],
+                "redirect": f"/foreign/{hit['key']}",
+            }
         raise LookupError(f"no model {model}")
     v = models.get(model, {})
     label, params = comp.get(model, (None, None))
@@ -5076,10 +5285,12 @@ def api_chat(q: dict) -> dict:
     if not str(text).strip():
         return {"error": "no question", "run": run, "model": model}
     try:
-        tokens = max(1, min(int(q.get("tokens", 80)), 256))
+        tokens = max(1, min(int(q.get("tokens", 512)), 1024))
         temperature = max(0.0, min(float(q.get("temperature", 0.7)), 2.0))
+        raw_thinking = q.get("thinking")
+        thinking = None if raw_thinking is None else str(raw_thinking).strip().lower() not in ("0", "false", "off", "no", "")
         if model:
-            return chat.foreign_answer(model, str(text), tokens=tokens, temperature=temperature)
+            return chat.foreign_answer(model, str(text), tokens=tokens, temperature=temperature, thinking=thinking, history=q.get("history") or [])
         step = q.get("step")
         return chat.answer(
             run,
@@ -6007,11 +6218,74 @@ class Handler(BaseHTTPRequestHandler):
     def _json(self, code: int, obj) -> None:
         self._send(code, json.dumps(_finite(obj), default=str).encode(), "application/json")
 
+    def _onboard_page(self, path: str) -> None:
+        """The first-run page and its two files, from thorp/onboard/web. It does not need the Astro
+        build: a fresh clone must be able to run setup before it has a dashboard."""
+        from thorp.onboard import api
+
+        rel = "index.html" if path in ("/onboard", "/onboard/") else path[len("/onboard/") :]
+        got = api.asset(rel)
+        if got is None:
+            return self._send(404, b"not found", "text/plain")
+        return self._send(200, got[0], got[1], "no-store")
+
+    def _onboard_api(self, path: str, q: dict) -> None:
+        from thorp.onboard import api
+
+        if not api.authorized(self.headers, q):
+            return self._json(403, {"error": "the first-run token is missing or expired; open the link printed in the terminal"})
+        name = path[len("/api/onboard/") :]
+        routes = {"state": api.state_payload, "catalogue": api.catalogue_payload}
+        if name not in routes:
+            return self._json(404, {"error": "not found"})
+        return self._json(200, routes[name]())
+
+    def _onboard_post(self, path: str) -> None:
+        from thorp.onboard import api
+
+        try:
+            n = int(self.headers.get("Content-Length") or 0)
+            body = json.loads(self.rfile.read(min(n, 4_000_000)) or b"{}")
+            if not isinstance(body, dict):
+                raise api.OnboardError("the request body must be a JSON object")
+            if path == "/api/store/switch":
+                # the Settings cog, not the first run: no onboarding token, but the same conservative
+                # switch (a test, the at-sea rule, a restart note).
+                return self._json(200, api.switch_store(body))
+            if not api.authorized(self.headers):
+                return self._json(403, {"error": "the first-run token is missing or expired; open the link printed in the terminal"})
+            name = path[len("/api/onboard/") :]
+            handlers = {
+                "answer": api.answer,
+                "downloads": api.start_downloads,
+                "downloads/cancel": api.cancel_download,
+                "store/setup": api.start_store,
+                "store/test": api.test_store,
+                "build": lambda _: api.start_build(),
+                "finish": lambda _: api.finish(),
+                "reset": lambda _: api.reset(),
+            }
+            if name not in handlers:
+                return self._json(404, {"error": "not found"})
+            return self._json(200, handlers[name](body))
+        except api.OnboardError as e:
+            return self._json(getattr(e, "status", 400), {"error": str(e)})
+        except (ValueError, KeyError) as e:
+            return self._json(400, {"error": str(e)})
+        except Exception as e:  # noqa: BLE001
+            return self._json(500, {"error": repr(e)})
+        finally:
+            from thorp.ledger import close_reader
+
+            close_reader()
+
     def do_POST(self):  # noqa: N802
         """The writes: the table (POST /api/table/reply {run, question, history, ...}) and the fitout
         builder (POST /api/fitouts/save {fitout}, POST /api/fitouts/queue {key, preset, seeds, where},
         the latter changing what the Mac trains next, so the page asks before it sends)."""
         u = urlparse(self.path)
+        if u.path.startswith("/api/onboard/") or u.path == "/api/store/switch":
+            return self._onboard_post(u.path)
         posts = {
             "/api/table/reply": api_table_reply,
             "/api/fitouts/save": api_fitout_save,
@@ -6024,6 +6298,8 @@ class Handler(BaseHTTPRequestHandler):
             "/api/vast": api_vast_set,
             "/api/compute": api_compute_set,
             "/api/chat": api_chat,
+            "/api/chat/notes": post_chat_note,
+            "/api/expedition_priority": post_expedition_priority,
         }
         if u.path not in posts:
             return self._send(404, b"not found", "text/plain")
@@ -6053,6 +6329,10 @@ class Handler(BaseHTTPRequestHandler):
         u = urlparse(self.path)
         q = {k: v[0] for k, v in parse_qs(u.query).items()}
         try:
+            if u.path == "/onboard" or u.path.startswith("/onboard/"):
+                return self._onboard_page(u.path)
+            if u.path.startswith("/api/onboard/"):
+                return self._onboard_api(u.path, q)
             if u.path in ("/", "/index.html"):
                 page = _static("index.html")
                 return (
@@ -6091,7 +6371,8 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/ladder": lambda: api_ladder(),
                 "/api/journeys": api_journeys,
                 "/api/foreign": lambda: api_foreign(q.get("key", "qwen3-4b")),
-                "/api/shipbuilder": lambda: api_shipbuilder(q.get("harbour", "phaleron")),
+                "/api/foreign_control_tokens": api_foreign_control_tokens,
+                "/api/shipbuilder": lambda: api_shipbuilder(q.get("harbour", "schimint")),
                 "/api/library_summary": lambda: api_library_summary(q["path"]),
                 "/api/journey": lambda: api_journey(q["key"]),
                 "/api/rung": lambda: api_rung(q["preset"], q.get("limit", 0)),
@@ -6117,6 +6398,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/expeditions": lambda: api_voyages(),
                 "/api/expedition": lambda: api_voyage_series(q["key"]),
                 "/api/expeditions/overview": api_expeditions_overview,
+                "/api/expedition_priority": api_expedition_priority,
                 "/api/deck_atlas": api_deck_atlas,
                 "/api/lanes": api_lanes,
                 "/api/constraints": api_constraints,
@@ -6160,6 +6442,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/ask_questions": lambda: api_ask_questions(q["preset"]),
                 "/api/chat": lambda: api_chat(q),
                 "/api/chat/models": api_chat_models,
+                "/api/chat/notes": lambda: api_chat_notes(q),
                 "/api/maths_book": lambda: api_maths_book(),
                 "/api/class_subjects": lambda: api_class_subjects(q["preset"]),
                 "/api/class_shapes": lambda: api_class_shapes(q["preset"]),
@@ -6226,11 +6509,49 @@ class _DualStack(ThreadingHTTPServer):
         super().server_bind()
 
 
-def serve(port: int = 8787) -> None:
+class _Loopback(ThreadingHTTPServer):
+    """The first run listens on 127.0.0.1 only: its token and its downloads are not a LAN service."""
+
+    address_family = socket.AF_INET
+    request_queue_size = 32
+    daemon_threads = True
+
+
+def serve(port: int = 8787, *, onboard: bool = False, open_browser: bool = False) -> None:
+    if onboard:
+        import threading
+        import time
+        import webbrowser
+
+        from thorp.onboard import api
+
+        api.begin()
+        srv = _Loopback(("127.0.0.1", port), Handler)
+        url = f"http://127.0.0.1:{port}/onboard?token={api.token()}"
+        print(f"thorp onboard on {url}", flush=True)
+        print("  the first-run page is local to this Mac; keep this terminal open. Ctrl-C stops it.", flush=True)
+        if open_browser:
+            def _open() -> None:
+                time.sleep(0.35)
+                try:
+                    webbrowser.open(url)
+                except Exception:  # noqa: BLE001  (headless shells, no default browser)
+                    pass
+
+            threading.Thread(target=_open, name="onboard-browser", daemon=True).start()
+        try:
+            srv.serve_forever()
+        except KeyboardInterrupt:
+            pass
+        return
     srv = _DualStack(("::", port), Handler)  # :: with V6ONLY=0 covers both ::1 and 127.0.0.1
     # the warm threads are started on the first visit, not here: a cold server must answer the
     # leaderboard before the shelves' long read begins
     print(f"thorp dash on http://localhost:{port}  (ledger {paths.ledger_path()})", flush=True)
+    from thorp.onboard import state as onboard_state
+
+    if not onboard_state.path().exists():
+        print("  first run? `thorp onboard` sets up the store, models and dashboard.", flush=True)
     # the leaderboard is the page most visits first: fill its cache before the shelves' long read, so
     # the first request after a restart does not race a 25 s library build for the store (10 November)
     with contextlib.suppress(Exception):

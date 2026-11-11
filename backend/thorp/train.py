@@ -198,9 +198,21 @@ def check_refusals(recipe: list[str], refused: dict[str, list[str]]) -> None:
         raise RefusedBook(f"recipe contains refused books: {clash}")
 
 
+def _checkpoint_tokeniser(rid: str) -> str | None:
+    """The tokeniser a voyage's latest checkpoint was written with, if it has one."""
+    try:
+        ck = latest_checkpoint(rid)
+        return json.loads((ck / "state.json").read_text()).get("tokeniser_id") if ck else None
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def prepare(
-    spec: dict, resolver: ListResolver = gutenberg_resolver, log=print, known: bool | None = None
+    spec: dict, resolver: ListResolver = gutenberg_resolver, log=print, known: bool | None = None,
+    sailed: str | None = None,
 ) -> Prepared:
+    """`sailed` is the run this spec was read from when the spec has since been changed (a rescore swaps the
+    eval sets, which moves run_id(spec)): its checkpoint says which tokeniser the voyage was trained with."""
     d = spec["data"]
     # S3, the gate (thorp/vsm.py): every enforced S5 policy applied to a new run, before it reads a page. A rescore
     # re-runs prepare with the spec's eval sets changed, which changes run_id(spec): the run is known by definition,
@@ -255,6 +267,19 @@ def prepare(
     )  # data.clean: the text as read, training and held-out decks alike
     if clean != "raw":  # a raw voyage keeps its old tokeniser id
         settings["clean"] = clean
+    # the control tokens a voyage declares become single pieces (11 November: until now `symbols` was
+    # read by the SOP check and never passed on, so every "control-token" arm split its markers into
+    # byte pieces). The tokeniser's own specials are not user-defined pieces; a plain voyage declares
+    # none and keeps its tokeniser id. A voyage that already has a checkpoint keeps the tokeniser that
+    # checkpoint was written with, so a resume or a rescore of an earlier sailing reads it as it was trained.
+    symbols = tokmod.user_symbols(t.get("symbols"))
+    if symbols:
+        before = tokmod.tokeniser_id(tok_books, {**tokmod.DEFAULTS, **settings})
+        if _checkpoint_tokeniser(sailed or run_id(spec)) == before:
+            log(f"control tokens: this voyage's checkpoint was written without them as pieces; kept as trained ({before[:12]})")
+        else:
+            settings["symbols"] = symbols
+            log(f"control tokens: {len(symbols)} declared as single pieces")
     log(f"cleaning: {clean}")
     log(f"tokeniser: training or loading on {len(tok_books)} books ({train_on})")
     prep.tokeniser = tokmod.train_or_load(tok_books, settings)
@@ -698,16 +723,37 @@ def scaffold_weight(step: int, total: int, sc: dict) -> float:
     )  # the release stage (2026-11-08, the 21m): the pull off from this share of the voyage
     if rel is not None and step >= float(rel) * total:
         return 0.0
+    pulse = probe_at(step, total, sc)
+    scale = 1.0 if pulse is None else float(pulse.get("to", 0.0))
     fade = sc.get("fade")
     if fade is None:
-        return w
+        return w * scale
     floor = float(sc.get("floor", 0.0))
     hold, end = float(sc.get("hold", 0.0)) * total, float(fade) * total
     if step < hold:
-        return w
+        return w * scale
     if step >= end:
-        return floor
-    return floor + (w - floor) * (end - step) / max(end - hold, 1.0)
+        return floor * scale
+    return (floor + (w - floor) * (end - step) / max(end - hold, 1.0)) * scale
+
+
+def probe_windows(total: int, sc: dict) -> list[tuple[int, int, dict]]:
+    """The probe phase (Kipling, aim 4): `probes: [{at, steps, to}]` pulses the pull down for `steps` steps from
+    `at` (a share of the voyage), to `to` times its scheduled weight (0 unless set), then lets it return. Each
+    window as (first step, first step after it, the probe)."""
+    out = []
+    for p in sc.get("probes") or []:
+        a = int(float(p["at"]) * total)
+        out.append((a, a + int(p["steps"]), p))
+    return out
+
+
+def probe_at(step: int, total: int, sc: dict) -> dict | None:
+    """The probe this step falls in, if any."""
+    for a, b, p in probe_windows(total, sc):
+        if a <= step < b:
+            return p
+    return None
 
 
 def scaffold_weights(step: int, total: int, sc: dict) -> list[float]:
@@ -751,19 +797,12 @@ def scaffold_on(step: int, total: int, sc: dict) -> list[float]:
     ]
 
 
-def scaffold_loss(
-    pats: dict,
-    x,
-    sc: dict,
-    targets: dict | None = None,
-    flags: dict | None = None,
-    on=None,
-    weights=None,
-):
-    """The mean, over the scaffolded heads (those started, when `on` is given), of the cross-entropy from the card's
-    pattern to the head's attention (over the queries that have a target). Its floor is the target's own entropy
-    (0 for previous-word). `weights` gives one weight a head, so a card can fade out while another holds (the
-    induction's own fade, 10 November)."""
+def scaffold_head_losses(
+    pats: dict, x, sc: dict, targets: dict | None = None, flags: dict | None = None
+) -> list:
+    """Each scaffolded head's distance from its card: the cross-entropy from the card's pattern to the head's
+    attention, over the queries that have a target, whatever the pull's weight. The probe phase reads these
+    while the weight is zero: the leak when the pull goes, the recovery when it returns."""
     out = []
     for h in sc["heads"]:
         card = h["card"]
@@ -772,6 +811,24 @@ def scaffold_loss(
         ce = -(tgt * mx.log(p + 1e-9)).sum(axis=-1)
         hf = has.astype(mx.float32)
         out.append((ce * hf).sum() / mx.maximum(hf.sum(), 1.0))
+    return out
+
+
+def scaffold_loss(
+    pats: dict,
+    x,
+    sc: dict,
+    targets: dict | None = None,
+    flags: dict | None = None,
+    on=None,
+    weights=None,
+    per_head: list | None = None,
+):
+    """The mean, over the scaffolded heads (those started, when `on` is given), of the cross-entropy from the card's
+    pattern to the head's attention (over the queries that have a target). Its floor is the target's own entropy
+    (0 for previous-word). `weights` gives one weight a head, so a card can fade out while another holds (the
+    induction's own fade, 10 November). `per_head` passes the heads' distances in when the caller has them."""
+    out = per_head if per_head is not None else scaffold_head_losses(pats, x, sc, targets, flags)
     if on is None:
         if weights is None:
             return sum(out) / len(out)
@@ -811,6 +868,15 @@ def check_scaffold(sc: dict, layers: int, heads: int) -> None:
             )
     if not sc.get("heads") and not sc.get("riddles"):
         raise ValueError("scaffold names no heads")
+    last = -1.0
+    for p in sc.get("probes") or []:
+        if not 0.0 <= float(p.get("at", -1)) < 1.0 or int(p.get("steps", 0)) < 1:
+            raise ValueError(f"scaffold probe {p}: `at` is a share of the voyage, `steps` at least 1")
+        if not 0.0 <= float(p.get("to", 0.0)) < 1.0:
+            raise ValueError(f"scaffold probe {p}: `to` scales the pull down, from 0 to under 1")
+        if float(p["at"]) <= last:
+            raise ValueError(f"scaffold probe {p}: the probes are in order and do not repeat")
+        last = float(p["at"])
     if sc.get("release") is not None:
         rel = float(sc["release"])
         if not float(sc.get("fade") or 0.0) <= rel < 1.0:
@@ -1059,9 +1125,11 @@ def train(
         "scaffold"
     )  # the metre scaffold (2026-11-07): {weight, hold, fade, floor, heads, sample, riddles}
     picks, flags, sample, riddle_cfg, pools = None, None, None, {}, {}
+    probing = False  # the probe phase: the pull pulsed down, each pinned head's distance logged every step
     if sc:
         check_scaffold(sc, model.cfg.layers, model.cfg.heads)
         picks = scaffold_picks(sc) if sc.get("heads") else None
+        probing = bool(picks and sc.get("probes"))
         if any(h["card"] in KEYED or h["card"] == "rare_word" for h in sc.get("heads") or []):
             flags = metre_flags(tok, list(prep.recipe))
         sample = sc.get(
@@ -1171,19 +1239,20 @@ def train(
     def loss_fn(mdl, x, y, sw, hw, rb, on):
         # (batch, time) -> the mean per window, so the loss can be attributed to the window's book;
         # every window is the same length, so the mean of the window means is the batch mean.
+        dist = []  # each pinned head's distance from its card, whatever the weight (the probe phase reads it)
         if picks and not sample:
             logits, pats = mdl.forward_attending(x, picks)
+            dist = scaffold_head_losses(pats, x, sc, scaffold_targets(x), flags)
             sl = scaffold_loss(
-                pats, x, sc, targets=scaffold_targets(x), flags=flags, on=on if staged else None,
-                weights=hw,
+                pats, x, sc, on=on if staged else None, weights=hw, per_head=dist,
             )
         elif picks:  # the pull read on part of the batch: a second, smaller forward pass
             logits = mdl(x)
             xs = x[: int(sample["windows"]), : int(sample["length"])]
             _, pats = mdl.forward_attending(xs, picks)
+            dist = scaffold_head_losses(pats, xs, sc, scaffold_targets(xs), flags)
             sl = scaffold_loss(
-                pats, xs, sc, targets=scaffold_targets(xs), flags=flags, on=on if staged else None,
-                weights=hw,
+                pats, xs, sc, on=on if staged else None, weights=hw, per_head=dist,
             )
         else:
             logits, sl = mdl(x), mx.array(0.0)
@@ -1214,6 +1283,8 @@ def train(
         # the metre scaffold: the heads carry their own weights (the induction's fade), the riddles the
         # voyage's; zero in the content phase
         pull = parts[0] + sw * (parts[1] + parts[2]) if riddle_cfg else parts[0]
+        if probing:  # a probing voyage logs every pinned head's distance beside the three parts
+            parts = parts + [mx.stop_gradient(d) for d in dist]
         return base + pull, per_window, mx.stack(parts)
 
     value_and_grad = nn.value_and_grad(model, loss_fn)
@@ -1309,9 +1380,13 @@ def train(
                 vals["scaffold/started"] = float(sum(scaffold_on(step - 1, total, sc)))
             parts = sl.tolist()
             vals["scaffold/loss"] = parts[0]
-            for key, v in zip(("comparator", "bridge"), parts[1:], strict=True):
+            for key, v in zip(("comparator", "bridge"), parts[1:3], strict=True):
                 if key in riddle_cfg:
                     vals[f"scaffold/riddle/{key}"] = v
+            if probing:
+                vals["scaffold/probe"] = 1.0 if probe_at(step - 1, total, sc) else 0.0
+                for h, v in zip(sc.get("heads") or [], parts[3:]):
+                    vals[f"scaffold/distance/{h['card']}/l{h['layer']}h{h['head']}"] = v
             vals["scaffold/phase"] = float(
                 ("metre", "fade", "content", "release").index(scaffold_phase(step - 1, total, sc))
             )
@@ -1455,7 +1530,7 @@ def rescore(
         spec["eval"] = {**spec["eval"], "sets": list(sets)}
     if evaluators:
         spec["eval"] = {**spec["eval"], "evaluators": list(evaluators)}
-    prep = prepare(spec, resolver=resolver, log=log, known=True)
+    prep = prepare(spec, resolver=resolver, log=log, known=True, sailed=rid)
     step = json.loads((ckpt / "state.json").read_text())["step"]
     if backend_of(spec) == "torch":  # either backend's checkpoint loads in the torch model
         from thorp import train_torch

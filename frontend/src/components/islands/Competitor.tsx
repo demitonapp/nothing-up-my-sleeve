@@ -6,11 +6,14 @@ import { useEffect, useState } from 'react';
 import { cardCls, crumbCls, emptyCls } from '@/lib/ui';
 import { sectionProps, useApi, useRoute } from '@/lib/useApi';
 import { competitorHtml, drawCompetitorCharts, testsHtml } from '@/scripts/views/competitor';
+import { TabNav } from '../TabNav';
 
 export default function Competitor() {
   const route = useRoute();
-  const thorp = route.startsWith('/leaderboard/thorp/');
-  const key = decodeURIComponent((route.split('/')[3] || '').trim());
+  const thorp = route.startsWith('/leaderboard/thorp');
+  const key = typeof window !== 'undefined'
+    ? decodeURIComponent((route.split('/')[3] || '').trim() || new URLSearchParams(location.search).get('ship') || '')
+    : decodeURIComponent((route.split('/')[3] || '').trim());
   const url = !key ? null : thorp ? `/api/thorp?ship=${encodeURIComponent(key)}` : `/api/competitor?model=${encodeURIComponent(key)}`;
   const comp = useApi<any>(url, 120000);
   const disc = useApi<any>('/api/discoveries', 120000);
@@ -20,7 +23,12 @@ export default function Competitor() {
   const [koData, setKoData] = useState<any>(null);
 
   const stars = disc.data?.stars || [];
-  const html = comp.data ? competitorHtml(comp.data, stars) : null;
+  const html = comp.data && !comp.data.redirect ? competitorHtml(comp.data, stars) : null;
+
+  // a model with no chain tests has a foreign ship page: go there rather than show an empty board
+  useEffect(() => {
+    if (comp.data?.redirect) location.replace(String(comp.data.redirect));
+  }, [comp.data]);
 
   useEffect(() => {
     if (html) void drawCompetitorCharts(html, thorp);
@@ -53,6 +61,15 @@ export default function Competitor() {
     return () => { live = false; };
   }, [knock, koData]);
 
+  if (comp.data?.redirect) {
+    return (
+      <div {...sectionProps('competitor')}>
+        <h1><a className={crumbCls('back')} href="/leaderboard">← leaderboard</a> <span>{comp.data.label || key}</span></h1>
+        <div className={emptyCls()}>opening its foreign ship page…</div>
+      </div>
+    );
+  }
+
   if (comp.error) {
     return (
       <div {...sectionProps('competitor')}>
@@ -75,10 +92,25 @@ export default function Competitor() {
       <h1><a className={crumbCls('back')} href="/leaderboard">← leaderboard</a> <span id="cptitle">{html.title}</span> <span id="cppills" dangerouslySetInnerHTML={{ __html: html.pills }} /></h1>
       <section className={cardCls(false, 'panel')}><div className="rungover" id="cpover" dangerouslySetInnerHTML={{ __html: html.over }} /></section>
 
-      <div className="tabs" role="tablist">
-        <button role="tab" aria-selected={tab === 'chaining'} className={tab === 'chaining' ? 'tab on' : 'tab'} onClick={() => setTab('chaining')}>Chaining</button>
-        <button role="tab" aria-selected={tab === 'tests'} className={tab === 'tests' ? 'tab on' : 'tab'} onClick={() => setTab('tests')}>Tests<span className="s"> {html.bench.rows.length ? html.bench.rows.length : ''}</span></button>
-      </div>
+      <TabNav
+        id="cpnav"
+        ariaLabel="competitor sections"
+        tablist
+        items={[
+          { key: 'chaining', label: 'Chaining', active: tab === 'chaining', onClick: () => setTab('chaining') },
+          {
+            key: 'tests',
+            label: (
+              <>
+                Tests
+                <span className="s normal-case tracking-normal"> {html.bench.rows.length ? html.bench.rows.length : ''}</span>
+              </>
+            ),
+            active: tab === 'tests',
+            onClick: () => setTab('tests'),
+          },
+        ]}
+      />
 
       {tab === 'chaining' && (<>
       <section className={cardCls(false, 'panel')}>

@@ -1,15 +1,20 @@
-// The ship builder (UI.md "Ship builder"; #/harbours/phaleron/shipbuilder): who signs the supplies,
+// The ship builder (UI.md "Ship builder"; #/harbours/schimint/shipbuilder): who signs the supplies,
 // and the SOP's variables in two legs (training and parts) with their subtabs. A controller on the
 // harbour island: it owns its own DOM, wires its controls once, and survives the ladder's poll.
 
 import { big, esc, get, postJSON } from '../../lib/format';
-import { checkCls, emptyCls, fieldCls, pillCls } from '../../lib/ui';
+import { checkCls, emptyCls, fieldCls, pillCls, tabCls, tabsCls } from '../../lib/ui';
 import { artImg } from './helpers';
 
 type Payload = any;
 
 const LIB_SUMMARY: Record<string, any> = {};
 let shipbuilderPhase = 'pretraining', shipbuilderActive = 'training';
+
+// The builder's own rows (the two legs, the standard's tabs and their sub-tabs) are the site's tab
+// rows too: one class list, one active state, so the shipyard does not grow a second look.
+const TAB_ROW = tabsCls('line', 'subnav');
+const TAB_BTN = `${tabCls('')} bg-transparent [font-family:inherit]`;
 
 const SOP_CATS = [
   { key: 'library', name: 'Library', keys: ['content', 'readings'],
@@ -31,7 +36,7 @@ const SOP_TABS = [
 ];
 const SOP_EDIT = new Set(['library', 'training', 'parts']);
 
-export const shipbuilderKey = (harbour: string | null): boolean => harbour === 'phaleron';
+export const shipbuilderKey = (harbour: string | null): boolean => harbour === 'schimint';
 
 /** Mount the ship builder into `el` for one harbour. Reuses itself when the same harbour is already
  *  built (the island calls this after every poll), and is cleared by the ships view. */
@@ -58,7 +63,7 @@ export async function mountShipbuilder(
     ${crumb}
     <figure class="sbbanner">${artImg('shipyard', 'shipbuilderart')}<figcaption><b>The shipyard</b> <span>· the SOP: what the ship reads, what it must build, and what it is made of</span></figcaption></figure>
     <h2>Shipyard <span class="s">${esc(hh.ship_builder || 'unnamed')} signs the supplies: the two legs' stages, and the SOP variables below that carry them</span></h2>
-    <div class="phasenav" id="phasenav" role="tablist"></div>
+    <div class="${TAB_ROW} mt-1 mb-2" id="phasenav" data-orientation="horizontal" data-variant="line" role="tablist"></div>
     <div class="phasebody" id="phasebody"></div>
     <div class="hmgrid">
       <div class="hmfacts">
@@ -74,8 +79,8 @@ export async function mountShipbuilder(
       <div class="hmedit">
         <div class="fbrow"><label class="s" for="hmadopted">adopted</label><input type="text" class="${fieldCls('w-full')}" id="hmadopted" value="${esc('defined at ' + hh.name + ' by ' + (hh.ship_builder || 'the ship builder'))}"></div>
         <div class="atsea" id="hmatsea" hidden></div>
-        <div class="sopnav" id="sopnav" role="tablist"></div>
-        <div class="sopnav subsop" id="sopsub" role="tablist"></div>
+        <div class="${TAB_ROW} my-2" id="sopnav" data-orientation="horizontal" data-variant="line" role="tablist"></div>
+        <div class="${TAB_ROW} subsop" id="sopsub" data-orientation="horizontal" data-variant="line" role="tablist"></div>
         <div class="sopnote" id="sopnote"></div>
         <div class="hmform">
           <div class="hmrow" id="hmchoices">
@@ -181,8 +186,8 @@ export async function mountShipbuilder(
     const nav = document.getElementById('phasenav'), body = document.getElementById('phasebody');
     if (!nav || !body) return;
     const tabs: [string, string, string][] = [['pretraining', 'Pretraining', 'outbound'], ['posttraining', 'Posttraining', 'return']];
-    nav.innerHTML = tabs.map(([k, name, leg]) => `<button type="button" class="phasebtn${phase === k ? ' active' : ''}" data-phase="${k}" role="tab" aria-selected="${phase === k}">${name} <span class="s">${leg}</span></button>`).join('');
-    nav.querySelectorAll<HTMLElement>('.phasebtn').forEach((b) => { b.onclick = () => { phase = b.dataset.phase!; shipbuilderPhase = phase; drawPhase(); showTab(active); }; });
+    nav.innerHTML = tabs.map(([k, name, leg]) => `<button type="button" class="${TAB_BTN}" data-phase="${k}" data-state="${phase === k ? 'active' : 'inactive'}" role="tab" aria-selected="${phase === k}">${name} <span class="s">${leg}</span></button>`).join('');
+    nav.querySelectorAll<HTMLElement>('button[data-phase]').forEach((b) => { b.onclick = () => { phase = b.dataset.phase!; shipbuilderPhase = phase; drawPhase(); showTab(active); }; });
     if (!journey) { body.innerHTML = '<div class="s">no journey is recorded for this harbour yet</div>'; return; }
     const leg = journey[phase] || {}, stages = leg.stage || [];
     const post = phase === 'posttraining' ? postOf() : null;
@@ -210,7 +215,7 @@ export async function mountShipbuilder(
     if (onLib && browse) renderSelection();
     const c = catOf(key);
     const editor = SOP_EDIT.has(key);
-    document.querySelectorAll<HTMLElement>('#sopnav .sopbtn').forEach((b) => { const on = b.dataset.sop === key; b.classList.toggle('active', on); b.setAttribute('aria-selected', String(on)); });
+    document.querySelectorAll<HTMLElement>('#sopnav button[data-sop]').forEach((b) => { const on = b.dataset.sop === key; b.setAttribute('data-state', on ? 'active' : 'inactive'); b.setAttribute('aria-selected', String(on)); });
     const sub = (SOP_TABS.find((t) => t.key === key) || {}).sub || [];
     if (sub.length && !sub.some(([k]) => k === shipbuilderSub)) shipbuilderSub = sub[0][0];
     const note = key === 'training' ? (shipbuilderSub === 'process'
@@ -251,8 +256,8 @@ export async function mountShipbuilder(
     const subnav = document.getElementById('sopsub');
     if (subnav) {
       subnav.hidden = !sub.length;
-      subnav.innerHTML = sub.map(([k, n]) => `<button type="button" class="sopbtn sub${k === shipbuilderSub ? ' active' : ''}" data-sub="${esc(k)}" role="tab" aria-selected="${k === shipbuilderSub}">${esc(n)}</button>`).join('');
-      subnav.querySelectorAll<HTMLElement>('.sopbtn').forEach((b) => { b.onclick = () => {
+      subnav.innerHTML = sub.map(([k, n]) => `<button type="button" class="${TAB_BTN}" data-sub="${esc(k)}" data-state="${k === shipbuilderSub ? 'active' : 'inactive'}" role="tab" aria-selected="${k === shipbuilderSub}">${esc(n)}</button>`).join('');
+      subnav.querySelectorAll<HTMLElement>('button[data-sub]').forEach((b) => { b.onclick = () => {
         shipbuilderSub = b.dataset.sub!;
         showTab(key);  // the leg is the phase nav; Content and Process only switch the panels
       }; });
@@ -533,6 +538,14 @@ export async function mountShipbuilder(
       draft.sizes_to_sail = [...ss.querySelectorAll<HTMLInputElement>('input[data-size]:checked')].map((x) => x.dataset.size);
     }; });
   };
+  // the standard's tab row: one renderer, so a load and a save draw it the same way
+  const renderSopTabs = (): void => {
+    const nav = document.getElementById('sopnav');
+    if (!nav) return;
+    nav.innerHTML = (only ? SOP_TABS.filter((c) => c.key === only) : SOP_TABS).map((c) => `<button type="button" class="${TAB_BTN}" data-sop="${esc(c.key)}" data-state="${c.key === active ? 'active' : 'inactive'}" role="tab" aria-selected="${c.key === active}">${esc(c.name)}</button>`).join('');
+    nav.hidden = !!only;
+    nav.querySelectorAll<HTMLElement>('button[data-sop]').forEach((b) => { b.onclick = () => { if (!readDraft()) return; showTab(b.dataset.sop!); }; });
+  };
   const load = (v: string): void => {
     draft = { ...(std[v] || {}) };
     if (browse) applyDraftSelection();
@@ -540,10 +553,7 @@ export async function mountShipbuilder(
     paintChoices();
     const about = document.getElementById('hmabout'); if (about) about.textContent = String((std[v] || {}).about || '');
     if (!SOP_TABS.some((c) => c.key === active)) active = 'library';
-    const nav = document.getElementById('sopnav')!;
-    nav.innerHTML = (only ? SOP_TABS.filter((c) => c.key === only) : SOP_TABS).map((c) => `<button type="button" class="sopbtn${c.key === active ? ' active' : ''}" data-sop="${esc(c.key)}" role="tab" aria-selected="${c.key === active}">${esc(c.name)}</button>`).join('');
-    nav.hidden = !!only;
-    nav.querySelectorAll<HTMLElement>('.sopbtn').forEach((b) => { b.onclick = () => { if (!readDraft()) return; showTab(b.dataset.sop!); }; });
+    renderSopTabs();
     showTab(active);
     drawPhase();
   };
@@ -718,10 +728,7 @@ export async function mountShipbuilder(
       sel.innerHTML = (r.versions || []).map((v: string) => `<option value="${esc(v)}"${v === r.version ? ' selected' : ''}>v${esc(v)}${v === cur ? ' · in force' : ''}</option>`).join('');
       sel.dataset.v = r.version; draft = { ...(r.standard || {}) }; if (browse) applyDraftSelection(); cats = SOP_CATS; active = SOP_TABS.some((c) => c.key === active) ? active : 'library';
       const about = document.getElementById('hmabout'); if (about) about.textContent = String((r.standard || {}).about || '');
-      const nav = document.getElementById('sopnav')!;
-      nav.innerHTML = (only ? SOP_TABS.filter((c) => c.key === only) : SOP_TABS).map((c) => `<button type="button" class="sopbtn${c.key === active ? ' active' : ''}" data-sop="${esc(c.key)}" role="tab" aria-selected="${c.key === active}">${esc(c.name)}</button>`).join('');
-      nav.hidden = !!only;
-      nav.querySelectorAll<HTMLElement>('.sopbtn').forEach((b) => { b.onclick = () => { if (!readDraft()) return; showTab(b.dataset.sop!); }; });
+      renderSopTabs();
       paintChoices();
       showTab(active);
       drawPhase();

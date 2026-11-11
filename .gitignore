@@ -31,3 +31,8 @@ ships/lists/nltk_data/
 # local pnpm store (the sandbox cannot write the shared store; not source)
 .pnpm-store/
 ships/lists/ogden-v0.1.4.csv
+
+# local headless Chrome profiles and one-off screenshots (not source)
+.chrome-*/
+kipling.png
+lb5.png

@@ -1,0 +1,19 @@
+---
+// One size band's leaderboard at its own address (/leaderboard/small): the chaining board and the
+// approach board for that size. The band cards on /leaderboard open these, as the Market Harbour's
+// open a band's ships. The static routes beside this one (competitor/, thorp/, lab/) win over it.
+import Layout from '../../layouts/Layout.astro';
+import Leaderboard from '../../components/islands/Leaderboard';
+import { BANDS, type SizeBand } from '../../scripts/views/bands';
+
+export function getStaticPaths() {
+  return BANDS.map((b) => ({ params: { band: b.key } }));
+}
+
+const band = Astro.params.band as SizeBand;
+---
+<Layout>
+  <main>
+    <Leaderboard client:load band={band} />
+  </main>
+</Layout>

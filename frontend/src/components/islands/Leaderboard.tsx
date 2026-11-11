@@ -1,21 +1,27 @@
-// Leaderboard (UI.md "Leaderboard"), as a client island: the ranked chaining board and the
-// approach board, split into three size classes (small up to 4B, medium up to 30B, large above
-// 30B), then the four Faces' scorecard, Smoking Qwen and the every-ship table. A class with no
-// chaining reading yet carries the five likeliest candidates to approach instead. The competitor
-// and lab sub-views are their own pages for now (they keep the shared script); this page no longer
-// loads dashboard.ts.
+// Leaderboard (UI.md "Leaderboard"), as a client island. /leaderboard is the way in: the four size
+// bands as cards (extra small under 1B, small 1B–4B, medium 4B–32B, large above 32B), then what is not
+// one size's: ARC-AGI-2, the four Faces' scorecard, Smoking Qwen and the every-ship table. Each card
+// opens its size's own page (/leaderboard/<band>, the `band` prop): the ranked chaining board and the
+// approach board for that size. A size with no chaining reading yet carries its likeliest candidates
+// to approach instead. The competitor and lab sub-views are their own pages for now (they keep the
+// shared script); this page no longer loads dashboard.ts.
 
 import { useEffect, useState } from 'react';
-import { cardCls, checkCls, emptyCls, selectCls } from '@/lib/ui';
+import { cardCls, checkCls, crumbCls, emptyCls, selectCls } from '@/lib/ui';
+import { TabNav } from '@/components/TabNav';
+import { StepsBoard } from '@/components/islands/StepsBoard';
 import { sectionProps, useApi } from '@/lib/useApi';
-import { boardHtml, candidatesHtml, drawSmokingChart, facesHtml, reasoningHtml, runsHtml, smokingHtml } from '@/scripts/views/leaderboard-main';
+import { bandCardsHtml, boardHtml, candidatesHtml, drawSmokingChart, facesHtml, reasoningHtml, runsHtml, smokingHtml } from '@/scripts/views/leaderboard-main';
+import { BAND, BANDS, bandOf, sizeOf, type SizeBand } from '@/scripts/views/bands';
 
-export default function Leaderboard() {
+export default function Leaderboard({ band }: { band?: SizeBand }) {
   const lb = useApi<any>('/api/leaderboard', 60000);
   const sq = useApi<any>('/api/smoking_qwen', 60000);
   const ladder = useApi<any>('/api/ladder', 300000);
   const [want, setWant] = useState('');
-  const [sizeTab, setSizeTab] = useState<'small' | 'medium' | 'large'>('small');
+  // the size this page is for; the landing page (no band) draws no board, only the cards that open one
+  const sizeTab: SizeBand = band || 'small';
+  const bandInfo = BAND(band);
   const [showFc, setShowFc] = useState(true);
   const [showPy, setShowPy] = useState(true);
 
@@ -24,62 +30,62 @@ export default function Leaderboard() {
   const presets = [...new Set<string>((lb.data?.ships || []).map((r: any) => r.preset).filter(Boolean))].sort((a, b) => order(a) - order(b));
   const nameOf = (p: string): string => (rungs.find((r) => r.preset === p) || { name: '' }).name;
 
-  // three size classes (11 November, Justin): small up to 4B, medium above 4B up to 30B, large
-  // above 30B. The payload carries the boundaries; the fallback keeps the tabs before it loads.
-  const sizeClasses: { key: 'small' | 'medium' | 'large'; label: string; range: string }[] = lb.data?.size_classes || [
-    { key: 'small', label: 'Small', range: 'up to 4B' },
-    { key: 'medium', label: 'Medium', range: 'above 4B to 30B' },
-    { key: 'large', label: 'Large', range: 'above 30B' },
-  ];
-  const table = lb.data?.table || [];
+  // The three size bands are the Market Harbour's (bands.ts): small 300k–4B, medium 4B–32B, large
+  // above 32B. A row is placed by its parameter count, not by the payload's older 30B boundary, so the
+  // two pages cannot disagree.
+  const table: any[] = lb.data?.table || [];
+  const allCands: any[] = Object.values(lb.data?.candidates || {}).flat() as any[];
+  const rowBand = (r: any): SizeBand => bandOf(sizeOf(r));
   const isSmall = sizeTab === 'small';
-  const measured = table.filter((r: any) => (r.size_class || 'small') === sizeTab);
-  const cands = lb.data?.candidates?.[sizeTab] || [];
-  const countOf = (k: string): number => table.filter((r: any) => (r.size_class || 'small') === k).length + (lb.data?.candidates?.[k]?.length || 0);
+  // under 1B nothing chains, so the extra small band is read by the steps to chaining (StepsBoard)
+  const byStepsBand = band === 'xsmall';
+  const measured = table.filter((r: any) => rowBand(r) === sizeTab);
+  const measuredChaining = measured.some((r: any) => r.group === 'chaining');
+  const cands = allCands.filter((c: any) => rowBand(c) === sizeTab);
 
   const runs = lb.data ? runsHtml(lb.data, want, rungs) : null;
-  const board = lb.data ? boardHtml(lb.data, sq.data || {}, rungs, showFc, showPy, sizeTab) : null;
+  // boardHtml filters its table by size_class; hand it the band's rows with that label so one definition
+  // of the bands serves the whole board
+  const boardData = lb.data ? { ...lb.data, table: measured.map((r: any) => ({ ...r, size_class: sizeTab })) } : null;
+  const board = boardData ? boardHtml(boardData, sq.data || {}, rungs, showFc, showPy, sizeTab) : null;
   const candidate = lb.data ? candidatesHtml(cands, sizeTab) : null;
   const reasoning = lb.data?.reasoning ? reasoningHtml(lb.data.reasoning) : null;
   const faces = lb.data?.faces ? facesHtml(lb.data.faces, rungs) : null;
   const smoking = sq.data ? smokingHtml(sq.data) : null;
 
   useEffect(() => {
-    if (sq.data) void drawSmokingChart(sq.data);
-  }, [sq.data]);
+    if (!band && sq.data) void drawSmokingChart(sq.data);
+  }, [band, sq.data]);
 
-  // the tab is linkable (?size=medium); read it after hydration so the server and client first
-  // render agree, then keep the address in step when the tab changes
+  // the sizes were tabs on this page once (?size=medium): an old address forwards to the size's page
   useEffect(() => {
+    if (band) return;
     const s = new URLSearchParams(window.location.search).get('size');
-    if (s === 'medium' || s === 'large') setSizeTab(s);
-  }, []);
-  const pickSize = (k: 'small' | 'medium' | 'large') => {
-    setSizeTab(k);
-    const u = new URL(window.location.href);
-    if (k === 'small') u.searchParams.delete('size'); else u.searchParams.set('size', k);
-    window.history.replaceState(null, '', u);
-  };
+    if (BAND(s)) window.location.replace(`/leaderboard/${s}`);
+  }, [band]);
 
   return (
     <div {...sectionProps('leaderboard')}>
-      <h1>Leaderboard <span className="q">the chaining boards by size — small up to 4B, medium above 4B up to 30B, large above 30B: the models that chain, ranked by how well; those not chaining yet, ranked by how close; the canonical intelligence ranking, ARC-AGI-2; and the four Faces — the Nevermore, Counter, Scales and Mover — beside Qwen 3 4B. The method is under <a href="/discoveries/tests?test=chaining">Discoveries, Tests: chaining two facts</a></span></h1>
+      {band ? (
+        <>
+          <h1><a className={crumbCls('back')} href="/leaderboard">← leaderboard</a> <span>{bandInfo?.name}</span> <span className="q">{bandInfo?.range}: {byStepsBand ? 'under 1B nothing chains two facts yet, so the board is ranked by AI2 ARC — Easy as the anchor and Challenge beside it, the one peer-recognised test at this size — with the steps to chaining, and each of our ships beside the outside model ten times its size, below' : 'the models of this size that chain, ranked by how well, and those not chaining yet, ranked by how close'}. The method is under <a href="/discoveries/tests?test=chaining">Discoveries, Tests: chaining two facts</a></span></h1>
+          <TabNav
+            ariaLabel="model size"
+            items={BANDS.map((b) => ({ key: b.key, label: <>{b.name} <span className="s">{b.range}</span></>, href: `/leaderboard/${b.key}`, active: b.key === band }))}
+          />
+        </>
+      ) : (
+        <>
+          <h1>Leaderboard <span className="q">the chaining boards by size — extra small under 1B, small 1B to 4B, medium 4B to 32B, large above 32B: the models that chain, ranked by how well; those not chaining yet, ranked by how close; the canonical intelligence ranking, ARC-AGI-2; and the four Faces — the Nevermore, Counter, Scales and Mover — beside Qwen 3 4B. The method is under <a href="/discoveries/tests?test=chaining">Discoveries, Tests: chaining two facts</a></span></h1>
+          <div className="cards bandcards" dangerouslySetInnerHTML={{ __html: lb.data ? bandCardsHtml(lb.data) : '' }} />
+        </>
+      )}
 
-      <div className="tabs" role="tablist" aria-label="model size">
-        {sizeClasses.map((s) => {
-          const n = countOf(s.key);
-          return (
-            <button key={s.key} role="tab" aria-selected={sizeTab === s.key}
-              className={sizeTab === s.key ? 'tab on' : 'tab'}
-              onClick={() => pickSize(s.key)}>
-              {s.label} <span className="s">{s.range}{n ? ` · ${n}${s.key === 'small' ? '' : ` candidate${n === 1 ? '' : 's'}`}` : ''}</span>
-            </button>
-          );
-        })}
-      </div>
+      {byStepsBand && <StepsBoard lb={lb.data} error={lb.error} band={sizeTab} />}
 
+      {band && !byStepsBand && <>
       <section className={cardCls(false, 'panel')}>
-        <h2>Chaining <span className="note">the models whose chaining lift clears the noise (+0.03), ranked by it: the mean lift on the four chaining tests. {isSmall ? 'The small class is the one measured so far.' : sizeTab === 'medium' ? 'The medium class is the next goal, and has no chaining reading yet.' : `The ${sizeTab} class has no chaining reading yet.`}</span></h2>
+        <h2>Chaining <span className="note">the models through the door, ranked by chaining lift (the mean lift on the four chaining tests): a lift that clears the noise (+0.03), a chaining gain above its noise ({lb.data?.steps?.gain_noise ?? 0.05}) and at least one test performed. {isSmall ? 'The small class is measured on the four chaining tests.' : measuredChaining ? 'This class is measured on the four chaining tests.' : sizeTab === 'medium' ? 'The medium class is the next goal, and has no chaining reading yet.' : `The ${sizeTab} class has no chaining reading yet.`}</span></h2>
         {!lb.data ? (
           <div className={emptyCls()}>{lb.error ? `the leaderboard could not be read: ${lb.error}` : 'reading the leaderboard…'}</div>
         ) : isSmall ? (
@@ -95,7 +101,7 @@ export default function Leaderboard() {
                 <tbody dangerouslySetInnerHTML={{ __html: board?.body || '' }} />
               </table>
             </div>
-            <p className="note mt">The leaderboard is the four chaining tests only (Nature's breeder, the mill test, the between test, the pigeonhole test; 96 pairs), each cell its lift and share of pairs right, ✓ when performed (lift 0.1 and two in three right); Nothing up my sleeve's other tests are internal. The chaining gain is the logic deck's: invented words and counterfactual premises, each item asked with both premises and with one; the lift with both less the better single premise, the proof that a pass is chaining, not knowing or one premise. A Nothing up my sleeve size is its best ship, its voyages averaged. The 2–4B models (Qwen, Phi, Llama, Gemma, SmolLM, base checkpoints where one exists) are the competitors: Nothing up my sleeve must chain two facts as well as each at a tenth its size, and they never grade the chains (the reference ladder does). Forecast rows (italic) are Nothing up my sleeve's own sizes fitted against size, straight (conservative) and bending (probable), as Smoking Qwen fits them; while fewer than three sizes are above the noise (0.03) they are curves through noise, shown but not trusted. "Nothing up my sleeve matches it at" is the size where each fit reaches that model's lift; "a tenth its size" is each fit's reading there, with the probability it reaches that model's lift once forecastable. Performed at <b id="lbthr">{board?.thr || ''}</b>.</p>
+            <p className="note mt">The leaderboard is the four chaining tests only (Nature's breeder, the mill test, the between test, the pigeonhole test; 96 pairs), each cell its lift and share of pairs right, ✓ when performed (lift 0.1 and two in three right); Nothing up my sleeve's other tests are internal. The chaining gain is the logic deck's: invented words and counterfactual premises, each item asked with both premises and with one; the lift with both less the better single premise, the proof that a pass is chaining, not knowing or one premise, so a model whose lift has no such gain behind it is on the approach board below, not here. A Nothing up my sleeve size is its best ship, its voyages averaged. The 2–4B models (Qwen, Phi, Llama, Gemma, SmolLM, base checkpoints where one exists) are the competitors: Nothing up my sleeve must chain two facts as well as each at a tenth its size, and they never grade the chains (the reference ladder does). Forecast rows (italic) are Nothing up my sleeve's own sizes fitted against size, straight (conservative) and bending (probable), as Smoking Qwen fits them; while fewer than three sizes are above the noise (0.03) they are curves through noise, shown but not trusted. "Nothing up my sleeve matches it at" is the size where each fit reaches that model's lift; "a tenth its size" is each fit's reading there, with the probability it reaches that model's lift once forecastable. Performed at <b id="lbthr">{board?.thr || ''}</b>.</p>
           </>
         ) : measured.some((r: any) => r.group === 'chaining') ? (
           <>
@@ -109,25 +115,25 @@ export default function Leaderboard() {
           </>
         ) : (
           <>
-            <div className={emptyCls()}>No {sizeTab} model has been scored on the four chaining tests yet. The five likeliest candidates to approach are on the board below.</div>
-            <p className="note mt">The four chaining tests are the only public measure. A candidate is a target, not a result: it joins this board only when it has a chaining lift on those tests. The small class's readings stay on their own tab.</p>
+            <div className={emptyCls()}>No {sizeTab} model has been scored on the four chaining tests yet. The likeliest candidates to approach are on the board below.</div>
+            <p className="note mt">The four chaining tests are the only public measure. A candidate is a target, not a result: it joins this board only when it has a chaining lift on those tests. The small class's readings stay on their own page.</p>
           </>
         )}
       </section>
 
       <section className={cardCls(false, 'panel')}>
-        <h2>{isSmall ? 'Approaching chaining' : `The five likeliest ${sizeTab} candidates`} <span className="note">{isSmall
-          ? "the closest to chaining: the cards every chainer holds, then following one premise. Models not chaining yet, ranked by how many of the four necessary cards they hold, then by the logic deck's one-hop lift"
+        <h2>{measuredChaining ? 'Approaching chaining' : `The ${cands.length} likeliest ${sizeTab} candidates`} <span className="note">{measuredChaining
+          ? "the closest to chaining: the cards every chainer holds, then following one premise. Models not through the door, including those whose tests pass with no chaining gain behind them, ranked by how many of the four necessary cards they hold, then by the logic deck's one-hop lift"
           : `no ${sizeTab} model has a chaining reading yet; these are the targets to approach, most likely first`}</span></h2>
-        {!lb.data ? null : isSmall ? (
+        {!lb.data ? null : measuredChaining ? (
           <>
             <div className="scroll">
               <table id="lbapproach" data-nosort>
-                <thead><tr><th>#</th><th>model</th><th>parameters</th><th>the necessary cards <span className="s">P♣ N♠ M♦ C♥</span></th><th title="the logic deck's lift on one-hop items: following one premise">one-hop lift</th><th title="the logic deck's chaining gain on its cause items; eight items: a strong reading counts, a small one is noise">cause and effect</th><th title="below +0.03 it is noise">chaining lift <span className="s">noise</span></th></tr></thead>
+                <thead><tr><th>#</th><th>model</th><th>parameters</th><th>the necessary cards <span className="s">P♣ N♠ M♦ C♥</span></th><th title="the logic deck's lift on one-hop items: following one premise">one-hop lift</th><th title="the logic deck's chaining gain: the lift with both premises less the better single premise; the door needs it above its noise">chaining gain<div className="s">logic deck</div></th><th title="the logic deck's chaining gain on its cause items; eight items: a strong reading counts, a small one is noise">cause and effect</th><th title="how many of the four chaining tests the model performs">passed</th><th title="below +0.03 it is noise; above it, a lift with no chaining gain behind it is not yet shown to be chaining">chaining lift</th></tr></thead>
                 <tbody dangerouslySetInnerHTML={{ __html: board?.approach || '' }} />
               </table>
             </div>
-            <p className="note mt">Below the line nothing is ranked by chaining lift: below +0.03 it is noise. The four cards are the ones every model that chains plays (the card judge's necessary cards); one hop is following a single premise, the step before chaining two. One-hop lifts within 0.05 of each other are noise, so those rows tie and share a rank (=5), listed biggest first. Cause and effect, on both boards, is the logic deck's chaining gain on its cause items: eight items, so a strong reading counts and a small one is noise (the mark, 0.1, dotted).</p>
+            <p className="note mt">Below the line nothing is ranked by chaining lift: below +0.03 it is noise, and above it a lift with no chaining gain behind it (the logic deck's, above {lb.data?.steps?.gain_noise ?? 0.05}) is not yet shown to be chaining, however many of the four tests it performs. The four cards are the ones every model that chains plays (the card judge's necessary cards); one hop is following a single premise, the step before chaining two. One-hop lifts within 0.05 of each other are noise, so those rows tie and share a rank (=5), listed biggest first. Cause and effect, on both boards, is the logic deck's chaining gain on its cause items: eight items, so a strong reading counts and a small one is noise (the mark, 0.1, dotted).</p>
           </>
         ) : (
           <>
@@ -137,11 +143,14 @@ export default function Leaderboard() {
                 <tbody dangerouslySetInnerHTML={{ __html: candidate?.body || '' }} />
               </table>
             </div>
-            <p className="note mt">The five are chosen on the evidence the board already has — the families that chain at 2–4B, the reasoning leaders of the open field, and one boundary case that fits a workstation — not on a chaining reading they do not have. Their order is a working order, not a result. The logic deck's gain and one-hop lift, where held, are the only evidence so far; the four chaining tests have not been run. A candidate enters the chaining board only when it has a chaining lift.</p>
+            <p className="note mt">The candidates are chosen on the evidence the board already has — the families that chain at 2–4B, the reasoning leaders of the open field, and one boundary case that fits a workstation — not on a chaining reading they do not have. Their order is a working order, not a result. The logic deck's gain and one-hop lift, where held, are the only evidence so far; the four chaining tests have not been run. A candidate enters the chaining board only when it has a chaining lift.</p>
           </>
         )}
       </section>
 
+      </>}
+
+      {!band && <>
       <section className={cardCls(false, 'panel')}>
         <h2>Reasoning <span className="note">the canonical intelligence ranking: ARC-AGI-2, pass@2 on the 120-task evaluation set. It is not comparable with the chaining lift — the chaining tests measure one skill on text, ARC-AGI-2 measures fluid intelligence on grids — so it stays a panel of its own. Published scores are the public leaderboard's, not our measurements; Nothing up my sleeve's reading is the Kipling ARC arm's.</span></h2>
         <div className="scroll">
@@ -197,6 +206,7 @@ export default function Leaderboard() {
           </table>
         </div>
       </details>
+      </>}
     </div>
   );
 }

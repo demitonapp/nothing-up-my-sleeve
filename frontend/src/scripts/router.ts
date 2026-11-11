@@ -21,7 +21,7 @@ export const CLASS_ALIASES: Record<string, string> = Object.fromEntries(
   Object.entries(CLASS_RENAMES).flatMap(([a, b]) => [[a, b], [b, a]]),
 );
 
-export const MTABS = ['overview', 'fleet', 'goals', 'training', 'scoring', 'waypoints', 'sops', 'fitouts', 'bet'];
+export const MTABS = ['overview', 'fleet', 'goals', 'training', 'scoring', 'waypoints', 'sops', 'fitouts', 'bet', 'chat'];
 export const STABS = ['betting', 'books', 'languages', 'sieves', 'attention', 'traits', 'chat'];
 export const STAB_EL: Record<string, string> = { betting: 'betting', books: 'books', languages: 'languages', sieves: 'sieves', attention: 'attention', traits: 'traits-section', chat: 'chat' };
 export const OLD_SHIP: Record<string, string> = { betting: 'betting', books: 'books', languages: 'languages', sieves: 'sieves', attention: 'attention', 'traits-section': 'traits' };

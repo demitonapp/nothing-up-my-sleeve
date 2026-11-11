@@ -306,7 +306,7 @@ def test_a_chartered_voyage_sails_and_comes_home(library, spec, tmp_thorp, monke
     assert train.latest_checkpoint(rid) is not None
     # the spend log: hired, then released with its cost and the rate it made
     ev = [(r["event"], r.get("status")) for r in s3.log()]
-    assert ev == [("hired", None), ("released", "home")]
+    assert ev == [("hired", None), ("at sea", None), ("released", "home")]  # at sea: the deadline, for an attach (11 November)
     rel = s3.log()[-1]
     assert rel["cost"] >= 0 and rel["tokens_per_s"] > 0 and s3.out_now() == []
     with s2.berth(1, "next"):  # and the berth is free again: a second charter could hire
@@ -504,3 +504,337 @@ def test_aboard_no_evaluator_asks_the_store(library, spec, tmp_thorp, monkeypatc
     # registered with its ship at home, since aboard it cannot be (the toy preset is no size, so it says why)
     home = [x for x in said if "regist" in x]
     assert len(home) == 1 and "aboard" not in home[0] and ("registered as a voyage" in home[0] or "no size for preset 'tiny'" in home[0])
+
+
+# ---------------------------------------------------------------- an outage on this Mac (11 November)
+#
+# The architecture audit's item 2: lost contact releases nothing, SIGTERM and SIGHUP run the charter's clean-up,
+# and `attach` takes up a ship still hired. The box here only answers polls (no voyage is trained), the market is
+# the fake above, and the pulls are counted, so these read the charter's decisions and nothing else.
+
+
+class QuietBox:
+    """A box that answers each poll as it is told: None (still at sea), an exit status, an exception (no
+    answer), or a function to call. Its fit-out does nothing."""
+
+    def __init__(self, answers=()):
+        self.answers, self.polls, self.launched, self.log = list(answers), 0, None, None
+
+    def finished(self, rid):
+        self.polls += 1
+        a = self.answers.pop(0) if self.answers else None
+        if callable(a):
+            a = a()
+        if isinstance(a, BaseException):
+            raise a
+        return a
+
+    def wait_ssh(self, **kw):
+        return 1
+
+    def launch(self, rid):
+        self.launched = rid
+
+    def bootstrap(self):
+        pass
+
+    sync_env = bootstrap
+
+    def put(self, root, rels, dst=""):
+        pass
+
+    put_tar = put
+
+
+@pytest.fixture
+def pulls(monkeypatch):
+    """`bring_home` counted, not done: `made` is each pull asked for, and each writes the run's row as the box
+    would have it (`status[0]`: set it to "running" for a voyage that came in short)."""
+    from types import SimpleNamespace
+
+    made, status = [], ["finished"]
+
+    def bring_home(box, rid, start, rec, hire, commit):
+        made.append({"rid": rid, "start": start, "commit": commit, "instance": hire["instance"]})
+        rec.run({"run_id": rid, "name": hire.get("name"), "status": status[0]})
+        return {"metrics": len(made)}
+
+    monkeypatch.setattr(s1, "bring_home", bring_home)
+    monkeypatch.setattr(s1, "_register_home", lambda rec, rid, log: None)
+    return SimpleNamespace(made=made, status=status)
+
+
+def _hire(market, rid="r-attach-0123456789", name="1m@attach", **over) -> dict:
+    """A ship hired by a charter that has since died: out at the market, and in S3's spend log."""
+    import time
+
+    instance = Vast(market).hire(12, "img", 80, s1.LABEL + rid)
+    fields = dict(instance=instance, run_id=rid, name=name, gpu="RTX 4090", dph=0.38, offer=12, started=time.time() - 600,
+                  quote=0.76, quote_hours=2.0, preset="9m", start_step=120, commit="abc1234")  # fmt: skip
+    return s3.record("hired", **{**fields, **over})
+
+
+def _attach(market, box, which, said=None, **kw):
+    return s1.attach(which, vast=Vast(market), box_factory=lambda inst: box, rec=Ledger(),
+                     log=(said.append if said is not None else (lambda *a: None)), sleep=lambda s: None, poll_s=0, **kw)  # fmt: skip
+
+
+def test_lost_contact_releases_nothing(tmp_thorp, pulls):
+    """Forty polls the box does not answer (it was ten that released it): each is logged, the ship stays hired,
+    and when the box answers again the voyage goes on to its end."""
+    import subprocess
+
+    market, said = FakeMarket(), []
+    hire = _hire(market)
+    still_hired = []
+    silence = [s1.BoxError("ssh ssh9.vast.ai:40901 exit 255: Connection timed out")] * 39 + [subprocess.TimeoutExpired("ssh", 60)]
+    box = QuietBox([None, *silence, lambda: still_hired.append(hire["instance"] in market.instances), 0])
+    out = _attach(market, box, hire["instance"], said)
+    assert out["status"] == "home" and box.polls == 43 and still_hired == [True]
+    misses = [m for m in said if "did not answer" in m]
+    assert len(misses) == 40 and "miss 1," in misses[0] and "miss 40," in misses[-1]
+    assert all("stays hired" in m for m in misses)
+    assert any("answers again, after 40 missed poll(s)" in m for m in said)
+    assert [c for c in market.calls if c[0] == "DELETE"] == [("DELETE", f"/api/v0/instances/{hire['instance']}/", None)]
+    assert len(pulls.made) == 1  # the last pull only: none was tried into the silence
+    assert [(r["event"], r.get("status")) for r in s3.log()] == [("hired", None), ("released", "home")]
+
+
+def test_the_overrun_deadline_still_brings_a_silent_ship_home(tmp_thorp, pulls):
+    """The deadline is policy and is kept: a box out of contact past it is brought home and released."""
+    import time
+
+    market, said = FakeMarket(), []
+    hire = _hire(market, started=time.time() - 3 * 3600, quote_hours=1.0)  # 1 h quoted, 1.5 h allowed, 3 h gone
+    box = QuietBox([s1.BoxError("no route to host")] * 5)
+    out = _attach(market, box, hire["run_id"], said)
+    assert out["status"] == "overran" and box.polls == 1 and market.instances == {}
+    assert any("past its deadline" in m for m in said)
+    assert s3.log()[-1]["status"] == "overran" and s3.out_now() == []
+    assert Ledger().get_run(hire["run_id"])["status"] == "finished"  # as the pull left it; a short leg says so below
+
+
+def test_attach_takes_up_a_ship_still_hired_and_hires_nothing(tmp_thorp, pulls):
+    market, said = FakeMarket(), []
+    hire = _hire(market)
+    s3.record("at sea", instance=hire["instance"], run_id=hire["run_id"], deadline=hire["started"] + 9 * 3600)
+    assert s1._deadline(hire, s5.terms()) == hire["started"] + 9 * 3600  # the charter's own deadline, when on record
+    assert s1._deadline({**hire, "instance": 1}, s5.terms()) == hire["started"] + 2.0 * s5.terms()["overrun"] * 3600
+    box = QuietBox([None, None, 0])
+    out = _attach(market, box, "1m@attach", said)
+    assert out["status"] == "home" and out["instance"] == hire["instance"] and out["run_id"] == hire["run_id"]
+    assert box.launched is None and box.polls == 3  # nothing fitted out or launched: the voyage never stopped
+    assert len([c for c in market.calls if c[0] == "PUT"]) == 1  # the hire this test made; attach made none
+    assert market.instances == {} and s3.out_now() == []
+    assert pulls.made == [{"rid": hire["run_id"], "start": 120, "commit": "abc1234", "instance": hire["instance"]}]
+    rel = s3.log()[-1]
+    assert (rel["event"], rel["status"], rel["instance"], rel["preset"], rel["gpu"]) == ("released", "home", hire["instance"], "9m", "RTX 4090")
+    assert rel["started"] == hire["started"] and rel["cost"] > 0  # the whole hire is paid for, not the attached part
+    assert any(f"attached to instance {hire['instance']}" in m for m in said)
+    notes = (paths.runs_dir() / f"{hire['run_id']}.log").read_text()
+    assert '"event": "attached"' in notes and '"event": "released"' in notes
+    with s2.berth(1, "next"):  # its berth is free again
+        pass
+
+
+def test_a_ship_is_found_by_its_instance_its_run_or_its_name(tmp_thorp):
+    market = FakeMarket()
+    a = _hire(market, rid="aaaaaaaaaaaa1111", name="one")
+    b = _hire(market, rid="aaaaaaaaaaaa2222", name="two")
+    assert s1.hired(a["instance"])["name"] == "one" and s1.hired(str(b["instance"]))["name"] == "two"
+    assert s1.hired("aaaaaaaaaaaa2222")["name"] == "two" and s1.hired("two")["instance"] == b["instance"]
+    with pytest.raises(s1.NotAttachable, match="more than one"):
+        s1.hired("aaaaaaaa")  # the start of both run ids
+    with pytest.raises(s1.NotAttachable, match="no hired ship is out as 'three'; out now: instance"):
+        s1.hired("three")
+    s3.record("released", instance=a["instance"], run_id=a["run_id"], status="home", ended=0, cost=0)
+    assert s1.hired("aaaaaaaa")["name"] == "two"  # one left out: six characters or more of its id are enough
+
+
+def test_attach_refuses_and_touches_nothing(tmp_thorp, pulls):
+    market = FakeMarket()
+    with pytest.raises(s1.NotAttachable, match="no hired ship"):
+        _attach(market, QuietBox(), "nothing-out")
+    hire = _hire(market)
+    with s2.berth(1, hire["run_id"]):  # its charter is alive
+        with pytest.raises(s1.NotAttachable, match="still sailing"):
+            _attach(market, QuietBox([0]), hire["instance"])
+    assert hire["instance"] in market.instances
+    market.instances[hire["instance"]]["actual_status"] = "exited"
+    with pytest.raises(s1.NotAttachable, match="not up at Vast.ai.*'exited'"):
+        _attach(market, QuietBox([0]), hire["instance"])
+    market.instances.clear()  # Vast.ai no longer has it at all
+    with pytest.raises(s1.NotAttachable, match="not up at Vast.ai"):
+        _attach(market, QuietBox([0]), hire["instance"])
+    assert not [c for c in market.calls if c[0] == "DELETE"] and pulls.made == []
+    assert [r["event"] for r in s3.log()] == ["hired"]  # the log is the audit's to close, not attach's
+    old = s3.record("hired", instance=4, run_id="r-old", dph=0.4, started=0.0)
+    with pytest.raises(s1.NotAttachable, match="no quote on record"):
+        s1._deadline(old, s5.terms())
+
+
+def test_a_voyage_that_came_in_short_while_no_one_watched_says_so(tmp_thorp, pulls):
+    market = FakeMarket()
+    hire = _hire(market)
+    pulls.status[0] = "running"  # the box's voyage exited 0 with its run unfinished (a stop_after, say)
+    out = _attach(market, QuietBox([0]), hire["instance"])
+    assert out["status"] == "came in unfinished" and market.instances == {}
+    assert Ledger().get_run(hire["run_id"])["status"] == "chartered: came in unfinished"
+
+
+def _canned_sail(monkeypatch, tmp_thorp, rid="r-sail-0123456789"):
+    """`sail` with its quote and its cargo canned: what is under test is the charter after the hire."""
+    from types import SimpleNamespace
+
+    spec = {"name": "1m@sail", "model": {"preset": "9m", "backend": "torch"}}
+    q = {"offer_id": 12, "gpu": "RTX 4090", "dph": 0.38, "hours": 1.0, "cost": 0.38, "speed": "canned"}
+
+    def quote(spec_path, gpu=None, vast=None, resolver=None, log=print):
+        return {"spec": spec, "prep": SimpleNamespace(tokeniser=SimpleNamespace(id="tok")), "quotes": [q], "market": "market",
+                "plan": {"run_id": rid, "start": 0}, "vast": vast, "terms": s5.terms()}  # fmt: skip
+
+    def stage(r):
+        d = paths.data_dir() / "charter" / r / "stage"
+        d.mkdir(parents=True, exist_ok=True)
+        return d
+
+    monkeypatch.setattr(s1, "quote", quote)
+    monkeypatch.setattr(s1, "gate", lambda spec, q: None)
+    monkeypatch.setattr(s1, "_public_key", lambda t: None)
+    monkeypatch.setattr(s1, "voyage_books", lambda prep: set())
+    monkeypatch.setattr(s1, "carried_data", lambda tok, books=None: [])
+    monkeypatch.setattr(s1, "checkpoints_carried", lambda rid, spec, rec: [])
+    monkeypatch.setattr(s1, "stage", stage)
+    monkeypatch.setattr(s2, "papers", lambda *a, **k: [])
+    return rid
+
+
+def _sail(market, box, said=None):
+    return s1.sail("canned.yaml", vast=Vast(market), box_factory=lambda inst: box, rec=Ledger(),
+                   log=(said.append if said is not None else (lambda *a: None)), sleep=lambda s: None, poll_s=0)  # fmt: skip
+
+
+def test_a_canned_sail_goes_to_sea_and_records_its_deadline(tmp_thorp, pulls, monkeypatch):
+    import time
+
+    rid = _canned_sail(monkeypatch, tmp_thorp)
+    market, box = FakeMarket(), QuietBox([None, 0])
+    t0 = time.time()
+    out = _sail(market, box)
+    assert out["status"] == "home" and box.launched == rid and market.instances == {}
+    hired_, at_sea, released = s3.log()
+    assert [hired_["event"], at_sea["event"], released["event"]] == ["hired", "at sea", "released"]
+    assert hired_["start_step"] == 0 and hired_["quote_hours"] == 1.0 and hired_["commit"]  # all attach will need
+    assert at_sea["instance"] == hired_["instance"] == released["instance"]
+    want = t0 + 1.0 * float(s5.terms()["overrun"]) * 3600  # the quote times the overrun, from the launch: unchanged
+    assert want - 1 <= at_sea["deadline"] <= want + 30
+    assert s3.out_now() == [] and s3.week_spent() >= 0  # the new line is no hire and no spend
+
+
+def test_sigterm_runs_the_clean_up_and_the_ship_is_released(tmp_thorp, pulls, monkeypatch):
+    """SIGTERM used to end the charter where it stood: no `finally`, no release, the ship billing on. Now it is
+    raised in the charter as `Recalled`, the ship is released and the release is on record with its instance."""
+    import os
+    import signal
+
+    rid = _canned_sail(monkeypatch, tmp_thorp)
+    market, said = FakeMarket(), []
+    before = signal.getsignal(signal.SIGTERM), signal.getsignal(signal.SIGHUP)
+    box = QuietBox([None, lambda: os.kill(os.getpid(), signal.SIGTERM), None, 0])
+    real_release, again = Vast.release, []
+
+    def release(self, instance):  # a second signal, mid-release, must not cut the release short
+        os.kill(os.getpid(), signal.SIGHUP)
+        again.append(instance)
+        real_release(self, instance)
+
+    monkeypatch.setattr(Vast, "release", release)
+    with pytest.raises(s1.Recalled, match="SIGTERM"):
+        _sail(market, box, said)
+    assert box.polls == 2 and market.instances == {} and len(again) == 1
+    rel = s3.log()[-1]
+    assert (rel["event"], rel["status"], rel["instance"]) == ("released", "recalled (SIGTERM)", again[0])
+    assert s3.out_now() == [] and pulls.made == []
+    assert any("SIGTERM while instance" in m for m in said) and any("SIGHUP again, during SIGTERM" in m for m in said)
+    notes = (paths.runs_dir() / f"{rid}.log").read_text()
+    assert f'"instance": {again[0]}' in notes and "recalled (SIGTERM)" in notes
+    assert (signal.getsignal(signal.SIGTERM), signal.getsignal(signal.SIGHUP)) == before  # the handlers put back
+
+
+def test_sighup_to_an_attached_charter_is_a_recall_too(tmp_thorp, pulls):
+    import os
+    import signal
+
+    market = FakeMarket()
+    hire = _hire(market)
+    with pytest.raises(s1.Recalled, match="SIGHUP"):
+        _attach(market, QuietBox([lambda: os.kill(os.getpid(), signal.SIGHUP), None]), hire["instance"])
+    assert market.instances == {} and s3.log()[-1]["status"] == "recalled (SIGHUP)"
+
+
+def test_a_signal_is_not_swallowed_by_a_pull_that_sails_on(tmp_thorp, monkeypatch):
+    """A mid-run pull that fails is logged and the voyage sails on (`except Exception`); a recall that arrives
+    during one must still reach the release, which is why `Recalled` is a BaseException."""
+    import os
+    import signal
+    import time
+
+    market = FakeMarket()
+    hire = _hire(market)
+
+    def bring_home(*a):
+        os.kill(os.getpid(), signal.SIGTERM)
+        time.sleep(0.01)  # the handler runs here, inside the pull
+        return {}
+
+    monkeypatch.setattr(s1, "bring_home", bring_home)
+    monkeypatch.setattr(s1, "PULL_EVERY_MIN", -1)  # a pull at every poll
+    with pytest.raises(s1.Recalled):
+        _attach(market, QuietBox([None, None]), hire["instance"])
+    assert market.instances == {} and s3.log()[-1]["status"] == "recalled (SIGTERM)"
+
+
+def test_a_hire_the_spend_log_could_not_take_is_still_released(tmp_thorp, pulls, monkeypatch):
+    """The hire's record used to sit before the `try`: a store that refused it left the ship out with no charter.
+    Now the instance is in the voyage's own log first, and whatever fails after the hire releases the ship."""
+    rid = _canned_sail(monkeypatch, tmp_thorp)
+    market, real = FakeMarket(), s3.record
+
+    def record(event, **fields):
+        if event == "hired":
+            raise RuntimeError("the store would not take it")
+        return real(event, **fields)
+
+    monkeypatch.setattr(s3, "record", record)
+    with pytest.raises(RuntimeError, match="would not take it"):
+        _sail(market, QuietBox([0]))
+    assert market.instances == {} and len([c for c in market.calls if c[0] == "DELETE"]) == 1
+    assert [(r["event"], r["status"]) for r in s3.log()] == [("released", "lost")]
+    assert '"event": "hired"' in (paths.runs_dir() / f"{rid}.log").read_text()
+
+
+def test_a_box_that_cannot_be_reached_is_a_miss_not_a_voyage_still_at_sea(tmp_thorp):
+    import subprocess
+
+    answer = {}
+
+    def run(argv, **kw):
+        return subprocess.CompletedProcess(argv, answer["code"], stdout=answer.get("out", ""), stderr=answer.get("err", ""))
+
+    b = s1.Box("ssh9.vast.ai", 40123, run=run)
+    answer.update(code=0, out="")
+    assert b.finished("rid1") is None  # reached, and not in yet
+    answer.update(code=0, out="3\n")
+    assert b.finished("rid1") == 3
+    answer.update(code=255, out="", err="ssh: connect to host ssh9.vast.ai port 40123: Operation timed out")
+    with pytest.raises(s1.BoxError, match="exit 255: ssh: connect to host"):
+        b.finished("rid1")  # ssh itself failed: until 11 November this read as "not in yet"
+
+
+def test_the_cli_attaches_by_name_and_says_when_there_is_nothing(tmp_thorp, capsys):
+    from thorp import cli
+
+    assert cli.main(["charter", "attach"]) == 2
+    assert "needs a run id, an instance id or a voyage's name" in capsys.readouterr().err
+    assert cli.main(["charter", "attach", "no-such-voyage"]) == 2  # refused before any key or network is asked for
+    assert "no hired ship is out as 'no-such-voyage'" in capsys.readouterr().err

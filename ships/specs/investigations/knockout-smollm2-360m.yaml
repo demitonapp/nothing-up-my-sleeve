@@ -1,0 +1,23 @@
+# ships/specs/investigations: The knockout's second goal (11 November, Justin: "a knockout expedition goal
+# to get our 21m to smoke SmolLM2-360M"), so the expedition is under way: an investigation names its
+# expedition outright, and a line the coordinator can sail.
+kind: investigation
+name: knockout-smollm2-360m
+expedition: knockout
+ship: "Knockout: what SmolLM2-360M's reading depends on"
+question: >-
+  Does SmolLM2-360M's AI2 ARC-Easy reading (64.8% at 360M, the best under 1B and the model the band's
+  board ranks first) depend on the four necessary cards at all? The knockout as written reads a model that
+  chains; this one reads the model we mean to beat. Silence the 8 strongest heads for each card, measure
+  what the logic deck's cause gain and the four chaining tests lose, against 8 random heads from no card,
+  three draws; then the ARC-Easy reading under the same silencing, so the 21m is told which components are
+  worth carrying. The rule is pre-registered in thorp/knockout.py; a model that never chained may show no
+  card at all, and that is a reading too.
+subject: HuggingFaceTB/SmolLM2-360M
+run:
+  - -m
+  - thorp.knockout
+  - "{subject}"
+timeout: 90m
+readings:
+  - knockout-HuggingFaceTB__SmolLM2-360M

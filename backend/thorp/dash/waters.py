@@ -47,17 +47,34 @@ WATERS = {
 # enough for it, so the sizes sort themselves. Phaleron is 20M deep (the 21m, 15.4M, fits; the 50m, 46.7M, does not);
 # Piraeus has no bottom and takes our deep ships; Zayton is `foreign_only` and takes no ship of ours at all. The
 # depths are Justin's to set; they are columns of the harbours table.
+# The names are the young Culture's (11 November, Justin: "the world is banks early days of the culture";
+# "naming must change and art style accordingly"): the harbours are Orbitals, not Greek and Chinese ports.
+# The old keys stay as aliases, so a saved address, a stored row or a queued line written before the rename
+# still resolves to its harbour.
+_RENAMED = {"phaleron": "schimint", "piraeus": "vavatch-end", "zayton": "masaq-reach"}
+
 _FALLBACK = (
-    {"key": "phaleron", "name": "Phaleron", "aka": "internal waters", "lane": "mac", "where": "this Mac mini",
-     "about": "Athens' first harbour, where its early fleet lay and sailed from: the youngest ships, trained on this Mac.",
+    {"key": "schimint", "name": "Schi'mint", "aka": "the first Orbital", "lane": "mac", "where": "this Mac mini",
+     "about": "The first Orbital, where the young Culture trains its crews: the youngest ships, laid down and sailed from this Mac.",
      "depth": 20_000_000, "ship_builder": "Justin", "foreign": False},
-    {"key": "piraeus", "name": "Piraeus", "aka": "the deep waters", "lane": "vast", "where": "GPUs hired from Vast.ai",
-     "about": "Themistocles' deep harbour beside Phaleron: our own 50m, 100m and 350m, the ships too deep for Phaleron and too big for this Mac.",
+    {"key": "vavatch-end", "name": "Vavatch End", "aka": "the deep yards", "lane": "vast", "where": "GPUs hired from Vast.ai",
+     "about": "The great construction and fitting Orbital at the edge of the new worlds: our own 50m, 100m and 350m, the ships too deep for Schi'mint and too big for this Mac.",
      "depth": None, "ship_builder": "", "foreign": False},
-    {"key": "zayton", "name": "Zayton", "aka": "the Market Harbour", "lane": "foreign", "where": "the Market Harbour",
-     "about": "Zayton (Quanzhou), the greatest trading harbour of the Silk Road's sea road: every foreign ship, read on our decks, not ours to build.",
+    {"key": "masaq-reach", "name": "Masaq' Reach", "aka": "the Reach", "lane": "foreign", "where": "the Reach",
+     "about": "The cosmopolitan Orbital, where every civilisation's ships come to trade: every foreign ship, read on our decks, not ours to build.",
      "depth": None, "ship_builder": "", "foreign": True},
 )  # fmt: skip
+
+
+def canonical(key: str) -> str:
+    """A harbour key as it is named now, from a key or an old one (phaleron -> schimint)."""
+    k = str(key or "").strip()
+    return _RENAMED.get(k, k)
+
+
+def is_old(key: str) -> bool:
+    """Whether a key is one of the three the harbours were called before the rename."""
+    return str(key or "") in _RENAMED
 
 
 def harbours() -> list[dict]:
@@ -69,7 +86,18 @@ def harbours() -> list[dict]:
         rows = ship_store.harbours()
     except Exception:  # noqa: BLE001
         rows = []
-    return [{**dict(h), "foreign": bool(h.get("foreign"))} for h in (rows or _FALLBACK)]
+    # a row written before the rename answers to the new key AND the new name, keeping its own depth,
+    # builder and lane: the store needs no migration for what it is for, and the page never shows a port
+    # that the world no longer has
+    fresh = {h["key"]: h for h in _FALLBACK}
+    out = []
+    for h in rows or _FALLBACK:
+        k = canonical(h.get("key"))
+        row = {**dict(h), "key": k, "foreign": bool(h.get("foreign"))}
+        if is_old(h.get("key")) and k in fresh:
+            row.update(name=fresh[k]["name"], aka=fresh[k]["aka"], about=fresh[k]["about"])
+        out.append(row)
+    return out
 
 
 HARBOURS = _FALLBACK  # older readers; the page and the rule read `harbours()`
@@ -80,7 +108,7 @@ def harbour_for(parameters: int) -> str:
     rows = [h for h in harbours() if not h.get("foreign")]
     return next(
         (h["key"] for h in rows if h["depth"] is None or parameters <= h["depth"]),
-        rows[-1]["key"] if rows else "phaleron",
+        rows[-1]["key"] if rows else "schimint",
     )
 
 

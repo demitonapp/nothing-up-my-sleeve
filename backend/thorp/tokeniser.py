@@ -34,6 +34,21 @@ DEFAULTS = {
 NEWLINE = "\n"
 
 
+# the tokeniser's own specials (unknown, and the begin and end sentencepiece reserves): a voyage that lists them
+# among its control tokens gets no second piece for them
+OWN_SPECIALS = ("<unk>", "<s>", "</s>")
+
+
+def user_symbols(symbols) -> list[str]:
+    """The control tokens to declare as single pieces: the voyage's list in its order, once each, without the
+    tokeniser's own specials (sentencepiece refuses a user-defined piece it already defines)."""
+    out: list[str] = []
+    for s in symbols or ():
+        if s and s not in OWN_SPECIALS and s != NEWLINE and s not in out:
+            out.append(str(s))
+    return out
+
+
 def tokeniser_id(book_ids: list[str], settings: dict | None = None) -> str:
     key = "\n".join(sorted(book_ids))
     extra = {k: v for k, v in (settings or {}).items() if DEFAULTS.get(k) != v}
@@ -181,7 +196,7 @@ def train_or_load(book_ids: list[str], settings: dict | None = None) -> Tokenise
         remove_extra_whitespaces=False,
         allow_whitespace_only_pieces=True,
         split_digits=True,
-        user_defined_symbols=[NEWLINE, *(settings.get("symbols") or ())],
+        user_defined_symbols=[NEWLINE, *user_symbols(settings.get("symbols"))],
         unk_id=0,
         bos_id=1,
         eos_id=2,

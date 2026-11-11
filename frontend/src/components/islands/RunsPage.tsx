@@ -6,6 +6,7 @@ import { cardCls, crumbCls, emptyCls } from '@/lib/ui';
 import { sectionProps, useApi, useRoute } from '@/lib/useApi';
 import { route } from '@/scripts/router';
 import { shipHash } from '@/scripts/router';
+import SectionNav from '../SectionNav';
 
 export const isRunsPage = (path: string): boolean => route(path.replace(/^#/, '')).page === 'runs-section';
 
@@ -45,6 +46,7 @@ export default function RunsPage() {
   if (!mine) return null;
   return (
     <div {...sectionProps('runs-section')}>
+      <SectionNav />
       <h1><a className={crumbCls('back')} href="/harbours">← harbours</a> Every ship <span className="q">every voyage on the ledger, of every size; open one to see it sail</span></h1>
       <section className={cardCls(false, 'panel')}>
         <div className="scroll">

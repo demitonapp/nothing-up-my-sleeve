@@ -227,3 +227,88 @@ def test_the_bridge_in_all_four_relations(monkeypatch):
     assert len(b["q"]) == 40 and (b["b"] != b["d"]).all()
     texts = [tok.decode([int(v) for v in row[1 : q + 1]]) for row, q in zip(b["tokens"], b["q"], strict=True)]
     assert any(" has" in t[-6:] for t in texts) and any(" are" in t[-6:] or " is" in t[-6:] for t in texts)
+
+
+# ---- the probe phase (11 November, Kipling's fourth aim): the pull pulsed down, each pinned head's distance read
+
+
+def test_a_probe_pulses_the_pull_down_and_lets_it_return():
+    sc = {**SC, "hold": 0.5, "fade": 1.0, "probes": [{"at": 0.1, "steps": 20}, {"at": 0.7, "steps": 10, "to": 0.5}]}
+    assert train.scaffold_weight(99, 1000, sc) == 1.0
+    assert train.scaffold_weight(100, 1000, sc) == 0.0 and train.scaffold_weight(119, 1000, sc) == 0.0
+    assert train.scaffold_weight(120, 1000, sc) == 1.0  # the pull returns
+    assert train.scaffold_weight(705, 1000, sc) == pytest.approx(0.5 * train.scaffold_weight(705, 1000, SC | {"hold": 0.5, "fade": 1.0}))
+    assert train.scaffold_weights(105, 1000, sc) == [0.0, 0.0]  # every pinned head feels the pulse
+    assert [(a, b) for a, b, _ in train.probe_windows(1000, sc)] == [(100, 120), (700, 710)]
+    assert train.scaffold_weight(100, 1000, SC) == train.scaffold_weight(100, 1000, {**SC, "probes": []})
+    train.check_scaffold(sc, 2, 2)
+    for bad in ([{"at": 1.0, "steps": 5}], [{"at": 0.2, "steps": 0}], [{"at": 0.2, "steps": 5, "to": 1.0}],
+                [{"at": 0.4, "steps": 5}, {"at": 0.2, "steps": 5}]):  # fmt: skip
+        with pytest.raises(ValueError):
+            train.check_scaffold({**sc, "probes": bad}, 2, 2)
+
+
+def test_the_heads_distances_are_the_loss_unweighted():
+    mx.random.seed(0)
+    model = GPT(GPTConfig(layers=2, width=32, heads=2, vocab=50, context=16, positions="rope"))
+    x = mx.random.randint(0, 50, (2, 12))
+    _, pats = model.forward_attending(x, train.scaffold_picks(SC))
+    dist = train.scaffold_head_losses(pats, x, SC)
+    assert len(dist) == 2
+    assert train.scaffold_loss(pats, x, SC).item() == pytest.approx((dist[0] + dist[1]).item() / 2, rel=1e-5)
+    zero = train.scaffold_loss(pats, x, SC, weights=mx.array([0.0, 0.0]), per_head=dist)
+    assert zero.item() == 0.0 and dist[0].item() > 0  # the distance is read while the pull is off
+
+
+def test_a_probing_voyage_records_each_heads_distance(library, spec, tmp_thorp, monkeypatch):
+    import dataclasses
+
+    from thorp import vsm
+    from thorp.ledger import Ledger
+
+    # this test is the probe's, not the gate's: the standard rule is advisory here
+    monkeypatch.setitem(vsm.POLICIES, "standard", dataclasses.replace(vsm.POLICIES["standard"], enforced=False))
+    spec["model"]["preset"] = "300k"  # the smallest class the registry still builds
+    spec["optim"]["scaffold"] = {"weight": 1.0, "hold": 0.5, "fade": 1.0,
+                                 "probes": [{"at": 0.2, "steps": 6}],
+                                 "riddles": {"comparator": {"layer": 2, "head": 1, "items": 4, "pool": 64}},
+                                 "heads": [{"layer": 0, "head": 0, "card": "previous_word"},
+                                           {"layer": 1, "head": 0, "card": "induction"}]}  # fmt: skip
+    prep = train.prepare(spec, resolver=library["resolver"], log=lambda *a: None)
+    rec = Ledger(tmp_thorp / "probe.sqlite")
+    rid = train.train(spec, prep, rec, log=lambda *a: None)["run_id"]
+    rows = {r["name"]: r for r in rec.query(
+        "select name, min(value) lo, max(value) hi, count(*) n, sum(value) total from metrics where run_id=? and name like 'scaffold/%' group by name", [rid])}  # fmt: skip
+    assert rows["scaffold/probe"]["total"] == 6.0  # six steps with the pull off
+    steps = rows["scaffold/loss"]["n"]
+    for key in ("scaffold/distance/previous_word/l0h0", "scaffold/distance/induction/l1h0"):
+        assert rows[key]["n"] == steps and rows[key]["lo"] > 0  # read at every step, the pulse included
+    off = rec.query("select m.step from metrics m where m.run_id=? and m.name='scaffold/probe' and m.value=1", [rid])
+    w = rec.query("select step, value from metrics where run_id=? and name='scaffold/weight'", [rid])
+    assert {r["step"] for r in w if r["value"] == 0.0} >= {r["step"] for r in off}
+
+
+def test_a_voyage_without_probes_is_unchanged_and_declares_its_control_tokens(library, spec, tmp_thorp, monkeypatch):
+    import dataclasses
+
+    from thorp import vsm
+    from thorp.ledger import Ledger
+
+    monkeypatch.setitem(vsm.POLICIES, "standard", dataclasses.replace(vsm.POLICIES["standard"], enforced=False))
+    spec["model"]["preset"] = "300k"
+    spec["tokeniser"]["symbols"] = ["<bos>", "<eos>", "<unk>", "<question>", "<answer>", "<end>"]
+    spec["optim"]["scaffold"] = {"weight": 1.0, "hold": 0.2, "fade": 0.5,
+                                 "heads": [{"layer": 0, "head": 0, "card": "previous_word"}]}  # fmt: skip
+    prep = train.prepare(spec, resolver=library["resolver"], log=lambda *a: None)
+    tok = prep.tokeniser
+    # each declared control token is one piece; the tokeniser's own <unk> is not declared twice
+    for s in ("<bos>", "<eos>", "<question>", "<answer>", "<end>"):
+        assert len(tok.encode(s)) == 1, s
+    assert tok.encode("<question> why <answer> so <end>")[0] == tok.encode("<question>")[0]
+    plain = dict(spec, tokeniser={k: v for k, v in spec["tokeniser"].items() if k != "symbols"})
+    assert train.prepare(plain, resolver=library["resolver"], log=lambda *a: None).tokeniser.id != tok.id
+    rec = Ledger(tmp_thorp / "plain.sqlite")
+    rid = train.train(spec, prep, rec, log=lambda *a: None)["run_id"]
+    names = {r["name"] for r in rec.query("select distinct name from metrics where run_id=? and name like 'scaffold/%'", [rid])}
+    assert "scaffold/loss" in names and "scaffold/weight" in names
+    assert not any(n.startswith("scaffold/distance") or n == "scaffold/probe" for n in names)

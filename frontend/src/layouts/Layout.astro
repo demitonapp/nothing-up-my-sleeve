@@ -7,6 +7,8 @@ import { ClientRouter } from 'astro:transitions';
 import '../styles/ui.css';
 import '../styles/global.css';
 import Header from '../components/Header.astro';
+import CommandPalette from '../components/islands/CommandPalette';
+import ChatConsole from '../components/islands/ChatConsole';
 ---
 <!doctype html>
 <html lang="en">
@@ -20,6 +22,50 @@ import Header from '../components/Header.astro';
   <body>
     <Header />
     <slot />
+    <!-- ⌘K, on every page: type a model, open its chat (components/islands/CommandPalette) -->
+    <CommandPalette client:idle />
+    <!-- the chat console: a carved drawer that slides up from the bottom of every page (⌘J) -->
+    <ChatConsole client:idle />
     <ClientRouter />
+    <!-- One row, one active tab: an island may push a new address without a page load (a canonical
+         size address, a discoveries tab), so re-light the header from the live address. The prefixes
+         come from lib/nav.ts via Header.astro (data-match), so there is still one source of truth. -->
+    <script is:inline>
+      (() => {
+        const light = () => {
+          const raw = location.hash && location.hash.startsWith('#/') ? location.hash.slice(1) : location.pathname;
+          const clean = raw.replace(/^#/, '').split('?')[0];
+          const path = (clean.length > 1 ? clean.replace(/\/+$/, '') : clean) || '/';
+          const tabs = Array.from(document.querySelectorAll('#mainnav a[data-nav]'));
+          if (!tabs.length) return;
+          let active = null;
+          for (const tab of tabs) {
+            const prefixes = (tab.getAttribute('data-match') || '').split(',').filter(Boolean);
+            if (prefixes.some((p) => path === p || path.startsWith(p + '/'))) { active = tab; break; }
+          }
+          // settings is the cog's page, not one of the ways in: no tab is lit there
+          const settings = path === '/settings';
+          if (!active && !settings) active = tabs.find((tab) => tab.getAttribute('data-nav') === 'places') || null;
+          const cog = document.getElementById('settingscog');
+          if (cog) { if (settings) cog.setAttribute('aria-current', 'page'); else cog.removeAttribute('aria-current'); }
+          for (const tab of tabs) {
+            const on = tab === active;
+            tab.setAttribute('data-state', on ? 'active' : 'inactive');
+            if (on) tab.setAttribute('aria-current', 'page'); else tab.removeAttribute('aria-current');
+          }
+        };
+        if (!window.__thorpMainNav) {
+          window.__thorpMainNav = true;
+          const push = history.pushState;
+          history.pushState = function (...args) { const out = push.apply(this, args); light(); return out; };
+          const replace = history.replaceState;
+          history.replaceState = function (...args) { const out = replace.apply(this, args); light(); return out; };
+          addEventListener('popstate', light);
+          addEventListener('hashchange', light);
+          document.addEventListener('astro:page-load', light);
+        }
+        light();
+      })();
+    </script>
   </body>
 </html>

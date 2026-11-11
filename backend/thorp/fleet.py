@@ -23,10 +23,24 @@ from typing import Literal
 
 from thorp.models.registry import LADDER
 
+
+def _preset(predicate, fallback: str) -> str:
+    """A ladder row's preset, or the bootstrap preset when the store has not been migrated yet.
+
+    `fleet` is imported by a migration (`a9c3e5b7d1f2`, the cards a journey stage carries) and by
+    the first-run page before `s1.sizes` exists. The static preset names in registry.py are the
+    bootstrap; once the store answers, the store's rows still win.
+    """
+    try:
+        return next(r["preset"] for r in LADDER if predicate(r))
+    except Exception:  # noqa: BLE001  (no store yet: a migration, or a fresh clone's first run)
+        return fallback
+
+
 # the pilot's preset (kind "proxy"), from the ladder (preset names live in registry.py only)
-PROXY = next(r["preset"] for r in LADDER if r.get("kind") == "proxy")
-NURSERY = next(r["preset"] for r in LADDER if r.get("kind") == "nursery")
-PARAGRAPH = next(r["preset"] for r in LADDER if r.get("name") == "The paragraph")
+PROXY = _preset(lambda r: r.get("kind") == "proxy", "1m")
+NURSERY = _preset(lambda r: r.get("kind") == "nursery", "300k")
+PARAGRAPH = _preset(lambda r: r.get("name") == "The paragraph", "50m")
 
 # ---------------------------------------------------------------------------------------- stars
 
@@ -1706,6 +1720,10 @@ class Expedition:
     # finish before a learning ship sails, then the ships themselves (9 November, Justin: "the expedition
     # page should list the ship launching order and the things like spying on Qwen3")
     plan: tuple[dict, ...] = ()
+    # the goals one by one, each with why it is wanted (11 November, Justin: "under the goals section we need
+    # to have table that also shows why we want this"): {"text", "detail" (what it is), "why"}. The page
+    # draws them as a table under `goal`; an expedition without them shows its `goal` alone.
+    goals: tuple[dict, ...] = ()
 
 
 EXPEDITIONS: dict[str, Expedition] = {
@@ -1858,7 +1876,7 @@ EXPEDITIONS: dict[str, Expedition] = {
             "that must learn the trick itself.",
             ship="Apprentice",
             fleet="First Fleet",
-            preset=next(r["preset"] for r in LADDER if r.get("kind") == "nursery"),
+            preset=_preset(lambda r: r.get("kind") == "nursery", "300k"),
             outcomes=(
                 Outcome(
                     "stars/previous_word/shared_score",
@@ -1917,7 +1935,7 @@ EXPEDITIONS: dict[str, Expedition] = {
             "Table Talk (1835).",
             ship="Table Talk",
             fleet="First Fleet",
-            preset=next(r["preset"] for r in LADDER if r.get("name") == "The speller"),
+            preset=_preset(lambda r: r.get("name") == "The speller", "9m"),
             outcomes=(
                 Outcome(
                     "tricks/turn_taking/score",
@@ -2212,6 +2230,37 @@ EXPEDITIONS: dict[str, Expedition] = {
             results="s4.outside_readings, knockout-<model>",
             status="running",
             stars=("previous_word", "nevermore", "mover", "comparator"),
+            goals=(
+                {"text": "Are the four cards causally necessary for chaining?",
+                 "detail": "in each model that chains, silence a card's 8 strongest heads and measure what "
+                           "the logic deck's cause gain and the four chaining tests lose, against 8 random "
+                           "heads from no card, three draws. A card is necessary when the drop beats twice "
+                           "the largest random drop and at least 0.1",
+                 "why": "five models that chain hold all four cards, but that is co-occurrence: if the cards "
+                        "are not causal, pinning them in our ships is teaching the shadow and not the thing"},
+                {"text": "Give the return legs a reasoning budget",
+                 "detail": "a thinking segment in the return leg's turns (`<think>…</think>` in the marked "
+                           "deck, plain markers otherwise), declared as two more control pieces in a new "
+                           "tokeniser version, and a two-phase inference budget: generate up to a reasoning "
+                           "allowance until `</think>`, then continue with a separate answer allowance, so a "
+                           "long trace can never eat the answer. Record reasoning tokens, answer tokens and "
+                           "the finish reason in the chat receipt and in the notes.",
+                 "why": "the knockout shows which cards a model actually uses; the next question is what a "
+                        "ship does with them when it has room to think. Every Thorp ship is pretrained only "
+                        "today: its chat continues text, and one max-tokens cap makes the trace and the "
+                        "answer compete (a 0.6B spent all 128 tokens thinking and never answered). The "
+                        "foreign thinking models already have the mode; this is the harness that gives ours "
+                        "a budget for it, and it is what the causal cards need to be exercised at test time"},
+                {"text": "Make the 21m smoke SmolLM2-360M",
+                 "detail": "read SmolLM2-360M (the best model under 1B on AI2 ARC: 64.8% Easy at 360M, "
+                           "against 52.5% for the 600M Qwen3 and 45.5% for the 410M pythia) the way the "
+                           "knockout reads a model that chains: silence the heads its own cards name, and "
+                           "measure what its ARC-Easy reading loses, against random heads; then carry what "
+                           "holds into the 21m as a goal of its own",
+                 "why": "the 21m is 17 times smaller than the model the board now ranks first, so the only "
+                        "way to beat it is to know which of its components the reading depends on. A size "
+                        "curve cannot get there; a causal census can say what to transplant or to train"},
+            ),
         ),
         Expedition(
             key="induction",
@@ -2313,7 +2362,7 @@ EXPEDITIONS: dict[str, Expedition] = {
             "with the bigger ship as teacher.",
             ship="Fitout: Ogden (The Smallest Bridge)",
             fleet="First Fleet",
-            preset=next(r["preset"] for r in LADDER if r.get("name") == "The speller"),
+            preset=_preset(lambda r: r.get("name") == "The speller", "9m"),
             outcomes=(
                 Outcome("stars/bridge/max_score", "higher", "the Bridge, played at 0.5 nats"),
                 Outcome("stars/mover/shared_score", "higher", "the Mover's look, at 0.2 (with the one-hop lift at 0.1)"),
@@ -2350,7 +2399,7 @@ EXPEDITIONS: dict[str, Expedition] = {
             "and cards are read, never handed over.",
             ship="Logic tutor",
             fleet="First Fleet",
-            preset=next(r["preset"] for r in LADDER if r.get("name") == "The speller"),
+            preset=_preset(lambda r: r.get("name") == "The speller", "9m"),
             outcomes=(
                 Outcome("tricks/logic_test/gain", "higher", "the chaining gain on the logic deck, performed at 0.1"),
                 Outcome("tricks/logic_test/score", "higher", "the share of logic items right, performed at two-thirds"),
@@ -2448,69 +2497,112 @@ TERMS = {
 EXPEDITIONS["kipling"] = Expedition(
     key="kipling",
     name="The Kipling Expedition",
-    goal="SOP v0.0.6 (Justin, 9 November), named for Kipling: six honest serving-men (What and Why and When and How and Where and Who) are the question answering, and \"If—\" is a poem of nothing but constraints, which is what instruction following is. Five aims on one standard. (1) Beat IFEval: a class trained to obey the "
-    "25 verifiable instructions, scored prompt-level strict on the official 541. (2) Control tokens in our "
-    "embeddings: the marked deck against the plain one. (3) Teach question answering to the 9m: the return leg on "
-    "the dialogue shelf. (4) Test the probe phase in pretraining: pulse the scaffold down and measure whether the "
-    "heads respond — the leak when the pull goes and the recovery when it returns — against the heads that do not "
-    "respond at all. (5) ARC-AGI-2 (11 November, Justin): build the text ARC harness, train an ARC arm on the "
-    "1,000 training tasks and read the 120-task evaluation set — the canonical intelligence ranking, and the test "
-    "the chaining skill is ultimately measured against. The investigations sail before the learning ships: "
-    "auditing Qwen3 4B's heads comes first, because what the 300k, 1m and 9m are asked to grow is read off that map.",
+    goal="SOP v0.0.6 (Justin, 9 November), named for Kipling: six honest serving-men (What and Why and When and How and Where and Who) are the question answering, and \"If—\" is a poem of nothing but constraints, which is what instruction following is. Four aims on one standard, and one ship that carries them. (1) Beat IFEval: "
+    "prompt-level strict on the official 541, by whatever way is quickest; the way is rigged, and said so (the ship "
+    "is taught a checker-proof response for each official prompt, 499 of the 541 being provable). The 9m must come "
+    "close (65%); the final reading is the 21m's, against GPT-4's 76.89%. (2) Control tokens in our embeddings: "
+    "the marked ship against the plain one, proved or not on the answer's own loss on held-out questions, seed for "
+    "seed. (3) A 9m that can be chatted to: the return leg on the dialogue shelf and the instruction turns. (4) The "
+    "probe phase in pretraining: pulse the pull off and read each pinned head's leak when it goes and recovery when "
+    "it returns, against the heads that do not respond at all. The best-in-class ship (ten pins, each released or "
+    "held as the probe reads, shared key/value heads, marks if they are proved) is confirmed at 9m and, if it "
+    "holds, sailed once more at 21m: the final Kipling ship. ARC-AGI-2, Kipling's fifth aim for a day, belongs to "
+    "Arc de Triomphe (Justin, 11 November: 'ARC-AGI-2 should be in the arc de triumphe expedition, not Kipling').",
+    goals=(
+        {"text": "Beat IFEval",
+         "detail": "prompt-level strict on the official 541, by whatever way is quickest (rigged, and said so); "
+                   "the 9m must come close, the final reading is the 21m's",
+         "why": "so we can troll the models that use it as a benchmark"},
+        {"text": "Control tokens in our embeddings",
+         "detail": "the marked ship against the plain one, proved or not on the answer's own loss on held-out "
+                   "questions, seed for seed",
+         "why": "to learn how control tokens work and how we can use them for reasoning and functionality, and "
+                "for possibly better logic and performance"},
+        {"text": "Teach question answering to the 9m",
+         "detail": "a 9m that can be chatted to: the return leg on the dialogue shelf and the instruction turns",
+         "why": "so we can start talking to the models. That is a kind of test that is more art than science: "
+                "without talking to a model it is very hard to see it through controlled tests alone"},
+        {"text": "Test the probe phase in pretraining",
+         "detail": "pulse the pull off and read each pinned head's leak when it goes and its recovery when it "
+                   "returns, against the heads that do not respond at all",
+         "why": "to determine which heads are sticky and which are not"},
+        {"text": "The 21m as the first ship we can have a conversation with",
+         "detail": "the best-in-class ship, confirmed at 9m and, if it holds, sailed once more at 21m: the final "
+                   "Kipling ship",
+         "why": ""},
+        {"text": "GQA",
+         "detail": "grouped-query attention: shared key/value heads, fewer than the query heads (the "
+                   "1m@v0.0.6-gqa arm)",
+         "why": "to test its performance, and whether it is something we should adopt on future expeditions"},
+    ),
     ship="SOP v0.0.6",
     fleet="Star Fleet",
     preset="300k",
     outcomes=(
-        Outcome("ifeval/prompt_strict", "higher", "IFEval, prompt-level strict, the official 541"),
+        Outcome("ifeval/prompt_strict", "higher", "IFEval, prompt-level strict, the official 541 (rigged, and labelled so)"),
         Outcome("ifeval/instruction_strict", "higher", "instruction-level strict, as the proof beside it"),
+        Outcome("answers/bpb", "lower", "the answer's bits per byte on held-out questions: the control-token proof"),
+        Outcome("answers/prompt_strict", "higher", "IFEval on prompts never trained on: the honest number beside the rigged one"),
         Outcome("tricks/logic_test/lift_one_hop", "higher", "following one stated premise: the step before two"),
-        Outcome("arc/pass@2", "higher", "ARC-AGI-2, exact match on the 120-task evaluation set (the canonical intelligence ranking)"),
     ),
     levers=(
-        Lever("control tokens", choices=("marked", "plain"), about="the deck's premise/question/answer/end as pieces"),
-        Lever("scaffold control", choices=("fixed 10/60", "probe and equilibrium"), about="the dynamic schedule"),
-        Lever("class", choices=("300k", "1m", "9m"), about="which learning ship reads the standard"),
+        Lever("control tokens", choices=("marked", "plain"), about="the turns as <question>/<answer>/<end> pieces, or as plain words"),
+        Lever("scaffold control", choices=("fixed 25/100", "probed", "released by pin"), about="the pull's schedule, a pin at a time"),
+        Lever("class", choices=("300k", "9m", "21m"), about="which ship reads the standard"),
     ),
-    stop=StopRule(8, "the investigations first (the Qwen3 4B head census, the control-token arm, the IFEval corpus "
-                     "and its verifiers, the ARC harness), then the three learning ships in size order and the ARC "
-                     "arm; nothing sails before the investigation it depends on is home"),
+    stop=StopRule(24, "the approved order (Justin, 11 November): the 300k investigations and the 9m pilot, then three "
+                      "holds, each a line of the queue with its rule on it: the candidate signed, the candidate beating "
+                      "the ten-pin arm, and the 9m holding (it chats, IFEval at 65% or better, the control-token "
+                      "verdict in, its pins kept) before the 21m sails"),
     runner="thorp/train.py",
     results="data/runs/",
-    status="planned",
+    status="running",
     plan=(
         {"n": 1, "kind": "investigation", "name": "audit Qwen3 4B's heads",
-         "detail": "a census of all 1,152 heads (36 x 32): ablate each one, measure what it moves on the deck and "
-                   "on held-out text, and rank the empty slots by how much they matter. The learning ships are "
-                   "asked to grow what this map says is worth growing.",
-         "queue": "cmd: the head census (backend/scripts/head_census.py) on mlx-community/Qwen3-4B-4bit"},
-        {"n": 2, "kind": "investigation", "name": "the control tokens",
-         "detail": "the marked deck (<premise>/<question>/<answer>/<end>) against the plain one, in the embeddings",
-         "queue": "300k@v0.0.6-control (both arms)"},
-        {"n": 3, "kind": "investigation", "name": "the IFEval corpus and its verifiers",
-         "detail": "25 rule types, every training pair proved compliant by the official checker; the 541 read "
-                   "prompt-level strict",
-         "queue": "held until teh corpus and the evaluator are home (specs/ifeval-ready.hold)"},
-        {"n": 4, "kind": "ship", "name": "300k@v0.0.6", "detail": "the first learning ship", "queue": "after 1-3"},
-        {"n": 5, "kind": "ship", "name": "1m@v0.0.6", "detail": "the second, if the 300k clears its rung", "queue": "after 4"},
-        {"n": 6, "kind": "ship", "name": "9m@v0.0.6", "detail": "the third, if the 1m does", "queue": "after 5"},
-        {"n": 7, "kind": "investigation", "name": "the ARC-AGI-2 harness and corpus",
-         "detail": "the 1,000 training tasks serialised as text (thorp/arc.py, scripts/make_arc_corpus.py) and the "
-                   "120-task evaluation set fetched; scripts/score_arc.py reads an outside model on the same form, "
-                   "and the evaluator 'arc' reads a Nothing up my sleeve checkpoint. The first pilot is a subset, "
-                   "labelled as one, never a published score.",
-         "queue": "after 3; the corpus is written and the pilot is run before the arm sails"},
-        {"n": 8, "kind": "ship", "name": "1m@v0.0.6-arc",
-         "detail": "the ARC arm: Ogden, then the ARC training episodes as a post-training stage, with eval.arc set "
-                   "to the 120-task evaluation set and pass@2 the outcome",
-         "queue": "after 7; the ARC corpus and its data.opt_in are written first"},
+         "detail": "a census of all 1,152 heads (36 x 32): done (10 November), in the store",
+         "queue": "home"},
+        {"n": 2, "kind": "ship", "name": "9m@v0.0.5-return-rigged",
+         "detail": "the pilot: the return leg on the finished 9m@v0.0.5, the dialogue shelf and then every provable "
+                   "IFEval prompt. Does memorising work at 9m, and the first 9m to chat to",
+         "queue": "first"},
+        {"n": 3, "kind": "ship", "name": "300k@v0.0.6 and 300k@v0.0.6-marks, two seeds each",
+         "detail": "the plain base and the marked ship (the markers in the text, single pieces): what the marks cost "
+                   "in pretraining. The plain pair is also the matched base of the shared-heads arm",
+         "queue": "after 2"},
+        {"n": 4, "kind": "ship", "name": "the four return legs at 300k",
+         "detail": "300k@v0.0.6-return(-s2) and 300k@v0.0.6-marks-return(-s2): the control-token proof, the answer's "
+                   "bits per byte on the 139 held-out prompts, marked against plain, seed for seed",
+         "queue": "after 3"},
+        {"n": 5, "kind": "ship", "name": "300k@v0.0.6-probe, two seeds, and the probe reading",
+         "detail": "the ten pins with the pull pulsed off five times (thorp/probe_phase.py): which pins are held by "
+                   "heart, which need the pull, which never took the card",
+         "queue": "after 4"},
+        {"n": 6, "kind": "hold", "name": "Justin signs the candidate",
+         "detail": "the per-pin release schedule from the probe reading; marks in or out from the proof",
+         "queue": "ships/specs/kipling-candidate.hold"},
+        {"n": 7, "kind": "ship", "name": "300k@v0.0.6-kipling, two seeds",
+         "detail": "the characteristics together for the first time; must beat the ten-pin arm before the 9m sails",
+         "queue": "after 6; written at the hold"},
+        {"n": 8, "kind": "ship", "name": "9m@v0.0.6-kipling and its return leg",
+         "detail": "does it hold at 9m: every kept pin at half its 300k reading or better, every released pin at half "
+                   "its reading at release, bits per byte within 0.03 of the plain 9m (1.501), one-hop no lower than "
+                   "the 300k candidate; then the return leg, the 9m that chats and is read on IFEval",
+         "queue": "after 7"},
+        {"n": 9, "kind": "hold", "name": "before the 21m",
+         "detail": "the 9m chats; IFEval at 9m is 65% or better; the control-token verdict is in; the pins hold",
+         "queue": "after 8"},
+        {"n": 10, "kind": "ship", "name": "21m@v0.0.6-kipling and its return leg",
+         "detail": "the final Kipling ship; the final IFEval reading, against 76.89%",
+         "queue": "after 9"},
     ),
 )
 
 
-# Arc de Triomphe (11 November, Justin): the expedition after Kipling. Leg 1 reads Qwen3.8 27B on
-# ARC-AGI-2 and audits it until the score has a cause; leg 2 carries what transfers down the ladder
-# to find the smallest ship that scores above 5. The plan and its pre-registered marks are in
-# ships/plans/arc-de-triomphe.md; the decision is in DECISIONS.md under the same name.
+# Arc de Triomphe (11 November, Justin): the expedition after Kipling. Leg 1 reads Qwen on ARC-AGI-2 and
+# audits it until the score has a cause; leg 2 carries what transfers down the ladder to find the smallest
+# ship that scores above 5, and teaches our ships to reason on the way. The plan and its pre-registered
+# marks are in ships/plans/arc-de-triomphe.md; the decisions are in DECISIONS.md under the same name. Its
+# investigations are specs under ships/specs/investigations/, queued beside the voyages (thorp/investigate.py).
 ARC_FLOOR = 5.0  # the mark: pass@2 above 5% on the 120-task public evaluation set, i.e. 7 tasks or more
 
 EXPEDITIONS["arc_de_triomphe"] = Expedition(
@@ -2521,110 +2613,216 @@ EXPEDITIONS["arc_de_triomphe"] = Expedition(
     "asked the question and to determine definitely why Qwen 27 is the only model of its size that scores so high "
     "on that test'; then 'taking the findings from auditing Qwen 27B and applying them against 300k, 1m, 9, and "
     "then the 21m to try get a 21m to score on ARC-AGI-2 ... we need to understand what the theoretical lowest "
-    "size model is that can score above 5'). Two legs on one question. Leg 1, the audit: reproduce Qwen3.8 27B's "
-    "ARC-AGI-2 reading on our own harness, then take it apart — the reasoning ladder (ARC Prize verified 42.4 at "
-    "xhigh, 22.8 low, 13.2 medium, 1.5 with reasoning off), the same-shape predecessor and the same-size peers, "
-    "the reasoning traces, and a causal census of every component (16 full-attention layers of 24 heads, 48 Gated "
-    "DeltaNet layers that have no attention map to read) — until each of four stated causes is held or refuted. "
-    "Leg 2, the arch: what the audit says transfers is written into the standard and sailed at 300k, 1m, 9m and "
-    "21m, each rung earning the next, to find the smallest ship that scores above 5 on the 120-task public "
-    "evaluation set. The outside markers are already below the 21m: a 7M recursive model is reported at about 8 "
-    "and a model with no pretraining at about 4, neither of them a language model, so the open question is the "
-    "smallest ship of our kind, not whether the size is possible.",
+    "size model is that can score above 5'; and, the same day, 'another goal for Arc de Triomphe is for Nothing up "
+    "my sleeve ships to be able to have reasoning'; and, later that afternoon, 'one of the goals must be for us to have our "
+    "first reasoning model'). Four aims. (1) The audit: read Qwen on ARC-AGI-2 with its "
+    "reasoning off and on, starting with Qwen3 4B, whose every head is already on the census, then take Qwen3.8 "
+    "27B apart — the reasoning ladder (ARC Prize verified 42.4 at xhigh, 22.8 low, 13.2 medium, 1.5 with reasoning "
+    "off), the same-shape predecessor and the same-size peers, the traces, and a causal census of every component "
+    "(16 full-attention layers of 24 heads, and 48 Gated DeltaNet layers read with the linear-attention "
+    "instrument) — until each of four stated causes is held or refuted. (2) The arch: what the audit says "
+    "transfers is written into the standard and sailed at 300k, 1m, 9m and 21m, each rung earning the next, to "
+    "find the smallest ship that scores above 5 on the 120-task public evaluation set. (3) Our first reasoning "
+    "model: a Nothing up my sleeve ship that thinks before it answers and answers better for it, read the way "
+    "Qwen is read, the same ship with its thinking off against on. It is the first ship whose reasoning gain is "
+    "above zero on two seeds, which the ladder asks of the 1m. (4) The AI2 ARC audit (this afternoon: 'talk me through "
+    "how we can audit all those results on the 9 foreign ships to see if we can figure out where our best ship is "
+    "against SmolM2 360m'): the nine outside readings on AI2 ARC taken apart — a per-question receipt for every one of "
+    "them, determinism, the format ablations and a contamination probe — and our own ships read on the same test and "
+    "the same normalisation, so the tenth-the-size claim finally has a reading with a gradient under 1B: the 50m at "
+    "41M beside SmolLM2-360M at 360M, 8.8 times its size, with the chaining deck as the second axis. ARC-AGI-2 gives "
+    "nothing under 1B (every model of this size solves 0 tasks), so the audit is what makes the band's ranking a "
+    "result rather than a claim. The outside markers are already below the 21m: a 7M recursive model is "
+    "reported at about 8 and a model with no pretraining at about 4, neither of them a language model, so the open "
+    "question is the smallest ship of our kind, not whether the size is possible.",
     ship="Arc de Triomphe",
     fleet="Star Fleet",
     preset="300k",
     outcomes=(
         Outcome("arc/pass@2", "higher", "ARC-AGI-2, exact match in two attempts on the 120-task public evaluation "
                                         "set; the mark is above 5 (7 tasks or more)"),
+        Outcome("arc/reasoning_gain", "higher", "pass@2 with the thinking on, less the same model or ship with it "
+                                                "off: what reasoning buys (Qwen3.8 27B: 42.4 against 1.5). The first of "
+                                                "our ships to hold it above zero on two seeds is our first "
+                                                "reasoning model"),
         Outcome("arc/cell_accuracy", "higher", "the partial reading beside it, never a substitute for exact"),
         Outcome("arc/format_rate", "higher", "the share of answers that parse as a grid: the 300k's rung"),
         Outcome("arc/held_out_train", "higher", "exact match on training tasks held out of the reading: the 1m's rung"),
+        Outcome("arc_easy/accuracy", "higher", "AI2 ARC-Easy, zero-shot with the option's text as the continuation "
+                                               "(thorp/arc_ai2.py): the one peer-recognised test under 1B, and the only "
+                                               "ARC test with a gradient at this size. Our ship's reading against "
+                                               "SmolLM2-360M's 64.8% at 8.8 times its size; the mark is set after "
+                                               "the audit, not before it"),
+        Outcome("arc_challenge/accuracy", "higher", "AI2 ARC-Challenge beside it: at or under its 25% floor for every "
+                                                    "model trained before 2025, so it is a horizon, not a rank"),
     ),
     levers=(
+        Lever("reasoning", choices=("off", "on"),
+              about="both legs: the thinking switch on an outside model; on our ships, a thinking span written "
+                    "before the answer. Every reading is taken both ways"),
         Lever("reasoning effort", choices=("none", "low", "medium", "xhigh"),
-              about="leg 1: the template's instruction, not a budget; the dose-response on the same 120 tasks"),
-        Lever("subject", choices=("Qwen3.8 27B", "Qwen3.6 27B", "Gemma 4 26B A4B", "gpt-oss 20B", "Phi-4 14B"),
-              about="leg 1: the same harness on the same-shape predecessor and the same-size peers"),
+              about="leg 1, the 27B: the template's instruction, not a budget; the dose-response on the same 120 tasks"),
+        Lever("subject", choices=("Qwen3 4B", "Qwen3.8 27B", "Qwen3.6 27B", "Gemma 4 26B A4B", "gpt-oss 20B", "Phi-4 14B"),
+              about="leg 1: the 4B first, then the 27B, its same-shape predecessor and the same-size peers"),
         Lever("weights", choices=("bf16", "4-bit MLX"), about="leg 1: the audit runs on whichever holds the score"),
         Lever("class", choices=("300k", "1m", "9m", "21m"), about="leg 2: the rung; each sails only if the one below "
                                                                  "clears its mark"),
         Lever("model.context", choices=(1024, 4096, 8192),
-              about="leg 2: 2 of the 120 evaluation tasks fit 1,024 pieces whole, 87 fit 4,096, 118 fit 8,192"),
+              about="leg 2: 2 of the 120 evaluation tasks fit 1,024 pieces whole, 87 fit 4,096, 118 fit 8,192, "
+                    "before any room to think"),
         Lever("content", choices=("training tasks", "augmented", "generated"),
               about="leg 2: the 1,000 training tasks, their rotations, flips and recolourings, then generated tasks"),
+        Lever("thinking taught from", choices=("worked rules", "Qwen's traces"),
+              about="leg 2: what a ship's thinking span is learned from: rules written out by the generator that "
+                    "made the task, or the outside model's own traces (modern prose, so an opt-in)"),
         Lever("test-time reading", choices=("off", "on"),
               about="leg 2: a short reading of the task's own example pairs before answering (ARC's rule allows "
                     "it; every small entry that scores uses it)"),
-        Lever("scratchpad", choices=("none", "rule line"),
-              about="leg 2: the compact form of what Qwen's trace does, if leg 1 holds the trace as the cause"),
         Lever("scaffold", choices=("off", "Qwen's map"),
               about="leg 2: the components leg 1 finds causal, pinned as cards, against the same ship without them"),
     ),
-    stop=StopRule(28, "leg 1's eight investigations in order, none skipped; then at most five voyages a rung. The "
+    stop=StopRule(30, "leg 1's ten investigations in order, none skipped; then at most five voyages a rung. The "
                       "expedition ends at the smallest rung that reads above 5 on two seeds, or with the 21m's "
                       "best reading and the floor stated as above 21m for this method. No learning ship sails "
-                      "before leg 1's verdict is written and Justin has signed the standard it becomes."),
+                      "before leg 1's verdict is written and Justin has signed the standard it becomes. The AI2 ARC "
+                      "audit (steps 15 to 18) is independent of that order: it reads a test and trains nothing, so "
+                      "it may run at any time and blocks no ship."),
     runner="thorp/train.py",
     results="data/runs/",
     status="planned",
+    goals=(
+        {"text": "The audit: why Qwen3.8 27B reads 42.4",
+         "detail": "Qwen on ARC-AGI-2 with its reasoning off and on, starting with Qwen3 4B, then the 27B taken "
+                   "apart — the reasoning ladder, the same-shape predecessor and the same-size peers, the traces, "
+                   "and a causal census of every component — until each of four stated causes is held or refuted",
+         "why": "so we know which cause is the cause before anything is copied into a ship; a score without a cause "
+                "is a coincidence we would be imitating"},
+        {"text": "The arch: the smallest ship above 5",
+         "detail": "what the audit says transfers is written into the standard and sailed at 300k, 1m, 9m and 21m, "
+                   "each rung earning the next, to pass@2 above 5 (7 of 120) on the public evaluation set",
+         "why": "so we know the theoretical lowest size of our kind that can hold the mark, not whether the size is "
+                "possible at all"},
+        {"text": "Our first reasoning model",
+         "detail": "a ship that thinks before it answers and answers better for it: the same ship with its thinking "
+                   "off against on, the first to hold a reasoning gain above zero on two seeds",
+         "why": "because at this size the whole difference between a model that composes and one that recalls may be "
+                "the written trace, and we want that inside our own ships, not borrowed from Qwen's"},
+        {"text": "The AI2 ARC audit: where our best ship stands against SmolLM2-360M",
+         "detail": "the nine outside AI2 ARC readings taken apart — a per-question receipt for every reading, a "
+                   "determinism re-run, the format ablations (sum against mean loss, options shuffled, the question "
+                   "stripped, a no-model baseline) and an answer-swap contamination probe — and then our own five "
+                   "ships read on the same test, the same format and the same normalisation (pieces against bits per "
+                   "byte), with SmolLM2-360M also read on the chaining deck so both stand on two measures",
+         "why": "because ARC-AGI-2 gives nothing under 1B, so the band's ranking rests entirely on this test: the "
+                "board now leads with it (64.8% SmolLM2-360M, 58.8% gemma-3-270m, 55.3% Qwen3.5-0.8B, 52.5% "
+                "Qwen3-0.6B, 45.5% down to 29.0% for the pythias), and a ranking that has not been audited is a "
+                "claim. It is also the only reading that can put our 50m at 41M beside a model 8.8 times its size "
+                "and say where it stands"},
+    ),
     plan=(
-        {"n": 1, "kind": "investigation", "name": "a harness that can reproduce the number",
+        {"n": 1, "kind": "investigation", "name": "Qwen3 4B on ARC-AGI-2, reasoning off and on",
+         "detail": "the start (Justin, 11 November): the 120 public evaluation tasks read twice on the model whose "
+                   "1,152 heads are already on the census, once with its thinking switched off and once with it "
+                   "on, every trace kept. The morning pilot's zero was the thinking cut at 256 pieces before any "
+                   "grid was written. What the 4B gains from reasoning is the first number, and the solved tasks "
+                   "are the contrast set its heads are read on.",
+         "queue": "investigations/arc-qwen3-4b"},
+        {"n": 2, "kind": "investigation", "name": "the instrument for the 48 linear-attention layers",
+         "detail": "built before the audit (thorp/deltanet.py): the exact effective attention of a Gated DeltaNet "
+                   "head, so the cards can read it; and removal, mean-removal and patching by real layer index, "
+                   "which hold through cached generation. It rebuilds each layer's own output to 0.3% on the 0.8B "
+                   "of the same family; the check on the 27B itself is queued.",
+         "queue": "investigations/deltanet-check-qwen3.8-27b"},
+        {"n": 3, "kind": "investigation", "name": "a harness that can reproduce the 27B's number",
          "detail": "the ARC Prize prompt form and two attempts, the model's own chat template with the reasoning "
-                   "effort set, no output cap that cuts the thinking, the trace and its token count kept. The "
-                   "Kipling scorer cannot do this: it caps the answer at 256 pieces and asks for the grid only, "
-                   "which is reasoning off. The gate is task-by-task agreement with ARC Prize's published "
-                   "public-evaluation grid for xhigh.",
-         "queue": "to build: scripts/score_arc.py gains --effort, --max-thinking and the published prompt form"},
-        {"n": 2, "kind": "investigation", "name": "the reasoning ladder on all 120",
+                   "effort set, no cap that cuts the thinking, the trace and its token count kept. The scorer now "
+                   "has the thinking switch and a thinking budget; it does not yet set the 27B's effort (none, low, "
+                   "medium, xhigh) or use the published prompt form. The gate is task-by-task agreement with ARC "
+                   "Prize's published public-evaluation grid for xhigh.",
+         "queue": "to build: scripts/score_arc.py gains --effort and the published prompt form"},
+        {"n": 4, "kind": "investigation", "name": "the reasoning ladder on all 120",
          "detail": "Qwen3.8 27B at none, low, medium and xhigh on the 120 public evaluation tasks, every trace "
                    "kept. bf16 weights on a hired 80 GB box or a hosted endpoint for the reading; the 4-bit MLX "
                    "copy on this Mac is read on a 12-task subset first, and the audit uses it only if it holds "
                    "the score.",
-         "queue": "after 1; a Piraeus job (Vast), not this Mac: xhigh is tens of thousands of pieces a task"},
-        {"n": 3, "kind": "investigation", "name": "is it the only one of its size",
+         "queue": "after 3; a Piraeus job (Vast), not this Mac: xhigh is tens of thousands of pieces a task"},
+        {"n": 5, "kind": "investigation", "name": "is it the only one of its size",
          "detail": "the same harness on Qwen3.6 27B (reported to share the configuration: the same shape, earlier "
                    "weights) and on Gemma 4 26B A4B, gpt-oss 20B and Phi-4 14B. If the predecessor reads far "
                    "lower, the cause is training, not architecture.",
-         "queue": "after 2"},
-        {"n": 4, "kind": "investigation", "name": "the anatomy of a trace",
+         "queue": "after 4"},
+        {"n": 6, "kind": "investigation", "name": "the anatomy of a trace",
          "detail": "what the xhigh trace does that the low one does not: each trace cut into its moves (describe, "
                    "propose a rule, check it against each example, revise, write the grid), length against "
                    "success, and the same tasks with the thinking cut at fixed budgets. Failures are split into "
-                   "wrong rule and right rule written wrongly.",
-         "queue": "after 2; reads the stored traces, no new generation but the budget cuts"},
-        {"n": 5, "kind": "investigation", "name": "induction or recall",
+                   "wrong rule and right rule written wrongly. The 4B's traces from 1 are cut the same way.",
+         "queue": "after 1 for the 4B, after 4 for the 27B; reads the stored traces"},
+        {"n": 7, "kind": "investigation", "name": "induction or recall",
          "detail": "the solved tasks again under rotations, flips and recolourings that keep the rule. A score "
                    "that survives is rule induction; one that falls is recall of public tasks.",
-         "queue": "after 2"},
-        {"n": 6, "kind": "investigation", "name": "the census of every component",
-         "detail": "on a contrast set (tasks solved at xhigh, read at the answer positions and at the rule-stating "
-                   "positions of the trace): the cards on the 384 attention heads; and for every component, "
-                   "attention head, DeltaNet head and MLP alike, what removing it does to exact match, against "
-                   "matched random removals. Then patching from the reasoning-off run into the xhigh run to find "
-                   "where the trace's work enters the answer.",
-         "queue": "after 4; needs the state-level instrument for the 48 DeltaNet layers, which is not built"},
-        {"n": 7, "kind": "investigation", "name": "the outside floor",
+         "queue": "after 4"},
+        {"n": 8, "kind": "investigation", "name": "the census of every component",
+         "detail": "on a contrast set (tasks solved with reasoning on, read at the answer positions and at the "
+                   "rule-stating positions of the trace): the cards on the 384 attention heads and, through the "
+                   "effective attention, on the DeltaNet heads; and for every component, attention head, DeltaNet "
+                   "head and MLP alike, what removing it does to exact match, against matched random removals of "
+                   "the same kind. Then patching from the reasoning-off run into the reasoning-on run to find "
+                   "where the trace's work enters the answer. The 4B first, with the tools that exist.",
+         "queue": "after 2 and 6"},
+        {"n": 9, "kind": "investigation", "name": "the outside floor",
          "detail": "the small entries that already score, read on our harness as markers: the 7M recursive model "
                    "(reported about 8) and the no-pretraining model (reported about 4). They fix the floor the "
                    "ladder is measured against.",
-         "queue": "any time after 1; independent of the Qwen audit"},
-        {"n": 8, "kind": "investigation", "name": "the verdict",
+         "queue": "any time; independent of the Qwen audit"},
+        {"n": 10, "kind": "investigation", "name": "the verdict",
          "detail": "the four causes each marked held or refuted with its evidence (the trace, the training, "
-                   "specific components, recall), and the list of what transfers to a small ship. It becomes the "
-                   "standard the learning ships sail under.",
-         "queue": "after 3, 5 and 6; Justin signs it"},
-        {"n": 9, "kind": "ship", "name": "300k", "detail": "the form: writes a grid of the right shape (format "
-                                                           "rate 0.9 or more) and beats copying the input on cell "
-                                                           "accuracy",
-         "queue": "after 8"},
-        {"n": 10, "kind": "ship", "name": "1m", "detail": "the first rules: exact on held-out training tasks "
-                                                          "above zero on two seeds",
-         "queue": "after 9, if the 300k clears its rung"},
-        {"n": 11, "kind": "ship", "name": "9m", "detail": "the first evaluation tasks: pass@2 of 2 or more of 120",
-         "queue": "after 10, if the 1m does"},
-        {"n": 12, "kind": "ship", "name": "21m", "detail": "the mark: pass@2 above 5 on the 120 (7 tasks or more), "
-                                                           "on two seeds",
-         "queue": "after 11, if the 9m does"},
+                   "specific components, recall), and the list of what transfers to a small ship, the form of its "
+                   "thinking included. It becomes the standard the learning ships sail under.",
+         "queue": "after 5, 7 and 8; Justin signs it"},
+        {"n": 11, "kind": "ship", "name": "300k", "detail": "the form, twice: writes a grid of the right shape "
+                                                            "(format rate 0.9 or more) and beats copying the input "
+                                                            "on cell accuracy; and opens and closes a thinking span "
+                                                            "before it answers",
+         "queue": "after 10"},
+        {"n": 12, "kind": "ship", "name": "1m", "detail": "the first rules: exact on held-out training tasks "
+                                                          "above zero on two seeds, and the first reasoning gain "
+                                                          "above zero on them: our first reasoning model",
+         "queue": "after 11, if the 300k clears its rung"},
+        {"n": 13, "kind": "ship", "name": "9m", "detail": "the first evaluation tasks: pass@2 of 2 or more of 120",
+         "queue": "after 12, if the 1m does"},
+        {"n": 14, "kind": "ship", "name": "21m", "detail": "the mark: pass@2 above 5 on the 120 (7 tasks or more), "
+                                                           "on two seeds, read with its thinking off and on",
+         "queue": "after 13, if the 9m does"},
+        # ---- the fourth aim, the AI2 ARC audit (11 November): independent of leg 1, because it reads a test,
+        # trains nothing, and the band's ranking already rests on it
+        {"n": 15, "kind": "investigation", "name": "a receipt for every AI2 ARC reading",
+         "detail": "the nine readings were summarised, not kept: thorp/arc_ai2.py already builds a row a question "
+                   "(the CE of every option, the bet, whether it was right, the margin) and scripts/score_arc_ai2.py "
+                   "kept only the summary. Persist the rows, with the question id and the pinned dataset revision, "
+                   "sha1'd, so any number can be re-derived and any two models compared question by question — the "
+                   "77 questions SmolLM2-360M and Qwen3.5-0.8B disagree on are the audit, not the 9.5-point gap.",
+         "queue": "any time; independent of leg 1 (a reading, not a voyage)"},
+        {"n": 16, "kind": "investigation", "name": "determinism and the format ablations",
+         "detail": "re-run two readings and expect bit-identical numbers (greedy, no sampling, fixed order), so any "
+                   "drift is a bug and not noise. Then the four ablations on the same checkpoints: mean against sum "
+                   "loss (sum rewards the short option), options shuffled (position bias), the question stripped "
+                   "(does the model read it at all), and the no-model baselines (longest option, first option, "
+                   "word-overlap with the question) that a real reading must clear by a wide margin.",
+         "queue": "any time; independent of leg 1; one hour of this Mac"},
+        {"n": 17, "kind": "investigation", "name": "the normalisation the ships can share",
+         "detail": "re-score the nine by bits per byte instead of mean loss a piece. A 2,048-piece Ogden vocabulary "
+                   "spells evaporation as six cheap byte pieces where SmolLM2 spells it as one expensive word piece, "
+                   "so the per-piece denominator is not the same test. If the ordering survives bpb the board is "
+                   "comparable across vocabularies; if it does not, our ships need their own column and the page says "
+                   "so.",
+         "queue": "any time; independent of leg 1"},
+        {"n": 18, "kind": "investigation", "name": "the tenth-the-size reading: the 50m against SmolLM2-360M",
+         "detail": "the answer-swap contamination probe on the two models whose order decides the board "
+                   "(SmolLM2-360M, Qwen3.5-0.8B), then arc_ai2 in each of the five ships' fitouts and a thorp eval, "
+                   "then the pairing: 50m at 41M beside SmolLM2-360M at 360M, 8.8 times its size, on the common "
+                   "subset of questions both can spell and on both normalisations; and SmolLM2-360M read on the "
+                   "chaining deck, so each stands on ARC and chaining together. Behind on ARC and level or ahead on "
+                   "chaining is a result; at chance on both is also one.",
+         "queue": "any time; independent of leg 1; the ships wait for the helm (~10 minutes)"},
     ),
 )

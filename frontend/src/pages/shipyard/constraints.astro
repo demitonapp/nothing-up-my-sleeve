@@ -4,16 +4,18 @@
 // the clerk, the jigs and the survey dock; so is this one. The table is deliberately about the yard,
 // not about one ship: the question is how many voyages a week it can launch.
 import Layout from '../../layouts/Layout.astro';
+import SectionTabs from '../../components/SectionTabs.astro';
 import { cardCls } from '../../lib/ui';
 import YardConstraints from '../../components/islands/YardConstraints';
 import ComputeResources from '../../components/islands/ComputeResources';
 ---
 <Layout>
   <main>
-    <YardConstraints client:load />
-    <ComputeResources client:load />
+    <SectionTabs />
     <p class="crumbs"><a href="/shipyard">← shipyard</a></p>
     <h1 class="yardtitle">The yard’s constraints <span class="q">a shipyard is not slow because its shipwrights are slow: it is slow because there are only so many slipways, the tide opens once, the timber must be seasoned, the clerk tallies every plank, the jigs are reset for every frame, and one survey dock holds one hull</span></h1>
+    <YardConstraints client:load />
+    <ComputeResources client:load />
     <section class={cardCls(false, 'panel')}>
       <p>These are the constraints on how many voyages this yard can launch, and the levers that move
         them. Each row is a constraint a shipwright would recognise; the two columns are the setting for

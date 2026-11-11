@@ -35,16 +35,31 @@ The same by construction, and checked by `tests/test_torch.py`:
   weights, the logits, residual streams and every head's attention match MLX's to about 1e-5.
 - **Optimiser:** MLX's AdamW exactly (decay first, no bias correction) and MLX's `clip_grad_norm`, with fp32
   master weights and the model computing in `precision`.
+- **Architecture, grouped:** `model.kv_heads` (grouped-query attention) builds the same three projections under
+  the same names (`q_proj`, `k_proj`, `v_proj`), so a grouped checkpoint loads in either backend (11 November).
 - **Loss terms:** cross-entropy, teacher distillation, the copy-weighted tack (induction, duplicate,
-  conclusion), the metre scaffold (every card rule, `hold`/`fade`/`floor`, staged `from` starts, `sample`), the
-  comparator and bridge riddles, and seeding (`free`/`slow`/`freeze`) and transplants.
+  conclusion), the metre scaffold (every card rule, `hold`/`fade`/`floor`/`release`, staged `from` starts,
+  `sample`, a head's own `hold`/`fade`/`floor`/`release`, a teacher's head as a head's target
+  (`teacher_layer`/`teacher_head`), the probe phase (`probes`)), the comparator and bridge riddles, and seeding
+  (`free`/`slow`/`freeze`) and transplants. From one checkpoint the two loops' next three steps agree to under
+  1e-6 on every recorded loss term in fp32 on the CPU (`test_both_loops_sail_the_same_scaffold`).
 - **Checkpoints:** the same three files, with the same weight names and MLX's optimiser layout. A torch
   checkpoint loads in MLX, and an MLX checkpoint resumes on torch (tested), so `thorp eval` on the Mac can score
   a checkpoint made on the GPU.
 - **Ledger rows:** the same metric names each step and every 50 steps (the sieves, per-book loss, the
-  scaffold's weight, loss, phase, starts and riddles), and the same evaluator rows. Every evaluator runs on
+  scaffold's weight (the voyage's and each head's), loss, phase, starts, riddles and, when probing, each head's
+  distance), the run row's `sop_version`, and the same evaluator rows. Every evaluator runs on
   either backend: ce_bpb, bpb_split, stars, nevermore, cards, shapes, pips, logic, discovery, successor, probes,
   curiosity, soundings, samples and laws. Given the same weights, their scores agree with MLX's to within 2e-3.
+
+**Refused, never ignored (11 November).** The two loops are typed twice, so a key taught to `train.py` is not
+known to the torch loop until it is typed again. The torch loop reads every spec against the list of keys it
+honours (`train_torch.HONOURED`) before it does any work and raises `UnsupportedSpec`, naming each key, for
+anything else: a key it was never taught, or one listed in `train_torch.UNSUPPORTED` with its reason. `thorp
+charter` asks the same question at the quote, before a box is hired. To teach the loop a key: implement it, hold
+it to MLX's numbers in `tests/test_torch.py`, and add it to `HONOURED`. A key that only shared code reads (the
+tokeniser, an evaluator) is added to `HONOURED` with a note. `test_every_spec_on_disk_is_one_the_torch_loop_knows`
+fails on the Mac when a spec under `ships/specs` uses a key the torch loop has not been taught.
 
 Not the same:
 

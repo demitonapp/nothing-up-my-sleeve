@@ -3,11 +3,13 @@
 // scripts/views/ship.ts, imported at run time (ECharts touches `self` and `document` at load).
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { cardCls, crumbCls, pillCls, selectCls, tabCls, tabsCls } from '@/lib/ui';
+import { cardCls, crumbCls, pillCls, selectCls } from '@/lib/ui';
 import { sectionProps, useApi, useRoute } from '@/lib/useApi';
 import { shipHash } from '@/scripts/router';
 import { isShipPage, loadAboard, shipAddress, chooseShip, shipHeader, stageListHtml } from '@/scripts/views/ship-page';
 import Chat from './Chat';
+import SectionNav from '../SectionNav';
+import { TabNav } from '../TabNav';
 
 const TABS = ['betting', 'books', 'languages', 'sieves', 'attention', 'traits', 'chat'];
 
@@ -172,10 +174,10 @@ export default function ShipPage() {
   }, [mine]);
 
   if (!mine) return null;
-  const tabState = (t: string): 'active' | 'inactive' => (tab === t ? 'active' : 'inactive');
   const go = (t: string): string => shipHash(key, sailing, t);
   return (
     <div {...sectionProps('ship')} ref={root}>
+      <SectionNav />
       <h1><a className={crumbCls('back')} href="/harbours">← harbours</a> <a className={crumbCls('crumb')} id="shipclass" /> <span id="shipname" /> <span id="shiptags" /> <span className="q" id="shipfitout" /></h1>
       <div className="sailings"><span className="k">voyages</span><span id="sailings" /><span className="sub" id="title" /></div>
       <section className={cardCls(false, 'panel')} id="stagepanel" hidden>
@@ -186,9 +188,17 @@ export default function ShipPage() {
         <h2>Library aboard <span className="note">the libraries this voyage carried (thorp.library.aboard): each one's stage, where it came from (the prose stores, the trigram stores, drawn from the stores, or outside the stores), its books and its hash; the decks it refused; its opt-in, if it read outside the stores</span></h2>
         <div id="aboard" />
       </section>
-      <nav className={tabsCls('line', 'subnav')} data-orientation="horizontal" data-variant="line" id="shipnav">
-        {TABS.map((t) => <a key={t} className={tabCls('')} data-state={tabState(t)} data-stab={t} href={go(t)}>{t[0].toUpperCase() + t.slice(1)}</a>)}
-      </nav>
+      <TabNav
+        id="shipnav"
+        ariaLabel="ship sections"
+        items={TABS.map((t) => ({
+          key: t,
+          label: t[0].toUpperCase() + t.slice(1),
+          href: go(t),
+          active: tab === t,
+          data: { 'data-stab': t },
+        }))}
+      />
 
       <details className={cardCls(false, 'panel')} id="stripwrap" open><summary>The ship at a glance <span className="note" id="stripsum" /></summary><div className="strip" id="strip" /></details>
 

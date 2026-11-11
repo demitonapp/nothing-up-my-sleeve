@@ -48,6 +48,10 @@ REFERENCE_PARAMS = {
     "Qwen/Qwen3-0.6B": 0.6e9,
     "mlx-community/Qwen3-1.7B-4bit": 1.7e9,
     "mlx-community/Qwen3-4B-4bit": 4.0e9,
+    # read for the extra small board's AI2 ARC reading (11 November), not in the chaining ladder
+    "mlx-community/gemma-3-270m-bf16": 270e6,
+    "HuggingFaceTB/SmolLM2-360M": 360e6,
+    "mlx-community/Qwen3.5-0.8B-bf16": 800e6,
     **{m: n for m, (_, n) in fleet.COMPETITORS.items()},
 }
 

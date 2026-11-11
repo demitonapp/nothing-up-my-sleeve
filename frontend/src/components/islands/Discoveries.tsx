@@ -10,10 +10,12 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { MouseEvent as ReactMouseEvent } from 'react';
-import { btnCls, cardCls, checkCls, crumbCls, emptyCls, selectCls, tabCls, tabsCls } from '@/lib/ui';
+import { btnCls, cardCls, checkCls, crumbCls, emptyCls, selectCls } from '@/lib/ui';
 import { routePath, sectionProps, useApi, useRoute } from '@/lib/useApi';
 import { shipHash } from '@/scripts/router';
 import { esc } from '@/lib/format';
+import SectionNav from '../SectionNav';
+import { TabNav } from '../TabNav';
 import {
   cardDeckHtml,
   chainPageHtml,
@@ -79,6 +81,13 @@ const STAR_TABS: { key: 'heads' | 'cards' | 'unsorted' | 'census' | 'beyond' | '
   { key: 'census', label: 'All heads' },
   { key: 'beyond', label: 'All cards' },
   { key: 'personas', label: 'Personas' },
+];
+// the four doors of Discoveries, in the order they are read (the section row uses the same labels)
+const DISC_TABS: { key: Sub; label: string }[] = [
+  { key: 'overview', label: 'Overview' },
+  { key: 'stars', label: 'Stars' },
+  { key: 'skills', label: 'Skills' },
+  { key: 'quantum-tests', label: 'Tests' },
 ];
 // the cards that are not one head (or not a head at all): the split the audit has to resolve
 const HEADLESS_CARDS = [
@@ -503,7 +512,7 @@ export default function Discoveries() {
       const href = a.getAttribute('href') || '';
       // the cards live in the shipyard now, so its links are this island's too: navigate in place
       // rather than reloading the page (9 November: "clicking cards doesn't open the tab")
-      if (href.startsWith('/discoveries') || href.startsWith('/shipyard')) {
+      if (href.startsWith('/discoveries') || href.startsWith('/shipyard/charting')) {
         e.preventDefault();
         go(href);
       }
@@ -522,36 +531,47 @@ export default function Discoveries() {
     }
   };
 
-  const tab = (s: Sub): { className: string; 'data-state': string; 'data-dsub': string; href: string; 'aria-current'?: 'page' } => ({
-    className: tabCls(''),
-    'data-state': view === 'index' && sub === s ? 'active' : 'inactive',
-    'data-dsub': s,
-    href: subHref(s, inCharting),
-    ...(view === 'index' && sub === s ? { 'aria-current': 'page' as const } : {}),
-  });
-
   return (
     <div {...sectionProps('discoveries')} onClick={onClick}>
+      <SectionNav />
+      {/* the charting section lives under Places > Shipyard: its own title and its four tabs sit
+          under the section row, while Discoveries' own tabs are the section row itself */}
+      {inCharting ? (
+        <h1>
+          <a className={crumbCls('back')} href="/shipyard">← shipyard</a>{' '}
+          Charting{' '}
+          <span className="q">sorting out the charts the voyage is planned on: the route, the stars, and the suits</span>
+        </h1>
+      ) : null}
       {/* ============================== the tricks of the trade */}
       <div className={`dview${view === 'index' ? ' active' : ''}`} data-dview="index">
-        <nav className={tabsCls('line', 'subnav')} data-orientation="horizontal" data-variant="line" id="discnav">
-          <a {...tab('overview')}>Overview</a>
-          <a {...tab('stars')}>Stars</a>
-          <a {...tab('skills')}>Skills</a>
-          <a {...tab('quantum-tests')}>Tests</a>
-        </nav>
+        {inCharting ? (
+          <TabNav
+            id="chartingnav"
+            ariaLabel="charting sections"
+            items={DISC_TABS.map((t) => ({
+              key: t.key,
+              label: t.label,
+              href: subHref(t.key, true),
+              active: view === 'index' && sub === t.key,
+              data: { 'data-dsub': t.key },
+            }))}
+          />
+        ) : null}
 
         {/* the tests: the four quantum chains, the two item decks, and how chaining two facts is measured */}
         <div className={`dsub${sub === 'quantum-tests' ? ' active' : ''}`} data-dsub="quantum-tests">
           <p className="q dsubintro">The <b>tests</b>: the four quantum chains, each climbed in six rungs from the keel to the explorer; the two item decks that ask whether a pass is chaining rather than knowledge — the <b>40 logic items</b> over five relations and the <b>96 cause items</b> that widen the one relation Qwen 4B shows a gain on; and <b>chaining two facts</b>, the claim and the method it is judged by.</p>
-          <nav className={tabsCls('line', 'subnav')} aria-label="Tests">
-            {TEST_TABS.map((t) => (
-              <button key={t.key} type="button" className={tabCls('')} data-state={testsTab === t.key ? 'active' : 'inactive'}
-                onClick={() => pickTest(t.key)}>
-                {t.label}
-              </button>
-            ))}
-          </nav>
+          <TabNav
+            ariaLabel="Tests"
+            tablist
+            items={TEST_TABS.map((t) => ({
+              key: t.key,
+              label: t.label,
+              active: testsTab === t.key,
+              onClick: () => pickTest(t.key),
+            }))}
+          />
           {testsTab === 'quantum' ? (
             <section className={cardCls(false, 'panel')}>
               <h2>All the layers <span className="note">keel to explorer, smallest rung first; the last rung is the bet itself. ▲/✓ evidence and grades are on the Skills tab; the method is under Chaining two facts</span></h2>
@@ -765,14 +785,16 @@ export default function Discoveries() {
         {/* the stars: all the head kinds and the sixteen cards, side by side */}
         <div className={`dsub${sub === 'stars' ? ' active' : ''}`} data-dsub="stars">
           <p className="q dsubintro">What inside does it? <b>All the head kinds</b> attention research has named, and <b>the sixteen cards</b> a ship is built from. A card is a job; a star is a head that passes the job's mark, and lit shared when the best layer's two strongest heads reach it together. The item decks that score the jobs live under <a href="/discoveries/tests">Tests</a>.</p>
-          <nav className={tabsCls('line', 'subnav')} aria-label="Stars">
-            {STAR_TABS.map((t) => (
-              <button key={t.key} type="button" className={tabCls('')} data-state={starsTab === t.key ? 'active' : 'inactive'}
-                onClick={() => pickStar(t.key)}>
-                {t.label}
-              </button>
-            ))}
-          </nav>
+          <TabNav
+            ariaLabel="Stars"
+            tablist
+            items={STAR_TABS.map((t) => ({
+              key: t.key,
+              label: t.label,
+              active: starsTab === t.key,
+              onClick: () => pickStar(t.key),
+            }))}
+          />
           {starsTab === 'census' ? (
           <section className={cardCls(false, 'panel')}>
             <h2>Every head, by category <span className="note">all 1,152 heads of Qwen3 4B, grouped by the kind that names them; expand a category to list its heads, the layer, what names them, and the readings that identify them</span></h2>

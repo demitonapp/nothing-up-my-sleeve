@@ -47,6 +47,11 @@ RUN_COLUMNS = (
     "tokens_seen",
     "wall_minutes",
 )
+# Columns a run row may carry that the table was not made with (11 November: `sop_version`, which Postgres' s1.runs
+# has and a hired box's SQLite log had not, so a voyage sailed on a box came home without its SOP version). A file
+# gains such a column only when a row first carries a value for it (as `ship` was added, but on the write, not on the
+# open: a ledger nobody writes a version to is never altered); a row that carries none is written exactly as before.
+LATER_RUN_COLUMNS = ("sop_version",)
 
 
 class Recorder(Protocol):
@@ -84,8 +89,22 @@ class Ledger:
         self.con = connect(path)
 
     # -- writes
+    def _run_column(self, name: str) -> None:
+        """Add a later column to this file's `runs` if it lacks it (additive: every row keeps its values)."""
+        if name in {r[1] for r in self.con.execute("pragma table_info(runs)")}:
+            return
+        try:
+            self.con.execute(f'alter table runs add column "{name}" text')
+            self.con.commit()
+        except sqlite3.OperationalError:  # another writer added it between the look and the change
+            if name not in {r[1] for r in self.con.execute("pragma table_info(runs)")}:
+                raise
+
     def run(self, row: dict) -> None:
-        row = {k: row.get(k) for k in RUN_COLUMNS}
+        later = [k for k in LATER_RUN_COLUMNS if row.get(k) is not None]
+        for k in later:
+            self._run_column(k)
+        row = {k: row.get(k) for k in (*RUN_COLUMNS, *later)}
         cols = ", ".join(f'"{k}"' for k in row)
         qs = ", ".join("?" for _ in row)
         upd = ", ".join(f'"{k}"=coalesce(excluded."{k}", "{k}")' for k in row if k != "run_id")

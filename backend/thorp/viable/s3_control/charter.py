@@ -7,6 +7,8 @@ a quote to S5's terms (thorp/viable/s5_policy/charter.py); the gate asks it thro
 
 The spend log (s3.spend_events in Postgres) is S3's account of the money: one line when a ship is hired, one when it is
 released with what it cost. The week's spend counts what is released this week and what is still out, accruing.
+Since 11 November a charter also writes an `at sea` line when its voyage starts on the box, carrying the overrun
+deadline, so that `thorp charter attach` can take the ship up again; it counts for nothing in the spend.
 """
 
 from __future__ import annotations

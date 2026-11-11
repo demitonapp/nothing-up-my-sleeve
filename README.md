@@ -85,13 +85,22 @@ uv run --project backend thorp ledger "select book_id, bpb, ce_nats from evals w
 A path a spec or a script names (`lists/...`, `specs/...`, `scripts/...`) is found in its part by its first
 folder (`thorp/paths.py`: `resolve` and `ROUTER`), so specs read the same as before the split.
 
+**First run on a fresh Mac.** `uv run --project backend thorp onboard` starts the setup page on
+`127.0.0.1`, opens the default browser and walks through four choices: whether to sail Thorp's own
+ships (and which class), which outside instruct models to download, where the records live (local
+Postgres now; hosted later) and then the install. It creates `data/postgres` if the Postgres binaries
+are already installed, runs the migrations, downloads the chosen MLX models into the Hugging Face
+cache, and builds the dashboard. `python -m thorp onboard` is the same command once the backend
+environment exists; `thorp onboard --reset` archives the answers and starts again. The store switch
+is also on `/settings`, under **The store**.
+
 The dashboard is an Astro app in `frontend/`. It builds to `backend/thorp/dash/static` (not committed), which `thorp dash` serves beside its JSON API. While working on the page, `pnpm --dir frontend dev` serves it with hot reload on http://localhost:4321 and forwards `/api` to a running `thorp dash`. Its standards are in `backend/thorp/dash/UI.md`.
 
 `thorp run` on a finished spec prints its ledger row and exits; on a spec with a checkpoint it resumes from the latest one. `thorp eval RUN` re-scores a run's latest checkpoint. Each `?` in `thorp ledger` binds to the latest finished run unless you pass parameters or `--run ID`.
 
 ## Layout
 
-- `backend/thorp/`: the harness (see `DECISIONS.md` for every choice the brief left open); `backend/thorp/viable/` the code laid out by VSM system (S1 to S5) with the Postgres fitout store; `backend/migrations/` and `backend/alembic.ini` its Alembic migrations. `backend/thorp/gather.py` is acquisition's S1 over a bulk corpus, `backend/thorp/sources/catalog.py` and `bulk.py` its S4 (the sources, their walls and their adapters).
+- `backend/thorp/`: the harness (see `DECISIONS.md` for every choice the brief left open); `backend/thorp/onboard/` the first-run wizard (`thorp onboard`: catalogue, downloads, local Postgres, the standalone page); `backend/thorp/config.py` the install's own store choice; `backend/thorp/viable/` the code laid out by VSM system (S1 to S5) with the Postgres fitout store; `backend/migrations/` and `backend/alembic.ini` its Alembic migrations. `backend/thorp/gather.py` is acquisition's S1 over a bulk corpus, `backend/thorp/sources/catalog.py` and `bulk.py` its S4 (the sources, their walls and their adapters).
 - `backend/scripts/`: the spec writers (`make_*.py`), the pool and shelf cutters, and the queues (`queue.sh`, the standing queue).
 - `backend/tests/`: the test suite.
 - `frontend/`: the dashboard page (Astro): `src/pages/index.astro` the shell, `src/components/` one per tab, `src/scripts/dashboard.js` the panels, `src/lib/` the shared pieces (DataTable, charts, formatters, the book reader), `src/styles/global.css` the tokens.

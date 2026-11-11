@@ -1,0 +1,395 @@
+// The chat console: a permanent drawer that slides up from the bottom of every page (11 November, Justin:
+// "There needs to be a permanent chat model that slides up from the bottom of the screen. Very elegant,
+// fal image of wooden carvings like a beautiful ship navigation panel built in the hey day or the merchant
+// navy days. It slides up and then it's the chat console, where you can choose any instruct model you
+// want, see the context window, and also save notes").
+//
+// The panel is carved oak and brass, drawn as SVG (`Woodwork`): grain, bevelled rails, brass screws and a
+// nameplate. There is no image generator wired to this repository (no fal key — `data/secrets` holds only
+// the Vast key), so the wood is drawn rather than generated. A generated plate drops in by CSS alone: save
+// it as `public/art/chat-console.png`, then enable the two commented rules at the end of the console's
+// block in `styles/global.css`, which paint the bar with the image and hide the drawn grain.
+//
+// It is a compact sibling of /chat: the same /api/chat, the same conversation store (a console chat is a
+// thread, saved and listed on the chat page too), the same context meter, plus notes.
+
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ContextMeter } from './Chat';
+import { autoTitle, getThread, listThreads, newId, saveThread, type Thread } from '@/lib/conversations';
+import { addNote, listNotes, removeNote, subscribeNotes, type Note } from '@/lib/notes';
+
+interface Model {
+  kind: 'thorp' | 'foreign';
+  model?: string | null;
+  ship_key: string;
+  name: string;
+  params: number | null;
+  available: boolean;
+  run: { run: string; step: string } | null;
+  facts?: {
+    context?: number | null;
+    tuning?: string | null;
+    chat_template?: boolean;
+    thinking?: { mode: 'toggle' | 'auto' | 'none'; default: boolean; why?: string } | null;
+  } | null;
+}
+interface Meta { prompt_tokens?: number; answer_tokens?: number; reasoning_tokens?: number; finish?: string }
+interface Say { role: 'you' | 'thorp'; text: string; model?: string; meta?: Meta }
+interface Reply { answer?: string; error?: string; step?: string; meta?: Meta }
+
+// the labs, as thorp/labs.py LABS and the leaderboard's MAKER: a lab first, then its model
+const LABS: [RegExp, string][] = [
+  [/qwen/i, 'Alibaba'],
+  [/llama/i, 'Meta'],
+  [/phi/i, 'Microsoft'],
+  [/pythia/i, 'EleutherAI'],
+  [/gemma/i, 'Google'],
+  [/smollm/i, 'Hugging Face'],
+  [/gpt-oss/i, 'OpenAI'],
+  [/maincoder/i, 'Maincode'],
+];
+const labOf = (m: Model): string => (LABS.find(([re]) => re.test(`${m.model || ''} ${m.name}`)) || [null, 'Other'])[1] as string;
+
+const convoKeyOf = (m: Model): string => (m.kind === 'foreign' ? `foreign:${m.model}` : `ship:${m.ship_key}`);
+const hrefOf = (m: Model): string => (m.kind === 'foreign' ? `/chat?model=${encodeURIComponent(String(m.model || ''))}` : `/chat?ship=${encodeURIComponent(m.ship_key)}`);
+
+/** The carved panel: oak, brass and a rope border, as SVG so it scales and costs no request. */
+function Woodwork() {
+  return (
+    <svg className="consolewood" viewBox="0 0 1200 120" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+      <defs>
+        <linearGradient id="oak" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#4a2f1b" />
+          <stop offset="0.18" stopColor="#6b4527" />
+          <stop offset="0.55" stopColor="#5a3920" />
+          <stop offset="1" stopColor="#3a2413" />
+        </linearGradient>
+        <linearGradient id="brass" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#f6e2a8" />
+          <stop offset="0.45" stopColor="#c9a24a" />
+          <stop offset="1" stopColor="#8a6a25" />
+        </linearGradient>
+        <filter id="carve" x="-5%" y="-20%" width="110%" height="160%">
+          <feDropShadow dx="0" dy="1" stdDeviation="0.6" floodColor="#1b0f06" floodOpacity="0.9" />
+          <feDropShadow dx="0" dy="-1" stdDeviation="0.4" floodColor="#b98a52" floodOpacity="0.35" />
+        </filter>
+        <filter id="grain">
+          <feTurbulence type="fractalNoise" baseFrequency="0.006 0.42" numOctaves="4" seed="11" result="n" />
+          <feColorMatrix in="n" type="matrix" values="0 0 0 0 0.32  0 0 0 0 0.18  0 0 0 0 0.08  0 0 0 0.5 0" />
+        </filter>
+      </defs>
+      <rect width="1200" height="120" fill="url(#oak)" />
+      <rect width="1200" height="120" filter="url(#grain)" opacity="0.55" />
+      {/* the bevelled rails: a lit top edge, a shadowed bottom */}
+      <rect x="0" y="0" width="1200" height="5" fill="#8d6035" opacity="0.55" />
+      <rect x="0" y="5" width="1200" height="2" fill="#2a1809" opacity="0.7" />
+      <rect x="0" y="108" width="1200" height="12" fill="#2b190a" opacity="0.85" />
+      <rect x="0" y="110" width="1200" height="2" fill="#a97a44" opacity="0.35" />
+      {/* carved scrolls, one either side of the nameplate */}
+      {[120, 1080].map((x, i) => (
+        <g key={i} transform={`translate(${x} 62)`} filter="url(#carve)" opacity="0.85">
+          <path d="M-58 0 q18 -18 36 0 q-18 18 -36 0 z M58 0 q-18 -18 -36 0 q18 18 36 0 z" fill="none" stroke="#c9a24a" strokeWidth="1.2" opacity="0.55" />
+          <circle r="17" fill="none" stroke="#8f6a2e" strokeWidth="1" opacity="0.5" />
+        </g>
+      ))}
+      {/* the brass screws along the rails */}
+      {Array.from({ length: 24 }, (_, i) => 24 + i * 50).map((x) => (
+        <g key={x} transform={`translate(${x} 14)`}>
+          <circle r="3.2" fill="url(#brass)" />
+          <circle r="3.2" fill="none" stroke="#4a3413" strokeWidth="0.6" />
+          <path d="M-2.2 0 H2.2" stroke="#5b4318" strokeWidth="0.8" />
+        </g>
+      ))}
+      {Array.from({ length: 24 }, (_, i) => 24 + i * 50).map((x) => (
+        <g key={`b${x}`} transform={`translate(${x} 100)`}>
+          <circle r="2.6" fill="url(#brass)" opacity="0.85" />
+          <path d="M-1.8 0 H1.8" stroke="#5b4318" strokeWidth="0.7" />
+        </g>
+      ))}
+    </svg>
+  );
+}
+
+export default function ChatConsole() {
+  const [open, setOpen] = useState(false);
+  const [models, setModels] = useState<Model[] | null>(null);
+  const [err, setErr] = useState('');
+  const [pick, setPick] = useState('');
+  const [lab, setLab] = useState('');
+  const [think, setThink] = useState(true);
+  const [says, setSays] = useState<Say[]>([]);
+  const [input, setInput] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [threadId, setThreadId] = useState('');
+  const [notesOpen, setNotesOpen] = useState(false);
+  const [note, setNote] = useState('');
+  const [notes, setNotes] = useState<Note[]>([]);
+  const field = useRef<HTMLInputElement | null>(null);
+  const said = useRef<Say[]>([]);
+
+  useEffect(() => {
+    said.current = says;
+  }, [says]);
+
+  // Only instruction-tuned models, and only outside ones: a base checkpoint continues prose instead of
+  // answering, and no Nothing up my sleeve ship is instruction-tuned yet, so a Thorp row would be a lie.
+  // The choice is a sequence — the lab first, then the model within it (11 November, Justin: "in the model
+  // selection it's a sequence. Choose the lab. and then choose the relevant model. Only show instruct
+  // models, so no Thorp model exists yet").
+  const instruct = useMemo(
+    () => (models || []).filter((m) => m.kind === 'foreign' && m.available && m.model && m.facts?.tuning === 'instruct'),
+    [models],
+  );
+  const labs = useMemo(() => {
+    const seen: string[] = [];
+    for (const m of instruct) {
+      const l = labOf(m);
+      if (!seen.includes(l)) seen.push(l);
+    }
+    return seen.sort((a, b) => a.localeCompare(b));
+  }, [instruct]);
+  const inLab = useMemo(() => instruct.filter((m) => labOf(m) === lab), [instruct, lab]);
+  const chosen = useMemo(
+    () => inLab.find((m) => convoKeyOf(m) === pick) || inLab[0] || null,
+    [inLab, pick],
+  );
+
+  // a lab is chosen before a model: the first lab with an instruct model is the default
+  useEffect(() => {
+    if (lab && labs.includes(lab)) return;
+    setLab(labs[0] || '');
+    setPick('');
+  }, [labs, lab]);
+
+  useEffect(() => {
+    if (!open || models) return;
+    let live = true;
+    void (async () => {
+      try {
+        const r = await fetch('/api/chat/models');
+        const d = await r.json();
+        if (!live) return;
+        setModels(((d.models || []) as Model[]).filter((m) => m.available && (m.run || m.model)));
+      } catch (e) {
+        if (live) setErr(String((e as Error)?.message ?? e));
+      }
+    })();
+    return () => {
+      live = false;
+    };
+  }, [open, models]);
+
+  // the thread follows the model: its newest, else a fresh one on the first message
+  useEffect(() => {
+    if (!open || !chosen) return;
+    const key = convoKeyOf(chosen);
+    const latest = listThreads().find((t) => t.key === key);
+    setThreadId(latest?.id || '');
+    setSays(((latest?.messages as unknown as Say[]) || []).slice());
+  }, [open, chosen?.kind, chosen?.model, chosen?.ship_key]);
+
+  // the thinking switch follows the model: a template with an off switch starts on its own default, one
+  // that always reasons is on and cannot be turned off, one with no reasoning mode is off and inert
+  const thinking = chosen?.facts?.thinking;
+  const thinkingToggle = thinking?.mode === 'toggle';
+  const thinkingAuto = thinking?.mode === 'auto';
+  useEffect(() => {
+    setThink(thinking?.mode === 'none' ? false : (thinking?.default ?? false));
+  }, [chosen?.ship_key, chosen?.model, thinking?.mode, thinking?.default]);
+
+  useEffect(() => {
+    const sync = (): void => setNotes(listNotes());
+    sync();
+    return subscribeNotes(sync);
+  }, []);
+
+  useEffect(() => {
+    if (open) window.setTimeout(() => field.current?.focus(), 260);
+  }, [open]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key.toLowerCase() === 'j' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        setOpen((v) => !v);
+      } else if (e.key === 'Escape' && open) {
+        setOpen(false);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open]);
+
+  const last = [...says].reverse().find((s) => s.meta)?.meta;
+  const used = says.reduce((n, s) => n + (s.meta?.prompt_tokens ?? 0) + (s.meta?.answer_tokens ?? 0) + (s.meta?.reasoning_tokens ?? 0), 0);
+
+  const persist = (next: Say[]): void => {
+    if (!chosen || !next.length) return;
+    const base: Thread = threadId && getThread(threadId) ? (getThread(threadId) as Thread) : {
+      id: newId(), key: convoKeyOf(chosen), name: chosen.name, kind: chosen.kind,
+      model: chosen.model ?? null, shipKey: chosen.ship_key, href: hrefOf(chosen),
+      title: '', saved: false, createdAt: Date.now(), updatedAt: Date.now(), messages: [],
+    };
+    saveThread({ ...base, title: base.title || autoTitle(next as never), messages: next as never });
+    if (!threadId) setThreadId(base.id);
+  };
+
+  const send = async (): Promise<void> => {
+    const q = input.trim();
+    if (!q || busy || !chosen) return;
+    setInput('');
+    setBusy(true);
+    setErr('');
+    const mine: Say = { role: 'you', text: q };
+    const nextUser = [...said.current, mine];
+    said.current = nextUser;
+    setSays(nextUser);
+    persist(nextUser);
+    try {
+      const body = chosen.kind === 'foreign'
+        ? { model: chosen.model, q, tokens: 256, temperature: 0.7, thinking: think ? 'on' : 'off' }
+        : { run: chosen.run?.run, q, tokens: 256, temperature: 0.7, thinking: think ? 'on' : 'off' };
+      const d = await (await fetch('/api/chat', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })).json() as Reply;
+      if (d.error) setErr(String(d.error));
+      else {
+        const answer: Say = { role: 'thorp', text: String(d.answer || ''), model: chosen.name, meta: d.meta };
+        const next = [...said.current, answer];
+        said.current = next;
+        setSays(next);
+        persist(next);
+      }
+    } catch (e) {
+      setErr(String((e as Error)?.message ?? e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const keepNote = (): void => {
+    if (!chosen) return;
+    addNote(note, chosen.name, threadId || undefined);
+    setNote('');
+  };
+
+  return (
+    <div className={`console${open ? ' open' : ''}`} aria-label="chat console">
+      <button
+        type="button"
+        className="consolebar"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-controls="consolepanel"
+        title={open ? 'close the console (⌘J)' : 'open the chat console (⌘J)'}
+      >
+        <Woodwork />
+        <span className="consoleplate">
+          <span className="consoletitle">The chat console</span>
+          <span className="consolenote">{chosen ? chosen.name : 'reading the models…'}{open ? ' · ⌘J or esc to close' : ' · ⌘J'}</span>
+        </span>
+        <span className="consolemeter">
+          <ContextMeter used={used} context={chosen?.facts?.context ?? null} next={256} turns={says.filter((s) => s.role === 'you').length} last={last} />
+        </span>
+        <span className="consolechevron" aria-hidden="true">{open ? '▾' : '▴'}</span>
+      </button>
+
+      <div className="consolepanel" id="consolepanel" role="region" aria-label="chat">
+        <div className="consolehead">
+          <label className="note consolepick">
+            lab{' '}
+            <select
+              value={lab}
+              onChange={(e) => { setLab(e.target.value); setPick(''); }}
+              aria-label="lab"
+              title="who made the model"
+            >
+              {labs.length === 0 ? <option value="">reading the labs…</option> : null}
+              {labs.map((l) => (
+                <option key={l} value={l}>{l}</option>
+              ))}
+            </select>
+          </label>
+          <label className="note consolepick">
+            model{' '}
+            <select
+              value={chosen ? convoKeyOf(chosen) : ''}
+              onChange={(e) => setPick(e.target.value)}
+              aria-label="model"
+              title="the instruction-tuned checkpoints this lab makes"
+              disabled={!inLab.length}
+            >
+              {inLab.map((m) => (
+                <option key={convoKeyOf(m)} value={convoKeyOf(m)}>{m.name}</option>
+              ))}
+            </select>
+          </label>
+          <label
+            className={`consoleswitch${think && (thinkingToggle || thinkingAuto) ? ' on' : ''}${!thinkingToggle && !thinkingAuto ? ' inert' : ''}`}
+            title={thinking?.why || (thinkingToggle ? 'the model\'s own reasoning mode: off asks it to answer directly' : 'this model has no reasoning mode')}
+          >
+            <input
+              type="checkbox"
+              checked={thinkingToggle ? think : thinkingAuto}
+              disabled={!thinkingToggle && !thinkingAuto}
+              onChange={(e) => setThink(e.target.checked)}
+              aria-label="thinking"
+            />
+            <span className="consoleswitchtrack" aria-hidden="true"><span className="consoleswitchthumb" /></span>
+            <span className="consoleswitchlabel">thinking {thinkingAuto ? 'auto' : think && (thinkingToggle || thinkingAuto) ? 'on' : 'off'}</span>
+          </label>
+          <button type="button" className="consolbtn" onClick={() => setNotesOpen((v) => !v)} aria-pressed={notesOpen}>
+            Notes{notes.length ? ` (${notes.length})` : ''}
+          </button>
+          {chosen ? <a className="consolbtn" href={hrefOf(chosen)} title="open this model's chat page">Full page ↗</a> : null}
+        </div>
+
+        <div className="consolebody">
+          <div className="consolechat" aria-live="polite">
+            {says.length === 0 ? (
+              <p className="note">{chosen ? `Ask ${chosen.name} something. The answer is its own continuation; the console keeps the thread, and notes beside it.` : 'reading the models…'}</p>
+            ) : null}
+            {says.map((s, i) => (
+              <p key={i} className={s.role === 'you' ? 'consoleyou' : 'consoleanswer'}>
+                <b>{s.role === 'you' ? 'you' : (s.model || 'model')}:</b> {s.text}
+                {s.meta ? (
+                  <span className="note"> · {s.meta.prompt_tokens ?? '–'} asked → {s.meta.answer_tokens ?? '–'} answer{s.meta.finish === 'length' ? ' · stopped at length' : ''}</span>
+                ) : null}
+              </p>
+            ))}
+            {busy ? <p className="note">sampling…</p> : null}
+            {err ? <p className="note consoleerr">{err}</p> : null}
+          </div>
+          {notesOpen ? (
+            <div className="consolenotes">
+              <div className="consolenotesnew">
+                <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="a line worth keeping…" rows={3} aria-label="a note" />
+                <button type="button" className="consolbtn" onClick={keepNote} disabled={!note.trim()}>Save note</button>
+              </div>
+              <div className="consolenoteslist">
+                {notes.length === 0 ? <p className="note">No notes yet.</p> : null}
+                {notes.slice(0, 50).map((n) => (
+                  <div key={n.id} className="consolenoterow">
+                    <span>{n.text}</span>
+                    <span className="note">{n.model}</span>
+                    <button type="button" onClick={() => removeNote(n.id)} title="delete this note" aria-label="delete this note">×</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </div>
+
+        <form className="consoleinput" onSubmit={(e) => { e.preventDefault(); void send(); }}>
+          <input
+            ref={field}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder={chosen ? `ask ${chosen.name}…` : 'reading the models…'}
+            aria-label="your question"
+            disabled={!chosen}
+          />
+          <button type="submit" className="consolbtn primary" disabled={busy || !input.trim() || !chosen}>{busy ? '…' : 'send'}</button>
+        </form>
+      </div>
+    </div>
+  );
+}

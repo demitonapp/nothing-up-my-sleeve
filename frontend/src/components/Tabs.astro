@@ -1,0 +1,36 @@
+---
+// One row of tabs, rendered as plain links at build time: the header's main tabs and the section
+// tabs on static pages. The islands use TabNav.tsx instead, with the same classes and data-state
+// (UI.md, "Navigation").
+import { tabCls, tabsCls } from '../lib/ui';
+import type { TabItem } from '../lib/nav';
+
+interface Props {
+  items: TabItem[];
+  variant?: 'default' | 'line';
+  id?: string;
+  class?: string;
+  ariaLabel?: string;
+}
+
+const { items, variant = 'default', id, class: extra = '', ariaLabel } = Astro.props;
+---
+<nav
+  class={tabsCls(variant, extra)}
+  data-orientation="horizontal"
+  data-variant={variant}
+  id={id}
+  aria-label={ariaLabel}
+>
+  {items.map((t) => (
+    <a
+      class={tabCls('')}
+      data-state={t.active ? 'active' : 'inactive'}
+      href={t.href}
+      title={t.title}
+      data-nav={t.key}
+      aria-current={t.active ? 'page' : undefined}
+      {...(t.data ?? {})}
+    >{t.label}</a>
+  ))}
+</nav>

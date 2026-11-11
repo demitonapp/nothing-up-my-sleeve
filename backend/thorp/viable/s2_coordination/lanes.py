@@ -19,6 +19,15 @@ runs. What the coordinator adds:
   sea (the helm, vsm.at_sea, is still taken by the voyage itself).
 - **What is out:** s2.lanes (Postgres) names each lane's line, its process and since when (the dashboard and the
   S2 lint read it). The queue file's edits are made under a lock (specs/queue.txt.lock).
+- **What is at sea is a row** (11 November, the architecture audit's item 2). A line that starts moves from
+  `s2.queue_lines` to `s2.at_sea` in one transaction, its pid is written the moment its process exists, and the
+  row is deleted in the transaction that writes its `s2.queue_history`. A coordinator that starts adopts every
+  row: a live process that is plausibly that line keeps its seat and is watched to its end (a voyage's outcome
+  then read from the ledger, since only a parent can collect an exit status); a dead one is recorded as `lost`
+  and its seat freed. Nothing is requeued without a person: a lost voyage may have a checkpoint, or a box.
+- **A coordinator's death is not its children's.** Each line is launched in its own session, so a signal to the
+  coordinator's process group (launchd ending the job) does not reach it; whatever stops a line signals the
+  line's own group.
 
 Run it in place of queue.sh (which now execs it): `uv run --project backend python -m
 thorp.viable.s2_coordination.lanes`. Log: data/runs/queue.out, as before.
@@ -30,6 +39,7 @@ import contextlib
 import json
 import os
 import re
+import signal
 import subprocess
 import sys
 import time
@@ -70,7 +80,7 @@ def slots_of(lane: str) -> int:
 class Line:
     text: str  # the line as written in the queue
     lane: str  # "mac" or "vast"
-    kind: str  # "spec", "cmd" or "wait"
+    kind: str  # "spec", "cmd", "wait" or "hold"
     payload: (
         str  # the spec's path under specs/ (no .yaml), the shell command, or the voyage waited for
     )
@@ -109,9 +119,21 @@ def parse(text: str, specs: Path | None = None) -> Line:
         if m:
             seconds = int(m.group(1)) * {"s": 1, "m": 60, "h": 3600}[m.group(2) or "m"]
             return Line(text.strip(), lane, "cmd", m.group(3).strip(), timeout=seconds)
-        return Line(text.strip(), lane, "cmd", body)
+        ln = Line(text.strip(), lane, "cmd", body)
+        with contextlib.suppress(Exception):
+            from thorp import investigate
+
+            inv = investigate.of_line(text)  # an investigation queued beside the voyages (11 November)
+            if inv:
+                ln.name = inv["name"]
+        return ln
     if s.startswith("wait:"):
         return Line(text.strip(), lane, "wait", s[len("wait:") :].strip())
+    if s.startswith("hold:"):
+        # hold: <what is being signed> (11 November, Justin: "can we encode hold in the queue primitive?"). The
+        # lane waits here, as it does at any first line, until the line is released (`thorp queue release`):
+        # a sign-off is a line of the queue, with its rule written on it, not a file beside it.
+        return Line(text.strip(), lane, "hold", s[len("hold:") :].strip())
     ln = Line(text.strip(), lane, "spec", s)
     spec = _load_spec(s, specs)
     if spec:
@@ -264,6 +286,28 @@ def has_key() -> bool:
         return False
 
 
+def ship_out() -> str | None:
+    """Why the Vast lane must not hire now (None when it may): S3's spend log already has as many ships out
+    as the terms allow, and no seat of this lane is sailing them (the lane asks only when it has a seat
+    free). That is a charter that died with its ship still hired, or one sailed by hand. The gate would
+    refuse each line in turn for "already hired" and the lane would write its whole queue to the history
+    as failures; it waits instead, and says what will free it (11 November)."""
+    try:
+        from thorp.viable.s3_control import charter as s3
+        from thorp.viable.s5_policy import charter as s5
+
+        out = s3.out_now()
+        if out and len(out) >= int(s5.terms().get("max_instances", 1)):
+            h = out[0]
+            return (
+                f"instance {h.get('instance')} ({h.get('name')}) is still hired and no line here is sailing it: "
+                f"thorp charter attach {h.get('run_id')}, or thorp charter audit"
+            )
+    except Exception:  # noqa: BLE001 - no store, no terms: the gate still stands behind the lane
+        return None
+    return None
+
+
 def outside_voyage() -> bool:
     """A `thorp run`, `thorp eval` or `thorp.train` at sea that this coordinator did not start
     (queue.sh's old wait). The direct `python -m thorp.train` form is caught too: the four manual
@@ -315,6 +359,8 @@ def blocked(ln: Line, above: list[Line], at_sea: list[Line]) -> str | None:
     """Why this line cannot start yet (None when it can): a run it reads from queued above it or at sea, the same
     run at sea in the other lane, or (for `wait:`) the voyage waited for still queued or at sea."""
     sailing = list(at_sea)
+    if ln.kind == "hold":
+        return f"held: {ln.payload}"  # until it is released: nothing behind it starts, on either seat
     if ln.kind == "wait":
         name = ln.payload
         if any(x.name == name or x.payload == name for x in above + sailing):
@@ -429,46 +475,125 @@ def _alive(pid: int) -> bool:
     return True
 
 
+def _group_of(pid: int) -> int | None:
+    """The process group this pid leads, when it leads one of its own. Every line is launched in its own
+    session (11 November), so stopping one must signal its whole group or what it started is orphaned. None
+    when the process shares this coordinator's group (a launcher that started no session): that group holds
+    the coordinator itself and is never signalled."""
+    try:
+        g = os.getpgid(int(pid))
+    except (ProcessLookupError, PermissionError, OSError):
+        return None
+    return g if g == int(pid) and g != os.getpgrp() else None
+
+
+def _signal(pid: int, sig: int, group: int | None = None) -> None:
+    """Signal a seat's process: its whole group when it leads one, else the process alone."""
+    group = group if group is not None else _group_of(pid)
+    with contextlib.suppress(ProcessLookupError, PermissionError):
+        if group:
+            os.killpg(group, sig)
+        else:
+            os.kill(int(pid), sig)
+
+
 class _Adopted:
-    """A command this coordinator started before a restart: still alive, but not our child, so there is no
-    exit code to collect — poll() reports -1 when the pid is gone."""
+    """A line a coordinator started before a restart: still alive, but not our child, so there is no exit
+    code to collect. When the pid is gone poll() reports what `outcome` says (a voyage's status on the
+    ledger), or -1 when no outcome was given."""
 
-    def __init__(self, pid: int):
+    def __init__(self, pid: int, outcome=None):
         self.pid = int(pid)
-        self.returncode: int | None = None
+        self.returncode: int | str | None = None
+        self._outcome = outcome
 
-    def poll(self) -> int | None:
+    def poll(self) -> int | str | None:
         if _alive(self.pid):
             return None
-        self.returncode = -1
-        return -1
+        if self.returncode is None:
+            self.returncode = self._outcome() if self._outcome else -1
+        return self.returncode
 
     def terminate(self) -> None:
-        with contextlib.suppress(ProcessLookupError, PermissionError):
-            os.kill(self.pid, 15)
+        _signal(self.pid, signal.SIGTERM)
 
     def kill(self) -> None:
-        with contextlib.suppress(ProcessLookupError, PermissionError):
-            os.kill(self.pid, 9)
+        _signal(self.pid, signal.SIGKILL)
 
 
 def _stop(proc, grace: float = 2.0) -> int:
-    """End a seat's process (a timed-out cmd:), gently then hard; returns the code it left."""
+    """End a seat's process (a timed-out cmd:) and everything it started, gently then hard; returns the
+    code it left. The group is read before the first signal: once its leader has gone it cannot be asked."""
     if proc.poll() is not None:
         return proc.returncode
-    with contextlib.suppress(Exception):
-        proc.terminate()
+    group = _group_of(proc.pid)
+    _signal(proc.pid, signal.SIGTERM, group)
     for _ in range(max(1, int(grace / 0.2))):
         time.sleep(0.2)
         if proc.poll() is not None:
-            return proc.returncode
+            break
+    else:
+        _signal(proc.pid, signal.SIGKILL, group)
+        for _ in range(10):
+            time.sleep(0.2)
+            if proc.poll() is not None:
+                break
+    if group:  # what the leader left behind in its group (a child that ignored the first signal)
+        with contextlib.suppress(ProcessLookupError, PermissionError):
+            os.killpg(group, signal.SIGKILL)
+    return proc.returncode if proc.poll() is not None else -9
+
+
+def _is_that_job(pid: int, ln: Line) -> bool:
+    """Whether a live pid is plausibly the process launched for this line, read from its command line: a pid
+    kept in a row can have been given to another process since. A voyage's command names its spec file; a
+    `cmd:` is the shell running the command, or the command itself where the shell exec'd it. Where the
+    process list cannot be read (a sandbox that blocks ps) the answer is yes: hold the seat and stay safe."""
+    try:
+        r = subprocess.run(
+            ["ps", "-ww", "-o", "command=", "-p", str(int(pid))], capture_output=True, text=True
+        )
+    except (PermissionError, FileNotFoundError, OSError):
+        return True
+    cmd = " ".join(r.stdout.split())
+    if not cmd:
+        return True  # it answers a signal and ps shows nothing: hidden from us, not gone
+    if ln.kind == "spec":
+        return f"{ln.payload}.yaml" in cmd
+
+    def squash(x: str) -> str:
+        return " ".join(x.replace('"', "").replace("'", "").split())
+
+    if squash(ln.payload) in squash(cmd):
+        return True
+    first = (ln.payload.split() or [""])[0].rsplit("/", 1)[-1]
+    return bool(first) and any(w.rsplit("/", 1)[-1] == first for w in cmd.split())
+
+
+def _ledger_status(run_id: str | None) -> str | None:
+    """A run's status on the ledger, or None when it has no row (or the ledger cannot be asked)."""
+    if not run_id:
+        return None
     with contextlib.suppress(Exception):
-        proc.kill()
-    for _ in range(10):
-        time.sleep(0.2)
-        if proc.poll() is not None:
-            return proc.returncode
-    return -9
+        from thorp.ledger import close_reader, reader
+
+        try:
+            return (reader().get_run(run_id) or {}).get("status")
+        finally:
+            close_reader()
+    return None
+
+
+def _outcome(ln: Line, gone: bool = False) -> str:
+    """What to record for a line whose exit this coordinator could not collect, because it was not the
+    process's parent. A voyage's outcome is its status on the ledger (`adopted:finished`; a row still
+    'running' with its process gone is `adopted:unfinished`). `gone` is a process found dead at start-up:
+    unless the ledger says the voyage finished, it is `lost`. One word, so the file queue's history line
+    (`<started> <line> <status>`) still parses."""
+    status = _ledger_status(ln.run_id) if ln.kind == "spec" else None
+    if status == "finished" or (status and not gone):
+        return "adopted:" + ("unfinished" if status == "running" else "-".join(str(status).split()))
+    return "lost" if gone else "adopted:exit-unknown"
 
 
 def _procs_path(root: Path | None = None) -> Path:
@@ -522,6 +647,18 @@ def _reap_runs(say) -> int:
     from thorp import store, vsm
 
     live = {h.get("name") for h in vsm.helms(8)}
+    # a run with a live at-sea row, or sailing on a box still hired, is not a ghost though it holds no helm
+    # here (11 November: a chartered voyage's row comes home 'running' with each pull and never takes this
+    # Mac's helm, so a coordinator restarted mid-charter would have closed it)
+    held: set = set()
+    with contextlib.suppress(Exception):
+        from thorp.viable.s2_coordination import queue_store
+
+        held |= {r["run_id"] for r in queue_store.at_sea() if r["pid"] and _alive(r["pid"])}
+    with contextlib.suppress(Exception):
+        from thorp.viable.s3_control import charter as s3
+
+        held |= {h.get("run_id") for h in s3.out_now()}
     cutoff = time.time() - 3600
     with store.session() as s:
         rows = s.execute(
@@ -529,7 +666,7 @@ def _reap_runs(say) -> int:
         ).fetchall()
         stale = []
         for run_id, name, started in rows:
-            if name in live:
+            if name in live or run_id in held:
                 continue
             try:
                 ts = datetime.fromisoformat(str(started)).timestamp()
@@ -546,15 +683,157 @@ def _reap_runs(say) -> int:
     return len(stale)
 
 
-def _record(done: Path, text: str, started: str, status) -> None:
+_unsunk: set[int] = set()  # at-sea rows whose line is in the history but which could not be deleted yet
+
+
+def _leave_sea(row: int | None) -> None:
+    """Delete an at-sea row outside the history's own transaction (a failed launch, the file queue, a history
+    kept in the file). A row that cannot be deleted now is kept in `_unsunk` and tried again each loop: left
+    in the table it would be adopted as a lost voyage at the next start."""
+    if row is None:
+        return
+    try:
+        from thorp.viable.s2_coordination import queue_store
+
+        queue_store.from_sea(row)
+        _unsunk.discard(row)
+    except Exception:  # noqa: BLE001 - the store is away: try again next loop
+        _unsunk.add(row)
+
+
+def _to_sea(queue: Path, ln: Line, lane: str, seat: int, now: str, say) -> tuple[bool, int | None]:
+    """Take a line from the queue and write its at-sea row; returns (taken, the row's id). With the store as
+    the queue both happen in one transaction (queue_store.take_to_sea). If the row cannot be written (the
+    table not migrated yet, say) the line is taken as before and sails without one: a record must never hold
+    the queue in port."""
+    from thorp.viable.s2_coordination import queue_store
+
+    fields = {
+        "lane": lane, "seat": seat, "kind": ln.kind, "name": ln.name, "run_id": ln.run_id,
+        "started": now, "started_ts": time.time(), "coordinator": os.getpid(),
+    }  # fmt: skip
+    if _queue_pg():
+        try:
+            row = queue_store.take_to_sea(ln.text, **fields)
+            return row is not None, row
+        except store.StoreDown:
+            raise
+        except Exception as e:  # noqa: BLE001
+            say(f"S2: {ln.text} has no at-sea row ({e}); it sails without one")
+            return take(queue, ln.text), None
+    if not take(queue, ln.text):
+        return False, None
+    try:
+        return True, queue_store.to_sea(ln.text, **fields)
+    except Exception as e:  # noqa: BLE001
+        say(f"S2: {ln.text} has no at-sea row ({e}); it sails without one")
+        return True, None
+
+
+def _seat_pid(row: int | None, pid: int, say) -> None:
+    """The launched process's pid, onto its at-sea row."""
+    if row is None:
+        return
+    try:
+        from thorp.viable.s2_coordination import queue_store
+
+        queue_store.set_pid(row, pid)
+    except Exception as e:  # noqa: BLE001 - the line is at sea either way
+        say(f"S2: pid {pid} could not be written to its at-sea row: {e}")
+
+
+def _adopt(running: dict, specs: Path, done: Path, root: Path, say) -> None:
+    """Take up what the last coordinator left at sea (11 November). Every `s2.at_sea` row: a live process
+    that is plausibly that line keeps its seat and is watched to its end; a dead one (or a row that never
+    got a pid) is written to the history as lost, or as finished when the ledger says the voyage docked
+    while no coordinator was watching, and its seat is free. Nothing is requeued here.
+
+    Then the old pid file (data/queue-procs.json), for what a coordinator from before the rows left: the
+    same rule, and a live process is given a row, so the next restart finds it there."""
+    from thorp.viable.s2_coordination import queue_store
+
+    now = time.strftime("%Y-%m-%dT%H:%M:%S")
+
+    def line_of(text: str, name=None, run_id=None) -> Line:
+        try:
+            ln = parse(text, specs)
+        except Exception:  # noqa: BLE001 - a spec gone since the launch still has a line to record
+            ln = Line(text.strip(), "mac", "cmd", text.strip())
+        ln.name, ln.run_id = name or ln.name, run_id or ln.run_id  # as launched, not as the spec reads now
+        return ln
+
+    def seat(lane: str, ln: Line, pid: int, started, ts, slot, row) -> None:
+        running[lane].append(
+            {
+                "line": ln,
+                "proc": _Adopted(pid, outcome=lambda: _outcome(ln)),
+                "since": started or now,
+                "started": started or now,
+                "since_ts": float(ts or time.time()),
+                "slot": int(slot or 0),
+                "row": row,
+            }
+        )
+        _children.add(int(pid))  # ours: not a voyage started outside the queue (outside_voyage)
+        say(f"[{lane}] adopted {ln.text} (pid {pid})")
+
+    def lost(lane: str, ln: Line, pid, started, row) -> None:
+        status = _outcome(ln, gone=True)
+        why = f"its process (pid {pid}) is gone" if pid else "it was never given a pid"
+        hint = ""
+        if lane == "vast" and status == "lost":
+            hint = f"; if its box is still hired: thorp charter attach {ln.run_id or ln.name or '<run id>'}"
+        say(
+            f"[{lane}] {ln.text} was at sea when the last coordinator stopped and {why}: "
+            f"recorded as {status}, not requeued{hint}"
+        )
+        _record(done, ln.text, started or now, status, row=row)
+
+    try:
+        rows = queue_store.at_sea()
+    except Exception as e:  # noqa: BLE001 - no table yet, or no store: the pid file is what there is
+        say(f"S2: the at-sea rows could not be read ({e})")
+        rows = []
+    seen = set()
+    for r in rows:
+        seen.add((r["text"], r["pid"]))
+        ln = line_of(r["text"], r["name"], r["run_id"])
+        lane = r["lane"] if r["lane"] in LANES else ln.lane
+        if r["pid"] and _alive(r["pid"]) and _is_that_job(r["pid"], ln):
+            seat(lane, ln, r["pid"], r["started"], r["started_ts"], r["seat"], r["id"])
+        else:
+            lost(lane, ln, r["pid"], r["started"], r["id"])
+    for e in _read_procs(root):
+        text, pid = str(e.get("text") or "").strip(), int(e.get("pid") or 0)
+        if not text or not pid or (text, pid) in seen or pid in _children:
+            continue
+        ln = line_of(text)
+        if ln.kind not in ("cmd", "spec"):
+            continue
+        lane = e.get("lane") if e.get("lane") in LANES else ln.lane
+        started = e.get("started") or e.get("since")
+        if _alive(pid) and _is_that_job(pid, ln):
+            row = None
+            with contextlib.suppress(Exception):
+                row = queue_store.to_sea(
+                    text, lane=lane, seat=int(e.get("slot") or 0), kind=ln.kind, name=ln.name,
+                    run_id=ln.run_id, pid=pid, started=started, started_ts=e.get("since_ts"),
+                )  # fmt: skip
+            seat(lane, ln, pid, started, e.get("since_ts"), e.get("slot"), row)
+        else:
+            lost(lane, ln, pid, started, None)
+
+
+def _record(done: Path, text: str, started: str, status, row: int | None = None) -> None:
     """Write a line that ended to queue-done.txt, or to queue_history when the store is the queue. If the
     store refuses it, keep it in the file and carry on: a record must never kill the coordinator (10
-    November: a stale id sequence took the queue down on the exit of a finished voyage)."""
+    November: a stale id sequence took the queue down on the exit of a finished voyage). `row` is the line's
+    at-sea row: deleted with the history in one transaction, or straight after a history kept in the file."""
     if _queue_pg():
         from thorp.viable.s2_coordination import queue_store
 
         try:
-            queue_store.record(text, started, status)
+            queue_store.record(text, started, status, at_sea=row)
             return
         except Exception as e:  # noqa: BLE001 - the file keeps what the store could not
             print(
@@ -564,10 +843,12 @@ def _record(done: Path, text: str, started: str, status) -> None:
             )
     with done.open("a", encoding="utf-8") as f:
         f.write(f"{started} {text} {status}\n")
+    _leave_sea(row)
 
 
 def run(queue: Path | None = None, done: Path | None = None, root: Path | None = None,
-        poll_s: float = 30.0, key=has_key, outside=outside_voyage, launch=None, log=None, until_empty: bool = True) -> None:  # fmt: skip
+        poll_s: float = 30.0, key=has_key, outside=outside_voyage, launch=None, log=None, until_empty: bool = True,
+        hired=ship_out) -> None:  # fmt: skip
     """The coordinator's loop: start each idle lane's next line, record each line that ends, until the queue is
     empty and both lanes are in port."""
     queue = queue or paths.resolve("specs/queue.txt")
@@ -596,6 +877,8 @@ def run(queue: Path | None = None, done: Path | None = None, root: Path | None =
             out = open(out_path, "w")  # noqa: SIM115
         cmd = command(ln)
         env = {**os.environ, "THORP_HELM_SLOT": str(slot), "THORP_HELM_SLOTS": str(slots_of("mac"))}
+        # its own session (11 November): a signal to the coordinator's process group, which is what launchd
+        # sends when the job ends, must not reach a voyage. What stops a line signals the line's own group.
         p = subprocess.Popen(
             cmd,
             cwd=root,
@@ -603,6 +886,7 @@ def run(queue: Path | None = None, done: Path | None = None, root: Path | None =
             stdout=out or None,
             stderr=subprocess.STDOUT if out else None,
             env=env,
+            start_new_session=True,
         )  # noqa: S602
         if out:
             out.close()
@@ -613,31 +897,26 @@ def run(queue: Path | None = None, done: Path | None = None, root: Path | None =
     running: dict[str, list[dict]] = {lane: [] for lane in LANES}
     told: dict[str, str | None] = {lane: None for lane in LANES}
     attempts: dict[str, int] = {}
-    # adopt what a crashed coordinator left running: a `cmd:` holds no helm, so nothing else knows it is out
-    for e in _read_procs(root):
-        if e.get("kind") != "cmd" or not _alive(int(e.get("pid") or 0)):
-            continue
-        ln = parse(str(e.get("text") or ""), specs)
-        if ln.kind != "cmd":
-            continue
-        lane = e.get("lane") if e.get("lane") in LANES else "mac"
-        since = e.get("since") or time.strftime("%Y-%m-%dT%H:%M:%S")
-        running[lane].append(
-            {
-                "line": ln,
-                "proc": _Adopted(int(e["pid"])),
-                "since": since,
-                "started": e.get("started") or since,
-                "since_ts": float(e.get("since_ts") or time.time()),
-                "slot": int(e.get("slot") or 0),
-            }
-        )
-        say(f"[{lane}] adopted {ln.text} (pid {e['pid']})")
+    # adopt what the last coordinator left at sea: every at-sea row, then the old pid file
+    try:
+        _adopt(running, specs, done, root, say)
+    except Exception as e:  # noqa: BLE001 - a start that cannot adopt still runs the queue
+        say(f"S2: what was at sea could not be adopted: {e}")
     try:
         _reap_runs(say)
     except Exception as e:  # noqa: BLE001 - a cleanup must never stop the queue
         say(f"S2: could not close stale runs: {e}")
     while True:
+        # the expedition states are a column now (s1.expedition_status): the coordinator writes them as
+        # the helm and the queue move, and the pages read them rather than deriving them
+        try:
+            from thorp import vsm
+
+            vsm.refresh_expedition_states()
+        except Exception as e:  # noqa: BLE001 - a status write must never stop the queue
+            say(f"S2: could not write the expedition states: {e}")
+        for row in list(_unsunk):  # rows whose history is written but which the store would not delete
+            _leave_sea(row)
         # the seats that ended (a lane may hold several now)
         for lane, seats in running.items():
             for seat in list(seats):
@@ -660,6 +939,7 @@ def run(queue: Path | None = None, done: Path | None = None, root: Path | None =
                         or seat.get("since")
                         or time.strftime("%Y-%m-%dT%H:%M:%S"),
                         code,
+                        row=seat.get("row"),
                     )
                     _children.discard(seat["proc"].pid)
                     attempts.pop(seat["line"].text, None)
@@ -692,35 +972,56 @@ def run(queue: Path | None = None, done: Path | None = None, root: Path | None =
                         say("[mac] in port: a voyage started outside the queue is at sea")
                     told[lane] = "outside"
                     break
-                if not take(queue, ln.text):
-                    break  # edited away meanwhile: read the queue again next time
-                told[lane] = None
+                if lane == "vast" and ln.kind == "spec" and (why := hired()):
+                    if why != told[lane]:
+                        say(f"[vast] in port: {why}")
+                    told[lane] = why
+                    break
+                now = time.strftime("%Y-%m-%dT%H:%M:%S")
                 if ln.kind == "wait":
+                    if not take(queue, ln.text):
+                        break  # edited away meanwhile: read the queue again next time
+                    told[lane] = None
                     say(f"[{lane}] {ln.text}: docked, going on")
-                    _record(done, ln.text, time.strftime("%Y-%m-%dT%H:%M:%S"), 0)
+                    _record(done, ln.text, now, 0)
                     lines = [x for x in lines if x is not ln]
                     continue
+                # the lowest free seat, not the count of seats taken: with seat 1 still out and seat 0 home,
+                # the count is 1 again and the new voyage would wait on the helm its neighbour holds
+                used = {int(seat.get("slot") or 0) for seat in running[lane]}
+                seat_no = next(i for i in range(len(used) + 1) if i not in used)
+                # the line leaves the queue and its at-sea row is written in one step (11 November)
+                try:
+                    taken, row = _to_sea(queue, ln, lane, seat_no, now, say)
+                except store.StoreDown as e:  # the store went between the read and the take: next loop
+                    say(f"S2: the queue could not be written: {e}")
+                    break
+                if not taken:
+                    break  # edited away meanwhile: read the queue again next time
+                told[lane] = None
                 say(f"[{lane}] starting {ln.text}")
-                seat_no = len(running[lane])
                 try:
                     p = launch(ln) if custom else launch(ln, seat_no)
                 except Exception as e:  # noqa: BLE001 - one broken line must not take the queue down
                     # the line was taken; retry it twice (requeued at the end, so it cannot wedge the head),
-                    # then record the failure and let the queue go on
+                    # then record the failure and let the queue go on. Either way its at-sea row goes: it
+                    # never sailed. Requeued before the row is deleted, so a death between the two leaves
+                    # the line queued (and a row a restart records as lost), never in neither place.
                     n = attempts.get(ln.text, 0) + 1
                     attempts[ln.text] = n
                     if n < 3:
                         say(f"[{lane}] {ln.text} could not start (attempt {n}/3): {e}")
                         with contextlib.suppress(Exception):
                             append(queue, ln.text)
+                        _leave_sea(row)
                     else:
                         say(f"[{lane}] {ln.text} could not start after 3 attempts: {e}")
-                        _record(done, ln.text, time.strftime("%Y-%m-%dT%H:%M:%S"), 1)
+                        _record(done, ln.text, now, 1, row=row)
                         attempts.pop(ln.text, None)
                     lines = [x for x in lines if x is not ln]
                     continue
                 _children.add(p.pid)
-                now = time.strftime("%Y-%m-%dT%H:%M:%S")
+                _seat_pid(row, p.pid, say)
                 running[lane].append(
                     {
                         "line": ln,
@@ -729,6 +1030,7 @@ def run(queue: Path | None = None, done: Path | None = None, root: Path | None =
                         "started": now,
                         "since_ts": time.time(),
                         "slot": seat_no,
+                        "row": row,
                     }
                 )
                 lines = [x for x in lines if x is not ln]

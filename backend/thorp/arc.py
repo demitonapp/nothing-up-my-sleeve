@@ -138,6 +138,34 @@ def parse_grid(text: str, shape: tuple[int, int] | None = None) -> tuple[list[li
     return None, False
 
 
+THINK_OPEN, THINK_CLOSE = "<think>", "</think>"
+
+
+def answer_text(text: str, opened: bool = False) -> str | None:
+    """The answer in a model's output: what follows its thinking, or None when the thinking never ended.
+
+    A thinking model writes ``<think>...</think>`` and then its answer. A grid quoted inside the
+    thinking is not an answer, so only the text after the last ``</think>`` is read. Thinking that
+    was opened (in the output, or by the prompt: `opened`) and never closed ran out of tokens before
+    any answer: None, which the scorer counts as no grid written. Text with no thinking is the answer."""
+    if not text:
+        return None if opened else text
+    if THINK_CLOSE in text:
+        return text.rsplit(THINK_CLOSE, 1)[1]
+    if opened or THINK_OPEN in text:
+        return None
+    return text
+
+
+THINKING_MARK = "@thinking"
+
+
+def reading_name(model: str, thinking: str | None = None) -> str:
+    """The store name of a model's ARC reading: ``arc-<model>``, or ``arc-<model>@thinking`` when it
+    was read with thinking on, so the two readings of one model sit side by side."""
+    return f"arc-{model}" + (THINKING_MARK if thinking == "on" else "")
+
+
 def task_prompt(task: dict, pairs: int = 3) -> str:
     """The text form of a task: examples, then the test input and an open ``output``."""
     task = task if isinstance(task, dict) else json.loads(task)

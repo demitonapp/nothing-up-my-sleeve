@@ -269,6 +269,7 @@ def summary(key: str) -> dict:
         "learned": v.learned,
         "next_steps": list(v.next_steps),
         "plan": list(getattr(v, "plan", ())),
+        "goals": list(getattr(v, "goals", ())),
         "runs": [run_summary(r, v) for r in runs_of(v)],
         "stars": list(v.stars),
     }
@@ -406,7 +407,11 @@ def overview() -> dict:
                 "version": v,
                 "name": f"SOP v{v}",
                 "art": std.get("art"),
-                "goals": std.get("goals") or [],
+                # an expedition that lists its goals one by one speaks for its standard's card too, so the
+                # card and the expedition's own page cannot name different goals
+                "goals": list(getattr(fleet.EXPEDITIONS.get(std.get("expedition") or ""), "goals", ()))
+                or std.get("goals")
+                or [],
                 "at_sea": sum(1 for r in at_sea if (r.get("sop") if isinstance(r, dict) else None) == v),
                 "queued": 0,
                 "finished": 0,

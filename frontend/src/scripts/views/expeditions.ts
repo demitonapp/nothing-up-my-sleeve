@@ -13,7 +13,7 @@ import { CARD_FACE } from '../../lib/deck';
 import { big, esc, fmt, signed } from '../../lib/format';
 import { alertCls, btnCls as shadcnBtnCls, cardCls, emptyCls, hoverCardCls, pillCls, toggleCls as shadcnToggleCls } from '../../lib/ui';
 import { modelHash, shipHash } from '../router';
-import { STAR_LABEL, starHeadline, statusPill } from './helpers';
+import { STAR_LABEL, artImg, starHeadline, statusPill } from './helpers';
 
 // the ⓘ beside a metric heading. lib/info wires its popover listeners at module load, so it cannot be
 // imported by this server-rendered module: the chip is drawn here and the island loads lib/info in an
@@ -58,6 +58,8 @@ export interface Ship {
 export interface Fit { coef?: Record<string, [number, number, number]>; cv_r2?: number; runs?: number }
 export interface Expedition {
   key: string; name: string; goal: string; status: string; fleet?: string; preset?: string; sop?: string | null;
+  /** the goals one by one, each with what it is and why it is wanted (fleet.py `goals`); absent on most */
+  goals?: { text: string; detail?: string; why?: string }[];
   runs: Run[]; ships: Ship[]; stars?: string[]; learned?: string; next_steps?: string[];
   outcomes?: Outcome[]; levers?: Lever[]; stop: { max_runs: number; about?: string };
   fit?: Fit | null;
@@ -69,7 +71,7 @@ export interface ExpRoute {
   kind: 'overview' | 'queue' | 'list' | 'voyage' | 'table' | 'other';
   key: string | null;
   tab: string;
-  qview: 'glance' | 'every';
+  qview: 'glance' | 'every' | 'planning';
 }
 
 export const ETABS = ['overview', 'plan', 'at-sea', 'findings', 'fleet', 'runs', 'training', 'fitting', 'inside'];
@@ -86,7 +88,7 @@ export function parseExpeditionRoute(path: string): ExpRoute {
   const dec = (x: string): string => { try { return decodeURIComponent(x); } catch { return x; } };
   const rest = parts.slice(1).map(dec);
   if (!rest.length) return { kind: 'overview', key: null, tab: 'overview', qview: 'glance' };
-  if (rest[0] === 'queue') return { kind: 'queue', key: null, tab: 'overview', qview: rest[1] === 'every' ? 'every' : 'glance' };
+  if (rest[0] === 'queue') return { kind: 'queue', key: null, tab: 'overview', qview: rest[1] === 'every' ? 'every' : rest[1] === 'planning' ? 'planning' : 'glance' };
   if (rest[0] === 'expeditions' || rest[0] === 'plans') return { kind: 'list', key: null, tab: 'overview', qview: 'glance' };
   if (rest[1] === 'table') return { kind: 'table', key: rest[0], tab: 'overview', qview: 'glance' };
   return { kind: 'voyage', key: rest[0], tab: ETABS.includes(rest[1]) ? rest[1] : 'overview', qview: 'glance' };
@@ -111,18 +113,30 @@ export const classLink = (rungs: Rung[], preset: string | null | undefined): str
 const btnClsLocal = (v: 'outline' | 'ghost' | 'default' = 'outline', extra = ''): string => shadcnBtnCls(v, extra);
 const toggleClsLocal = (extra = ''): string => shadcnToggleCls(extra);
 
-// ---- the expedition cards (#voyagecards)
-export function expeditionCardsHtml(exps: Expedition[], states: Record<string, string>): string {
-  return exps.map((v) => {
+// ---- the expedition cards (#voyagecards): one card an expedition, its fal image (generate_art.py,
+// EXPEDITIONS), its aim, what it found and the same counts the table carried, so the page reads as one
+// grid of like cards rather than a table of names with no picture.
+const cut = (t: string, n: number): string => (t.length > n ? t.slice(0, n - 1).trimEnd() + '…' : t);
+export function expeditionCardsHtml(exps: Expedition[], states: Record<string, string>, overview?: any): string {
+  const ov: Record<string, any> = {};
+  for (const e of (overview && overview.expeditions) || []) ov[e.key] = e;
+  const cards = exps.map((v) => {
+    const o = ov[v.key] || {};
     const valid = v.runs.filter((r) => !r.set_aside).length;
-    const headline = v.learned || starHeadline(v) || 'nothing found yet';
-    return `<a class="${cardCls(true, 'card')}" href="/expeditions/${esc(v.key)}">
+    const found = v.learned || starHeadline(v) || '';
+    const ships = (v.ships || []).length;
+    const queued = Number(o.queued || 0);
+    const counts = `${Number(o.at_sea || 0)} at sea · ${Number(o.finished || 0)} home · ${Number(o.failed || 0)} failed · ${queued} queued`;
+    return `<a class="${cardCls(true, 'card expcard')}" href="/expeditions/${esc(v.key)}" data-expedition="${esc(v.key)}">
+      ${artImg(`exp-${v.key}`, 'cardart ship')}
       <div class="top"><span class="preset">${esc(v.name)}</span>${expPill(states[v.key], v)}</div>
       <div class="goal">${esc(v.goal)}</div>
-      <div class="ov">${esc(headline)}</div>
-      <div class="foot"><span>${esc(v.fleet || '')} · ${esc(v.preset || '')}</span><span>${valid} of ${v.stop.max_runs} voyages</span></div>
-      <div class="foot"><span>${(v.ships || []).length} ship${(v.ships || []).length === 1 ? '' : 's'}${v.stars && v.stars.length ? ` · bound for ${esc(v.stars.map((k) => STAR_LABEL[k] || k).join(', '))}` : ''}</span></div></a>`;
-  }).join('') || `<div class="${emptyCls()}">no expeditions yet</div>`;
+      <div class="ov" title="${esc(found)}">${esc(cut(found, 240) || 'nothing written up yet: what it found is written when it comes home')}</div>
+      <div class="foot"><span>${esc(v.fleet || '')}${v.preset ? ` · ${esc(v.preset)}` : ''}</span><span>${valid} of ${v.stop.max_runs} voyages</span></div>
+      <div class="foot"><span class="expcounts">${counts} · ${ships} ship${ships === 1 ? '' : 's'}</span></div>
+    </a>`;
+  }).join('');
+  return cards ? `<div class="cards expcards">${cards}</div>` : `<div class="${emptyCls()}">no expeditions yet</div>`;
 }
 
 // ---- the plan and the waters each ship sails in (#waters; thorp/dash/waters.py, /api/waters)
@@ -246,11 +260,11 @@ export function queueRowsHtml(d: any, rungs: Rung[]): string {
   // the at-sea voyages are the first of the queue: number them too (10 November, Justin: "I'd be
   // expecting the at sea ships to still have a number"), and let the number run on through the file.
   let seq = 0;
-  const rows = (d.rows || []).map((r: any) => {
+  const rows = (d.rows || []).map((r: any, i: number) => {
     seq += 1;
     return r.kind === 'step'
       ? `<tr class="qstep"><td class="s">${seq}</td><td colspan="5" class="s" title="${esc(r.cmd)}">↳ then a step: <span class="mono">${esc(r.name)}</span></td></tr>`
-      : `<tr${r.status === 'at sea' ? ' class="sel"' : ''}><td class="s">${seq}</td>
+      : `<tr data-qi="${i}" tabindex="0" aria-label="show the card for ${esc(r.name)}" title="show this voyage's card"${r.status === 'at sea' ? ' class="sel"' : ''}><td class="s">${seq}</td>
       <td><b>${esc(r.name)}</b><div class="s" title="${esc(r.goal || '')}">${esc(queueGoal(r))}</div></td>
       <td>${(() => {
         const rung = rungs.find((x) => x.preset === r.preset);
@@ -263,6 +277,21 @@ export function queueRowsHtml(d: any, rungs: Rung[]): string {
   }).join('')
     || `<tr><td colspan="6" class="${emptyCls(true)}">the queue is empty</td></tr>`;
   return rows;
+}
+
+/** A voyage's pins as one strip: a cell a layer, each card a chip in the layer it is taught (the queue's
+ *  card and the at-sea card draw the same strip). */
+export function pinsStripHtml(pins: { card?: string; layer?: number }[], layers: number): string {
+  const by: Record<number, string[]> = {};
+  (pins || []).forEach((h) => {
+    const L = Number(h.layer);
+    if (!Number.isFinite(L)) return;
+    (by[L] || (by[L] = [])).push(String(h.card || '?'));
+  });
+  return Array.from({ length: Math.max(0, layers) }, (_, L) => {
+    const cs = by[L] || [];
+    return `<span class="pincell${cs.length ? ' used' : ''}" title="layer ${L}: ${cs.length ? esc(cs.join(', ')) : 'free'}">${cs.map((c) => `<i>${esc(c)}</i>`).join('')}<b>L${L}</b></span>`;
+  }).join('');
 }
 
 // ---- every run of the expedition (the Runs tab): the finished arms, not only the ones at sea
@@ -653,19 +682,43 @@ export function tableReadingsHtml(r: any): string {
 export const expeditionName = (exps: Expedition[], key: string | null | undefined): string =>
   (exps.find((x) => x.key === key) || {}).name || String(key || '');
 
-// ---- the SOP cards (#expeditions; /api/expeditions/overview .sops): one card per version that states an aim
-export function sopCardsHtml(d: any): string {
-// the SOP cards: the page's subject is the standard (9 November): one card per version that states an aim, its art
-  // and its goals. The running one comes first; the fleet's older groupings stay for the other tabs.
-  const sops = d.sops || [];
-  const cards = sops.length ? `<div class="sopcards">${sops.map((e: any) => `<a class="sopcard${e.at_sea ? ' atsea' : ''}" href="${e.expedition ? `/expeditions/${esc(e.expedition)}` : '/shipyard/training'}" title="${e.expedition ? `open the ${esc(e.expedition)} expedition` : 'open the SOP in the shipyard'}">
+// ---- the cards in play (#expeditions; /api/expeditions/overview .sops and /api/expeditions): one grid,
+// the standard at sea beside the expeditions open ahead of their own standard, so every card reads alike.
+const sopCardHtml = (e: any): string => `<a class="sopcard${e.at_sea ? ' atsea' : ''}" href="${e.expedition ? `/expeditions/${esc(e.expedition)}` : '/shipyard/training'}" title="${e.expedition ? `open the ${esc(e.expedition)} expedition` : 'open the SOP in the shipyard'}">
       ${e.art ? `<img class="sopart" src="/art/${esc(e.art)}.png" alt="" loading="lazy">` : '<div class="sopart"></div>'}
       <div class="sopbody">
         <div class="sophead"><b>${esc(e.expedition_name || `SOP v${e.version}`)}</b><span class="s">SOP v${esc(e.version)}</span>${e.at_sea ? `<span class="${pillCls('running')}">at sea</span>` : `<span class="${pillCls('')}">${e.finished ? 'in port' : 'planned'}</span>`}<span class="s">${e.at_sea ? `${e.at_sea} voyage${e.at_sea === 1 ? '' : 's'} out` : e.finished ? `${e.finished} voyage${e.finished === 1 ? '' : 's'} home` : 'not sailed'}</span></div>
         <div class="k">its goals</div>
         <ul class="sopgoals">${(e.goals || []).map((g: any) => `<li><b>${esc(typeof g === 'string' ? g : g.text)}</b>${typeof g === 'string' || !g.detail ? '' : ` <span class="s">— ${esc(g.detail)}</span>`}</li>`).join('')}</ul>
-      </div></a>`).join('')}</div>` : '';
-  return cards;
+      </div></a>`;
+
+const openCardHtml = (v: Expedition, states: Record<string, string>, ov: Record<string, any>): string => {
+  const o = ov[v.key] || {};
+  const valid = v.runs.filter((r) => !r.set_aside).length;
+  const atSea = Number(o.at_sea || 0);
+  const sailed = `${valid} of ${v.stop.max_runs} voyage${v.stop.max_runs === 1 ? '' : 's'}`;
+  return `<a class="sopcard${atSea ? ' atsea' : ''}" href="/expeditions/${esc(v.key)}" title="open the ${esc(v.name)} expedition">
+      ${artImg(`exp-${v.key}`, 'sopart')}
+      <div class="sopbody">
+        <div class="sophead"><b>${esc(v.name)}</b><span class="s">expedition</span>${expPill(states[v.key], v)}<span class="s">${sailed}</span></div>
+        <div class="k">its goal</div>
+        <ul class="sopgoals"><li title="${esc(v.goal)}">${esc(cut(v.goal, 640))}</li></ul>
+      </div></a>`;
+};
+
+/** One grid for the page: every live SOP card and every open expedition card. They are different data
+ *  and the same shape, so Kipling and Arc de Triomphe sit side by side rather than stacked. */
+export function overviewCardsHtml(d: any, exps: Expedition[], states: Record<string, string>, overview?: any): string {
+  const ov: Record<string, any> = {};
+  for (const e of (overview && overview.expeditions) || []) ov[e.key] = e;
+  const cards = [...(d.sops || []).map(sopCardHtml), ...(exps || []).map((v) => openCardHtml(v, states, ov))];
+  return cards.length ? `<div class="sopcards">${cards.join('')}</div>` : '';
+}
+
+// ---- the SOP cards on the Plans tab's earlier standards (one grid, unchanged)
+export function sopCardsHtml(d: any): string {
+  const sops = d.sops || [];
+  return sops.length ? `<div class="sopcards">${sops.map(sopCardHtml).join('')}</div>` : '';
 }
 
 // ---- First Light: the first expedition's findings, from its fourteen round-1 voyages
@@ -703,7 +756,6 @@ export function firstLightFindings(v: Expedition): string {
 }
 
 // ---- the plans page as a table: every expedition, one row, with what it has sailed and what it found
-const cut = (t: string, n: number): string => (t.length > n ? t.slice(0, n - 1).trimEnd() + '…' : t);
 export function expeditionTableHtml(exps: Expedition[], states: Record<string, string>, overview: any): string {
   const ov: Record<string, any> = {};
   for (const e of (overview && overview.expeditions) || []) ov[e.key] = e;

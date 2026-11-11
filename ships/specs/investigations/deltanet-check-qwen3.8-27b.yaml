@@ -1,0 +1,19 @@
+# ships/specs/investigations: Arc de Triomphe, the instrument's check on the model it was built for
+# (11 November, Justin: "we need a new instrument for the 48 before we do the audit").
+kind: investigation
+name: deltanet-check-qwen3.8-27b
+expedition: arc_de_triomphe
+ship: "Arc de Triomphe: the linear-attention instrument, checked on Qwen3.8 27B"
+question: >-
+  Does the instrument for the 48 linear-attention layers hold on the 27B itself? It passed on the 0.8B of the
+  same family (18 linear layers, one value head to a key head). The 27B has three value heads to a key head
+  and 4-bit weights. The check: the effective attention rebuilds what each layer computed, an empty edit
+  changes nothing, a removal does, the removal holds through cached generation, and an attention layer is
+  refused. Loads 15 GB for a twelve-token prompt.
+subject: mlx-community/Qwen3.8-27B-4bit
+run:
+  - -m
+  - thorp.deltanet
+  - "{subject}"
+timeout: 40m
+readings: []

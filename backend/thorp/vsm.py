@@ -916,11 +916,12 @@ def helm() -> dict | None:
     return seats[0] if seats else None
 
 
-def expedition_states() -> dict[str, str]:
-    """Each expedition's state as S2 sees it, from the helm and the queue (not the declared status):
-    'at sea' (its voyage holds the helm: at most one), 'under way' (voyages queued), and otherwise its
-    declared state: 'home' (done), 'in port' (planned), 'paused', or 'awaiting orders' (declared running
-    with nothing at sea and nothing queued: stalled, or finished and not yet closed)."""
+def _compute_expedition_states() -> dict[str, str]:
+    """The six-state value from the helm and the queue (not the declared status): 'at sea' (its voyage
+    holds the helm: at most one), 'under way' (voyages queued), and otherwise its declared state:
+    'home' (done), 'in port' (planned), 'paused', or 'awaiting orders' (declared running with nothing at
+    sea and nothing queued: stalled, or finished and not yet closed). The coordinator writes this into
+    s1.expedition_status; the pages read that column."""
     import yaml
 
     from thorp import fleet
@@ -939,6 +940,14 @@ def expedition_states() -> dict[str, str]:
     under = set()
     for ln in q.read_text().splitlines():
         ln = ln.strip()
+        if ln.startswith("cmd:"):
+            # an investigation queued beside the voyages names its expedition outright (thorp/investigate.py)
+            from thorp import investigate
+
+            inv = investigate.of_line(ln)
+            if inv:
+                under.add(inv["expedition"])
+            continue
         if (
             ln
             and not ln.startswith(("#", "cmd:"))
@@ -958,6 +967,25 @@ def expedition_states() -> dict[str, str]:
             )
         )
     return out
+
+
+def refresh_expedition_states() -> dict[str, str]:
+    """Compute the states and write them to s1.expedition_status: the coordinator's one write."""
+    from thorp import expedition_status
+
+    states = _compute_expedition_states()
+    expedition_status.write(states)
+    return states
+
+
+def expedition_states() -> dict[str, str]:
+    """The stored column, one row per expedition; a fresh or partial table is filled once."""
+    from thorp import expedition_status, fleet
+
+    stored = expedition_status.read()
+    if set(stored) != set(fleet.EXPEDITIONS):
+        return refresh_expedition_states()
+    return stored
 
 
 def _sailing_without_helm(name: str) -> bool:

@@ -13,7 +13,7 @@ import math
 
 from thorp import store
 
-KINDS = ("chain-grades", "knockout-deck", "knockout", "deck", "logic", "math500", "arc")
+KINDS = ("chain-grades", "knockout-deck", "knockout", "deck", "logic", "math500", "arc-ai2", "arc", "blimp")
 
 
 def kind_of(name: str) -> tuple[str, str | None]:
@@ -24,7 +24,10 @@ def kind_of(name: str) -> tuple[str, str | None]:
         return "math500", name[len("math500-"):].replace("--", "/").replace("__", "/")
     for k in KINDS[1:]:
         if name.startswith(k + "-"):
-            return k, name[len(k) + 1:].replace("--", "/").replace("__", "/")
+            model = name[len(k) + 1:]
+            if k == "arc":  # `arc-<model>@thinking`: the same model, read with thinking on (thorp/arc.py)
+                model = model.removesuffix("@thinking")
+            return k, model.replace("--", "/").replace("__", "/")
     if "__" in name:  # <model>__<list>[__<clean>]: a book list scored on an outside model
         return "scored", name.split("__")[0].replace("--", "/")
     return "other", None

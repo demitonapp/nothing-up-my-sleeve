@@ -9,10 +9,21 @@ import RunsPage from '../../components/islands/RunsPage';
 import Reader from '../../components/Reader.astro';
 
 export function getStaticPaths() {
-  const harbours = ['phaleron', 'piraeus', 'zayton'];
+  // the Orbitals' keys now; the three old harbour keys stay as addresses so an old link lands on the
+  // right one (the island reads the alias and replaces the address)
+  const harbours = ['schimint', 'vavatch-end', 'masaq-reach'];
+  const aliases = ['phaleron', 'piraeus', 'zayton'];
   const paths: string[] = [];
   for (const h of harbours) {
     paths.push(h, `${h}/ships`, `${h}/shipbuilder`);
+  }
+  for (const old of aliases) {
+    paths.push(old, `${old}/ships`, `${old}/shipbuilder`);
+  }
+  // the Reach's four size bands open the outside ships in each
+  for (const band of ['xsmall', 'small', 'medium', 'large']) {
+    paths.push(`masaq-reach/${band}`);
+    paths.push(`zayton/${band}`);
   }
   return paths.map((path) => ({ params: { path } }));
 }

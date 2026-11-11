@@ -249,7 +249,17 @@ header tab but an action on a ship's page, Nothing up my sleeve and foreign alik
   size, each measure ahead, tie or behind), **Against size** (one reading against parameters, our
   ships and the outside models as two lines) and **ARC-AGI-2 at this size** (prompted cold and
   trained on ARC tasks as two columns, never one number). They are steps, not rungs: a rung is a
-  size class. Below the two boards is
+  size class.
+
+  The **medium** band has no reading of ours on the public tests either, so its page carries
+  **The tests** (`BenchBoard.tsx`, `data/benchmarks.json`): one flip card a test — IFBench,
+  Multi-IF, LIFE-Bench, ArtifactsBench, Terminal-Bench 2.1, SciCode, BFCL v4, TAU3-Banking,
+  GDPval v2, AA-LCR, AA-Omniscience accuracy and non-hallucination, GPQA Diamond, HLE,
+  HMMT Feb 2026, IMO-AnswerBench — each turned over for its board of the five medium models
+  (Ling 3.0 Tiny, Qwen3.5 4B and 9B, Gemma 4 E4B and 12B). The readings are Artificial
+  Analysis's published November 2026 numbers, labelled as published on every card and in the
+  note, never as our measurement; a test with no art of its own gets its group on a plate
+  instead of an empty frame. A card is linkable (`?open=ifbench`). Below the two boards is
   **Reasoning**: ARC-AGI-2, the canonical intelligence ranking (pass@2 on the 120-task evaluation
   set) — the published scores of the board's models, and Nothing up my sleeve's own reading once the
   Kipling ARC arm has one. It is a panel of its own because ARC percentages and chaining lift are
@@ -385,19 +395,28 @@ header tab but an action on a ship's page, Nothing up my sleeve and foreign alik
   voyages' folders, named from the ledger and linked to their ship pages) and **the outside models**
   (each model in the cache, biggest first). **The store**: Postgres's address (no password), whether it
   answers, its version, size and ten biggest tables, and which of the ledger, the library and the queue
-  it holds. **Server and machine**: above the facts, **the performance chart** — the dash process's own CPU
-  and memory as two lines (CPU % on the left axis, memory in MB on the right) over the last hour, day or
-  week (a row of range tabs: a minute, five minutes or half an hour a point), sampled every twenty seconds
-  by `thorp.dash.perf` into `data/dash/perf.jsonl` and kept eight days; a strip above it gives CPU and
-  memory now, their mean and peak over the range, and the samples, and a break in the line is a time the
-  server was not running. Then the version, commit and files changed since, when the server started
-  and when the dashboard was built, Python and the frameworks, the chip, cores and memory, and each
-  lane's seats. **Switches**: every `THORP_*` the server was started with, a dash for a default, and what
-  each does. **Keys and places**: whether each key (`FAL_KEY`, `VAST_API_KEY`, `HF_TOKEN`) is set, never
-  its value, and where the repository, data, ships, ledger, checkpoints and model cache live. Nothing is
-  deleted from this page; the store's address is the one thing changed here (a switch in the store tab),
-  and the policies stay on the VSM's S5 and the seats on the queue. A
-  part that cannot be read says why and the rest still stands.
+  it holds. **Server and machine**: above the facts, **the performance chart** — the machine and this
+  server as four lines over the last hour, day or week (a row of range tabs: a minute, five minutes or half
+  an hour a point): the machine's **GPU utilisation** (IOAccelerator, the gold area) and **memory in use**
+  of its total (vm_stat's wired, anonymous and compressed pages, the blue line on the right axis), beside
+  **this server's CPU** (green) and **its own resident memory** (the dashed line, right axis). A strip
+  above gives GPU now with its cores and the memory it holds, CPU now with its peak, memory in use of the
+  total with its peak, this server's memory, and the samples; a break in a line is a time the server was not
+  running. Sampled every twenty seconds by `thorp.dash.perf` into `data/dash/perf.jsonl` and kept eight
+  days. Then the version, commit and files changed since, when the server started and when the dashboard
+  was built, Python and the frameworks, the chip (its CPU and GPU cores) and memory, and each lane's
+  seats. Then **Vast.ai**: a stat strip (whether the key is set, the seats, the week's spend of its
+  budget, the all-time spend, voyages and hours, and the ships out) and a table, one row a GPU chip class
+  the terms allow: its ceiling, how many times the market was read and when, the latest price and the
+  host's reliability, the range (min, median, max), the voyages hired with any still out, the hours, the
+  money spent, and the last measured rate (or the TFLOP/s guess when that class has never sailed). The
+  terms' classes come first, then any class the spend log knows; it is read from the store
+  (`s4.market_reads`, `s3.spend_events`, `s5.charter`), never the API. **Switches**: every `THORP_*` the
+  server was started with, a dash for a default, and what each does. **Keys and places**: whether each key
+  (`FAL_KEY`, `VAST_API_KEY`, `HF_TOKEN`) is set, never its value, and where the repository, data, ships,
+  ledger, checkpoints and model cache live. Nothing is deleted from this page; the store's address is the
+  one thing changed here (a switch in the store tab), and the policies stay on the VSM's S5 and the seats
+  on the queue. A part that cannot be read says why and the rest still stands.
 - **VSM** (`/vsm`, a tab under Expeditions; `thorp/vsm.py`, `/api/governance`): Thorp's rules
   as Beer's Viable System Model, five Card bands from S5 at the top to S1, each with its name, purpose,
   its code as Badge chips and its live numbers from `vsm.audit()`. S5 policy: each policy's

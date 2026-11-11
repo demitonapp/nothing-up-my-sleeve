@@ -1,16 +1,19 @@
-"""The dash server's own performance, sampled (/settings/server's chart).
+"""What the machine is doing, and what the dash server is doing, sampled (/settings/server's chart).
 
-`thorp dash` starts one sampler thread (server.serve, via `start`): every twenty seconds it writes this
-process's CPU — the CPU seconds it spent over the interval, as a percentage of one core — and its resident
-memory, to data/dash/perf.jsonl. The file keeps eight days: the week's chart and a day of margin.
+`thorp dash` starts one sampler thread (server.serve, via `start`): every twenty seconds it writes a line to
+data/dash/perf.jsonl — this process's CPU (the CPU seconds it spent over the interval, as a percentage of
+one core) and resident memory; and the machine's own readings: the GPU's utilisation and the memory it
+holds (IOAccelerator), and the memory in use (vm_stat: wired, anonymous and the compressor, what Activity
+Monitor calls Memory Used). The file keeps eight days: the week's chart and a day of margin.
 
 `history` reads it back as one point per bucket — a minute for the last hour, five minutes for the day,
 half an hour for the week — the mean of each bucket, null where nothing was sampled. A line that breaks is
-a time the dashboard was not running, which is also why a restarted server keeps its past: the file is
-the history, not the process.
+a time the dashboard was not running, which is also why a restarted server keeps its past: the file is the
+history, not the process.
 
-A sample is this process alone. A voyage trains in its own process, so the chart is what the dashboard
-costs, not what it is watching; the queue and the store have their own pages.
+The machine's lines are not this process's: a voyage trains in its own process, on the GPU, inside the
+same 32 GB of unified memory. That is the point of showing both — the dashboard's own cost (a gigabyte or
+two, idle) beside the machine it answers from (the GPU at its work, the memory that work holds).
 """
 
 from __future__ import annotations
@@ -19,6 +22,7 @@ import ctypes
 import ctypes.util
 import json
 import os
+import re
 import subprocess
 import sys
 import threading
@@ -91,6 +95,88 @@ def store() -> Path:
     return paths.data_dir() / "dash" / "perf.jsonl"
 
 
+def parse_vm_stat(text: str) -> dict:
+    """The machine's memory in use (bytes) from `vm_stat`: wired, anonymous and the compressor's pages —
+    the three Activity Monitor adds up — at the page size it reports. {} when a line is not there."""
+    m = re.search(r"page size of (\d+) bytes", text)
+    if not m:
+        return {}
+    page = int(m.group(1))
+    want = ("Pages wired down", "Anonymous pages", "Pages occupied by compressor")
+    pages: dict[str, int] = {}
+    for line in text.splitlines():
+        key, _, value = line.partition(":")
+        key = key.strip().strip('"')
+        value = value.strip().rstrip(".")
+        if key in want and value.isdigit():
+            pages[key] = int(value)
+    if len(pages) < len(want):
+        return {}
+    return {"mem": page * sum(pages.values())}
+
+
+def parse_ioreg(text: str) -> dict:
+    """The GPU's reading from an IOAccelerator dump: how busy it is (percent), the memory it holds (bytes)
+    and how many cores it has. Whatever the dump does not carry is left out; a driver's own memory line
+    (`In use system memory (driver)`) is not the one asked for."""
+    out = {}
+    for key, name in (
+        ("Device Utilization %", "gcpu"),
+        ("In use system memory", "gmem"),
+        ("gpu-core-count", "gpu_cores"),
+    ):
+        m = re.search(r'"' + re.escape(key) + r'"\s*=\s*(\d+)', text)
+        if m:
+            out[name] = int(m.group(1))
+    return out
+
+
+def _run(args: list[str], timeout: float = 5.0) -> str:
+    try:
+        r = subprocess.run(args, capture_output=True, text=True, timeout=timeout)
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    return r.stdout if r.returncode == 0 else ""
+
+
+def gpu_cores() -> int | None:
+    """How many cores the machine's GPU has, from the accelerator's own entry (macOS; None elsewhere)."""
+    if sys.platform != "darwin":
+        return None
+    return parse_ioreg(_run(["ioreg", "-rc", "AGXAccelerator", "-d", "1"])).get("gpu_cores")
+
+
+def machine() -> dict:
+    """The machine's readings: the memory in use (`mem`) and the total (`mem_total`), the GPU's utilisation
+    (`gcpu`), the memory it holds (`gmem`) and its cores. None where this machine does not answer, so the
+    chart draws a gap rather than a false zero; Linux reads /proc where a Mac reads vm_stat and ioreg."""
+    out = {"mem": None, "mem_total": None, "gcpu": None, "gmem": None, "gpu_cores": None}
+    if sys.platform == "darwin":
+        out.update(parse_vm_stat(_run(["vm_stat"])))
+        out.update(parse_ioreg(_run(["ioreg", "-rc", "IOAccelerator", "-d", "1"])))
+    else:
+        try:
+            with open("/proc/meminfo", encoding="ascii") as f:
+                info = {
+                    k.strip(): int(v.split()[0]) * 1024
+                    for k, _, v in (line.partition(":") for line in f)
+                    if v.split()[0].isdigit()
+                }
+            total = info.get("MemTotal")
+            free = info.get("MemAvailable")
+            if total:
+                out["mem_total"] = total
+                out["mem"] = max(0, total - free) if free is not None else None
+        except (OSError, ValueError, IndexError):
+            pass
+    if out["mem_total"] is None:
+        try:
+            out["mem_total"] = os.sysconf("SC_PHYS_PAGES") * os.sysconf("SC_PAGE_SIZE")
+        except (ValueError, OSError, AttributeError):
+            pass
+    return out
+
+
 def rss() -> int | None:
     """The process's resident memory in bytes, or None: libproc on macOS, /proc on Linux, `ps` if neither."""
     if sys.platform == "darwin":
@@ -141,10 +227,15 @@ def _loop() -> None:
         wall = time.monotonic()
         cpu = time.process_time()
         seconds = wall - prev_wall
+        seen = machine()
         row = {
             "t": round(time.time(), 1),
             "cpu": round(100.0 * (cpu - prev_cpu) / seconds, 1) if seconds > 0 else None,
             "rss": rss(),
+            "mem": seen["mem"],
+            "gcpu": seen["gcpu"],
+            "gmem": seen["gmem"],
+            "gpu_cores": seen["gpu_cores"],
         }
         prev_wall, prev_cpu = wall, cpu
         _append(row)
@@ -216,9 +307,13 @@ def _prune() -> int:
     return len(rows) - len(kept)
 
 
+MACHINE_KEYS = ("cpu", "rss", "gcpu", "mem")
+
+
 def history(rng: str = "24h", now: float | None = None) -> dict:
-    """The last hour, day or week as one point per bucket: the mean CPU and memory of each, null where
-    nothing was sampled, and the summary of the samples the range holds. `now` is for the tests."""
+    """The last hour, day or week as one point per bucket: the mean of each reading (this server's CPU and
+    memory, the machine's GPU and memory in use), null where nothing was sampled, and the summary of the
+    samples the range holds. `now` is for the tests."""
     if rng not in RANGES:
         rng = "24h"
     span, step = RANGES[rng]
@@ -226,29 +321,50 @@ def history(rng: str = "24h", now: float | None = None) -> dict:
     rows = _load()
     first = int((now - span) // step) * step
     n = int((now - first) // step) + 1
-    cpu_sum, cpu_n = [0.0] * n, [0] * n
-    rss_sum, rss_n = [0.0] * n, [0] * n
+    sums = {k: [0.0] * n for k in MACHINE_KEYS}
+    counts = {k: [0] * n for k in MACHINE_KEYS}
     inside = [r for r in rows if first <= r["t"] <= now]
     for r in inside:
         i = int((r["t"] - first) // step)
         if not 0 <= i < n:  # a clock that went backwards, or a sample ahead of `now`
             continue
-        if isinstance(r.get("cpu"), (int, float)):
-            cpu_sum[i] += float(r["cpu"])
-            cpu_n[i] += 1
-        if isinstance(r.get("rss"), (int, float)):
-            rss_sum[i] += float(r["rss"])
-            rss_n[i] += 1
+        for k in MACHINE_KEYS:
+            if isinstance(r.get(k), (int, float)):
+                sums[k][i] += float(r[k])
+                counts[k][i] += 1
     points = [
         {
             "t": first + i * step,
-            "cpu": round(cpu_sum[i] / cpu_n[i], 2) if cpu_n[i] else None,
-            "rss": int(rss_sum[i] / rss_n[i]) if rss_n[i] else None,
+            **{
+                k: (
+                    round(sums[k][i] / counts[k][i], 2)
+                    if k in ("cpu", "gcpu")
+                    else int(sums[k][i] / counts[k][i])
+                )
+                if counts[k][i]
+                else None
+                for k in MACHINE_KEYS
+            },
         }
         for i in range(n)
     ]
-    cpus = [float(r["cpu"]) for r in inside if isinstance(r.get("cpu"), (int, float))]
-    rsses = [float(r["rss"]) for r in inside if isinstance(r.get("rss"), (int, float))]
+    seen = {
+        k: [float(r[k]) for r in inside if isinstance(r.get(k), (int, float))] for k in MACHINE_KEYS
+    }
+
+    def summary(k: str) -> dict:
+        v = seen[k]
+        if not v:
+            return {"mean": None, "peak": None}
+        mean, peak = sum(v) / len(v), max(v)
+        if k in ("cpu", "gcpu"):  # percentages keep their decimals; memory is whole bytes
+            return {"mean": round(mean, 2), "peak": round(peak, 2)}
+        return {"mean": int(mean), "peak": int(peak)}
+
+    try:
+        mem_total = os.sysconf("SC_PHYS_PAGES") * os.sysconf("SC_PAGE_SIZE")
+    except (ValueError, OSError, AttributeError):
+        mem_total = None
     return {
         "range": rng,
         "step": step,
@@ -258,12 +374,11 @@ def history(rng: str = "24h", now: float | None = None) -> dict:
         "now": rows[-1] if rows else None,
         "stats": {
             "count": len(inside),
-            "cpu_mean": round(sum(cpus) / len(cpus), 2) if cpus else None,
-            "cpu_peak": round(max(cpus), 2) if cpus else None,
-            "rss_mean": int(sum(rsses) / len(rsses)) if rsses else None,
-            "rss_peak": int(max(rsses)) if rsses else None,
+            **{f"{k}_{how}": summary(k)[how] for k in MACHINE_KEYS for how in ("mean", "peak")},
         },
         "first": rows[0]["t"] if rows else None,
+        "mem_total": mem_total,
+        "gpu_cores": next((r.get("gpu_cores") for r in reversed(rows) if r.get("gpu_cores")), None),
         "kept_days": KEEP // 86400,
         "step_sampled": STEP,
         "pid": os.getpid(),

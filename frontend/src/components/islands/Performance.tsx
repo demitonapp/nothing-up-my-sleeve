@@ -1,7 +1,8 @@
-// The server tab's chart (/settings/server): the dash server's own CPU and memory, sampled every twenty
-// seconds by thorp.dash.perf (data/dash/perf.jsonl) and read back as one point per bucket for the last
-// hour, day or week. ECharts is imported inside the effect: the page is server-rendered, and nothing that
-// touches `document` may be imported at module load (UI.md, "Navigation" and the discoveries island's rule).
+// The server tab's chart (/settings/server): the machine's GPU and memory beside this server's own CPU and
+// memory, sampled every twenty seconds by thorp.dash.perf (data/dash/perf.jsonl) and read back as one point
+// per bucket for the last hour, day or week. ECharts is imported inside the effect: the page is
+// server-rendered, and nothing that touches `document` may be imported at module load (UI.md, "Navigation"
+// and the discoveries island's rule).
 
 import { useEffect, useRef } from 'react';
 import { useApi } from '@/lib/useApi';
@@ -9,13 +10,15 @@ import { cardCls, emptyCls, toggleCls } from '@/lib/ui';
 
 export type PerfRange = '1h' | '24h' | '7d';
 
-interface Point { t: number; cpu: number | null; rss: number | null }
+interface Point { t: number; cpu: number | null; rss: number | null; gcpu: number | null; mem: number | null }
 interface Perf {
   error?: string; range: string; step: number; from: number; to: number;
   points: Point[];
-  now: Point | null;
+  now: (Point & { gmem?: number | null; gpu_cores?: number | null }) | null;
   first: number | null;
-  stats: { count: number; cpu_mean: number | null; cpu_peak: number | null; rss_mean: number | null; rss_peak: number | null };
+  stats: Record<string, number | null>;
+  mem_total: number | null;
+  gpu_cores: number | null;
   kept_days: number; step_sampled: number; pid: number;
 }
 
@@ -26,6 +29,7 @@ const RANGES: { key: PerfRange; label: string; about: string }[] = [
 ];
 
 const mb = (v: number | null | undefined): string => (v == null ? '–' : `${Math.round(v / 2 ** 20).toLocaleString()} MB`);
+const gb = (v: number | null | undefined): string => (v == null ? '–' : `${(v / 2 ** 30).toFixed(v / 2 ** 30 >= 10 ? 1 : 2)} GB`);
 const pc = (v: number | null | undefined): string => (v == null ? '–' : `${Number(v).toFixed(Number(v) < 10 ? 1 : 0)}%`);
 const clock = (ms: number): string => {
   const t = new Date(ms);
@@ -43,6 +47,7 @@ function Stat({ k, v, s }: { k: string; v: string; s?: string }) {
 export default function Performance({ range, onRange }: { range: PerfRange; onRange: (r: PerfRange) => void }) {
   const { data: d, error } = useApi<Perf>(`/api/settings/perf?range=${range}`, 60000);
   const el = useRef<HTMLDivElement>(null);
+  const totalGb = d?.mem_total ? d.mem_total / 2 ** 30 : null;
 
   useEffect(() => {
     if (!d || d.error || d.range !== range || !d.stats.count || !el.current) return;
@@ -52,16 +57,13 @@ export default function Performance({ range, onRange }: { range: PerfRange; onRa
       const { echartsPlot } = await import('@/lib/echarts');
       if (!live) return;
       const tok = (n: string): string => getComputedStyle(document.documentElement).getPropertyValue('--' + n).trim();
-      const C = { text: tok('text'), muted: tok('muted'), line: tok('line'), accent: tok('accent'), blue: tok('blue') };
-      const peakMb = Math.max(0, ...d.points.map((p) => (p.rss ?? 0) / 2 ** 20));
-      // below a gigabyte the right axis reads in MB, above it in GB: 2,210 MB is a size no one thinks in
-      const mem = (v: number): string => (peakMb >= 1024
-        ? `${(v / 1024).toFixed(v >= 10240 ? 0 : 1)} GB`
-        : `${Math.round(v)} MB`);
+      const C = { text: tok('text'), muted: tok('muted'), line: tok('line'), accent: tok('accent'), blue: tok('blue'), good: tok('good') };
+      const gbOf = (v: number | null): number | null => (v == null ? null : +(v / 2 ** 30).toFixed(2));
+      const total = d.mem_total ? +(d.mem_total / 2 ** 30).toFixed(1) : undefined;
       await echartsPlot(node, {
         animation: false,
-        grid: { left: 52, right: peakMb >= 1024 ? 62 : 66, top: 34, bottom: 28 },
-        legend: { top: 0, left: 0, textStyle: { color: C.muted, fontSize: 11 }, data: ['CPU %', 'memory'] },
+        grid: { left: 52, right: 62, top: 40, bottom: 28 },
+        legend: { top: 0, left: 0, textStyle: { color: C.muted, fontSize: 11 }, data: ['GPU %', 'CPU % (server)', 'memory in use', 'this server'] },
         tooltip: {
           trigger: 'axis',
           backgroundColor: 'rgba(18,18,18,.94)', borderColor: C.line, textStyle: { color: C.text, fontSize: 11 },
@@ -70,8 +72,13 @@ export default function Performance({ range, onRange }: { range: PerfRange; onRa
           formatter: (params: any) => {
             const p = Array.isArray(params) ? params : [params];
             if (!p.length) return '';
-            const head = clock(p[0].value[0]);
-            return [head, ...p.map((x: any) => `${x.marker} ${x.seriesName}: <b>${x.seriesName === 'CPU %' ? pc(x.value[1]) : mem(x.value[1])}</b>`)].join('<br>');
+            const shares = p.map((x: any) => {
+              const v = x.value?.[1];
+              const isPct = x.seriesName === 'GPU %' || x.seriesName === 'CPU % (server)';
+              const share = v == null ? '–' : isPct ? pc(v) : `${Number(v).toFixed(1)} GB`;
+              return `${x.marker} ${x.seriesName}: <b>${share}</b>`;
+            });
+            return [clock(p[0].value[0]), ...shares].join('<br>');
           },
         },
         xAxis: {
@@ -100,26 +107,36 @@ export default function Performance({ range, onRange }: { range: PerfRange; onRa
             axisLine: { show: false }, axisTick: { show: false },
           },
           {
-            type: 'value', min: 0,
-            axisLabel: { color: C.muted, fontSize: 10, formatter: (v: number) => mem(v) },
+            type: 'value', min: 0, max: total, interval: total ? total / 4 : undefined,
+            axisLabel: { color: C.muted, fontSize: 10, formatter: (v: number) => `${v} GB` },
             splitLine: { show: false },
             axisLine: { show: false }, axisTick: { show: false },
           },
         ],
         series: [
           {
-            name: 'CPU %', type: 'line', data: d.points.map((p) => [p.t * 1000, p.cpu]),
+            name: 'GPU %', type: 'line', data: d.points.map((p) => [p.t * 1000, p.gcpu]),
             showSymbol: true, symbolSize: 3, symbol: 'circle', connectNulls: false,
             lineStyle: { color: C.accent, width: 1.4 }, itemStyle: { color: C.accent },
-            areaStyle: { color: C.accent, opacity: 0.13 },
-            tooltip: { valueFormatter: (v: number | null) => (v == null ? '–' : `${Number(v).toFixed(v < 10 ? 1 : 0)}%`) },
+            areaStyle: { color: C.accent, opacity: 0.16 },
           },
           {
-            name: 'memory', type: 'line', yAxisIndex: 1,
-            data: d.points.map((p) => [p.t * 1000, p.rss == null ? null : +(p.rss / 2 ** 20).toFixed(0)]),
-            showSymbol: true, symbolSize: 3, symbol: 'circle', connectNulls: false,
+            name: 'CPU % (server)', type: 'line', data: d.points.map((p) => [p.t * 1000, p.cpu]),
+            showSymbol: true, symbolSize: 2.5, symbol: 'circle', connectNulls: false,
+            lineStyle: { color: C.good, width: 1.2 }, itemStyle: { color: C.good },
+          },
+          {
+            name: 'memory in use', type: 'line', yAxisIndex: 1,
+            data: d.points.map((p) => [p.t * 1000, gbOf(p.mem)]),
+            showSymbol: false, connectNulls: false,
             lineStyle: { color: C.blue, width: 1.4 }, itemStyle: { color: C.blue },
-            tooltip: { valueFormatter: (v: number | null) => (v == null ? '–' : mem(Number(v))) },
+            areaStyle: { color: C.blue, opacity: 0.08 },
+          },
+          {
+            name: 'this server', type: 'line', yAxisIndex: 1,
+            data: d.points.map((p) => [p.t * 1000, gbOf(p.rss)]),
+            showSymbol: false, connectNulls: false,
+            lineStyle: { color: C.muted, width: 1, type: 'dashed' }, itemStyle: { color: C.muted },
           },
         ],
       } as Record<string, unknown>);
@@ -129,10 +146,11 @@ export default function Performance({ range, onRange }: { range: PerfRange; onRa
 
   const r = RANGES.find((x) => x.key === range) ?? RANGES[1];
   const empty = Boolean(d) && !d!.stats.count;
+  const gpuCores = d?.gpu_cores ?? d?.now?.gpu_cores ?? null;
 
   return (
     <section className={cardCls(false, 'panel')}>
-      <h2>Performance <span className="note">the dash server's own CPU and memory, sampled every {(d?.step_sampled ?? 20).toFixed(0)} s and kept {(d?.kept_days ?? 8)} days. A break in the line is a time the server was not running</span></h2>
+      <h2>Performance <span className="note">the machine's GPU and memory, and this server's own CPU and memory, sampled every {(d?.step_sampled ?? 20).toFixed(0)} s and kept {(d?.kept_days ?? 8)} days. The GPU's memory is inside the machine's (unified); a break in a line is a time the server was not running</span></h2>
       <div className="mt" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: 6 }}>
         {RANGES.map((x) => (
           <button
@@ -147,22 +165,22 @@ export default function Performance({ range, onRange }: { range: PerfRange; onRa
         ))}
         <span className="s">{r.about}</span>
       </div>
-      {error && !d ? <div className={emptyCls()}>the server's performance could not be read: {error}. A server started before this chart was added has no /api/settings/perf: restart <code>thorp dash</code>.</div>
-        : !d ? <div className={emptyCls()}>reading the server's performance…</div>
+      {error && !d ? <div className={emptyCls()}>the performance could not be read: {error}. A server started before this chart was added has no /api/settings/perf: restart <code>thorp dash</code>.</div>
+        : !d ? <div className={emptyCls()}>reading the performance…</div>
         : empty ? <div className={emptyCls()}>no samples yet: the chart begins with the server ({d.step_sampled} s a sample, kept {d.kept_days} days), so {r.label} fills in as it runs.</div>
         : (
           <>
             <div className="strip mt">
-              <Stat k="CPU now" v={pc(d.now?.cpu)} s={ago(d.now?.t)} />
-              <Stat k={`CPU, ${r.label}`} v={pc(d.stats.cpu_mean)} s={`peak ${pc(d.stats.cpu_peak)}`} />
-              <Stat k="memory now" v={mb(d.now?.rss)} s="resident, this process" />
-              <Stat k={`memory, ${r.label}`} v={mb(d.stats.rss_mean)} s={`peak ${mb(d.stats.rss_peak)}`} />
-              <Stat k="samples" v={d.stats.count.toLocaleString()} s={`first ${ago(d.first)}`} />
+              <Stat k="GPU now" v={pc(d.now?.gcpu)} s={`${gpuCores ? `${gpuCores} cores` : 'the machine'}${d.now?.gmem ? ` · ${gb(d.now.gmem)} held` : ''}`} />
+              <Stat k="CPU now" v={pc(d.now?.cpu)} s={`this server · peak ${pc(d.stats.cpu_peak)}`} />
+              <Stat k="memory in use" v={gb(d.now?.mem)} s={`of ${totalGb ? `${totalGb.toFixed(0)} GB` : 'the machine'} · peak ${gb(d.stats.mem_peak)}`} />
+              <Stat k="this server" v={mb(d.now?.rss)} s="resident, the dash process" />
+              <Stat k="samples" v={Number(d.stats.count).toLocaleString()} s={`first ${ago(d.first)}`} />
             </div>
-            <div ref={el} className="chart mt" role="img" aria-label={`the dash server: CPU and memory, ${r.label}`} />
+            <div ref={el} className="chart mt" role="img" aria-label={`the machine and this server: GPU, CPU and memory, ${r.label}`} />
           </>
         )}
-      <p className="note mt">A sample is this process alone (pid {d?.pid ?? '–'}): a voyage trains in its own process, so this is what the dashboard costs, not what it is watching. CPU is the process's own time over the interval as a share of one core, so a page that many threads serve at once can read above 100%. The samples live in <code>data/dash/perf.jsonl</code> and outlive a restart.</p>
+      <p className="note mt">A sample is two things. <b>The machine's</b>: the GPU's utilisation and the memory it holds (IOAccelerator), and the memory in use of the {totalGb ? `${totalGb.toFixed(0)} GB` : 'machine'} (vm_stat: wired, anonymous and compressed, what Activity Monitor calls Memory Used). <b>This server's</b>: its own CPU time and resident memory, the dashed line. A voyage trains in its own process on the GPU, so it moves the machine's lines and leaves the server's gigabyte alone; the samples live in <code>data/dash/perf.jsonl</code> and outlive a restart.</p>
     </section>
   );
 }

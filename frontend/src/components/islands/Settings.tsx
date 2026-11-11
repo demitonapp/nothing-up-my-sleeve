@@ -33,7 +33,7 @@ interface Store {
 interface Server {
   error?: string; version: string | null; branch: string; commit: string; commit_subject: string; commit_at: string;
   uncommitted: number; python: string; frameworks: Record<string, string | null>; platform: string; chip: string;
-  cores: number | null; memory: number | null; pid: number; started: number; uptime: number; built: number | null; executable: string;
+  cores: number | null; gpu_cores: number | null; memory: number | null; pid: number; started: number; uptime: number; built: number | null; executable: string;
 }
 interface SettingsData {
   storage: Storage;
@@ -309,14 +309,14 @@ export default function Settings() {
                       <dt>dashboard built</dt><dd>{sv.built ? when(sv.built) : <span className="s">not built: <code>pnpm --dir frontend build</code></span>}</dd>
                       <dt>Python</dt><dd>{sv.python} <span className="s"><code>{sv.executable}</code></span></dd>
                       <dt>frameworks</dt><dd>{Object.entries(sv.frameworks).map(([k, v]) => <span key={k} className={pillCls('')} title={v ? '' : 'not installed here'}>{k} {v || '–'}</span>)}</dd>
-                      <dt>machine</dt><dd>{sv.chip}<div className="s">{sv.cores ? `${sv.cores} cores · ` : ''}{sv.memory ? `${Math.round(sv.memory / 2 ** 30)} GB memory · ` : ''}{sv.platform}</div></dd>
+                      <dt>machine</dt><dd>{sv.chip}<div className="s">{sv.cores ? `${sv.cores} CPU cores · ` : ''}{sv.gpu_cores ? `${sv.gpu_cores} GPU cores · ` : ''}{sv.memory ? `${Math.round(sv.memory / 2 ** 30)} GB memory · ` : ''}{sv.platform}</div></dd>
                       <dt>lanes</dt><dd>{d.lanes?.error ? <span className="s">{d.lanes.error}</span> : (d.lanes?.lanes || []).map((l) => (
                         <div key={l.lane}><b>{l.lane}</b>: {l.seats} seat{l.seats === 1 ? '' : 's'} <span className="s">{l.out ? `· ${l.out} at sea` : '· in port'}</span></div>
                       ))}<div className="s">set on the <a href="/expeditions/queue">queue</a></div></dd>
                     </dl>
                   )}
                 </section>
-                <VastPanel vast={d.vast} />
+                {d.vast ? <VastPanel vast={d.vast} /> : <Failed what="the Vast.ai figures" error="no vast part in /api/settings: restart thorp dash" />}
               </>
             ) : null}
 

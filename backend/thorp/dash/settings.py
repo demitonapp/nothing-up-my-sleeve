@@ -321,6 +321,7 @@ def server_info() -> dict:
         "platform": platform.platform(terse=True),
         "chip": _sysctl("machdep.cpu.brand_string") or platform.processor() or platform.machine(),
         "cores": os.cpu_count(),
+        "gpu_cores": _gpu_cores(),
         "memory": memory,
         "pid": os.getpid(),
         "started": STARTED,
@@ -328,6 +329,16 @@ def server_info() -> dict:
         "built": built,
         "executable": _home(Path(sys.executable)),
     }
+
+
+def _gpu_cores() -> int | None:
+    """The machine's GPU cores (the Mac's integrated GPU); None where there is no reading."""
+    try:
+        from thorp.dash import perf
+
+        return perf.gpu_cores()
+    except Exception:  # noqa: BLE001  (a machine without the accelerator's entry)
+        return None
 
 
 def paths_info() -> list[dict]:

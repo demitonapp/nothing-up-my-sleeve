@@ -282,7 +282,9 @@ def check(spec: dict) -> list[str]:
             out.append(
                 f"warmup {optim.get('warmup_steps')}; SOP v{version} at {size} is {params_size['warmup_steps']}"
             )
-    if int((spec.get("model") or {}).get("context", 0)) != int(params["context"]):
+    # the window is a declarable block like content and the tokeniser (12 November, the 21m at 8,192 for
+    # knockout:3): a voyage that says `field: context` and why keeps the rest of the standard
+    if not departed("context") and int((spec.get("model") or {}).get("context", 0)) != int(params["context"]):
         out.append(f"context {spec['model'].get('context')}; SOP v{version} is {params['context']}")
     sc = optim.get("scaffold") or {}
     if not sc:

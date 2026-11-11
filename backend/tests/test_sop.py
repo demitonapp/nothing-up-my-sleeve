@@ -73,6 +73,18 @@ def test_a_floor_is_refused():
     assert any("floor" in f for f in sop.check(spec))
 
 
+def test_another_window_is_refused_unless_it_is_declared():
+    """The window is the standard's, and a declarable block: `field: context` with its why excuses the
+    window and nothing else (the 21m at 8,192, 12 November)."""
+    spec = _spec()
+    spec["model"]["context"] = 8192
+    assert any("context 8192" in f for f in sop.check(spec))
+    spec["departures"] = [{"field": "context", "why": "the window the test needs"}]
+    assert sop.check(spec) == []
+    spec["optim"]["lr"] = 0.01
+    assert any("lr" in f for f in sop.check(spec))
+
+
 def test_a_voyage_named_to_the_sop_must_carry_the_scaffold_phase():
     spec = _spec()
     del spec["optim"]["scaffold"]

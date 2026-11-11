@@ -1,0 +1,171 @@
+# ships/specs/fitouts: the 21m of SOP v0.0.6 with an 8,192-piece window (12 November), for knockout:3:
+# "beat SmolLM2-360M ... and match its context window (8,192) in the 21m". It is 9m@v0.0.6 as it docked
+# (Ogden v0.1.4 kept raw, the marked tokeniser, the four metre cards and the comparator riddle) carried to
+# the 21m's shape, learning rate, warmup and pin layers, with ONE thing changed: the window, 1,024 -> 8,192.
+# Positions are rotary, so the window needs no table of its own and no other key moves.
+#
+# Why it sails on a hired GPU and not on this Mac (model.backend: torch). One training step of the 21m's
+# shape at batch one, bf16, no scaffold, measured here on 12 November: 1.20 GB at 1,024 pieces, 2.70 at
+# 2,048, 5.39 at 3,072, 9.17 at 4,096. That is 0.54 + 0.54 x (window / 1,024)^2 GB: the MLX kernel holds
+# every head's whole attention map for the backward pass. At 8,192 it is about 35 GB for ONE window and about
+# 138 GB for the standard's batch of four; the Mac has 32. (At 1,024 the same law gives the 24 GB the
+# 21m@v0.0.5 peaked at.) The torch loop's attention is F.scaled_dot_product_attention, which on CUDA need
+# not hold the map. NOT MEASURED on a box: the first thing a hire must show is the memory of a real step.
+#
+# What stays dense on any backend: the metre pull. forward_attending writes each pinned head's map in full,
+# 4 windows x 8,192 x 8,192 in fp32 = 1.07 GB a tensor a head, four heads. It is left on the whole batch, as
+# the standard reads it, so a card is pulled at every distance the window now has. If the box cannot hold it,
+# optim.scaffold.sample ({windows, length}) reads the pull on part of the batch; that is a second change and a
+# new run id, so it is not made here.
+#
+# batch_tokens stays 32,768, so the tokens a step, the step count (about 8,700) and what `hold` 10% and
+# `fade` 60% mean are the standard's. A step is now 4 windows where it was 32: fewer independent draws a step.
+#
+# How its readings sit beside the other ships'. The hole cards are scored in windows of the ship's own
+# context (ce_bpb), so this ship's bits a byte are read with up to 8,192 pieces of the book behind each
+# guess and are NOT the 1,024-window reading every other ship carries; set them beside 21m@v0.0.5 or
+# 9m@v0.0.6 only with that said. The cards, stars, pips, the Nevermore and the logic deck read their own
+# fixed lengths and are comparable as they stand. ce_bpb's 16-window batch at this window is about 68 GB on
+# the Mac's kernel, so the full evaluation must run on the box; a later `thorp eval` on the Mac can take the
+# light evaluators but not ce_bpb.
+#
+# What this voyage does not do: it gives the 21m the room (118 of the 120 ARC-AGI-2 evaluation tasks fit
+# 8,192 whole, 2 fit 1,024). Nothing in Ogden teaches a grid, so it is not expected to score there; the
+# content is the next lever. Not queued: the 21m is held until Justin is happy with the 9m.
+name: 21m@v0.0.6-ctx8192
+expedition: knockout
+goal: 3  # knockout:3, make the 21m smoke SmolLM2-360M: the window half of it
+ship: 'SOP v0.0.6 at 21m, 8,192 context'
+experiment: 'The 21m with SmolLM2-360M''s window: SOP v0.0.6 as the 9m docked it (Ogden v0.1.4, the marked
+  tokeniser, the four-card pull and the comparator riddle), read through 8,192 pieces instead of 1,024.'
+question: 'Does the 21m hold the standard''s cards and its language when every window is 8,192 pieces: are
+  the four pinned cards and the comparator still held by heart after the pull is gone, does it read the hole
+  cards no worse than a 1,024-window ship, and does a head attend usefully past the 1,024 pieces every other
+  Thorp has been limited to? Read against 9m@v0.0.6 (the same corpus and tokeniser) and 21m@v0.0.5 (the same
+  shape at 1,024).'
+# milestones (12 November: every voyage carries them). Proposed here from the two nearest voyages; the
+# thresholds are Justin's to confirm before it sails. Both recall, because a dead arm on a hired box is money.
+milestones:
+- at: 0.3
+  metric: stars/previous_word/max_score
+  at_least: 0.5
+  if_missed: recall
+  why: '21m@v0.0.5 and 9m@v0.0.6 both read it at 0.99 or better by a quarter of the voyage; a ship that
+    has not lit the first card by 30% is not holding the pull at this window'
+- at: 0.5
+  metric: eval/hole-cards-unseen/bpb_mean
+  at_most: 2.3
+  if_missed: recall
+  why: '9m@v0.0.6 reads 2.00 at halfway on the same raw corpus through 1,024 windows; a larger ship with
+    eight times the window should read lower, so 2.3 is a catastrophe guard, not a target'
+data:
+  recipe: lists/ogden-v0.1.4.csv
+  passes: 4
+  stages:
+  - name: ogden
+    recipe: lists/ogden-v0.1.4.csv
+    passes: 4
+  order: shuffled
+  refuse:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+  - lists/hole-cards-unseen.csv
+  clean: raw
+  opt_in: 'reads Ogden v0.1.4, the 1m''s bigger corpus (v0.1.3''s 592 books plus the logic tutor at 5% of
+    the words), so the question/answer and premise/conclusion control pieces are exercised'
+tokeniser:
+  kind: spm-bpe
+  vocab: 2048
+  byte_fallback: true
+  train_on: lists/ogden-v0.1.4.csv
+  symbols:
+  - "<bos>"
+  - "<eos>"
+  - "<pad>"
+  - "<unk>"
+  - "<sep>"
+  - "<premise>"
+  - "<conclusion>"
+  - "<question>"
+  - "<answer>"
+  - "<end>"
+model:
+  family: gpt
+  preset: 21m
+  context: 8192
+  positions: rope
+  backend: torch
+optim:
+  name: adamw
+  lr: 0.0008
+  betas:
+  - 0.9
+  - 0.95
+  weight_decay: 0.1
+  warmup_steps: 300
+  schedule: cosine
+  min_lr_ratio: 0.1
+  batch_tokens: 32768
+  grad_clip: 1.0
+  precision: bf16
+  scaffold:
+    weight: 1.0
+    hold: 0.10
+    fade: 0.60
+    heads:
+    - layer: 0
+      head: 0
+      card: previous_word
+    - layer: 0
+      head: 1
+      card: delimiter
+    - layer: 16
+      head: 2
+      card: induction
+    - layer: 16
+      head: 3
+      card: duplicate_word
+    riddles:
+      comparator:
+        layer: 8
+        head: 3
+        items: 16
+        pool: 2048
+eval:
+  sets:
+  - lists/hole-cards-unseen.csv
+  every_steps: 640
+  evaluators:
+  - ce_bpb
+  - discovery
+  - logic
+  - stars
+  - nevermore
+  - cards
+  - shapes
+  - pips
+  - soundings
+  light:
+    every_steps: 64
+    evaluators:
+    - stars
+    - nevermore
+    - cards
+    - logic
+    - shapes
+    - pips
+checkpoint:
+  every_steps: 640
+sop: '0.0.6'
+departures:
+- "the post-training SOP: the deck stage read after the four pretraining passes, with the pull off"
+- field: content
+  why: 'reads Ogden v0.1.4 (the bigger corpus: 592 books plus the logic tutor at 5% of the words) and keeps
+    it raw on purpose, as 9m@v0.0.6 does, so the question/answer and premise/conclusion pieces are exercised'
+- field: tokeniser
+  why: 'the ten control tokens as single pieces (the marked tokeniser), which SOP v0.0.6''s pieces-2048 does
+    not declare: the chat turns need them whole, and it is the piece table 9m@v0.0.6 was written with'
+- field: context
+  why: 'the window is 8,192 pieces where SOP v0.0.6 is 1,024: knockout:3 asks the 21m to match
+    SmolLM2-360M''s window, and 118 of the 120 ARC-AGI-2 evaluation tasks fit 8,192 whole where 2 fit 1,024'
+seed: 1

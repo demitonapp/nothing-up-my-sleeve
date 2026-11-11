@@ -731,6 +731,77 @@ def models(leaderboard: dict | None = None) -> list[dict]:
     return out
 
 
+TALK_LAB = "Demiton"
+TALK_PREFIX = "9m@v0.0.6-"  # the 9m's legs: -talk, -talk-hot, -return, each seeded from the finished 9m@v0.0.6
+
+
+def talking_models() -> list[dict]:
+    """The 9m legs that were taught to answer (12 November, Justin: "for the 9m I'd like to be able to talk to it
+    via the chat terminal; the lab should be Demiton, and then I should be able to select the model"): each
+    finished leg of the 9m that reads turns, with every checkpoint it kept and what its reading was there, so the
+    ship we talk to is picked by its best reading and not only its last step. A base checkpoint continues prose
+    instead of answering, so only a leg that read turns is listed. `step` goes back to /api/chat as it is."""
+    from thorp import turns
+
+    con = reader()
+    out: list[dict] = []
+    try:
+        names = [
+            r["name"]
+            for r in con.query(
+                "select distinct name from runs where status='finished' and name like ? order by name",
+                (TALK_PREFIX + "%",),
+            )
+        ]
+        for name in names:
+            r = con.get_run_by_name(name, finished=True)
+            if not r:
+                continue
+            spec = spec_of(r)
+            if not turns.format_of(spec):
+                continue
+            ck = latest_checkpoint(r["run_id"])
+            if ck is None:
+                continue
+            steps = sorted(
+                int(p.name[5:])
+                for p in ck.parent.glob("step-*")
+                if p.name[5:].isdigit() and (p / "state.json").exists()
+            )
+            read: dict[int, dict] = {}
+            for m in con.query(
+                "select step, name, value from metrics where run_id=? and name in (?, ?)",
+                (r["run_id"], "answers/bpb", "answers/stopped"),
+            ):
+                read.setdefault(int(m["step"]), {})["bpb" if m["name"] == "answers/bpb" else "stopped"] = m["value"]
+            leg = name[len(TALK_PREFIX):]
+            lr = (spec.get("optim") or {}).get("lr")
+            facts = _facts(spec, ck.name)
+            facts["tuning"] = "talk"
+            out.append(
+                {
+                    "kind": "thorp",
+                    "talks": True,
+                    "lab": TALK_LAB,
+                    "ship_key": f"run:{name}",
+                    "name": f"Nothing up my sleeve 9m · {leg}" + (f" (lr {lr:g})" if lr else ""),
+                    "params": None,
+                    "available": True,
+                    "run": {"run": name, "run_id": r["run_id"], "step": ck.name},
+                    "runs": [name],
+                    "facts": facts,
+                    "checkpoints": [
+                        {"step": s, "bpb": (read.get(s) or {}).get("bpb"), "stopped": (read.get(s) or {}).get("stopped")}
+                        for s in steps
+                    ],
+                    "why": None,
+                }
+            )
+    finally:
+        con.close()
+    return out
+
+
 # ---- the foreign ships (11 November, Justin: "chat has to appear on both Nothing up my sleeve's
 # ships as well as foreign ships"): an outside model's own continuation, from the MLX weights when
 # they are in the cache. No audit: the heads/cards trace is Nothing up my sleeve's own GPT.

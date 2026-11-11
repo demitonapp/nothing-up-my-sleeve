@@ -19,6 +19,11 @@ import { autoTitle, getThread, listThreads, markSaved, newId, saveThread, type T
 
 interface Model {
   kind: 'thorp' | 'foreign';
+  // a Demiton ship that answers (the 9m's talk legs, thorp.chat.talking_models): its lab, and the checkpoints it kept
+  // with their readings, so the one we talk to is chosen by its reading and not only by its last step
+  talks?: boolean;
+  lab?: string;
+  checkpoints?: { step: number; bpb?: number | null; stopped?: number | null }[];
   model?: string | null;
   ship_key: string;
   name: string;
@@ -52,7 +57,7 @@ const LABS: [RegExp, string][] = [
   [/gpt-oss/i, 'OpenAI'],
   [/maincoder/i, 'Maincode'],
 ];
-const labOf = (m: Model): string => (LABS.find(([re]) => re.test(`${m.model || ''} ${m.name}`)) || [null, 'Other'])[1] as string;
+const labOf = (m: Model): string => m.lab || (LABS.find(([re]) => re.test(`${m.model || ''} ${m.name}`)) || [null, 'Other'])[1] as string;
 
 const convoKeyOf = (m: Model): string => (m.kind === 'foreign' ? `foreign:${m.model}` : `ship:${m.ship_key}`);
 const hrefOf = (m: Model): string => (m.kind === 'foreign' ? `/chat?model=${encodeURIComponent(String(m.model || ''))}` : `/chat?ship=${encodeURIComponent(m.ship_key)}`);
@@ -120,6 +125,7 @@ export default function ChatConsole() {
   const [err, setErr] = useState('');
   const [pick, setPick] = useState('');
   const [lab, setLab] = useState('');
+  const [step, setStep] = useState(''); // the checkpoint of a Demiton ship; '' is its latest
   const [think, setThink] = useState(true);
   const [says, setSays] = useState<Say[]>([]);
   const [input, setInput] = useState('');
@@ -171,13 +177,13 @@ export default function ChatConsole() {
     said.current = says;
   }, [says]);
 
-  // Only instruction-tuned models, and only outside ones: a base checkpoint continues prose instead of
-  // answering, and no Nothing up my sleeve ship is instruction-tuned yet, so a Thorp row would be a lie.
+  // Only models that answer: an outside instruction-tuned model, or a Demiton leg that was taught turns (the 9m's
+  // talk legs, 12 November). A base checkpoint continues prose instead of answering, so a Thorp row of one would be a lie.
   // The choice is a sequence — the lab first, then the model within it (11 November, Justin: "in the model
   // selection it's a sequence. Choose the lab. and then choose the relevant model. Only show instruct
   // models, so no Thorp model exists yet").
   const instruct = useMemo(
-    () => (models || []).filter((m) => m.kind === 'foreign' && m.available && m.model && m.facts?.tuning === 'instruct'),
+    () => (models || []).filter((m) => m.available && (m.talks || (m.kind === 'foreign' && m.model && m.facts?.tuning === 'instruct'))),
     [models],
   );
   const labs = useMemo(() => {
@@ -211,9 +217,11 @@ export default function ChatConsole() {
   useEffect(() => {
     if (defaultKey && instruct.some((m) => m.model === defaultKey)) return;
     if (lab && labs.includes(lab)) return;
-    setLab(labs[0] || '');
+    setLab(labs.includes('Demiton') ? 'Demiton' : labs[0] || ''); // our own lab first (12 November, Justin)
     setPick('');
   }, [labs, lab, instruct, defaultKey]);
+  // a checkpoint belongs to the model it was chosen for
+  useEffect(() => { setStep(''); }, [chosen?.ship_key]);
 
   useEffect(() => {
     if (!open || models) return;
@@ -365,7 +373,7 @@ export default function ChatConsole() {
         .map((s) => ({ role: s.role === 'you' ? 'user' : 'assistant', text: s.text }));
       const body = chosen.kind === 'foreign'
         ? { model: chosen.model, q, tokens, temperature: 0.7, thinking: think ? 'on' : 'off', think_tokens: thinkCap, history }
-        : { run: chosen.run?.run, q, tokens, temperature: 0.7, thinking: think ? 'on' : 'off' };
+        : { run: chosen.run?.run, q, tokens, temperature: 0.7, ...(step ? { step } : {}) };
       setLastReq(body);
       // the answer comes a line an event (/api/chat/stream): shown as it is written, and stoppable
       const ctl = new AbortController();
@@ -519,13 +527,31 @@ export default function ChatConsole() {
               value={chosen ? convoKeyOf(chosen) : ''}
               onChange={(e) => setPick(e.target.value)}
               aria-label="model"
-              title="the instruction-tuned checkpoints this lab makes"
+              title="the models this lab makes that answer: instruction-tuned, or a Demiton leg taught to talk"
               disabled={!inLab.length}
             >
               {inLab.map((m) => (
                 <option key={convoKeyOf(m)} value={convoKeyOf(m)}>{m.model && m.model === defaultKey ? `★ ${m.name}` : m.name}</option>
               ))}
             </select>
+            {chosen?.checkpoints?.length ? (
+              <>
+                {' '}checkpoint{' '}
+                <select
+                  value={step}
+                  onChange={(e) => setStep(e.target.value)}
+                  aria-label="checkpoint"
+                  title="every checkpoint this leg kept, with its reading on held-out exchanges: bits per byte (lower is better) and how often it ends its own turn"
+                >
+                  <option value="">latest (step {chosen.run?.step?.replace('step-', '')})</option>
+                  {[...chosen.checkpoints].reverse().map((c) => (
+                    <option key={c.step} value={String(c.step)}>
+                      step {c.step}{c.bpb != null ? ` · ${c.bpb.toFixed(2)} bpb` : ''}{c.stopped != null ? ` · ends turn ${Math.round(c.stopped * 100)}%` : ''}
+                    </option>
+                  ))}
+                </select>
+              </>
+            ) : null}
             <button
               type="button"
               className={`consolstar${chosen?.model && defaultKey === chosen.model ? ' on' : ''}`}

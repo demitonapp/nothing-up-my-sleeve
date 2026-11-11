@@ -5599,7 +5599,7 @@ def api_chat_models() -> dict:
     the same cached leaderboard payload as the board."""
     from thorp import chat
 
-    return {"models": chat.models(api_leaderboard()) + chat.foreign_models()}
+    return {"models": chat.models(api_leaderboard()) + chat.talking_models() + chat.foreign_models()}
 
 
 def api_chat(q: dict) -> dict:

@@ -44,7 +44,20 @@ DEFAULTS: dict = {
     # how long a hired ship may stay out: the quote's hours times this, then it is brought home and released
     "overrun": 1.5,
     "max_instances": 1,  # ships hired at once (S2)
+    # the purser, S3's allocation of the backlog between local and foreign waters (DECISIONS.md, "The purser",
+    # 8 November, Justin: "Accept all five"; built 12 November). `off` calls nothing; `advisory` writes its call
+    # beside each line (s3.allocations, the queue page) and routes nothing, so `vast:` lines still decide;
+    # `routing` sails the lines it calls foreign on the Vast lane. Advisory for a week first, as decided.
+    "purser": "advisory",
+    # the expeditions whose voyages may sail abroad: a comparison is kept in one set of waters (a torch voyage
+    # starts from other random weights), so every other expedition is local until Justin says
+    "foreign_expeditions": ["table_talk"],
+    # a hire only when it brings the voyage home at least this much sooner, in hours and as a share of its wait
+    "margin_hours": 1.0,
+    "margin_fraction": 0.25,
 }
+
+PURSER_MODES = ("off", "advisory", "routing")
 
 # S4's starting guess of what each class delivers on a small GPT (bf16, effective TFLOP/s, about 30 to 40% of the
 # card's dense peak at these widths); replaced by the measured rate once a voyage of that class and preset has

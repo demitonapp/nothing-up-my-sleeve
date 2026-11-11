@@ -1,5 +1,4 @@
 cmd: sh backend/scripts/restart_coordinator.sh
-fitouts/9m@v0.0.6-converse
 fitouts/300k@v0.0.6-probe
 fitouts/300k@v0.0.6-probe-s2
 cmd: PYTHONPATH=backend backend/.venv/bin/python -m thorp.investigate run probe-phase-300k

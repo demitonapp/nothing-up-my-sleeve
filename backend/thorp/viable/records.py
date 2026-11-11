@@ -143,6 +143,35 @@ class SpendEvent(Base):
     detail: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}")
 
 
+class Allocation(Base):
+    """One call of the purser (S3, thorp/viable/s3_control/purser.py): a queued voyage's waters, local or
+    foreign, with both estimates and the reason, so S3* can set the estimate against what the voyage took and
+    the market against the bill (DECISIONS.md, "The purser", 8 November). A row is written when a line's call
+    changes, and again when the line is taken; `applied` says whether the call routed the line (S5's
+    `purser` term `routing`) or was only advice."""
+
+    __tablename__ = "allocations"
+    __table_args__ = (Index("allocations_line_at", "line", "at"), {"schema": S3})
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    line: Mapped[str] = mapped_column(Text)  # the queue line as written
+    name: Mapped[str | None] = mapped_column(Text)  # the voyage's name
+    run_id: Mapped[str | None] = mapped_column(Text)
+    expedition: Mapped[str | None] = mapped_column(Text)
+    waters: Mapped[str] = mapped_column(Text)  # local or foreign
+    gpu: Mapped[str | None] = mapped_column(Text)  # the class it would sail on abroad
+    local_min: Mapped[float | None] = mapped_column(Float)  # its time on this Mac
+    local_home_min: Mapped[float | None] = mapped_column(Float)  # minutes from the call until home, sailing here
+    foreign_min: Mapped[float | None] = mapped_column(Float)  # its time abroad, set-up included
+    foreign_home_min: Mapped[float | None] = mapped_column(Float)  # minutes from the call until home, abroad
+    cost: Mapped[float | None] = mapped_column(Float)  # the hire, at the market's last price for the class
+    allowance: Mapped[float | None] = mapped_column(Float)  # what the day's allowance had left for it
+    mode: Mapped[str] = mapped_column(Text)  # the purser's mode when it called: advisory or routing
+    applied: Mapped[bool] = mapped_column(Boolean, default=False)
+    reason: Mapped[str] = mapped_column(Text)
+
+
 # ---------------------------------------------------------------- S3*, audit
 
 

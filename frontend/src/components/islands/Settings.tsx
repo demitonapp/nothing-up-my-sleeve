@@ -1,11 +1,17 @@
 // Settings (/settings, the cog in the header; /api/settings, thorp/dash/settings.py): what the dashboard
-// runs on. Read-only except the store's edit form: the disk and what is kept on it, the store, the
-// server and its machine, the switches and keys, and the lanes. Each part is read on its own
-// server-side, so one that failed says why and the rest still stands.
+// runs on, one tab per part — Storage, The store, Server and machine, Switches, Keys and places — each at
+// its own address (/settings/store …) so a tab survives a refresh and can be linked to. Read-only except
+// the store's edit form. Each part is read on its own server-side, so one that failed says why and the
+// rest still stands.
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { TabNav } from '../TabNav';
+import Performance from './Performance';
+import type { PerfRange } from './Performance';
+import { VastPanel } from './VastStats';
+import type { Vast } from './VastStats';
 import { cardCls, btnCls, emptyCls, pillCls } from '@/lib/ui';
-import { sectionProps, useApi } from '@/lib/useApi';
+import { routePath, sectionProps, useApi, useRoute } from '@/lib/useApi';
 import { shipHash } from '@/scripts/router';
 
 interface Part { key: string; name: string; about: string; path: string; bytes: number | null }
@@ -36,7 +42,24 @@ interface SettingsData {
   paths: { name: string; path: string; about: string; exists: boolean }[] | { error: string };
   environment: { error?: string; switches: { name: string; value: string | null; about: string }[]; keys: { name: string; set: boolean; about: string }[] };
   lanes: { error?: string; lanes: { lane: string; seats: number; out: string | null }[] };
+  vast: Vast;
 }
+
+/** The page's tabs, in order: the addresses are the island's own (the catch-all page serves them). */
+type View = 'storage' | 'store' | 'server' | 'switches' | 'keys';
+const TABS: { view: View; label: string; href: string }[] = [
+  { view: 'storage', label: 'Storage', href: '/settings' },
+  { view: 'store', label: 'The store', href: '/settings/store' },
+  { view: 'server', label: 'Server and machine', href: '/settings/server' },
+  { view: 'switches', label: 'Switches', href: '/settings/switches' },
+  { view: 'keys', label: 'Keys and places', href: '/settings/keys' },
+];
+const VIEWS: View[] = TABS.map((t) => t.view);
+const viewFrom = (p: string): View => {
+  const m = /^\/settings\/([a-z]+)\/?$/.exec(p.split('?')[0]);
+  return m && VIEWS.includes(m[1] as View) ? (m[1] as View) : 'storage';
+};
+const hrefOf = (v: View): string => TABS.find((t) => t.view === v)!.href;
 
 /** A size on disk, in the units the Finder uses (powers of ten). */
 const bytes = (v: number | null | undefined): string => {
@@ -65,7 +88,10 @@ function Failed({ what, error }: { what: string; error: string }) {
 }
 
 export default function Settings() {
+  const route = useRoute();
+  const [view, setView] = useState<View>('storage');
   const [fresh, setFresh] = useState(0);
+  const [perfRange, setPerfRange] = useState<PerfRange>('24h');
   const [storeEdit, setStoreEdit] = useState(false);
   const [storeMode, setStoreMode] = useState<'local' | 'hosted'>('local');
   const [hostedUrl, setHostedUrl] = useState('');
@@ -79,96 +105,122 @@ export default function Settings() {
   const disk = st?.disk;
   const others = disk && st ? Math.max(0, disk.used - st.ours) : 0;
 
+  // the route picks the tab on the first render after mount and on reload; a click pushes its address
+  useEffect(() => { setView(viewFrom(route)); }, [route]);
+  useEffect(() => {
+    const onPop = () => setView(viewFrom(routePath()));
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+  const go = (v: View) => {
+    setView(v);
+    if (routePath() !== hrefOf(v)) history.pushState(null, '', hrefOf(v));
+  };
+
   return (
     <div {...sectionProps('settings')}>
-      <h1>Settings <span className="q">what this dashboard runs on: the disk and what is kept on it, the store, the server and its machine, the switches and the lanes. Only the store can be changed here; each part says where it is set</span></h1>
+      <h1>Settings <span className="q">what this dashboard runs on, one tab per part: the disk and what is kept on it, the store, the server and its machine, the switches, and the keys and places. Only the store can be changed here; each part says where it is set</span></h1>
+
+      <TabNav
+        id="setnav"
+        ariaLabel="Settings"
+        items={TABS.map((t) => ({
+          key: t.view,
+          label: t.label,
+          href: t.href,
+          active: view === t.view,
+          onClick: () => go(t.view),
+        }))}
+      />
 
       {error && !d ? <div className={emptyCls()}>the settings could not be read: {error}. A server started before this page was added has no /api/settings: restart <code>thorp dash</code>.</div>
         : !d ? <div className={emptyCls()}>reading the settings…</div>
         : (
           <>
-            <section className={cardCls(false, 'panel')}>
-              <h2>Storage <span className="note">the space each part takes on disk, measured {st?.measured ? new Date(st.measured * 1000).toLocaleTimeString() : ''} <button type="button" className={btnCls('ghost')} onClick={() => setFresh((n) => n + 1)}>measure again</button></span></h2>
-              {!st || st.error ? <Failed what="the disk" error={st?.error || 'no answer'} /> : (
-                <>
-                  <div className="govstats">
-                    <div className="govstat big"><b>{bytes(st.ours)}</b><span>kept by Nothing up my sleeve</span></div>
-                    {disk ? <div className={`govstat${disk.free / disk.total < 0.1 ? ' warn' : ''}`}><b>{bytes(disk.free)}</b><span>free of {bytes(disk.total)}</span></div> : null}
-                    {parts[0] ? <div className="govstat"><b>{bytes(parts[0].bytes)}</b><span>the biggest part: {parts[0].name.toLowerCase()}</span></div> : null}
-                    <div className="govstat"><b>{st.checkpoints.count}</b><span>voyages with checkpoints</span></div>
-                    <div className="govstat"><b>{st.models.count}</b><span>outside models downloaded</span></div>
-                  </div>
-                  {disk ? (
-                    <>
-                      <div className="setdisk mt" role="img" aria-label={`the disk: ${bytes(st.ours)} ours, ${bytes(others)} everything else, ${bytes(disk.free)} free`}>
-                        <i className="ours" style={{ width: `${100 * st.ours / disk.total}%` }} title={`Nothing up my sleeve: ${bytes(st.ours)}`} />
-                        <i className="others" style={{ width: `${100 * others / disk.total}%` }} title={`everything else on the disk: ${bytes(others)}`} />
+            {view === 'storage' ? (
+              <section className={cardCls(false, 'panel')}>
+                <h2>Storage <span className="note">the space each part takes on disk, measured {st?.measured ? new Date(st.measured * 1000).toLocaleTimeString() : ''} <button type="button" className={btnCls('ghost')} onClick={() => setFresh((n) => n + 1)}>measure again</button></span></h2>
+                {!st || st.error ? <Failed what="the disk" error={st?.error || 'no answer'} /> : (
+                  <>
+                    <div className="govstats">
+                      <div className="govstat big"><b>{bytes(st.ours)}</b><span>kept by Nothing up my sleeve</span></div>
+                      {disk ? <div className={`govstat${disk.free / disk.total < 0.1 ? ' warn' : ''}`}><b>{bytes(disk.free)}</b><span>free of {bytes(disk.total)}</span></div> : null}
+                      {parts[0] ? <div className="govstat"><b>{bytes(parts[0].bytes)}</b><span>the biggest part: {parts[0].name.toLowerCase()}</span></div> : null}
+                      <div className="govstat"><b>{st.checkpoints.count}</b><span>voyages with checkpoints</span></div>
+                      <div className="govstat"><b>{st.models.count}</b><span>outside models downloaded</span></div>
+                    </div>
+                    {disk ? (
+                      <>
+                        <div className="setdisk mt" role="img" aria-label={`the disk: ${bytes(st.ours)} ours, ${bytes(others)} everything else, ${bytes(disk.free)} free`}>
+                          <i className="ours" style={{ width: `${100 * st.ours / disk.total}%` }} title={`Nothing up my sleeve: ${bytes(st.ours)}`} />
+                          <i className="others" style={{ width: `${100 * others / disk.total}%` }} title={`everything else on the disk: ${bytes(others)}`} />
+                        </div>
+                        <div className="setkey s"><span><i className="ours" /> Nothing up my sleeve {bytes(st.ours)} ({pct(st.ours, disk.total)})</span><span><i className="others" /> everything else on the disk {bytes(others)}</span><span><i /> free {bytes(disk.free)} ({pct(disk.free, disk.total)})</span></div>
+                      </>
+                    ) : null}
+                    <div className="scroll mt">
+                      <table id="setparts" data-nosort>
+                        <thead><tr><th>part</th><th>size</th><th>share <span className="s">of ours</span></th><th></th><th>what it is</th><th>where</th></tr></thead>
+                        <tbody>
+                          {parts.map((p) => (
+                            <tr key={p.key}>
+                              <td><b>{p.name}</b></td>
+                              <td className="num">{bytes(p.bytes)}</td>
+                              <td className="num">{pct(p.bytes, st.ours)}</td>
+                              <td><Bar value={p.bytes} of={most} /></td>
+                              <td className="s">{p.about}</td>
+                              <td><code>{p.path}</code></td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <p className="note mt">A size is the space taken on disk (<code>du</code>), so a file the disk shares between two folders counts once where it lies. The disk's own free space is what macOS reports for the volume the data sits on. Nothing here is deleted from the dashboard: a checkpoint belongs to a voyage in the ledger, and an outside model is fetched again the next time it is read.</p>
+
+                    <details className="setfold">
+                      <summary>The heaviest checkpoints <span className="s">the {st.checkpoints.top.length} biggest of {st.checkpoints.count} voyages' folders</span></summary>
+                      <div className="scroll">
+                        <table data-nosort>
+                          <thead><tr><th>voyage</th><th>size</th><th></th><th>saved steps</th><th>status</th><th>ship</th></tr></thead>
+                          <tbody>
+                            {st.checkpoints.top.map((c) => (
+                              <tr key={c.run_id}>
+                                <td>{c.name ? <a href={shipHash(c.name)} title={c.run_id}>{c.name}</a> : <code title="no voyage of this id in the ledger">{c.run_id.slice(0, 12)}</code>}</td>
+                                <td className="num">{bytes(c.bytes)}</td>
+                                <td><Bar value={c.bytes} of={st.checkpoints.top[0]?.bytes || 1} /></td>
+                                <td className="num">{c.steps || '–'}</td>
+                                <td>{c.status ? <span className={pillCls(c.status === 'finished' ? 'good' : c.status === 'running' ? 'running' : '')}>{c.status}</span> : <span className="s">not in the ledger</span>}</td>
+                                <td className="s">{c.ship || ''}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
                       </div>
-                      <div className="setkey s"><span><i className="ours" /> Nothing up my sleeve {bytes(st.ours)} ({pct(st.ours, disk.total)})</span><span><i className="others" /> everything else on the disk {bytes(others)}</span><span><i /> free {bytes(disk.free)} ({pct(disk.free, disk.total)})</span></div>
-                    </>
-                  ) : null}
-                  <div className="scroll mt">
-                    <table id="setparts" data-nosort>
-                      <thead><tr><th>part</th><th>size</th><th>share <span className="s">of ours</span></th><th></th><th>what it is</th><th>where</th></tr></thead>
-                      <tbody>
-                        {parts.map((p) => (
-                          <tr key={p.key}>
-                            <td><b>{p.name}</b></td>
-                            <td className="num">{bytes(p.bytes)}</td>
-                            <td className="num">{pct(p.bytes, st.ours)}</td>
-                            <td><Bar value={p.bytes} of={most} /></td>
-                            <td className="s">{p.about}</td>
-                            <td><code>{p.path}</code></td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  <p className="note mt">A size is the space taken on disk (<code>du</code>), so a file the disk shares between two folders counts once where it lies. The disk's own free space is what macOS reports for the volume the data sits on. Nothing here is deleted from the dashboard: a checkpoint belongs to a voyage in the ledger, and an outside model is fetched again the next time it is read.</p>
+                    </details>
 
-                  <details className="setfold">
-                    <summary>The heaviest checkpoints <span className="s">the {st.checkpoints.top.length} biggest of {st.checkpoints.count} voyages' folders</span></summary>
-                    <div className="scroll">
-                      <table data-nosort>
-                        <thead><tr><th>voyage</th><th>size</th><th></th><th>saved steps</th><th>status</th><th>ship</th></tr></thead>
-                        <tbody>
-                          {st.checkpoints.top.map((c) => (
-                            <tr key={c.run_id}>
-                              <td>{c.name ? <a href={shipHash(c.name)} title={c.run_id}>{c.name}</a> : <code title="no voyage of this id in the ledger">{c.run_id.slice(0, 12)}</code>}</td>
-                              <td className="num">{bytes(c.bytes)}</td>
-                              <td><Bar value={c.bytes} of={st.checkpoints.top[0]?.bytes || 1} /></td>
-                              <td className="num">{c.steps || '–'}</td>
-                              <td>{c.status ? <span className={pillCls(c.status === 'finished' ? 'good' : c.status === 'running' ? 'running' : '')}>{c.status}</span> : <span className="s">not in the ledger</span>}</td>
-                              <td className="s">{c.ship || ''}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </details>
+                    <details className="setfold">
+                      <summary>The outside models <span className="s">{st.models.count} in the Hugging Face cache, biggest first</span></summary>
+                      <div className="scroll">
+                        <table data-nosort>
+                          <thead><tr><th>model</th><th>size</th><th></th></tr></thead>
+                          <tbody>
+                            {st.models.top.map((m) => (
+                              <tr key={m.model}>
+                                <td>{m.model}</td>
+                                <td className="num">{bytes(m.bytes)}</td>
+                                <td><Bar value={m.bytes} of={st.models.top[0]?.bytes || 1} /></td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </details>
+                  </>
+                )}
+              </section>
+            ) : null}
 
-                  <details className="setfold">
-                    <summary>The outside models <span className="s">{st.models.count} in the Hugging Face cache, biggest first</span></summary>
-                    <div className="scroll">
-                      <table data-nosort>
-                        <thead><tr><th>model</th><th>size</th><th></th></tr></thead>
-                        <tbody>
-                          {st.models.top.map((m) => (
-                            <tr key={m.model}>
-                              <td>{m.model}</td>
-                              <td className="num">{bytes(m.bytes)}</td>
-                              <td><Bar value={m.bytes} of={st.models.top[0]?.bytes || 1} /></td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </details>
-                </>
-              )}
-            </section>
-
-            <div className="row">
+            {view === 'store' ? (
               <section className={cardCls(false, 'panel')}>
                 <h2>The store <span className="note">Postgres: the ledger, the library, the queue and the VSM's records. Its address comes from <code>THORP_PG</code> or the install file; this one is {pg?.mode === 'hosted' ? 'hosted' : 'local'}</span></h2>
                 {!pg || (pg.error && !pg.url) ? <Failed what="the store" error={pg?.error || 'no answer'} /> : (
@@ -242,27 +294,33 @@ export default function Settings() {
                   </>
                 )}
               </section>
+            ) : null}
 
-              <section className={cardCls(false, 'panel')}>
-                <h2>Server and machine <span className="note">the process answering this page, and what it runs on</span></h2>
-                {!sv || sv.error ? <Failed what="the server" error={sv?.error || 'no answer'} /> : (
-                  <dl className="setlist">
-                    <dt>version</dt><dd>thorp {sv.version || '–'}</dd>
-                    <dt>commit</dt><dd><code>{sv.commit || '–'}</code> on {sv.branch || '–'}{sv.uncommitted ? <span className="s"> · {sv.uncommitted} file{sv.uncommitted === 1 ? '' : 's'} changed since</span> : null}<div className="s">{sv.commit_subject}{sv.commit_at ? ` · ${new Date(sv.commit_at).toLocaleString()}` : ''}</div></dd>
-                    <dt>started</dt><dd>{when(sv.started)} <span className="s">up {span(sv.uptime)} · pid {sv.pid}</span></dd>
-                    <dt>dashboard built</dt><dd>{sv.built ? when(sv.built) : <span className="s">not built: <code>pnpm --dir frontend build</code></span>}</dd>
-                    <dt>Python</dt><dd>{sv.python} <span className="s"><code>{sv.executable}</code></span></dd>
-                    <dt>frameworks</dt><dd>{Object.entries(sv.frameworks).map(([k, v]) => <span key={k} className={pillCls('')} title={v ? '' : 'not installed here'}>{k} {v || '–'}</span>)}</dd>
-                    <dt>machine</dt><dd>{sv.chip}<div className="s">{sv.cores ? `${sv.cores} cores · ` : ''}{sv.memory ? `${Math.round(sv.memory / 2 ** 30)} GB memory · ` : ''}{sv.platform}</div></dd>
-                    <dt>lanes</dt><dd>{d.lanes?.error ? <span className="s">{d.lanes.error}</span> : (d.lanes?.lanes || []).map((l) => (
-                      <div key={l.lane}><b>{l.lane}</b>: {l.seats} seat{l.seats === 1 ? '' : 's'} <span className="s">{l.out ? `· ${l.out} at sea` : '· in port'}</span></div>
-                    ))}<div className="s">set on the <a href="/expeditions/queue">queue</a></div></dd>
-                  </dl>
-                )}
-              </section>
-            </div>
+            {view === 'server' ? (
+              <>
+                <Performance range={perfRange} onRange={setPerfRange} />
+                <section className={cardCls(false, 'panel')}>
+                  <h2>Server and machine <span className="note">the process answering this page, and what it runs on</span></h2>
+                  {!sv || sv.error ? <Failed what="the server" error={sv?.error || 'no answer'} /> : (
+                    <dl className="setlist">
+                      <dt>version</dt><dd>thorp {sv.version || '–'}</dd>
+                      <dt>commit</dt><dd><code>{sv.commit || '–'}</code> on {sv.branch || '–'}{sv.uncommitted ? <span className="s"> · {sv.uncommitted} file{sv.uncommitted === 1 ? '' : 's'} changed since</span> : null}<div className="s">{sv.commit_subject}{sv.commit_at ? ` · ${new Date(sv.commit_at).toLocaleString()}` : ''}</div></dd>
+                      <dt>started</dt><dd>{when(sv.started)} <span className="s">up {span(sv.uptime)} · pid {sv.pid}</span></dd>
+                      <dt>dashboard built</dt><dd>{sv.built ? when(sv.built) : <span className="s">not built: <code>pnpm --dir frontend build</code></span>}</dd>
+                      <dt>Python</dt><dd>{sv.python} <span className="s"><code>{sv.executable}</code></span></dd>
+                      <dt>frameworks</dt><dd>{Object.entries(sv.frameworks).map(([k, v]) => <span key={k} className={pillCls('')} title={v ? '' : 'not installed here'}>{k} {v || '–'}</span>)}</dd>
+                      <dt>machine</dt><dd>{sv.chip}<div className="s">{sv.cores ? `${sv.cores} cores · ` : ''}{sv.memory ? `${Math.round(sv.memory / 2 ** 30)} GB memory · ` : ''}{sv.platform}</div></dd>
+                      <dt>lanes</dt><dd>{d.lanes?.error ? <span className="s">{d.lanes.error}</span> : (d.lanes?.lanes || []).map((l) => (
+                        <div key={l.lane}><b>{l.lane}</b>: {l.seats} seat{l.seats === 1 ? '' : 's'} <span className="s">{l.out ? `· ${l.out} at sea` : '· in port'}</span></div>
+                      ))}<div className="s">set on the <a href="/expeditions/queue">queue</a></div></dd>
+                    </dl>
+                  )}
+                </section>
+                <VastPanel vast={d.vast} />
+              </>
+            ) : null}
 
-            <div className="row">
+            {view === 'switches' ? (
               <section className={cardCls(false, 'panel')}>
                 <h2>Switches <span className="note">the environment <code>thorp dash</code> was started with; a dash is the default. Set them where the server is launched (<code>.claude/launch.json</code>, or the shell)</span></h2>
                 {!env || env.error ? <Failed what="the environment" error={env?.error || 'no answer'} /> : (
@@ -282,10 +340,12 @@ export default function Settings() {
                   </div>
                 )}
               </section>
+            ) : null}
 
+            {view === 'keys' ? (
               <section className={cardCls(false, 'panel')}>
                 <h2>Keys and places <span className="note">whether each key is present, never its value; and where everything lives</span></h2>
-                {env && !env.error ? (
+                {!env || env.error ? <Failed what="the keys" error={env?.error || 'no answer'} /> : (
                   <dl className="setlist">
                     {env.keys.map((k) => (
                       <div key={k.name} className="contents">
@@ -294,7 +354,7 @@ export default function Settings() {
                       </div>
                     ))}
                   </dl>
-                ) : null}
+                )}
                 {Array.isArray(d.paths) ? (
                   <dl className="setlist mt">
                     {d.paths.map((p) => (
@@ -304,10 +364,12 @@ export default function Settings() {
                       </div>
                     ))}
                   </dl>
-                ) : null}
+                ) : (
+                  <Failed what="the places" error={d.paths.error} />
+                )}
                 <p className="note mt">The rules a voyage sails under are not here: the policies and their switches are on <a href="/vsm/s5">the VSM, S5</a>, and the standing queue and its seats on <a href="/expeditions/queue">Expeditions, Queue</a>.</p>
               </section>
-            </div>
+            ) : null}
           </>
         )}
     </div>

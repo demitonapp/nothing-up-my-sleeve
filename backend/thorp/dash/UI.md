@@ -78,7 +78,9 @@ art, version, voyages out and home, and its goals. The same grid carries one car
 open ahead of its own standard — Arc de Triomphe today: a launching order, no SOP signed yet — drawn
 with the same SOP card (16:9 art, head, aim list), so Kipling and Arc de Triomphe sit side by side and
 read alike. **Queue** (`/expeditions/queue`) is every voyage
-still to sail, in order, with its goal and about when it sails. **Click a voyage** to open its card: the
+still to sail, in order, with its goal and about when it sails, and a **% complete** column: a voyage at
+sea shows the same step-of-schedule bar and percent as its card, and a line that has not sailed reads 0%.
+**Click a voyage** to open its card: the
 spec's question and experiment, its place in the queue and estimated start, the ship's shape and
 parameters, its tokeniser and corpus, its optimiser, the scaffold's pins and schedule, and (for a voyage
 at sea) how far it has come as a progress bar with its percent and steps, when it should dock at its
@@ -369,8 +371,11 @@ header tab but an action on a ship's page, Nothing up my sleeve and foreign alik
   **its chain**, one rung per class; **where the $100 goes** (the H100 sitting, step by step); **the
   gates** before the $100 is spent, each an open or passed Badge, beside **the risks**. A server
   without `/api/bet` shows an Empty state saying to restart `thorp dash`.
-- **Settings** (`/settings`, the cog at the top right of the header, lit on its own page with no tab lit;
-  `thorp/dash/settings.py`, `/api/settings`): what the dashboard runs on, read-only. **Storage**: a stat
+- **Settings** (`/settings`, the cog at the top right of the header, lit on its own page and on all of its
+  tabs with no tab lit; `thorp/dash/settings.py`, `/api/settings`): what the dashboard runs on, read-only,
+  in five tabs under one line row (`#setnav`), each at its own address so a tab survives a refresh:
+  **Storage** (`/settings`), **The store** (`/settings/store`), **Server and machine** (`/settings/server`),
+  **Switches** (`/settings/switches`) and **Keys and places** (`/settings/keys`). **Storage**: a stat
   strip (the space Nothing up my sleeve keeps, the disk's free space, the biggest part, the voyages with
   checkpoints, the outside models downloaded), the disk as one bar (ours, everything else, free), then a
   table of the parts biggest first (the outside models' Hugging Face cache, the checkpoints, the store's
@@ -380,12 +385,18 @@ header tab but an action on a ship's page, Nothing up my sleeve and foreign alik
   voyages' folders, named from the ledger and linked to their ship pages) and **the outside models**
   (each model in the cache, biggest first). **The store**: Postgres's address (no password), whether it
   answers, its version, size and ten biggest tables, and which of the ledger, the library and the queue
-  it holds. **Server and machine**: the version, commit and files changed since, when the server started
+  it holds. **Server and machine**: above the facts, **the performance chart** — the dash process's own CPU
+  and memory as two lines (CPU % on the left axis, memory in MB on the right) over the last hour, day or
+  week (a row of range tabs: a minute, five minutes or half an hour a point), sampled every twenty seconds
+  by `thorp.dash.perf` into `data/dash/perf.jsonl` and kept eight days; a strip above it gives CPU and
+  memory now, their mean and peak over the range, and the samples, and a break in the line is a time the
+  server was not running. Then the version, commit and files changed since, when the server started
   and when the dashboard was built, Python and the frameworks, the chip, cores and memory, and each
   lane's seats. **Switches**: every `THORP_*` the server was started with, a dash for a default, and what
   each does. **Keys and places**: whether each key (`FAL_KEY`, `VAST_API_KEY`, `HF_TOKEN`) is set, never
   its value, and where the repository, data, ships, ledger, checkpoints and model cache live. Nothing is
-  changed or deleted from this page; the policies stay on the VSM's S5 and the seats on the queue. A
+  deleted from this page; the store's address is the one thing changed here (a switch in the store tab),
+  and the policies stay on the VSM's S5 and the seats on the queue. A
   part that cannot be read says why and the rest still stands.
 - **VSM** (`/vsm`, a tab under Expeditions; `thorp/vsm.py`, `/api/governance`): Thorp's rules
   as Beer's Viable System Model, five Card bands from S5 at the top to S1, each with its name, purpose,

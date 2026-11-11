@@ -1,0 +1,17 @@
+---
+// Settings' tabs, one page each so a tab survives a refresh: /settings is Storage, then /settings/store,
+// /settings/server, /settings/switches and /settings/keys (and /settings/storage for the first, if it is
+// ever linked). The island reads the route (useRoute) and picks the tab; `thorp dash` falls back to the
+// settings shell for any other sub-route too (server.py's static fallback).
+import Layout from '../../layouts/Layout.astro';
+import Settings from '../../components/islands/Settings';
+
+export function getStaticPaths() {
+  return ['storage', 'store', 'server', 'switches', 'keys'].map((path) => ({ params: { path } }));
+}
+---
+<Layout>
+  <main>
+    <Settings client:load />
+  </main>
+</Layout>

@@ -269,6 +269,18 @@ const queueGoal = (r: any): string => {
   const t = String(r.goal || r.experiment || '').replace(/\s+/g, ' ').trim();
   return t.length > 90 ? t.slice(0, 87) + '…' : t;
 };
+/** How far a voyage has come, as the card reads it: its training step of the steps its schedule sets,
+ *  from the row's own `detail`. A line that has not sailed is 0%: there is nothing to read yet. */
+const queueComplete = (r: any): string => {
+  const det = r.detail || {}, rd = det.readings || {}, sch = det.schedule || {}, opt = det.optim || {};
+  const step = rd.step != null ? Number(rd.step) : sch.step != null ? Number(sch.step) : null;
+  const total = opt.steps != null ? Number(opt.steps) : sch.total != null ? Number(sch.total) : null;
+  if (step == null || !(step > 0)) return '<span class="s" title="not started: it sails when the lines ahead of it are home">0%</span>';
+  if (total == null || !(total > 0)) return `<span class="s" title="its step total is known once it sails">step ${Math.round(step).toLocaleString()}</span>`;
+  const done = Math.max(0, Math.min(100, (100 * step) / total));
+  const pct = done < 1 ? done.toFixed(1) : done.toFixed(0);
+  return `<div class="qprog" title="step ${Math.round(step).toLocaleString()} of ${Math.round(total).toLocaleString()} · ${pct}% complete"><progress class="qvbar qminibar" max="${total}" value="${step}" aria-label="voyage progress"></progress><b>${pct}%</b></div>`;
+};
 export function queueRowsHtml(d: any, rungs: Rung[]): string {
   // the at-sea voyages are the first of the queue: number them too (10 November, Justin: "I'd be
   // expecting the at sea ships to still have a number"), and let the number run on through the file.
@@ -279,7 +291,7 @@ export function queueRowsHtml(d: any, rungs: Rung[]): string {
     // to be opened, currently only voyages can be opened with a modal")
     const what = ({ investigation: 'an investigation', reading: 'a reading', upkeep: 'upkeep' } as Record<string, string>)[r.what] || 'a step';
     return r.kind === 'step'
-      ? `<tr class="qstep${r.status === 'at sea' ? ' sel' : ''}" data-qi="${i}" tabindex="0" aria-label="show the card for ${esc(r.name)}" title="show this step's card"><td class="s">${seq}</td><td colspan="3" class="s">${r.status === 'at sea' ? '' : '↳ then '}${what}: <b>${esc(r.name)}</b>${r.goal_id ? ` <span class="${pillCls('accent')}" title="the goal this step serves">${esc(r.goal_id)}</span>` : r.what === 'upkeep' || r.status === 'at sea' ? '' : ` <span class="${pillCls('bad')}" title="every line serves an expedition's goal: thorp queue goal LINE --goal EXPEDITION:N">no goal</span>`}<div class="s">${stepLength(r)}</div></td>
+      ? `<tr class="qstep${r.status === 'at sea' ? ' sel' : ''}" data-qi="${i}" tabindex="0" aria-label="show the card for ${esc(r.name)}" title="show this step's card"><td class="s">${seq}</td><td colspan="4" class="s">${r.status === 'at sea' ? '' : '↳ then '}${what}: <b>${esc(r.name)}</b>${r.goal_id ? ` <span class="${pillCls('accent')}" title="the goal this step serves">${esc(r.goal_id)}</span>` : r.what === 'upkeep' || r.status === 'at sea' ? '' : ` <span class="${pillCls('bad')}" title="every line serves an expedition's goal: thorp queue goal LINE --goal EXPEDITION:N">no goal</span>`}<div class="s">${stepLength(r)}</div></td>
       <td class="s" title="${r.est_min == null ? 'no time yet' : `about ${Math.round(r.est_min)} min · ${esc(r.est_source || '')}`}">${startsAt(r)}</td>
       <td class="s">${r.status === 'at sea' ? `<span class="${pillCls('running')}">at sea</span>` : sailsIn(r.starts_in_min, !!r.at_least)}</td></tr>`
       : `<tr data-qi="${i}" tabindex="0" aria-label="show the card for ${esc(r.name)}" title="show this voyage's card"${r.status === 'at sea' ? ' class="sel"' : ''}><td class="s">${seq}</td>
@@ -290,10 +302,11 @@ export function queueRowsHtml(d: any, rungs: Rung[]): string {
         return rung ? `<a href="${modelHash(rung, 'training')}" title="open ${esc(String(rung.name).toLowerCase().replace(/^the\s+/, '').replace(/[^a-z0-9]+/g, '-'))}'s training page">${label}</a>` : label;
       })()}${r.missing ? ` <span class="${pillCls('bad')}">no spec</span>` : ''}</td>
       <td>${r.sop ? `<span class="${pillCls('accent')}">v${esc(r.sop)}</span>` : '<span class="s">–</span>'}</td>
+      <td class="s qcomplete">${queueComplete(r)}</td>
       <td class="s" title="${r.est_min == null ? 'no time yet' : `about ${Math.round(r.est_min)} min · ${esc(r.est_source || '')}`}">${startsAt(r)}</td>
       <td class="s">${r.status === 'at sea' ? `<span class="${pillCls('running')}">at sea</span>` : sailsIn(r.starts_in_min, !!r.at_least)}</td></tr>`;
   }).join('')
-    || `<tr><td colspan="6" class="${emptyCls(true)}">the queue is empty</td></tr>`;
+    || `<tr><td colspan="7" class="${emptyCls(true)}">the queue is empty</td></tr>`;
   return rows;
 }
 

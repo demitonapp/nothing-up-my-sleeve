@@ -43,8 +43,8 @@ import ChatConsole from '../components/islands/ChatConsole';
             const prefixes = (tab.getAttribute('data-match') || '').split(',').filter(Boolean);
             if (prefixes.some((p) => path === p || path.startsWith(p + '/'))) { active = tab; break; }
           }
-          // settings is the cog's page, not one of the ways in: no tab is lit there
-          const settings = path === '/settings';
+          // settings is the cog's page, not one of the ways in: no tab is lit there (nor on its tabs)
+          const settings = path === '/settings' || path.startsWith('/settings/');
           if (!active && !settings) active = tabs.find((tab) => tab.getAttribute('data-nav') === 'places') || null;
           const cog = document.getElementById('settingscog');
           if (cog) { if (settings) cog.setAttribute('aria-current', 'page'); else cog.removeAttribute('aria-current'); }

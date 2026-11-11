@@ -39,7 +39,7 @@ def test_pending_and_history_are_the_stores(ships):
     queue_store.add("hold: Justin signs")
     assert queue_read.pending() == ["fitouts/a", "hold: Justin signs"]
     queue_store.record("fitouts/z", "2026-11-11T10:00:00", "0")
-    assert queue_read.history() == [{"text": "fitouts/z", "started": "2026-11-11T10:00:00", "status": "0"}]
+    assert queue_read.history() == [{"text": "fitouts/z", "started": "2026-11-11T10:00:00", "status": "0", "goal_id": None}]
     (ships / "specs" / "queue.txt").write_text("fitouts/only-in-the-file\n")  # an export is never read back
     assert "fitouts/only-in-the-file" not in queue_read.pending()
 

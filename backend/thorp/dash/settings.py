@@ -14,6 +14,8 @@ Read-only, except for the store switch: this module reads what the dashboard run
   the dashboard was last built.
 - **environment**: every THORP_* switch that is set, and whether each key is present (never its value).
 - **lanes**: how many seats each lane runs.
+- **vast**: Vast.ai by GPU class: the terms' ceilings, the market's price reads (count, range, the latest
+  price and reliability) and the voyages hired (the spend log: count, hours, spend, the last measured rate).
 
 Each part is read on its own and says why when it cannot be, so a store that is down still shows the disk.
 The sizes are cached for a minute: `du` over the texts is the only slow read here.
@@ -368,6 +370,133 @@ def lanes() -> dict:
         return {"lanes": [], "error": str(e).splitlines()[0][:300]}
 
 
+def _chip_row(gpu: str, ceiling: float | None = None) -> dict:
+    """One GPU class's line in the Vast table, before anything is known of it."""
+    return {
+        "gpu": gpu,
+        "ceiling": ceiling,
+        "reads": 0,
+        "last_read": None,
+        "price": None,
+        "reliability": None,
+        "min": None,
+        "median": None,
+        "max": None,
+        "hires": 0,
+        "out": 0,
+        "hours": 0.0,
+        "spent": 0.0,
+        "rate": None,
+        "rate_preset": None,
+        "rate_at": None,
+        "guess": None,
+    }
+
+
+def chip_stats(reads: list[dict], events: list[dict], terms: dict) -> list[dict]:
+    """The Vast table, one row a GPU chip class: what the market asked for it (the cheapest offer each
+    charter quote read: its count, its range and its latest price and host reliability) and what was hired
+    on it (the spend log's voyages, their hours, the money and the last measured rate). The classes the
+    terms allow come first, even when nothing has been read or hired; a class the log knows and the terms
+    do not follows, so an old reading is not hidden.
+
+    Pure over its three inputs (the terms, s4.market_reads' lines and s3.spend_events' lines), so the
+    arithmetic can be tested without a store."""
+    import statistics
+
+    from thorp.viable.s5_policy.charter import EFFECTIVE_TFLOPS
+
+    ceilings: dict[str, float] = dict(terms.get("gpus") or {})
+    prices: dict[str, list[float]] = {}
+    latest: dict[str, dict] = {}
+    for r in reads:
+        gpu = r.get("gpu")
+        if not gpu or r.get("dph") is None:
+            continue
+        prices.setdefault(gpu, []).append(float(r["dph"]))
+        if gpu not in latest or str(r.get("at") or "") > str(latest[gpu].get("at") or ""):
+            latest[gpu] = r
+
+    rows = {gpu: _chip_row(gpu, float(c)) for gpu, c in ceilings.items()}
+    for gpu in prices:
+        rows.setdefault(gpu, _chip_row(gpu))
+    released = {e.get("instance") for e in events if e.get("event") == "released"}
+    for e in events:
+        gpu = e.get("gpu")
+        if not gpu:
+            continue  # a release that never reached the box (refused ssh, a stalled copy): no class, no money
+        row = rows.setdefault(gpu, _chip_row(gpu))
+        if e.get("event") == "hired":
+            row["hires"] += 1
+            if e.get("instance") not in released:
+                row["out"] += 1
+        elif e.get("event") == "released":
+            if e.get("cost") is not None:
+                row["spent"] += float(e["cost"])
+            if e.get("started") and e.get("ended"):
+                row["hours"] += (float(e["ended"]) - float(e["started"])) / 3600
+            if e.get("tokens_per_s") and (
+                row["rate_at"] is None or str(e.get("at")) > row["rate_at"]
+            ):
+                row["rate"] = float(e["tokens_per_s"])
+                row["rate_preset"] = e.get("preset")
+                row["rate_at"] = e.get("at")
+
+    for gpu, row in rows.items():
+        row["guess"] = EFFECTIVE_TFLOPS.get(gpu)
+        seen = prices.get(gpu) or []
+        row["reads"] = len(seen)
+        if seen:
+            last = latest[gpu]
+            row["last_read"] = last.get("at")
+            row["price"] = round(float(last["dph"]), 4)
+            row["reliability"] = last.get("reliability")
+            row["min"] = round(min(seen), 4)
+            row["median"] = round(statistics.median(seen), 4)
+            row["max"] = round(max(seen), 4)
+        row["hours"] = round(row["hours"], 2)
+        row["spent"] = round(row["spent"], 2)
+        if row["rate"] is not None:
+            row["rate"] = round(row["rate"])
+
+    allowed = [rows[g] for g in ceilings if g in rows]
+    others = [rows[g] for g in sorted(rows) if g not in ceilings]
+    return allowed + others
+
+
+def vast() -> dict:
+    """The Vast.ai lane, by GPU class: the terms that bound it (s5.charter), the market's price reads
+    (s4.market_reads) and the voyages hired (s3.spend_events, the spend log).
+
+    Read from the store only, never the API: the settings page must answer while Vast is unreachable, and
+    it asks the store on every visit, so the figures are as fresh as the last charter quote or hire. The
+    key is only ever said to be present."""
+    from datetime import UTC, datetime
+
+    from thorp import providers
+    from thorp.viable.s3_control import charter as s3
+    from thorp.viable.s4_intelligence import market
+    from thorp.viable.s5_policy import charter as s5
+
+    terms = s5.terms()
+    chips = chip_stats(market.reads(limit=2000), s3.log(), terms)
+    return {
+        "at": datetime.now(UTC).isoformat(timespec="seconds"),
+        "key": bool(providers.vast_key()),
+        "seats": providers.vast_seats(),
+        "week": {"spent": round(s3.week_spent(), 2), "budget": float(terms["weekly_budget"])},
+        "voyage_budget": float(terms["voyage_budget"]),
+        "out": sum(c["out"] for c in chips),
+        "chips": chips,
+        "totals": {
+            "reads": sum(c["reads"] for c in chips),
+            "hires": sum(c["hires"] for c in chips),
+            "hours": round(sum(c["hours"] for c in chips), 1),
+            "spent": round(sum(c["spent"] for c in chips), 2),
+        },
+    }
+
+
 def _part(fn):
     try:
         return fn()
@@ -389,4 +518,5 @@ def payload(fresh: bool = False) -> dict:
         "paths": _part(paths_info),
         "environment": _part(environment),
         "lanes": _part(lanes),
+        "vast": _part(vast),
     }

@@ -11,6 +11,7 @@ backfill never imports mlx or torch.
 
 from __future__ import annotations
 
+import contextlib
 import os
 from pathlib import Path
 
@@ -65,6 +66,7 @@ class QueueHistory(Base):
     started: Mapped[str | None] = mapped_column(Text)
     status: Mapped[str | None] = mapped_column(Text)
     run: Mapped[str | None] = mapped_column(Text)
+    goal_id: Mapped[str | None] = mapped_column(Text)  # the goal it served, carried from its at-sea row
 
 
 class AtSea(Base):
@@ -89,6 +91,9 @@ class AtSea(Base):
     started: Mapped[str | None] = mapped_column(Text)  # as the coordinator writes it (ISO, its own clock)
     started_ts: Mapped[float | None] = mapped_column(Float)  # the same moment in seconds: a cmd:'s deadline
     coordinator: Mapped[int | None] = mapped_column(Integer)  # the pid of the coordinator that launched it
+    # the goal it serves, carried from its queue_lines row when it is taken (12 November: until this column the
+    # goal was lost the moment a line sailed, and the queue page showed the voyage at sea with none)
+    goal_id: Mapped[str | None] = mapped_column(Text)
 
 
 def tables() -> list:
@@ -204,6 +209,10 @@ def _rows(s) -> list[dict]:
             "payload": r.payload,
             "lane": r.lane,
             "goal_id": r.goal_id,
+            # kept so `_write` does not blank them: every rewrite of the queue (a take, a move, a drop) wrote
+            # the rows back from this dict, and without these two every line lost who added it and when
+            "added_by": r.added_by,
+            "added_at": r.added_at,
         }
         for r in rows
     ]
@@ -302,6 +311,17 @@ def _goal_of_cmd(payload: str) -> str | None:
     return _goal_of_spec(f"investigations/{m.group(1)}") if m else None
 
 
+def goal_of_line(text: str) -> str | None:
+    """The goal a line serves, read from the line itself (its spec's `goal:`, or its investigation's): for a line
+    with no queued row to carry it (adopted from the old pid file) and for history written before the column."""
+    parsed = parse_line(text)
+    if parsed["kind"] == "spec":
+        return _goal_of_spec(parsed["payload"])
+    if parsed["kind"] == "cmd":
+        return _goal_of_cmd(parsed["payload"])
+    return None
+
+
 def needs_goal(parsed: dict) -> bool:
     """Every spec and cmd line serves a goal (Justin, 12 November: "all items in the queue need an expedition and
     goal code. like knockout:3"); a wait or a hold is a rule about other lines, and upkeep serves the queue."""
@@ -385,7 +405,7 @@ def take(text: str) -> bool:
 
 # ---------------------------------------------------------------- what is at sea (11 November)
 
-_SEA_FIELDS = ("lane", "seat", "kind", "name", "run_id", "pid", "started", "started_ts", "coordinator")
+_SEA_FIELDS = ("lane", "seat", "kind", "name", "run_id", "pid", "started", "started_ts", "coordinator", "goal_id")
 
 
 def _sea_row(line: str, fields: dict) -> AtSea:
@@ -394,6 +414,11 @@ def _sea_row(line: str, fields: dict) -> AtSea:
     known.setdefault("lane", parsed["lane"])
     known.setdefault("kind", parsed["kind"])
     known.setdefault("seat", 0)
+    if "goal_id" not in known:  # no queued row carried one (an adopted process): read it off the line
+        with contextlib.suppress(Exception):
+            g = goal_of_line(line)
+            if g:
+                known["goal_id"] = g
     return AtSea(text=line.strip(), **known)
 
 
@@ -421,7 +446,9 @@ def take_to_sea(line: str, **fields) -> int | None:
         for i, r in enumerate(rows):
             if r["text"] == line:
                 _write(rows[:i] + rows[i + 1 :], s)
-                row = _sea_row(line, fields)
+                # the goal goes to sea with the line (12 November): the queued row is deleted here, and
+                # with it the only record of what the line serves
+                row = _sea_row(line, {**({"goal_id": r["goal_id"]} if r.get("goal_id") else {}), **fields})
                 s.add(row)
                 s.flush()
                 return int(row.id)
@@ -476,6 +503,13 @@ def record(line: str, started: str, status: str, at_sea: int | None = None) -> N
                 "coalesce((select max(id) from s2.queue_history), 1))"
             )
         )
+        goal = None
+        if at_sea is not None:
+            sea = s.get(AtSea, int(at_sea))
+            goal = sea.goal_id if sea is not None else None
+        if goal is None:
+            with contextlib.suppress(Exception):
+                goal = goal_of_line(line)
         s.add(
             QueueHistory(
                 text=line,
@@ -483,10 +517,41 @@ def record(line: str, started: str, status: str, at_sea: int | None = None) -> N
                 started=started,
                 status=str(status),
                 run=None,
+                goal_id=goal,
             )
         )
         if at_sea is not None:
             s.execute(delete(AtSea).where(AtSea.id == int(at_sea)))
+
+
+def backfill_goals() -> dict:
+    """Fill `goal_id` on the at-sea and history rows written before the column (12 November), each from its
+    line's spec or investigation. A line whose spec names no goal (or no longer exists) stays empty: that is
+    the record's truth, not a gap to guess at. Returns how many rows of each table were filled."""
+    from sqlalchemy import update
+
+    from thorp import store
+
+    out = {"at_sea": 0, "queue_history": 0}
+    goals: dict[str, str | None] = {}
+
+    def goal(t: str) -> str | None:
+        if t not in goals:
+            try:
+                goals[t] = goal_of_line(t)
+            except Exception:  # noqa: BLE001 - an unreadable spec leaves its row as it was
+                goals[t] = None
+        return goals[t]
+
+    with store.session() as s:
+        for model, key in ((AtSea, "at_sea"), (QueueHistory, "queue_history")):
+            texts = s.scalars(select(model.text).where(model.goal_id.is_(None)).distinct()).all()
+            for t in texts:
+                g = goal(t)
+                if g:
+                    n = s.execute(update(model).where(model.text == t, model.goal_id.is_(None)).values(goal_id=g))
+                    out[key] += n.rowcount or 0
+    return out
 
 
 def sort_specs(key, reads=None) -> None:

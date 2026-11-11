@@ -142,9 +142,20 @@ def split_lane(s: str) -> tuple[str, str]:
     when it names none. `cmd:`, `wait:` and `hold:` are kinds of line, never lanes."""
     s = s.strip()
     m = re.match(r"([A-Za-z][A-Za-z0-9_-]*):", s)
-    if m and m.group(1) not in RESERVED and m.group(1) != "mac" and m.group(1) in lane_defs():
+    if m and m.group(1) == "mac":
+        # `mac: <spec>` pins a line here, so the purser leaves it alone (12 November: a line the purser sent
+        # abroad comes back pinned if its charter fails). Before this the prefix was kept as part of the spec's
+        # path, so a `mac:` line could never be read.
+        return "mac", s[m.end() :].strip()
+    if m and m.group(1) not in RESERVED and m.group(1) in lane_defs():
         return m.group(1), s[m.end() :].strip()
     return "mac", s
+
+
+def pinned(text: str) -> bool:
+    """A line that names its lane (`mac:` or `vast:`, or any lane s2.lane_defs names): the purser never moves it."""
+    m = re.match(r"\s*([A-Za-z][A-Za-z0-9_-]*):", text)
+    return bool(m) and m.group(1) not in RESERVED and (m.group(1) == "mac" or m.group(1) in lane_defs())
 
 
 def helm_offset(lane: str) -> int:
@@ -210,6 +221,7 @@ class Line:
         default_factory=list
     )  # the runs it reads from (seed, teacher, donor), by name
     timeout: int | None = None  # seconds a cmd: line may run; None is no limit
+    routed: bool = False  # the purser sent it abroad (S5's `purser` term `routing`): a failure abroad comes home
 
 
 def _load_spec(rel: str, specs: Path) -> dict | None:
@@ -1022,6 +1034,23 @@ def _adopt(running: dict, specs: Path, done: Path, root: Path, say) -> None:
             lost(lane, ln, pid, started, None)
 
 
+def _come_home(queue: Path, ln: Line, say) -> None:
+    """A voyage the purser sent abroad that did not come home (no offer within the terms, a box that would not
+    provision, the charter's gate): it goes back to the top of the queue pinned to this Mac (`mac: <spec>`), so
+    a failed hire costs a retry here, never the voyage, and the purser does not send it abroad again."""
+    from thorp.viable.s2_coordination import queue_store
+
+    home = f"mac: {ln.payload}"
+    try:
+        if _queue_pg():
+            queue_store.add(home, top=True, goal_id=queue_store.goal_of_line(ln.text), require_goal=False)
+        else:
+            append(queue, home)
+        say(f"[vast] {ln.text} did not come home from abroad: requeued at the top as {home!r}")
+    except Exception as e:  # noqa: BLE001 - the history keeps the failure; a person can requeue it
+        say(f"[vast] {ln.text} failed abroad and could not be requeued here: {e}")
+
+
 def _record(done: Path, text: str, started: str, status, row: int | None = None) -> None:
     """Write a line that ended to queue-done.txt, or to queue_history when the store is the queue. If the
     store refuses it, keep it in the file and carry on: a record must never kill the coordinator (10
@@ -1046,7 +1075,7 @@ def _record(done: Path, text: str, started: str, status, row: int | None = None)
 
 def run(queue: Path | None = None, done: Path | None = None, root: Path | None = None,
         poll_s: float = 30.0, key=has_key, outside=outside_voyage, launch=None, log=None, until_empty: bool = True,
-        hired=ship_out) -> None:  # fmt: skip
+        hired=ship_out, steward=None) -> None:  # fmt: skip
     """The coordinator's loop: start each idle lane's next line, record each line that ends, until the queue is
     empty and both lanes are in port."""
     queue = queue or paths.resolve("specs/queue.txt")
@@ -1093,6 +1122,12 @@ def run(queue: Path | None = None, done: Path | None = None, root: Path | None =
         return p
 
     custom = launch is not None
+    # S3's purser beside the lanes (12 November): it calls each voyage's waters, and in S5's `routing` mode sends
+    # the ones it calls foreign to the Vast lane. Not in a test's custom launch, unless the test hands one in.
+    if steward is None and not custom:
+        from thorp.viable.s3_control.purser import Steward
+
+        steward = Steward(say)
     launch = launch or default_launch
     running: dict[str, list[dict]] = {lane: [] for lane in lane_names()}  # s2.lane_defs (item 11)
     told: dict[str, str | None] = {lane: None for lane in lane_names()}
@@ -1156,6 +1191,8 @@ def run(queue: Path | None = None, done: Path | None = None, root: Path | None =
                     _children.discard(seat["proc"].pid)
                     attempts.pop(seat["line"].text, None)
                     seats.remove(seat)
+                    if code != 0 and seat["line"].routed:
+                        _come_home(queue, seat["line"], say)
         # a run whose heartbeat stopped with nothing at sea covering it is lost (11 November, item 11)
         if time.monotonic() - swept > SWEEP_EVERY_S:
             swept = time.monotonic()
@@ -1175,6 +1212,8 @@ def run(queue: Path | None = None, done: Path | None = None, root: Path | None =
                 lines.append(parse(t, specs))
             except Exception as e:  # noqa: BLE001 - one unreadable line must not stop the lane
                 say(f"S2: cannot read the queue line {t!r}: {e}")
+        if steward is not None:
+            lines = steward.steer(lines, [seat["line"].text for seats in running.values() for seat in seats])
         have_key = key()
         lane_defs(fresh=True)  # a lane added, disabled or re-seated in s2.lane_defs since the last loop
         for lane in enabled_lanes():

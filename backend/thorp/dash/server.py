@@ -3627,6 +3627,17 @@ def _api_queue() -> dict:
             return None
         return max(0.0, (datetime.now(d.tzinfo or timezone.utc) - d).total_seconds() / 60)
 
+    # the goal of each line at sea, carried from its queued row (s2.at_sea.goal_id, 12 November). A line that
+    # sails leaves s2.queue_lines, so the queued lines alone gave every row at sea no goal.
+    from thorp.viable.s2_coordination import queue_store as _qs
+
+    try:
+        _sea_rows = _qs.at_sea()
+    except Exception:  # noqa: BLE001  (a store before the column: the queue still shows)
+        _sea_rows = []
+    sea_goal_by_name = {r["name"]: r.get("goal_id") for r in _sea_rows if r.get("name") and r.get("goal_id")}
+    sea_goal_by_text = {r["text"]: r.get("goal_id") for r in _sea_rows if r.get("goal_id")}
+
     rows = []
     for run in sea:
         name, ship, started = run["name"], run["ship"], run["started"]
@@ -3647,6 +3658,10 @@ def _api_queue() -> dict:
                 spec_path = None
         r = {**row(name, ship, spec, "at sea", None), "started": started, "run_id": run["run_id"],
              "spec": spec_path, "detail": _spec_detail(spec, run)}
+        r["goal_id"] = sea_goal_by_name.get(name)
+        if not r["goal_id"] and spec_path:  # a voyage sailed outside the queue: its spec's own `goal:`
+            with contextlib.suppress(Exception):
+                r["goal_id"] = _qs._goal_of_spec(spec_path)
         est, source = times.estimate(name, spec)
         r["est_min"], r["est_source"] = est, source
         rows.append(r)
@@ -3661,13 +3676,12 @@ def _api_queue() -> dict:
                 for s in seat["mac"]:
                     s["end"], s["kind"] = now + left, "other"
     lines = _queue_lines()
-    # the goal a line serves, so the page can say what each row is for (s2.queue_lines.goal_id)
-    from thorp.viable.s2_coordination import queue_store as _qs
-
+    # the goal a line serves, so the page can say what each row is for (s2.queue_lines.goal_id, and for a
+    # command at sea, s2.at_sea.goal_id)
     try:
-        line_goals = {r["text"]: r.get("goal_id") for r in _qs.lines()}
+        line_goals = {**sea_goal_by_text, **{r["text"]: r.get("goal_id") for r in _qs.lines()}}
     except Exception:  # noqa: BLE001  (a store before the goal column: the queue still shows)
-        line_goals = {}
+        line_goals = dict(sea_goal_by_text)
 
     run_names = {r["run_id"]: r["name"] for r in all_runs}
 
@@ -3892,8 +3906,25 @@ def _api_queue() -> dict:
     for r in rows:
         if r.get("goal_id") in words:
             r["serves"] = words[r["goal_id"]]
+    # the purser's latest call on each queued line, as the coordinator kept it (s3.allocations, 12 November):
+    # its waters, the class abroad, both homecomings, the cost and the reason in words
+    purser_mode = None
+    try:
+        from thorp.viable.s3_control import purser as _purser
+
+        purser_mode = _purser.mode()
+        kept = _purser.latest()
+    except Exception:  # noqa: BLE001  (a store before the table: the rows still show)
+        kept = {}
+    for r in rows:
+        k = kept.get(r.get("line") or (r.get("spec") if r.get("kind") == "voyage" else None) or "")
+        if k and r.get("status") == "queued":
+            r["purser"] = {key: k.get(key) for key in ("waters", "gpu", "local_home_min", "foreign_home_min",
+                                                       "cost", "reason", "mode", "applied")}  # fmt: skip
+            r["purser"]["at"] = k["at"].isoformat() if k.get("at") else None
     end = max((s["end"] for v in seat.values() for s in v), default=now)
-    return {"rows": rows, "hours_left": round((end - now) / 60, 1), "without_a_time": without_a_time}
+    return {"rows": rows, "hours_left": round((end - now) / 60, 1), "without_a_time": without_a_time,
+            "purser": purser_mode}
 
 
 def _where_of(aboard: dict) -> str:
@@ -7081,6 +7112,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/smoking_qwen": api_smoking_qwen,
                 "/api/bet": api_bet,
                 "/api/settings": lambda: api_settings(q.get("fresh", "")),
+                "/api/settings/perf": lambda: api_settings_perf(q.get("range", "24h")),
                 "/api/climb": lambda: api_climb(q.get("runs", "")),
                 "/api/shelf": lambda: api_shelf(q["run"]),
                 "/api/book": lambda: api_book(q["id"], q.get("offset", 0), q.get("length", 20000)),
@@ -7163,6 +7195,10 @@ def serve(port: int = 8787, *, onboard: bool = False, open_browser: bool = False
             pass
         return
     srv = _DualStack(("::", port), Handler)  # :: with V6ONLY=0 covers both ::1 and 127.0.0.1
+    # the settings page's chart: this process's own CPU and memory, sampled every twenty seconds
+    from thorp.dash import perf
+
+    perf.start()
     # the warm threads are started on the first visit, not here: a cold server must answer the
     # leaderboard before the shelves' long read begins
     print(f"thorp dash on http://localhost:{port}  (ledger {paths.ledger_path()})", flush=True)
@@ -7190,6 +7226,14 @@ def api_settings(fresh: str = "") -> dict:
     from thorp.dash import settings
 
     return settings.payload(fresh=fresh in ("1", "true", "yes"))
+
+
+def api_settings_perf(range_: str = "24h") -> dict:
+    """The server tab's chart: this dash process's own CPU and memory over the last hour, day or week
+    (`range` is 1h, 24h or 7d), sampled by thorp.dash.perf since the server started."""
+    from thorp.dash import perf
+
+    return perf.history(range_)
 
 
 def api_ladder() -> dict:

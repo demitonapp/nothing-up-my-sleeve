@@ -45,7 +45,7 @@ def history() -> list[dict]:
 
     with store.session() as s:
         return [
-            {"text": r.text, "started": r.started, "status": r.status}
+            {"text": r.text, "started": r.started, "status": r.status, "goal_id": r.goal_id}
             for r in s.scalars(select(QueueHistory).order_by(QueueHistory.id))
         ]
 

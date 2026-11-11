@@ -80,9 +80,11 @@ HARBOURS: dict[str, str] = {
     "phaleron": "the ancient Greek harbour of Phaleron at night, a sheltered curved bay of calm black water, a row of "
     "small beached wooden triremes and young ships drawn up on the shingle, shipwrights and trainee oarsmen with "
     "torches, a stone breakwater, the lamplit hills of Athens and the Acropolis faint on the dark horizon",
-    "piraeus": "the ancient deep harbour of Piraeus at night, a great circular naval basin ringed by long stoas and "
-    "dry docks, deep water and tall stone moles, large war galleys and deep-draught merchant ships moored in rows, "
-    "lanterns along the quays, ship sheds and arsenals behind, the dark sea beyond the harbour mouth",
+    "piraeus": "the ancient Greek deep harbour of Piraeus in the 5th century BC, at night: a great circular naval "
+    "basin ringed by long stone stoas, ship sheds and arsenals, tall stone moles and deep black water, ancient "
+    "Greek war galleys (triremes) with rows of oars and deep-draught wooden merchant ships moored along the "
+    "quays, oil lamps and torches burning on the stone, no modern boats, no yachts, no cars, no electric lights, "
+    "no modern city, the dark sea beyond the harbour mouth",
     "zayton": "a vast ancient trading harbour at night, lantern-lit quays crowded with bales of silk and sacks of "
     "spice, merchants of many nations bargaining, dhows, junks and tall merchantmen moored in rows with their "
     "sails furled, a camel caravan arriving down to the water, countless lamps reflected in the black harbour",

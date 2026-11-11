@@ -1384,6 +1384,11 @@ button[aria-busy="true"] { cursor: progress; opacity: .7; }
 .hflip .hbackfoot a { color: var(--accent) !important; text-decoration: none; }
 .hflip .hbackfoot a:hover { text-decoration: underline; }
 @media (prefers-reduced-motion: reduce) { .hflip-inner, .hflipicon { transition: none; } .hshot { animation: none; } }
+/* the harbour cards fit above the chat console: Harbours.tsx (fitHarbourCards) sets --harbour-art when the row
+   would run under the bar, and the art is cropped to it; unset, the art keeps its 16:9. The back face's
+   picture gives way with it, so the turned card is no taller than the front. */
+.harbours:not(.shipyardgrid) .harbourcard .cardart.ship { height: var(--harbour-art, auto); }
+.harbours .hflip .hshotbox { min-height: min(190px, var(--harbour-art, 190px)); }
 .harbourrules { border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; background: var(--raise); display: grid; gap: 8px; }
 .hrule { font-size: var(--fs-sm); }
 .hdraught { display: grid; gap: 4px; }

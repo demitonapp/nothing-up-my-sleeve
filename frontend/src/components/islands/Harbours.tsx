@@ -17,6 +17,26 @@ export const isHarboursPage = (path: string): boolean => {
   return p === '' || p === '/' || /^\/harbours?(\/|$)/.test(p) || p === '/ships' || p === '/classes' || p === '/sizes' || p === '/rung' || p === '/shipyard' || p.startsWith('/shipyard/');
 };
 
+/** The harbour cards' first row stands clear of the chat console's bar (11 November, Justin: "the cards need
+ *  to dynamically scale so they don't go past the chat"). Only the art gives way: it is laid out at its own
+ *  16:9, the row's overshoot past the bar is measured, and the art is cut by that much (cropped, not
+ *  squashed), never below `ART_MIN`. A window too short even for that scrolls, as before. */
+const ART_MIN = 110;
+function fitHarbourCards(grid: HTMLElement): void {
+  if (!grid.classList.contains('harbours') || grid.classList.contains('shipyardgrid')) return;
+  grid.style.removeProperty('--harbour-art');
+  const cards = [...grid.querySelectorAll<HTMLElement>(':scope > .hflip, :scope > .harbourcard')];
+  if (!cards.length) return;
+  const top = cards[0].getBoundingClientRect().top;
+  const row = cards.filter((c) => Math.abs(c.getBoundingClientRect().top - top) < 2);
+  const bottom = Math.max(...row.map((c) => c.getBoundingClientRect().bottom)) + window.scrollY;
+  const bar = document.querySelector<HTMLElement>('.consolebar')?.offsetHeight ?? 54;
+  const limit = window.innerHeight - bar - 12; // page y the row should end above, read at the top of the page
+  const art = row[0].querySelector<HTMLElement>('.cardart')?.getBoundingClientRect().height ?? 0;
+  const over = bottom - limit;
+  if (over > 0 && art) grid.style.setProperty('--harbour-art', `${Math.max(ART_MIN, Math.floor(art - over))}px`);
+}
+
 export default function Harbours() {
   const route = useRoute();
   const [path, setPath] = useState('/');
@@ -32,6 +52,17 @@ export default function Harbours() {
 
   // on the document, not the cards' container: the island drops its markup off the harbours' addresses
   useEffect(() => wireHarbourFlip(document.documentElement), []);
+
+  // the harbour cards stand above the chat console (11 November): refit on every resize (a zoom is one too)
+  useEffect(() => {
+    let frame = 0;
+    const refit = (): void => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => { if (cardsRef.current) fitHarbourCards(cardsRef.current); });
+    };
+    window.addEventListener('resize', refit);
+    return () => { window.removeEventListener('resize', refit); cancelAnimationFrame(frame); };
+  }, []);
 
   useEffect(() => {
     const read = (): void => setPath(location.hash && location.hash.startsWith('#/') ? location.hash.slice(1) : location.pathname);
@@ -99,6 +130,7 @@ export default function Harbours() {
       // the poll rewrites the cards, so a turned card is painted back from the kept flip state
       cards.innerHTML = harbourCardsHtml(data);
       applyHarbourFlips(cards);
+      fitHarbourCards(cards);
     } else if (!h) {
       cards.innerHTML = `<div class="${emptyCls()}">no harbour called ${harbour}</div>`;
     } else {

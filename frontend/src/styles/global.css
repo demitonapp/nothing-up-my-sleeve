@@ -2134,3 +2134,57 @@ ol.goaltext { padding-left: 22px; }
 #leaderboard h1 .q a { color: #d8b566; }
 #leaderboard .panel .pill { border-radius: 2px; }
 #leaderboard .panel .chart { background: transparent; }
+
+/* ---- the library in the house style (11 November: "arrange this in the new style /library"): a catalogue
+   room rather than a web page. Ink ground, brass rules, bone type; the shelf groups read as drawers, the
+   books as entries in a ledger. Scoped to #shelves so the reader and the other islands keep their reading. */
+#shelves .panel {
+  background: #0b0a09; border: 1px solid #3a2a12 !important; border-radius: 2px !important;
+  box-shadow: 0 1px 0 #2a1d0d inset, 0 16px 38px rgba(0,0,0,.5); color: #e9e2d3;
+}
+#shelves h1, #shelves h2 {
+  color: #c9a24a; text-transform: uppercase; letter-spacing: .14em; font-size: 11px; font-weight: 700;
+}
+#shelves h2 .note, #shelves h1 .q { color: #8f7d5f; text-transform: none; letter-spacing: 0; font-weight: 400; }
+#shelves .note, #shelves .s { color: #a8977a; }
+#shelves a { color: #d8b566; }
+#shelves a:hover { color: #f2e6cf; }
+/* the branch list, one drawer a branch */
+#shelves .bbar {
+  display: grid; gap: 3px; padding: 12px 14px; border: 1px solid #2a1d0d; border-radius: 2px;
+  background: #0e0d0b; transition: border-color .18s, background .18s;
+}
+#shelves .bbar:hover { border-color: #6b5628; background: #131110; }
+#shelves .bbar.sel, #shelves .bbar[aria-selected="true"] { border-color: #c9a24a; background: #131110; }
+#shelves .bbname { color: #f2e6cf; font-weight: 700; letter-spacing: .02em; }
+#shelves .bbnum, #shelves .bnum {
+  color: #c9a24a; font-variant-numeric: tabular-nums; letter-spacing: .04em;
+}
+#shelves .bbpurpose, #shelves .bsummary { color: #a8977a; font-size: var(--fs-sm); line-height: 1.5; }
+#shelves .bbpurpose { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+/* the facets: brass-edged controls on ink */
+#shelves .bfacets, #shelves .tools {
+  border-top: 1px solid #3a2a12; border-bottom: 1px solid #3a2a12; padding: 10px 0; gap: 10px;
+}
+#shelves .bfacet { color: #8f7d5f; text-transform: uppercase; letter-spacing: .08em; font-size: 10px; }
+#shelves .bfacet select, #shelves .handtools select, #shelves .handtools input {
+  background: #0b0a09; color: #f2e6cf; border: 1px solid #6b5628; border-radius: 2px;
+}
+#shelves .bfacet select:focus, #shelves .handtools input:focus {
+  outline: none; border-color: #c9a24a; box-shadow: 0 0 0 1px rgba(201,162,74,.25);
+}
+#shelves .bshow { color: #d8b566; }
+/* the shelf groups and the books inside them */
+#shelves #shelfgroups { display: grid; gap: 18px; }
+#shelves .k {
+  color: #c9a24a; text-transform: uppercase; letter-spacing: .12em; font-size: 10px; font-weight: 700;
+  border-bottom: 1px solid #3a2a12; padding-bottom: 5px; margin: 0 0 6px;
+}
+#shelves .bookbtn {
+  display: block; width: 100%; text-align: left; padding: 7px 10px; border: 0; border-bottom: 1px solid #1d1509;
+  background: transparent; color: #e9e2d3; cursor: pointer; font: inherit; border-radius: 0;
+  transition: background .15s, color .15s, padding-left .15s;
+}
+#shelves .bookbtn:hover { background: #131110; color: #f2e6cf; padding-left: 14px; }
+#shelves .bookbtn.off { color: #6f6047; }
+#shelves .mono.s { color: #6f6047; }

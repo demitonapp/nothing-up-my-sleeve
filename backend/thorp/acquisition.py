@@ -412,11 +412,8 @@ def _signed(c: Candidate) -> list[str]:
 def _not_duplicate(c: Candidate) -> list[str]:
     if not c.sha1:
         return []
-    with manifest._connect() as con:
-        r = con.execute(
-            "select id from books where sha1=? and id<>? limit 1", (c.sha1, c.book_id)
-        ).fetchone()
-    return [f"the same text is already in the library as {r['id']}"] if r else []
+    other = manifest.same_text(c.sha1, c.book_id)  # the register the readers use (11 November), not the file
+    return [f"the same text is already in the library as {other}"] if other else []
 
 
 def _provenance(c: Candidate) -> list[str]:

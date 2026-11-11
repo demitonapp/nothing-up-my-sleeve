@@ -85,7 +85,7 @@ def spec_for(key: str, who: str, p: dict) -> dict:
 def main(queue: bool = False) -> int:
     from thorp import vsm
     from thorp.viable.s1_operations import prechecks
-    from thorp.viable.s2_coordination import lanes
+    from thorp.viable.s2_coordination import queue_read
     from thorp.viable.s3_control import compose
 
     plan = paths.resolve("plans") / "diderot-slice.json"
@@ -118,10 +118,10 @@ def main(queue: bool = False) -> int:
         prechecks.run(key, by="make_position_fitouts")
         vsm.gate(s, where="the four positions")
     if queue:
-        q = paths.resolve("specs/queue.txt")
         for who, _key, s in lines:
-            lanes.append(q, f"fitouts/{s['name']}", note=f"The four positions at the 1m (DECISIONS.md, \"Four positions at the 1m\"; Justin, 8 November: \"queue em\"): {POSITIONS[who]['pos']}, seed 1, Ogden v0.1 + 2%")
-            print(f"queued {s['name']}")
+            # the four positions at the 1m (DECISIONS.md, "Four positions at the 1m"; Justin, 8 November: "queue em")
+            queue_read.add([f"fitouts/{s['name']}"])  # the store's queue (11 November)
+            print(f"queued {s['name']}: {POSITIONS[who]['pos']}, seed 1, Ogden v0.1 + 2%")
     return 0
 
 
@@ -129,9 +129,8 @@ def more_seeds(seed: int) -> int:
     """The same four voyages at another seed (a position counts at a size only on two): each seed-1 spec copied with the seed
     and the name's suffix changed (Augustus's is the maths arm), through the gate, and put at the end of the queue."""
     from thorp import vsm
-    from thorp.viable.s2_coordination import lanes
+    from thorp.viable.s2_coordination import queue_read
 
-    q = paths.resolve("specs/queue.txt")
     keys = ("ogden-v0-1-maths2", *(f"ogden-v0-1-{p['slug']}" for p in POSITIONS.values()))
     for key in keys:
         s = yaml.safe_load(paths.resolve(f"specs/fitouts/fu-{key}@1m-pre-s1.yaml").read_text())
@@ -139,7 +138,8 @@ def more_seeds(seed: int) -> int:
         out = paths.resolve(f"specs/fitouts/{s['name']}.yaml")
         out.write_text(f"# the four positions at the 1m, seed {seed} (DECISIONS.md): built by scripts/make_position_fitouts.py --seed {seed}\n" + yaml.safe_dump(s, sort_keys=False, width=100))
         vsm.gate(s, where="the four positions, a second seed")
-        lanes.append(q, f"fitouts/{s['name']}", note=f"The four positions at the 1m, seed {seed} (DECISIONS.md; Justin, 8 November: \"Queue seeds now\"): a position counts at a size only on two seeds")
+        # a position counts at a size only on two seeds (DECISIONS.md; Justin, 8 November: "Queue seeds now")
+        queue_read.add([f"fitouts/{s['name']}"])  # the store's queue (11 November)
         print(f"queued {s['name']}")
     return 0
 

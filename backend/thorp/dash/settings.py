@@ -78,8 +78,8 @@ SWITCHES = {
     "THORP_LEDGER": "the SQLite ledger's file (default: ledger.sqlite at the repository root)",
     "THORP_SHIPS": "where the specs, lists and fitouts live (default: ships/)",
     "THORP_PG": "the store's address; overrides the install file (default: postgresql://thorp@localhost:5433/thorp)",
-    "THORP_LEDGER_PG": "1: the ledger is read from and written to Postgres",
-    "THORP_LIBRARY_PG": "1: the library's register is read from Postgres",
+    "THORP_LEDGER_PG": "the ledger is Postgres unless 0 (the default at home; a hired box keeps its SQLite log)",
+    "THORP_LIBRARY_PG": "the library's register is Postgres unless 0 (the default at home; a box reads its carried file)",
     "THORP_QUEUE_PG": "1: the standing queue is the store's, not specs/queue.txt",
     "THORP_LEDGER_DUAL": "set: a new voyage writes both ledgers",
     "THORP_BACKEND": "the framework a voyage trains in (mlx or torch), over the spec's own",
@@ -234,12 +234,13 @@ def store_info() -> dict:
         "config_path": str(config.path()),
     }
     try:
+        from thorp import manifest
         from thorp.ledger import _use_pg
         from thorp.viable.s2_coordination import queue_store
 
         out["holds"] = {
             "ledger": bool(_use_pg()),
-            "library": os.environ.get("THORP_LIBRARY_PG") == "1",
+            "library": bool(manifest._pg()),
             "queue": bool(queue_store.enabled()),
         }
     except Exception:  # noqa: BLE001

@@ -62,9 +62,13 @@ def _store_clean(_store_migrated):
     from sqlalchemy import text
 
     from thorp import ledger_store, manifest_store, store
+    from thorp.ledger import close_reader
     from thorp.viable import records
     from thorp.viable.s2_coordination import queue_store
 
+    # the ledger's per-thread Postgres reader keeps its transaction open between queries; a previous test's
+    # reader would hold s1.runs and this truncate would wait on it for ever (11 November: test_vsm hung there)
+    close_reader()
     tables = ", ".join(
         f"{t.schema}.{t.name}"
         for t in (*records.tables(), *ledger_store.tables(), *manifest_store.tables(), *queue_store.tables())
@@ -157,7 +161,9 @@ BASE_SPEC = {
         "clean": "unwrap-v2",  # S5 policy 'clean'
     },
     "tokeniser": {"kind": "spm-bpe", "vocab": 512, "byte_fallback": True, "train_on": "recipe"},
-    "model": {"family": "gpt", "preset": "tiny", "context": 64},
+    # the registry's "tiny" is gone (11 November): its shape, two layers of two 32-wide heads, by override of the
+    # keel's preset, as test_torch gives it
+    "model": {"family": "gpt", "preset": "300k", "layers": 2, "width": 64, "heads": 2, "context": 64},
     "optim": {
         "name": "adamw",
         "lr": 3e-3,
@@ -177,5 +183,13 @@ BASE_SPEC = {
 
 
 @pytest.fixture
-def spec():
+def spec(monkeypatch):
+    """BASE_SPEC, fresh. A test that takes it is the loop's, not the gate's, so S5's 'standard' rule (every voyage
+    names an SOP version) is advisory in it, as test_torch and test_scaffold make it (11 November: until then every
+    voyage sailed on this spec was refused at the gate, and the resume, growth and charter tests tested nothing)."""
+    import dataclasses
+
+    from thorp import vsm
+
+    monkeypatch.setitem(vsm.POLICIES, "standard", dataclasses.replace(vsm.POLICIES["standard"], enforced=False))
     return copy.deepcopy(BASE_SPEC)

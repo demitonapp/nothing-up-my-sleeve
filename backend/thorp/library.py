@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import csv
 import json
-import os
 import re
 from collections import Counter
 from pathlib import Path
@@ -173,7 +172,9 @@ def _rows(path: Path) -> list[dict]:
 
 def _resolved() -> dict[str, list[str]]:
     """list path -> manifest book ids, from data/resolution.csv (the title-matched lists that have been fetched)."""
-    if os.environ.get("THORP_LIBRARY_PG") == "1":
+    from thorp import manifest
+
+    if manifest._pg():  # the one switch for the library (11 November: Postgres unless THORP_LIBRARY_PG=0)
         from thorp import manifest_store
 
         return manifest_store.resolved_lists()
@@ -224,14 +225,14 @@ def _uses() -> dict[str, list[dict]]:
             add(json.loads(spec_json), name, status or "", ship)
     finally:
         con.close()
-    q = paths.resolve("specs/queue.txt")
-    if q.exists():
-        for line in q.read_text().splitlines():
-            line = line.strip()
-            if line and not line.startswith(("#", "cmd:")):
-                p = paths.resolve(f"specs/{line}.yaml")
-                if p.exists():
-                    add(yaml.safe_load(p.read_text()), line.split("/")[-1], "queued")
+    from thorp.viable.s2_coordination import queue_read
+
+    for line in queue_read.pending():  # the store's queue (11 November), not the specs/queue.txt export
+        line = line.strip()
+        if line and not line.startswith("cmd:"):
+            p = paths.resolve(f"specs/{line}.yaml")
+            if p.exists():
+                add(yaml.safe_load(p.read_text()), line.split("/")[-1], "queued")
     return uses
 
 
@@ -381,10 +382,10 @@ def _summary_pg(rel: str) -> dict | None:
     """A shelf's summary from Postgres: `list_rows` -> `books` -> `s3.library_facts`, with no CSV read
     and no library-facts build. Returns None when the shelf is not fully named there (a partially named
     shelf falls back to the resolver, which can still find the rest)."""
+    from thorp import store
+
     try:
         from sqlalchemy import text
-
-        from thorp import store
 
         with store.session() as s:
             rows = s.execute(text("""
@@ -397,6 +398,8 @@ def _summary_pg(rel: str) -> dict | None:
                 where r.list = :rel
                 order by r.ordinal
             """), {"rel": rel}).mappings().all()
+    except store.StoreDown:  # a store that is down is an error, not a reason to read the files (11 November)
+        raise
     except Exception:  # noqa: BLE001  no list_rows table or no library_facts: the CSV path still works
         return None
     if not rows:
@@ -452,7 +455,7 @@ def summary(rel: str) -> dict:
     p = paths.resolve(rel)
     if p.exists() and p.stat().st_size > 20_000_000:  # a synthetic card-stage deck: 360k inline passages, not books
         return _large_summary(rel, p)
-    if os.environ.get("THORP_LIBRARY_PG") == "1":
+    if manifest._pg():  # the one switch for the library (11 November)
         got = _summary_pg(rel)
         if got is not None:
             return got
@@ -580,14 +583,11 @@ def fitouts() -> list[dict]:
         }
     finally:
         con.close()
-    queued = set()
-    q = paths.resolve("specs/queue.txt")
-    if q.exists():
-        queued = {
-            ln.strip().split("/")[-1]
-            for ln in q.read_text().splitlines()
-            if ln.startswith("fitouts/")
-        }
+    from thorp.viable.s2_coordination import queue_read
+
+    queued = {  # the store's queue (11 November), not the specs/queue.txt export
+        ln.strip().split("/")[-1] for ln in queue_read.pending() if ln.startswith("fitouts/")
+    }
 
     def stage(st, kind: str, i: int) -> dict:
         sh = shelves.get(st.shelf, {})

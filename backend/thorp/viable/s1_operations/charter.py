@@ -393,11 +393,9 @@ def checkpoints_carried(rid: str, spec: dict, rec: Ledger) -> list[str]:
     """The latest checkpoint of the voyage and of each run it reads from, relative to data/."""
     from thorp import train
 
-    rids = [rid] + [
-        r[0]["run_id"]
-        for n in s2.related_runs(spec)
-        if (r := rec.query("select run_id from runs where name=? and status='finished' order by started desc", [n]))
-    ]
+    # each parent by its id or its name, as the papers carry it (s2.related_rows, 11 November): a parent pinned by
+    # run id was looked up as a name here, found nothing, and sailed without its checkpoint
+    rids = [rid] + [r["run_id"] for r in s2.related_rows(spec, rec)]
     out = []
     for r in rids:
         ck = train.latest_checkpoint(r)
@@ -599,6 +597,10 @@ def _close(rec: Ledger, hire: dict, status: str, ended: float, counts: dict, log
     log(f"charter: {hire.get('name')} {status}; instance {instance} released; ${cost:.2f} for {(ended - hire['started']) / 3600:.2f} h")
     if status != "home" and (rec.get_run(rid) or {}).get("status") == "running":
         rec.run({"run_id": rid, "status": f"chartered: {status}"})
+        # the final state beside the status (11 November, item 11); never raises
+        from thorp import run_state
+
+        run_state.ended(rid, f"chartered: {status}", rec, log)
     return {"run_id": rid, "status": status, "instance": instance, "cost": cost, "rows": counts}
 
 

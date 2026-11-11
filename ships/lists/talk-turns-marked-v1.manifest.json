@@ -1,0 +1,89 @@
+{
+ "version": "talk-turns-marked-v1",
+ "transform": "talk-turns",
+ "generator": "backend/scripts/make_talk_corpus.py",
+ "about": "questions and the replies that followed them, mined from the dialogue candidates, as marked turns",
+ "books": 1490,
+ "sha1": "e67fa727a02a28c8a275d5b6d64460fe2d56baf6",
+ "turns": 37244,
+ "held_out_turns": 1538,
+ "books_read": 1667,
+ "books_unread": 227,
+ "by_kind": {
+  "play": 36440,
+  "philosophical dialogue": 1437,
+  "catechism": 70,
+  "table talk": 835
+ },
+ "by_how": {
+  "labelled": 34817,
+  "quoted": 3961,
+  "catechism": 4
+ },
+ "capped_same_reply": 1617,
+ "rule": {
+  "ogden": 0.65,
+  "same": 25,
+  "per_book": 25,
+  "question_words": [
+   2,
+   30
+  ],
+  "reply_words": [
+   1,
+   30
+  ]
+ },
+ "commonest_replies": [
+  [
+   "no.",
+   25
+  ],
+  [
+   "i do.",
+   25
+  ],
+  [
+   "yes.",
+   25
+  ],
+  [
+   "i did.",
+   25
+  ],
+  [
+   "yes, sir.",
+   25
+  ],
+  [
+   "i am.",
+   25
+  ],
+  [
+   "certainly.",
+   25
+  ],
+  [
+   "i don't know.",
+   25
+  ],
+  [
+   "true.",
+   25
+  ],
+  [
+   "certainly not.",
+   25
+  ],
+  [
+   "why not?",
+   25
+  ],
+  [
+   "no!",
+   25
+  ]
+ ],
+ "books_written": 1490,
+ "held_out_pairs_written": 400
+}

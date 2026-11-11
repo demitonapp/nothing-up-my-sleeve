@@ -286,15 +286,9 @@ def queue(key: str, preset: str, seeds: tuple[int, ...] = (1, 2), where: str = "
             )
         lines.append(f"fitouts/{s['name']}")
     (paths.data_dir() / "runs" / "fitouts").mkdir(parents=True, exist_ok=True)
-    q = paths.resolve("specs/queue.txt")
-    ql = q.read_text().split("\n")
-    block = [f"# Fitout {key} @ {preset}, built in the fitout builder"] + lines
-    if where == "top":
-        first = next(
-            (i for i, ln in enumerate(ql) if ln.strip() and not ln.startswith("#")), len(ql)
-        )
-        ql = ql[:first] + block + ql[first:]
-    else:
-        ql += block
-    q.write_text("\n".join(ql))
+    # the store is the queue (11 November): specs/queue.txt is only the CLI's export, which the coordinator
+    # never reads, so a block written there never sailed. A line already queued keeps its place.
+    from thorp.viable.s2_coordination import queue_read
+
+    queue_read.add(lines, top=where == "top")
     return lines

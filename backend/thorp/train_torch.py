@@ -65,13 +65,22 @@ def _honoured() -> frozenset[str]:
     riddle = "layer head weight items pool seed kinds from"
     return frozenset(
         # the top level: every key that is part of the run id (the labels, train.NOT_HASHED, are never refused)
-        "data tokeniser model optim eval checkpoint seed sop departures seeded_from transplant".split()
+        "data tokeniser model optim eval checkpoint seed sop departures seeded_from transplant ledger".split()
+        # goal: the expedition goal a voyage serves, read by the queue (queue_store, priorities.py), never the loop
+        + ["goal"]
         # (data.turns: the turn format the voyage was taught, read by thorp/turns.py for the evaluators, not here)
         + under("data", "recipe passes order refuse clean opt_in first first_repeats stages turns")
         + under("data.stages[]", "name recipe passes")
-        + under("eval", "sets every_steps evaluators light options")
+        # eval.offline (11 November, item 5): those evaluators are scored later from saved weights (train.score)
+        + under("eval", "sets every_steps evaluators light options offline")
         + under("eval.light", "every_steps evaluators")
-        + under("checkpoint", "every_steps")
+        # keep_last / keep_every: checkpoint retention, train.retain, called by both loops (11 November, item 10)
+        + under("checkpoint", "every_steps keep_last keep_every")
+        # a voyage's milestones (thorp/milestones.py), judged by both loops alike (11 November, item 10)
+        + ["milestones"]
+        + under("milestones[]", "at step metric at_least at_most if_missed why")
+        # how many steps' metrics are written at once (ledger.MetricBuffer, 11 November): when, never what
+        + under("ledger", "flush_every")
         # cache_gb is MLX's free-buffer cache (train._run): there is nothing of it to honour here
         + under("model", "family preset context positions backend layers width heads kv_heads cache_gb")
         + under(
@@ -500,9 +509,7 @@ def seeded_master(spec: dict, seed: dict, master: dict, vocab: int, log) -> tupl
     from thorp import growth
     from thorp.ledger import spec_of
 
-    rows = reader().get_run_by_name(seed["run"], finished=True)
-    if not rows:
-        raise LookupError(f"seeded_from: no finished run named {seed['run']!r}")
+    rows = T.parent_run(seed["run"], "seeded_from", log)
     src_spec, src_rid = spec_of(rows), rows["run_id"]
     if src_spec.get("tokeniser", {}).get("vocab") != spec["tokeniser"]["vocab"] or src_spec[
         "tokeniser"
@@ -514,10 +521,16 @@ def seeded_master(spec: dict, seed: dict, master: dict, vocab: int, log) -> tupl
     )
     if src_pos != dst_pos:
         raise ValueError("seeded_from: the seed must use the same kind of positions as this run")
+    # the shapes the runs were built with, overrides included, as train.seeded_master (11 November)
+    def _shape(m: dict) -> dict:
+        return {"layers": m.get("layers"), "width": m.get("width"), "heads": m.get("heads")}
+
     src_cfg = registry.config(
-        src_spec["model"]["preset"], vocab, src_spec["model"]["context"], src_pos
+        src_spec["model"]["preset"], vocab, src_spec["model"]["context"], src_pos, **_shape(src_spec["model"])
     )
-    dst_cfg = registry.config(spec["model"]["preset"], vocab, spec["model"]["context"], dst_pos)
+    dst_cfg = registry.config(
+        spec["model"]["preset"], vocab, spec["model"]["context"], dst_pos, **_shape(spec["model"])
+    )
     ck = T.latest_checkpoint(src_rid)
     if seed.get("step") is not None:
         ck = T.checkpoint_root(src_rid) / f"step-{int(seed['step'])}"
@@ -555,9 +568,7 @@ def load_teacher(teach: dict, spec: dict, vocab: int, log):
     """train.load_teacher: a finished run's model (either backend's checkpoint), frozen."""
     from thorp.ledger import spec_of
 
-    rows = reader().get_run_by_name(teach["run"], finished=True)
-    if not rows:
-        raise LookupError(f"teacher: no finished run named {teach['run']!r}")
+    rows = T.parent_run(teach["run"], "teacher", log)
     t_spec, t_rid = spec_of(rows), rows["run_id"]
     if t_spec["tokeniser"].get("vocab") != spec["tokeniser"]["vocab"] or t_spec["tokeniser"].get(
         "train_on"
@@ -578,9 +589,7 @@ def transplant_heads(spec: dict, master: dict, log) -> tuple:
     from thorp.ledger import spec_of
 
     t = spec["transplant"]
-    rows = reader().get_run_by_name(t["from_run"], finished=True)
-    if not rows:
-        raise LookupError(f"transplant: no finished run named {t['from_run']!r}")
+    rows = T.parent_run(t["from_run"], "transplant", log)
     donor_spec, donor_rid = spec_of(rows), rows["run_id"]
     if (
         donor_spec["model"]["preset"] != spec["model"]["preset"]
@@ -647,9 +656,23 @@ def train(
 ) -> dict:
     """train.train on PyTorch: train (or resume) the run this spec describes."""
     refuse_unsupported(spec)  # before any work: a key this loop would pass over is a refusal, never a silent drift
-    rid = T.run_id(spec)
+    from thorp.ledger import MetricBuffer, flush_every
+
     rec = rec or recorder()
+    buf = MetricBuffer(rec, every=flush_every(spec))  # the per-step metrics, as train.train writes them (item 4)
+    with T.stoppable():  # SIGTERM/SIGHUP: checkpoint the step under way and stop, as train.train (item 10)
+        try:
+            return _train(spec, prep, rec, buf, stop_after, log)
+        except BaseException:
+            buf.flush_quietly()
+            raise
+
+
+def _train(spec: dict, prep, rec: Ledger, buf, stop_after: int | None, log) -> dict:
+    """train's loop; `buf` holds the per-step metrics until they are flushed (train._train's rules)."""
+    rid = T.run_id(spec)
     log = log or T.Log(paths.runs_dir() / f"{rid}.log")
+    buf.log = log
     o, m = spec["optim"], spec["model"]
     precision = o.get("precision", "bf16")
     tok = prep.tokeniser
@@ -709,6 +732,11 @@ def train(
         master, handed = transplant_heads(spec, master, log)
     if ckpt is not None:
         st = json.loads((ckpt / "state.json").read_text())
+        from thorp import versioning
+
+        # train.train's check: the checkpoint's tokeniser is the one this sailing built, before anything is truncated
+        if why := versioning.tokeniser_mismatch(st, tok.id):
+            raise ValueError(why)
         start, tokens_seen, wall_before = st["step"], st["tokens_seen"], st["wall_seconds"]
         master = load_master(ckpt, dev)
         opt.load_flat(load_flat(ckpt / "optimizer.safetensors"), dev)
@@ -737,6 +765,13 @@ def train(
             rec.artifact(rid, 0, "stages", "", "", json.dumps(stream.record()))
         if handed is not None:
             rec.artifact(rid, 0, "transplant", "", "", json.dumps(handed))
+    from thorp import versioning  # train.train's provenance, beside the id; never raises
+
+    versioning.record_provenance(spec, rid, tok.id, rec, log, start=start)
+    # train.train's run state and expedition rows (11 November, item 11); never raises
+    from thorp import run_state
+
+    run_state.started(spec, rid, rec, log)
     log(
         f"run {rid} ({spec.get('name')}): {m['preset']} {counts}, {total} steps x "
         f"{stream.tokens_per_step} tokens, {stream.unique_tokens} unique tokens/pass; torch on {dev}"
@@ -865,7 +900,16 @@ def train(
     book_n: dict[int, int] = {}
     every_eval = spec["eval"]["every_steps"]
     light = spec["eval"].get("light")
+    offline = T.offline_evaluators(spec)  # eval.offline: scored later from saved weights (`thorp score`)
     every_ckpt = spec["checkpoint"]["every_steps"]
+    stop = T.stop_flag()  # raised by SIGTERM/SIGHUP (train.stoppable): checkpoint this step and stop
+    stop.log = log
+    # per-voyage milestones (train.train's, 12 November): judged at the first evaluation at or after their step,
+    # and a missed one that asks for a recall stops the voyage there, at a checkpoint
+    from thorp import milestones as milestones_mod
+
+    ms = milestones_mod.declared(spec, total)
+    judged_milestones: set[int] = set()
     t_run = time.time()
     params = dict(model.named_parameters())
 
@@ -991,22 +1035,36 @@ def train(
                 f"step {step}/{total} loss {loss_v:.4f} lr {lr:.2e} "
                 f"{vals['tokens_per_s']:.0f} tok/s mem {vals['mem_gb']:.1f} GB"
             )
-        rec.metrics(rid, step, vals)
+        buf.add(rid, step, vals)
+        run_state.beat(rid, rec)  # train.train's heartbeat, at most one upsert a minute (item 11)
 
+        latest: dict | None = None
         if step % every_eval == 0 or step == total:
-            T.run_evaluators(spec, rid, step, model, prep, rec, log)
+            buf.flush()
+            latest = T.evaluate_in_loop(
+                spec, rid, step, model, prep, rec, log, spec["eval"]["evaluators"], offline,
+                step % every_ckpt == 0 or step == total, master,
+            )  # fmt: skip
         elif light and step % light["every_steps"] == 0:
-            T.run_evaluators(
-                {**spec, "eval": {**spec["eval"], "evaluators": light["evaluators"]}},
-                rid,
-                step,
-                model,
-                prep,
-                rec,
-                log,
-            )
+            buf.flush()
+            latest = T.evaluate_in_loop(
+                spec, rid, step, model, prep, rec, log, light["evaluators"], offline,
+                step % every_ckpt == 0 or step == total, master,
+            )  # fmt: skip
         model.train()
-        if step % every_ckpt == 0 or step == total:
+        recall_reason = None
+        if ms and latest:
+            # train.train's rule: a bug in a milestone is reported and the voyage sails on
+            try:
+                verdicts = milestones_mod.check(ms, step, latest, judged_milestones)
+                if verdicts:
+                    milestones_mod.record(verdicts, rid, rec, log)
+                    recall_reason = milestones_mod.recall_reason(verdicts)
+            except Exception as e:  # noqa: BLE001
+                log(f"milestones: {e.__class__.__name__}: {e}")
+        stopping = stop.signal is not None and step < total  # read once: a signal from here on waits a step
+        if step % every_ckpt == 0 or step == total or recall_reason or stopping:
+            buf.flush(strict=True)  # every row up to the checkpoint's step is in the store before it exists
             wall = wall_before + time.time() - t_run
             d = save_checkpoint(
                 rid,
@@ -1024,10 +1082,42 @@ def train(
                 },
             )
             rec.artifact(rid, step, "checkpoint", str(d), "", "")
+            T.retain(spec, rid, log, rec)  # checkpoint.keep_last / keep_every; nothing without them
+        if stopping and not recall_reason:
+            wall = wall_before + time.time() - t_run
+            rec.run(
+                {
+                    "run_id": rid,
+                    "status": f"stopped: {stop.signal} at step {step}",
+                    "tokens_seen": tokens_seen,
+                    "wall_minutes": wall / 60,
+                    "commit": T.git_commit(),
+                }
+            )
+            log(f"stopped at step {step} by {stop.signal}: checkpointed, to resume from {d.name}")
+            run_state.ended(rid, f"stopped: {stop.signal} at step {step}", rec, log)
+            return {"run_id": rid, "step": step, "status": "stopped", "signal": stop.signal}
+        if recall_reason:
+            wall = wall_before + time.time() - t_run
+            rec.run(
+                {
+                    "run_id": rid,
+                    "finished": T.now(),
+                    "status": f"recalled: {recall_reason}",
+                    "tokens_seen": tokens_seen,
+                    "wall_minutes": wall / 60,
+                    "commit": T.git_commit(),
+                }
+            )
+            log(f"recalled at step {step}: {recall_reason}")
+            run_state.ended(rid, f"recalled: {recall_reason}", rec, log)
+            return {"run_id": rid, "step": step, "status": "recalled", "reason": recall_reason}
         if stop_after is not None and step >= stop_after:
+            buf.flush(strict=True)
             log(f"stopping at step {step} (stop_after)")
             return {"run_id": rid, "step": step, "status": "running"}
 
+    buf.flush(strict=True)
     wall = wall_before + time.time() - t_run
     rec.run(
         {
@@ -1040,4 +1130,5 @@ def train(
         }
     )
     log(f"finished {rid}: {tokens_seen} tokens in {wall / 60:.1f} min")
+    run_state.ended(rid, "finished", rec, log)
     return {"run_id": rid, "step": step, "status": "finished"}

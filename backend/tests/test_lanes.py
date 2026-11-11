@@ -283,7 +283,7 @@ def test_a_restart_adopts_a_live_voyage_and_reads_its_outcome_from_the_ledger(ha
     queue_store.to_sea("fitouts/big", lane="mac", kind="spec", name="big", run_id="r-big", pid=pid, seat=1,
                        started="2026-11-11T10:00:00", started_ts=time.time())  # fmt: skip
     asked = []
-    monkeypatch.setattr(lanes, "_ledger_status", lambda rid: asked.append(rid) or "finished")
+    monkeypatch.setattr(lanes, "_ledger_status", lambda rid, name=None, since=None: asked.append(rid) or "finished")
     said = _restart(harbour)
     assert any("adopted fitouts/big" in m for m in said) and asked == ["r-big"]  # the id it sailed under
     assert _history(harbour) == {"fitouts/big": "adopted:finished"} and queue_store.at_sea() == []
@@ -300,16 +300,36 @@ def test_an_adopted_voyage_that_died_is_unfinished_not_a_success(harbour, monkey
         ("chartered: lost contact", "adopted:chartered:-lost-contact", "lost"),
         (None, "adopted:exit-unknown", "lost"),
     ]:
-        monkeypatch.setattr(lanes, "_ledger_status", lambda rid, s=status: s)
+        monkeypatch.setattr(lanes, "_ledger_status", lambda rid, name=None, since=None, s=status: s)
         assert (lanes._outcome(v), lanes._outcome(v, gone=True)) == (alive_then_gone, found_dead)
 
 
 def test_the_ledger_is_where_an_adopted_voyages_outcome_is_read(harbour):
     from thorp.ledger import reader
 
-    reader().run({"run_id": "r-home", "name": "home", "status": "finished"})
+    reader().run({"run_id": "r-home", "name": "home", "status": "finished", "started": "2026-11-11T08:43:46+00:00"})
     assert lanes._ledger_status("r-home") == "finished"
     assert lanes._ledger_status("r-nowhere") is None and lanes._ledger_status(None) is None
+    # a row with the wrong id (the raw YAML's, before 11 November's fix) is answered by the voyage's name,
+    # but only by a run that started with the line or after it, never an older voyage of that name
+    assert lanes._ledger_status("r-wrong", "home", "2026-11-11T08:43:29+00:00") == "finished"
+    assert lanes._ledger_status("r-wrong", "home", "2026-11-11T09:43:29+00:00") is None
+    assert lanes._ledger_status("r-wrong", "elsewhere", "2026-11-11T08:43:29+00:00") is None
+
+
+def test_a_voyages_run_id_is_the_one_it_sails_under(harbour):
+    """train.load_spec adds the ladder's evaluators before the id is computed; the queue's id must be that one,
+    or an adopted voyage's outcome is read from no row at all (11 November, the live 9m@v0.0.6)."""
+    from thorp import paths, train
+
+    real = paths.resolve("specs/fitouts/9m@v0.0.6.yaml")
+    raw = yaml.safe_load(real.read_text())
+    p = harbour["specs"] / "fitouts" / "nine.yaml"
+    p.parent.mkdir(parents=True)
+    p.write_text(yaml.safe_dump(raw))
+    ln = lanes.parse("fitouts/nine", harbour["specs"])
+    assert ln.run_id == train.run_id(train.load_spec(p)) != train.run_id(raw)  # the ladder adds to this one
+    assert ln.spec == raw  # the spec as written is kept; only the id is the sailed one
 
 
 def test_a_restart_records_a_dead_line_as_lost_and_does_not_requeue_it(harbour, monkeypatch):
@@ -317,7 +337,7 @@ def test_a_restart_records_a_dead_line_as_lost_and_does_not_requeue_it(harbour, 
 
     _spec(harbour["specs"], "fitouts/big", "big")
     _spec(harbour["specs"], "m1", "m1")
-    monkeypatch.setattr(lanes, "_ledger_status", lambda rid: "running")
+    monkeypatch.setattr(lanes, "_ledger_status", lambda rid, name=None, since=None: "running")
     queue_store.to_sea("fitouts/big", lane="mac", kind="spec", name="big", run_id="r-big", pid=_dead_pid(), started="2026-11-11T10:00:00")
     queue_store.to_sea("vast: m1", lane="vast", kind="spec", name="m1", run_id="r-m1", pid=None, started="2026-11-11T10:05:00")
     launched = []

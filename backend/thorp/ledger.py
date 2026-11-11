@@ -122,6 +122,14 @@ class Ledger:
                 [(run_id, step, k, float(v), ts) for k, v in values.items()],
             )
 
+    def metrics_many(self, rows: list[tuple[str, int, dict[str, float], float]]) -> None:
+        """Many steps' metrics, each (run_id, step, values, ts), in one transaction: all or none (MetricBuffer)."""
+        with self.con:
+            self.con.executemany(
+                "insert into metrics values (?,?,?,?,?)",
+                [(rid, step, k, float(v), ts) for rid, step, values, ts in rows for k, v in values.items()],
+            )
+
     def evals(self, rows: Iterable[dict]) -> None:
         rows = [tuple(r[c] for c in EVAL_COLUMNS) for r in rows]
         with self.con:
@@ -243,6 +251,10 @@ class DualRecorder:
         self.sqlite.metrics(run_id, step, values)
         self._pg(lambda: self.pg.metrics(run_id, step, values), f"metrics at step {step}")
 
+    def metrics_many(self, rows: list[tuple[str, int, dict[str, float], float]]) -> None:
+        self.sqlite.metrics_many(rows)
+        self._pg(lambda: self.pg.metrics_many(rows), f"metrics of {len(rows)} steps")
+
     def evals(self, rows: Iterable[dict]) -> None:
         rows = list(rows)
         self.sqlite.evals(rows)
@@ -266,6 +278,125 @@ class DualRecorder:
     def close(self) -> None:
         self.sqlite.close()
         self.pg.close()
+
+
+def transient(e: BaseException) -> bool:
+    """Whether a failed write is the store being out of reach for a while (Postgres down or restarting, the
+    network, SQLite locked by another writer), so the same write may be tried again, rather than a fault in it."""
+    if isinstance(e, sqlite3.OperationalError):
+        return any(w in str(e).lower() for w in ("locked", "busy"))
+    try:
+        from thorp.store import StoreDown
+
+        if isinstance(e, StoreDown):
+            return True
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        from sqlalchemy.exc import InterfaceError, OperationalError
+
+        if isinstance(e, (OperationalError, InterfaceError)):
+            return True
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        import psycopg
+
+        return isinstance(e, (psycopg.OperationalError, psycopg.InterfaceError))
+    except Exception:  # noqa: BLE001
+        return False
+
+
+class BufferFull(RuntimeError):
+    """The store has been out of reach for longer than the buffer will hold: the voyage stops, loudly."""
+
+
+class MetricBuffer:
+    """A trainer's per-step metrics, written many steps at a time (11 November, the audit's item 4).
+
+    Until then every training step was one insert and one commit, and 16M rows for 200 runs were written that way.
+    The buffer keeps each step's values with the time they were read (the `ts` the row would have had), and writes
+    them all in one transaction when `every` steps are waiting (spec `ledger.flush_every`, default 25) or `seconds`
+    have passed since the last write. The rows are the same rows; only when a reader can see them moves.
+
+    The trainers flush it before every evaluation, before every checkpoint (strictly: a checkpoint is saved only
+    when every row up to its step is in the store, so a resume, which forgets what lies after its checkpoint, never
+    leaves a gap), at the end, and on the way out of an exception. A write the store refuses for a while (`transient`)
+    keeps its rows for the next flush, with a warning; past `cap` steps waiting it raises BufferFull, so a long
+    outage stops the voyage rather than eating memory. Any other failure raises at once, as the write did before."""
+
+    def __init__(self, rec, every: int = 25, cap: int = 2000, seconds: float = 30.0, log=None,
+                 tries: int = 3, wait: float = 5.0, sleep=time.sleep):  # fmt: skip
+        self.rec, self.every, self.cap, self.seconds = rec, max(1, int(every)), int(cap), float(seconds)
+        self.tries, self.wait, self.sleep = max(1, int(tries)), float(wait), sleep
+        self.log = log or (lambda msg: print(msg, file=sys.stderr))
+        self.rows: list[tuple[str, int, dict[str, float], float]] = []
+        self._due, self._t_due = self.every, time.time() + self.seconds
+        self.flushes = self.failures = 0
+
+    def __len__(self) -> int:
+        return len(self.rows)
+
+    def add(self, run_id: str, step: int, values: dict[str, float]) -> None:
+        """One step's values, written later (now, when a flush is due)."""
+        if values:
+            self.rows.append((run_id, step, dict(values), time.time()))
+        if self.rows and (len(self.rows) >= self._due or time.time() >= self._t_due):
+            self.flush()
+
+    def _write(self) -> None:
+        if hasattr(self.rec, "metrics_many"):
+            self.rec.metrics_many(self.rows)
+            self.rows = []
+            return
+        while self.rows:  # a recorder with no batch write: a step at a time, each kept until it is written
+            rid, step, values, _ = self.rows[0]
+            self.rec.metrics(rid, step, values)
+            self.rows.pop(0)
+
+    def flush(self, strict: bool = False) -> bool:
+        """Write what is waiting. True when nothing is left waiting. A transient failure keeps the rows (and, when
+        `strict`, is tried `tries` times, `wait` seconds apart, then raised); past `cap` steps it raises BufferFull."""
+        attempts = self.tries if strict else 1
+        for attempt in range(attempts):
+            if not self.rows:
+                return True
+            try:
+                self._write()
+            except Exception as e:  # noqa: BLE001
+                if not transient(e):
+                    raise
+                self.failures += 1
+                n = len(self.rows)
+                self._due, self._t_due = n + self.every, time.time() + self.seconds
+                if n > self.cap:
+                    raise BufferFull(
+                        f"ledger: the store has refused {n} steps' metrics (steps {self.rows[0][1]}-{self.rows[-1][1]}),"
+                        f" more than the {self.cap} the buffer holds: stopping the voyage ({e.__class__.__name__}: {e})"
+                    ) from e
+                self.log(f"ledger: {n} steps' metrics not written yet ({e.__class__.__name__}: {str(e)[:200]}); "
+                         f"kept, and tried again {'in ' + str(self.wait) + ' s' if strict and attempt + 1 < attempts else 'at the next flush'}")  # fmt: skip
+                if strict and attempt + 1 < attempts:
+                    self.sleep(self.wait)
+                    continue
+                if strict:
+                    raise
+                return False
+            self.flushes += 1
+            self._due, self._t_due = self.every, time.time() + self.seconds
+        return not self.rows
+
+    def flush_quietly(self) -> None:
+        """On the way out of an exception: write what can be written, and never hide the exception that is leaving."""
+        try:
+            self.flush()
+        except Exception as e:  # noqa: BLE001
+            self.log(f"ledger: {len(self.rows)} steps' metrics lost on the way out ({e.__class__.__name__}: {e})")
+
+
+def flush_every(spec: dict) -> int:
+    """The spec's `ledger.flush_every`: how many steps' metrics a trainer writes at once (default 25)."""
+    return int(((spec.get("ledger") or {}).get("flush_every")) or 25)
 
 
 def _use_pg() -> bool:

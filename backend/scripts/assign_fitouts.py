@@ -22,8 +22,10 @@ from thorp import fleet, paths, train
 
 
 def queued() -> list[str]:
-    q = paths.resolve("specs/queue.txt").read_text().splitlines()
-    return [ln.strip() for ln in q if ln.strip() and not ln.strip().startswith(("#", "cmd:"))]
+    from thorp.viable.s2_coordination import queue_read
+
+    q = queue_read.pending()  # the store's queue (11 November), not the specs/queue.txt export
+    return [ln.strip() for ln in q if ln.strip() and not ln.strip().startswith("cmd:")]
 
 
 def main() -> None:

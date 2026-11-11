@@ -100,6 +100,12 @@ def load(run_name: str, step: int | None = None):
         return got
 
 
+# How a Thorp ship's answer is drawn (11 November, the talk leg): from the likeliest pieces only, and not the
+# piece it has just written. A 9m sampled over its whole vocabulary wanders, and greedy it loops; the outside
+# models at the same table are sampled by their own libraries' defaults (foreign_answer).
+DECODING = {"top_k": 40, "top_p": 0.9, "repetition_penalty": 1.15}
+
+
 def prompt_for(spec: dict, question: str) -> tuple[str, str]:
     """The question wrapped the way the voyage was taught: the v0.1.4 marks where it read them, else
     plain prose. Returns (prompt, format)."""
@@ -121,7 +127,12 @@ def _ask(
 ) -> tuple[str, str, str]:
     prompt, fmt = prompt_for(spec, question)
     key = seed if ops.is_torch(model) else _mx_key(seed)
-    out = generate(model, tok, prompt, temperature, tokens, int(spec["model"]["context"]), key)
+    # a marked ship ends its own turn: stop at <end> when it is one piece, rather than write on and cut the text
+    end = tok.encode("<end>") if fmt == "marks" else []
+    out = generate(
+        model, tok, prompt, temperature, tokens, int(spec["model"]["context"]), key,
+        stop_ids=tuple(end) if len(end) == 1 else (), **DECODING,
+    )  # fmt: skip
     if fmt == "marks":
         for end in ("<end>", "<sep>", "<question>"):
             out = out.split(end)[0]
@@ -513,7 +524,7 @@ def answer(
             "reasoning": "",
             "thinking": "none",
             "meta": {
-                "settings": {"temperature": temperature, "max_tokens": tokens, "thinking": "none"},
+                "settings": {"temperature": temperature, "max_tokens": tokens, "thinking": "none", **DECODING},
                 "prompt_tokens": prompt_tokens,
                 "answer_tokens": answer_tokens,
                 "reasoning_tokens": 0,

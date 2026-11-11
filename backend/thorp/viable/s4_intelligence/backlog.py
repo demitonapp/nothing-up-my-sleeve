@@ -170,9 +170,9 @@ def order(rows: list, gap_minutes: float | None = None) -> list:
 
 def queued() -> set[str]:
     """The lines the queue already holds: an item caught up into the queue is not offered again."""
-    from thorp.viable.s2_coordination import lanes
+    from thorp.viable.s2_coordination import queue_read
 
-    return {_bare(ln) or ln.strip() for ln in lanes.pending(paths.resolve("specs/queue.txt"))}
+    return {_bare(ln) or ln.strip() for ln in queue_read.pending()}  # the store's queue (11 November)
 
 
 def rank(gap_minutes: float | None = None) -> list[BacklogItem]:

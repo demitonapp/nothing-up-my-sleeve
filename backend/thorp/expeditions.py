@@ -39,7 +39,7 @@ def runs_of(voyage: fleet.Expedition) -> list[dict]:
     rows += [
         r
         for r in _rows(f"select {cols} from runs order by started")
-        if r["run_id"] not in seen and fleet.expedition_of_label(r["name"], r["ship"]) == voyage.key
+        if r["run_id"] not in seen and fleet.expedition_of_run(r) == voyage.key
     ]
     rows.sort(key=lambda r: r["started"] or "")
     for r in rows:
@@ -47,13 +47,14 @@ def runs_of(voyage: fleet.Expedition) -> list[dict]:
     return rows
 
 
-def star_timeline(run_id: str, star: fleet.Star, tokens_per_step: int) -> dict:
-    pts = _rows(
+def star_timeline(run_id: str, star: fleet.Star, tokens_per_step: int, pre: dict | None = None) -> dict:
+    """`pre` (summary's, 11 November): every run's star series read in one query; without it, two queries a star."""
+    pts = pre["series"].get((run_id, star.metric), []) if pre is not None else _rows(
         "select step, value from metrics where run_id=? and name=? order by step, rowid",
         [run_id, star.metric],
     )
     lit = next((p["step"] for p in pts if p["value"] >= star.threshold), None)
-    shared = _shared_series(run_id, star) if star.shared_metric else []
+    shared = _shared_series(run_id, star, pre) if star.shared_metric else []
     shared_lit = next((p["step"] for p in shared if p["value"] >= star.threshold), None)
     return {
         "star": star.key,
@@ -71,18 +72,18 @@ def star_timeline(run_id: str, star: fleet.Star, tokens_per_step: int) -> dict:
     }
 
 
-def _shared_series(run_id: str, star: fleet.Star) -> list[dict]:
+def _shared_series(run_id: str, star: fleet.Star, pre: dict | None = None) -> list[dict]:
     """The shared score by step: from its metric where recorded, otherwise worked out from the
     'stars' artifacts, which hold every head's score at every reading (so runs scored before the
-    metric existed have it too)."""
-    pts = _rows(
+    metric existed have it too). `pre` as star_timeline's (its "arts": the stars artifacts of the runs that need them)."""
+    pts = pre["series"].get((run_id, star.shared_metric), []) if pre is not None else _rows(
         "select step, value from metrics where run_id=? and name=? order by step, rowid",
         [run_id, star.shared_metric],
     )
     if pts:
         return pts
     out = {}
-    for a in _rows(
+    for a in pre["arts"].get(run_id, []) if pre is not None else _rows(
         "select step, text from artifacts where run_id=? and kind='stars' order by step, rowid",
         [run_id],
     ):
@@ -92,15 +93,18 @@ def _shared_series(run_id: str, star: fleet.Star) -> list[dict]:
     return [{"step": k, "value": v} for k, v in sorted(out.items())]
 
 
-def run_summary(r: dict, voyage: fleet.Expedition) -> dict:
+def run_summary(r: dict, voyage: fleet.Expedition, pre: dict | None = None) -> dict:
     ship = fleet.ship_of_run(r, save=False) if r.get("spec_json") else None
     spec = json.loads(r.pop("spec_json") or "{}")
     tps = spec.get("optim", {}).get("batch_tokens", 32768)
-    ft = _rows(
-        "select step, value from metrics where run_id=? and name=? order by step desc, rowid desc limit 1",
-        [r["run_id"], FT],
-    )
-    stars = [star_timeline(r["run_id"], fleet.STARS[s], tps) for s in fleet.STARS]
+    if pre is not None:  # the Forgotten Tomes score from s1.metric_latest (summary's prefetch)
+        ft = [{"value": pre["ft"][r["run_id"]]}] if r["run_id"] in pre["ft"] else []
+    else:
+        ft = _rows(
+            "select step, value from metrics where run_id=? and name=? order by step desc, rowid desc limit 1",
+            [r["run_id"], FT],
+        )
+    stars = [star_timeline(r["run_id"], fleet.STARS[s], tps, pre) for s in fleet.STARS]
     return {
         **r,
         "ship_key": ship.key if ship else None,
@@ -192,14 +196,19 @@ def _seats() -> set[str]:
 
 
 def _queued() -> set[str]:
-    """The voyage names in specs/queue.txt: a run still in the queue is queued, not running."""
+    """The voyage names in the standing queue (the store's, 11 November): a run still in the queue is queued, not
+    running. A store that cannot be read answers no names, as `_seats` answers no seats."""
     import yaml
 
+    from thorp import store
+    from thorp.viable.s2_coordination import queue_read
+
     out: set[str] = set()
-    q = paths.resolve("specs/queue.txt")
-    if not q.exists():
+    try:
+        pending = queue_read.pending()
+    except store.StoreDown:
         return out
-    for ln in q.read_text(encoding="utf-8").splitlines():
+    for ln in pending:
         ln = ln.strip()
         if not ln or ln.startswith("#") or ln.startswith("cmd:"):
             continue
@@ -255,6 +264,23 @@ def _mark_status(runs: list[dict]) -> None:
 
 def summary(key: str) -> dict:
     v = fleet.EXPEDITIONS[key]
+    runs = runs_of(v)
+    pre = None
+    from thorp.ledger import _use_pg
+
+    if _use_pg() and runs:
+        # every run's star series in one query and their Forgotten Tomes scores in another, not two queries a star
+        # a run (11 November, the audit's item 7); the stars artifacts only for the runs that lack a shared metric
+        from thorp import ledger_store
+
+        ids = [r["run_id"] for r in runs]
+        names = sorted({s.metric for s in fleet.STARS.values()} | {s.shared_metric for s in fleet.STARS.values() if s.shared_metric})
+        pre = {"series": {}, "arts": {}}
+        for x in ledger_store.history_of_pairs([(i, n) for i in ids for n in names]):
+            pre["series"].setdefault((x["run_id"], x["name"]), []).append({"step": x["step"], "value": x["value"]})
+        pre["ft"] = {x["run_id"]: x["value"] for x in ledger_store.latest_rows(ids, names=(FT,))}
+        lack = [i for i in ids if any(s.shared_metric and (i, s.shared_metric) not in pre["series"] for s in fleet.STARS.values())]
+        pre["arts"] = ledger_store.artifacts_of_kind_many(lack, "stars")
     out = {
         "key": v.key,
         "name": v.name,
@@ -270,7 +296,7 @@ def summary(key: str) -> dict:
         "next_steps": list(v.next_steps),
         "plan": list(getattr(v, "plan", ())),
         "goals": list(getattr(v, "goals", ())),
-        "runs": [run_summary(r, v) for r in runs_of(v)],
+        "runs": [run_summary(r, v, pre) for r in runs],
         "stars": list(v.stars),
     }
     _mark_status(out["runs"])
@@ -340,10 +366,9 @@ def overview() -> dict:
             "where status='finished' and wall_minutes > 0 group by p"
         )
     }
-    q = paths.resolve("specs/queue.txt")
-    lines = [
-        ln.strip() for ln in q.read_text().splitlines() if ln.strip() and not ln.startswith("#")
-    ]
+    from thorp.viable.s2_coordination import queue_read
+
+    lines = [ln.strip() for ln in queue_read.pending() if ln.strip()]  # the store's queue (11 November)
     queued: dict[str, list[int]] = collections.defaultdict(list)
     minutes, steps, unknown = 0.0, 0, 0
     for i, ln in enumerate(lines, 1):
@@ -352,14 +377,14 @@ def overview() -> dict:
             continue
         p = paths.resolve(f"specs/{ln}.yaml")
         spec = yaml.safe_load(p.read_text()) if p.exists() else {}
-        key = fleet.expedition_of_label(spec.get("name"), spec.get("ship")) or "(no expedition)"
+        key = fleet.expedition_of_spec(spec) or "(no expedition)"
         queued[key].append(i)
         m = wall.get((spec.get("model") or {}).get("preset"))
         minutes += m or 0.0
         unknown += m is None
     done = collections.Counter()
-    for r in _rows("select name, ship, status from runs"):
-        k = fleet.expedition_of_label(r["name"], r["ship"]) or "(no expedition)"
+    for r in _rows("select run_id, name, ship, status from runs"):
+        k = fleet.expedition_of_run(r) or "(no expedition)"
         done[
             (
                 k,
@@ -425,7 +450,7 @@ def overview() -> dict:
     # at-sea tab of nothing (9 November, Justin: clicking a card "should open the SOP card, which is
     # actually the expedition page")
     exp_of_sop: dict[str, collections.Counter] = {}
-    for r in _rows("select name, ship, status, spec_json from runs where spec_json is not null"):
+    for r in _rows("select run_id, name, ship, status, spec_json from runs where spec_json is not null"):
         try:
             v = _json.loads(r["spec_json"]).get("sop")
         except Exception:
@@ -434,7 +459,7 @@ def overview() -> dict:
             continue
         v = str(v)
         runs_by_sop[(v, r["status"])] += 1
-        k = fleet.expedition_of_label(r["name"], r["ship"])
+        k = fleet.expedition_of_run(r)
         if k:
             exp_of_sop.setdefault(v, collections.Counter())[k] += 1
     for e in sops:
@@ -450,7 +475,7 @@ def overview() -> dict:
     return {
         "sops": sops,
         "at_sea": [
-            {**r, "expedition": fleet.expedition_of_label(r["name"], r["ship"])} for r in at_sea
+            {**r, "expedition": fleet.expedition_of_run(r)} for r in at_sea
         ],
         "helm": vsm.helm(),
         "queue": {

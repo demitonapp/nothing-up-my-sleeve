@@ -12,20 +12,23 @@ about 14:00 and drift: two other sessions were editing `server.py`, `train.py` a
 Items 8 (the dashboard's open port) and 12 (backup and tests) are not in the programme. They are kept below so
 the decision is visible.
 
-| # | Weakness | In the programme |
-| --- | --- | --- |
-| 1 | The two trainers have drifted | yes |
-| 2 | A coordinator death loses voyages; a hired voyage hangs on this Mac | yes |
-| 3 | A run id does not pin what was trained | yes |
-| 4 | The metrics table will not survive 10x | yes |
-| 5 | Evaluators run inside the training loop | yes |
-| 6 | The Postgres cut-over is half done | yes |
-| 7 | Dashboard endpoints loop over every run | yes |
-| 8 | The dashboard listens on every interface with no login | no |
-| 9 | The outside-model tooling cannot read Qwen3.8 27B | yes |
-| 10 | The data stream rebuilds the corpus in RAM; checkpoints are never pruned | yes |
-| 11 | Expeditions, lanes and run status are hard-coded | yes |
-| 12 | No Postgres backup found; restart, fold and API payloads untested | no |
+| # | Weakness | In the programme | Built (11 November, night) |
+| --- | --- | --- | --- |
+| 1 | The two trainers have drifted | yes | built: refusal allow-list, the gaps closed, twin-leg parity |
+| 2 | A coordinator death loses voyages; a hired voyage hangs on this Mac | yes | built: `s2.at_sea`, own process groups, `charter attach` |
+| 3 | A run id does not pin what was trained | yes | built as provenance beside an unchanged id |
+| 4 | The metrics table will not survive 10x | yes | built: buffered writes, incremental atomic fold |
+| 5 | Evaluators run inside the training loop | yes | built: per-evaluator times, `eval.offline` + `thorp score`, greedy KV cache |
+| 6 | The Postgres cut-over is half done | yes | built: queue from the store only, library on Postgres, no silent fallback |
+| 7 | Dashboard endpoints loop over every run | yes | built: `s1.metric_latest`, set-based readers |
+| 8 | The dashboard listens on every interface with no login | no | — |
+| 9 | The outside-model tooling cannot read Qwen3.8 27B | yes | built: `thorp/hooked.py`, real layer indices |
+| 10 | The data stream rebuilds the corpus in RAM; checkpoints are never pruned | yes | built: memmap windows, retention, SIGTERM checkpoint |
+| 11 | Expeditions, lanes and run status are hard-coded | yes | built: `expedition:`, `s2.lane_defs`, `s1.run_state` |
+| 12 | No Postgres backup found; restart, fold and API payloads untested | no | — |
+
+What was built, what it measured and what is still open is in DECISIONS.md, "The architecture programme,
+built". Nothing of the coordinator's own changes is live until it is restarted in port.
 
 **What can start while a voyage is at sea.** Items 1, 5, 7, 9, 10 and 11 change code a running trainer has
 already loaded, or code it does not use; they are safe on a branch at any time. Items 3, 4 and 6 change what a

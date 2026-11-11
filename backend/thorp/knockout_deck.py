@@ -109,10 +109,10 @@ def gains(items: dict, idx_by_rel: dict[str, list[str]], pick: dict[str, np.ndar
 def read(name: str, k: int = K, controls: int = CONTROLS, log=print) -> dict:
     import mlx.core as mx
     from mlx.utils import tree_map
-    from mlx_lm import load
 
     from thorp import cleaning
     from thorp.evaluators.logic import load_deck, score_deck
+    from thorp.hooked import load
     from thorp.inside import Inside
     from thorp.outside_deck import OutsideTok
 
@@ -121,12 +121,16 @@ def read(name: str, k: int = K, controls: int = CONTROLS, log=print) -> dict:
     model.update(tree_map(lambda p: p.astype(mx.float32) if p.dtype in (mx.float16, mx.bfloat16) else p, model.parameters()))
     tok = OutsideTok(name, t, cleaning.CURRENT)
     inner = Inside(model)
-    n_layers = len(inner.hidden(mx.array([[tok.eos_id]])))
-    n_heads = inner.attention_patterns(mx.array([[tok.eos_id] + tok.encode("A test.")]))[0].shape[1]
+    # the shape from the model's own map (11 November), real layer indices throughout
+    n_layers = inner.n_layers
+    n_heads = inner.heads_of(inner.attention_layers[0])
     mats = card_matrices(inner, tok)
     curve = mats.pop("_bridge_curve")
-    heads = {c: top_heads(m, k) for c, m in mats.items()}
-    bridge_layer = int(np.argmax(curve)) if len(curve) else None
+    # a card's rows are the attention layers in order (pattern_layers); its heads are named by real layer
+    real = inner.pattern_layers
+    heads = {c: [(real[r], h) for r, h in top_heads(m, k)] for c, m in mats.items()}
+    bridge_layer = int(np.argmax(curve)) if len(curve) else None  # read in the residual stream: a real layer
+    bridge_kind = inner.layer_map[bridge_layer]["kind"] if bridge_layer is not None else None
     log(f"{name}: {n_layers} layers x {n_heads} heads; cards {sorted(heads)}; the Bridge's layer {bridge_layer} ({time.time() - t0:.0f}s)")
     deck = load_deck(DECK)
     rels = {}
@@ -135,7 +139,8 @@ def read(name: str, k: int = K, controls: int = CONTROLS, log=print) -> dict:
     idx = {rel: sorted(v) for rel, v in rels.items()}
 
     def run(silence: dict) -> dict:
-        with inner.silenced(silence):
+        # a whole layer may be a linear-attention layer on a hybrid model: edited() zeroes its value heads
+        with inner.edited({la: {"zero": hs} for la, hs in silence.items()}):
             return score_deck(inner, tok, deck)["items"]
 
     conds: dict[str, dict] = {"baseline": {"heads": {}}}
@@ -145,9 +150,9 @@ def read(name: str, k: int = K, controls: int = CONTROLS, log=print) -> dict:
         hs = sorted({h for c in cs if c in heads for h in heads[c]})
         conds["suit:" + s] = {"heads": as_layers(hs), "n": len(hs)}
     if bridge_layer is not None:
-        conds["bridge_layer"] = {"heads": {bridge_layer: list(range(n_heads))}}
+        conds["bridge_layer"] = {"heads": {bridge_layer: list(range(inner.heads_of(bridge_layer)))}}
     taken = {h for hs in heads.values() for h in hs}
-    every = [(la, h) for la in range(n_layers) for h in range(n_heads)]
+    every = inner.head_pool()  # attention heads only, each layer's real count (Qwen3 4B: the old order)
     pool = [x for x in every if x not in taken]
 
     def draw(n):  # random heads outside every card's set; from all heads where too few lie outside (small models)
@@ -160,8 +165,10 @@ def read(name: str, k: int = K, controls: int = CONTROLS, log=print) -> dict:
         conds[f"control:{k}:{i}"] = {"heads": as_layers(draw(k))}
         conds[f"control:{suit_n}:{i}"] = {"heads": as_layers(draw(suit_n))}
     if bridge_layer is not None:
-        others = [la for la in range(n_layers) if la != bridge_layer]
-        conds["control:layer"] = {"heads": {int(rng.choice(others)): list(range(n_heads))}}
+        # another layer of the Bridge's own kind, whole
+        others = [m["layer"] for m in inner.layer_map if m["kind"] == bridge_kind and m["layer"] != bridge_layer]
+        other = int(rng.choice(others))
+        conds["control:layer"] = {"heads": {other: list(range(inner.heads_of(other)))}}
     items = {}
     for c, spec in conds.items():
         items[c] = run(spec["heads"])

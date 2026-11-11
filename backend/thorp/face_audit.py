@@ -64,12 +64,15 @@ def unlabel(s: str) -> tuple[int, int]:
     return int(m.group(1)), int(m.group(2))
 
 
-def _top(matrix, n: int) -> list[tuple[int, int]]:
+def _top(matrix, n: int, layers=None) -> list[tuple[int, int]]:
+    """The n strongest (layer, head) of a card matrix. A matrix's rows are the attention layers in order;
+    `layers` (Inside.pattern_layers) names their real layers, which differ on a hybrid model."""
     a = np.asarray(matrix, dtype=float) if matrix is not None else np.zeros((0, 0))
     if a.size == 0:
         return []
     flat = np.argsort(-a, axis=None)[: max(0, int(n))]
-    return [tuple(int(x) for x in np.unravel_index(int(i), a.shape)) for i in flat]
+    got = [tuple(int(x) for x in np.unravel_index(int(i), a.shape)) for i in flat]
+    return got if layers is None else [(int(layers[r]), h) for r, h in got]
 
 
 def _layers(heads: list[tuple[int, int]]) -> dict[int, list[int]]:
@@ -144,22 +147,24 @@ def _fallback(inner, tok, ctx, rec: dict) -> dict:
     return mats
 
 
-def _targets(mats: dict, inv: list, rec: dict, faces, k: int) -> dict[str, list[tuple[int, int]]]:
+def _targets(mats: dict, inv: list, rec: dict, faces, k: int, layers=None) -> dict[str, list[tuple[int, int]]]:
+    """The heads to silence, by real layer: the census inventory is by real layer already; a matrix's rows
+    are mapped through `layers` (Inside.pattern_layers)."""
     out: dict[str, list[tuple[int, int]]] = {}
     if "nevermore" in faces:
-        out["nevermore"] = _top(mats.get("natural_scores") or mats.get("nevermore") or mats.get("scores"), k)
+        out["nevermore"] = _top(mats.get("natural_scores") or mats.get("nevermore") or mats.get("scores"), k, layers)
     if "mover" in faces:
-        out["mover"] = _top(mats.get("mover"), k)
+        out["mover"] = _top(mats.get("mover"), k, layers)
     if "scales" in faces:
-        sc = _top(mats.get("comparator"), max(2, k // 2))
+        sc = _top(mats.get("comparator"), max(2, k // 2), layers)
         for key in ("number_spotter", "order_word"):
-            sc += _top((rec.get(key) or {}).get("scores") or mats.get(key), max(2, k // 2))
+            sc += _top((rec.get(key) or {}).get("scores") or mats.get(key), max(2, k // 2), layers)
         out["scales"] = list(dict.fromkeys(sc))
     if "counter" in faces:
         def top_attr(attr: str, n: int) -> list[tuple[int, int]]:
             rows = sorted([r for r in inv if r.get(attr) is not None], key=lambda r: -r[attr])[:n]
             heads = [(int(r["layer"]), int(r["head"])) for r in rows]
-            return heads or _top(mats.get(attr), n)
+            return heads or _top(mats.get(attr), n, layers)
 
         out["counter"] = list(dict.fromkeys(
             top_attr("delimiter", 4) + top_attr("attention_sink", 4) + top_attr("offset_2", 4)
@@ -167,11 +172,6 @@ def _targets(mats: dict, inv: list, rec: dict, faces, k: int) -> dict[str, list[
     return {f: hs for f, hs in out.items() if hs}
 
 
-def _shape(inner) -> tuple[int, int]:
-    import mlx.core as mx
-
-    probe = inner.attention_patterns(mx.array([[1, 2, 3]]))
-    return len(inner.layers), int(probe[0].shape[1])
 
 
 def _append(path: Path, obj: dict) -> None:
@@ -296,13 +296,12 @@ def run(model: str = "mlx-community/Qwen3-4B-4bit", *, context: int = 256, k: in
             log("  no head census: computing the card matrices on the model")
             mats = _fallback(inner, tok, ctx, rec)
             inv = []
-        targets = _targets(mats, inv, rec, faces, k)
+        targets = _targets(mats, inv, rec, faces, k, inner.pattern_layers)
         taken = {h for hs in targets.values() for h in hs}
         rng = np.random.default_rng(1859)
         pool = [(int(r["layer"]), int(r["head"])) for r in inv if (int(r["layer"]), int(r["head"])) not in taken]
-        if not pool:  # no inventory: every head not in the targets, from the model's own shape
-            nl, nh = _shape(inner)
-            pool = [(l, h) for l in range(nl) for h in range(nh) if (l, h) not in taken]
+        if not pool:  # no inventory: every attention head not in the targets, from the model's own map
+            pool = inner.head_pool(exclude=taken)
         controls_ = [pool[i] for i in rng.choice(len(pool), min(controls, len(pool)), replace=False)] if pool else []
         if not targets:
             raise SystemExit("no target heads: the census/matrices gave nothing to audit")

@@ -18,7 +18,7 @@ from thorp.viable.s4_intelligence import readings
 
 
 def _external(name):
-    from mlx_lm import load
+    from thorp.hooked import load  # mlx-lm's loader, then the mlx_ports fallback
 
     m, t = load(name)
 

@@ -54,10 +54,14 @@ def run(name: str, log=print) -> dict:
     log(f"baseline: chaining {base['chaining_lift']:+.3f}, deck gain {base['logic_gain']:+.3f}")
 
     taken = set(UP) | set(DOWN)
+    # UP and DOWN are Qwen3 4B's heads (chain_probe, 08:25): on a model without them they name nothing
+    missing = sorted(taken - set(inner.head_pool()))
+    if missing:
+        raise ValueError(f"{name} has no attention heads {missing}: UP and DOWN are Qwen3 4B's (36 x 32)")
     rng = np.random.default_rng(SEED)
-    n_layers, n_heads = len(inner.layers), 32
-    pool = [(l, h) for l in range(n_layers) for h in range(n_heads) if (l, h) not in taken]
-    randoms = [pool[i] for i in rng.choice(len(pool), CONTROLS, replace=False)]
+    # the shape is read from the model: attention layers only, each with its real head count (on Qwen3 4B
+    # the same pool and the same draws as the 36 x 32 it hard-coded before 11 November)
+    randoms = inner.random_heads(CONTROLS, rng=rng, exclude=taken)
 
     out: dict = {"model": name, "baseline": base, "conditions": {}}
     for label, head in [("up", h) for h in UP] + [("down", h) for h in DOWN] + [("random", h) for h in randoms]:

@@ -48,16 +48,133 @@ from pathlib import Path
 
 from thorp import paths, store
 
-LANES = ("mac", "vast")
+LANES = ("mac", "vast")  # today's two lanes: the fallback when s2.lane_defs cannot be read (a box, a test, no store)
+
+# ---------------------------------------------------------------- the lanes are rows (11 November, item 11)
+#
+# `s2.lane_defs` holds one row a lane: its kind (`local`: launched on this Mac; `charter`: `thorp charter sail` on
+# a hired GPU), its seats, the presets that may share its seats, its resource, whether it is enabled. A third lane
+# is a row; a new *kind* is a launcher in `command` as well (until then it takes nothing, and says why). For the two
+# lanes of 11 November the rows say what the constants said, so the coordinator behaves exactly as before.
+
+KINDS = ("local", "charter")  # the kinds this coordinator can launch
+RESERVED = ("cmd", "wait", "hold")  # line prefixes that are kinds of line, never lane names
+LANE_DEFS_TTL_S = 20.0
+
+
+@dataclass(frozen=True)
+class LaneDef:
+    lane: str
+    kind: str  # "local" or "charter"; another kind takes nothing until it has a launcher
+    seats: int | None = None  # a local lane's seats when s2.lanes holds none (the dashboard's control wins)
+    shared_presets: frozenset = frozenset()  # presets that may share seats; empty: any line may take any seat
+    resource_id: str | None = None
+    enabled: bool = True
+    note: str = ""
+
+
+def _default_defs() -> dict[str, LaneDef]:
+    """What the constants said before the rows: the Mac (local, 300k may share) and Vast (charter, one seat)."""
+    return {
+        "mac": LaneDef("mac", "local", None, frozenset(TWO_AT_ONCE)),
+        "vast": LaneDef("vast", "charter", 1, frozenset()),
+    }
+
+
+_DEFS: dict = {"at": float("-inf"), "defs": None}
+
+
+def _read_defs() -> dict[str, LaneDef] | None:
+    """The rows of s2.lane_defs, local lanes first; None when the table cannot be read or is empty."""
+    from sqlalchemy import text
+
+    with store.session() as s:
+        rows = s.execute(
+            text(
+                "select lane, kind, seats, shared_presets, resource_id, enabled, note from s2.lane_defs "
+                "order by case kind when 'local' then 0 when 'charter' then 1 else 2 end, lane"
+            )
+        ).fetchall()
+    out = {
+        r[0]: LaneDef(r[0], r[1], r[2], frozenset(r[3] or ()), r[4], bool(r[5]), r[6] or "")
+        for r in rows
+        if r[0] not in RESERVED
+    }
+    return out or None
+
+
+def lane_defs(fresh: bool = False) -> dict[str, LaneDef]:
+    """Every lane, enabled or not, in order (read at most every LANE_DEFS_TTL_S); today's two when the table
+    cannot be read or holds nothing, so a box, a unit test or a store not yet migrated sails as before."""
+    if fresh or _DEFS["defs"] is None or time.monotonic() - _DEFS["at"] > LANE_DEFS_TTL_S:
+        try:
+            defs = _read_defs()
+        except Exception:  # noqa: BLE001 - no store, no table: the constants
+            defs = None
+        _DEFS.update(at=time.monotonic(), defs=defs or _default_defs())
+    return _DEFS["defs"]
+
+
+def lane_names() -> tuple[str, ...]:
+    """Every defined lane (a disabled one still has what it had out watched home)."""
+    return tuple(lane_defs())
+
+
+def enabled_lanes() -> tuple[str, ...]:
+    return tuple(k for k, d in lane_defs().items() if d.enabled)
+
+
+def kind_of(lane: str) -> str:
+    d = lane_defs().get(lane)
+    return d.kind if d else ("charter" if lane == "vast" else "local")
+
+
+def _charter_lane() -> str:
+    """Where a voyage written for CUDA sails: the Vast lane, else the first charter lane defined."""
+    defs = lane_defs()
+    if "vast" in defs or not any(d.kind == "charter" for d in defs.values()):
+        return "vast"
+    return next(k for k, d in defs.items() if d.kind == "charter")
+
+
+def split_lane(s: str) -> tuple[str, str]:
+    """A queue line's lane prefix (`vast: <spec>`, or `<lane>: <spec>` for any lane defined) and the rest; the Mac
+    when it names none. `cmd:`, `wait:` and `hold:` are kinds of line, never lanes."""
+    s = s.strip()
+    m = re.match(r"([A-Za-z][A-Za-z0-9_-]*):", s)
+    if m and m.group(1) not in RESERVED and m.group(1) != "mac" and m.group(1) in lane_defs():
+        return m.group(1), s[m.end() :].strip()
+    return "mac", s
+
+
+def helm_offset(lane: str) -> int:
+    """The first helm slot a local lane's seats use: the seats of the local lanes before it, so two local lanes
+    never share a helm slot (0 for the Mac, whose slots are as they were)."""
+    off = 0
+    for k, d in lane_defs().items():
+        if k == lane:
+            return off
+        if d.kind == "local" and d.enabled:
+            off += slots_of(k)
+    return off
+
+
+def helm_slots_total() -> int:
+    """Every helm slot the local lanes use (the Mac's seats alone, while it is the only local lane)."""
+    return max(1, sum(slots_of(k) for k, d in lane_defs().items() if d.kind == "local" and d.enabled))
 
 
 def slots_of(lane: str) -> int:
-    """How many lines this lane may have at sea at once: THORP_MAC_SLOTS for the Mac, else the seats
-    `s2.lanes` holds (the dashboard's control, and the value the UI shows), one on a hired box (the
-    charter terms count voyages, not seats)."""
-    if lane != "mac":
+    """How many lines this lane may have at sea at once. A local lane: THORP_<LANE>_SLOTS (THORP_MAC_SLOTS for the
+    Mac), else the seats `s2.lanes` holds (the dashboard's control, and the value the UI shows), else its row's
+    seats, else one. A charter lane: its row's seats, one on a hired box today (the charter terms count voyages,
+    not seats). A lane no row defines: one."""
+    d = lane_defs().get(lane)
+    if d is None:
         return 1
-    env = os.environ.get("THORP_MAC_SLOTS")
+    if d.kind != "local":
+        return max(1, int(d.seats or 1))
+    env = os.environ.get(f"THORP_{lane.upper().replace('-', '_')}_SLOTS")
     if env:
         try:
             return max(1, int(env))
@@ -68,11 +185,13 @@ def slots_of(lane: str) -> int:
         from thorp.viable.records import Lane
 
         with store.session() as s:
-            r = s.get(Lane, "mac")
+            r = s.get(Lane, lane)
             if r is not None and r.seats:
                 return max(1, min(8, int(r.seats)))
     except Exception:  # noqa: BLE001 - no store on a box: one seat
         pass
+    if d.seats:
+        return max(1, min(8, int(d.seats)))
     return 1
 
 
@@ -107,10 +226,7 @@ def _load_spec(rel: str, specs: Path) -> dict | None:
 def parse(text: str, specs: Path | None = None) -> Line:
     """One queue line, read: its lane, its kind and (for a voyage) its spec, run id and the runs it reads from."""
     specs = specs or paths.resolve("specs")
-    s = text.strip()
-    lane = "mac"
-    if s.startswith("vast:"):
-        lane, s = "vast", s[len("vast:") :].strip()
+    lane, s = split_lane(text)  # `vast: <spec>`, or any lane s2.lane_defs names (11 November, item 11)
     if s.startswith("cmd:"):
         body = s[len("cmd:") :].strip()
         # cmd:[timeout=90m] <command>: a queued audit gets a deadline; a bare cmd: keeps running until it
@@ -143,9 +259,20 @@ def parse(text: str, specs: Path | None = None) -> Line:
         ln.spec, ln.name, ln.reads = spec, spec.get("name"), related_runs(spec)
         with contextlib.suppress(Exception):
             ln.run_id = train.run_id(spec)
-        if (spec.get("model") or {}).get("backend") == "torch":
+        with contextlib.suppress(Exception):
+            # the id the voyage will really sail under: train.load_spec adds the ladder's evaluators before
+            # the id is computed, so the raw YAML's id is another run's (11 November: the 9m@v0.0.6 at-sea
+            # row said 4e4b5225, the trainer 136246a7). A copy: the spec read here stays as written.
+            import copy
+
+            from thorp import ladder
+
+            sailed = copy.deepcopy(spec)
+            ladder.ensure(sailed)
+            ln.run_id = train.run_id(sailed)
+        if (spec.get("model") or {}).get("backend") == "torch" and kind_of(ln.lane) != "charter":
             ln.lane = (
-                "vast"  # a voyage written for CUDA sails on a hired GPU, never on this Mac's CPU
+                _charter_lane()  # a voyage written for CUDA sails on a hired GPU, never on this Mac's CPU
             )
     return ln
 
@@ -167,14 +294,20 @@ def preset_of(ln: Line) -> str | None:
 
 def capacity_for(lane: str, lines: list[Line], running: dict[str, list]) -> int:
     """A lane's seats, capped on the Mac so a second seat is used only for 300k-scale lines: two 1m or 9m
-    voyages on one GPU do not fit, and the stored seat count is per lane, not per class."""
+    voyages on one GPU do not fit, and the stored seat count is per lane, not per class. The cap is the lane
+    row's `shared_presets` ({300k} on the Mac; a lane with none uses every seat for any line); a disabled lane,
+    or one of a kind with no launcher, takes nothing."""
+    d = lane_defs().get(lane)
+    if d is not None and (not d.enabled or d.kind not in KINDS):
+        return 0
     cap = slots_of(lane)
-    if lane != "mac" or cap <= 1:
+    shared = d.shared_presets if d is not None else (frozenset(TWO_AT_ONCE) if lane == "mac" else frozenset())
+    if not shared or cap <= 1:
         return cap
     nxt = next((ln for ln in lines if ln.lane == lane), None)
-    if nxt is None or preset_of(nxt) not in TWO_AT_ONCE:
+    if nxt is None or preset_of(nxt) not in shared:
         return 1
-    if any(preset_of(s["line"]) not in TWO_AT_ONCE for s in running.get("mac", [])):
+    if any(preset_of(s["line"]) not in shared for s in running.get(lane, [])):
         return 1
     return cap
 
@@ -390,7 +523,7 @@ def next_for(
     lane: str, lines: list[Line], at_sea: list[Line], key: bool
 ) -> tuple[Line | None, str | None]:
     """The line this lane would start now, or (None, why not). A lane waits at its first line: nothing jumps it."""
-    if lane == "vast" and not key:
+    if kind_of(lane) == "charter" and not key:
         return None, "no Vast.ai key: the Vast lane's lines wait in the queue"
     for i, ln in enumerate(lines):
         if ln.lane != lane:
@@ -405,7 +538,13 @@ def command(ln: Line) -> list[str] | str:
     if ln.kind == "cmd":
         return ln.payload
     spec = f"ships/specs/{ln.payload}.yaml"
-    if ln.lane == "vast":
+    kind = kind_of(ln.lane)
+    if kind not in KINDS:  # a lane row of a kind this coordinator has no launcher for (11 November, item 11)
+        raise NotImplementedError(
+            f"lane {ln.lane!r} is of kind {kind!r}, which has no launcher (have: {', '.join(KINDS)}): "
+            "teach lanes.command to launch it"
+        )
+    if kind == "charter":
         return [
             "uv",
             "run",
@@ -454,7 +593,7 @@ def state() -> dict:
             if r.line
         }
     out = {}
-    for lane in LANES:
+    for lane in lane_names():
         r = d.get(lane)
         alive = False
         if r:
@@ -570,27 +709,42 @@ def _is_that_job(pid: int, ln: Line) -> bool:
     return bool(first) and any(w.rsplit("/", 1)[-1] == first for w in cmd.split())
 
 
-def _ledger_status(run_id: str | None) -> str | None:
-    """A run's status on the ledger, or None when it has no row (or the ledger cannot be asked)."""
-    if not run_id:
+def _ledger_status(run_id: str | None, name: str | None = None, since: str | None = None) -> str | None:
+    """A run's status on the ledger, or None when it has no row (or the ledger cannot be asked). With no
+    row under the id, the newest run of that `name` started no earlier than `since` (the line's launch, the
+    coordinator's local ISO time) answers: an at-sea row written before 11 November's id fix carries the
+    raw YAML's id, not the one the voyage sailed under, and an older voyage of the same name never does."""
+    if not run_id and not name:
         return None
     with contextlib.suppress(Exception):
+        from datetime import datetime
+
         from thorp.ledger import close_reader, reader
 
         try:
-            return (reader().get_run(run_id) or {}).get("status")
+            r = reader().get_run(run_id) if run_id else None
+            if r is None and name:
+                r = reader().get_run_by_name(name)
+                if r is not None and since:
+                    began = datetime.fromisoformat(str(r.get("started")))
+                    launched = datetime.fromisoformat(str(since))
+                    began = began if began.tzinfo else began.astimezone()
+                    launched = launched if launched.tzinfo else launched.astimezone()
+                    if (began - launched).total_seconds() < -120:  # a voyage before this line's launch
+                        r = None
+            return (r or {}).get("status")
         finally:
             close_reader()
     return None
 
 
-def _outcome(ln: Line, gone: bool = False) -> str:
+def _outcome(ln: Line, gone: bool = False, since: str | None = None) -> str:
     """What to record for a line whose exit this coordinator could not collect, because it was not the
     process's parent. A voyage's outcome is its status on the ledger (`adopted:finished`; a row still
     'running' with its process gone is `adopted:unfinished`). `gone` is a process found dead at start-up:
     unless the ledger says the voyage finished, it is `lost`. One word, so the file queue's history line
     (`<started> <line> <status>`) still parses."""
-    status = _ledger_status(ln.run_id) if ln.kind == "spec" else None
+    status = _ledger_status(ln.run_id, ln.name, since) if ln.kind == "spec" else None
     if status == "finished" or (status and not gone):
         return "adopted:" + ("unfinished" if status == "running" else "-".join(str(status).split()))
     return "lost" if gone else "adopted:exit-unknown"
@@ -634,6 +788,49 @@ def _read_procs(root: Path | None = None) -> list[dict]:
     return []
 
 
+def _covered(running: dict | None = None) -> tuple[set, set]:
+    """What is at sea now, as (run names, run ids): a live helm, a live at-sea row, a box still hired, and the
+    seats this coordinator is watching. A run so covered is never a ghost though it holds no helm here (11
+    November: a chartered voyage's row comes home 'running' with each pull and never takes this Mac's helm, so a
+    coordinator restarted mid-charter would have closed it)."""
+    from thorp import vsm
+
+    live = {h.get("name") for h in vsm.helms(8)}
+    held: set = set()
+    with contextlib.suppress(Exception):
+        from thorp.viable.s2_coordination import queue_store
+
+        held |= {r["run_id"] for r in queue_store.at_sea() if r["pid"] and _alive(r["pid"])}
+    with contextlib.suppress(Exception):
+        from thorp.viable.s3_control import charter as s3
+
+        held |= {h.get("run_id") for h in s3.out_now()}
+    for seats in (running or {}).values():
+        for seat in seats:
+            ln = seat.get("line")
+            if ln is not None:
+                held.add(ln.run_id)
+                live.add(ln.name)
+    held.discard(None)
+    live.discard(None)
+    return live, held
+
+
+SWEEP_EVERY_S = 300.0  # how often the coordinator looks for runs whose heartbeat has stopped
+
+
+def _sweep_lost(running: dict, say) -> list[str]:
+    """Mark lost every `running` state row with no heartbeat for run_state.LOST_AFTER_S that nothing at sea covers
+    (11 November, item 11): what the start-up reaper guessed once from an hour's age, judged every few minutes from
+    the heartbeat. Only with the store as the queue (the file queue's ledger is a box's SQLite)."""
+    if not _queue_pg():
+        return []
+    from thorp import run_state
+
+    live, held = _covered(running)
+    return run_state.sweep(held, live, say=say)
+
+
 def _reap_runs(say) -> int:
     """Close ledger rows still marked running that hold no helm and started over an hour ago. A voyage killed
     with a signal never writes a finish, so without this they return as ghosts on every page (10 November:
@@ -644,25 +841,19 @@ def _reap_runs(say) -> int:
 
     from sqlalchemy import text
 
-    from thorp import store, vsm
+    from thorp import store
 
-    live = {h.get("name") for h in vsm.helms(8)}
-    # a run with a live at-sea row, or sailing on a box still hired, is not a ghost though it holds no helm
-    # here (11 November: a chartered voyage's row comes home 'running' with each pull and never takes this
-    # Mac's helm, so a coordinator restarted mid-charter would have closed it)
-    held: set = set()
-    with contextlib.suppress(Exception):
-        from thorp.viable.s2_coordination import queue_store
-
-        held |= {r["run_id"] for r in queue_store.at_sea() if r["pid"] and _alive(r["pid"])}
-    with contextlib.suppress(Exception):
-        from thorp.viable.s3_control import charter as s3
-
-        held |= {h.get("run_id") for h in s3.out_now()}
+    live, held = _covered()
     cutoff = time.time() - 3600
     with store.session() as s:
+        # a run with a state row is the heartbeat's to judge (run_state.sweep, every loop); this guess is kept for
+        # the runs from before the rows (11 November, item 11)
+        stated = s.scalar(text("select to_regclass('s1.run_state') is not null"))
         rows = s.execute(
-            text("select run_id, name, started from s1.runs where status='running'")
+            text(
+                "select run_id, name, started from s1.runs r where status='running'"
+                + (" and not exists (select 1 from s1.run_state t where t.run_id = r.run_id)" if stated else "")
+            )
         ).fetchall()
         stale = []
         for run_id, name, started in rows:
@@ -763,10 +954,10 @@ def _adopt(running: dict, specs: Path, done: Path, root: Path, say) -> None:
         return ln
 
     def seat(lane: str, ln: Line, pid: int, started, ts, slot, row) -> None:
-        running[lane].append(
+        running.setdefault(lane, []).append(
             {
                 "line": ln,
-                "proc": _Adopted(pid, outcome=lambda: _outcome(ln)),
+                "proc": _Adopted(pid, outcome=lambda: _outcome(ln, since=started)),
                 "since": started or now,
                 "started": started or now,
                 "since_ts": float(ts or time.time()),
@@ -778,7 +969,7 @@ def _adopt(running: dict, specs: Path, done: Path, root: Path, say) -> None:
         say(f"[{lane}] adopted {ln.text} (pid {pid})")
 
     def lost(lane: str, ln: Line, pid, started, row) -> None:
-        status = _outcome(ln, gone=True)
+        status = _outcome(ln, gone=True, since=started)
         why = f"its process (pid {pid}) is gone" if pid else "it was never given a pid"
         hint = ""
         if lane == "vast" and status == "lost":
@@ -798,7 +989,7 @@ def _adopt(running: dict, specs: Path, done: Path, root: Path, say) -> None:
     for r in rows:
         seen.add((r["text"], r["pid"]))
         ln = line_of(r["text"], r["name"], r["run_id"])
-        lane = r["lane"] if r["lane"] in LANES else ln.lane
+        lane = r["lane"] if r["lane"] in lane_names() else ln.lane
         if r["pid"] and _alive(r["pid"]) and _is_that_job(r["pid"], ln):
             seat(lane, ln, r["pid"], r["started"], r["started_ts"], r["seat"], r["id"])
         else:
@@ -810,7 +1001,7 @@ def _adopt(running: dict, specs: Path, done: Path, root: Path, say) -> None:
         ln = line_of(text)
         if ln.kind not in ("cmd", "spec"):
             continue
-        lane = e.get("lane") if e.get("lane") in LANES else ln.lane
+        lane = e.get("lane") if e.get("lane") in lane_names() else ln.lane
         started = e.get("started") or e.get("since")
         if _alive(pid) and _is_that_job(pid, ln):
             row = None
@@ -876,7 +1067,9 @@ def run(queue: Path | None = None, done: Path | None = None, root: Path | None =
             out_path.parent.mkdir(parents=True, exist_ok=True)
             out = open(out_path, "w")  # noqa: SIM115
         cmd = command(ln)
-        env = {**os.environ, "THORP_HELM_SLOT": str(slot), "THORP_HELM_SLOTS": str(slots_of("mac"))}
+        # a local lane's seats sit after the earlier local lanes' in the helm (the Mac's are 0.., as before)
+        helm_slot = slot + (helm_offset(ln.lane) if kind_of(ln.lane) == "local" else 0)
+        env = {**os.environ, "THORP_HELM_SLOT": str(helm_slot), "THORP_HELM_SLOTS": str(helm_slots_total())}
         # its own session (11 November): a signal to the coordinator's process group, which is what launchd
         # sends when the job ends, must not reach a voyage. What stops a line signals the line's own group.
         p = subprocess.Popen(
@@ -894,8 +1087,9 @@ def run(queue: Path | None = None, done: Path | None = None, root: Path | None =
 
     custom = launch is not None
     launch = launch or default_launch
-    running: dict[str, list[dict]] = {lane: [] for lane in LANES}
-    told: dict[str, str | None] = {lane: None for lane in LANES}
+    running: dict[str, list[dict]] = {lane: [] for lane in lane_names()}  # s2.lane_defs (item 11)
+    told: dict[str, str | None] = {lane: None for lane in lane_names()}
+    swept = float("-inf")  # when the heartbeats were last swept (the first sweep is in the first loop)
     attempts: dict[str, int] = {}
     # adopt what the last coordinator left at sea: every at-sea row, then the old pid file
     try:
@@ -915,6 +1109,15 @@ def run(queue: Path | None = None, done: Path | None = None, root: Path | None =
             vsm.refresh_expedition_states()
         except Exception as e:  # noqa: BLE001 - a status write must never stop the queue
             say(f"S2: could not write the expedition states: {e}")
+        finally:
+            # the states are read through the ledger's per-thread reader, whose session otherwise stays
+            # idle in a transaction for the coordinator's whole life, holding a lock on s1.runs that a
+            # truncate or an ALTER waits on for ever (11 November: 40 minutes on the live store; every
+            # test after the first that ran this loop hung on its fixture's truncate)
+            with contextlib.suppress(Exception):
+                from thorp.ledger import close_reader
+
+                close_reader()
         for row in list(_unsunk):  # rows whose history is written but which the store would not delete
             _leave_sea(row)
         # the seats that ended (a lane may hold several now)
@@ -929,7 +1132,9 @@ def run(queue: Path | None = None, done: Path | None = None, root: Path | None =
                 ):
                     label = f"{timeout // 60} min" if timeout >= 60 else f"{timeout} s"
                     say(f"[{lane}] {seat['line'].text} timed out after {label}")
-                    code = _stop(seat["proc"])
+                    # a voyage stops on SIGTERM by finishing its step and saving a checkpoint (11 November):
+                    # give it the time to; a cmd: keeps the short grace it always had
+                    code = _stop(seat["proc"], grace=180.0 if seat["line"].kind == "spec" else 2.0)
                 if code is not None:
                     say(f"[{lane}] {seat['line'].text} exited {code}")
                     _record(
@@ -944,6 +1149,13 @@ def run(queue: Path | None = None, done: Path | None = None, root: Path | None =
                     _children.discard(seat["proc"].pid)
                     attempts.pop(seat["line"].text, None)
                     seats.remove(seat)
+        # a run whose heartbeat stopped with nothing at sea covering it is lost (11 November, item 11)
+        if time.monotonic() - swept > SWEEP_EVERY_S:
+            swept = time.monotonic()
+            try:
+                _sweep_lost(running, say)
+            except Exception as e:  # noqa: BLE001 - a record must never stop the queue
+                say(f"S2: could not sweep the heartbeats: {e}")
         try:
             raw = pending(queue)
         except store.StoreDown as e:  # the store is the queue: wait for it, do not die on it
@@ -957,7 +1169,16 @@ def run(queue: Path | None = None, done: Path | None = None, root: Path | None =
             except Exception as e:  # noqa: BLE001 - one unreadable line must not stop the lane
                 say(f"S2: cannot read the queue line {t!r}: {e}")
         have_key = key()
-        for lane in LANES:
+        lane_defs(fresh=True)  # a lane added, disabled or re-seated in s2.lane_defs since the last loop
+        for lane in enabled_lanes():
+            running.setdefault(lane, [])
+            told.setdefault(lane, None)
+            if kind_of(lane) not in KINDS:  # a row of a kind with no launcher yet: it takes nothing
+                why = f"lane {lane} is of kind {kind_of(lane)!r}, which has no launcher"
+                if why != told[lane]:
+                    say(f"[{lane}] in port: {why}")
+                told[lane] = why
+                continue
             capacity = capacity_for(lane, lines, running)
             while len(running[lane]) < capacity:
                 at_sea = [seat["line"] for seats in running.values() for seat in seats]
@@ -967,14 +1188,14 @@ def run(queue: Path | None = None, done: Path | None = None, root: Path | None =
                         say(f"[{lane}] in port: {why}")
                     told[lane] = why
                     break
-                if lane == "mac" and ln.kind != "wait" and outside():
+                if kind_of(lane) == "local" and ln.kind != "wait" and outside():
                     if told[lane] != "outside":
-                        say("[mac] in port: a voyage started outside the queue is at sea")
+                        say(f"[{lane}] in port: a voyage started outside the queue is at sea")
                     told[lane] = "outside"
                     break
-                if lane == "vast" and ln.kind == "spec" and (why := hired()):
+                if kind_of(lane) == "charter" and ln.kind == "spec" and (why := hired()):
                     if why != told[lane]:
-                        say(f"[vast] in port: {why}")
+                        say(f"[{lane}] in port: {why}")
                     told[lane] = why
                     break
                 now = time.strftime("%Y-%m-%dT%H:%M:%S")
@@ -1041,7 +1262,10 @@ def run(queue: Path | None = None, done: Path | None = None, root: Path | None =
         with contextlib.suppress(Exception):
             _write_procs(running, root)
         idle = all(len(seats) == 0 for seats in running.values())
-        left = [x for x in (parse(t, specs) for t in pending(queue)) if x.lane == "mac" or have_key]
+        # what is still to sail: a line of a lane that can take it (enabled, of a kind with a launcher; a charter
+        # lane's only with a key), so a disabled lane's lines wait in the queue as a keyless Vast lane's do
+        sails = {k for k in enabled_lanes() if kind_of(k) in KINDS and (kind_of(k) == "local" or have_key)}
+        left = [x for x in (parse(t, specs) for t in pending(queue)) if x.lane in sails]
         if until_empty and idle and not left:
             with contextlib.suppress(Exception):
                 _write_procs({}, root)

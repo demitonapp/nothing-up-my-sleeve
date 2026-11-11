@@ -242,9 +242,13 @@ def points(bet: dict, outcome: str, pull_fall: dict) -> int:
     return p
 
 
-def _in_queue(name: str) -> bool:
-    q = paths.resolve("specs/queue.txt")
-    return q.exists() and f"fitouts/{name}" in {ln.strip() for ln in q.read_text().splitlines()}
+def _in_queue(name: str, queued: list[str] | None = None) -> bool:
+    """Whether the voyage's line is in the standing queue (the store's; 11 November, not specs/queue.txt)."""
+    if queued is None:
+        from thorp.viable.s2_coordination import queue_read
+
+        queued = queue_read.pending()
+    return f"fitouts/{name}" in queued
 
 
 def payload(preset: str, bets_for=None) -> dict:
@@ -258,6 +262,9 @@ def payload(preset: str, bets_for=None) -> dict:
             seen.add(r["key"])
             every.append(r)
     bets_for = bets_for or bets
+    from thorp.viable.s2_coordination import queue_read
+
+    queued = queue_read.pending()  # the queue read once, not once a round
     for r in every:
         control, pull = _sailing(r["control"]), _sailing(r["pull"])
         settled = control["status"] == "finished" and pull["status"] == "finished"
@@ -286,7 +293,7 @@ def payload(preset: str, bets_for=None) -> dict:
             "settled": settled, "cards": cards, "score": {"navigator": you, "house": them, "claude": cl},
             "winner": (None if not settled else "navigator" if you > them else "house"),
             "open": pull["status"] == "queued",
-            "in_queue": _in_queue(r["pull"]),
+            "in_queue": _in_queue(r["pull"], queued),
         })  # fmt: skip
     return {
         "preset": preset,
@@ -531,8 +538,11 @@ def queue(round_key: str) -> dict:
         if _voyage(spec["name"]) is not None:
             raise ValueError(f"{spec['name']} has already sailed")
         line = f"fitouts/{spec['name']}"
-        q = paths.resolve("specs/queue.txt")
-        queued = [ln.strip() for ln in q.read_text().splitlines()]
+        # the store is the queue (11 November): the line goes to s2.queue_lines, which the coordinator reads,
+        # not to specs/queue.txt; the round it was dealt in is on its WagerRound row (status 'queued')
+        from thorp.viable.s2_coordination import queue_read
+
+        queued = queue_read.pending()
         if line in queued:
             raise ValueError(f"{spec['name']} is already in the queue")
         vsm.gate(spec)  # S3 before the queue: a refused voyage is not queued
@@ -542,12 +552,11 @@ def queue(round_key: str) -> dict:
                 "# ships/specs/fitouts: dealt in the Navigator's Wager (the Bet tab): Ogden v0.1 with one lever pulled.\n"
                 + yaml.safe_dump(spec, sort_keys=False, width=100)
             )
-        with q.open("a", encoding="utf-8") as f:
-            f.write(f"# The Navigator's Wager: {round_key}\n{line}\n")
+        queue_read.add([line])
         if row is not None:
             row.status = "queued"
             row.queued_at = __import__("datetime").datetime.now(__import__("datetime").UTC)
-    return {"queued": spec["name"], "position": sum(1 for ln in queued if ln and not ln.startswith("#")) + 1}
+    return {"queued": spec["name"], "position": len(queued) + 1}
 
 
 def dealt_rounds(preset: str) -> list[dict]:

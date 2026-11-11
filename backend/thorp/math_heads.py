@@ -168,8 +168,11 @@ def prompt_for(hf, problem: str) -> str:
 
 
 def generate_batch(model, hf, prompts: list[str], n: int, inner=None, silenced=None):
-    """Greedy generation of a batch, one answer per prompt. With `silenced` (a list of (layer, head)) the
-    explicit attention zeroes those heads' outputs on every pass: the same questions, one head removed."""
+    """Greedy generation of a batch, one answer per prompt. With `silenced` ({layer: [heads]}, real layer
+    indices) the explicit attention zeroes those heads' outputs on every pass: the same questions, one head
+    removed. Since 11 November the head is found by a wrapper on its own layer, so the silencing holds on
+    every cached step of batch_generate; before, a call counter reset only by Inside.__call__ moved it off
+    the head after the first forward pass."""
     from mlx_lm import batch_generate
     from mlx_lm.sample_utils import make_sampler
 
@@ -212,7 +215,9 @@ def trace_batch(inner, hf, seqs: list[list[int]], prompt_lens: list[int], keep_h
     ids = np.zeros((len(seqs), Tm), np.int64)
     for i, s in enumerate(seqs):
         ids[i, : len(s)] = s
-    L, H = 36, 32
+    # rows are real layers (a hybrid model's linear layers stay zero and are not ranked); read from the model
+    L = inner.n_layers
+    H = max(inner.heads_of(i) for i in inner.attention_layers)
 
     # per-sequence fixed pieces, prepared once
     pre = []
@@ -276,8 +281,8 @@ def trace_batch(inner, hf, seqs: list[list[int]], prompt_lens: list[int], keep_h
             continue
         z = Z[bi]
         rk = []
-        for l in range(L):
-            for h in range(H):
+        for l in inner.attention_layers:
+            for h in range(inner.heads_of(l)):
                 stars = {
                     "sink": float(z["sink"][l, h]) if z["sink"][l, h] >= SINK else 0.0,
                     "previous": float(z["prev"][l, h]) if z["prev"][l, h] >= PREV else 0.0,
@@ -371,8 +376,7 @@ def by_group(rows: list[dict], key: str) -> dict:
 
 # ---------------------------------------------------------------- the commands
 def cmd_trace(a) -> int:
-    from mlx_lm import load
-
+    from thorp.hooked import load
     from thorp.inside import Inside
 
     OUT.mkdir(parents=True, exist_ok=True)
@@ -412,9 +416,10 @@ def cmd_trace(a) -> int:
         print(f"{min(start+a.batch, len(qs))}/{len(qs)}  acc {acc}  "
               f"({sum(r['correct'] for r in rows)}/{len(graded)})  [{time.time()-t0:.0f}s]", flush=True)
 
-    L, H = 36, 32
+    L, H = len(inner.attention_layers), max(inner.heads_of(i) for i in inner.attention_layers)
     doc = {
         "model": MODEL, "test": "MATH-500", "run_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+        "attention_layers": inner.attention_layers, "heads_per_layer": H,
         "tokens_cap": a.tokens, "batch": a.batch, "seconds": round(time.time() - t0, 1),
         "n": len(rows), "graded": sum(not r["truncated"] for r in rows),
         "correct": sum(r["correct"] for r in rows),
@@ -457,8 +462,7 @@ def cmd_trace(a) -> int:
 
 
 def cmd_causal(a) -> int:
-    from mlx_lm import load
-
+    from thorp.hooked import load
     from thorp.inside import Inside
 
     OUT.mkdir(parents=True, exist_ok=True)
@@ -471,8 +475,8 @@ def cmd_causal(a) -> int:
     top = [(d["layer"], d["head"]) for d in pilot["heads"]["heads"][: a.silence]]
     taken = set(top)
     rng = np.random.default_rng(SEED)
-    pool = [(l, h) for l in range(36) for h in range(32) if (l, h) not in taken]
-    controls = [list(pool[i]) for i in rng.choice(len(pool), a.silence, replace=False)]
+    # attention layers only, each with its real head count (Qwen3 4B: the old 36 x 32 pool, the same draws)
+    controls = [list(x) for x in inner.random_heads(a.silence, rng=rng, exclude=taken)]
 
     base = generate_batch(model, hf, prompts, a.tokens)
     rows, t0 = [], time.time()
@@ -527,7 +531,8 @@ def cmd_regrade(a) -> int:
     doc["accuracy"] = round(sum(r["correct"] for r in graded) / max(1, len(graded)), 4)
     doc["by_subject"] = by_group(rows, "subject")
     doc["by_level"] = by_group(rows, "level")
-    doc["heads"] = summarise(rows, 36, 32)
+    # the shape the trace recorded (a run before 11 November is Qwen3 4B's 36 x 32)
+    doc["heads"] = summarise(rows, len(doc.get("attention_layers") or range(36)), doc.get("heads_per_layer", 32))
     path.write_text(json.dumps(doc, indent=1))
     key = "math500-" + MODEL.replace("/", "--")
     try:

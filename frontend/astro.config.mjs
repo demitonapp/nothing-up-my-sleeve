@@ -5,6 +5,22 @@ import { defineConfig } from 'astro/config';
 import react from '@astrojs/react';
 import tailwindcss from '@tailwindcss/vite';
 
+// A branch's address (/library/ogden) is data, not a fixed route: `thorp dash` already serves the
+// Library's shell for any branch in production, and this gives the dev server the same fallback.
+// The static build still writes a page per default branch (pages/library/[...path].astro), and the
+// island reads the address, so the shell does not need to know which key was asked for.
+const libraryBranchShell = {
+  name: 'library-branch-shell',
+  configureServer(server) {
+    server.middlewares.use((req, _res, next) => {
+      if (req.url && (req.method === 'GET' || req.method === 'HEAD') && /^\/library\/[^/?#]+\/?(?:\?.*)?$/.test(req.url)) {
+        req.url = '/library';
+      }
+      next();
+    });
+  },
+};
+
 export default defineConfig({
   outDir: '../backend/thorp/dash/static',
   build: { assets: 'assets' },
@@ -23,7 +39,7 @@ export default defineConfig({
     '/governance/acquisition': '/vsm',
   },
   vite: {
-    plugins: [tailwindcss()],
+    plugins: [libraryBranchShell, tailwindcss()],
     // pre-bundled at startup, so a newly imported one never re-optimises under an open tab
     // (the browser then asks for the old bundle: "504 Outdated Optimize Dep")
     optimizeDeps: {

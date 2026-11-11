@@ -71,7 +71,7 @@ SYSTEMS: dict[str, System] = {
             "keep the operations from colliding: one GPU, one queue, shared files",
             (
                 "scripts/queue.sh",
-                "specs/queue.txt",
+                "s2.queue_lines",
                 "thorp/ledger.py",
                 "data/ships.json",
                 "thorp/vsm.py lint_queue",
@@ -251,10 +251,14 @@ def _sop_names_a_standard(spec: dict) -> list[str]:
 
 
 def _pre_registered(spec: dict) -> list[str]:
-    """An operation's voyages belong to an expedition written up in DECISIONS.md before they sail."""
+    """An operation's voyages belong to an expedition written up in DECISIONS.md before they sail: the one the
+    spec names outright (`expedition:`, which must exist: fleet.EXPEDITIONS or s1.expeditions), else its label's."""
     from thorp import fleet
 
-    v = fleet.expedition_of_label(spec.get("name"), spec.get("ship"))
+    why = fleet.unknown_expedition(spec)
+    if why:
+        return [why]
+    v = fleet.expedition_of_spec(spec)
     if v is None:
         return ["belongs to no expedition"]
     return []
@@ -933,12 +937,13 @@ def _compute_expedition_states() -> dict[str, str]:
     elif h is None:  # a voyage launched before the helm existed
         from thorp.ledger import reader
 
-        for r in reader().query("select name, ship from runs where status='running'"):
+        for r in reader().query("select run_id, name, ship from runs where status='running'"):
             if _sailing_without_helm(r["name"]):
-                sea = fleet.expedition_of_label(r["name"], r["ship"])
-    q = paths.resolve("specs/queue.txt")
+                sea = fleet.expedition_of_run(r)
+    from thorp.viable.s2_coordination import queue_read
+
     under = set()
-    for ln in q.read_text().splitlines():
+    for ln in queue_read.pending():  # the store's queue (11 November), not the specs/queue.txt export
         ln = ln.strip()
         if ln.startswith("cmd:"):
             # an investigation queued beside the voyages names its expedition outright (thorp/investigate.py)
@@ -954,7 +959,7 @@ def _compute_expedition_states() -> dict[str, str]:
             and (p := paths.resolve(f"specs/{ln}.yaml")).exists()
         ):
             spec = yaml.safe_load(p.read_text())
-            under.add(fleet.expedition_of_label(spec.get("name"), spec.get("ship")))
+            under.add(fleet.expedition_of_spec(spec))
     out = {}
     for k, e in fleet.EXPEDITIONS.items():
         out[k] = (
@@ -1075,10 +1080,10 @@ def lint_queue() -> list[str]:
 
     from thorp import train
 
-    q = paths.resolve("specs/queue.txt")
-    lines = [
-        ln.strip() for ln in q.read_text().splitlines() if ln.strip() and not ln.startswith("#")
-    ]
+    # the store's queue and its history (11 November), not the specs/queue.txt export or queue-done.txt
+    from thorp.viable.s2_coordination import queue_read
+
+    lines = [ln.strip() for ln in queue_read.pending() if ln.strip()]
     from thorp.ledger import reader
 
     found, seen, order = [], {}, {}
@@ -1087,17 +1092,14 @@ def lint_queue() -> list[str]:
         r["name"]
         for r in reader().query("select name from runs where status in ('running','finished')")
     }
-    done = (
-        paths.resolve("specs/queue-done.txt").read_text()
-        if paths.resolve("specs/queue-done.txt").exists()
-        else ""
-    )
+    # queue-done.txt's shape, `<started> <line> <status>`, so the seed check below reads it as before
+    done = "\n".join(f"{h['started']} {h['text']} {h['status']}" for h in queue_read.history())
     for i, ln in enumerate(lines):
         if ln.startswith(
             "vast:"
         ):  # the Vast lane (s2_coordination.lanes): the same spec, sailed on a hired GPU
             ln = ln[len("vast:") :].strip()
-        if ln.startswith(("cmd:", "wait:")):
+        if ln.startswith(("cmd:", "wait:", "hold:")):  # a hold names a decision, not a spec
             continue
         p = paths.resolve(f"specs/{ln}.yaml")
         if not p.exists():
@@ -1118,14 +1120,11 @@ def lint_queue() -> list[str]:
         seen[rid] = ln
         order[spec.get("name")] = i
         src = (spec.get("seeded_from") or {}).get("run")
-        if src:  # S5 'clean': a model carries its tokeniser, so a seed must have read the same text
-            from thorp import cleaning
-
-            mine, theirs = cleaning.version_of(spec), _clean_of(src, specs_by_name)
-            if theirs is not None and theirs != mine:
-                found.append(
-                    f"{ln}: reads {mine} text but is seeded from {src}, which read {theirs}"
-                )
+        # S5 'clean': a model carries its tokeniser. A leg that cleans its text another way than its seed was a
+        # finding here until 11 November, and only a finding: nothing stopped it, and the return leg would have
+        # trained a second tokeniser with four ids changed hands. Now train.prepare gives such a leg its seed's
+        # pieces under its own cleaning (tokeniser.graft) and seeded_master refuses a table that differs, so a
+        # different cleaning is no longer a hazard to report.
         if src and src in order:
             continue
         if (
@@ -1152,11 +1151,10 @@ def audit() -> dict:
     from thorp.ledger import reader
 
     rec = reader()
-    q = paths.resolve("specs/queue.txt")
-    queued = [
-        ln.strip()
-        for ln in q.read_text().splitlines()
-        if ln.strip() and not ln.startswith(("#", "cmd:"))
+    from thorp.viable.s2_coordination import queue_read
+
+    queued = [  # the store's queue (11 November), not the specs/queue.txt export
+        ln.strip() for ln in queue_read.pending() if ln.strip() and not ln.startswith("cmd:")
     ]
     violations: dict[str, list[str]] = {}
     excused: dict[str, list[str]] = {}

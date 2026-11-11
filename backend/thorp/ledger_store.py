@@ -17,7 +17,7 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
-from sqlalchemy import BigInteger, Float, Index, Text, delete, func, select
+from sqlalchemy import BigInteger, DateTime, Float, Index, Text, delete, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -130,6 +130,23 @@ class Artifact(Base):
     text: Mapped[str] = mapped_column(Text, default="", server_default="")
 
 
+class FoldMark(Base):
+    """How far a hired box's ledger has been folded home, per run and table (migration a8v1w4x7y0z3; written by
+    s2_coordination.charter.bring_home, 11 November): the leg (`leg_start`), the box's last rowid folded, how many of
+    the leg's rows the box held up to it, and a digest of them, so the next fold inserts only what is new."""
+
+    __tablename__ = "fold_marks"
+    __table_args__ = {"schema": "s2"}
+
+    run_id: Mapped[str] = mapped_column(Text, primary_key=True)
+    tbl: Mapped[str] = mapped_column(Text, primary_key=True)
+    leg_start: Mapped[int] = mapped_column(BigInteger)
+    last_id: Mapped[int] = mapped_column(BigInteger)
+    rows: Mapped[int] = mapped_column(BigInteger)
+    digest: Mapped[str] = mapped_column(Text)
+    folded_at: Mapped[object] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 def tables() -> list:
     """The tables this module defines, for the test fixtures' truncate."""
     return [m.local_table for m in Base.registry.mappers if m.class_.__module__ == __name__]
@@ -158,6 +175,22 @@ def put_run(s, row: dict) -> None:
             set_={k: func.coalesce(stmt.excluded[k], getattr(Run, k)) for k in row if k != "run_id"},
         )
     )
+
+
+def insert_values(s, table, rows: list[dict]) -> int:
+    """Insert `rows` as multi-row VALUES statements (about 30,000 parameters each), never as an executemany.
+
+    psycopg sends an executemany as one statement a row, so a statement-level trigger on the table (s1.metrics'
+    metric_latest, migration z7u0v3w6x9y2) fires once a row: 20,000 metrics rows took 20.9 s that way on 11 November
+    and 1.3 s as four multi-row statements. Returns the number of statements sent."""
+    if not rows:
+        return 0
+    per = max(1, 30_000 // max(1, len(rows[0])))
+    n = 0
+    for i in range(0, len(rows), per):
+        s.execute(insert(table).values(rows[i : i + per]))
+        n += 1
+    return n
 
 
 def put_metrics(s, run_id: str, step: int, values: dict[str, float], ts: float) -> None:
@@ -397,12 +430,31 @@ class PgLedger:
     def query(self, sql: str, params: Iterable = ()) -> list[dict]:
         """The readers' raw SQL against s1 (see _translate). A failed read rolls back, so the next one
         on this thread's reused session is not stuck in the aborted transaction."""
+        import contextlib
+
+        from sqlalchemy.exc import OperationalError
+
+        from thorp import store
+
+        # a read that opened the transaction itself ends it (11 November): a long-lived reader (the coordinator's,
+        # the charter's) otherwise sat "idle in transaction" for hours, holding a lock on s1.runs that made every
+        # ALTER and every test fixture's TRUNCATE wait. A transaction someone else already had open is left alone.
+        opened_here = not self._s.in_transaction()
         try:
             conn = self._s.connection()
             conn.exec_driver_sql("set search_path to s1, public")
             res = conn.exec_driver_sql(self._translate(sql), tuple(params))
             cols = list(res.keys())
-            return [dict(zip(cols, r)) for r in res]
+            rows = [dict(zip(cols, r)) for r in res]
+            if opened_here:
+                self._s.commit()
+            return rows
+        except OperationalError as e:
+            # the store cannot be reached: say so as every other reader of the one store does (StoreDown), so
+            # a page reports the store down rather than a driver error; never answered from ledger.sqlite
+            with contextlib.suppress(Exception):
+                self._s.rollback()
+            raise store.StoreDown(f"the store (Postgres, {store._safe(store.url())}) cannot be reached: {e.orig!r}") from e
         except Exception:
             self._s.rollback()
             raise
@@ -454,6 +506,20 @@ class PgLedger:
             return
         put_metrics(self._s, run_id, step, values, time.time())
         self._commit()
+
+    def metrics_many(self, rows: list[tuple[str, int, dict[str, float], float]]) -> None:
+        """Many steps' metrics, each (run_id, step, values, ts), as one insert in one transaction (the trainer's
+        MetricBuffer, 11 November). A failure rolls back, so none is written and the session is clean to try again."""
+        flat = [{"run_id": rid, "step": step, "name": k, "value": float(v), "ts": ts}
+                for rid, step, values, ts in rows for k, v in values.items()]  # fmt: skip
+        if not flat:
+            return
+        try:
+            insert_values(self._s, Metric, flat)  # one statement for a flush's rows, not one a row
+            self._commit()
+        except Exception:
+            self._s.rollback()
+            raise
 
     def evals(self, rows: list[dict]) -> None:
         if not rows:
@@ -734,3 +800,239 @@ def artifacts_of_kind(run_id: str, kind: str) -> list[dict]:
             select(Artifact).where(Artifact.run_id == run_id, Artifact.kind == kind).order_by(Artifact.step, Artifact.id)
         ).all()
     return [{"step": r.step, "path": r.path, "sha1": r.sha1, "text": r.text} for r in rows]
+
+
+# ---------------------------------------------------------------- the newest value of every metric (11 November)
+#
+# `s1.metric_latest` (migration z7u0v3w6x9y2) holds, per (run_id, name), the metrics row that is newest by (step, id):
+# its step, value, ts and id (`metric_id`). Statement-level triggers on s1.metrics keep it; `backfill_latest` fills
+# it from the history (`thorp store latest`). The dashboard's "last value of each matching metric for every run"
+# reads it (one table of ~200 x ~1,500 rows) instead of each run's whole history, and its name list narrows a
+# history read to exact (run_id, name) index ranges (the architecture audit, item 7).
+
+_FILL_RUN = """
+insert into s1.metric_latest as l (run_id, name, step, value, ts, metric_id)
+select distinct on (name) run_id, name, step, value, ts, id
+from s1.metrics where run_id = :run
+order by name desc, step desc, id desc
+on conflict (run_id, name) do update
+    set step = excluded.step, value = excluded.value, ts = excluded.ts, metric_id = excluded.metric_id
+    where (excluded.step, excluded.metric_id) > (l.step, l.metric_id)
+       or not exists (select 1 from s1.metrics m where m.id = l.metric_id)
+"""
+_PRUNE_RUN = """
+delete from s1.metric_latest l
+where l.run_id = :run and not exists (select 1 from s1.metrics m where m.id = l.metric_id)
+"""
+# every run_id in s1.metrics, by skipping along the (run_id, ...) index (a loose index scan: one probe a run, not a
+# read of 16M index entries)
+_METRIC_RUNS = """
+with recursive r(run_id) as (
+    (select run_id from s1.metrics order by run_id limit 1)
+    union all
+    select (select m.run_id from s1.metrics m where m.run_id > r.run_id order by m.run_id limit 1)
+    from r where r.run_id is not null
+)
+select run_id from r where run_id is not null
+"""
+
+
+def backfill_latest(only: list[str] | None = None, log=print) -> dict:
+    """Fill s1.metric_latest from s1.metrics, run by run, each in its own short transaction, so a trainer's insert
+    (whose trigger upserts the same rows) never waits more than one run's fill. Idempotent: a stored row is replaced
+    only by a newer one, or when the row it names is gone; a pair with no rows left is dropped. Returns the counts and
+    the seconds taken."""
+    from sqlalchemy import text
+
+    from thorp import store
+
+    t0 = time.time()
+    with store.session() as s:
+        runs = only or sorted(
+            {r for (r,) in s.execute(text(_METRIC_RUNS))}
+            | {r for (r,) in s.execute(text("select distinct run_id from s1.metric_latest"))}
+        )
+    upserted = pruned = 0
+    for i, rid in enumerate(runs, 1):
+        with store.session() as s:  # one transaction, committed on leaving
+            upserted += s.execute(text(_FILL_RUN), {"run": rid}).rowcount
+            pruned += s.execute(text(_PRUNE_RUN), {"run": rid}).rowcount
+        if log and i % 25 == 0:
+            log(f"metric_latest: {i}/{len(runs)} runs, {time.time() - t0:.1f}s")
+    return {"runs": len(runs), "upserted": upserted, "pruned": pruned, "seconds": round(time.time() - t0, 1)}
+
+
+def latest_mismatches(run_ids: list[str]) -> list[dict]:
+    """Where s1.metric_latest differs from the newest metrics row per name, for these runs ([] when it agrees):
+    the check behind `thorp store latest`, and the triggers' test."""
+    from sqlalchemy import text
+
+    from thorp import store
+
+    with store.session() as s:
+        rows = s.execute(
+            text(
+                "with truth as (select distinct on (run_id, name) run_id, name, step, value, ts, id from s1.metrics"
+                " where run_id = any(:runs) order by run_id, name, step desc, id desc)"
+                " select coalesce(t.run_id, l.run_id) as run_id, coalesce(t.name, l.name) as name,"
+                " t.step as want_step, t.value as want_value, t.id as want_id,"
+                " l.step as got_step, l.value as got_value, l.metric_id as got_id"
+                " from truth t full join (select * from s1.metric_latest where run_id = any(:runs)) l"
+                " on l.run_id = t.run_id and l.name = t.name"
+                " where t.id is distinct from l.metric_id or t.step is distinct from l.step"
+                " or t.value is distinct from l.value or t.ts is distinct from l.ts"
+            ),
+            {"runs": list(run_ids)},
+        ).mappings()
+        return [dict(r) for r in rows]
+
+
+def latest_rows(run_ids: list[str], prefixes: tuple[str, ...] = (), names: tuple[str, ...] = ()) -> list[dict]:
+    """[{run_id, name, step, value, metric_id}] from s1.metric_latest: each run's newest row of every metric named
+    in `names` or starting with one of `prefixes` (a LIKE prefix, as `metrics_matching` reads it), ordered by run,
+    then (step, id) as the history is."""
+    from sqlalchemy import text
+
+    from thorp import store
+
+    if not run_ids or not (prefixes or names):
+        return []
+    with store.session() as s:
+        rows = s.execute(
+            text(
+                "select run_id, name, step, value, metric_id from s1.metric_latest"
+                " where run_id = any(:runs) and (name = any(:names) or name like any(:likes))"
+                " order by run_id, step, metric_id"
+            ),
+            {"runs": list(run_ids), "names": list(names), "likes": [p + "%" for p in prefixes]},
+        ).mappings()
+        return [dict(r) for r in rows]
+
+
+def history_rows(
+    run_ids: list[str], prefixes: tuple[str, ...] = (), names: tuple[str, ...] = (), flat_after: str = ""
+) -> list[dict]:
+    """[{run_id, name, step, value}] for every row of the matching metrics of these runs, ordered by run, then step,
+    then id (as `metrics_matching` and `metric_series` read one run). The names come from s1.metric_latest, so the
+    read is exact (run_id, name) index ranges, not a filter over each run's whole history. `flat_after` drops a
+    name with a further "/" after that prefix (the readers' `count("/") > 1` for grad_norm/layer_<i>)."""
+    from sqlalchemy import text
+
+    from thorp import store
+
+    if not run_ids or not (prefixes or names):
+        return []
+    flat = " and l.name not like :deeper" if flat_after else ""
+    with store.session() as s:
+        rows = s.execute(
+            text(
+                "select m.run_id, m.name, m.step, m.value from s1.metric_latest l"
+                " join s1.metrics m on m.run_id = l.run_id and m.name = l.name"
+                " where l.run_id = any(:runs) and (l.name = any(:names) or l.name like any(:likes))" + flat +
+                " order by m.run_id, m.step, m.id"
+            ),
+            {"runs": list(run_ids), "names": list(names), "likes": [p + "%" for p in prefixes],
+             "deeper": flat_after + "%/%"},
+        ).all()
+    return [{"run_id": r, "name": n, "step": st, "value": v} for r, n, st, v in rows]
+
+
+def metric_names(run_id: str) -> list[str]:
+    """A run's metric names, from s1.metric_latest (sorted)."""
+    from sqlalchemy import text
+
+    from thorp import store
+
+    with store.session() as s:
+        return [n for (n,) in s.execute(text("select name from s1.metric_latest where run_id = :r order by name"), {"r": run_id})]
+
+
+def metrics_series_named(run_id: str, names: list[str]) -> dict[str, list]:
+    """`metrics_series` for the named metrics only: {name: [[steps], [values]]}, the later row at one step standing."""
+    from thorp import store
+
+    out: dict[str, list] = {}
+    if not names:
+        return out
+    with store.session() as s:
+        rows = s.execute(
+            select(Metric.step, Metric.name, Metric.value)
+            .where(Metric.run_id == run_id, Metric.name.in_(list(names)))
+            .order_by(Metric.step, Metric.id)
+        ).all()
+    for step, name, value in rows:
+        series = out.setdefault(name, [[], []])
+        if series[0] and series[0][-1] == step:
+            series[1][-1] = value
+        else:
+            series[0].append(step)
+            series[1].append(value)
+    return out
+
+
+def runs_rows(run_ids: list[str] | None = None) -> list[dict]:
+    """Rows of s1.runs as `all_runs` gives them, newest first, optionally only these ids (one query)."""
+    from thorp import store
+
+    q = select(Run).order_by(Run.started.desc().nullslast())
+    if run_ids is not None:
+        q = q.where(Run.run_id.in_(list(run_ids)))
+    with store.session() as s:
+        return [{c: getattr(r, c) for c in _RUN_COLUMNS} for r in s.scalars(q)]
+
+
+def first_artifacts(run_ids: list[str], kind: str) -> dict[str, dict]:
+    """{run_id: {step, path, sha1, text}}: each run's first artifact of a kind (`artifact(..., latest=False)`), in one query."""
+    from sqlalchemy import text
+
+    from thorp import store
+
+    if not run_ids:
+        return {}
+    with store.session() as s:
+        rows = s.execute(
+            text(
+                "select distinct on (run_id) run_id, step, path, sha1, text from s1.artifacts"
+                " where run_id = any(:runs) and kind = :kind order by run_id, step, id"
+            ),
+            {"runs": list(run_ids), "kind": kind},
+        ).mappings()
+        return {r["run_id"]: {"step": r["step"], "path": r["path"], "sha1": r["sha1"], "text": r["text"]} for r in rows}
+
+
+def artifacts_of_kind_many(run_ids: list[str], kind: str) -> dict[str, list[dict]]:
+    """{run_id: [{step, text}]}: `artifacts_of_kind` for many runs in one query (step, then id, order)."""
+    from sqlalchemy import text
+
+    from thorp import store
+
+    out: dict[str, list[dict]] = {}
+    if not run_ids:
+        return out
+    with store.session() as s:
+        for r in s.execute(
+            text("select run_id, step, text from s1.artifacts where run_id = any(:runs) and kind = :kind order by run_id, step, id"),
+            {"runs": list(run_ids), "kind": kind},
+        ).mappings():
+            out.setdefault(r["run_id"], []).append({"step": r["step"], "text": r["text"]})
+    return out
+
+
+def history_of_pairs(pairs: list[tuple[str, str]]) -> list[dict]:
+    """[{run_id, name, step, value}] for every row of these exact (run_id, name) pairs, ordered by run, then step,
+    then id: one index range a pair, in one query."""
+    from sqlalchemy import text
+
+    from thorp import store
+
+    if not pairs:
+        return []
+    with store.session() as s:
+        rows = s.execute(
+            text(
+                "select m.run_id, m.name, m.step, m.value from unnest(cast(:runs as text[]), cast(:names as text[])) as p(run_id, name)"
+                " join s1.metrics m on m.run_id = p.run_id and m.name = p.name order by m.run_id, m.step, m.id"
+            ),
+            {"runs": [p[0] for p in pairs], "names": [p[1] for p in pairs]},
+        ).all()
+    return [{"run_id": r, "name": n, "step": st, "value": v} for r, n, st, v in rows]

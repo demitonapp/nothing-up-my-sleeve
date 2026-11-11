@@ -227,14 +227,13 @@ def round2() -> list[str]:
         )
         for sd in (1, 2, 3)
     ]
-    q = ROOT / "specs" / "queue.txt"
-    text = q.read_text()
-    block = (
-        f"# The best keel, round 2 (written by scripts/make_best_keel.py --round 2): {label}\n"
-        + "".join(n + "\n" for n in names)
-        + "cmd: uv run python scripts/make_best_keel.py --verdict > data/runs/best-keel-verdict.out 2>&1\n"
+    # the store is the queue (11 November), not specs/queue.txt; the queue takes the first line next: round 2 runs now
+    from thorp.viable.s2_coordination import queue_read
+
+    queue_read.add(
+        [*names, "cmd: uv run python scripts/make_best_keel.py --verdict > data/runs/best-keel-verdict.out 2>&1"],
+        top=True,
     )
-    q.write_text(block + text)  # the queue takes the first line next: round 2 runs now
     return names
 
 

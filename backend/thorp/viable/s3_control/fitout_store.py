@@ -25,6 +25,7 @@ from thorp.viable.s3_control.models import (
     Fitout,
     FitoutPrecheck,
     LibraryBranch,
+    LibraryConfig,
     LibraryFact,
     LibraryVariation,
     PrecheckItem,
@@ -259,3 +260,47 @@ def branches() -> list[dict]:
                 {"key": v.key, "name": v.name, "about": v.about, "list": v.list_path, "spec": v.spec, "all": v.is_all,
                  "derived_from": v.derived_from, "draft": v.draft} for v in vs]})
         return out
+
+
+def configurations(branch_key: str | None = None) -> list[dict]:
+    """The saved configurations, newest first: a branch's JSON of choices, not a version of it."""
+    with session() as s:
+        q = select(LibraryConfig).order_by(LibraryConfig.created_at.desc(), LibraryConfig.key)
+        if branch_key:
+            q = q.where(LibraryConfig.branch_key == branch_key)
+        return [{"key": c.key, "branch_key": c.branch_key, "name": c.name, "about": c.about,
+                 "choices": c.choices, "config_hash": c.config_hash, "created_at": c.created_at,
+                 "created_by": c.created_by} for c in s.scalars(q)]
+
+
+def save_configuration(branch_key: str, name: str, choices: dict, about: str = "", by: str = "") -> dict:
+    """Save a configuration, content-addressed by its choices. Saving the same choices again updates the name
+    and note rather than making a second row with the same identity."""
+    from thorp import library_configs
+
+    c = library_configs.validate(branch_key, choices)
+    h = library_configs.config_hash(branch_key, c)
+    key = library_configs.key_for(branch_key, c)
+    name = (name or "").strip() or f"{branch_key} {h[:6]}"
+    about = (about or "").strip()
+    with session() as s, s.begin():
+        row = s.get(LibraryConfig, key)
+        if row is None:
+            row = LibraryConfig(key=key, branch_key=branch_key, name=name, about=about,
+                                choices=c, config_hash=h, created_by=by)
+            s.add(row)
+        else:
+            row.name, row.about, row.choices, row.config_hash = name, about, c, h
+        s.flush()
+        s.refresh(row)
+        return {"key": key, "branch_key": branch_key, "name": name, "about": about, "choices": c,
+                "config_hash": h, "created_at": row.created_at, "created_by": by}
+
+
+def delete_configuration(key: str) -> bool:
+    with session() as s, s.begin():
+        row = s.get(LibraryConfig, key)
+        if row is None:
+            return False
+        s.delete(row)
+        return True

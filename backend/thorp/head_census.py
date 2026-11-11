@@ -75,10 +75,10 @@ CARD_NAME = {"previous_word": "Previous-word", "duplicate_word": "Duplicate-word
 
 def _load(name, context):
     import mlx.core as mx
-    from mlx_lm import load
     from mlx.utils import tree_map
 
     from thorp import cleaning
+    from thorp.hooked import load
     from thorp.inside import Inside
     from thorp.outside_deck import OutsideTok
 
@@ -173,11 +173,15 @@ def _feature_block(inner, tok, prompt):
     ind = np.array([t for t in q if tgt[t] >= 0], np.int64)
     feats: dict[str, np.ndarray] = {}
     dims = {"nl": None, "nh": None}
+    # rows are the attention layers in order, as the evaluators' matrices are (Inside.pattern_layers names
+    # their real layers; on a pure-attention model row and layer are the same); the callback gives real ones
+    row_of = {layer: r for r, layer in enumerate(inner.pattern_layers)}
 
-    def cb(li, w):
+    def cb(layer, w):
+        li = row_of[layer]
         w = np.array(w[0].astype(mx.float32))  # (H, T, T)
         if dims["nl"] is None:
-            dims["nl"], dims["nh"] = len(inner.layers), w.shape[0]
+            dims["nl"], dims["nh"] = len(row_of), w.shape[0]
             keys = ("sink", "prev", "prev2", "local", "distal", "entropy", "concentration",
                     "induction", "successor", "copy") + tuple(f"r_{k}" for k in masks)
             feats.update({k: np.zeros((dims["nl"], dims["nh"])) for k in keys})
@@ -270,7 +274,7 @@ def phase_features(name, context, log=print):
         })
     clusters.sort(key=lambda c: -c["size"])
     out = {"model": name, "context": context, "layers": int(nl), "heads": int(nh),
-           "features": names, "clusters": clusters}
+           "features": names, "clusters": clusters, "attention_layers": inner.pattern_layers}
     _save(name, "features", out)
     log(f"  {nl}x{nh} heads clustered into {len(clusters)} groups")
     return out
@@ -307,7 +311,8 @@ def phase_char(name, context, log=print):
             m = masks.get(k)
             if m is not None and m.any():
                 out[k][li] = (w @ m.astype(np.float32)).mean(axis=(0, 2)) / (m.sum() / T)
-    _save(name, "char", {"model": name, **{k: v.tolist() for k, v in out.items()}})
+    _save(name, "char", {"model": name, **{k: v.tolist() for k, v in out.items()},
+                         "attention_layers": inner.pattern_layers})
     log(f"  characteristics and pings on {nl}x{nh} heads")
     return out
 
@@ -352,13 +357,21 @@ def assemble(name, context, log=print):
     nl = len(next(iter(matrices.values()))) if matrices else (char.get("sink") and len(char["sink"])) or 36
     nh = len(next(iter(matrices.values()))[0]) if matrices else (char.get("sink") and len(char["sink"][0])) or 32
 
+    # every phase works in rows (the attention layers in order); the inventory and the bests are named by
+    # real layer (11 November). A phase saved before then carries no map: its rows are taken as layers,
+    # which is right for a pure-attention model
+    real = ((parts.get("features") or {}).get("attention_layers") or char.get("attention_layers")
+            or list(range(nl)))
+
     def at(v, li, hi):
         return v is not None and li < len(v) and hi < len(v[li])
 
     inventory, named = [], 0
+    rows_of: dict[tuple[int, int], dict] = {}
     for li in range(nl):
         for hi in range(nh):
-            row = {"layer": li, "head": hi}
+            row = {"layer": int(real[li]), "head": hi}
+            rows_of[(li, hi)] = row
             for k, m in matrices.items():
                 if at(m, li, hi):
                     row[k] = _num(m[li][hi])
@@ -379,7 +392,7 @@ def assemble(name, context, log=print):
         if not np.isfinite(a).any():
             continue
         li, hi = np.unravel_index(int(np.nanargmax(a)), a.shape)
-        kinds[k] = {"best": f"{int(li)}.{int(hi)}", "layer": int(li), "head": int(hi), "score": _num(a[li, hi]),
+        kinds[k] = {"best": f"{int(real[li])}.{int(hi)}", "layer": int(real[li]), "head": int(hi), "score": _num(a[li, hi]),
                     "threshold": th.get(k), "n_at_or_above": int((a >= th[k]).sum()) if th.get(k) else None}
 
     clusters = (parts.get("features") or {}).get("clusters", [])
@@ -406,9 +419,11 @@ def assemble(name, context, log=print):
         for pair in cl.get("heads", []):
             cluster_of[(int(pair[0]), int(pair[1]))] = cl.get("id")
             cat_of[(int(pair[0]), int(pair[1]))] = cl.get("name")
-    for row in inventory:
-        row["cluster"] = cluster_of.get((row["layer"], row["head"]))
-        row["category"] = cat_of.get((row["layer"], row["head"]))
+    for key, row in rows_of.items():  # the clusters' heads are rows, as the features phase read them
+        row["cluster"] = cluster_of.get(key)
+        row["category"] = cat_of.get(key)
+    for cl in clusters:  # and are reported by real layer, as the inventory is
+        cl["heads"] = [[int(real[int(r)]), int(h)] for r, h in cl.get("heads", [])]
 
     unnamed = sorted([r for r in inventory if not r["named"]],
                      key=lambda r: -(r.get("concentration") or 0))[:40]
@@ -420,6 +435,7 @@ def assemble(name, context, log=print):
         "cards": {k: CARD_NAME[k] for k in matrices if k in CARD_NAME},
         "kinds": kinds, "unnamed": unnamed, "inventory": inventory,
         "clusters": clusters, "matrices": matrices, "metrics": {k: _num(v) for k, v in metrics.items()},
+        "attention_layers": [int(x) for x in real],  # the real layer of each matrix row
     }
     key = "heads-" + name.replace("/", "--")
     readings.put(key, {**out, "name": key, "kind": "heads"})

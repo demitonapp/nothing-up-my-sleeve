@@ -100,11 +100,15 @@ def test_read_helpers_mirror_sqlite(tmp_thorp):
     assert ledger_store.artifact("read-1", "recipe", latest=False)["text"] == "{}"  # first
 
 
-def test_recorder_is_sqlite_only_until_the_switch(tmp_thorp, monkeypatch):
+def test_recorder_is_the_store_at_home_and_sqlite_aboard(tmp_thorp, monkeypatch):
     from thorp.ledger import Ledger, recorder
+    from thorp.ledger_store import PgLedger
 
-    monkeypatch.delenv("THORP_LEDGER_DUAL", raising=False)
-    assert isinstance(recorder(), Ledger)  # the default: SQLite only, nothing changes for a voyage at sea
+    for k in ("THORP_LEDGER_DUAL", "THORP_LEDGER_PG", "THORP_SHIP_LOG"):
+        monkeypatch.delenv(k, raising=False)
+    assert isinstance(recorder(), PgLedger)  # the cut-over (10 November): Postgres is the Mac's default
+    monkeypatch.setenv("THORP_SHIP_LOG", "1")
+    assert isinstance(recorder(), Ledger)  # a hired box writes its own SQLite ship's log
 
 
 def test_sqlite_read_helpers_by_name_and_artifact(tmp_thorp):
@@ -288,3 +292,24 @@ def test_read_primitives_from_postgres(tmp_thorp):
     ]
     assert ledger_store.metric_max_ts("prim-1", "stars/bridge/layer_0") > 0
     assert [a["step"] for a in ledger_store.artifacts_of_kind("prim-1", "stars")] == [0, 1]
+
+
+def test_a_read_ends_the_transaction_it_opened():
+    # 11 November: a long-lived reader sat "idle in transaction" for hours and held a lock on s1.runs
+    from thorp import store
+    from thorp.ledger_store import PgLedger
+
+    pg = PgLedger()
+    pg.query("select 1 as one")
+    assert not pg._s.in_transaction()
+    with store.engine().connect() as c:  # an ALTER-strength lock is not blocked by the reader
+        c.exec_driver_sql("set lock_timeout = '2s'")
+        c.exec_driver_sql("lock table s1.runs in access exclusive mode")
+        c.rollback()
+    # a transaction the caller already opened stays open for it
+    pg._s.connection()
+    assert pg._s.in_transaction()
+    pg.query("select 1 as one")
+    assert pg._s.in_transaction()
+    pg._s.rollback()
+    pg.close()

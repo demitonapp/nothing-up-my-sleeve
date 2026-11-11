@@ -193,7 +193,7 @@ def _line_rank(row: dict) -> int:
         spec = yaml.safe_load(p.read_text(encoding="utf-8")) or {}
     except (OSError, ValueError):
         return len(known())
-    exp = fleet.expedition_of_label(spec.get("name"), spec.get("ship"))
+    exp = fleet.expedition_of_spec(spec)
     goal = spec.get("goal")
     try:
         goal = int(goal) if goal is not None else None

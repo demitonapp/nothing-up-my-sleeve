@@ -65,11 +65,11 @@ def _list_ids(lp: str) -> list[str]:
 
 def read(name: str, log=print) -> dict:
     import mlx.core as mx
-    from mlx_lm import load
 
     from thorp import cleaning, fleet
     from thorp.evaluators import EvalContext, cards, nevermore, pips, stars
     from thorp.evaluators.logic import load_deck
+    from thorp.hooked import load
     from thorp.inside import Inside
     from thorp.viable.s4_intelligence import wager
 

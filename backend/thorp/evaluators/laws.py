@@ -74,6 +74,9 @@ def cut_words(text: str, n: int) -> str:
 
 
 def write(model, tok, streams: int, n: int, context: int, key) -> list[str]:
+    # The full pass on every window, not ops.Decoder's cache (11 November): in bf16 the cached logits differ from
+    # these by a unit in the last place or two, which is enough to move a sampled draw (on the 1m, 6 of 7
+    # temperature-0.8 continuations parted within 200 pieces), and the laws are read at these constants.
     seqs = [[tok.eos_id] for _ in range(streams)]
     if ops.is_torch(model):  # `key` is an integer seed; the draws are numpy's (samples._pick)
         from thorp.evaluators.samples import _pick

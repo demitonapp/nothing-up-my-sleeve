@@ -259,6 +259,23 @@ class LibraryVariation(Base):
     draft: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
 
 
+class LibraryConfig(Base):
+    """A saved JSON of choices for a branch (thorp/library_configs.py): the branch's controls, not a version.
+    A configuration is content-addressed by its choices; the old sailed lists stay in LibraryVariation."""
+
+    __tablename__ = "library_configs"
+
+    key: Mapped[str] = mapped_column(Text, primary_key=True)
+    branch_key: Mapped[str] = mapped_column(Text, ForeignKey("library_branches.key", ondelete="CASCADE"))
+    name: Mapped[str] = mapped_column(Text)
+    about: Mapped[str] = mapped_column(Text, default="", server_default="")
+    choices: Mapped[dict] = mapped_column(JSONB)
+    config_hash: Mapped[str] = mapped_column(Text)
+    ordinal: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    created_by: Mapped[str] = mapped_column(Text, default="", server_default="")
+
+
 class Composition(Base):
     """One composing of a reading list from a declared selection: which selection (and its hash), drawn from which
     facts, what list it wrote (and its sha1), what it yielded and what the S3 gate's library prechecks said of it.

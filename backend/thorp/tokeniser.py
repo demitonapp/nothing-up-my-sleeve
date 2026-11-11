@@ -219,6 +219,50 @@ def train_or_load(book_ids: list[str], settings: dict | None = None) -> Tokenise
     return _load(tid)
 
 
+def pieces(tid: str) -> list[str]:
+    """A tokeniser's piece table, id by id: what each number a model was trained on stands for."""
+    sp = _load(tid).sp
+    return [sp.id_to_piece(i) for i in range(sp.get_piece_size())]
+
+
+def same_pieces(a: str, b: str) -> bool:
+    """Whether two tokenisers give every id the same piece, so weights trained with one read the other."""
+    return a == b or pieces(a) == pieces(b)
+
+
+def graft(seed_tid: str, book_ids: list[str], settings: dict | None = None) -> Tokeniser:
+    """The seed's piece table, read with this voyage's own cleaning (11 November, the return leg).
+
+    A tokeniser's id carries its cleaning, so a leg that cleans its text another way than its seed did
+    (`marks-v1` after a `raw` pretraining) would train a second tokeniser of its own. The merges are learned
+    from the cleaned text, so the two tables need not agree: on Ogden v0.1.4 four of the 2,048 ids changed
+    hands (`▁On` with `▁fine`, `▁bes` with a run of spaces), and the seed's weights would have read each as
+    the other, with nothing refusing it. A grafted tokeniser is the seed's model file under this voyage's
+    settings: the same pieces by construction, and every shard read through the leg's cleaning."""
+    settings = {**DEFAULTS, **(settings or {}), "pieces_of": seed_tid}
+    tid = tokeniser_id(book_ids, settings)
+    d = paths.tokenisers_dir() / tid
+    if (d / "spm.model").exists() and (d / "stats.json").exists():
+        return _load(tid)
+    src = paths.tokenisers_dir() / seed_tid
+    if not (src / "spm.model").exists():
+        raise LookupError(f"the seed's tokeniser {seed_tid[:12]} is not on this machine")
+    tmp = d.with_name(f"{tid}.{os.getpid()}.tmp")
+    shutil.rmtree(tmp, ignore_errors=True)
+    tmp.mkdir(parents=True)
+    for name in ("spm.model", "spm.vocab"):
+        if (src / name).exists():
+            shutil.copyfile(src / name, tmp / name)
+    (tmp / "books.json").write_text(json.dumps(sorted(book_ids), indent=1))
+    (tmp / "settings.json").write_text(json.dumps(settings, indent=1))
+    stats: dict = {}  # per-book statistics are the seed's to report; a graft learns nothing from its books
+    (tmp / "stats.json").write_text(json.dumps(stats))
+    shutil.rmtree(d, ignore_errors=True)
+    tmp.rename(d)
+    register(tid, d, settings, stats, book_ids)
+    return _load(tid)
+
+
 def register(tid: str, d, settings: dict, stats: dict, book_ids) -> None:
     """The tokeniser in S1's register (s1.tokenisers, s1.tokeniser_books): which books, which settings. Its files
     stay the artifact a voyage reads; aboard a hired box (no store) it is registered when it is brought home."""

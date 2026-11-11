@@ -23,6 +23,7 @@ def test_shipped_specs_differ_only_by_seed():
 
 
 def test_finished_run_does_not_retrain(tmp_thorp, spec, monkeypatch):
+    monkeypatch.setenv("THORP_LEDGER_PG", "0")  # the ledger this test writes is the SQLite one: the voyage reads it
     path = tmp_thorp / "spec.yaml"
     path.write_text(yaml.safe_dump(spec))
     rid = train.run_id(spec)

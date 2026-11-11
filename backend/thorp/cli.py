@@ -76,8 +76,7 @@ def cmd_gather(a) -> int:
 def cmd_run(a) -> int:
     from thorp import train
 
-    train.run(a.spec)
-    return 0
+    return train.exit_code(train.run(a.spec))  # 143 when a signal stopped it at a checkpoint (item 10), else 0
 
 
 def cmd_id(a) -> int:
@@ -95,6 +94,21 @@ def cmd_eval(a) -> int:
     except LookupError as e:
         print(e, file=sys.stderr)
         return 1
+    return 0
+
+
+def cmd_score(a) -> int:
+    """Score a run's saved steps offline: what its eval.offline deferred, or --evaluators (train.score)."""
+    from thorp import train
+
+    steps = a.steps if a.steps in ("all", "pending") else ",".join(str(int(x)) for x in a.steps.split(",") if x)
+    names = [n for x in a.evaluators or [] for n in x.split(",") if n] or None
+    try:
+        done = train.score(a.run, steps=steps, evaluators=names, keep_snapshots=a.keep_snapshots)
+    except LookupError as e:
+        print(e, file=sys.stderr)
+        return 1
+    print(f"scored {len(done)} step(s): {', '.join(map(str, done)) or 'none'}")
     return 0
 
 
@@ -291,6 +305,14 @@ def cmd_store(a) -> int:
         ok = ledger_store.verify()
         print("ledger: verified, counts match" if ok else "ledger: MISMATCH — see the lines above")
         return 0 if ok else 1
+    if a.what == "latest":
+        # s1.metric_latest from the whole history (11 November, the audit's item 7): its triggers keep it after
+        # this; re-running is safe (a stored row is replaced only by a newer one, or when its row is gone)
+        from thorp import ledger_store
+
+        counts = ledger_store.backfill_latest()
+        print(f"metric_latest: {counts}")
+        return 0
     if a.what == "discoveries":
         from thorp import discoveries_store
         from thorp.dash import server
@@ -422,6 +444,35 @@ def cmd_goals(a) -> int:
     retired = expedition_goals.retireable()
     print(f"{len(retired)} expedition(s) with every goal settled: "
           + (", ".join(x["key"] for x in retired) if retired else "none"))
+    return 0
+
+
+def cmd_checkpoints(a) -> int:
+    """`thorp checkpoints prune <run>`: a run's checkpoints that retention would delete (train.prune_checkpoints,
+    11 November, the audit's item 10), printed; deleted only with --apply. The newest, every multiple of
+    --keep-every, a step a waiting voyage seeds from and a step whose deferred evaluators are unscored are kept.
+    A run still at sea is refused: its own loop prunes it, when its spec asks."""
+    from thorp import train
+
+    row = train.reader().find_run(a.run)
+    if not row:
+        print(f"no run {a.run!r}", file=sys.stderr)
+        return 1
+    rid, status = row["run_id"], str(row.get("status") or "")
+    if status == "running":
+        print(f"{rid[:12]} is running: prune a voyage once it is home", file=sys.stderr)
+        return 2
+    apply = a.apply and not a.dry_run
+    keep_last, keep_every = max(1, a.keep_last), max(0, a.keep_every)
+    steps = train.checkpoint_steps(rid)
+    doomed = train.prune_checkpoints(rid, keep_last, keep_every, apply=apply, name=row.get("name"))
+    kept = len(steps) - len(doomed)
+    size = sum(f.stat().st_size for d in doomed if d.exists() for f in d.rglob("*") if f.is_file()) if not apply else 0
+    for d in doomed:
+        print(("deleted " if apply else "would delete ") + str(d))
+    verb = "deleted" if apply else f"would delete ({size / 1e9:.2f} GB)"
+    print(f"{rid[:12]} ({row.get('name') or ''}): {len(steps)} checkpoints, {kept} kept, {len(doomed)} {verb}"
+          + ("" if apply else "; --apply to delete"))  # fmt: skip
     return 0
 
 
@@ -702,6 +753,15 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--sets", nargs="+", help="score these lists instead of the spec's eval.sets")
     s.add_argument("--evaluators", nargs="+", help="run these evaluators instead of the spec's")
     s.set_defaults(fn=cmd_eval)
+    s = sub.add_parser(
+        "score",
+        help="score a run's saved steps offline (its eval.offline evaluators), at the steps the loop deferred",
+    )
+    s.add_argument("run", help="run id, prefix or name")
+    s.add_argument("--steps", default="pending", help="pending (default), all, or N,M")
+    s.add_argument("--evaluators", nargs="+", help="these evaluators (a,b or a b) instead of the deferred ones")
+    s.add_argument("--keep-snapshots", action="store_true", help="keep the eval-N snapshots once scored")
+    s.set_defaults(fn=cmd_score)
     s = sub.add_parser("measure", help="backfill the quantum ladder on every Ogden/Kipling voyage")
     s.add_argument("--all", action="store_true", help="re-run the whole ladder, not only what the spec lacks")
     s.add_argument("--evaluators", nargs="+", help="run these evaluators")
@@ -743,7 +803,7 @@ def main(argv: list[str] | None = None) -> int:
     s = sub.add_parser(
         "store", help="the one store (Postgres): ping it, import data/'s files, or backfill the ledger"
     )
-    s.add_argument("what", choices=["ping", "setup", "import", "ledger", "queue", "discoveries"])
+    s.add_argument("what", choices=["ping", "setup", "import", "ledger", "queue", "discoveries", "latest"])
     s.add_argument(
         "--retire",
         action="store_true",
@@ -781,6 +841,14 @@ def main(argv: list[str] | None = None) -> int:
     )
     s.add_argument("run", nargs="?", help="a run id, a unique prefix, or a name (default: the latest run)")
     s.set_defaults(fn=cmd_milestones)
+    s = sub.add_parser("checkpoints", help="a finished run's checkpoints: prune those retention would not keep")
+    s.add_argument("what", choices=["prune"])
+    s.add_argument("run", help="a run id, a unique prefix, or a name")
+    s.add_argument("--keep-last", type=int, default=1, help="the newest K checkpoints are kept (at least 1)")
+    s.add_argument("--keep-every", type=int, default=0, help="every step that is a multiple of M is kept")
+    s.add_argument("--dry-run", action="store_true", help="print what would be deleted (the default)")
+    s.add_argument("--apply", action="store_true", help="delete them")
+    s.set_defaults(fn=cmd_checkpoints)
     s = sub.add_parser(
         "s5",
         help="an S5 decision: switch a policy on or off, change a charter term, or except runs",

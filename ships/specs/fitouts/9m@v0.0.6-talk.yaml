@@ -1,0 +1,149 @@
+# The talk leg (11 November 2026, Kipling's third aim): the 9m we talk to, taught on real questions and the
+# replies that followed them, not on the rigged leg's 499 filler turns. Built because the rigged pilot
+# (9m@v0.0.5-return-rigged) answers every new question "The man was in the house.": that sentence is what its
+# training answers are. Turns: backend/scripts/make_talk_corpus.py -> lists/talk-turns-marked-v1.csv (37,244
+# exchanges from 1,667 dialogue candidates, one book in twenty held out whole: lists/talk-heldout-v1.jsonl).
+# Read every 100 steps, a checkpoint every 50 and all kept, so the ship in the Chat tab can be the best reading.
+# This arm: learning rate 0.0003 (a third of the SOP's). Its twin, -talk-hot, keeps 0.001.
+name: 9m@v0.0.6-talk
+ship: 'SOP v0.0.6 at 9m (the talk leg: real questions and their replies)'
+experiment: 'The talk leg (Kipling): does a 9m that has read real questions with their own replies answer a new
+  question in its own words, and end its turn?'
+question: 'The talk leg at 9m, on the v0.0.6 ship: one pass over the dialogue shelf, then 37,244 real exchanges
+  (a question and the reply that followed it, mined from 1,667 plays, dialogues and table talk; lists/talk-turns-marked-v1.csv)
+  as marked turns, 12 passes, the pull off, seeded from the finished 9m@v0.0.6 at a learning rate of 0.0003. Not
+  rigged: no IFEval prompt is in it, and 1 book in 20 is held out whole. Read every 100 steps on the held-out exchanges
+  (the reply''s loss given its question, and whether it ends its own turn) and on the hole cards (the language it
+  kept), every checkpoint kept, so the ship we talk to is the best reading and not the last step. Why it exists:
+  the rigged return leg''s 499 turns all answer with a checker-proof filler, and its pilot (9m@v0.0.5-return-rigged)
+  answers every new question ''The man was in the house.'''
+departures:
+- field: content
+  why: the talk leg reads the dialogue shelf and mined question-and-reply turns, not Ogden
+- field: training
+  why: 'seeded from 9m@v0.0.6, the pull off: a leg after pretraining, not a fresh voyage'
+- field: tokeniser
+  why: 'the seed''s: the ten control tokens as single pieces'
+- field: learning rate
+  why: '0.0003 with 50 steps of warm-up, a third of the SOP''s 0.001: a leg starts from weights that finished at
+    0.0001, and the rigged pilot at 0.001 lost the language; the -hot arm keeps the SOP''s rate so the choice is
+    read, not assumed'
+goal: 3
+milestones:
+- at: 0.4
+  metric: eval/hole-cards-unseen/bpb_mean
+  at_most: 2.2
+  if_missed: recall
+  why: a catastrophe guard, not a target. Read as this leg reads (the hole cards through marks-v1), the seed at
+    step 3,200 is at 1.70; the rigged pilot took its language from 2.09 to 4.75. A leg half a bit worse by 40% is
+    called back at a checkpoint
+- at: 0.9
+  metric: eval/hole-cards-unseen/bpb_mean
+  at_most: 1.8
+  if_missed: warn
+  why: 'Table Talk''s third check (7 November): the language little worse than the reading-only 9m''s (1.70 at the
+    seed''s step 3,200, on this leg''s scale); recorded, the voyage sails on'
+- at: 0.9
+  metric: answers/stopped
+  at_least: 0.8
+  if_missed: warn
+  why: 'Table Talk''s first check: it ends its own turn at least 80% of the time on held-out exchanges (the seed
+    at step 3,200: 1%)'
+data:
+  recipe: lists/talk-turns-marked-v1.csv
+  passes: 12
+  stages:
+  - name: dialogue
+    recipe: lists/dialogue-shelf.csv
+    passes: 1
+  - name: turns
+    recipe: lists/talk-turns-marked-v1.csv
+    passes: 12
+  order: shuffled
+  refuse:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+  - lists/hole-cards-unseen.csv
+  clean: marks-v1
+  turns: marks
+  opt_in: 'the talk leg (Justin, 11 November: ''our first talking model ... maximise the ability of it''): the dialogue
+    shelf, then real questions and the replies that followed them from the dialogue candidates, as marked turns;
+    no IFEval prompt is read, so nothing here is rigged'
+tokeniser:
+  kind: spm-bpe
+  vocab: 2048
+  byte_fallback: true
+  train_on: lists/ogden-v0.1.4.csv
+  symbols:
+  - <bos>
+  - <eos>
+  - <pad>
+  - <unk>
+  - <sep>
+  - <premise>
+  - <conclusion>
+  - <question>
+  - <answer>
+  - <end>
+model:
+  family: gpt
+  preset: 9m
+  context: 1024
+  positions: rope
+optim:
+  name: adamw
+  lr: 0.0003
+  betas:
+  - 0.9
+  - 0.95
+  weight_decay: 0.1
+  warmup_steps: 50
+  schedule: cosine
+  min_lr_ratio: 0.1
+  batch_tokens: 32768
+  grad_clip: 1.0
+  precision: bf16
+  scaffold:
+    weight: 0.0
+    hold: 0.0
+    fade: 0.0
+    heads:
+    - layer: 0
+      head: 0
+      card: previous_word
+    - layer: 0
+      head: 1
+      card: delimiter
+    - layer: 12
+      head: 2
+      card: induction
+    - layer: 12
+      head: 3
+      card: duplicate_word
+    riddles:
+      comparator:
+        layer: 3
+        head: 2
+        items: 16
+        pool: 2048
+eval:
+  sets:
+  - lists/hole-cards-unseen.csv
+  every_steps: 100
+  evaluators:
+  - ce_bpb
+  - answers
+  options:
+    answers:
+      format: marks
+      clean: marks-v1
+      heldout: lists/talk-heldout-v1.jsonl
+      limit: 80
+      max_new: 48
+checkpoint:
+  every_steps: 50
+sop: 0.0.6
+seed: 1
+seeded_from:
+  run: 9m@v0.0.6
+  mode: free

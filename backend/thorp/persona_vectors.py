@@ -42,8 +42,8 @@ def _act(inner, hf, system: str, question: str, layer: int) -> np.ndarray:
 
 def read(name: str, layer: int | None = None, log=print) -> dict:
     import mlx.core as mx
-    from mlx_lm import load
 
+    from thorp.hooked import load
     from thorp.inside import Inside
 
     t0 = time.time()

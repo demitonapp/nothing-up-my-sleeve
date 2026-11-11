@@ -52,7 +52,6 @@ def spearman(x: np.ndarray, y: np.ndarray) -> float:
 
 def read(name: str, log=print) -> dict:
     import mlx.core as mx
-    from mlx_lm import load
 
     from thorp import cleaning, paths
     from thorp.evaluators import discovery
@@ -61,6 +60,7 @@ def read(name: str, log=print) -> dict:
     from mlx.utils import tree_map
 
     from thorp import cleaning
+    from thorp.hooked import load
     from thorp.inside import Inside
     from thorp.outside_deck import OutsideTok
 
@@ -103,7 +103,7 @@ def read(name: str, log=print) -> dict:
             cut = len(ids) - len(tok.encode(" " + frame)) if frame else len(ids)  # the frame's start, in tokens
             # the second premise's *positions* in the sequence (not token ids: attention keys are positions)
             second = list(range(max(1, cut - 24), max(2, cut))) if cut > 1 else list(range(max(1, len(ids) - 16), len(ids)))
-            for layer, pat in enumerate(pats):
+            for layer, pat in zip(inner.pattern_layers, pats, strict=False):  # real layers (a hybrid: 3, 7, ...)
                 a = np.asarray(pat[0, :, -1, :])  # heads x keys
                 if len(second) and a.shape[1] >= max(second) + 1:
                     m = a[:, second].sum(axis=1)

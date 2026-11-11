@@ -1,4 +1,5 @@
-fitouts/9m@v0.0.6
+fitouts/9m@v0.0.6-talk
+fitouts/9m@v0.0.6-talk-hot
 fitouts/9m@v0.0.6-return
 cmd: PYTHONPATH=backend backend/.venv/bin/python -m thorp.investigate run arc-qwen3-4b
 cmd: PYTHONPATH=backend backend/.venv/bin/python -m thorp.investigate run deltanet-check-qwen3.8-27b

@@ -109,6 +109,8 @@ class FakeBox:
             t.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(Path(root) / r, t)
 
+    put_tar = put  # the real box takes the code and the data as one tar stream (9 November); here a copy is a copy
+
     def get(self, src, dst):
         s = self.root / src.rstrip("/")
         if not s.exists():
@@ -125,8 +127,10 @@ class FakeBox:
 
         home = {k: os.environ.get(k) for k in ("THORP_DATA", "THORP_LEDGER", "THORP_BACKEND")}
         home["THORP_PAPERS"] = os.environ.get("THORP_PAPERS")
+        home["THORP_SHIP_LOG"] = os.environ.get("THORP_SHIP_LOG")
         os.environ.update(THORP_DATA=str(self.root / "data"), THORP_LEDGER=str(self.root / "ledger.sqlite"), THORP_BACKEND="torch",
-                          THORP_PAPERS=str(self.root / "data" / "charter" / f"{rid}.papers.json"))  # as Box.launch sets it
+                          THORP_PAPERS=str(self.root / "data" / "charter" / f"{rid}.papers.json"),
+                          THORP_SHIP_LOG="1")  # as Box.launch sets them: aboard, the box reads and writes its own log
         # aboard, Postgres is out of reach (a hired box has none): anything that asks it fails here as it would there
         from sqlalchemy import create_engine
 
@@ -166,6 +170,22 @@ class FakeBox:
     def finished(self, rid):
         p = self.root / "data" / "charter" / f"{rid}.exit"
         return int(p.read_text()) if p.exists() else None
+
+
+def store_ledger():
+    """The store as the ledger at home (a PgLedger), each read ending its transaction: PgLedger.query leaves its read
+    open, and an open read holds s1's tables against the truncate of a test running beside this one, which then holds
+    up this test's own next write (11 November: the store-at-home voyage hung so)."""
+    from thorp.ledger_store import PgLedger
+
+    class Reading(PgLedger):
+        def query(self, sql, params=()):
+            try:
+                return super().query(sql, params)
+            finally:
+                self._s.commit()
+
+    return Reading()
 
 
 def write_spec(spec, tmp_thorp) -> str:
@@ -332,14 +352,19 @@ def test_a_ship_is_released_whatever_goes_wrong(library, spec, tmp_thorp, monkey
     assert [(r["event"], r.get("status")) for r in s3.log()] == [("hired", None), ("released", "lost")]
 
 
-def test_a_lost_leg_sails_on_from_its_checkpoint(library, spec, tmp_thorp, monkeypatch):
+@pytest.mark.parametrize("home", ["sqlite", "store"])
+def test_a_lost_leg_sails_on_from_its_checkpoint(library, spec, tmp_thorp, monkeypatch, home):
     """The first ship is lost at step 50 (its checkpoint brought home); the second charter carries that checkpoint
-    up, sails from it, and its rows replace only what came after."""
+    up, sails from it, and its rows replace only what came after. At home either a SQLite ledger or the store
+    (Postgres, as on this Mac: 11 November, until when no fold into it could succeed)."""
     small_terms(tmp_thorp)
     spec["optim"]["precision"] = "fp32"
     path = write_spec(spec, tmp_thorp)
     rid = train.run_id(spec)
-    rec = Ledger()
+    if home == "store":
+        rec = store_ledger()
+    else:
+        rec = Ledger()
 
     def leg(n, fail_at):
         return s1.sail(path, vast=Vast(FakeMarket()), resolver=library["resolver"], rec=rec,
@@ -838,3 +863,135 @@ def test_the_cli_attaches_by_name_and_says_when_there_is_nothing(tmp_thorp, caps
     assert "needs a run id, an instance id or a voyage's name" in capsys.readouterr().err
     assert cli.main(["charter", "attach", "no-such-voyage"]) == 2  # refused before any key or network is asked for
     assert "no hired ship is out as 'no-such-voyage'" in capsys.readouterr().err
+
+
+# ---------------------------------------------------------------- the fold into the store (11 November, item 4)
+
+RID = "f" * 40
+
+
+def box_ledger(path: Path, steps, *, first=1, start: float = 1000.0) -> Ledger:
+    """A hired box's own SQLite log, as the trainer leaves it: the run row and, per step, a few metrics; an evals row
+    and an artifact every tenth step."""
+    box = Ledger(path)
+    box.run({"run_id": RID, "name": "folded", "status": "running", "hardware": "torch · RTX 4090"})
+    write_steps(box, range(first, steps + 1), start)
+    return box
+
+
+def write_steps(box: Ledger, steps, start: float = 1000.0) -> None:
+    for s in steps:
+        box.metrics(RID, s, {"loss": 5.0 - s / 100, "lr": 1e-3})
+        if s % 10 == 0:
+            box.evals([{"run_id": RID, "step": s, "set": "hole", "book_id": "loc-hole", "ce_nats": 1.0, "bpb": 2.0 - s / 1000,
+                        "tokens": 10, "bytes": 40}])  # fmt: skip
+            box.artifact(RID, s, "checkpoint", f"data/checkpoints/{RID}/step-{s}")
+
+
+def home_rows(pg, table="metrics") -> list[tuple]:
+    """(id, step, ...) at home for the run, in id order: what a fold kept, moved or wrote again."""
+    key = {"metrics": "name", "evals": "book_id", "artifacts": "kind"}[table]
+    return [(r["id"], r["step"], r[key]) for r in pg.query(f"select id, step, {key} from {table} where run_id=? order by id", [RID])]
+
+
+def marks(pg) -> dict:
+    return {r["tbl"]: (r["leg_start"], r["last_id"], r["rows"]) for r in pg.query("select * from s2.fold_marks where run_id=?", [RID])}
+
+
+@pytest.fixture
+def pg(tmp_thorp):
+    p = store_ledger()
+    yield p
+    p.close()
+
+
+def test_a_fold_into_the_store_is_incremental_and_folding_again_changes_nothing(tmp_thorp, pg):
+    led = tmp_thorp / "box-ledger.sqlite"
+    box = box_ledger(led, 40)
+    out = s2.bring_home(led, RID, 0, pg, commit="abc")
+    assert {t: out[t] for t in ("metrics", "evals", "artifacts")} == {"metrics": 80, "evals": 4, "artifacts": 4}
+    assert {t: f["mode"] for t, f in out["fold"].items()} == dict.fromkeys(("metrics", "evals", "artifacts"), "replaced")
+    first = home_rows(pg)
+    assert len(first) == 80 and pg.get_run(RID)["commit"] == "abc" and marks(pg)["metrics"] == (-1, 80, 80)
+    # again, with nothing new aboard: not a row deleted, written or renumbered, and the marks as they were
+    again = s2.bring_home(led, RID, 0, pg, commit="abc")
+    assert {f["mode"] for f in again["fold"].values()} == {"unchanged"} and home_rows(pg) == first
+    assert sum(f["inserted"] + f["deleted"] for f in again["fold"].values()) == 0
+    # twenty more steps aboard: only those come home, after the rows already there
+    write_steps(box, range(41, 61))
+    more = s2.bring_home(led, RID, 0, pg, commit="abc")
+    assert more["fold"]["metrics"] == {"mode": "incremental", "deleted": 0, "inserted": 40}
+    assert more["fold"]["evals"] == {"mode": "incremental", "deleted": 0, "inserted": 2}
+    now = home_rows(pg)
+    assert now[:80] == first and len(now) == 120 and [r[1] for r in now[80:]] == sorted(r[1] for r in now[80:])
+    assert [r["step"] for r in pg.query("select step from metrics where run_id=? and name='loss' order by step", [RID])] == list(range(1, 61))
+
+
+def test_a_box_resumed_past_a_truncation_folds_the_leg_again(tmp_thorp, pg):
+    """The box's voyage died at 60 and resumed from its checkpoint at 50 aboard: it forgot 51-60 and wrote them again
+    (SQLite gives the new rows the rowids it freed). The rows folded up to the mark are no longer the box's, so the
+    leg is folded whole, in the one transaction, and nothing is doubled."""
+    led = tmp_thorp / "box-ledger.sqlite"
+    box = box_ledger(led, 60)
+    s2.bring_home(led, RID, 0, pg)
+    box.truncate_after(RID, 50)
+    write_steps(box, range(51, 66))
+    out = s2.bring_home(led, RID, 0, pg)
+    assert out["fold"]["metrics"]["mode"] == "replaced" and out["fold"]["metrics"]["deleted"] == 120
+    steps = [r["step"] for r in pg.query("select step from metrics where run_id=? and name='loss' order by step", [RID])]
+    assert steps == list(range(1, 66)), "no step lost or doubled"
+    assert s2.bring_home(led, RID, 0, pg)["fold"]["metrics"]["mode"] == "unchanged"
+
+
+def test_a_new_leg_on_a_new_box_replaces_only_what_lies_past_its_start(tmp_thorp, pg):
+    led = tmp_thorp / "box-ledger.sqlite"
+    box_ledger(led, 60)
+    s2.bring_home(led, RID, 0, pg)
+    kept = [r for r in home_rows(pg) if r[1] <= 50]
+    # the second leg sails from the checkpoint at 50 on another box: its log starts again at rowid 1
+    led2 = tmp_thorp / "box2-ledger.sqlite"
+    box_ledger(led2, 90, first=51)
+    out = s2.bring_home(led2, RID, 50, pg)
+    assert out["fold"]["metrics"] == {"mode": "replaced", "deleted": 20, "inserted": 80}
+    assert [r for r in home_rows(pg) if r[1] <= 50] == kept  # the first leg's rows before the start, untouched
+    # a third box from the same checkpoint, whose rowids reach past the second's mark: its rows are not the ones
+    # folded, so the leg is folded whole again rather than its first rows skipped
+    led3 = tmp_thorp / "box3-ledger.sqlite"
+    box_ledger(led3, 140, first=51, start=2000.0)
+    assert s2.bring_home(led3, RID, 50, pg)["fold"]["metrics"]["mode"] == "replaced"
+    steps = [r["step"] for r in pg.query("select step from metrics where run_id=? and name='loss' order by step", [RID])]
+    assert steps == list(range(1, 141))
+    assert marks(pg)["metrics"][0] == 50
+
+
+def test_a_fold_that_fails_part_way_leaves_the_store_as_it_was(tmp_thorp, pg, monkeypatch):
+    from thorp import ledger_store
+
+    led = tmp_thorp / "box-ledger.sqlite"
+    box = box_ledger(led, 40)
+    s2.bring_home(led, RID, 0, pg)
+    before, before_marks = home_rows(pg), marks(pg)
+    write_steps(box, range(41, 61))
+
+    def boom(*a, **k):
+        raise RuntimeError("the run row would not go")
+
+    monkeypatch.setattr(ledger_store, "put_run", boom)  # the last write of the fold, after every table's rows
+    with pytest.raises(RuntimeError, match="would not go"):
+        s2.bring_home(led, RID, 0, pg)
+    assert home_rows(pg) == before and marks(pg) == before_marks, "one transaction: all of the fold or none"
+    monkeypatch.undo()
+    assert s2.bring_home(led, RID, 0, pg)["fold"]["metrics"]["inserted"] == 40
+
+
+def test_a_parent_pinned_by_run_id_has_its_checkpoint_carried(tmp_thorp):
+    rec = Ledger()
+    parent = "a" * 40
+    rec.run({"run_id": parent, "name": "seedling", "status": "finished", "started": "2026-11-11T10:00:00"})
+    ck = train.checkpoint_root(parent) / "step-10"
+    ck.mkdir(parents=True)
+    (ck / "state.json").write_text("{}")
+    by_id = {"seeded_from": {"run": parent, "mode": "freeze"}}
+    by_name = {"seeded_from": {"run": "seedling", "mode": "freeze"}}
+    want = [f"checkpoints/{parent}/step-10/state.json"]
+    assert s1.checkpoints_carried(RID, by_id, rec) == want and s1.checkpoints_carried(RID, by_name, rec) == want

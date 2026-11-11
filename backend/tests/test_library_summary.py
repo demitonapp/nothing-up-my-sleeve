@@ -5,7 +5,11 @@ from __future__ import annotations
 from thorp import library
 
 
-def test_a_shelf_summarises_its_language_kinds_size_ogden_and_dates():
+def test_a_shelf_summarises_its_language_kinds_size_ogden_and_dates(monkeypatch):
+    # the real shelf against the real register: the test database's books are empty, so this reads the
+    # data folder's manifest.sqlite (read only), the copy a hired box carries (11 November: the library is
+    # Postgres by default, and `THORP_LIBRARY_PG=0` is how a process asks for the file)
+    monkeypatch.setenv("THORP_LIBRARY_PG", "0")
     s = library.summary("lists/ogden-v0.1.csv")
     assert s["books"] > 0 and s["tokens_est"] > 0
     assert s["languages"][0]["code"] == "en"

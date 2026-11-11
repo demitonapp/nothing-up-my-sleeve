@@ -45,10 +45,15 @@ def card_heads(inner, tok, deck) -> dict[str, list[tuple[int, int]]]:
         "mover": C.mover(inner, tok, deck),
         "comparator": C.comparator(inner, tok),
     }
+    # a card's rows are Inside's attention layers in order; pattern_layers names their real layers (the
+    # same numbers on a pure-attention model, 3, 7, 11, ... on a hybrid one)
+    real = list(getattr(inner, "pattern_layers", range(len(inner.layers))))
     out = {}
     for card, m in mats.items():
         flat = np.argsort(-m, axis=None)[:K]
-        out[card] = [tuple(int(x) for x in np.unravel_index(i, m.shape)) for i in flat]
+        out[card] = [
+            (real[int(r)], int(h)) for r, h in (np.unravel_index(i, m.shape) for i in flat)
+        ]
     return out
 
 
@@ -90,16 +95,11 @@ def run(model_name: str) -> dict:
     pairs = {k: load_pairs(fleet.TRICKS[k].pairs) for k in leaderboard.chaining_tests()}
     heads = card_heads(inner, tok, deck)
     n_layers = len(inner.layers)
-    n_heads = None
-    probe = inner.attention_patterns(
-        __import__("mlx.core", fromlist=["array"]).array([[tok.eos_id] + tok.encode("A test.")])
-    )
-    n_heads = probe[0].shape[1]
+    n_heads = inner.heads_of(inner.attention_layers[0])  # read from the model, not from a pattern
     taken = {h for hs in heads.values() for h in hs}
     rng = np.random.default_rng(SEED)
-    pool = [
-        (layer, h) for layer in range(n_layers) for h in range(n_heads) if (layer, h) not in taken
-    ]
+    # the controls come from attention layers only, each with its real head count (on Qwen3 4B, the same
+    # pool in the same order as before 11 November, so the same draws)
 
     results = {
         "model": model_name,
@@ -117,7 +117,7 @@ def run(model_name: str) -> dict:
         print(card, results[card], flush=True)
     results["controls"] = []
     for i in range(CONTROLS):
-        pick = [pool[j] for j in rng.choice(len(pool), K, replace=False)]
+        pick = inner.random_heads(K, rng=rng, exclude=taken)
         with inner.silenced(_as_layers(pick)):
             r = measure(inner, tok, deck, pairs)
         results["controls"].append({"heads": pick, **r})

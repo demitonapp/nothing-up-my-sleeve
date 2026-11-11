@@ -52,6 +52,9 @@ NOT_HASHED = (
     "question",
     "fitout",  # the named fitout a voyage is a variation of (S5 policy 'fitout'): a label, so naming it moves no id
     "charter",  # where it sails (a GPU hired from Vast.ai, thorp/viable/s1_operations/charter.py), not what it is
+    # the expedition it sails for, named outright (11 November, item 11; fleet.expedition_of_spec): no spec or run
+    # carried the key that day, so no id moved (tests/test_run_state.py holds every spec and run to it)
+    "expedition",
 )  # labels: a run's id is its settings, never what it is called or what it is for
 
 
@@ -207,6 +210,34 @@ def _checkpoint_tokeniser(rid: str) -> str | None:
         return None
 
 
+def _grafted(tid: str) -> bool:
+    """Whether a tokeniser on this machine is a seed's piece table under another cleaning (tokeniser.graft)."""
+    try:
+        return bool(json.loads((paths.tokenisers_dir() / tid / "settings.json").read_text()).get("pieces_of"))
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def _seed_tokeniser(seed) -> str | None:
+    """The tokeniser a leg's seed was trained with, from the seed's own checkpoint: the newest finished run of
+    that name (the one `seeded_master` will take), or, before the seed has docked, the run of that name now at
+    sea, so a queued leg can be prepared and checked while its seed still sails. None when the spec names no
+    seed or no run of that name has a checkpoint yet."""
+    if not isinstance(seed, dict) or not seed.get("run"):
+        return None
+    from thorp import versioning
+
+    ref = str(seed["run"])
+    try:
+        if versioning.is_run_id(ref):
+            row = reader().get_run(ref)
+        else:
+            row = reader().get_run_by_name(ref, finished=True) or reader().get_run_by_name(ref)
+    except Exception:  # noqa: BLE001  (no ledger on a box: seeded_master is the check that refuses)
+        return None
+    return _checkpoint_tokeniser(row["run_id"]) if row else None
+
+
 def prepare(
     spec: dict, resolver: ListResolver = gutenberg_resolver, log=print, known: bool | None = None,
     sailed: str | None = None,
@@ -281,8 +312,23 @@ def prepare(
             settings["symbols"] = symbols
             log(f"control tokens: {len(symbols)} declared as single pieces")
     log(f"cleaning: {clean}")
-    log(f"tokeniser: training or loading on {len(tok_books)} books ({train_on})")
-    prep.tokeniser = tokmod.train_or_load(tok_books, settings)
+    # a leg reads with its seed's pieces (11 November, the return leg): the tokeniser's id carries the cleaning,
+    # so a leg that cleans its text another way than its seed would build a second tokeniser, and the merges
+    # learned from differently cleaned text need not land on the same ids (thorp/tokeniser.py graft). A voyage
+    # that already has a checkpoint keeps the tokeniser it was written with.
+    own_tid = tokmod.tokeniser_id(tok_books, {**tokmod.DEFAULTS, **settings})
+    kept_tid = _checkpoint_tokeniser(sailed or run_id(spec))
+    seed_tid = _seed_tokeniser(spec.get("seeded_from"))
+    if kept_tid and kept_tid != own_tid and _grafted(kept_tid):
+        log(f"tokeniser: this voyage's checkpoint was written with its seed's pieces ({kept_tid[:12]}); kept")
+        prep.tokeniser = tokmod.load(kept_tid)
+    elif seed_tid and seed_tid != own_tid and not kept_tid:
+        prep.tokeniser = tokmod.graft(seed_tid, tok_books, settings)
+        log(f"tokeniser: the seed's pieces ({seed_tid[:12]}) read with this leg's cleaning ({clean}): "
+            f"{prep.tokeniser.id[:12]}, not a second tokeniser of its own ({own_tid[:12]})")  # fmt: skip
+    else:
+        log(f"tokeniser: training or loading on {len(tok_books)} books ({train_on})")
+        prep.tokeniser = tokmod.train_or_load(tok_books, settings)
     log(f"tokeniser {prep.tokeniser.id[:12]} vocab {prep.tokeniser.vocab_size}; sharding")
     for b in recipe + [b for s in eval_sets.values() for b in s]:
         shards.encode(prep.tokeniser.id, b, prep.tokeniser)
@@ -300,8 +346,10 @@ def latest_checkpoint(rid: str) -> Path | None:
     root = checkpoint_root(rid)
     if not root.exists():
         return None
-    done = [p for p in root.glob("step-*") if (p / "state.json").exists()]
-    return max(done, key=lambda p: int(p.name.split("-")[1]), default=None)
+    # step-N only: a half-written step-N.tmp (a crash between state.json and the rename) or a pruned
+    # .step-N.pruned is never a checkpoint (11 November)
+    done = [p for p in root.glob("step-*") if p.name[5:].isdigit() and (p / "state.json").exists()]
+    return max(done, key=lambda p: int(p.name[5:]), default=None)
 
 
 def save_checkpoint(rid: str, step: int, master, opt, state: dict) -> Path:
@@ -317,6 +365,186 @@ def save_checkpoint(rid: str, step: int, master, opt, state: dict) -> Path:
         shutil.rmtree(d)
     tmp.rename(d)
     return d
+
+
+# Checkpoint retention (11 November, the audit's item 10): every `step-N` was kept, about 650 GB for a 100k-step
+# 350m voyage. A spec may now say `checkpoint.keep_last: K` (the newest K) and `checkpoint.keep_every: M` (every
+# step that is a multiple of M, the voyage's milestones in its own history); after each new checkpoint is safely
+# written, the others are deleted. With neither key every checkpoint is kept, as before. The newest is never
+# deleted (a resume reads it, and so do a seed, a teacher and a heads' donor named without a step), and nor is a
+# step a queued or at-sea voyage names as its seed (`seeded_from: {run, step}`, the only parent read at a step),
+# nor a step whose deferred evaluators (eval.offline) `thorp score` has still to read from it.
+
+
+def retention(spec: dict) -> tuple[int, int] | None:
+    """(keep_last, keep_every) from the spec's checkpoint block, or None to keep every checkpoint. keep_last is
+    at least 1 (1 when only keep_every is given); keep_every 0 keeps no milestones."""
+    c = spec.get("checkpoint") or {}
+    if c.get("keep_last") is None and c.get("keep_every") is None:
+        return None
+    return max(1, int(c.get("keep_last") or 1)), max(0, int(c.get("keep_every") or 0))
+
+
+def checkpoint_steps(rid: str) -> list[int]:
+    """The steps of a run's complete checkpoints (state.json written), oldest first."""
+    root = checkpoint_root(rid)
+    if not root.exists():
+        return []
+    return sorted(
+        int(p.name[5:]) for p in root.glob("step-*") if p.name[5:].isdigit() and (p / "state.json").exists()
+    )
+
+
+def _voyages_waiting() -> list[dict]:
+    """The specs of every voyage queued or at sea at home, read from the queue store (raw YAML: only their
+    parents are wanted). A hired box has no standing queue: none. Raises when the store cannot be read, so
+    that nothing is pruned on a guess."""
+    from thorp import store
+    from thorp.viable.s2_coordination import queue_store
+
+    if store.papers() is not None or not queue_store.enabled():
+        return []
+    texts = queue_store.pending_texts() + [r["text"] for r in queue_store.at_sea()]
+    out = []
+    for t in texts:
+        line = queue_store.parse_line(t)
+        if line["kind"] != "spec":
+            continue
+        p = paths.resolve("specs") / f"{line['payload']}.yaml"
+        if p.exists():
+            s = yaml.safe_load(p.read_text(encoding="utf-8"))
+            if isinstance(s, dict):
+                out.append(s)
+    return out
+
+
+def pinned_steps(rid: str, name: str | None = None, specs: list[dict] | None = None) -> set[int]:
+    """The steps of this run a queued or at-sea voyage reads by step: a `seeded_from` naming the run (by id or
+    by its name; by name it may mean another run of that name, so it is kept to be safe) with a `step`."""
+    specs = _voyages_waiting() if specs is None else specs
+    out: set[int] = set()
+    for s in specs:
+        seed = s.get("seeded_from") or {}
+        ref = str(seed.get("run") or "")
+        if seed.get("step") is not None and ref and (ref == rid or (name and ref == name)):
+            out.add(int(seed["step"]))
+    return out
+
+
+def prune_plan(rid: str, keep_last: int, keep_every: int, pinned: set[int] = frozenset()) -> list[Path]:
+    """The checkpoints retention would delete: neither among the newest `keep_last`, nor a multiple of
+    `keep_every`, nor pinned, nor the newest."""
+    steps = checkpoint_steps(rid)
+    keep = set(steps[-max(1, keep_last) :]) | set(pinned)
+    if keep_every:
+        keep |= {s for s in steps if s % keep_every == 0}
+    return [checkpoint_root(rid) / f"step-{s}" for s in steps if s not in keep]
+
+
+def unscored_steps(rid: str, look) -> set[int]:
+    """The steps whose evaluators the loop deferred (eval.offline, item 5) and `thorp score` has not yet all
+    scored: a checkpoint step among them is the weights `thorp score` will read, so it is kept until then."""
+    plan = offline_plan(rid, look)
+    return {s for s, names in plan.items() if not set(names) <= scored_at(rid, s, look)}
+
+
+def prune_checkpoints(rid: str, keep_last: int, keep_every: int, apply: bool = False, name: str | None = None,
+                      look=None) -> list[Path]:  # fmt: skip
+    """The checkpoints of `rid` that retention deletes, deleted when `apply`. Kept besides: a step a waiting
+    voyage seeds from, and a step whose deferred evaluators are not yet scored (read from `look`, the ledger in
+    hand, else the reader). Each is first renamed out of the `step-*` pattern, so a half-deleted one is never
+    read as a checkpoint."""
+    import shutil
+
+    pinned = pinned_steps(rid, name) | unscored_steps(rid, look if look is not None else reader())
+    doomed = prune_plan(rid, keep_last, keep_every, pinned)
+    if apply:
+        for d in doomed:
+            gone = d.with_name(f".{d.name}.pruned")
+            d.rename(gone)
+            shutil.rmtree(gone)
+    return doomed
+
+
+def retain(spec: dict, rid: str, log, look=None) -> None:
+    """After a checkpoint is written: delete what the spec's retention does not keep. Never raises (a failed
+    prune keeps every checkpoint, and costs disk, not the voyage)."""
+    r = retention(spec)
+    if r is None:
+        return
+    try:
+        gone = prune_checkpoints(rid, *r, apply=True, name=spec.get("name"), look=look)
+        if gone:
+            log(f"checkpoints: pruned {', '.join(d.name for d in gone)} (keep_last {r[0]}, keep_every {r[1]})")
+    except Exception as e:  # noqa: BLE001
+        log(f"checkpoints: none pruned ({e.__class__.__name__}: {e})")
+
+
+# Stopping on a signal (11 November, the audit's item 10): neither loop handled SIGTERM, so a preempted box or a
+# recalled voyage lost up to a checkpoint's interval of steps. While a voyage trains, SIGTERM and SIGHUP only
+# raise a flag: the step under way finishes, the loop flushes, checkpoints that step, writes the run's status as
+# `stopped: SIGTERM at step N` and returns, and the process exits 143. A second signal is logged and ignored:
+# nothing may cut the checkpoint short. The handlers are put back on leaving, and none is set off the main thread.
+
+
+class Stop:
+    """The flag a signal raises while a voyage trains."""
+
+    def __init__(self):
+        self.signal: str | None = None
+        self.again: list[str] = []  # signals that came after the first, ignored
+        self.log = None
+
+
+_stops: list[Stop] = []
+
+
+def stop_flag() -> Stop:
+    """The flag the training loop in hand reads: the one `stoppable` set, or one no signal will raise."""
+    return _stops[-1] if _stops else Stop()
+
+
+class stoppable:
+    """While inside, SIGTERM and SIGHUP raise `stop_flag()` instead of ending the process."""
+
+    def __enter__(self) -> Stop:
+        import contextlib
+        import signal
+        import threading
+
+        flag, self.old = Stop(), {}
+
+        def say(text: str) -> None:
+            with contextlib.suppress(Exception):  # a print inside a print is a RuntimeError: never raise here
+                if flag.log:
+                    flag.log(text)
+
+        def handler(signum, frame):
+            name = signal.Signals(signum).name
+            if flag.signal:
+                flag.again.append(name)
+                say(f"{name} again, while stopping on {flag.signal}: ignored until the checkpoint is written")
+                return
+            flag.signal = name
+            say(f"{name}: the step under way finishes, then a checkpoint, then the voyage stops")
+
+        if threading.current_thread() is threading.main_thread():
+            for sig in (signal.SIGTERM, signal.SIGHUP):
+                self.old[sig] = signal.signal(sig, handler)
+        _stops.append(flag)
+        return flag
+
+    def __exit__(self, *exc) -> None:
+        import signal
+
+        _stops.pop()
+        for sig, was in self.old.items():
+            signal.signal(sig, was)
+
+
+def exit_code(out: dict | None) -> int:
+    """The process's exit status for what train returned: 143 (128 + SIGTERM) for a voyage stopped by a signal."""
+    return 143 if (out or {}).get("status") == "stopped" else 0
 
 
 def load_master(ckpt: Path):
@@ -365,7 +593,27 @@ def to_compute(master, precision: str):
     return tree_map(lambda p: p.astype(dt), master)
 
 
-def seeded_master(spec: dict, seed: dict, master, vocab: int, log) -> tuple:
+def parent_run(ref: str, what: str, log=None) -> dict:
+    """A parent voyage's run row (a seed, a teacher, a heads' donor). Named by its run id (forty hex characters), it
+    is that run, which must be finished; named by name, it is as it always was, the newest finished run with that
+    name. A name resolves to whichever run of it finished last (11 November, the audit's item 3: 22 names are
+    reused), so the id used is logged here and kept in the voyage's provenance (thorp/versioning.py)."""
+    from thorp import versioning
+
+    if versioning.is_run_id(ref):
+        rows = reader().get_run(ref)
+        if not rows or rows.get("status") != "finished":
+            raise LookupError(f"{what}: no finished run {ref}")
+    else:
+        rows = reader().get_run_by_name(ref, finished=True)
+        if not rows:
+            raise LookupError(f"{what}: no finished run named {ref!r}")
+    if log is not None:
+        log(f"{what}: {ref} is run {rows['run_id']}")
+    return rows
+
+
+def seeded_master(spec: dict, seed: dict, master, vocab: int, log, tokeniser_id: str | None = None) -> tuple:
     """The finished run `seed["run"]` grown into this spec's model (thorp/growth.py): the new fp32
     master weights, and {"mask", "values"} for the inherited part (flat, by weight name)."""
     import numpy as np
@@ -373,22 +621,36 @@ def seeded_master(spec: dict, seed: dict, master, vocab: int, log) -> tuple:
     from thorp import growth
     from thorp.ledger import spec_of
 
-    rows = reader().get_run_by_name(seed["run"], finished=True)
-    if not rows:
-        raise LookupError(f"seeded_from: no finished run named {seed['run']!r}")
+    rows = parent_run(seed["run"], "seeded_from", log)
     src_spec, src_rid = spec_of(rows), rows["run_id"]
     if src_spec.get("tokeniser", {}).get("vocab") != spec["tokeniser"]["vocab"] or src_spec[
         "tokeniser"
     ].get("train_on") != spec["tokeniser"].get("train_on"):
         raise ValueError("seeded_from: the seed must share this run's tokeniser")
+    # the same vocabulary and list are not the same pieces: a cleaning that differs retrains the merges (11
+    # November, the return leg: four ids of 2,048 had changed hands). Refuse rather than read the seed's weights
+    # through another table; prepare() grafts the seed's pieces, so this only fires when that was bypassed.
+    seed_tid = _checkpoint_tokeniser(src_rid)
+    if tokeniser_id and seed_tid and not tokmod.same_pieces(seed_tid, tokeniser_id):
+        raise ValueError(
+            f"seeded_from: {seed['run']} was trained with tokeniser {seed_tid[:12]} and this leg reads with "
+            f"{tokeniser_id[:12]}, whose pieces differ: the inherited weights would read other pieces than they learned"
+        )
     src_pos = src_spec["model"].get("positions", "learned")
     dst_pos = spec["model"].get("positions", "learned")
     if src_pos != dst_pos:
         raise ValueError("seeded_from: the seed must use the same kind of positions as this run")
+    # the shapes the two runs were actually built with: build_model honours the layers/width/heads overrides,
+    # so the growth must too (11 November: a seeded voyage with an override grew from the preset's shape)
+    def _shape(m: dict) -> dict:
+        return {"layers": m.get("layers"), "width": m.get("width"), "heads": m.get("heads")}
+
     src_cfg = registry.config(
-        src_spec["model"]["preset"], vocab, src_spec["model"]["context"], src_pos
+        src_spec["model"]["preset"], vocab, src_spec["model"]["context"], src_pos, **_shape(src_spec["model"])
     )
-    dst_cfg = registry.config(spec["model"]["preset"], vocab, spec["model"]["context"], dst_pos)
+    dst_cfg = registry.config(
+        spec["model"]["preset"], vocab, spec["model"]["context"], dst_pos, **_shape(spec["model"])
+    )
     ck = latest_checkpoint(src_rid)
     if seed.get("step") is not None:  # an earlier checkpoint of the seed run (its own lineage)
         ck = checkpoint_root(src_rid) / f"step-{int(seed['step'])}"
@@ -420,9 +682,7 @@ def load_teacher(teach: dict, spec: dict, vocab: int, log):
     """A finished run's model, frozen, to teach from: same tokeniser, any class."""
     from thorp.ledger import spec_of
 
-    rows = reader().get_run_by_name(teach["run"], finished=True)
-    if not rows:
-        raise LookupError(f"teacher: no finished run named {teach['run']!r}")
+    rows = parent_run(teach["run"], "teacher", log)
     t_spec, t_rid = spec_of(rows), rows["run_id"]
     if t_spec["tokeniser"].get("vocab") != spec["tokeniser"]["vocab"] or t_spec["tokeniser"].get(
         "train_on"
@@ -452,9 +712,7 @@ def transplant_heads(spec: dict, master, log) -> tuple:
     from thorp.ledger import spec_of
 
     t = spec["transplant"]
-    rows = reader().get_run_by_name(t["from_run"], finished=True)
-    if not rows:
-        raise LookupError(f"transplant: no finished run named {t['from_run']!r}")
+    rows = parent_run(t["from_run"], "transplant", log)
     donor_spec, donor_rid = spec_of(rows), rows["run_id"]
     if (
         donor_spec["model"]["preset"] != spec["model"]["preset"]
@@ -890,7 +1148,12 @@ def check_scaffold(sc: dict, layers: int, heads: int) -> None:
             raise ValueError(f"scaffold riddle {key} {r} is not in a {layers} x {heads} model")
 
 
-def run_evaluators(spec, rid, step, model, prep, rec: Ledger, log) -> dict:
+def run_evaluators(spec, rid, step, model, prep, rec: Ledger, log, total: bool = True) -> dict:
+    """Run the spec's evaluators at `step` and record what each returns. Beside the step's `eval/seconds` it
+    records `eval/seconds/<evaluator>` (11 November, item 5: the ledger held only the total, so which evaluator
+    cost a voyage its hours could not be read), written only when that evaluator returned, so the per-evaluator
+    figure also marks a step as scored on it (`score`). `total=False` (an offline score) leaves the step's
+    `eval/seconds`, the loop's own cost, as the loop wrote it."""
     books = prep.books()
     ctx = evaluators.EvalContext(
         run_id=rid,
@@ -909,7 +1172,9 @@ def run_evaluators(spec, rid, step, model, prep, rec: Ledger, log) -> dict:
         rec.clear_step(rid, step, tables=("evals",), sets=list(prep.eval_sets))
     t0 = time.time()
     merged = {}
+    took: dict[str, float] = {}
     for name in spec["eval"]["evaluators"]:
+        t1 = time.time()
         try:
             res = evaluators.get(name)(ctx)
         except Exception as e:  # noqa: BLE001
@@ -932,9 +1197,88 @@ def run_evaluators(spec, rid, step, model, prep, rec: Ledger, log) -> dict:
             rec.artifact(
                 rid, step, a["kind"], a.get("path", ""), a.get("sha1", ""), a.get("text", "")
             )
-    rec.metrics(rid, step, {"eval/seconds": time.time() - t0})
+        took[f"eval/seconds/{name}"] = time.time() - t1
+    rec.metrics(rid, step, ({"eval/seconds": time.time() - t0} if total else {}) | took)
     log(f"eval @ {step}: " + ", ".join(f"{k}={v:.4f}" for k, v in merged.items()))
     return merged
+
+
+# ---------------------------------------------------------------- offline evaluation (11 November, item 5)
+#
+# The evaluators ran inside the loop: 39% of the 50m reading stage's hired hours, 80% of the torch 9m parity run.
+# `eval.offline: [names]` takes the named evaluators out of the loop. At each evaluation step that would have run
+# them, the loop keeps the weights instead (the step's checkpoint when it is a checkpoint step, else a weights-only
+# snapshot `eval-<step>` beside the checkpoints) and records an `eval_offline` artifact naming what it deferred.
+# `thorp score <run>` (train.score) then scores those steps from the saved weights, writing the metrics at the step
+# the loop would have, and removes each snapshot once every evaluator deferred at its step has been scored. A spec
+# without the key evaluates exactly as before.
+
+SNAPSHOT_PREFIX = "eval-"
+
+
+def offline_evaluators(spec: dict) -> list[str]:
+    """eval.offline, checked: the names the loop defers to `thorp score`. ce_bpb stays in the loop (it is the score
+    that may stop a voyage, and the milestones read it); a name the loop would never run is a mistake, not a no-op."""
+    ev = spec.get("eval") or {}
+    off = list(ev.get("offline") or [])
+    if not off:
+        return []
+    if "ce_bpb" in off:
+        raise ValueError("eval.offline: ce_bpb is the loop's own score and stays in the loop")
+    ran = set(ev.get("evaluators") or []) | set((ev.get("light") or {}).get("evaluators") or [])
+    stray = [n for n in off if n not in ran]
+    if stray:
+        raise ValueError(f"eval.offline names {stray}, which are not among the voyage's evaluators")
+    return off
+
+
+def save_snapshot(rid: str, step: int, master, torch: bool = False) -> Path:
+    """`eval-<step>`: the master weights only, as a checkpoint's model.safetensors (no optimiser state), written to a
+    temporary name and renamed, so a reader never sees half of one. `master` is the MLX loop's tree of fp32 weights,
+    or, with `torch`, the torch loop's dict of fp32 tensors."""
+    import shutil
+
+    d = checkpoint_root(rid) / f"{SNAPSHOT_PREFIX}{step}"
+    tmp = d.with_name(d.name + ".tmp")
+    if tmp.exists():
+        shutil.rmtree(tmp)
+    tmp.mkdir(parents=True)
+    if torch:
+        from thorp.train_torch import save_flat
+
+        save_flat(tmp / "model.safetensors", {k: v.detach().cpu().numpy() for k, v in master.items()})
+    else:
+        mx.save_safetensors(str(tmp / "model.safetensors"), dict(tree_flatten(master)))
+    (tmp / "state.json").write_text(json.dumps({"run_id": rid, "step": step, "weights_only": True}, indent=1))
+    if d.exists():
+        shutil.rmtree(d)
+    tmp.rename(d)
+    return d
+
+
+def evaluate_in_loop(
+    spec, rid, step, model, prep, rec: Ledger, log, names: list[str], offline: list[str], saved: bool, master
+) -> dict:
+    """One of the loop's evaluations: `names` at `step`, except those in eval.offline. With nothing offline it is
+    run_evaluators exactly as the loop called it before. A deferred evaluator's weights are the step's checkpoint
+    when `saved` (the loop writes it straight after), else `master` is written as the snapshot eval-<step>."""
+    if spec["eval"]["evaluators"] == names:
+        full = spec
+    else:  # a light evaluation, as the loop has always built it
+        full = {**spec, "eval": {**spec["eval"], "evaluators": names}}
+    later = [n for n in names if n in offline]
+    if not later:
+        return run_evaluators(full, rid, step, model, prep, rec, log)
+    now = [n for n in names if n not in offline]
+    latest = (
+        run_evaluators({**spec, "eval": {**spec["eval"], "evaluators": now}}, rid, step, model, prep, rec, log)
+        if now
+        else {}
+    )
+    where = f"step-{step}" if saved else save_snapshot(rid, step, master, backend_of(spec) == "torch").name
+    rec.artifact(rid, step, "eval_offline", where, "", json.dumps({"evaluators": later, "weights": where}))
+    log(f"eval @ {step}: {', '.join(later)} deferred to `thorp score` ({where})")
+    return latest
 
 
 def record_eval_sets(rid: str, step: int, prep: Prepared, rec: Ledger) -> None:
@@ -1008,9 +1352,26 @@ def train(
         from thorp import train_torch
 
         return train_torch.train(spec, prep, rec, stop_after=stop_after, log=log)
+    from thorp.ledger import MetricBuffer, flush_every
+
+    rec = rec or recorder()
+    # the per-step metrics, written `ledger.flush_every` steps at a time (11 November, item 4); whatever waits is
+    # written on the way out of an exception too, before it reaches the caller (which marks the run failed)
+    buf = MetricBuffer(rec, every=flush_every(spec))
+    with stoppable():  # SIGTERM/SIGHUP: checkpoint the step under way and stop (item 10)
+        try:
+            return _train(spec, prep, rec, buf, stop_after, log)
+        except BaseException:
+            buf.flush_quietly()
+            raise
+
+
+def _train(spec: dict, prep: Prepared, rec: Ledger, buf, stop_after: int | None, log) -> dict:
+    """train's MLX loop; `buf` holds the per-step metrics until they are flushed."""
     rid = run_id(spec)
     rec = rec or recorder()
     log = log or Log(paths.runs_dir() / f"{rid}.log")
+    buf.log = log
     o, m = spec["optim"], spec["model"]
     precision = o.get("precision", "bf16")
     tok = prep.tokeniser
@@ -1057,7 +1418,7 @@ def train(
     seed = spec.get("seeded_from")  # grow a finished smaller run into this model (growth.py)
     inherit = None
     if seed:
-        grown, inherit = seeded_master(spec, seed, master, tok.vocab_size, log)
+        grown, inherit = seeded_master(spec, seed, master, tok.vocab_size, log, tokeniser_id=tok.id)
         if ckpt is None:
             master = grown
     handed = None
@@ -1067,6 +1428,12 @@ def train(
         master, handed = transplant_heads(spec, master, log)
     if ckpt is not None:
         st = json.loads((ckpt / "state.json").read_text())
+        from thorp import versioning
+
+        # the checkpoint's tokeniser against the one this sailing built, before anything is truncated: a list
+        # edited under the same run id would otherwise resume the weights on other pieces (11 November, item 3)
+        if why := versioning.tokeniser_mismatch(st, tok.id):
+            raise ValueError(why)
         start, tokens_seen, wall_before = st["step"], st["tokens_seen"], st["wall_seconds"]
         # both rebuilt on the model's own tree: a checkpoint is a flat file, which cannot hold a module with no
         # weights (nn.RoPE: an empty `rope` in every layer), so every rotary voyage failed to resume (8 November,
@@ -1103,6 +1470,14 @@ def train(
             handed is not None
         ):  # after the step-0 clear-out, or it is wiped (as on 7 November, 08:19)
             rec.artifact(rid, 0, "transplant", "", "", json.dumps(handed))
+    # what the id does not pin, written beside it (11 November, item 3); never raises
+    from thorp import versioning
+
+    versioning.record_provenance(spec, rid, tok.id, rec, log, start=start)
+    # the run's state (with a heartbeat) and its expedition, as rows beside it (11 November, item 11); never raises
+    from thorp import run_state
+
+    run_state.started(spec, rid, rec, log)
     log(
         f"run {rid} ({spec.get('name')}): {m['preset']} {counts}, {total} steps x "
         f"{stream.tokens_per_step} tokens, {stream.unique_tokens} unique tokens/pass"
@@ -1326,7 +1701,10 @@ def train(
     book_n: dict[int, int] = {}
     every_eval = spec["eval"]["every_steps"]
     light = spec["eval"].get("light")  # {"every_steps": N, "evaluators": [...]}, optional
+    offline = offline_evaluators(spec)  # eval.offline: scored later from saved weights (`thorp score`)
     every_ckpt = spec["checkpoint"]["every_steps"]
+    stop = stop_flag()  # raised by SIGTERM/SIGHUP (stoppable): checkpoint this step and stop
+    stop.log = log
     # per-voyage milestones (12 November): judged at the first evaluation at or after their step, and a
     # missed one that asks for a recall stops the voyage here, at a checkpoint
     from thorp import milestones as milestones_mod
@@ -1450,23 +1828,24 @@ def train(
                 f"step {step}/{total} loss {loss_v:.4f} lr {lr:.2e} "
                 f"{vals['tokens_per_s']:.0f} tok/s mem {vals['mem_gb']:.1f} GB"
             )
-        rec.metrics(rid, step, vals)
+        buf.add(rid, step, vals)  # written with the next flush (MetricBuffer), not a commit a step
+        run_state.beat(rid, rec)  # the heartbeat: one upsert at most a minute, else a clock read (item 11)
 
         latest: dict | None = None
         if step % every_eval == 0 or step == total:
-            latest = run_evaluators(spec, rid, step, model, prep, rec, log)
+            buf.flush()  # an evaluation, and anyone reading the store meanwhile, sees every step before it
+            latest = evaluate_in_loop(
+                spec, rid, step, model, prep, rec, log, spec["eval"]["evaluators"], offline,
+                step % every_ckpt == 0 or step == total, master,
+            )  # fmt: skip
         elif light and step % light["every_steps"] == 0:
             # a light eval between full ones (eval.light, 2026-11-07): only the cheap evaluators,
             # such as the Nevermores, so a lean run can still be watched forming
-            latest = run_evaluators(
-                {**spec, "eval": {**spec["eval"], "evaluators": light["evaluators"]}},
-                rid,
-                step,
-                model,
-                prep,
-                rec,
-                log,
-            )
+            buf.flush()
+            latest = evaluate_in_loop(
+                spec, rid, step, model, prep, rec, log, light["evaluators"], offline,
+                step % every_ckpt == 0 or step == total, master,
+            )  # fmt: skip
         recall_reason = None
         if ms and latest:
             # a bug in a milestone must never cost a night's training: it is reported and the voyage
@@ -1478,7 +1857,11 @@ def train(
                     recall_reason = milestones_mod.recall_reason(verdicts)
             except Exception as e:  # noqa: BLE001
                 log(f"milestones: {e.__class__.__name__}: {e}")
-        if step % every_ckpt == 0 or step == total or recall_reason:
+        stopping = stop.signal is not None and step < total  # read once: a signal from here on waits a step
+        if step % every_ckpt == 0 or step == total or recall_reason or stopping:
+            # every row up to this step is in the store before the checkpoint exists, or a resume from it would
+            # leave a gap (it forgets only what lies after its step): strict, so it raises rather than sail past
+            buf.flush(strict=True)
             wall = wall_before + time.time() - t_run
             d = save_checkpoint(
                 rid,
@@ -1495,6 +1878,21 @@ def train(
                 },
             )
             rec.artifact(rid, step, "checkpoint", str(d), "", "")
+            retain(spec, rid, log, rec)  # checkpoint.keep_last / keep_every; nothing without them
+        if stopping and not recall_reason:
+            wall = wall_before + time.time() - t_run
+            rec.run(
+                {
+                    "run_id": rid,
+                    "status": f"stopped: {stop.signal} at step {step}",
+                    "tokens_seen": tokens_seen,
+                    "wall_minutes": wall / 60,
+                    "commit": git_commit(),
+                }
+            )
+            log(f"stopped at step {step} by {stop.signal}: checkpointed, to resume from {d.name}")
+            run_state.ended(rid, f"stopped: {stop.signal} at step {step}", rec, log)  # item 11's state row
+            return {"run_id": rid, "step": step, "status": "stopped", "signal": stop.signal}
         if recall_reason:
             wall = wall_before + time.time() - t_run
             rec.run(
@@ -1508,11 +1906,14 @@ def train(
                 }
             )
             log(f"recalled at step {step}: {recall_reason}")
+            run_state.ended(rid, f"recalled: {recall_reason}", rec, log)
             return {"run_id": rid, "step": step, "status": "recalled", "reason": recall_reason}
         if stop_after is not None and step >= stop_after:
+            buf.flush(strict=True)
             log(f"stopping at step {step} (stop_after)")
             return {"run_id": rid, "step": step, "status": "running"}
 
+    buf.flush(strict=True)
     wall = wall_before + time.time() - t_run
     rec.run(
         {
@@ -1525,6 +1926,7 @@ def train(
         }
     )
     log(f"finished {rid}: {tokens_seen} tokens in {wall / 60:.1f} min")
+    run_state.ended(rid, "finished", rec, log)
     return {"run_id": rid, "step": step, "status": "finished"}
 
 
@@ -1564,17 +1966,135 @@ def rescore(
         spec["eval"] = {**spec["eval"], "evaluators": list(evaluators)}
     prep = prepare(spec, resolver=resolver, log=log, known=True, sailed=rid)
     step = json.loads((ckpt / "state.json").read_text())["step"]
-    if backend_of(spec) == "torch":  # either backend's checkpoint loads in the torch model
-        from thorp import train_torch
-
-        model = train_torch.load_model(spec, prep.tokeniser.vocab_size, ckpt)
-    else:
-        model = build_model(spec, prep.tokeniser.vocab_size)
-        model.update(to_compute(load_master(ckpt), spec["optim"].get("precision", "bf16")))
+    model = scoring_model(spec, prep.tokeniser.vocab_size, ckpt)
     if sets:
         record_eval_sets(rid, step, prep, rec)
     run_evaluators(spec, rid, step, model, prep, rec, log)
     return step
+
+
+def scoring_model(spec: dict, vocab: int, ckpt: Path, model=None):
+    """The run's model in its compute precision with a checkpoint's (or an eval snapshot's) weights, as the loop held
+    it at that step. Either backend's weights load in the torch model. `model`, when given, is reused."""
+    if backend_of(spec) == "torch":
+        from thorp import train_torch
+
+        if model is None:
+            return train_torch.load_model(spec, vocab, ckpt)
+        train_torch.set_weights(model, train_torch.load_master(ckpt, model.device))
+        return model
+    model = model if model is not None else build_model(spec, vocab)
+    model.update(to_compute(load_master(ckpt), spec["optim"].get("precision", "bf16")))
+    return model
+
+
+def saved_weights(rid: str) -> dict[int, Path]:
+    """Every finished set of weights a run has on disk, by step: its checkpoints (step-N) and its eval snapshots
+    (eval-N; where both exist, the snapshot, which is the one to consume). A name still being written (`.tmp`) or
+    without its state.json is not finished and is left out, so a voyage at sea is read safely."""
+    root = checkpoint_root(rid)
+    out: dict[int, Path] = {}
+    if not root.is_dir():
+        return out
+    for p in sorted(root.iterdir()):
+        for prefix in ("step-", SNAPSHOT_PREFIX):
+            n = p.name.removeprefix(prefix)
+            if n != p.name and n.isdigit() and (p / "state.json").exists() and (p / "model.safetensors").exists():
+                if prefix == SNAPSHOT_PREFIX or int(n) not in out:
+                    out[int(n)] = p
+    return out
+
+
+def offline_plan(rid: str, look) -> dict[int, list[str]]:
+    """step -> the evaluators the loop deferred there (its `eval_offline` artifacts), in the loop's order."""
+    plan: dict[int, list[str]] = {}
+    for r in look.query(
+        "select step, text from artifacts where run_id=? and kind='eval_offline' order by step", [rid]
+    ):
+        names = plan.setdefault(int(r["step"]), [])
+        names += [n for n in json.loads(r["text"] or "{}").get("evaluators") or [] if n not in names]
+    return plan
+
+
+def scored_at(rid: str, step: int, look) -> set[str]:
+    """The evaluators that have returned at a step: those with an `eval/seconds/<name>` there."""
+    rows = look.query(
+        "select distinct name from metrics where run_id=? and step=? and name like 'eval/seconds/%'", [rid, step]
+    )
+    return {r["name"].removeprefix("eval/seconds/") for r in rows}
+
+
+def score(
+    run: str,
+    steps: str = "pending",
+    evaluators: list[str] | None = None,
+    keep_snapshots: bool = False,
+    resolver: ListResolver = gutenberg_resolver,
+    rec: Ledger | None = None,
+    log=print,
+) -> list[int]:
+    """`thorp score`: run evaluators on a run's saved weights and record them at those steps, as the loop would have
+    (11 November, item 5). Returns the steps scored.
+
+    `steps` is "pending" (every step whose deferred evaluators have not all returned), "all" (every step the loop
+    deferred, again), or "N,M". `evaluators` replaces the deferred names (and with "all"/"pending" reaches every
+    saved step, checkpoints included, so a run with no eval.offline can be scored this way too). The step's
+    `eval/seconds` is the loop's and is left alone; each evaluator's own `eval/seconds/<name>` is written. A
+    snapshot (eval-N) is removed once every evaluator deferred at its step has returned, unless `keep_snapshots`;
+    a checkpoint is never removed. Safe while the voyage is at sea: it reads only finished weights."""
+    import shutil
+
+    from thorp import ladder
+    from thorp.ledger import spec_of
+
+    look = reader() if rec is None else rec
+    rec = rec or recorder()
+    row = look.find_run(run)
+    if not row:
+        raise LookupError(f"no run {run}")
+    spec, rid = spec_of(row), row["run_id"]
+    plan, weights, want = offline_plan(rid, look), saved_weights(rid), list(evaluators or [])
+    if not want and not plan:
+        raise LookupError(
+            f"run {rid[:12]} deferred no evaluators (no eval.offline): name --evaluators to score its checkpoints"
+        )
+    if steps in ("all", "pending"):
+        chosen = sorted(set(weights) if want else set(plan))
+    else:
+        chosen = sorted({int(x) for x in str(steps).split(",") if x.strip()})
+    todo: dict[int, list[str]] = {}
+    for s in chosen:
+        names = want or plan.get(s, [])
+        if steps == "pending":
+            done = scored_at(rid, s, look)
+            names = [n for n in names if n not in done]
+        if not names:
+            continue
+        if s not in weights:
+            log(f"step {s}: no finished weights on disk (still being written, or not kept); skipped")
+            continue
+        todo[s] = names
+    if not todo:
+        log(f"{rid[:12]}: nothing to score")
+        return []
+    ladder.repair_spec(spec, rid)  # an old checkpoint's shape, not today's preset (a no-op for a current one)
+    prep = prepare(spec, resolver=resolver, log=log, known=True, sailed=rid)
+    model = None
+    for s, names in todo.items():
+        model = scoring_model(spec, prep.tokeniser.vocab_size, weights[s], model)
+        log(f"score {rid[:12]} @ {s} ({weights[s].name}): {', '.join(names)}")
+        run_evaluators(
+            {**spec, "eval": {**spec["eval"], "evaluators": names}}, rid, s, model, prep, rec, log, total=False
+        )
+        snap = weights[s]
+        if snap.name.startswith(SNAPSHOT_PREFIX) and s in plan and not keep_snapshots:
+            left = [n for n in plan[s] if n not in scored_at(rid, s, look)]
+            if left:
+                log(f"step {s}: {snap.name} kept; not yet scored: {', '.join(left)}")
+            else:
+                shutil.rmtree(snap, ignore_errors=True)
+                log(f"step {s}: {snap.name} removed")
+    return list(todo)
 
 
 def run(spec_path: str | Path, rec: Ledger | None = None) -> dict:
@@ -1602,6 +2122,12 @@ def _run(spec_path: str | Path, rec: Ledger | None = None) -> dict:
     existing = rec.get_run(rid)
     if existing and existing["status"] == "finished":
         print(json.dumps({k: v for k, v in existing.items() if k != "spec_json"}, indent=1))
+        try:  # the same id over other list bytes: said loudly, never re-sailed (11 November, item 3)
+            from thorp import versioning
+
+            versioning.warn_if_lists_changed(rid, rec)
+        except Exception as e:  # noqa: BLE001
+            print(f"provenance: lists not compared ({e.__class__.__name__}: {e})")
         return existing
     log = Log(paths.runs_dir() / f"{rid}.log")
     log(f"spec {spec_path} -> run id {rid}")
@@ -1615,7 +2141,7 @@ def _run(spec_path: str | Path, rec: Ledger | None = None) -> dict:
         from thorp import fleet
 
         ship = fleet.ship_for(
-            spec, expedition=fleet.expedition_of_label(spec.get("name"), spec.get("ship"))
+            spec, expedition=fleet.expedition_of_spec(spec)
         )
         log(f"ship {ship.name} ({ship.key}): {ship.subtitle}")
     except Exception as e:  # noqa: BLE001
@@ -1629,8 +2155,12 @@ def _run(spec_path: str | Path, rec: Ledger | None = None) -> dict:
     except Exception as e:
         rec.run({"run_id": rid, "status": f"failed: {e.__class__.__name__}"})
         log(f"FAILED: {e!r}")
+        # the final state beside the status (11 November, item 11); never raises
+        from thorp import run_state
+
+        run_state.ended(rid, f"failed: {e.__class__.__name__}", rec, log, reason=f"failed: {e!r}"[:500])
         raise
 
 
 if __name__ == "__main__":
-    run(sys.argv[1])
+    sys.exit(exit_code(run(sys.argv[1])))  # 143 when a signal stopped it at a checkpoint, else 0 as before

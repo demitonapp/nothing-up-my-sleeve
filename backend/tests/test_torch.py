@@ -812,3 +812,85 @@ def test_a_torch_voyage_writes_its_sop_version(library, spec, tmp_thorp):
     again = Ledger(tmp_thorp / "box.sqlite")
     again.run({"run_id": rid, "status": "finished"})  # a later write that carries no version keeps the one written
     assert again.get_run(rid)["sop_version"] == "0.0.6" and again.get_run(rid)["status"] == "finished"
+
+
+# ---------------------------------------------------------------- milestones and a signal on both loops (item 10)
+
+
+def test_both_loops_recall_on_the_same_missed_milestone(library, spec, tmp_thorp, monkeypatch):
+    """One spec, one checkpoint (MLX's, at step 50), a milestone at step 51 that cannot be met, judged at the light
+    evaluation at step 52: each loop, resumed from that checkpoint, recalls there, with the same reason and status,
+    and keeps a checkpoint at the recall."""
+    quiet = lambda *a: None  # noqa: E731
+    spec["optim"]["precision"] = "fp32"
+    spec["data"]["passes"] = 3
+    spec["eval"]["light"] = {"every_steps": 26, "evaluators": ["ce_bpb"]}
+    spec["milestones"] = [
+        {"step": 51, "metric": "eval/hole/bpb_mean", "at_most": 0.01, "if_missed": "recall", "why": "a gate no model passes"},
+        {"step": 51, "metric": "eval/hole/bpb_mean", "at_least": 0.0, "if_missed": "warn"},
+    ]  # fmt: skip
+    train_torch.refuse_unsupported({**spec, "model": {**spec["model"], "backend": "torch"}})
+    prep = train.prepare(spec, resolver=library["resolver"], log=quiet)
+    rid = train.run_id(spec)
+    root = paths.checkpoints_dir() / rid
+    assert train.train(spec, prep, Ledger(tmp_thorp / "first.sqlite"), stop_after=50, log=quiet)["step"] == 50
+    shutil.copytree(root, tmp_thorp / "at-50")
+
+    outs, rows = {}, {}
+    for backend in ("mlx", "torch"):
+        shutil.rmtree(root)
+        shutil.copytree(tmp_thorp / "at-50", root)
+        monkeypatch.setenv("THORP_BACKEND", backend)
+        rec = Ledger(tmp_thorp / f"{backend}.sqlite")
+        outs[backend] = train.train(spec, prep, rec, log=quiet)
+        assert train.latest_checkpoint(rid).name == "step-52", backend
+        rows[backend] = (
+            rec.get_run(rid)["status"],
+            {r["name"]: r["value"] for r in rec.query("select name, value from metrics where run_id=? and name like 'milestone/%'", [rid])},
+        )  # fmt: skip
+    monkeypatch.delenv("THORP_BACKEND")
+    a, b = outs["mlx"], outs["torch"]
+    assert a["status"] == b["status"] == "recalled" and a["step"] == b["step"] == 52
+    assert a["reason"] == b["reason"] and a["reason"].startswith("milestone 1 missed at step 52: eval/hole/bpb_mean")
+    assert rows["mlx"][0] == rows["torch"][0] == f"recalled: {a['reason']}"
+    ma, mb = rows["mlx"][1], rows["torch"][1]
+    assert set(ma) == set(mb) == {"milestone/1/value", "milestone/1/met", "milestone/2/value", "milestone/2/met"}
+    assert ma["milestone/1/met"] == mb["milestone/1/met"] == 0.0 and ma["milestone/2/met"] == mb["milestone/2/met"] == 1.0
+    assert mb["milestone/1/value"] == pytest.approx(ma["milestone/1/value"], rel=1e-4)
+
+
+def test_a_signal_stops_a_torch_voyage_at_a_checkpoint(library, spec, tmp_thorp, monkeypatch):
+    """train.train's rule on torch: the step under way finishes, is checkpointed and the run marked stopped; the
+    resume from it matches an uninterrupted voyage."""
+    import signal
+
+    from thorp import data
+
+    quiet = lambda *a: None  # noqa: E731
+    torch_spec(spec)
+    spec["data"]["passes"] = 3
+    prep = train.prepare(spec, resolver=library["resolver"], log=quiet)
+    rid = train.run_id(spec)
+    straight = Ledger(tmp_thorp / "straight.sqlite")
+    assert train.train(spec, prep, straight, stop_after=60, log=quiet)["step"] == 60
+    shutil.rmtree(paths.checkpoints_dir() / rid)
+
+    batch = data.Stream.batch
+
+    def sending(self, s):
+        if s == 22:
+            os.kill(os.getpid(), signal.SIGTERM)
+            os.kill(os.getpid(), signal.SIGTERM)  # a second, before the first is acted on: noted, ignored
+        return batch(self, s)
+
+    monkeypatch.setattr(data.Stream, "batch", sending)
+    before = signal.getsignal(signal.SIGTERM)
+    stopped = Ledger(tmp_thorp / "stopped.sqlite")
+    out = train.train(spec, prep, stopped, stop_after=60, log=quiet)
+    monkeypatch.setattr(data.Stream, "batch", batch)
+    assert out == {"run_id": rid, "step": 23, "status": "stopped", "signal": "SIGTERM"} and train.exit_code(out) == 143
+    assert stopped.get_run(rid)["status"] == "stopped: SIGTERM at step 23"
+    assert train.latest_checkpoint(rid).name == "step-23" and signal.getsignal(signal.SIGTERM) is before
+    assert train.train(spec, prep, stopped, stop_after=60, log=quiet)["step"] == 60
+    a, b = losses(straight, rid), losses(stopped, rid)
+    assert sorted(b) == list(range(1, 61)) and max(abs(a[s] - b[s]) for s in range(24, 61)) < 1e-3

@@ -1530,7 +1530,9 @@ ARCHIVE_BEFORE = "2026-11-06T20:40"
 
 
 def expedition_of_label(name: str | None, label: str | None) -> str | None:
-    """The expedition a voyage (a run) belongs to, from its name and ship label."""
+    """The expedition a voyage (a run) belongs to, from its name and ship label: the fallback since 11 November, for
+    a spec with no `expedition:` (expedition_of_spec) and a run with no s1.run_expedition row (expedition_of_run),
+    and what the backfill of that table read."""
     if (label or "").startswith("First Light"):
         return "first_light"
     if (label or "").startswith("Fitout: Trigram engine"):
@@ -1551,7 +1553,7 @@ def expedition_of_label(name: str | None, label: str | None) -> str | None:
     if (label or "").startswith("Fitout: Ogden"):
         return "ogden"
     if (label or "").startswith(
-        ("Cards:", "Fitout: Nothing up my sleeve")
+        ("Cards:", "Fitout: Nothing up my sleeve", "Fitout: Thorp")
     ):  # the census runs as the fitout's variations
         return "card_census"
     if (label or "").startswith("Two facts"):
@@ -1569,6 +1571,73 @@ def expedition_of_label(name: str | None, label: str | None) -> str | None:
     return None
 
 
+def expedition_of_spec(spec: dict) -> str | None:
+    """The expedition a spec sails for: its own top-level `expedition:` (11 November, the audit's item 11: a voyage
+    names its expedition outright, a label as `ship` is, so no run id moves), else the label chain above."""
+    e = (spec or {}).get("expedition")
+    if isinstance(e, str) and e.strip():
+        return e.strip()
+    return expedition_of_label((spec or {}).get("name"), (spec or {}).get("ship"))
+
+
+def unknown_expedition(spec: dict) -> str | None:
+    """Why a spec's `expedition:` is refused (None when it names none, or one that exists): it must be a key of
+    EXPEDITIONS or a row of s1.expeditions."""
+    e = (spec or {}).get("expedition")
+    if e is None:
+        return None
+    if not isinstance(e, str) or not e.strip():
+        return f"expedition: {e!r} is not an expedition key"
+    if e.strip() in EXPEDITIONS:
+        return None
+    try:
+        from sqlalchemy import text
+
+        from thorp import store
+
+        with store.session() as s:
+            if s.execute(text("select 1 from s1.expeditions where key = :k"), {"k": e.strip()}).first():
+                return None
+    except Exception:  # noqa: BLE001  (no store: the code's list is the authority)
+        pass
+    return f"names expedition {e.strip()!r}, which does not exist (have: {', '.join(sorted(EXPEDITIONS))})"
+
+
+_RUN_EXPEDITIONS: dict = {"at": float("-inf"), "map": {}}
+RUN_EXPEDITIONS_TTL_S = 30.0
+
+
+def recorded_expeditions(fresh: bool = False) -> dict[str, str]:
+    """{run_id: expedition} from s1.run_expedition (thorp/run_state.py), read at most every 30 s; empty when the
+    store cannot be asked (a box, a test with no store), so every reader falls back to the label chain."""
+    import time
+
+    if fresh or time.monotonic() - _RUN_EXPEDITIONS["at"] > RUN_EXPEDITIONS_TTL_S:
+        m: dict[str, str] = {}
+        try:
+            from sqlalchemy import text
+
+            from thorp import store
+
+            with store.session() as s:
+                m = dict(s.execute(text("select run_id, expedition from s1.run_expedition")).fetchall())
+        except Exception:  # noqa: BLE001
+            m = {}
+        _RUN_EXPEDITIONS.update(at=time.monotonic(), map=m)
+    return _RUN_EXPEDITIONS["map"]
+
+
+def expedition_of_run(row: dict) -> str | None:
+    """The expedition a ledger run belongs to: its row in s1.run_expedition (written by the trainer from the spec's
+    `expedition:` or the label, backfilled for older runs), else the label chain on its name and ship label."""
+    rid = (row or {}).get("run_id")
+    if rid:
+        e = recorded_expeditions().get(rid)
+        if e:
+            return e
+    return expedition_of_label((row or {}).get("name"), (row or {}).get("ship"))
+
+
 def ship_of_run(row: dict, save: bool = True) -> Ship:
     """The ship a ledger run belongs to (registering it, and the run as one of its voyages, if save)."""
     import json
@@ -1578,7 +1647,7 @@ def ship_of_run(row: dict, save: bool = True) -> Ship:
         spec,
         label=row.get("ship") or spec.get("ship"),
         archived=(row.get("started") or "") < ARCHIVE_BEFORE,
-        expedition=expedition_of_label(row.get("name"), row.get("ship")),
+        expedition=expedition_of_run(row),
         save=save,
     )
     if save and row.get("run_id"):

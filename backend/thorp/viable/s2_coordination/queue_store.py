@@ -104,10 +104,9 @@ def _specs() -> Path:
 
 def parse_line(text: str) -> dict:
     """One queue line, read the way `lanes.parse` reads it, without loading the spec (no mlx, no torch)."""
-    s = text.strip()
-    lane = "mac"
-    if s.startswith("vast:"):
-        lane, s = "vast", s[len("vast:") :].strip()
+    from thorp.viable.s2_coordination.lanes import split_lane
+
+    lane, s = split_lane(text)  # `vast: <spec>`, or any lane s2.lane_defs names (11 November, item 11)
     if s.startswith("cmd:"):
         return {"kind": "cmd", "payload": s[len("cmd:") :].strip(), "lane": lane}
     if s.startswith("wait:"):
@@ -264,11 +263,30 @@ def _goal_of_spec(payload: str) -> str | None:
             return None
         g = spec.get("goal")
         if isinstance(g, int):
-            exp = fleet.expedition_of_label(spec.get("name"), spec.get("ship"))
+            exp = fleet.expedition_of_spec(spec)
             return f"{exp}:{g}" if exp else None
         if isinstance(g, str) and g.strip():
             return g.strip()
         return None
+    return None
+
+
+def _refused_expedition(payload: str) -> str | None:
+    """Why a spec line may not be queued for its `expedition:` (11 November, item 11): it names an expedition that
+    is neither in fleet.EXPEDITIONS nor a row of s1.expeditions. None for a spec that names none, or cannot be read
+    (the gate judges that at launch)."""
+    import yaml
+
+    from thorp import fleet, paths
+
+    for p in (paths.resolve(f"specs/{payload}.yaml"), paths.resolve(f"specs/{payload}")):
+        if not p.is_file():
+            continue
+        try:
+            spec = yaml.safe_load(p.read_text(encoding="utf-8")) or {}
+        except (OSError, ValueError):
+            return None
+        return fleet.unknown_expedition(spec) if isinstance(spec, dict) else None
     return None
 
 
@@ -286,6 +304,8 @@ def add(text: str, top: bool = False, goal_id: str | None = None) -> None:
     if not text:
         return
     parsed = parse_line(text)
+    if parsed["kind"] == "spec" and (why := _refused_expedition(parsed["payload"])):
+        raise ValueError(f"{text!r} {why}")
     if goal_id is None and parsed["kind"] == "spec":
         goal_id = _goal_of_spec(parsed["payload"])
     if goal_id:

@@ -106,10 +106,10 @@ def _metric(run: str, name: str, which: str = "last"):
 
 
 def api_runs() -> list[dict]:
-    if _ledger_pg():
-        from thorp import ledger_store
+    if _ledger_pg():  # every run's latest hole-card bpb in one query (11 November, audit item 7)
+        from thorp.dash import batched
 
-        runs = ledger_store.all_runs()
+        return batched.runs()
     else:
         runs = _rows(
             "select run_id, name, ship, status, started, finished, tokens_seen, wall_minutes,"
@@ -124,11 +124,23 @@ def api_runs() -> list[dict]:
     return runs
 
 
-def api_metrics(run: str) -> dict:
-    if _ledger_pg():
-        from thorp import ledger_store
+def api_metrics(run: str, names: str = "", points: str = "") -> dict:
+    """{name: [[steps], [values]]} for a run. Optional bounds (11 November, audit item 7: one run's answer was
+    16 MB): `names` a comma list (an entry ending in `*` is a prefix), `points` a cap per series that keeps each
+    series' first, last, lowest and highest point. Neither given: every series in full, as before."""
+    from thorp.dash import batched
 
-        return ledger_store.metrics_series(run)
+    if _ledger_pg():
+        return batched.metrics(run, names, points)
+    if names or points:
+        full = _api_metrics_sqlite(run)
+        keep = batched.wanted(names, list(full)) if names else list(full)
+        cap = batched.cap_of(points)
+        return {k: batched.downsample(full[k][0], full[k][1], cap) if cap > 0 else full[k] for k in keep}
+    return _api_metrics_sqlite(run)
+
+
+def _api_metrics_sqlite(run: str) -> dict:
     out: dict[str, list] = {}
     con = _con()
     try:
@@ -322,6 +334,10 @@ def _run_id(key: str) -> str | None:
 
 def _run_row_by_name(name: str) -> dict | None:
     """The latest run with this name (the SQLite `select * from runs where name=? order by started desc limit 1`)."""
+    if _ledger_pg():  # one query, not every run read (11 November, audit item 7)
+        from thorp import ledger_store
+
+        return ledger_store.get_run_by_name(name)
     for r in reversed(_runs_rows()):
         if r.get("name") == name:
             return r
@@ -410,6 +426,10 @@ def api_run(run: str) -> dict:
 
 def api_compare() -> list[dict]:
     """Per run: the first eval set's bpb mean at each eval step, with tokens seen at that step."""
+    if _ledger_pg():  # six queries for every run, not seven a run (11 November, audit item 7)
+        from thorp.dash import batched
+
+        return batched.compare()
     out = []
     for r in api_runs():
         rid = r["run_id"]
@@ -530,6 +550,10 @@ QUEUES = ("9m-order.txt", "content-order.txt")
 
 def _last_scores(run_ids: list[str]) -> dict[str, dict[str, float]]:
     """Every run's latest eval/* and laws/* values: the last write for each name wins, as in _metric."""
+    if _ledger_pg():  # from s1.metric_latest, every run in one query (11 November, audit item 7)
+        from thorp.dash import batched
+
+        return batched.last_scores(run_ids)
     out: dict[str, dict[str, float]] = {}
     for run in run_ids:
         got: dict[str, float] = {}
@@ -1244,6 +1268,165 @@ def _shape_params(
     return _SHAPE_PARAMS[key]
 
 
+_SEED_MODES = {  # thorp/train.py: what the inherited weights do during the leg
+    "free": "every inherited weight keeps learning",
+    "slow": "the inherited weights learn at a reduced rate",
+    "freeze": "the inherited weights stay as they were",
+}
+_TURN_SHAPES = {  # thorp/turns.py pair()
+    "marks": "<question>Q<answer>A<end>",
+    "plain": "Question: Q / Answer: A",
+}
+_SEEDED: dict = {"key": None, "by_seed": {}}
+_EVAL_WORDS: dict[str, str | None] = {}
+
+
+def _seeded_index() -> dict[str, list[dict]]:
+    """Every fitout spec that is seeded from another voyage, by the seed's name: the legs that follow a
+    voyage. Rebuilt only when a spec file changes (the queue page is polled and there are hundreds of specs)."""
+    import yaml
+
+    files = sorted(paths.resolve("specs/fitouts").glob("*.yaml"))
+    key = (len(files), max((f.stat().st_mtime_ns for f in files), default=0))
+    if _SEEDED["key"] != key:
+        by_seed: dict[str, list[dict]] = {}
+        for f in files:
+            try:
+                s = yaml.safe_load(f.read_text()) or {}
+            except (OSError, ValueError):
+                continue
+            seed = (s.get("seeded_from") or {}).get("run") if isinstance(s.get("seeded_from"), dict) else None
+            if seed:
+                by_seed.setdefault(seed, []).append(s)
+        _SEEDED.update(key=key, by_seed=by_seed)
+    return _SEEDED["by_seed"]
+
+
+def _evaluator_words(name: str) -> str | None:
+    """What an evaluator reads, in its own words: the first sentence of its module's docstring, read from
+    the file (never imported: an evaluator pulls in MLX)."""
+    if name not in _EVAL_WORDS:
+        import ast
+
+        words = None
+        try:
+            doc = ast.get_docstring(ast.parse((paths.BACKEND / "thorp" / "evaluators" / f"{name}.py").read_text()))
+            if doc:
+                words = " ".join(doc.split("\n\n")[0].split())
+        except (OSError, SyntaxError):
+            words = None
+        _EVAL_WORDS[name] = words
+    return _EVAL_WORDS[name]
+
+
+def _turn_keys(recipes: list[str]) -> set[int]:
+    """The IFEval prompt keys a voyage trains on: its recipes' instruction turns (`local:ifp-m-13` is key 13)."""
+    import csv
+
+    keys: set[int] = set()
+    for recipe in recipes:
+        try:
+            with open(paths.resolve(recipe), encoding="utf-8", newline="") as f:
+                for r in csv.DictReader(f):
+                    m = re.fullmatch(r"local:ifp-[a-z]+-(\d+)", str(r.get("text") or ""))
+                    if m:
+                        keys.add(int(m.group(1)))
+        except OSError:
+            continue
+    return keys
+
+
+def _stage_rows(data: dict) -> list[dict]:
+    """A voyage's stages in the order it reads them, each with its book count (one stage when it names none)."""
+    stages = data.get("stages") or [{"name": "content", "recipe": data.get("recipe"), "passes": data.get("passes")}]
+    return [
+        {"name": s.get("name"), "recipe": s.get("recipe"), "passes": s.get("passes", 1),
+         "books": _content_version(s.get("recipe")).get("books")}
+        for s in stages
+    ]
+
+
+def _post_readings(spec: dict) -> dict:
+    """How a leg is judged: when it is read, on which sets, and each evaluator with its own options. For
+    the two readings that write answers, how many of the prompts they ask are in the leg's own training
+    turns, counted from the lists: a reading on prompts the ship was trained on is not a held-out one."""
+    ev = spec.get("eval") or {}
+    data = spec.get("data") or {}
+    options = ev.get("options") or {}
+    every = ev.get("every_steps")
+    trained: set[int] | None = None
+    rows = []
+    for name in ev.get("evaluators") or []:
+        opts = options.get(name) if isinstance(options.get(name), dict) else {}
+        row = {"name": name, "what": _evaluator_words(name), "options": opts, "seen": None}
+        if name in ("answers", "ifeval"):
+            if trained is None:
+                trained = _turn_keys([s["recipe"] for s in _stage_rows(data) if s.get("recipe")])
+            try:
+                if name == "answers":
+                    held = paths.resolve(str(opts.get("heldout") or "lists/return-heldout-v1.jsonl"))
+                    asked = {json.loads(ln)["key"] for ln in held.read_text(encoding="utf-8").splitlines() if ln.strip()}
+                    row["seen"] = {"n": len(asked & trained), "of": len(asked), "set": held.name}
+                elif trained:
+                    row["seen"] = {"n": len(trained), "of": 541, "set": "the official prompts"}
+            except (OSError, ValueError, KeyError):
+                row["seen"] = None
+        rows.append(row)
+    return {
+        "every_steps": every,
+        # train.py reads at `step % every == 0 or step == total`: an interval no voyage reaches is "at the end"
+        "when": "once, when it docks" if every and int(every) >= 10**8 else f"every {int(every):,} steps and when it docks" if every else None,
+        "sets": ev.get("sets") or [],
+        "evaluators": rows,
+    }
+
+
+def _post_training(spec: dict) -> dict:
+    """What the post-training does, for the queue's card (11 November, Justin: "in the voyage modal we need
+    to see what the posttraining does"). For a leg (a spec with `seeded_from`): the voyage it starts from
+    and where that voyage stands, what happens to the inherited weights, whether the scaffold still pulls,
+    the turn format, the stages in order and how the leg is read. For any voyage: the legs seeded from it."""
+    o = spec.get("optim") or {}
+    data = spec.get("data") or {}
+    sc = o.get("scaffold") or {}
+    seed = spec.get("seeded_from") if isinstance(spec.get("seeded_from"), dict) else None
+    out: dict = {"leg": bool(seed), "seed": None, "legs": []}
+    if seed:
+        row = _run_row_by_name(seed.get("run") or "") or {}
+        rid = row.get("run_id")
+        try:
+            seed_spec = json.loads(row.get("spec_json") or "{}")
+        except ValueError:
+            seed_spec = {}
+        mode = seed.get("mode") or "free"
+        out["seed"] = {
+            "run": seed.get("run"), "mode": mode, "mode_words": _SEED_MODES.get(mode), "at_step": seed.get("step"),
+            "status": ("at sea" if row.get("status") == "running" else row.get("status")) if row else None,
+            "step": _latest_step(rid) if rid else None,
+            "total": _latest(rid, "plan/total_steps") if rid else None,
+            "bpb": _latest_bpb(rid) if rid else None,
+            "lr": (seed_spec.get("optim") or {}).get("lr"),
+        }
+        weight = sc.get("weight")
+        out["pull"] = {
+            "weight": weight, "pins": len(sc.get("heads") or []), "riddles": len(sc.get("riddles") or {}),
+            "off": not sc or (weight is not None and float(weight) == 0.0),
+        }
+        fmt = data.get("turns")
+        out["turns"] = {"format": fmt, "shape": _TURN_SHAPES.get(fmt)} if fmt else None
+        out["stages"] = _stage_rows(data)
+        out["lr"] = o.get("lr")
+        out["read"] = _post_readings(spec)
+    for leg in _seeded_index().get(spec.get("name") or "", []):
+        ld = leg.get("data") or {}
+        out["legs"].append({
+            "name": leg.get("name"), "ship": leg.get("ship"), "mode": (leg.get("seeded_from") or {}).get("mode") or "free",
+            "turns": ld.get("turns"), "lr": (leg.get("optim") or {}).get("lr"), "stages": _stage_rows(ld),
+            "evaluators": (leg.get("eval") or {}).get("evaluators") or [],
+        })
+    return out
+
+
 def _spec_detail(spec: dict, run: dict | None = None) -> dict:
     """Everything a voyage's spec fixes, for the card the queue opens (11 November): the model's shape,
     its tokeniser, what it reads, its optimiser and schedule, the scaffold's pins and riddles, and, once
@@ -1304,10 +1487,12 @@ def _spec_detail(spec: dict, run: dict | None = None) -> dict:
             "train_on": tok.get("train_on"), "symbols": tok.get("symbols") or [],
         },
         "data": {
-            "recipe": data.get("recipe"), "passes": data.get("passes"), "stages": data.get("stages") or [],
+            "recipe": data.get("recipe"), "passes": data.get("passes"),
+            "stages": _stage_rows(data) if data.get("stages") else [],
             "order": data.get("order"), "refuse": data.get("refuse") or [], "clean": data.get("clean"),
             "opt_in": data.get("opt_in"),
         },
+        "post": _post_training(spec),
         "optim": {
             "name": o.get("name"), "lr": o.get("lr"), "warmup_steps": o.get("warmup_steps"),
             "schedule": o.get("schedule"), "min_lr_ratio": o.get("min_lr_ratio"),
@@ -2854,7 +3039,7 @@ def _sizes_by_list() -> dict[str, set[str]]:
 
 
 def _browse_build() -> dict:
-    from thorp import library, selection
+    from thorp import library, library_configs, selection
     from thorp import library_facts as lf
 
     facts_all = lf.build()
@@ -2885,6 +3070,12 @@ def _browse_build() -> dict:
             read_by.setdefault(st["shelf"], []).append(f["key"])
     sizes_by_list = _sizes_by_list()  # list path -> the sizes that have read it (the ledger's evidence)
     size_rank = {r["preset"]: i for i, r in enumerate(_sizes_all())}
+    configs_by: dict[str, list[dict]] = {}
+    try:  # the table may not be migrated yet: the branch page still opens, with no saved configurations
+        for c in fitout_store.configurations():
+            configs_by.setdefault(c["branch_key"], []).append(c)
+    except Exception:  # noqa: BLE001
+        configs_by = {}
     branches = []
     for b in brs:
         vs = []
@@ -2896,7 +3087,12 @@ def _browse_build() -> dict:
                        "sizes": sorted(sizes_by_list.get(v.get("list") or "", set()), key=lambda p: size_rank.get(p, 99)),
                        "books": sorted(index[i] for i in ids if i in index)})
         sizes = sorted({p for v in vs for p in v["sizes"]}, key=lambda p: size_rank.get(p, 99))
-        branches.append({"key": b["key"], "name": b["name"], "purpose": b["purpose"], "variations": vs, "sizes": sizes})
+        branches.append({
+            "key": b["key"], "name": b["name"], "purpose": b["purpose"], "variations": vs, "sizes": sizes,
+            "attributes": library_configs.attributes(b["key"]),
+            "default_choices": library_configs.defaults(b["key"], b["variations"]),
+            "configurations": configs_by.get(b["key"], []),
+        })
     return {
         "branches": branches, "branches_stored": stored,
         "sizes": _sizes_all(),
@@ -2917,6 +3113,55 @@ def api_library_browse() -> dict:
     kind, date, language, collection, voice, source and Ogden-ness. Built warm: the first call may answer `computing`."""
     value, busy, error = _warm("library_browse", _browse_build, ttl=3600.0)
     return value if value is not None else {"computing": busy, "error": error}
+
+
+def api_library_configs(branch: str) -> dict:
+    """A branch's saved configurations, read live (the branch payload's copy is warm and may lag a save)."""
+    from thorp.viable.s3_control import fitout_store
+
+    try:
+        return {"configurations": fitout_store.configurations(branch)}
+    except Exception as e:  # noqa: BLE001  the table may not be migrated yet
+        return {"configurations": [], "error": str(e)}
+
+
+def api_library_config_preview(body: dict) -> dict:
+    """What a branch configuration holds right now (thorp/library_configs.py): the books it chooses, the words,
+    the makeup by kind/voice/source/period, and the selection spec it composes to. The branch page's sliders
+    call this as they move; it reads the facts warm."""
+    from thorp import library_configs
+    from thorp import library_facts as lf
+
+    branch = str(body.get("branch") or "")
+    choices = library_configs.validate(branch, body.get("choices") or {})
+    facts, busy, error = _warm("library_facts", lf.build, ttl=3600.0)
+    if facts is None:
+        return {"computing": busy, "error": error}
+    return library_configs.preview(branch, choices, facts)
+
+
+def api_library_config_save(body: dict) -> dict:
+    """Save a branch's JSON of choices, content-addressed by the choices themselves. A new save with the same
+    choices updates its name and note; a different JSON is a different configuration, never a version."""
+    from thorp import library_branches, library_configs
+    from thorp.viable.s3_control import fitout_store
+
+    branch = str(body.get("branch") or "")
+    choices = library_configs.validate(branch, body.get("choices") or {})
+    fitout_store.migrate()
+    fitout_store.seed_branches(library_branches.DEFAULTS)
+    return fitout_store.save_configuration(
+        branch, str(body.get("name") or ""), choices, about=str(body.get("about") or ""), by="the branch page"
+    )
+
+
+def api_library_config_delete(body: dict) -> dict:
+    from thorp.viable.s3_control import fitout_store
+
+    key = str(body.get("key") or "")
+    if not key:
+        raise ValueError("a configuration key is needed")
+    return {"deleted": fitout_store.delete_configuration(key), "key": key}
 
 
 def api_selection(fitout: str) -> dict:
@@ -3869,6 +4114,10 @@ def api_bridge() -> dict:
     from thorp import fleet
 
     st = getattr(fleet, "STARS", {}).get("bridge")
+    if _ledger_pg():  # the latest readings from s1.metric_latest, every run in one query (11 November, audit item 7)
+        from thorp.dash import batched
+
+        return {"threshold": getattr(st, "threshold", None), "runs": batched.bridge_rows(_runs_rows())}
     out = []
     for run in _runs_rows():
         rid = run["run_id"]
@@ -6365,6 +6614,9 @@ class Handler(BaseHTTPRequestHandler):
             return self._onboard_post(u.path)
         posts = {
             "/api/table/reply": api_table_reply,
+            "/api/library_config/preview": api_library_config_preview,
+            "/api/library_config/save": api_library_config_save,
+            "/api/library_config/delete": api_library_config_delete,
             "/api/fitouts/save": api_fitout_save,
             "/api/shipbuilder/save": api_shipbuilder_save,
             "/api/fitouts/queue": api_fitout_queue,
@@ -6444,7 +6696,7 @@ class Handler(BaseHTTPRequestHandler):
             routes = {
                 "/api/runs": lambda: api_runs(),
                 "/api/waters": api_waters,
-                "/api/metrics": lambda: api_metrics(q["run"]),
+                "/api/metrics": lambda: api_metrics(q["run"], q.get("names", ""), q.get("points", "")),
                 "/api/evals": lambda: api_evals(q["run"]),
                 "/api/run": lambda: api_run(q["run"]),
                 "/api/compare": lambda: api_compare(),
@@ -6502,6 +6754,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/fitout_builder": api_fitout_builder,
                 "/api/selection": lambda: api_selection(q["fitout"]),
                 "/api/library_browse": api_library_browse,
+                "/api/library_configs": lambda: api_library_configs(q.get("branch", "")),
                 "/api/shelf_trigrams": lambda: api_shelf_trigrams(q["path"]),
                 "/api/knockout": lambda: api_knockout(q.get("model", "")),
                 "/api/class_score": lambda: api_class_score(q["preset"], q.get("runs", "")),

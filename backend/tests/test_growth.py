@@ -2,11 +2,20 @@
 
 import mlx.core as mx
 import numpy as np
+import pytest
 from mlx.utils import tree_flatten, tree_unflatten
 
 from thorp.growth import grow
 from thorp.models.gpt_mlx import GPT
 from thorp.models.registry import GPTConfig
+
+
+@pytest.fixture(autouse=True)
+def _sqlite_ledger(monkeypatch):
+    """These voyages write the SQLite ledger (ledger.Ledger(), the test's own file) and find their seed, donor and
+    teacher by name through train's reader: so the reader is that ledger too, not Postgres (11 November: every test
+    here but the first looked its parent up in the store, found nothing and failed)."""
+    monkeypatch.setenv("THORP_LEDGER_PG", "0")
 
 
 def test_grown_model_predicts_like_its_seed():
@@ -46,10 +55,10 @@ def test_a_seeded_run_starts_from_its_seed_and_freezes_it(library, spec):
     seed_spec = copy.deepcopy(spec)
     seed_spec["name"] = "seedling"
     prep = train.prepare(seed_spec, resolver=library["resolver"], log=quiet)
-    train.train(seed_spec, prep, rec=rec, log=quiet)  # the tiny preset: 2 layers x 64, 2 heads
+    train.train(seed_spec, prep, rec=rec, log=quiet)  # the tiny shape: 2 layers x 64, 2 heads
     grown = copy.deepcopy(spec)
     grown["name"] = "grown"
-    grown["model"]["preset"] = "1m"  # 4 layers x 128, 4 heads of 32
+    grown["model"].update(preset="1m", layers=4, width=128, heads=4)  # 4 layers x 128, 4 heads of 32 (the old 1m)
     grown["seeded_from"] = {"run": "seedling", "mode": "freeze"}
     grown["checkpoint"] = {"every_steps": 10}  # so the interrupted run leaves a checkpoint
     out = train.train(grown, prep, rec=rec, stop_after=20, log=quiet)
@@ -91,7 +100,7 @@ def test_transplant_hands_over_the_donors_heads(library, spec):
     got = dict(tree_flatten(new))
     src = dict(tree_flatten(train.load_master(train.latest_checkpoint(train.run_id(donor)))))
     layer, h = handed["layer"], handed["heads"][0]
-    hd = 64 // 2  # the tiny preset: width 64, two heads
+    hd = 64 // 2  # the tiny shape: width 64, two heads
     rows = slice(h * hd, (h + 1) * hd)
     qkv = f"layers.{layer}.attn.qkv.weight"
     assert np.allclose(

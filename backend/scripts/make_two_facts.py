@@ -205,20 +205,13 @@ def pick() -> list[str]:
         best = "all"
     lines.append(f"carried to the speller: {best}")
     names = [write(r2_spec("speller", best, seed, ROUND2[best])) for seed in (1, 2)]
-    q = ROOT / "specs" / "queue.txt"
-    ql = q.read_text().split("\n")
-    at = (
-        max(
-            (i for i, line in enumerate(ql) if line.startswith("two-facts/tf-base-speller")),
-            default=-1,
-        )
-        + 1
-    )
-    block = [
-        f"# The two-fact problem, round 2 on the speller (written by make_two_facts.py --pick): {best}"
-    ] + names
-    ql = ql[:at] + block + ql[at:]
-    q.write_text("\n".join(ql))
+    # the store is the queue (11 November), not specs/queue.txt: the block goes in after the base speller's lines
+    from thorp.viable.s2_coordination import queue_read, queue_store
+
+    ql = queue_read.pending()
+    at = max((i for i, line in enumerate(ql) if line.startswith("two-facts/tf-base-speller")), default=-1) + 1
+    for k, n in enumerate(queue_read.add(names)):
+        queue_store.move(n, at + k + 1)  # 1-based
     (ROOT / "data" / "runs" / "two-facts" / "round2-pick.md").write_text("\n".join(lines) + "\n")
     print("\n".join(lines))
     return names

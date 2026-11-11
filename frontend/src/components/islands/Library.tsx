@@ -5,6 +5,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { MouseEvent as ReactMouseEvent } from 'react';
+import BranchConfig, { type ConfigChoices, type SavedConfig } from './BranchConfig';
 import { big, periodOf } from '@/lib/format';
 import { libraryBranchHref, libraryBranchOf } from '@/lib/nav';
 import { cardCls, emptyCls, fieldCls, pillCls, selectCls } from '@/lib/ui';
@@ -48,6 +49,9 @@ interface Branch {
   purpose: string;
   variations: Variation[];
   sizes?: string[];
+  attributes?: string[];
+  default_choices?: ConfigChoices;
+  configurations?: SavedConfig[];
 }
 interface Size { preset: string; name: string }
 interface Collection { path: string; name: string; kind: string; about?: string; books: number }
@@ -152,7 +156,7 @@ export default function Library({ initialPath = '/library' }: { initialPath?: st
     <div {...sectionProps('shelves')}>
       <h1>Library <span className="q">every list of books Nothing up my sleeve reads from, is scored on or is drafting: how many books are fetched, about how many tokens they hold, their language families, and the voyages that read them</span></h1>
       <section className={cardCls(false, 'panel')} id="browsepanel">
-        <h2>The library <span className="note">it starts with branches, each a purpose its books are gathered for (Ogden, the decks, the content experiment...). Open a branch to see its variations, then explore what is in it by kind, date, language, collection, voice and source: click a card to filter</span></h2>
+        <h2>The library <span className="note">it starts with branches, each a purpose its books are gathered for (Ogden, the decks, the content experiment...). Open a branch to compose a JSON of choices and save it under a name; the lists it has already sailed stay beneath it, locked</span></h2>
         <div id="browse">
           {(() => {
             const b = browse.data as any;
@@ -337,7 +341,7 @@ function Branches({ br, sizes, setSizes, onOpen }: { br: BrowseData; sizes: Set<
   const sizeName = (p: string) => ((br.sizes || []).find((s) => s.preset === p) || { name: p }).name;
   return (
     <>
-      <div className="k">Branches <span className="s">a branch is a purpose the books are gathered for; open one to see its variations and explore what is in it</span></div>
+      <div className="k">Branches <span className="s">a branch is a purpose the books are gathered for; open one to compose a configuration and explore what is in it</span></div>
       <div className="bhand">
         <span className="k">Ships that work it</span>{' '}
         {(br.sizes || []).map((s) => (
@@ -360,7 +364,7 @@ function Branches({ br, sizes, setSizes, onOpen }: { br: BrowseData; sizes: Set<
             >
               <span className="bbname">{b.name}</span>
               <span className="bbpurpose">{b.purpose}</span>
-              <span className="bbnum"><b>{vars.length}</b> variation{vars.length === 1 ? '' : 's'} · <b>{t.n.toLocaleString()}</b> books · {big(t.w)} words</span>
+              <span className="bbnum"><b>{vars.length}</b> sailed · <b>{t.n.toLocaleString()}</b> books · {big(t.w)} words</span>
               <span className="bbnum s bbwork">ships: {sz}</span>
               <span className="bbvars">
                 {vars.slice(0, 6).map((v) => <span key={v.key} className="selchip">{v.name}</span>)}{' '}
@@ -391,6 +395,13 @@ function BranchView({ br, branch, vars, sizes, f, setVars, setF, onBack }: {
     setF((p) => ({ ...blankFilters(), sort: p.sort }));
   };
 
+  // the branch's whole shelf: what the configuration editor draws on, independent of the old list picked below
+  const branchBooks = useMemo(() => {
+    const ix = new Set(branch.variations.flatMap((v) => v.books));
+    return [...ix].sort((a, b) => a - b).map((i) => br.books[i]);
+  }, [branch, br.books]);
+  const branchWords = useMemo(() => bSum(branchBooks).w, [branchBooks]);
+  const lists = useMemo(() => branch.variations.filter((v) => v.list).map((v) => ({ key: v.key, name: v.name, list: v.list! })), [branch]);
   const scope = useMemo(() => {
     const vs = branch.variations.filter((v) => !vars.size || vars.has(v.key));
     const ix = new Set(vs.flatMap((v) => v.books));
@@ -477,7 +488,17 @@ function BranchView({ br, branch, vars, sizes, f, setVars, setF, onBack }: {
         <a className="selchip" href="/library" onClick={(e) => plainClick(e, onBack)}>Library</a> <span className="s">›</span> <b>{branch.name}</b>
       </div>
       <p className="foaim">{branch.purpose}</p>
-      <div className="k">Variations <span className="s">pick one or more to look at just those; none picked is all of them together{sizes.size ? `; dimmed: not read at ${[...sizes].map(sizeName).join(' or ')}` : ''}</span></div>
+      <BranchConfig
+        branchKey={branch.key}
+        branchName={branch.name}
+        books={branchBooks}
+        attributes={branch.attributes || []}
+        defaults={branch.default_choices || {}}
+        configurations={branch.configurations || []}
+        totalWords={branchWords}
+        lists={lists}
+      />
+      <div className="k mt">Sailed configurations <span className="s">the named lists this branch has already sailed, locked: pick one or more to look at just those, or none for all of them together{sizes.size ? `; dimmed: not read at ${[...sizes].map(sizeName).join(' or ')}` : ''}</span></div>
       <div className="bcards bvars">
         {branch.variations.map((v) => {
           const t = bSum(v.books.map((i) => br.books[i]));
@@ -485,7 +506,7 @@ function BranchView({ br, branch, vars, sizes, f, setVars, setF, onBack }: {
           const sz = (v.sizes || []).map(sizeName).join(', ') || 'not sailed yet';
           return (
             <button key={v.key} type="button" className={`bcard bvar${vars.has(v.key) ? ' on' : ''}${worked ? '' : ' none'}`} title={v.about || ''} onClick={() => toggleVar(v.key)}>
-              <span className="bname">{v.name}{v.draft ? <span className="s"> draft</span> : null}</span>
+              <span className="bname">{v.name}<span className="s"> locked</span>{v.draft ? <span className="s"> draft</span> : null}</span>
               <span className="bnum">{t.n.toLocaleString()}<span className="s"> books · {big(t.w)}</span></span>
               <span className="s">{v.kind === 'selection' ? 'a selection, not a list' : v.kind === 'all' ? 'the whole library' : v.list}</span>
               <span className="s">ships: {sz}</span>
@@ -494,11 +515,11 @@ function BranchView({ br, branch, vars, sizes, f, setVars, setF, onBack }: {
           );
         })}
       </div>
-      <div className="k mt">What is in {vars.size ? [...vars].map((k) => byKey[k].name).join(' + ') : 'the branch'}</div>
+      <div className="k mt">What is in the sailed {vars.size ? [...vars].map((k) => byKey[k].name).join(' + ') : 'branch'}</div>
       <div className="bsummary"><b>{cur.n.toLocaleString()}</b> of {tot.n.toLocaleString()} books · <b>{big(cur.w)}</b> of {big(tot.w)} words{chips.length ? <button type="button" className="selchip bclear" onClick={() => setF(blankFilters())}>clear all</button> : null}</div>
       <div className="selchips">{chips}</div>
       <div className="bfacets">{facets}</div>
-      <div className="k mt">The books <span className="s">sorted by <select className={selectCls('')} value={sort} onChange={(e) => setF({ ...f, sort: e.target.value as Filters['sort'], more: 200 })}><option value="words">length</option><option value="year">year</option><option value="title">title</option><option value="ogden">Ogden-ness</option></select> · hover a kind or voice for the rule that placed it</span></div>
+      <div className="k mt">The books in this sailed view <span className="s">sorted by <select className={selectCls('')} value={sort} onChange={(e) => setF({ ...f, sort: e.target.value as Filters['sort'], more: 200 })}><option value="words">length</option><option value="year">year</option><option value="title">title</option><option value="ogden">Ogden-ness</option></select> · hover a kind or voice for the rule that placed it</span></div>
       <div className="scroll">
         <table className="selbooks">
           <thead><tr><th>book</th><th>writer</th><th>lang</th><th>year</th><th>kind</th><th>voice</th><th>source</th><th>Ogden</th><th>words</th><th>collections</th></tr></thead>
@@ -519,7 +540,7 @@ function BranchView({ br, branch, vars, sizes, f, setVars, setF, onBack }: {
       </div>
       {rows.length > f.more ? <button type="button" className="selchip bmore" onClick={() => setF({ ...f, more: f.more + 200 })}>show 200 more ({rows.length - f.more} left)</button> : null}
       <details className="mt">
-        <summary>This view as a fitout's selection <span className="s">the same filters as declared weights and filters (thorp/selection.py); the shares are this view's, to be set by hand</span></summary>
+        <summary>This sailed view as a fitout's selection <span className="s">the same filters as declared weights and filters (thorp/selection.py); the shares are this view's, to be set by hand</span></summary>
         <pre className="bspec">{JSON.stringify(spec, null, 1)}</pre>
       </details>
       <div className="s mt">Library facts {br.fingerprint}; the year is an estimate (no catalogue we hold gives a publication date), the kind and voice are read from subjects, bookshelves and credits; each carries its rule.</div>

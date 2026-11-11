@@ -71,17 +71,26 @@ def at_sea() -> dict[str, str]:
     the ship docks.
     """
     out: dict[str, str] = {}
-    with contextlib.suppress(Exception):
+    from thorp.ledger import _use_pg
+
+    if _use_pg():
+        # at home the store is the ledger: a store that is down raises StoreDown rather than reading the old
+        # ledger.sqlite, whose 'running' rows stopped moving at the cut-over (11 November)
         from sqlalchemy import text
 
         from thorp import store
 
-        with store.session() as s:
-            rows = s.execute(
-                text("select sop_version, name from s1.runs where status = 'running' and sop_version is not null")
-            )
-            return {str(v): str(n or "") for v, n in rows}
-    # the store is down: the SQLite ledger still knows the version, inside the spec
+        try:
+            with store.session() as s:
+                rows = s.execute(
+                    text("select sop_version, name from s1.runs where status = 'running' and sop_version is not null")
+                )
+                return {str(v): str(n or "") for v, n in rows}
+        except store.StoreDown:
+            raise
+        except Exception:  # noqa: BLE001  a store without the column yet: no version is locked
+            return out
+    # a hired box's own SQLite ship's log: it knows the version inside the spec
     with contextlib.suppress(Exception):
         import json
 

@@ -156,6 +156,8 @@ a.crumb:not(:empty)::after { content: ' ›'; }
 .qvsubhead { margin-top: 6px; font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
 .qvlist { display: grid; gap: 3px; margin: 0; padding-left: 18px; }
 .qvlist li { font-size: var(--fs-sm); }
+.qvsteps { list-style: decimal; padding-left: 20px; }
+.qvseen { margin-top: 3px; padding: 4px 8px; border-left: 2px solid var(--bad); color: var(--bad); font-size: var(--fs-xs); line-height: 1.4; }
 .qvcards { display: flex; flex-wrap: wrap; gap: 5px 8px; }
 .qvfoot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; border-top: 1px solid var(--line); padding-top: 12px; }
 @media (max-width: 800px) { .qvgrid { grid-template-columns: 1fr; } .qvwrap { padding: 14px 14px 16px; } }
@@ -2191,3 +2193,41 @@ ol.goaltext { padding-left: 22px; }
 #shelves .bookbtn:hover { background: #131110; color: #f2e6cf; padding-left: 14px; }
 #shelves .bookbtn.off { color: #6f6047; }
 #shelves .mono.s { color: #6f6047; }
+/* the branch's configuration: a JSON of choices, edited with sliders. The panel is the catalogue room's
+   working table: ink ground, brass rules, tabular numbers; the saved configurations are cards beneath. */
+#shelves .cfgpanel {
+  display: grid; gap: 12px; margin: 14px 0 20px; padding: 12px 0 16px;
+  border-top: 1px solid #3a2a12; border-bottom: 1px solid #3a2a12;
+}
+#shelves .cfggrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px 26px; }
+#shelves .cfgblock { display: grid; gap: 6px; min-width: 0; }
+#shelves .cfgsliders { display: grid; gap: 3px; }
+#shelves .cfgslider {
+  display: grid; grid-template-columns: minmax(100px, 150px) 1fr 46px; gap: 8px; align-items: center;
+  font-size: var(--fs-sm); color: #e9e2d3;
+}
+#shelves .cfgslider > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#shelves .cfgslider input[type=range] { width: 100%; accent-color: #c9a24a; }
+#shelves .cfgslider > b { text-align: right; color: #c9a24a; font-variant-numeric: tabular-nums; }
+#shelves .cfgbrief {
+  padding: 8px 10px; border: 1px solid #3a2a12; background: #0e0d0b; color: #e9e2d3;
+  font-size: var(--fs-sm); line-height: 1.5;
+}
+#shelves .cfgbrief b { color: #c9a24a; font-variant-numeric: tabular-nums; }
+#shelves .cfgsave { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+#shelves .cfgname { width: 220px; }
+#shelves .cfgabout { width: 280px; }
+#shelves .cfgnum { width: 10ch; }
+#shelves .cfgundated { width: auto; min-width: 13ch; }
+#shelves .cfgedit {
+  width: 100%; min-height: 260px; font-family: var(--mono, ui-monospace, monospace); font-size: var(--fs-xs);
+  background: #0b0a09; color: #f2e6cf; border: 1px solid #6b5628; border-radius: 2px; padding: 8px;
+}
+#shelves .cfgcards { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 10px; }
+#shelves .cfgcard {
+  display: grid; gap: 4px; padding: 10px 12px; background: #0e0d0b;
+  border: 1px solid #2a1d0d; border-radius: 2px; font-size: var(--fs-sm);
+}
+#shelves .cfgcard .cfgname { display: flex; justify-content: space-between; gap: 8px; color: #f2e6cf; }
+#shelves .cfgpeek summary, #shelves .cfgcard summary { cursor: pointer; color: #d8b566; font-size: var(--fs-sm); }
+#shelves .cfgpeek .bspec, #shelves .cfgcard .bspec { max-height: 240px; overflow: auto; }

@@ -209,12 +209,12 @@ def _fitout(key: str | None) -> dict:
 def _like_run(recipe: str | None, preset: str | None) -> dict:
     """The last finished voyage on this Mac of the same corpus and size: its steps and tokens (the material's
     size and the voyage's length, which only preparing the voyage would otherwise tell)."""
-    from thorp.ledger import Ledger
+    from thorp.ledger import reader  # the one store's ledger (11 November), not ledger.sqlite
 
     if not recipe:
         return {}
     with contextlib.suppress(Exception):
-        rows = Ledger().query(
+        rows = reader().query(
             "select r.tokens_seen t, (select max(step) from metrics where run_id=r.run_id and name='loss') s,"
             " json_extract(r.spec_json,'$.data.passes') p from runs r where r.status='finished'"
             " and json_extract(r.spec_json,'$.data.recipe')=? and json_extract(r.spec_json,'$.model.preset')=?"
@@ -326,7 +326,7 @@ def _voyage(ln, wall: dict) -> dict:
 
     spec = ln.spec or {}
     m = spec.get("model") or {}
-    ex = fleet.expedition_of_label(spec.get("name"), spec.get("ship"))
+    ex = fleet.expedition_of_spec(spec)
     return {
         "name": ln.name or ln.payload,
         "spec": ln.payload,
@@ -375,10 +375,10 @@ def _item(ln, wall: dict, steps: dict | None = None) -> dict:
 
 def _step_now(name: str | None) -> int | None:
     """The last step a voyage at sea has recorded (its running row on the ledger)."""
-    from thorp.ledger import Ledger
+    from thorp.ledger import reader  # the one store's ledger (11 November), not ledger.sqlite
 
     with contextlib.suppress(Exception):
-        rows = Ledger().query(
+        rows = reader().query(
             "select (select max(step) from metrics m where m.run_id=r.run_id and m.name='loss') s from runs r"
             " where r.name=? and r.status='running' order by r.started desc limit 1",
             [name],
@@ -399,8 +399,10 @@ def waters() -> dict:
     from thorp.viable.s5_policy import charter as s5
 
     wall, steps = _wall_minutes(), _step_minutes()
-    q = paths.resolve("specs/queue.txt")
-    lines = [lanes.parse(t, q.parent) for t in lanes.pending(q)]
+    from thorp.viable.s2_coordination import queue_read
+
+    specs = paths.resolve("specs")  # where a queue line's spec lives
+    lines = [lanes.parse(t, specs) for t in queue_read.pending()]  # the store's queue (11 November)
     st = lanes.state()
     key = lanes.has_key()
     now = time.time()
@@ -412,7 +414,7 @@ def waters() -> dict:
         if not r:
             at_sea[lane], ahead[lane] = None, 0.0
             continue
-        it = _item(lanes.parse(r["line"], q.parent), wall, steps)
+        it = _item(lanes.parse(r["line"], specs), wall, steps)
         gone = _since_min(r.get("since"))
         left = None if it.get("est_min") is None or gone is None else max(0.0, it["est_min"] - gone)
         at_sea[lane] = {**it, "since": r.get("since"), "pid": r.get("pid"), "elapsed_min": round(gone) if gone is not None else None,
@@ -455,7 +457,7 @@ def waters() -> dict:
                 }
             )
     sea = {
-        lane: (lanes.parse(st[lane]["line"], q.parent) if st.get(lane) else None)
+        lane: (lanes.parse(st[lane]["line"], specs) if st.get(lane) else None)
         for lane in lanes.LANES
     }
     for i, ln in enumerate(lines):

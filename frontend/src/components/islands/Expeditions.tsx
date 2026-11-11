@@ -525,6 +525,62 @@ function QueueVoyageDialog({ row, onClose }: { row: any; onClose: () => void }) 
   const dur = (m: number): string => (m < 1 ? 'under a minute' : m < 90 ? `${Math.round(m)} min` : `${(m / 60).toFixed(1)} h`);
   const clockAt = (d: Date): string => d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     + (d.toDateString() === new Date().toDateString() ? '' : ` ${d.toLocaleDateString(undefined, { weekday: 'short' })}`);
+  // the post-training: what a leg does (its seed, its stages in order, how it is read), and the legs that
+  // follow this voyage. A leg puts it straight under the question; a pretraining voyage after what it reads.
+  const post = d.post || {};
+  const pseed = post.seed || null;
+  const legs: any[] = Array.isArray(post.legs) ? post.legs : [];
+  const stageLine = (s: any): ReactNode => <>
+    <b>{s.name || 'stage'}</b> · <span className="mono">{String(s.recipe || '').split('/').pop() || '–'}</span>
+    {' · '}{s.books != null ? `${int(s.books)} books` : 'books not counted'} × {int(s.passes ?? 1)} {Number(s.passes ?? 1) === 1 ? 'pass' : 'passes'}
+  </>;
+  const postSection = post.leg || legs.length ? (
+    <VSection title="The post-training" wide>
+      {post.leg && pseed ? <>
+        <VRow k="seeded from">
+          <b>{pseed.run || '–'}</b>
+          {pseed.at_step != null ? ` at step ${int(pseed.at_step)}` : ', its last checkpoint'}
+          <span className="s"> · {pseed.status
+            ? <>{pseed.status}{pseed.step != null ? `, step ${int(pseed.step)}${pseed.total ? ` of ${int(pseed.total)}` : ''}` : ''}{pseed.bpb != null ? ` · bpb ${num(pseed.bpb)}` : ''}</>
+            : 'not sailed yet: this leg cannot start before it docks'}</span>
+        </VRow>
+        <VRow k="inherits">{pseed.mode}{pseed.mode_words ? <span className="s"> · {pseed.mode_words}</span> : null}</VRow>
+        <VRow k="the pull">{post.pull?.off
+          ? <>off<span className="s"> · scaffold weight 0{post.pull.pins ? `: the seed's ${post.pull.pins} pin${post.pull.pins === 1 ? '' : 's'}${post.pull.riddles ? ` and ${post.pull.riddles} riddle${post.pull.riddles === 1 ? '' : 's'}` : ''} are named but nothing is taught` : ''}</span></>
+          : <>on<span className="s"> · scaffold weight {num(post.pull?.weight, 2)}, on the schedule below</span></>}</VRow>
+        <VRow k="turns">{post.turns
+          ? <>{post.turns.format}{post.turns.shape ? <> · <span className="mono">{post.turns.shape}</span></> : null}</>
+          : <span className="s">no turn format: it reads its lists as plain books</span>}</VRow>
+        <VRow k="learning rate">{post.lr ?? '–'}{pseed.lr != null ? <span className="s"> · the seed's peak was {pseed.lr}</span> : null}</VRow>
+        <div className="qvsubhead">what it does, in order</div>
+        <ol className="qvlist qvsteps">{(post.stages || []).map((s: any, i: number) => <li key={i}>{stageLine(s)}</li>)}</ol>
+        <div className="qvsubhead">how it is read</div>
+        <VRow k="when">{post.read?.when || '–'}{(post.read?.sets || []).length ? <span className="s"> · on <span className="mono">{(post.read.sets as string[]).map((x) => x.split('/').pop()).join(', ')}</span></span> : null}</VRow>
+        {(post.read?.evaluators || []).map((e: any) => {
+          const opts = Object.entries(e.options || {}).map(([k, v]) => `${k} ${v}`).join(' · ');
+          const all = e.seen && e.seen.of > 0 && e.seen.n >= e.seen.of;
+          return <VRow k={e.name} key={e.name}>
+            {e.what || <span className="s">no description</span>}
+            {opts ? <span className="s"> · {opts}</span> : null}
+            {e.seen && e.seen.n > 0 ? <div className="qvseen">
+              {int(e.seen.n)} of the {int(e.seen.of)} {e.seen.set === 'the official prompts' ? 'official prompts' : <>prompts in <span className="mono">{e.seen.set}</span></>} are in this leg's own training turns{all ? ': none is held out' : ''}.
+            </div> : null}
+          </VRow>;
+        })}
+      </> : null}
+      {legs.length ? <>
+        <div className="qvsubhead">{post.leg ? 'the legs after this one' : 'the legs seeded from this voyage'}</div>
+        {legs.map((l: any) => <VRow k={l.mode || 'leg'} key={l.name}>
+          <b>{l.name}</b>{l.ship ? <span className="s"> · {l.ship}</span> : null}
+          <ol className="qvlist qvsteps">{(l.stages || []).map((s: any, i: number) => <li key={i}>{stageLine(s)}</li>)}</ol>
+          <span className="s">
+            {l.turns ? `turns ${l.turns} · ` : ''}learning rate {l.lr ?? '–'}
+            {(l.evaluators || []).length ? ` · read by ${(l.evaluators as string[]).join(', ')}` : ''}
+          </span>
+        </VRow>)}
+      </> : null}
+    </VSection>
+  ) : null;
   return (
     <dialog ref={ref} className="qv-dialog" aria-labelledby="qvtitle"
       onClick={(e) => { if (e.target === ref.current) onClose(); }}>
@@ -551,6 +607,8 @@ function QueueVoyageDialog({ row, onClose }: { row: any; onClose: () => void }) 
               {row.goal ? <p className="qvtext">{row.goal}</p> : <p className="s">The spec states no question.</p>}
               {row.experiment ? <p className="qvtext qvexp"><span className="k">experiment</span> {row.experiment}</p> : null}
             </VSection>
+
+            {post.leg ? postSection : null}
 
             <VSection title="The run">
               <VRow k="expedition">{row.expedition ? <a href={`/expeditions/${row.expedition}`}>{row.expedition_name || row.expedition}</a> : '–'}</VRow>
@@ -605,6 +663,8 @@ function QueueVoyageDialog({ row, onClose }: { row: any; onClose: () => void }) 
               {refuses.length ? <VRow k="refuses"><ul className="qvlist">{refuses.map((x) => <li key={x} className="mono">{x}</li>)}</ul></VRow> : null}
               {data.opt_in ? <VRow k="opt-in"><span className="qvtext">{data.opt_in}</span></VRow> : null}
             </VSection>
+
+            {post.leg ? null : postSection}
 
             <VSection title="The scaffold" wide>
               {hasScaffold ? <>

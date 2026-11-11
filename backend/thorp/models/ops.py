@@ -182,3 +182,169 @@ def last_logits(model, x) -> np.ndarray:
     own code, keyed by MLX's generator)."""
     with _reading(model):
         return _np(model(x)[:, -1])
+
+
+# ---------------------------------------------------------------- generation with a key/value cache
+#
+# 11 November (the architecture audit, item 5): every evaluator that writes (samples, laws, arc, ifeval, answers)
+# ran one full forward pass over the whole window for every piece it wrote, at batch 1, the logits copied to numpy
+# each time. The Decoder below gives the same last-position logits from a key/value cache: the prompt is read once,
+# in one forward pass, and each later piece costs one position. The samplers keep their own code and their own draws
+# (MLX's keys, numpy's generator), so only where the logits come from changes.
+#
+# Used for GREEDY writing only. On a tiny model the cached and full passes give the same pieces, greedy and sampled,
+# on both backends (tests/test_offline_eval.py). On the 1m's own checkpoint in bf16 the logits differ by up to 0.3
+# (a unit or two in bf16's last place at that size): greedy still wrote the same 7 x 200 pieces, but 6 of 7
+# temperature-0.8 continuations parted within 200 pieces. So a sampled loop (laws, samples at 0.8, ARC's second
+# attempt) keeps the full pass, `Decoder(..., cache=False)`, and its numbers stay what they were.
+#
+# The cache is exact only while the whole sequence fits the context: past it the old code slides a window, so every
+# position moves and nothing cached is valid. There, and for any model that is not our GPT (the outside models), it
+# falls back to the old full forward pass on the window, call for call. THORP_GENERATE_CACHE=0 forces that path.
+
+
+def _cacheable(model) -> bool:
+    import os
+
+    if os.environ.get("THORP_GENERATE_CACHE", "1").strip().lower() in ("0", "false", "no", "off"):
+        return False
+    if is_torch(model):
+        from thorp.models.gpt_torch import GPT
+    else:
+        from thorp.models.gpt_mlx import GPT
+    return isinstance(model, GPT)
+
+
+class Decoder:
+    """seqs -> the logits after each sequence's last piece, (batch, vocab) float32: an mx.array for an MLX model,
+    numpy for a torch one, exactly what the old loops computed from `model(window)[:, -1]` (to float tolerance:
+    one query against the cache is not the same kernel as the full causal pass, so the last bits can differ).
+
+    Call it with the sequences grown by one piece each since the last call (all the same length), as a writing
+    loop does; anything else (the first call, a new batch, sequences that do not extend the last ones) reads the
+    sequences afresh. `cached` says whether the cache is in use at all."""
+
+    def __init__(self, model, context: int, cache: bool = True):
+        self.model, self.context = model, int(context)
+        self.cached = cache and _cacheable(model)
+        self.kv: list | None = None
+        self.n = 0
+        self.last: list[int] = []
+
+    def __call__(self, seqs):
+        lens = {len(s) for s in seqs}
+        n = lens.pop() if len(lens) == 1 else 0
+        if not self.cached or n == 0 or n > self.context:
+            self.kv = None
+            return self._full([list(s)[-self.context:] for s in seqs])
+        grown = (
+            self.kv is not None
+            and n == self.n + 1
+            and len(seqs) == len(self.last)
+            and all(s[self.n - 1] == t for s, t in zip(seqs, self.last, strict=True))
+        )
+        if grown:
+            out = self._step([[s[-1]] for s in seqs], self.n)
+        else:
+            self.kv = None
+            out = self._step([list(s) for s in seqs], 0)
+        self.n, self.last = n, [s[-1] for s in seqs]
+        return out
+
+    def _full(self, windows):
+        if is_torch(self.model):
+            return last_logits(self.model, windows)
+        import mlx.core as mx
+
+        return self.model(mx.array(windows))[:, -1].astype(mx.float32)
+
+    def _step(self, toks, offset: int):
+        return (self._step_torch if is_torch(self.model) else self._step_mlx)(toks, offset)
+
+    def _step_mlx(self, toks, offset: int):
+        """GPT.__call__ of gpt_mlx.py, the new positions only, their keys and values joined to the cache's."""
+        import mlx.core as mx
+
+        m = self.model
+        t = mx.array(toks)
+        B, T = t.shape
+        x = m.tok(t)
+        if not m.rotary:
+            x = x + m.pos(mx.arange(offset, offset + T))
+        kv = []
+        for i, b in enumerate(m.layers):
+            a = b.attn
+            h = b.ln1(x)
+            if a.kv_heads == a.heads:
+                q, k, v = mx.split(a.qkv(h), 3, axis=-1)
+            else:
+                q, k, v = a.q_proj(h), a.k_proj(h), a.v_proj(h)
+            q = q.reshape(B, T, a.heads, a.head_dim).transpose(0, 2, 1, 3)
+            k = k.reshape(B, T, a.kv_heads, a.head_dim).transpose(0, 2, 1, 3)
+            v = v.reshape(B, T, a.kv_heads, a.head_dim).transpose(0, 2, 1, 3)
+            if a.rope is not None:
+                q, k = a.rope(q, offset=offset), a.rope(k, offset=offset)
+            if self.kv is not None:
+                pk, pv = self.kv[i]
+                k, v = mx.concatenate([pk, k], axis=2), mx.concatenate([pv, v], axis=2)
+            y = mx.fast.scaled_dot_product_attention(
+                q, k, v, scale=a.head_dim**-0.5, mask="causal" if T > 1 else None
+            )
+            x = x + a.proj(y.transpose(0, 2, 1, 3).reshape(B, T, -1))
+            x = x + b.mlp(b.ln2(x))
+            kv.append((k, v))
+        logits = m.tok.as_linear(m.ln_f(x))[:, -1].astype(mx.float32)
+        mx.eval(logits, kv)
+        self.kv = kv
+        return logits
+
+    def _step_torch(self, toks, offset: int):
+        """GPT.forward of gpt_torch.py, the new positions only, their keys and values joined to the cache's."""
+        import torch.nn.functional as F
+
+        m = self.model
+        with _reading(m) as torch:
+            t = m._tokens(toks)
+            B, T = t.shape
+            x = m.tok(t)
+            if not m.rotary:
+                x = x + m.pos(torch.arange(offset, offset + T, device=t.device))
+            kv = []
+            for i, b in enumerate(m.layers):
+                a = b.attn
+                h = b.ln1(x)
+                if a.kv_heads == a.heads:
+                    q, k, v = a.qkv(h).split(h.shape[-1], dim=-1)
+                else:
+                    q, k, v = a.q_proj(h), a.k_proj(h), a.v_proj(h)
+                q = q.reshape(B, T, a.heads, a.head_dim).transpose(1, 2)
+                k = k.reshape(B, T, a.kv_heads, a.head_dim).transpose(1, 2)
+                v = v.reshape(B, T, a.kv_heads, a.head_dim).transpose(1, 2)
+                if a.rope is not None:
+                    q, k = _rope_torch(a.rope, q, offset), _rope_torch(a.rope, k, offset)
+                if a.kv_heads != a.heads:
+                    g = a.heads // a.kv_heads
+                    k, v = k.repeat_interleave(g, dim=1), v.repeat_interleave(g, dim=1)
+                if self.kv is not None:
+                    pk, pv = self.kv[i]
+                    k, v = torch.cat([pk, k], dim=2), torch.cat([pv, v], dim=2)
+                y = F.scaled_dot_product_attention(q, k, v, is_causal=T > 1, scale=a.head_dim**-0.5)
+                x = x + a.proj(y.transpose(1, 2).reshape(B, T, -1))
+                x = x + b.mlp(b.ln2(x))
+                kv.append((k, v))
+            self.kv = kv
+            return _np(m.tok.as_linear(m.ln_f(x))[:, -1])
+
+
+def _rope_torch(rope, x, offset: int):
+    """gpt_torch.RoPE.forward for positions offset .. offset + time - 1 (the same angles, the same casts)."""
+    import torch
+
+    T, half = x.shape[-2], rope.dims // 2
+    inv = rope.base ** (-torch.arange(half, dtype=torch.float32, device=x.device) * 2 / rope.dims)
+    pos = torch.arange(offset, offset + T, dtype=torch.float32, device=x.device)
+    ang = pos[:, None] * inv[None, :]
+    cos, sin = ang.cos().to(x.dtype), ang.sin().to(x.dtype)
+    x1, x2 = x[..., :half], x[..., half : rope.dims]
+    out = torch.cat([x1 * cos - x2 * sin, x1 * sin + x2 * cos], dim=-1)
+    return out if rope.dims == x.shape[-1] else torch.cat([out, x[..., rope.dims :]], dim=-1)

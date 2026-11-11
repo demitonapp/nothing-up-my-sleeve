@@ -1,0 +1,26 @@
+# ships/specs/investigations: an offline score, queued as an investigation (11 November, the audit's item 5:
+# "score the rest from checkpoints offline"). `thorp score` reads a run's saved weights and writes the readings at
+# the steps they belong to, as the loop would have. For a voyage that sets `eval.offline`, the line is
+#   run: [-m, thorp.cli, score, "{subject}"]            # every step whose deferred evaluators are still pending
+# and it may sail while the voyage is still at sea (it reads only finished snapshots). This example is a backfill
+# of an evaluator a finished voyage never carried. Not queued.
+kind: investigation
+name: score-laws-1m-fulldeck
+expedition: kipling
+ship: "Kipling: the laws of text on every saved step of the 1m full deck"
+question: >-
+  How did the 1m full deck's writing come to obey the laws of text (real words, Zipf, Heaps, punctuation and
+  brackets) over its voyage? Its spec predates the ladder's `laws`, so none of its ten checkpoints was read on
+  them. Score `laws` on every saved step, each at its own step, beside the curves it already has.
+subject: 1m@v0.0.6-fulldeck
+run:
+  - -m
+  - thorp.cli
+  - score
+  - "{subject}"
+  - --steps
+  - all
+  - --evaluators
+  - laws
+timeout: 45m
+readings: []

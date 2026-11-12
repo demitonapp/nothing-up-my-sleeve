@@ -471,11 +471,15 @@ def cmd_minutes(ln) -> float | None:
 
 
 def eligibility(terms: dict):
-    """The purser's rule for which voyages it may move: not pinned, and of an expedition allowed abroad."""
+    """The purser's rule for which voyages it may move: not pinned, of an expedition allowed abroad, and no smaller
+    than S5's `foreign_min_preset` (12 November, Justin: "only send 9m and up to vast")."""
     from thorp import fleet
+    from thorp.models import registry
     from thorp.viable.s2_coordination import lanes
 
     allowed = set(terms.get("foreign_expeditions") or [])
+    order = list(registry.PRESETS)
+    floor = str(terms.get("foreign_min_preset") or "")
 
     def eligible(ln) -> tuple[str | None, str | None]:
         exp = None
@@ -489,6 +493,12 @@ def eligibility(terms: dict):
             return exp, "its spec cannot be read"
         if exp not in allowed:
             return exp, f"its expedition ({exp or 'none'}) is local (S5's foreign_expeditions: {', '.join(sorted(allowed)) or 'none'})"
+        if floor in order:
+            preset = str(((ln.spec or {}).get("model") or {}).get("preset") or "")
+            if preset not in order:
+                return exp, f"its size ({preset or 'none'}) is not a preset, so it cannot be held to S5's foreign_min_preset ({floor})"
+            if order.index(preset) < order.index(floor):
+                return exp, f"a {preset} is smaller than S5's foreign_min_preset ({floor}): it sails here"
         return exp, None
 
     return eligible

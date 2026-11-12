@@ -58,6 +58,10 @@ DEFAULTS: dict = {
     # the expeditions whose voyages may sail abroad: a comparison is kept in one set of waters (a torch voyage
     # starts from other random weights), so every other expedition is local until Justin says
     "foreign_expeditions": ["table_talk"],
+    # the smallest size the purser may send abroad (a preset of models.registry.PRESETS; empty: any). 12 November,
+    # Justin: "don't send lines to 4090 for 300k and 1m, only send 9m and up to vast": the 4090 ran a 300k at 0.46
+    # of this Mac's speed. A line pinned `vast:` still sails abroad: the pin is a person's decision, not the purser's.
+    "foreign_min_preset": "",
     # a hire only when it brings the voyage home at least this much sooner, in hours and as a share of its wait
     "margin_hours": 1.0,
     "margin_fraction": 0.25,

@@ -177,6 +177,22 @@ def test_a_line_called_foreign_and_then_kept_here_is_written_home(tmp_thorp):
     assert "no GPU class has a measured speed-up at 300k yet" in never[0].reason
 
 
+def test_only_sizes_from_s5s_floor_up_may_be_sent_abroad():
+    """12 November, Justin: "don't send lines to 4090 for 300k and 1m, only send 9m and up to vast"."""
+    from thorp.viable.s3_control import purser as p
+
+    eligible = p.eligibility({"foreign_expeditions": ["kipling"], "foreign_min_preset": "9m"})
+    assert "smaller than S5's foreign_min_preset (9m)" in eligible(voyage("a", preset="300k"))[1]
+    assert "smaller than" in eligible(voyage("b", preset="1m"))[1]
+    assert eligible(voyage("c", preset="9m"))[1] is None and eligible(voyage("d", preset="21m"))[1] is None
+    assert "pinned" in eligible(voyage("e", preset="1m", text="vast: fitouts/e"))[1]  # a pin is a person's call
+    odd = voyage("f")
+    odd.spec = {"model": {"preset": "7m"}, "expedition": "kipling", "name": "f"}
+    assert "not a preset" in eligible(odd)[1]
+    anything = p.eligibility({"foreign_expeditions": ["kipling"]})  # no floor: any size, as before
+    assert anything(voyage("g", preset="300k"))[1] is None
+
+
 def test_a_size_no_class_has_sailed_takes_the_lead_of_the_nearest_measured_size(monkeypatch):
     # 12 November, Justin: "the purser rule is wrong": only the 9m had sailed abroad, so every 300k and 1m stayed here
     from thorp.viable.s4_intelligence import market

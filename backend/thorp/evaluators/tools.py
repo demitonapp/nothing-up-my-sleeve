@@ -45,6 +45,14 @@ def asked(question: str, clean: str) -> str:
     return cleaning.clean(turns.called(question, [], _SENT), clean).split(_SENT)[0].removesuffix("<answer>")
 
 
+def spread(items: list, n: int) -> list:
+    """`n` items taken evenly through the set, not its first `n` (13 November: the v2 set lists its 78 no-tool
+    questions last, from item 300, so a limit of 200 read none of them and `tools/none_right` was 0 of nothing)."""
+    if n <= 0 or n >= len(items):
+        return items
+    return [items[i * len(items) // n] for i in range(n)]
+
+
 def evaluate(ctx: EvalContext) -> EvalResult:
     opts = ((ctx.options or {}).get("tools") or {}) if isinstance(ctx.options, dict) else {}
     path = resolve(str(opts.get("heldout") or HELDOUT))
@@ -52,7 +60,7 @@ def evaluate(ctx: EvalContext) -> EvalResult:
         return EvalResult()
     items = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
     if opts.get("limit"):
-        items = items[: int(opts["limit"])]
+        items = spread(items, int(opts["limit"]))
     clean = str(opts.get("clean") or "marks-v1")
     max_new = int(opts.get("max_new") or MAX_NEW)
     tok, model = ctx.tokeniser, ctx.model

@@ -1,0 +1,9 @@
+{
+ "version": "tools-mixed-v2",
+ "about": "the tool lessons v2 beside Ogden books of about the same size, so a tool leg keeps its language (13 November: the 9m tool leg on lessons alone fell from 1.582 to 2.152 on the hole cards)",
+ "parts": {
+  "tools-marked-v2": 500,
+  "ogden-v0.1 books": 57
+ },
+ "sha1": "dc97ef03093548abcbd9ce24975ae6e353732b8b"
+}

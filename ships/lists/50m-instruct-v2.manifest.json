@@ -1,0 +1,10 @@
+{
+ "version": "50m-instruct-v2",
+ "about": "the 50m instruct leg's lessons, v2: the conversation corpus and the tool lessons v2 (a quarter wanting no tool), beside Ogden books of about the same size",
+ "parts": {
+  "conversations-marked-v1": 1247,
+  "tools-marked-v2": 500,
+  "ogden-v0.1 books": 136
+ },
+ "sha1": "8ad5758c31d9994261ad4367f589e28c7726a404"
+}

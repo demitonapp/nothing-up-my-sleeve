@@ -27,6 +27,7 @@ import re
 from thorp import cleaning, turns
 from thorp.evaluators import EvalContext, EvalResult
 from thorp.evaluators.samples import greedy
+from thorp.evaluators.tools import spread
 from thorp.paths import resolve
 
 HELDOUT = "lists/reasoning-heldout-v1.jsonl"
@@ -60,7 +61,7 @@ def evaluate(ctx: EvalContext) -> EvalResult:
     items = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
     limit = opts.get("limit")
     if limit:
-        items = items[: int(limit)]
+        items = spread(items, int(limit))  # evenly through the set, as the tool evaluator reads it
     clean = str(opts.get("clean") or "marks-v1")
     max_new = int(opts.get("max_new") or MAX_NEW)
     tok, model = ctx.tokeniser, ctx.model

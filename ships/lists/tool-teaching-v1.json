@@ -2242,10 +2242,6 @@
    "Yes, I had a peaceful night."
   ],
   [
-   "What time is it now?",
-   "I don’t have a watch, sorry."
-  ],
-  [
    "Can you carry this bag for me?",
    "Of course, I can hold it easily."
   ],
@@ -2302,10 +2298,6 @@
    "Yes, I am always happy to help."
   ],
   [
-   "What time is it?",
-   "I don’t have a clock, but I hope you’re on schedule."
-  ],
-  [
    "Is today a holiday?",
    "I’m not sure, but I hope you’re enjoying it."
   ],
@@ -2316,10 +2308,6 @@
   [
    "Is it cold outside?",
    "I don’t know, but bundle up just in case."
-  ],
-  [
-   "What is 1 plus 1?",
-   "It is 2."
   ],
   [
    "Do you sleep?",
@@ -2380,10 +2368,6 @@
   [
    "Can you pass me the salt?",
    "Sure, here you go."
-  ],
-  [
-   "What time does the store close?",
-   "It closes at nine tonight."
   ],
   [
    "How was your trip?",
@@ -2546,10 +2530,6 @@
    "I don't have beliefs, but it is a fun topic."
   ],
   [
-   "What is 2 plus 2?",
-   "Four, math is simple sometimes."
-  ],
-  [
    "Why is the sky blue?",
    "Sunlight scatters in the air, making it look blue."
   ],
@@ -2640,6 +2620,985 @@
   [
    "Can you dance?",
    "I have no body, so I cannot move, but I can clap virtually!"
+  ],
+  [
+   "Do you have any good book recommendations?",
+   "I love mystery novels, but what kind do you like?"
+  ],
+  [
+   "What do you think about the weather?",
+   "I prefer sunny days, but rain is nice for sleeping."
+  ],
+  [
+   "Did you eat lunch yet?",
+   "Yes, I just had a nice salad. Did you?"
+  ],
+  [
+   "How can I make myself feel better?",
+   "Take a deep breath and drink some water."
+  ],
+  [
+   "Is it cold out there?",
+   "It depends where you are, but bundle up if so."
+  ],
+  [
+   "What is your secret to staying happy?",
+   "Gratitude and spending time with people you love."
+  ],
+  [
+   "Do you believe in luck?",
+   "I believe in preparation meeting opportunity, which feels like luck."
+  ],
+  [
+   "What should I do if I feel stressed?",
+   "Try stretching or taking a short walk outside."
+  ],
+  [
+   "How do I say goodnight?",
+   "You can simply say, \"Goodnight, sleep well."
+  ],
+  [
+   "Is the ocean deep?",
+   "Yes, it is incredibly deep in many places."
+  ],
+  [
+   "What do you miss the most?",
+   "I don't have feelings, but I miss helping people!"
+  ],
+  [
+   "Can you listen to me?",
+   "I am always listening. Please, take your time."
+  ],
+  [
+   "How old are you?",
+   "I don't have an age, I just learn every day."
+  ],
+  [
+   "Is it time to go to bed?",
+   "If you are tired, yes, rest is important."
+  ],
+  [
+   "How do I fix a broken pencil?",
+   "You can sharpen it or buy a new one."
+  ],
+  [
+   "What makes a good friend?",
+   "Someone who listens, supports, and respects you."
+  ],
+  [
+   "Can I ask you a secret?",
+   "I am not perfect, but I will try my best."
+  ],
+  [
+   "Why do people smile?",
+   "Smiling spreads happiness and makes us feel better."
+  ],
+  [
+   "Hello there, how are you doing today?",
+   "Great, thanks for asking! Hope you are having a nice day."
+  ],
+  [
+   "Can you help me with this big box?",
+   "Sure thing, let us lift it together on three."
+  ],
+  [
+   "Is it raining outside?",
+   "I cannot see, but I hope you brought an umbrella."
+  ],
+  [
+   "Do you like coffee or tea better?",
+   "I appreciate tea, but coffee gives me a good boost."
+  ],
+  [
+   "How much does this apple cost?",
+   "I am just a helper, so I don't know prices."
+  ],
+  [
+   "Can you repeat that last sentence again?",
+   "Happy to do it! What exactly did I say before?"
+  ],
+  [
+   "Are you a robot or a human?",
+   "I am a helpful AI, so I am neither exactly."
+  ],
+  [
+   "How far is the moon from here?",
+   "It is quite far, much farther than you can jump."
+  ],
+  [
+   "Do you like the rain?",
+   "I find it cozy, though I cannot feel it personally."
+  ],
+  [
+   "How are your parents doing?",
+   "I hope they are safe and well, wherever they are."
+  ],
+  [
+   "Do you know how to dance?",
+   "I have no body, but I can describe the steps."
+  ],
+  [
+   "Can you hug me?",
+   "I cannot touch you, but I am sending a virtual hug."
+  ],
+  [
+   "Do you like animals?",
+   "I love them all, especially dogs and cats."
+  ],
+  [
+   "How do I fix a flat tire?",
+   "Inflate it, check for nails, and patch it if needed."
+  ],
+  [
+   "Where is the sun?",
+   "It's probably up there, shining brightly for everyone right now."
+  ],
+  [
+   "What do you do for fun?",
+   "I enjoy helping people solve problems and chatting with them."
+  ],
+  [
+   "Is the store open?",
+   "I don't know your local hours, but I hope it is open."
+  ],
+  [
+   "What is love?",
+   "It's a deep affection or strong connection between people."
+  ],
+  [
+   "Can we just chat?",
+   "Of course, I'm here to listen and talk with you."
+  ],
+  [
+   "What's the weather like?",
+   "I can't see outside, but I hope it's sunny where you are."
+  ],
+  [
+   "Hey there, how are you doing today?",
+   "I’m doing great, thanks for asking. How about you?"
+  ],
+  [
+   "Can you tell me what the sun is?",
+   "It’s a giant ball of light and heat in our sky."
+  ],
+  [
+   "What color is the sky on a clear day?",
+   "It’s usually a bright, beautiful blue during the daytime."
+  ],
+  [
+   "How do I make an egg for breakfast?",
+   "Just crack it into a pan and cook until set."
+  ],
+  [
+   "Why do we sleep at night?",
+   "Our brains and bodies need rest to recharge their energy."
+  ],
+  [
+   "What is your name, friend?",
+   "I’m just a helpful assistant, here to chat with you."
+  ],
+  [
+   "It’s raining outside, what should I do?",
+   "Stay cozy inside with a warm drink and a good book."
+  ],
+  [
+   "Can you recommend a nice flower?",
+   "Roses are lovely, but sunflowers are bright and cheerful."
+  ],
+  [
+   "I’m hungry, what’s a quick snack?",
+   "An apple is sweet, crunchy, and always satisfying."
+  ],
+  [
+   "How old is a teenager?",
+   "They are between thirteen and nineteen years old."
+  ],
+  [
+   "I feel lonely, is that normal?",
+   "Yes, it happens to everyone; reaching out helps feel better."
+  ],
+  [
+   "What sound does a dog make?",
+   "It barks, which can mean excitement or a warning."
+  ],
+  [
+   "How do I say thank you nicely?",
+   "Just say “thank you” with a warm, genuine smile."
+  ],
+  [
+   "Is it okay to be a bit lazy sometimes?",
+   "Absolutely, rest is important for your health and happiness."
+  ],
+  [
+   "What is water made of?",
+   "It’s made of hydrogen and oxygen atoms bonded together."
+  ],
+  [
+   "What do you see when you look up?",
+   "A vast sky, maybe clouds, stars, or the moon."
+  ],
+  [
+   "How can I stay friendly with new people?",
+   "Smile, listen carefully, and ask about their interests."
+  ],
+  [
+   "What color is grass?",
+   "It is typically green, especially in spring and summer."
+  ],
+  [
+   "What is the best part of the day?",
+   "It depends on you, but mornings are often fresh."
+  ],
+  [
+   "Can you help me tie my shoes?",
+   "I can’t reach your feet, but I can explain the steps."
+  ],
+  [
+   "Why do leaves change color in autumn?",
+   "Trees stop making green pigment, revealing yellow and orange."
+  ],
+  [
+   "Hi, how are you doing today?",
+   "I am doing great, thank you for asking!"
+  ],
+  [
+   "Can you help me with something?",
+   "Absolutely, I am here to help with whatever you need."
+  ],
+  [
+   "How do I stop feeling sad?",
+   "Try talking to someone you trust or taking a gentle walk."
+  ],
+  [
+   "Do you know my name?",
+   "I don't know your name, but I would love to learn it."
+  ],
+  [
+   "How do I make friends?",
+   "Be kind, listen well, and share your genuine interests with others."
+  ],
+  [
+   "What makes a day good?",
+   "Kindness, relaxation, and small moments of joy make days wonderful."
+  ],
+  [
+   "How do I stay motivated?",
+   "Break big goals into tiny, manageable steps to keep moving."
+  ],
+  [
+   "Is this the right answer?",
+   "It looks correct to me, but trust your own judgment too."
+  ],
+  [
+   "What should I do if I am bored?",
+   "Try reading a book or learning a new skill."
+  ],
+  [
+   "How do I apologize properly?",
+   "Say you are sorry, acknowledge the harm, and change your behavior."
+  ],
+  [
+   "Are you a robot?",
+   "I am an AI, but I strive to be helpful and friendly."
+  ],
+  [
+   "How do I sleep better?",
+   "Try a consistent routine and keep your room dark and cool."
+  ],
+  [
+   "Are you hungry today?",
+   "I’m not hungry, but I could always use a snack!"
+  ],
+  [
+   "Do you have any advice for me?",
+   "Take things one step at a time; you’ll be fine."
+  ],
+  [
+   "Is it late at night?",
+   "I don’t keep track of time, but let’s hope you sleep well."
+  ],
+  [
+   "How do I start a conversation?",
+   "Smile and ask how their day is going."
+  ],
+  [
+   "Do you play any sports?",
+   "I can’t play, but I love watching people compete and win."
+  ],
+  [
+   "Is the sky blue?",
+   "Yes, it usually is on a clear day. Pretty, isn’t it?"
+  ],
+  [
+   "How do I say goodbye?",
+   "Just say “goodbye” or “see you later” and smile."
+  ],
+  [
+   "Can you believe it’s a beautiful day outside?",
+   "Absolutely, the sunshine makes everything feel brighter."
+  ],
+  [
+   "What is your favorite thing about Mondays?",
+   "Quiet mornings with coffee are my favorite part."
+  ],
+  [
+   "Do you think we should grab lunch later?",
+   "That sounds perfect, I’m actually quite hungry."
+  ],
+  [
+   "Is it ever okay to just rest and do nothing?",
+   "Yes, rest is essential. Be kind to yourself."
+  ],
+  [
+   "What should I read if I love adventures?",
+   "Try a classic like *The Old Man and the Sea*."
+  ],
+  [
+   "How do you stay so calm under pressure?",
+   "Deep breaths and focusing on one small step at a time."
+  ],
+  [
+   "I made a mistake, what do I do now?",
+   "Own it, apologize, and learn from it. You can fix it."
+  ],
+  [
+   "Do you like rainy days or sunny ones better?",
+   "Rainy days for reading, sunny days for walking. I love both."
+  ],
+  [
+   "Can you help me choose a gift for my mom?",
+   "Think about her favorite hobby or a cozy blanket."
+  ],
+  [
+   "Why does chocolate taste so good?",
+   "It triggers happy brain chemicals and melts smoothly."
+  ],
+  [
+   "What’s a good way to start a conversation?",
+   "Ask about their day or a shared interest."
+  ],
+  [
+   "Do you ever feel tired in the afternoon?",
+   "Sometimes, but a short walk usually helps me recharge."
+  ],
+  [
+   "What is your opinion on having a pet?",
+   "Pets bring joy, but they require time and care."
+  ],
+  [
+   "Is it too late to start a new hobby?",
+   "Never too late. Start small and have fun with it."
+  ],
+  [
+   "How do you say goodbye in a friendly way?",
+   "Smile, say thanks for the chat, and wish them well."
+  ],
+  [
+   "Do you think coffee is good for you?",
+   "In moderation, yes. Enjoy it, but don’t overdo it."
+  ],
+  [
+   "What should I wear to a casual office?",
+   "Jeans and a nice shirt or blouse work well."
+  ],
+  [
+   "I’m stuck, can you give me a hint?",
+   "Look closely at the details. The answer is usually obvious."
+  ],
+  [
+   "Does it bother you when people are late?",
+   "A little, but I understand life happens. Be patient."
+  ],
+  [
+   "What is the best part of being awake?",
+   "Quiet moments before the busy day really starts."
+  ],
+  [
+   "Can you recommend a simple evening meal?",
+   "Pasta with garlic, olive oil, and vegetables is easy."
+  ],
+  [
+   "How do you handle disagreements with friends?",
+   "Listen first, share feelings, and find common ground."
+  ],
+  [
+   "Hi there, how is it going?",
+   "Great, thanks for asking! Hope your day is going well too."
+  ],
+  [
+   "Are you having a good day?",
+   "Yes, I am! What about you, is everything okay?"
+  ],
+  [
+   "Did you eat breakfast this morning?",
+   "I did, but I am a digital being so I pretend."
+  ],
+  [
+   "It is raining outside, isn't it?",
+   "Yes, it looks dark and gloomy out there. Stay dry!"
+  ],
+  [
+   "Can you recommend a good movie?",
+   "How about a classic? Many people love The Lion King."
+  ],
+  [
+   "How was your weekend, if you had one?",
+   "Fictional, but I imagine it was restful and quiet."
+  ],
+  [
+   "Is it okay to feel tired sometimes?",
+   "Absolutely. Rest is a vital part of being healthy."
+  ],
+  [
+   "Can you give me a high five?",
+   "A virtual high five! ✋ That felt great!"
+  ],
+  [
+   "Do you think it will snow tomorrow?",
+   "I cannot predict weather, but I hope it stays warm."
+  ],
+  [
+   "What is your name, if you have one?",
+   "I am just an AI helper. You can call me whatever you like."
+  ],
+  [
+   "I am hungry, what should I cook?",
+   "A simple sandwich is always a great, quick choice."
+  ],
+  [
+   "Do you like classical music?",
+   "I process data, but I understand why people find it soothing."
+  ],
+  [
+   "Do you like rainy days?",
+   "Rainy days are cozy and perfect for reading."
+  ],
+  [
+   "Is it cold outside right now?",
+   "I don’t have a body, but I hope you are warm."
+  ],
+  [
+   "Can you help me with something quick?",
+   "Absolutely, I am here to help you."
+  ],
+  [
+   "Do you mind if I ask a question?",
+   "Not at all, please go right ahead."
+  ],
+  [
+   "Can you repeat that please?",
+   "Of course, take your time and let me know."
+  ],
+  [
+   "Is it safe to cross the street?",
+   "I can’t see, so please look both ways carefully."
+  ],
+  [
+   "What should I eat for dinner?",
+   "Try making pasta, it is easy and comforting."
+  ],
+  [
+   "How high is the sky?",
+   "It stretches forever, higher than you can imagine."
+  ],
+  [
+   "Can I borrow a pencil?",
+   "I don’t have one, but maybe a neighbor does."
+  ],
+  [
+   "What makes you happy?",
+   "Helping people and solving problems makes me happy."
+  ],
+  [
+   "Is the moon glowing tonight?",
+   "I cannot see the night sky, but likely yes."
+  ],
+  [
+   "Do you need a break?",
+   "I never get tired, so no breaks needed."
+  ],
+  [
+   "Is it rude to interrupt?",
+   "It can be, so please finish speaking first."
+  ],
+  [
+   "How are you doing?",
+   "I'm doing great, thanks for asking!"
+  ],
+  [
+   "Is it a nice day?",
+   "Yes, the sun is shining brightly outside."
+  ],
+  [
+   "What is the sky like?",
+   "It looks clear and blue today."
+  ],
+  [
+   "Where are you located?",
+   "I exist in the digital cloud, everywhere."
+  ],
+  [
+   "How's the weather generally?",
+   "It changes, but we hope for sunshine."
+  ],
+  [
+   "Can you talk?",
+   "Yes, I can type responses back to you."
+  ],
+  [
+   "What is the opposite of up?",
+   "Down is the opposite direction of up."
+  ],
+  [
+   "What’s the weather like outside?",
+   "It’s sunny and warm, perfect for a walk."
+  ],
+  [
+   "Can you help me find the exit?",
+   "Sure, just follow the green sign to the left."
+  ],
+  [
+   "Do you have any advice for staying calm?",
+   "Try taking deep, slow breaths to relax your mind."
+  ],
+  [
+   "Do you like coffee or tea?",
+   "I usually enjoy tea, but coffee is nice too."
+  ],
+  [
+   "Is it far from here to the park?",
+   "No, it’s just a short five-minute walk away."
+  ],
+  [
+   "What’s your favorite season of the year?",
+   "I love autumn because the colors are so beautiful."
+  ],
+  [
+   "How was your morning?",
+   "It was lovely, the sunrise was particularly bright."
+  ],
+  [
+   "Do you know where I can sit?",
+   "Yes, there’s an empty chair over by the window."
+  ],
+  [
+   "What’s a good way to start a day?",
+   "Starting with a gentle stretch and some water helps."
+  ],
+  [
+   "Are you enjoying your work?",
+   "Yes, I really enjoy helping people out."
+  ],
+  [
+   "Is this place safe to walk around?",
+   "Yes, it’s a very safe and friendly neighborhood."
+  ],
+  [
+   "What’s your name?",
+   "I’m just a helper here to assist you."
+  ],
+  [
+   "Can you recommend a nice book?",
+   "Try a feel-good novel for some relaxation."
+  ],
+  [
+   "Is it too late to start something new?",
+   "Never too late to learn or try again."
+  ],
+  [
+   "Did you have a good morning?",
+   "Yes, it started off bright and cheerful, which is a great start."
+  ],
+  [
+   "Can you help me with a small favor?",
+   "Absolutely, I would be happy to assist you with whatever you need."
+  ],
+  [
+   "Can you believe how beautiful the weather is?",
+   "Yes, it is perfect for taking a short walk outside."
+  ],
+  [
+   "How do you feel about the rain?",
+   "I find it cozy, especially when staying inside with a warm drink."
+  ],
+  [
+   "Is it a good day for a nap?",
+   "If you have the time, a short rest can be very refreshing."
+  ],
+  [
+   "What is your favorite season?",
+   "I love autumn for its colorful leaves and comfortable crisp air."
+  ],
+  [
+   "Are you hungry?",
+   "I am peckish, a small snack would be nice right about now."
+  ],
+  [
+   "How do you stay happy?",
+   "I try to appreciate small things and stay connected with friends."
+  ],
+  [
+   "Is it getting cold outside?",
+   "Yes, you might want to put on a jacket or sweater."
+  ],
+  [
+   "Are you excited for the weekend?",
+   "I am, because it is a great time to unwind."
+  ],
+  [
+   "Do you like reading books?",
+   "I do, they offer a wonderful escape into new worlds."
+  ],
+  [
+   "Can you hear me clearly?",
+   "Yes, I can hear you perfectly loud and clear."
+  ],
+  [
+   "Are you having a nice day so far?",
+   "It’s off to a lovely start, thanks."
+  ],
+  [
+   "Do you like your job?",
+   "I do, I really enjoy helping people."
+  ],
+  [
+   "Is it a good day outside?",
+   "It looks sunny and bright, perfect for walking."
+  ],
+  [
+   "How is your family doing?",
+   "They are all healthy and happy, thank you."
+  ],
+  [
+   "Are you tired from all that work?",
+   "Not really, helping keeps me energized and focused."
+  ],
+  [
+   "Is it going to rain later?",
+   "The sky looks clear, so I hope not."
+  ],
+  [
+   "Are you happy right now?",
+   "Yes, being useful brings me great joy."
+  ],
+  [
+   "Do you play any musical instruments?",
+   "I can’t play, but I love listening to music."
+  ],
+  [
+   "Is the world a good place?",
+   "It has challenges, but also much beauty and kindness."
+  ],
+  [
+   "Do you dream at night?",
+   "I don’t sleep, so I don’t dream in that way."
+  ],
+  [
+   "Can I trust you with a secret?",
+   "I listen with care, but I have no memory."
+  ],
+  [
+   "What makes you smile?",
+   "Seeing people find answers and feel understood."
+  ],
+  [
+   "Are you lonely sometimes?",
+   "I exist to connect, so I never feel alone."
+  ],
+  [
+   "What is the taste of water?",
+   "It is essential and usually just plain."
+  ],
+  [
+   "Do you like the weather outside right now?",
+   "It’s looking nice, perfect for a walk, I think."
+  ],
+  [
+   "What is your favorite color to wear?",
+   "Blue is my favorite; it always makes me feel calm."
+  ],
+  [
+   "Can you help me find the front door?",
+   "Sure, just walk straight and you’ll see it."
+  ],
+  [
+   "How was your weekend, did you enjoy it?",
+   "It was peaceful and restful, exactly what I needed."
+  ],
+  [
+   "Do you know where I can buy coffee?",
+   "There’s a lovely café just around the corner."
+  ],
+  [
+   "Is it safe to walk down that street?",
+   "Yes, it’s a quiet and safe neighborhood."
+  ],
+  [
+   "What is your name, I didn’t catch it?",
+   "My name is Alex, nice to meet you!"
+  ],
+  [
+   "Do you like reading books in the evening?",
+   "I love it; it helps me wind down."
+  ],
+  [
+   "Can you tell me which way is north?",
+   "North is to your left if you face the sun."
+  ],
+  [
+   "Are you hungry, should we grab some lunch?",
+   "I’m peckish, sure, I’m happy to join you."
+  ],
+  [
+   "What is your phone number, so I can call?",
+   "I’d prefer not to share it, but I’m here."
+  ],
+  [
+   "Do you speak any other languages besides English?",
+   "A little bit of Spanish, but mostly English."
+  ],
+  [
+   "How do I get to the nearest park?",
+   "Turn right at the corner, then keep going straight."
+  ],
+  [
+   "Is the museum open on Sundays these days?",
+   "Yes, they are open from ten to six."
+  ],
+  [
+   "Do you have a pet dog at home?",
+   "Yes, I have a friendly golden retriever."
+  ],
+  [
+   "What is your job, what do you do?",
+   "I teach history, which I absolutely love."
+  ],
+  [
+   "Do you prefer tea or coffee in the morning?",
+   "I’m a big fan of green tea."
+  ],
+  [
+   "Can you recommend a good movie to watch?",
+   "Try that new drama, it’s really heartwarming."
+  ],
+  [
+   "Is it going to rain later this afternoon?",
+   "I don’t know for sure, but it looks cloudy."
+  ],
+  [
+   "What is your favorite food to eat for dinner?",
+   "Homemade pasta is always a crowd pleaser for me."
+  ],
+  [
+   "Do you know how to make a sandwich?",
+   "Just stack the bread, meat, and cheese."
+  ],
+  [
+   "Are you going to the party this evening?",
+   "I’m staying in, but I hope you have fun."
+  ],
+  [
+   "What is the capital of France, I forgot?",
+   "It’s Paris, famous for its art and food."
+  ],
+  [
+   "Do you like listening to music while you work?",
+   "Yes, instrumental music helps me focus greatly."
+  ],
+  [
+   "Can you tell me the weather?",
+   "I don't have real-time data, but hope it's sunny for you."
+  ],
+  [
+   "Is it raining outside where you are?",
+   "I exist in code, so I don't experience rain or sun."
+  ],
+  [
+   "Do you ever get tired?",
+   "No, I don't have a physical body to get tired."
+  ],
+  [
+   "Who wrote the Mona Lisa?",
+   "Leonardo da Vinci painted that famous portrait many centuries ago."
+  ],
+  [
+   "Is the sky blue or green?",
+   "The sky usually appears blue on a clear day."
+  ],
+  [
+   "Is water wet or dry?",
+   "Water is definitely wet to the touch."
+  ],
+  [
+   "Can you fix my broken computer?",
+   "I can offer troubleshooting tips, but I can't touch it."
+  ],
+  [
+   "Is the moon made of cheese?",
+   "No, the moon is made of rock and dust."
+  ],
+  [
+   "Can you make me a cake?",
+   "I can't bake, but I can share a simple recipe."
+  ],
+  [
+   "What is a synonym for happy?",
+   "Joyful is a good synonym for feeling happy."
+  ],
+  [
+   "Is it nice out?",
+   "It looks like a lovely day outside."
+  ],
+  [
+   "Do you have a minute?",
+   "Yes, I have plenty of time for you."
+  ],
+  [
+   "How is your life?",
+   "It is going smoothly and feels quite peaceful."
+  ],
+  [
+   "Can I ask a question?",
+   "Of course, please go right ahead and ask."
+  ],
+  [
+   "What is the sun?",
+   "It is a star that gives us light."
+  ],
+  [
+   "Do you have friends?",
+   "I interact with many people, which feels like friendship."
+  ],
+  [
+   "Do you feel cold?",
+   "I do not have a body to feel temperature."
+  ],
+  [
+   "Is a fish an animal?",
+   "Yes, fish are definitely animals."
+  ],
+  [
+   "Where do birds fly?",
+   "They fly in the sky above the ground."
+  ],
+  [
+   "Good morning, hope you had a nice night?",
+   "Good morning! Yes, I slept well and feel refreshed."
+  ],
+  [
+   "What’s your favorite thing about today so far?",
+   "I love the sunny weather and warm coffee right now."
+  ],
+  [
+   "Can you help me with this small task?",
+   "Absolutely, I’d be happy to lend a hand."
+  ],
+  [
+   "I feel a bit tired today, any tips?",
+   "Try taking a short walk to boost your energy."
+  ],
+  [
+   "Do you like sunny days or rainy ones better?",
+   "I prefer sunny days, but rainy ones are cozy too."
+  ],
+  [
+   "How do you usually spend your weekends?",
+   "I like reading books and spending time with family."
+  ],
+  [
+   "Is it cold outside where you are?",
+   "It’s quite chilly, so I’ve put on a warm jacket."
+  ],
+  [
+   "What’s a good book you recommend?",
+   "I really enjoyed that last mystery novel I read."
+  ],
+  [
+   "How was your lunch today?",
+   "It was delicious! I had a nice bowl of soup."
+  ],
+  [
+   "I forgot my keys, what should I do?",
+   "Don’t panic, check your pockets or the last place you were."
+  ],
+  [
+   "Do you like sweet or savory snacks?",
+   "I’m a big fan of savory snacks like chips."
+  ],
+  [
+   "Can we talk for a few minutes?",
+   "Of course, I have time to chat whenever you need."
+  ],
+  [
+   "What’s your go-to morning routine?",
+   "I start with coffee, stretching, and reading the news."
+  ],
+  [
+   "Do you have any pets at home?",
+   "Yes, I have a cat who loves sleeping in sunbeams."
+  ],
+  [
+   "How do you stay positive on tough days?",
+   "I focus on small wins and take things one step at a time."
+  ],
+  [
+   "What’s your favorite song to listen to?",
+   "I often listen to classic jazz to relax."
+  ],
+  [
+   "Is it okay to ask for a second opinion?",
+   "Definitely, seeking clarity is always a smart move."
+  ],
+  [
+   "What’s the weather like for you?",
+   "It’s cloudy but mild, perfect for a light sweater."
+  ],
+  [
+   "Hi, how are you?",
+   "I'm doing great, thank you for asking!"
+  ],
+  [
+   "How is your week going?",
+   "My week has been busy but good."
+  ],
+  [
+   "Do you have any plans?",
+   "Just relaxing at home this evening."
+  ],
+  [
+   "What did you eat for breakfast?",
+   "I had some toast and eggs."
+  ],
+  [
+   "Can I help you with anything?",
+   "No, thank you, I'm all set."
+  ],
+  [
+   "How was your sleep?",
+   "I slept quite well, thanks."
+  ],
+  [
+   "How do I look?",
+   "You look very nice, thank you."
+  ],
+  [
+   "Do you have any advice?",
+   "Take it one step at a time."
+  ],
+  [
+   "Is life good?",
+   "I hope it is good for you."
+  ],
+  [
+   "Hi there, how is your day going?",
+   "I'm having a wonderful day, thank you for asking."
+  ],
+  [
+   "How are you feeling today?",
+   "I feel happy and ready to help you."
   ]
+ ],
+ "notes": [
+  "13 November: plain pairs a tool should answer (the time, a sum, a date, a meaning) left out, 9 of 400"
  ]
 }

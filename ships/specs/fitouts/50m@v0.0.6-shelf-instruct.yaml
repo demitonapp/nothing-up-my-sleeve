@@ -35,7 +35,8 @@ tools:
   - liberty_machine_status
   - expedition_status
 data:
-  recipe: lists/50m-instruct-v1.csv
+  # v2 (13 November): the tool lessons with a quarter wanting no tool, and Ogden books beside the lessons
+  recipe: lists/50m-instruct-v2.csv
   passes: 3
   order: shuffled
   refuse:
@@ -120,6 +121,7 @@ eval:
     tools:
       clean: marks-v1
       limit: 100
+      heldout: lists/tools-heldout-v2.jsonl
     question_gain:
       format: marks
       clean: marks-v1

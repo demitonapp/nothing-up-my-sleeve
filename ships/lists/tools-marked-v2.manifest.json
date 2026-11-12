@@ -1,0 +1,90 @@
+{
+ "version": "tools-marked-v2",
+ "generator": "backend/scripts/make_tool_corpus.py",
+ "teaching": "lists/tool-teaching-v1.json",
+ "seed": 20261113,
+ "teacher": "mlx-community/Qwen3.8-27B-4bit",
+ "tools": [
+  "board_score",
+  "calculate",
+  "current_time",
+  "days_between",
+  "define",
+  "expedition_status",
+  "liberty_machine_status",
+  "queue_status"
+ ],
+ "sha1": "9a747bde88e183e790e60ce9cc46398b4211cac7",
+ "lessons": 20000,
+ "held_out": 378,
+ "by_kind": {
+  "add": 1315,
+  "subtract": 1212,
+  "multiply": 1298,
+  "divide": 1240,
+  "current_time": 1191,
+  "days_between": 1253,
+  "define": 1296,
+  "board_score": 1259,
+  "queue_all": 1213,
+  "queue_find": 1286,
+  "liberty": 1248,
+  "expedition": 1189,
+  "none": 5000
+ },
+ "patterns": {
+  "add": [
+   40,
+   10
+  ],
+  "subtract": [
+   40,
+   10
+  ],
+  "multiply": [
+   40,
+   10
+  ],
+  "divide": [
+   40,
+   10
+  ],
+  "current_time": [
+   40,
+   10
+  ],
+  "days_between": [
+   20,
+   5
+  ],
+  "define": [
+   38,
+   9
+  ],
+  "board_score": [
+   40,
+   10
+  ],
+  "queue_all": [
+   40,
+   10
+  ],
+  "queue_find": [
+   40,
+   10
+  ],
+  "liberty": [
+   40,
+   10
+  ],
+  "expedition": [
+   40,
+   10
+  ]
+ },
+ "books_written": 500,
+ "reads_as_written": [
+  19347,
+  20000
+ ]
+}

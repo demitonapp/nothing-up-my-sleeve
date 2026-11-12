@@ -857,6 +857,10 @@ def stage(rid: str) -> Path:
         shutil.rmtree(st)
     st.mkdir(parents=True)
     for db in paths.data_dir().glob("*.sqlite"):
+        # the register is always exported from the store (13 November: an empty `data/manifest.sqlite`, made at 07:54
+        # by a process that read the library from the file, was carried instead, and every box staged 0 books)
+        if db.name == "manifest.sqlite":
+            continue
         src = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
         dst = sqlite3.connect(st / db.name)
         src.backup(dst)

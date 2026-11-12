@@ -1,0 +1,133 @@
+# ships/specs/fitouts: the 21m's instruct leg (13 November; Justin: "should we be running all our tests on the 50m?").
+# The 50m's instruct leg carried to the 21m on the fleet's marks, to sail on this Mac as soon as its seed is home, so the legs'
+# recipes are confirmed a size up from the 9m before the 50m's are sailed abroad.
+name: 21m@v0.0.6-fleetmarks-instruct
+expedition: kipling
+goal: 14
+ship: 'SOP v0.0.6 at 21m (the instruct leg: conversation and tools, on the fleet''s marks)'
+experiment: 'The 21m instruct ship (kipling:14), for Justin to talk to and to try its tools: can the 21m hold a short conversation and call one of a fixed set of tools when a question needs it?'
+question: 'The instruct leg at 21m, on 21m@v0.0.6-fleetmarks: the conversation corpus and the tool corpus read together (lists/50m-instruct-v2.csv: 14,953 conversations and 20,000 tool lessons, eight tools, a quarter wanting none, beside Ogden books), three passes, the pull off, at a learning rate of 0.0002. Read every 100 steps on the held-out conversations (the question gain) and 200 held-out tool questions in wordings it never trained on (the exact call, the right tool, the right refusal), with the hole cards beside them.'
+departures:
+- field: content
+  why: the instruct leg reads conversations and tool lessons, not the books
+- field: training
+  why: 'seeded from 21m@v0.0.6-fleetmarks, the pull off: a leg after pretraining, not a fresh voyage'
+- field: tokeniser
+  why: 'the seed''s: the fleet''s eleven marks as single pieces'
+- field: optim
+  why: '0.0003 with 50 steps of warm-up, about a third of the 21m''s 0.0008, as the 9m''s legs take a third of its rate'
+milestones:
+- at: 0.5
+  metric: eval/hole-cards-unseen/bpb_mean
+  at_most: 2.2
+  if_missed: recall
+  why: a catastrophe guard, not a target, the 9m legs' own kind
+tools:
+  set:
+  - calculate
+  - current_time
+  - days_between
+  - define
+  - board_score
+  - queue_status
+  - liberty_machine_status
+  - expedition_status
+data:
+  # v2 (13 November): the tool lessons with a quarter wanting no tool, and Ogden books beside the lessons
+  recipe: lists/50m-instruct-v2.csv
+  passes: 3
+  order: shuffled
+  refuse:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+  - lists/hole-cards-unseen.csv
+  clean: marks-v1
+  turns: marks
+tokeniser:
+  kind: spm-bpe
+  vocab: 2048
+  byte_fallback: true
+  train_on: lists/ogden-v0.1.csv
+  symbols:
+  - "<bos>"
+  - "<eos>"
+  - "<question>"
+  - "<answer>"
+  - "<end>"
+  - "<premise>"
+  - "<sep>"
+  - "<conclusion>"
+  - "<think>"
+  - "<call>"
+  - "<result>"
+model:
+  family: gpt
+  preset: 21m
+  context: 1024
+  positions: rope
+optim:
+  name: adamw
+  lr: 0.0003
+  betas:
+  - 0.9
+  - 0.95
+  weight_decay: 0.1
+  warmup_steps: 50
+  schedule: cosine
+  min_lr_ratio: 0.1
+  batch_tokens: 32768
+  grad_clip: 1.0
+  precision: bf16
+  scaffold:
+    weight: 0.0
+    hold: 0.0
+    fade: 0.0
+    # the pull is off; its maps are read on 4 windows, not 32, so the deep 50m fits an RTX 4090 (the base needed 25 GB)
+    sample:
+      windows: 4
+      length: 1024
+    heads:
+    - layer: 0
+      head: 0
+      card: previous_word
+    - layer: 0
+      head: 1
+      card: delimiter
+    - layer: 16
+      head: 2
+      card: induction
+    - layer: 16
+      head: 3
+      card: duplicate_word
+    riddles:
+      comparator:
+        layer: 8
+        head: 2
+        items: 16
+        pool: 2048
+eval:
+  sets:
+  - lists/hole-cards-unseen.csv
+  # every 250 steps on 100 items (13 November): a 50m writes its answers a piece at a time, and voyage E's
+  # readings every 64 steps took more of its hours than its training did
+  every_steps: 250
+  evaluators:
+  - ce_bpb
+  - tools
+  - question_gain
+  options:
+    tools:
+      clean: marks-v1
+      limit: 100
+      heldout: lists/tools-heldout-v2.jsonl
+    question_gain:
+      format: marks
+      clean: marks-v1
+      heldout: lists/conversation-heldout-v1.jsonl
+checkpoint:
+  every_steps: 100
+sop: 0.0.6
+seed: 1
+seeded_from:
+  run: 21m@v0.0.6-fleetmarks
+  mode: free

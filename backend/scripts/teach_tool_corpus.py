@@ -77,10 +77,15 @@ def ask_plain(n: int) -> str:
             "kind, true answer of at most 16 words. One pair a line, no numbering, nothing else.")
 
 
+_TOOL_LIKE = re.compile(r"what time|time is it|\bplus\b|\bminus\b|\btimes\b|divided|what day|\bdate\b|define|what does .+ mean|how many days|\bqueue\b|\bscore\b", re.I)
+
+
 def keep_plain(line: str) -> tuple[str, str] | None:
     q, sep, a = line.partition("|")
     q, a = re.sub(r"^\s*(?:[-*\u2022]|\d+[.)])\s*", "", q).strip().strip('"'), a.strip().strip('"')
     if not sep or not q.endswith("?") or not a or len(q.split()) > 20 or len(a.split()) > 20 or re.search(r"[{}]", q + a):
+        return None
+    if _TOOL_LIKE.search(q):  # a question a tool should answer (the time, a sum, a date, a meaning) is not a no-tool lesson
         return None
     return q, a
 

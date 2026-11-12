@@ -4840,8 +4840,10 @@ def api_lab_models(lab: str) -> dict:
     return out
 
 
-def api_tests() -> dict:
-    """Every test in the store (thorp.viable.s4_intelligence.tests_store), in fleet's order."""
+def api_tests_index() -> dict:
+    """Every test in the store (thorp.viable.s4_intelligence.tests_store), in fleet's order: /api/tests. Its own
+    name (12 November): as `api_tests` it replaced the per-model helper above, and every competitor page failed
+    with "api_tests() takes 0 positional arguments"."""
     from thorp.viable.s4_intelligence import tests_store
 
     return {"tests": tests_store.rows()}
@@ -7578,7 +7580,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/drones/browser/sites": api_browser_sites,
                 "/api/drones/download": lambda: api_drone_download(q.get("model", "")),
                 "/api/drones/task": lambda: api_drone_task(q.get("id", "")),
-                "/api/tests": api_tests,
+                "/api/tests": api_tests_index,
                 "/api/bridge": api_bridge,
                 "/api/leaderboard/internal": api_leaderboard_internal,
                 "/api/smoking_qwen": api_smoking_qwen,

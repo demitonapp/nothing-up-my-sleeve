@@ -3,7 +3,7 @@
 // static pages read this file, so a section's tabs cannot drift from page to page (UI.md,
 // "Navigation"). Pure logic only: no DOM, no React.
 
-export type MainKey = 'places' | 'expeditions' | 'discoveries' | 'leaderboard' | 'library' | 'liberty-machine';
+export type MainKey = 'places' | 'expeditions' | 'leaderboard' | 'library' | 'liberty-machine';
 
 export interface MainTab {
   key: MainKey;
@@ -35,9 +35,8 @@ export const MAIN_TABS: MainTab[] = [
   {
     key: 'places', label: 'Places', href: '/orbitals',
     title: 'the places: Demiton\'s orbital (its berth, shipyard, library and expeditions) and the trading orbital, where every other lab and its ships reside',
-    match: ['/orbitals', '/harbours', '/harbors', '/ships', '/sizes', '/classes', '/rung', '/foreign', '/shipyard', '/masaq', '/labs', '/expeditions', '/library', '/shelves'],
+    match: ['/orbitals', '/harbours', '/harbors', '/ships', '/sizes', '/classes', '/rung', '/foreign', '/shipyard', '/masaq', '/labs', '/expeditions', '/library', '/shelves', '/discoveries'],
   },
-  { key: 'discoveries', label: 'Discoveries', href: '/discoveries', title: '', match: ['/discoveries'] },
   { key: 'leaderboard', label: 'Leaderboard', href: '/leaderboard', title: '', match: ['/leaderboard'] },
   // the Liberty Machine is a way in of its own (12 November, Justin: "need pages for each Liberty Machine system and then move it up a
   // level out of expeditions into it's own top level item"): it governs the whole of Nothing up my sleeve, not a voyage
@@ -80,7 +79,7 @@ const at = (p: string, base: string): boolean => p === base || p.startsWith(base
  *  where they are reached from. */
 export function mainTabFor(path: string): MainKey {
   const p = navPath(path);
-  if (at(p, '/discoveries')) return 'discoveries';
+  // Discoveries is not a way in of its own (12 November, Justin): it is a view in each orbital, so Places is lit
   if (at(p, '/leaderboard')) return 'leaderboard';
   if (at(p, '/orbitals/demiton/liberty-machine') || at(p, '/governance') || at(p, '/vsm')) return 'liberty-machine';
   // Expedition and Library addresses are Demiton's views now (12 November), so Places is the way in.
@@ -160,32 +159,6 @@ export const libertyMachineSystemOf = (path: string): 's1' | 's2' | 's3' | 's4' 
   return null;
 };
 
-// the overview doors: a domain is read on the overview, a trick and its chain on the skills ladder
-const DISCOVERY_DOMAINS = new Set(['physics', 'maths', 'mathematics', 'reasoning', 'philosophy']);
-
-const discoverySub = (p: string): string => {
-  const rest = p.replace(/^\/discoveries\/?/, '').split('/')[0];
-  if (rest === 'tests' || rest === 'two-facts') return 'tests';
-  if (rest === 'stars' || rest === 'cards' || rest === 'tells') return 'stars';
-  if (rest === 'skills' || rest === 'registry' || rest === 'quantum' || rest === 'traits' || rest === 'chains') return 'skills';
-  if (!rest || DISCOVERY_DOMAINS.has(rest)) return 'overview';
-  return 'skills'; // a trick of the trade
-};
-
-const discoveriesSection = (p: string): SectionNav => {
-  const sub = discoverySub(p);
-  return {
-    key: 'discoveries',
-    label: 'Discoveries',
-    items: [
-      { key: 'overview', label: 'Overview', href: '/discoveries', active: sub === 'overview' },
-      { key: 'stars', label: 'Stars', href: '/discoveries/stars', active: sub === 'stars' },
-      { key: 'skills', label: 'Skills', href: '/discoveries/skills', active: sub === 'skills' },
-      { key: 'tests', label: 'Tests', href: '/discoveries/tests', active: sub === 'tests' },
-    ],
-  };
-};
-
 /**
  * The tabs a page shows under the header, or null when the section is one page (Leaderboard,
  * Library) and has nothing to switch between. The same function serves the islands and the static
@@ -198,6 +171,5 @@ export function sectionNavFor(path: string): SectionNav | null {
     || at(p, '/sizes') || at(p, '/classes') || at(p, '/rung') || at(p, '/foreign') || at(p, '/labs')) return placesSection(p);
   if (at(p, '/expeditions') || at(p, '/voyages')) return expeditionsSection(p);
   if (at(p, '/orbitals/demiton/liberty-machine') || at(p, '/governance') || at(p, '/vsm')) return null;
-  if (at(p, '/discoveries')) return discoveriesSection(p);
   return null;
 }

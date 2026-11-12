@@ -1,0 +1,15 @@
+---
+// Masaq' Reach's discoveries, its other two tabs (the head kinds are the index).
+import Layout from '../../../../layouts/Layout.astro';
+import Discoveries from '../../../../components/islands/Discoveries';
+import Reader from '../../../../components/Reader.astro';
+import { MASAQ_SUBS } from '../../../../lib/discoveryPaths';
+
+export function getStaticPaths() {
+  return MASAQ_SUBS.filter((s) => s !== 'kinds').map((path) => ({ params: { path } }));
+}
+---
+<Layout>
+  <main><Discoveries client:load /></main>
+  <Reader />
+</Layout>

@@ -10,6 +10,8 @@ import Chat from './Chat';
 import { BAND, bandOf, sizeOf } from '@/scripts/views/bands';
 import SectionNav from '../SectionNav';
 import { TabNav } from '../TabNav';
+import { headsCensusHtml, personasHtml } from '@/scripts/views/discoveries';
+import { MASAQ_DISCOVERIES } from '@/lib/discoveryPaths';
 
 interface ForeignLogic {
   [k: string]: number | null | undefined;
@@ -60,6 +62,11 @@ export default function Foreign() {
   const [chatKey, setChatKey] = useState<string | null>(null);
   useEffect(() => { setChatKey(key || null); }, [key]);
   const href = (t: string): string => `/foreign/${encodeURIComponent(key)}${t === 'chat' ? '/chat' : t === 'versions' ? '/versions' : ''}`;
+  // the model's own head census and persona vectors, where they have been read (12 November: moved here from the
+  // Discoveries Stars tab, so Qwen3 4B's 1,152 heads are on Qwen3 4B's page); a model never read shows neither
+  const readsHeads = tab === 'readings' && !!d?.model;
+  const census = useApi<any>(readsHeads ? `/api/heads?model=${encodeURIComponent(d!.model)}` : null, 300000);
+  const personas = useApi<any>(readsHeads ? `/api/personas?model=${encodeURIComponent(d!.model)}` : null, 300000);
 
   return (
     <div {...sectionProps('foreign')}>
@@ -95,6 +102,18 @@ export default function Foreign() {
           />
           <div className={`shiptab${tab === 'readings' ? ' active' : ''}`}>
             <ForeignBody d={d} />
+            {census.data?.found ? (
+              <section className={cardCls(false, 'panel')} id="heads">
+                <h2>Every head, by category <span className="note">the census of all {census.data.n_heads ?? ''} heads (thorp.head_census): every kind the toolkit measures, grouped, with the heads at or above each kind's mark, and the heads no card names. Expand a category to list its heads: layer, what names it, and the readings that identify it. The kinds themselves are charted in <a href={MASAQ_DISCOVERIES}>the Reach's discoveries</a></span></h2>
+                <div dangerouslySetInnerHTML={{ __html: headsCensusHtml(census.data) }} />
+              </section>
+            ) : null}
+            {personas.data?.found ? (
+              <section className={cardCls(false, 'panel')} id="personas">
+                <h2>Persona vectors <span className="note">the residual-stream directions for six character traits, read by contrastive system prompts (thorp.persona_vectors): the direction's norm, its projection on a plain prompt, and how far the traits share a direction</span></h2>
+                <div dangerouslySetInnerHTML={{ __html: personasHtml(personas.data) }} />
+              </section>
+            ) : null}
           </div>
           <div className={`shiptab${tab === 'versions' ? ' active' : ''}`}>
             {tab === 'versions' ? <VersionsBody d={d} /> : null}

@@ -55,7 +55,7 @@ export function competitorHtml(d: Payload, stars: Payload[]): CompetitorHtml {
     : `<div class="tfs"><b>${mean == null ? '–' : signed(mean)}</b><span>chaining lift (mean of the four)</span></div>
        <div class="tfs"><b>${passed} of ${chainingTests.length}</b><span>chaining tests performed</span></div>
        <div class="tfs"><b class="${L && L.performed ? 'good' : ''}">${L && L.gain != null ? signed(L.gain) : 'not read'}</b><span>chaining gain on the logic deck${L && L.score != null ? `, ${Math.round(100 * L.score)}% of items right` : ''}${L && L.items_n ? `, ${L.items_n} items` : ''}${L && L.performed ? ' ✓' : ''}</span></div>`;
-  const tests = chainingTests.map((x: any, i: number) => `<tr><td><a href="/discoveries/${esc(x.key)}"><b>${esc(x.name)}</b></a></td><td><a href="/discoveries/chains/${esc(d.chains[i].key)}">${esc(d.chains[i].name)}</a></td>
+  const tests = chainingTests.map((x: any, i: number) => `<tr><td><a href="/orbitals/demiton/discoveries/${esc(x.key)}"><b>${esc(x.name)}</b></a></td><td><a href="/orbitals/demiton/discoveries/chains/${esc(d.chains[i].key)}">${esc(d.chains[i].name)}</a></td>
     <td class="${x.performed ? 'good' : ''}">${x.lift != null ? signed(x.lift) : '–'}</td><td>${x.score != null ? Math.round(100 * x.score) + '%' : '–'}</td><td>${x.performed ? '✓' : ''}</td></tr>`).join('');
   const variants = L ? LOGIC_VARIANTS.filter(([k]) => L[k] != null).map(([k, label]) => ({ key: k, label, value: L[k] })) : [];
   const relations = L ? Object.keys(L).filter((k) => k.startsWith('gain_')).map((k) => ({ key: k.slice(5), value: L[k] })) : [];
@@ -67,7 +67,7 @@ export function competitorHtml(d: Payload, stars: Payload[]): CompetitorHtml {
     const state = !C ? 'unread' : key !== 'bridge' && !read2 ? 'unreadable' : !x ? 'unread' : (x.lit || x.lit_shared) ? 'lit' : (x.max == null && key === 'bridge') ? 'unreadable' : 'unlit';
     const best = x ? Math.max(x.max ?? -Infinity, x.shared ?? -Infinity) : null;
     const star = stars.find((s) => s.key === key);
-    return { key, name, held: state === 'lit', state, near: thr && best != null && isFinite(best) ? best / thr : null, x, thr, untrusted: false, about: star && shortAbout(star.about), href: '/discoveries/stars' };
+    return { key, name, held: state === 'lit', state, near: thr && best != null && isFinite(best) ? best / thr : null, x, thr, untrusted: false, about: star && shortAbout(star.about), href: '/orbitals/demiton/discoveries/stars' };
   });
   const rowOf = (c: any) => {
     const x = c.x || {}, v = cardBadge(d.card_verdicts, c.key);
@@ -85,7 +85,7 @@ export function competitorHtml(d: Payload, stars: Payload[]): CompetitorHtml {
     + (bridge ? '<div class="k mt">the bridge over layers <span class="s">nats at the answer\'s position; the mark dotted</span></div><div class="chart cpbridge" id="cpbridge"></div>' : '');
   const width = Math.max(...d.chains.map((c: any) => c.rungs.length - 1));
   const rungsHead = `<tr><th>chain</th>${d.chains[0].rungs.slice(0, width).map((r: any) => `<th>${esc(r.rung || '')}</th>`).join('')}</tr>`;
-  const rungsBody = d.chains.map((c: any) => `<tr><td><a href="/discoveries/chains/${esc(c.key)}"><b>${esc(c.name)}</b></a></td>${c.rungs.slice(0, width).map((r: any) => `<td><a href="/discoveries/${esc(r.key)}">${esc(r.name)}</a><div class="${r.performed ? 'good' : 's'}">${r.lift != null ? `${signed(r.lift)} · ${r.score != null ? Math.round(100 * r.score) + '%' : ''}${r.performed ? ' ✓' : ''}` : 'not read'}</div></td>`).join('')}</tr>`).join('');
+  const rungsBody = d.chains.map((c: any) => `<tr><td><a href="/orbitals/demiton/discoveries/chains/${esc(c.key)}"><b>${esc(c.name)}</b></a></td>${c.rungs.slice(0, width).map((r: any) => `<td><a href="/orbitals/demiton/discoveries/${esc(r.key)}">${esc(r.name)}</a><div class="${r.performed ? 'good' : 's'}">${r.lift != null ? `${signed(r.lift)} · ${r.score != null ? Math.round(100 * r.score) + '%' : ''}${r.performed ? ' ✓' : ''}` : 'not read'}</div></td>`).join('')}</tr>`).join('');
   return { title, pills, over, sum, tests, cards, variants, relations, bridge, rungsHead, rungsBody, bench: testsHtml((d as any).tests) };
 }
 

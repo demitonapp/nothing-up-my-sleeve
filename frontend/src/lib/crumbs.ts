@@ -34,6 +34,7 @@ const DEMITON_MENU: MenuItem[] = [
   { label: 'Shipyard', href: '/shipyard' },
   { label: 'Library', href: '/library' },
   { label: 'Images', href: '/library/images', note: 'in the Library' },
+  { label: 'Discoveries', href: '/orbitals/demiton/discoveries', note: 'what our fleet found' },
   { label: 'Liberty Machine', href: '/orbitals/demiton/liberty-machine' },
   { label: 'Expeditions', href: '/expeditions', group: 'At sea' },
   { label: 'Queue', href: '/expeditions/queue' },
@@ -53,6 +54,7 @@ const MASAQ_MENU: MenuItem[] = [
   { label: 'Research', href: '/orbitals/masaq/research' },
   { label: 'Models', href: '/orbitals/masaq/models' },
   { label: 'Embeddings', href: '/orbitals/masaq/embeddings' },
+  { label: 'Discoveries', href: '/orbitals/masaq/discoveries', note: 'head kinds and the census' },
   { label: 'Extra small', href: '/orbitals/masaq/models/xsmall', group: 'Models by size' },
   { label: 'Small', href: '/orbitals/masaq/models/small' },
   { label: 'Medium', href: '/orbitals/masaq/models/medium' },
@@ -179,6 +181,13 @@ export function crumbsFor(path: string): Crumb[] {
       add('Research', '/orbitals/masaq/research');
       return out;
     }
+    // the Reach's discoveries (12 November): the head kinds, the cards beyond the sixteen, the Qwen mapping
+    if (x === 'discoveries') {
+      add('Discoveries', '/orbitals/masaq/discoveries');
+      if (y === 'cards') add('Cards beyond the sixteen', '/orbitals/masaq/discoveries/cards');
+      else if (y === 'unsorted') add('Still to be sorted', '/orbitals/masaq/discoveries/unsorted');
+      return out;
+    }
     // a house: /orbitals/masaq/<country>/<key>[/models]
     if (y) {
       add(houseLabel(y), `/orbitals/masaq/${x}/${y}`);
@@ -203,6 +212,11 @@ export function crumbsFor(path: string): Crumb[] {
       if (c === 'berth') add('Berth', '/orbitals/demiton/berth');
       else if (c === 'ships') add('Every ship', '/ships');
       else if (c === 'shipbuilder') out.push(SHIPYARD);
+      else if (c === 'discoveries') {
+        // Demiton's discoveries (12 November): its tabs, a trick, a chain, the traits, a door
+        add('Discoveries', '/orbitals/demiton/discoveries');
+        if (d && d !== 'overview') tail(3, '/orbitals/demiton/discoveries');
+      }
       return out;
     }
     if (b === 'masaq-reach' || b === 'zayton') {

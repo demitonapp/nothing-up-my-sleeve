@@ -1,0 +1,27 @@
+---
+// An old /discoveries address (12 November: Discoveries moved into the two orbitals, lib/discoveryPaths.ts). The page
+// is only a redirect: its new home is worked out at build (a meta refresh, so it works without script), and again in
+// the browser with the query, so ?tab=census and ?test=chaining reach the right page.
+import { DEMITON_DISCOVERIES, newHome } from '../lib/discoveryPaths';
+
+interface Props { path: string }
+const { path } = Astro.props;
+const target = newHome(path) || DEMITON_DISCOVERIES;
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="refresh" content={`0; url=${target}`} />
+    <link rel="canonical" href={target} />
+    <title>Discoveries have moved</title>
+    <script>
+      import { DEMITON_DISCOVERIES, newHome } from '../lib/discoveryPaths';
+      location.replace(newHome(location.pathname + location.search) || DEMITON_DISCOVERIES);
+    </script>
+  </head>
+  <body>
+    <p>Discoveries live in the two orbitals now: <a href={target}>go to its new page</a>.</p>
+  </body>
+</html>

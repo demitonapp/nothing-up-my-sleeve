@@ -1,0 +1,16 @@
+---
+// Demiton's discoveries, every address under it: the four tabs, the doors, every trick and chain, the traits, and the
+// old aliases the island rewrites (two-facts, registry). The list is lib/discoveryPaths.ts's.
+import Layout from '../../../../layouts/Layout.astro';
+import Discoveries from '../../../../components/islands/Discoveries';
+import Reader from '../../../../components/Reader.astro';
+import { DISCOVERY_PATHS } from '../../../../lib/discoveryPaths';
+
+export function getStaticPaths() {
+  return DISCOVERY_PATHS.map((path) => ({ params: { path } }));
+}
+---
+<Layout>
+  <main><Discoveries client:load /></main>
+  <Reader />
+</Layout>

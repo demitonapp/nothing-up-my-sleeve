@@ -62,8 +62,8 @@ export const coverageBar = (c: { here: number; inherited: number; open: number; 
 export const leadNote = (t: { key: string; name: string; leads_to?: string }, kts: { key: string; name: string; leads_to?: string }[]): string => {
   const name = (k: string): string => (kts.find((x) => x.key === k) || {}).name || k;
   const led = kts.filter((x) => x.leads_to === t.key);
-  return (t.leads_to ? `<div class="lead">→ leads to <a href="/discoveries/${esc(t.leads_to)}">${esc(name(t.leads_to))}</a></div>` : '')
-    + (led.length ? `<div class="lead">← led by ${led.map((x) => `<a href="/discoveries/${esc(x.key)}">${esc(x.name)}</a>`).join(', ')}</div>` : '');
+  return (t.leads_to ? `<div class="lead">→ leads to <a href="/orbitals/demiton/discoveries/${esc(t.leads_to)}">${esc(name(t.leads_to))}</a></div>` : '')
+    + (led.length ? `<div class="lead">← led by ${led.map((x) => `<a href="/orbitals/demiton/discoveries/${esc(x.key)}">${esc(x.name)}</a>`).join(', ')}</div>` : '');
 };
 
 // A select of the seven steps to quantum physics, kept as chosen.

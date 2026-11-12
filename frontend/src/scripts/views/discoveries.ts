@@ -310,8 +310,8 @@ export const trickProgress = (d: DiscData, kt: KnownTrick, rungs: Rung[]): Trick
 const leadNote = (t: { key: string; name: string; leads_to?: string | null }, kts: { key: string; name: string; leads_to?: string | null }[]): string => {
   const name = (k: string): string => (kts.find((x) => x.key === k) || {}).name || k;
   const led = kts.filter((x) => x.leads_to === t.key);
-  return (t.leads_to ? `<div class="lead">→ leads to <a href="/discoveries/${esc(t.leads_to)}">${esc(name(t.leads_to))}</a></div>` : '')
-    + (led.length ? `<div class="lead">← led by ${led.map((x) => `<a href="/discoveries/${esc(x.key)}">${esc(x.name)}</a>`).join(', ')}</div>` : '');
+  return (t.leads_to ? `<div class="lead">→ leads to <a href="/orbitals/demiton/discoveries/${esc(t.leads_to)}">${esc(name(t.leads_to))}</a></div>` : '')
+    + (led.length ? `<div class="lead">← led by ${led.map((x) => `<a href="/orbitals/demiton/discoveries/${esc(x.key)}">${esc(x.name)}</a>`).join(', ')}</div>` : '');
 };
 
 // A chain's grade from many models (mirrors views/chains.ts).
@@ -384,7 +384,7 @@ export const trickRouteHtml = (d: DiscData): string => {
       const mine = kts.filter((t) => t.waypoint === w.key);
       const gates = mine.filter((t) => t.gate);
       return `<div class="step"><div class="n">${i + 1}</div><div class="nm">${esc(w.name)}</div><div class="ab">${esc(w.about)}</div>
-      <div class="gt">${gates.map((t) => `<a href="/discoveries/${esc(t.key)}">◆ ${esc(t.name)}</a>`).join('')}${mine.filter((t) => t.leads_to).map((t) => `<a class="ld" href="/discoveries/${esc(t.key)}" title="leads to ${esc((kts.find((x) => x.key === t.leads_to) || {}).name || t.leads_to)}">↗ ${esc(t.name)}</a>`).join('')}</div><div class="ct">${mine.length} tricks</div></div>`;
+      <div class="gt">${gates.map((t) => `<a href="/orbitals/demiton/discoveries/${esc(t.key)}">◆ ${esc(t.name)}</a>`).join('')}${mine.filter((t) => t.leads_to).map((t) => `<a class="ld" href="/orbitals/demiton/discoveries/${esc(t.key)}" title="leads to ${esc((kts.find((x) => x.key === t.leads_to) || {}).name || t.leads_to)}">↗ ${esc(t.name)}</a>`).join('')}</div><div class="ct">${mine.length} tricks</div></div>`;
     })
     .join('<div class="arrow">→</div>');
 };
@@ -394,7 +394,7 @@ export const skillLadderHtml = (d: DiscData): string => {
   const wps = d.waypoints || [];
   return `<div class="skillgrid">${wps.map((w, i) => {
     const mine = kts.filter((t) => t.waypoint === w.key);
-    const skills = mine.map((t) => `<a class="skill${t.fleet ? ' measured' : ''}" href="/discoveries/${esc(t.key)}">
+    const skills = mine.map((t) => `<a class="skill${t.fleet ? ' measured' : ''}" href="/orbitals/demiton/discoveries/${esc(t.key)}">
       <b>${t.gate ? '◆ ' : ''}${esc(t.name)}</b><span>${esc(t.does)}</span>
       <em>${t.fleet ? 'measured by Nothing up my sleeve' : 'not measured yet'}${t.target_class ? ` · goal ${esc(t.target_class)}` : ''}${t.taught ? ' · taught' : ''}</em></a>`).join('');
     return `<section class="skillstep"><h3><span class="n">${i + 1}</span> ${esc(w.name)} <span class="s">${mine.length} skill${mine.length === 1 ? '' : 's'}</span></h3>
@@ -428,7 +428,7 @@ export const trickRowsHtml = (d: DiscData, rungs: Rung[], waypoint: string, band
   return { count, body };
 };
 
-// ---- one trick (#/discoveries/<trick>)
+// ---- one trick (/orbitals/demiton/discoveries/<trick>)
 
 export interface TrickPage {
   found: boolean;
@@ -456,14 +456,14 @@ export const trickPageHtml = (d: DiscData, rungs: Rung[], key: string | null): T
   const ownTest = t.field_params == null && /Nothing up my sleeve's own test/i.test(t.field_at || '');
   const over = [
     ['waypoint', `${esc(wp ? wp.name : t.waypoint)}${t.gate ? ' · <b>◆ a gate</b>: performed before a ship moves on' : ' · a milestone'}`],
-    ['rests on', (t.rests_on || []).length ? t.rests_on.map((k) => `<a href="/discoveries/${esc(k)}">${esc(tname[k] || k)}</a>`).join(', ') : '–'],
+    ['rests on', (t.rests_on || []).length ? t.rests_on.map((k) => `<a href="/orbitals/demiton/discoveries/${esc(k)}">${esc(tname[k] || k)}</a>`).join(', ') : '–'],
     ...(leadNote(t, d.known_tricks || []) ? [['leads', leadNote(t, d.known_tricks || [])]] : []),
     ...(() => {
       const ch = ((d.chain_rungs || {}).chains || []).find((c) => c.includes(t.key) || (t.fleet && c.includes(t.fleet)));
       if (!ch) return [];
       const end = ch[ch.length - 1];
       const en = (d.known_tricks || []).find((x) => x.key === end || x.fleet === end);
-      return [['the climb', `${ch.indexOf(t.fleet || t.key) === ch.length - 1 ? '' : `step ${ch.indexOf(t.fleet || t.key) + 1} of ${ch.length} on `}<a href="/discoveries/chains/${esc(end)}"><b>${esc(en ? en.name : end)}</b>: the climb, step by step</a>`]];
+      return [['the climb', `${ch.indexOf(t.fleet || t.key) === ch.length - 1 ? '' : `step ${ch.indexOf(t.fleet || t.key) + 1} of ${ch.length} on `}<a href="/orbitals/demiton/discoveries/chains/${esc(end)}"><b>${esc(en ? en.name : end)}</b>: the climb, step by step</a>`]];
     })(),
     [ownTest ? 'where it comes from' : 'the field shows it at', ownTest ? `<b>Nothing up my sleeve's own test</b> <span class="s">(not from the field${t.field_models ? `; ${esc(t.field_models)} for scale` : ''})</span>` : `<span class="sizeband">${esc(t.field_band)}</span> parameters · ${esc(t.field_at)} <span class="s">(${esc(t.sure)})</span>`],
     ['in', ownTest ? '<span class="s">Nothing up my sleeve\'s own test</span>' : esc(t.field_models)],
@@ -506,7 +506,7 @@ export const trickPageHtml = (d: DiscData, rungs: Rung[], key: string | null): T
   let pair: TrickPage['pair'] = null;
   if (pt) {
     const pf = pt.fleet ? d.tricks.find((x) => x.key === pt.fleet) : undefined;
-    const title = `${t.leads_to ? 'It leads to' : 'Led by'} <a href="/discoveries/${esc(pt.key)}">${esc(pt.name)}</a> <span class="note">${t.leads_to ? 'the bigger test this one tracks, on the same evaluator and scale' : 'the smaller test that tracks this one, on the same evaluator and scale'}</span>`;
+    const title = `${t.leads_to ? 'It leads to' : 'Led by'} <a href="/orbitals/demiton/discoveries/${esc(pt.key)}">${esc(pt.name)}</a> <span class="note">${t.leads_to ? 'the bigger test this one tracks, on the same evaluator and scale' : 'the smaller test that tracks this one, on the same evaluator and scale'}</span>`;
     const msg = !pf ? 'not measured yet' : pf.viable === false ? 'not viable on Gutenberg in English' : !pf.evaluator ? `pre-registered${pf.cutoff ? ` (cutoff ${pf.cutoff})` : ''}; its evaluator is not built yet` : null;
     pair = { title, chart: msg || !pf ? null : { fleetKey: pf.key, name: pt.name, reference: pt.reference }, empty: msg };
   }
@@ -668,14 +668,14 @@ export const chainsTableHtml = (d: DiscData, rungs: Rung[], chainRef: boolean): 
         const chainKey = end.fleet || end.key;
         const hasPage = (cr.chains || []).some((x) => x[x.length - 1] === chainKey);
         const nameOf = (k: string): string => (byKey[k] || {}).name || k;
-        return `<tr><td>${hasPage ? `<a href="/discoveries/chains/${esc(chainKey)}"><b>${esc(end.name)}</b></a>` : `<b>${esc(end.name)}</b>`}<div class="grade">${gradeNote((cr.grades || {})[chainKey], nameOf)}</div>${hasPage ? '<div class="s">the climb, step by step →</div>' : ''}</td>${cols
+        return `<tr><td>${hasPage ? `<a href="/orbitals/demiton/discoveries/chains/${esc(chainKey)}"><b>${esc(end.name)}</b></a>` : `<b>${esc(end.name)}</b>`}<div class="grade">${gradeNote((cr.grades || {})[chainKey], nameOf)}</div>${hasPage ? '<div class="s">the climb, step by step →</div>' : ''}</td>${cols
           .map((p) => at[p])
           .map((t) => {
             if (!t) return '<td class="none"><div class="s">no rung</div></td>';
             const ft = t.fleet ? d.tricks.find((x) => x.key === t.fleet) : undefined;
             const ref = Object.entries(t.reference || {})[0] as [string, number] | undefined;
             const ev = rungEvidence(t, ft, rank);
-            return `<td><a href="/discoveries/${esc(t.key)}"><b>${esc(t.name)}</b></a>${ev}${refRows(t.fleet || t.key, cr.reference as any[] | undefined, ref, signed, chainRef)}</td>`;
+            return `<td><a href="/orbitals/demiton/discoveries/${esc(t.key)}"><b>${esc(t.name)}</b></a>${ev}${refRows(t.fleet || t.key, cr.reference as any[] | undefined, ref, signed, chainRef)}</td>`;
           })
           .join('')}</tr>`;
       })
@@ -691,7 +691,7 @@ export const chainsTableHtml = (d: DiscData, rungs: Rung[], chainRef: boolean): 
   return { head, body };
 };
 
-// ---- one chain (#/discoveries/chains/<key>): the explorer's test told as a climb, keel to explorer
+// ---- one chain (/orbitals/demiton/discoveries/chains/<key>): the explorer's test told as a climb, keel to explorer
 
 export interface ChainPage {
   found: boolean;
@@ -708,7 +708,7 @@ export const chainPageHtml = (d: DiscData, rungs: Rung[], key: string | null, da
       title: `no chain called ${key ?? ''}`,
       strand: '',
       over: '',
-      steps: `<div class="${emptyCls()}">the chains are the explorer's four tests; <a href="/discoveries">back to the chains table</a></div>`,
+      steps: `<div class="${emptyCls()}">the chains are the explorer's four tests; <a href="/orbitals/demiton/discoveries">back to the chains table</a></div>`,
     };
   }
   const rank = classRank(rungs);
@@ -758,7 +758,7 @@ export const chainPageHtml = (d: DiscData, rungs: Rung[], key: string | null, da
       <div class="cnum">${i + 1}</div>
       <div class="cbody">
         <div class="crung">${r.preset ? classLink(rungs, r.preset) : ''}${r.title ? ` · <b>${esc(r.title)}</b>` : ''}</div>
-        <h2><a href="/discoveries/${esc(st.key)}">${esc(st.name)}</a></h2>
+        <h2><a href="/orbitals/demiton/discoveries/${esc(st.key)}">${esc(st.name)}</a></h2>
         <p class="cadds">${esc(st.adds)}</p>
         ${last && st.about ? `<p class="s">${esc(st.about)}</p>` : ''}
         <div class="row cev">
@@ -880,7 +880,7 @@ export const methodHtml = (d: DiscData, key: string, rungs: Rung[]): MethodHtml 
       }
       const vb = st ? cardBadge(d.card_verdicts, st.key) : '';
       const inner = `${st ? cardArt(st.key) : ''}${vb ? `<div class="vrow">${vb}</div>` : ''}<div class="top"><span class="preset">${esc(c.card)}</span><span class="${pillCls(planned ? '' : lit ? 'good' : 'blue')}">${planned ? 'planned' : lit ? 'lit' : 'in the deck'}</span></div><div class="ov">${esc(c.operation)}</div>${foot}`;
-      return planned ? `<div class="${cardCls(false, 'card planned')}">${inner}</div>` : `<div class="${cardCls(false, `card${lit ? ' lit pulse' : ''}`)}">${inner}<div class="foot"><a href="/discoveries/stars">${st ? esc(st.name) : 'the star chart'} on the star chart →</a></div></div>`;
+      return planned ? `<div class="${cardCls(false, 'card planned')}">${inner}</div>` : `<div class="${cardCls(false, `card${lit ? ' lit pulse' : ''}`)}">${inner}<div class="foot"><a href="/orbitals/demiton/discoveries/stars">${st ? esc(st.name) : 'the star chart'} on the star chart →</a></div></div>`;
     })
     .join('');
   return { name: m.name.toLowerCase(), status: m.status || '', trick: m.trick || '', parts, gaps, controls, metric: m.metric || '', cards };
@@ -942,7 +942,7 @@ export const twoFactsHtml = (d: DiscData, sq: any, lb: any, pulls: (any | null)[
       const pd = pulls[i];
       const st = pd && pd.steps && pd.steps.find((x: any) => x.key === t.key);
       const p = st && st.pairs && st.pairs[0];
-      return `<tr><td><a href="/discoveries/chains/${esc(t.chain)}">${esc(pd ? pd.name : t.chain)}</a><div class="s"><a href="/discoveries/${esc(t.key)}">${esc(st ? st.name : t.key)}</a></div></td>
+      return `<tr><td><a href="/orbitals/demiton/discoveries/chains/${esc(t.chain)}">${esc(pd ? pd.name : t.chain)}</a><div class="s"><a href="/orbitals/demiton/discoveries/${esc(t.key)}">${esc(st ? st.name : t.key)}</a></div></td>
       <td>${p ? passage(p) : '<span class="s">pairs not written yet</span>'}</td><td class="good">${p ? esc(p.idea) : ''}</td><td class="bad">${p ? esc(p.rival) : ''}</td></tr>`;
     })
     .join('');
@@ -952,7 +952,7 @@ export const twoFactsHtml = (d: DiscData, sq: any, lb: any, pulls: (any | null)[
     .map((c) => {
       const end = c[c.length - 1];
       const g: any = (cr.grades || {})[end];
-      return `<div class="tfg"><a href="/discoveries/chains/${esc(end)}"><b>${esc(nameOf(end))}</b></a> ${gradeNote(g, nameOf)}${g && g.counts ? `<div class="s">${Object.entries(g.counts as Record<string, number>).map(([, n]) => n).join(' → ')} of ${(cr.graded_on || []).length || '–'} models pass each rung, keel up</div>` : ''}</div>`;
+      return `<div class="tfg"><a href="/orbitals/demiton/discoveries/chains/${esc(end)}"><b>${esc(nameOf(end))}</b></a> ${gradeNote(g, nameOf)}${g && g.counts ? `<div class="s">${Object.entries(g.counts as Record<string, number>).map(([, n]) => n).join(' → ')} of ${(cr.graded_on || []).length || '–'} models pass each rung, keel up</div>` : ''}</div>`;
     })
     .join('');
   // the backtest

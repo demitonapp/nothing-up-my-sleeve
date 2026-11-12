@@ -50,7 +50,7 @@ export function deckHand(cards: DeckCard[], opts: { empty?: string } = {}): stri
     return `<span class="pc2-rear">${corner(f, 'tl')}
       <b class="pc2-rt">${esc(f.short)}</b><span class="pc2-about">${esc(c.about || 'what this card does is read with the stars')}</span>
       <span class="pc2-why">${esc(why(c))}${c.untrusted ? ' · the card judge does not trust this reading yet' : ''}</span>
-      <a class="pc2-more" href="${esc(c.href || '#/discoveries/stars')}">the stars →</a></span>`;
+      <a class="pc2-more" href="${esc(c.href || '/orbitals/demiton/discoveries/stars')}">the stars →</a></span>`;
   };
   // a card that turns: the box keeps its place in the fan, its inside turns over
   const turner = (c: DeckCard, cls: string, style: string, front: string): string => {

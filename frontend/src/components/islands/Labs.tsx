@@ -187,6 +187,8 @@ export default function Labs() {
           { key: 'research', label: 'Research', href: '/orbitals/masaq/research', active: researchView },
           { key: 'models', label: 'Models', href: '/orbitals/masaq/models', active: modelsView },
           { key: 'embeddings', label: 'Embeddings', href: '/orbitals/masaq/embeddings', active: embeddingsView },
+          // the Reach's discoveries (12 November): its own page, the head kinds research has named and the census
+          { key: 'discoveries', label: 'Discoveries', href: '/orbitals/masaq/discoveries', active: false },
         ]}
       />
 

@@ -781,7 +781,7 @@ async function classGoals(r: Payload, ladder: Ladder): Promise<void> {
     const chip = (t: any) => {
       const s = where(t), st = s === 'mine' || s === 'below' ? onClass(t) : null;
       const tip = `${t.name}: ${s === 'mine' ? 'a goal of this size' : s === 'below' ? `carried up from ${t.target_class}` : s === 'above' ? `a goal of ${t.target_class}` : s === 'taught' ? 'a reference, taught not read' : 'beyond the ladder'}${st ? ' · ' + st.text : ''}`;
-      return `<a class="chip ${s}${st && st.done ? ' done' : ''}" href="/discoveries/${esc(t.key)}" title="${esc(tip)}">${t.gate ? '◆ ' : ''}${esc(t.name)}${st && st.done ? ' ✓' : ''}${s === 'above' ? ` <span class="cls">${esc(t.target_class)}</span>` : ''}</a>`;
+      return `<a class="chip ${s}${st && st.done ? ' done' : ''}" href="/orbitals/demiton/discoveries/${esc(t.key)}" title="${esc(tip)}">${t.gate ? '◆ ' : ''}${esc(t.name)}${st && st.done ? ' ✓' : ''}${s === 'above' ? ` <span class="cls">${esc(t.target_class)}</span>` : ''}</a>`;
     };
     // the basics are the gates and roots at or below this class; everything else is the ladder
     const isBasic = (t: any) => { const s = where(t); return (s === 'mine' || s === 'below' || s === 'taught') && (t.gate || !(t.rests_on && t.rests_on.length)); };
@@ -808,7 +808,7 @@ function coverage(data: Payload, ladder: Ladder, preset: string): any[] {
 function drawGoalNotes(r: Payload, ladder: Ladder): void { void r; void ladder; }
 function wireTrickRows(): void {
   document.querySelectorAll<HTMLElement>('#goaltable tr[data-trick], #wp-expected tr[data-trick], #wp-envelope tr[data-trick], #wp-stars tr[data-trick]').forEach((tr) => {
-    tr.onclick = (e) => { if ((e.target as HTMLElement).closest('a')) return; location.href = '/discoveries/' + tr.dataset.trick; };
+    tr.onclick = (e) => { if ((e.target as HTMLElement).closest('a')) return; location.href = '/orbitals/demiton/discoveries/' + tr.dataset.trick; };
   });
 }
 const wsubOf = (path: string): string => sizeAddress(path).wsub;

@@ -1,21 +1,11 @@
 ---
-// Direct discoveries routes for dev (production falls back). The island reads the path; two-facts and
-// registry stay here so their deprecated addresses can redirect to Tests and Skills.
-import Layout from '../../layouts/Layout.astro';
-import Discoveries from '../../components/islands/Discoveries';
-import Reader from '../../components/Reader.astro';
+// Every old /discoveries address (12 November) is sent to its new home in the orbitals (lib/discoveryPaths.ts).
+import DiscoveriesMoved from '../../components/DiscoveriesMoved.astro';
+import { DISCOVERY_PATHS } from '../../lib/discoveryPaths';
 
 export function getStaticPaths() {
-  const tricks = ['copying', 'spelling', 'successor', 'kin_test', 'pedigree_test', 'fire_test', 'workshop_test', 'counting_test',
-    'period_test', 'breeders_test', 'smiths_test', 'gap_test', 'nature_test', 'mill_test', 'between_test', 'malthus_test',
-    'rumford_test', 'triads_test', 'again_test', 'refrain_test', 'seasons_test', 'pigeonhole_test', 'lucretius_test',
-    'recurrence_test', 'logic_test', 'crowns_test', 'origin_test', 'energy_test', 'mendeleev_gaps', 'geometry_test'];
-  const chains = ['origin_test', 'energy_test', 'mendeleev_gaps', 'recurrence_test'];
-  const paths = ['overview', 'two-facts', 'physics', 'maths', 'reasoning', 'philosophy', 'mathematics', 'skills', 'quantum-tests', 'tests', 'quantum', 'registry', 'stars', 'cards', 'traits', ...tricks, ...chains.map((k) => `chains/${k}`)];
-  return paths.map((path) => ({ params: { path } }));
+  return DISCOVERY_PATHS.filter((path) => path !== 'cards').map((path) => ({ params: { path } }));
 }
+const { path } = Astro.params;
 ---
-<Layout>
-  <main><Discoveries client:load /></main>
-  <Reader />
-</Layout>
+<DiscoveriesMoved path={`/discoveries/${path}`} />

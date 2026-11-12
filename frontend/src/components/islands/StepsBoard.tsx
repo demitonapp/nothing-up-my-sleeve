@@ -61,7 +61,7 @@ export function StepsBoard({ lb, error, band }: { lb: any; error: string | null;
             name="Chaining two facts"
             tag="the steps to it"
             about="Two premises, one conclusion neither gives alone: the fix two bearings make on a chart. Under 1B nothing chains yet, so a model is read by the steps on the way there: the four cards, one hop, the chaining gain, a chaining test."
-            link={{ href: '/discoveries/tests?test=chaining', label: 'Discoveries, Tests: chaining two facts' }}
+            link={{ href: '/orbitals/demiton/discoveries/tests?test=chaining', label: 'Discoveries, Tests: chaining two facts' }}
             stat={steps?.lead}
           >
             <h3 className="tbacktitle">The steps to chaining <span className="note">the second board: no model of this size chains two facts, so it is read by the steps on the way there, not ranked by a chaining lift that is noise here — the four cards, one hop, the chaining gain, a chaining test</span></h3>

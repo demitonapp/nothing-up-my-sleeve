@@ -7,6 +7,11 @@
 // in scripts/views/discoveries.ts; this file owns the shell (ported from components/Discoveries.astro),
 // the route and the data. Charts (ECharts) are imported lazily inside the effects: the page is server-
 // rendered, and nothing that touches document may be imported at module load.
+//
+// Since 12 November the island lives in the two orbitals (lib/discoveryPaths.ts): Demiton's discoveries at
+// /orbitals/demiton/discoveries (and the shipyard's Charting, the same page) are what our fleet found; Masaq'
+// Reach's at /orbitals/masaq/discoveries are the head kinds research has named, the census's cards beyond the
+// sixteen and the Qwen 4B mapping. The old /discoveries addresses are sent to their new homes.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { MouseEvent as ReactMouseEvent } from 'react';
@@ -14,6 +19,7 @@ import { btnCls, cardCls, checkCls, crumbCls, emptyCls, selectCls } from '@/lib/
 import { routePath, sectionProps, useApi, useRoute } from '@/lib/useApi';
 import { shipHash } from '@/scripts/router';
 import { esc } from '@/lib/format';
+import { DEMITON_DISCOVERIES as DB, MASAQ_DISCOVERIES as MB, MASAQ_SUBS, QWEN4B_PAGE, newHome, type MasaqSub } from '@/lib/discoveryPaths';
 import SectionNav from '../SectionNav';
 import { TabNav } from '../TabNav';
 import {
@@ -42,8 +48,6 @@ import {
   traitsHtml,
   twoFactTests,
   twoFactsHtml,
-  personasHtml,
-  headsCensusHtml,
   cardsBeyondHtml,
   type DiscData,
   type Rung,
@@ -51,7 +55,7 @@ import {
 } from '@/scripts/views/discoveries';
 
 type Sub = 'overview' | 'skills' | 'quantum-tests' | 'stars';
-type DView = 'index' | 'trick' | 'chain' | 'traits' | 'domain';
+type DView = 'index' | 'trick' | 'chain' | 'traits' | 'domain' | 'masaq';
 
 interface Parsed {
   view: DView;
@@ -59,6 +63,7 @@ interface Parsed {
   trick: string | null;
   chain: string | null;
   domain: string | null;
+  masaq?: MasaqSub;
 }
 
 const DSUBS: Sub[] = ['overview', 'skills', 'quantum-tests', 'stars'];
@@ -74,14 +79,20 @@ const TEST_TABS: { key: TestTab; label: string }[] = [
   { key: 'cause', label: 'The 96 cause items' },
   { key: 'chaining', label: 'Chaining two facts' },
 ];
-const STAR_TABS: { key: 'heads' | 'cards' | 'unsorted' | 'census' | 'beyond' | 'personas'; label: string }[] = [
-  { key: 'heads', label: 'Heads' },
+// Demiton's stars: what our ships have lit. The census, the personas, the cards beyond the sixteen and the Qwen
+// mapping moved to the Reach (12 November); their old ?tab= addresses are sent there (discoveryPaths.newHome).
+type StarTab = 'heads' | 'cards';
+const STAR_TABS: { key: StarTab; label: string }[] = [
+  { key: 'heads', label: 'Lit by size' },
   { key: 'cards', label: 'The 16 cards' },
-  { key: 'unsorted', label: 'Still to be sorted' },
-  { key: 'census', label: 'All heads' },
-  { key: 'beyond', label: 'All cards' },
-  { key: 'personas', label: 'Personas' },
 ];
+// Masaq' Reach's discoveries: the head kinds research has named, the census's cards beyond the sixteen, the Qwen mapping
+const MASAQ_TABS: { key: MasaqSub; label: string }[] = [
+  { key: 'kinds', label: 'Head kinds' },
+  { key: 'cards', label: 'Cards beyond the sixteen' },
+  { key: 'unsorted', label: 'Still to be sorted' },
+];
+const masaqHref = (s: MasaqSub): string => (s === 'kinds' ? MB : `${MB}/${s}`);
 // the four doors of Discoveries, in the order they are read (the section row uses the same labels)
 const DISC_TABS: { key: Sub; label: string }[] = [
   { key: 'overview', label: 'Overview' },
@@ -102,22 +113,22 @@ const DOMAINS: Record<string, { title: string; waypoint: string; image: string; 
   physics: {
     title: 'Physics', waypoint: 'physics', image: '/art/fall-physics.svg',
     blurb: 'The physical world in numbers: intuition, school mechanics, college physics, graduate questions and the quantum problems beyond.',
-    links: [['/discoveries/tests', 'The quantum tests'], ['/discoveries/skills', 'The whole ladder']],
+    links: [[`${DB}/tests`, 'The quantum tests'], [`${DB}/skills`, 'The whole ladder']],
   },
   maths: {
     title: 'Maths', waypoint: 'mathematics', image: '/art/fall-maths.svg',
     blurb: 'Symbols and proof: algebra, competition problems, calculus and the proofs that hold them together.',
-    links: [['/discoveries/skills', 'The whole ladder and every trick']],
+    links: [[`${DB}/skills`, 'The whole ladder and every trick']],
   },
   reasoning: {
     title: 'Reasoning', waypoint: 'reasoning', image: '/art/fall-reasoning.svg',
     blurb: 'Putting what is known to work: deduction, word problems, learning a task from examples and planning a route through it.',
-    links: [['/discoveries/tests?test=chaining', 'Chaining two facts'], ['/discoveries/skills', 'The whole ladder']],
+    links: [[`${DB}/tests?test=chaining`, 'Chaining two facts'], [`${DB}/skills`, 'The whole ladder']],
   },
   philosophy: {
     title: 'Philosophy', waypoint: 'discovery', image: '/art/fall-philosophy.svg',
     blurb: "The ideas the books do not yet hold: the explorer's four tests — the Origin, energy, Mendeleev's gaps and the eternal return — and the quanta beyond them.",
-    links: [['/discoveries/tests', 'The quantum tests'], ['/discoveries/skills', 'The whole ladder']],
+    links: [[`${DB}/tests`, 'The quantum tests'], [`${DB}/skills`, 'The whole ladder']],
   },
 };
 
@@ -134,6 +145,13 @@ const chartingHref = (s: Sub): string =>
 
 const parse = (route: string): Parsed => {
   const bits = route.split('?')[0].split('/').filter(Boolean);
+  // Masaq' Reach's discoveries: one view with its three tabs
+  if (bits[0] === 'orbitals' && bits[1] === 'masaq' && bits[2] === 'discoveries') {
+    const m = (MASAQ_SUBS as readonly string[]).includes(bits[3] || '') ? (bits[3] as MasaqSub) : 'kinds';
+    return { view: 'masaq', sub: 'skills', trick: null, chain: null, domain: null, masaq: m };
+  }
+  // Demiton's discoveries read as the old /discoveries did: the same tabs, tricks, chains and doors under its base
+  if (bits[0] === 'orbitals' && bits[1] === 'demiton' && bits[2] === 'discoveries') bits.splice(0, 3, 'discoveries');
   const at = (i: number): string | undefined => (bits[i] ? decodeURIComponent(bits[i]) : undefined);
   // the cards moved to the shipyard's charting section (9 November, Justin: "this /discoveries/cards needs
   // to move to /shipyard/charting"): the same island, reached from the yard
@@ -162,19 +180,32 @@ const parse = (route: string): Parsed => {
 
 const subHref = (s: Sub, charting: boolean): string => {
   if (charting) return chartingHref(s);
-  if (s === 'overview') return '/discoveries';
-  if (s === 'stars') return '/discoveries/stars';
-  if (s === 'skills') return '/discoveries/skills';
-  return '/discoveries/tests';
+  if (s === 'overview') return DB;
+  if (s === 'stars') return `${DB}/stars`;
+  if (s === 'skills') return `${DB}/skills`;
+  return `${DB}/tests`;
+};
+
+/** The page an address is drawn on: a Demiton address (its base or the shipyard's Charting), the Reach's, or
+ *  another page entirely. A move between two of them is a page load, so the crumbs and the header follow. */
+const pageOf = (p: string): 'demiton' | 'charting' | 'masaq' | 'elsewhere' => {
+  const path = p.split('?')[0];
+  if (path === DB || path.startsWith(`${DB}/`)) return 'demiton';
+  if (path === '/shipyard/charting' || path.startsWith('/shipyard/charting/')) return 'charting';
+  if (path === MB || path.startsWith(`${MB}/`)) return 'masaq';
+  return 'elsewhere';
 };
 
 // The two deprecated tabs (10 November): their old addresses still answer and are rewritten to where the
 // content lives now. A deep link to chaining opens the Tests tab on the chaining method.
 const canonicalPath = (route: string): string | null => {
+  // an old /discoveries address, or a Stars tab that moved to the Reach (12 November)
+  const moved = newHome(route);
+  if (moved) return moved;
   const bits = route.split('?')[0].split('/').filter(Boolean);
-  if (bits[0] === 'discoveries') {
-    if (bits[1] === 'two-facts') return '/discoveries/tests?test=chaining';
-    if (bits[1] === 'registry') return '/discoveries/skills';
+  if (bits[0] === 'orbitals' && bits[1] === 'demiton' && bits[2] === 'discoveries') {
+    if (bits[3] === 'two-facts') return `${DB}/tests?test=chaining`;
+    if (bits[3] === 'registry') return `${DB}/skills`;
   }
   if (bits[0] === 'shipyard' && bits[1] === 'charting') {
     if (bits[2] === 'two-facts') return '/shipyard/charting/tests?test=chaining';
@@ -247,6 +278,7 @@ export default function Discoveries() {
   const { view, sub, trick: trickKey, chain: chainKey } = parsed;
   const domain = parsed.domain ? DOMAINS[parsed.domain] : null;
   const inCharting = route.split('?')[0].startsWith('/shipyard/charting');
+  const masaqSub: MasaqSub = parsed.masaq || 'kinds';
 
   // the route the old router read: the hash first, then the path (a pasted path is answered by the server).
   // `ready` gates the sub-view endpoints: the first render is server-consistent (the default view), so
@@ -255,7 +287,13 @@ export default function Discoveries() {
   useEffect(() => {
     const read = (): void => {
       const p = routePath();
-      const c = canonicalPath(p);
+      // the query too: a Stars tab that moved to the Reach is named by it (?tab=census)
+      const c = canonicalPath(p + (location.hash.startsWith('#/') ? '' : location.search));
+      // an address whose new home is another page (the Reach, a model's page): go there, not draw it here
+      if (c && pageOf(c) !== pageOf(p)) {
+        window.location.replace(c);
+        return;
+      }
       if (c) {
         try {
           history.replaceState(null, '', c);
@@ -277,6 +315,11 @@ export default function Discoveries() {
 
   const go = (p: string): void => {
     const target = canonicalPath(p) || p;
+    // another page (Demiton to the Reach, or out to a model's page): load it, so the crumbs and header follow
+    if (pageOf(target) !== pageOf(route)) {
+      window.location.href = target;
+      return;
+    }
     try {
       history.pushState(null, '', target);
     } catch {
@@ -299,19 +342,21 @@ export default function Discoveries() {
   const starDev = useApi<{ cards: any[] }>(onStars ? '/api/stars_deviation' : null, 120000);
   const deck = useApi<{ cards: any[] }>(onCards ? '/api/card_deck' : null, 120000);
   const decksApi = useApi<any>(onTests && (testsTab === 'logic' || testsTab === 'cause') ? '/api/decks' : null, 300000);
-  const atlas = useApi<any>(sub === 'overview' ? '/api/deck_atlas' : null, 300000);
+  const atlas = useApi<any>(view === 'index' && sub === 'overview' ? '/api/deck_atlas' : null, 300000);
   const chainsApi = useApi<any[]>('/api/chains', 120000, onTests && testsTab === 'quantum');
   const bridge = useApi<any>(onStars ? '/api/bridge' : null, 120000);
-  const census = useApi<any>(onStars ? '/api/heads?model=mlx-community%2FQwen3-4B-4bit' : null, 300000);
-  const personas = useApi<any>(onStars ? '/api/personas?model=mlx-community%2FQwen3-4B-4bit' : null, 300000);
+  // the Reach's tabs: the census of Qwen3 4B feeds the cards beyond the sixteen (its heads and personas are read
+  // on its own page now, QWEN4B_PAGE)
+  const onMasaq = ready && view === 'masaq';
+  const census = useApi<any>(onMasaq && masaqSub === 'cards' ? '/api/heads?model=mlx-community%2FQwen3-4B-4bit' : null, 300000);
 
   const d = disc.data;
   const rungs: Rung[] = useMemo(() => (ladder.data?.rungs || []).map((r: any) => ({ preset: r.preset, name: r.name, total: r.total })), [ladder.data]);
   // the Stars tab: the heads, the cards, and what is still to be sorted between them
-  const [starsTab, setStarsTab] = useState<'heads' | 'cards' | 'unsorted' | 'census' | 'beyond' | 'personas'>(() => {
+  const [starsTab, setStarsTab] = useState<StarTab>(() => {
     try {
       const t = new URLSearchParams(window.location.search).get('tab');
-      if (t && ['heads', 'cards', 'unsorted', 'census', 'beyond', 'personas'].includes(t)) return t as any;
+      if (t === 'heads' || t === 'cards') return t;
     } catch { /* no window */ }
     return 'heads';
   });
@@ -342,9 +387,9 @@ export default function Discoveries() {
   useEffect(() => {
     const search = typeof window !== 'undefined' ? window.location.search : '';
     const t = new URLSearchParams(search).get('tab') ?? new URLSearchParams(route.split('?')[1] || '').get('tab');
-    if (t && ['heads', 'cards', 'unsorted', 'census', 'beyond', 'personas'].includes(t)) setStarsTab(t as any);
+    if (t === 'heads' || t === 'cards') setStarsTab(t);
   }, [route]);
-  const pickStar = (k: 'heads' | 'cards' | 'unsorted' | 'census' | 'beyond' | 'personas'): void => {
+  const pickStar = (k: StarTab): void => {
     setStarsTab(k);
     try {
       const u = new URL(window.location.href);
@@ -483,14 +528,15 @@ export default function Discoveries() {
   const traits = useMemo(() => (d && view === 'traits' ? traitsHtml(d) : null), [d, view]);
   const stars = useMemo(() => (d && sub === 'stars' ? starsCardsHtml(d) : ''), [d, sub]);
   const grid = useMemo(() => (d && sub === 'stars' ? starGridHtml(d, rungs) : null), [d, sub, rungs]);
-  // the head kinds no card names (the "still to be sorted" inventory): the 21 known heads minus the starred ones
-  const uncarded = useMemo(() => (d && sub === 'stars' ? (d.known_heads || []).filter((h: any) => !h.star) : []), [d, sub]);
+  // the head kinds no card names (the Reach's head kinds tab): the 21 known heads minus the starred ones
+  const uncarded = useMemo(() => (d && view === 'masaq' ? (d.known_heads || []).filter((h: any) => !h.star) : []), [d, view]);
   const chains = useMemo(() => (d && onSkills ? chainsTableHtml(d, rungs, chainRef) : null), [d, onSkills, rungs, chainRef]);
   const route1 = useMemo(() => (d && onSkills ? trickRouteHtml(d) : ''), [d, onSkills]);
   const skillLadder = useMemo(() => (d && onSkills ? skillLadderHtml(d) : ''), [d, onSkills]);
   const domainSkills = useMemo(() => (d && domain ? d.known_tricks.filter((t) => t.waypoint === domain.waypoint) : []), [d, domain]);
   const registry = useMemo(() => (d && onSkills ? trickRowsHtml(d, rungs, waypoint, band) : null), [d, onSkills, rungs, waypoint, band]);
-  const heads = useMemo(() => (d && sub === 'stars' ? headsHtml(d, rungs, family) : null), [d, sub, rungs, family]);
+  // the star chart (every head kind research has named) is the Reach's now
+  const heads = useMemo(() => (d && view === 'masaq' && masaqSub === 'kinds' ? headsHtml(d, rungs, family) : null), [d, view, masaqSub, rungs, family]);
   const method = useMemo(() => (d && onChaining ? methodHtml(d, 'chaining', rungs) : null), [d, onChaining, rungs]);
   const tf = useMemo(() => (d && onChaining && sq.data && lb.data ? twoFactsHtml(d, sq.data, lb.data, pulls) : null), [d, onChaining, sq.data, lb.data, pulls]);
 
@@ -512,7 +558,8 @@ export default function Discoveries() {
       const href = a.getAttribute('href') || '';
       // the cards live in the shipyard now, so its links are this island's too: navigate in place
       // rather than reloading the page (9 November: "clicking cards doesn't open the tab")
-      if (href.startsWith('/discoveries') || href.startsWith('/shipyard/charting')) {
+      // (and an old /discoveries link still drawn by a renderer is sent to its new home, in place)
+      if (href.startsWith('/discoveries') || pageOf(href) !== 'elsewhere') {
         e.preventDefault();
         go(href);
       }
@@ -521,7 +568,7 @@ export default function Discoveries() {
     const trickRow = t.closest('tr[data-trick]') as HTMLElement | null;
     if (trickRow) {
       e.preventDefault();
-      go(`/discoveries/${trickRow.dataset.trick}`);
+      go(`${DB}/${trickRow.dataset.trick}`);
       return;
     }
     const traitRow = t.closest('tr[data-run]') as HTMLElement | null;
@@ -534,7 +581,7 @@ export default function Discoveries() {
   return (
     <div {...sectionProps('discoveries')} onClick={onClick}>
       <SectionNav />
-      {/* the charting section lives under Places > Shipyard: its own title and its four tabs sit
+      {/* the charting section lives under Orbitals > Demiton > Shipyard: its own title and its four tabs sit
           under the section row, while Discoveries' own tabs are the section row itself */}
       {inCharting ? (
         <h1>
@@ -542,17 +589,23 @@ export default function Discoveries() {
           Charting{' '}
           <span className="q">sorting out the charts the voyage is planned on: the route, the stars, and the suits</span>
         </h1>
+      ) : view === 'index' ? (
+        <h1>
+          <a className={crumbCls('back')} href="/orbitals/demiton">← Demiton</a>{' '}
+          Discoveries{' '}
+          <span className="q">what our own fleet has found: the jobs and where the ships do them, the skills on the ladder, the tests that judge them, and the stars our ships have lit. The head kinds research has named, and Qwen3 4B's own census, are in <a href={MB}>Masaq' Reach</a></span>
+        </h1>
       ) : null}
       {/* ============================== the tricks of the trade */}
       <div className={`dview${view === 'index' ? ' active' : ''}`} data-dview="index">
-        {inCharting ? (
+        {view === 'index' ? (
           <TabNav
-            id="chartingnav"
-            ariaLabel="charting sections"
+            id={inCharting ? 'chartingnav' : 'discnav'}
+            ariaLabel={inCharting ? 'charting sections' : 'discoveries sections'}
             items={DISC_TABS.map((t) => ({
               key: t.key,
               label: t.label,
-              href: subHref(t.key, true),
+              href: subHref(t.key, inCharting),
               active: view === 'index' && sub === t.key,
               data: { 'data-dsub': t.key },
             }))}
@@ -748,19 +801,19 @@ export default function Discoveries() {
         {/* the overview: the cards are jobs, the questions they pass, and where the 0.0.5 fleet puts them */}
         <div className={`dsub${sub === 'overview' ? ' active' : ''}`} data-dsub="overview">
           <div className="discdoors">
-            <a className="discdoor" href="/discoveries/physics">
+            <a className="discdoor" href={`${DB}/physics`}>
               <img src="/art/fall-physics.svg" alt="" loading="lazy" />
               <div className="db"><span className="dk">Physics</span><b>The physical world, in numbers</b><p>Mechanics, energy and the quantum horizon: what the books say, and what they do not.</p></div>
             </a>
-            <a className="discdoor" href="/discoveries/maths">
+            <a className="discdoor" href={`${DB}/maths`}>
               <img src="/art/fall-maths.svg" alt="" loading="lazy" />
               <div className="db"><span className="dk">Maths</span><b>Symbols and proof</b><p>Algebra, calculus, competition problems and the proofs that hold them together.</p></div>
             </a>
-            <a className="discdoor" href="/discoveries/reasoning">
+            <a className="discdoor" href={`${DB}/reasoning`}>
               <img src="/art/fall-reasoning.svg" alt="" loading="lazy" />
               <div className="db"><span className="dk">Reasoning</span><b>Putting knowledge to work</b><p>Deduction, word problems and planning: the step from knowing a fact to using it.</p></div>
             </a>
-            <a className="discdoor" href="/discoveries/philosophy">
+            <a className="discdoor" href={`${DB}/philosophy`}>
               <img src="/art/fall-philosophy.svg" alt="" loading="lazy" />
               <div className="db"><span className="dk">Philosophy</span><b>The ideas the books do not hold</b><p>The explorer's tests — Origin, energy, Mendeleev's gaps and the eternal return — and the quanta beyond.</p></div>
             </a>
@@ -784,7 +837,7 @@ export default function Discoveries() {
 
         {/* the stars: all the head kinds and the sixteen cards, side by side */}
         <div className={`dsub${sub === 'stars' ? ' active' : ''}`} data-dsub="stars">
-          <p className="q dsubintro">What inside does it? <b>All the head kinds</b> attention research has named, and <b>the sixteen cards</b> a ship is built from. A card is a job; a star is a head that passes the job's mark, and lit shared when the best layer's two strongest heads reach it together. The item decks that score the jobs live under <a href="/discoveries/tests">Tests</a>.</p>
+          <p className="q dsubintro">What inside does it? The stars <b>our ships have lit</b>, size by size and against Qwen3 4B, and <b>the sixteen cards</b> a ship is built from. A card is a job; a star is a head that passes the job's mark, and lit shared when the best layer's two strongest heads reach it together. The item decks that score the jobs live under <a href={subHref('quantum-tests', inCharting)}>Tests</a>; every head kind attention research has named, and the cards beyond the sixteen, are in <a href={MB}>Masaq' Reach</a>.</p>
           <TabNav
             ariaLabel="Stars"
             tablist
@@ -795,36 +848,16 @@ export default function Discoveries() {
               onClick: () => pickStar(t.key),
             }))}
           />
-          {starsTab === 'census' ? (
-          <section className={cardCls(false, 'panel')}>
-            <h2>Every head, by category <span className="note">all 1,152 heads of Qwen3 4B, grouped by the kind that names them; expand a category to list its heads, the layer, what names them, and the readings that identify them</span></h2>
-            <div dangerouslySetInnerHTML={{ __html: census.data ? headsCensusHtml(census.data) : '<div class="s">reading the head census…</div>' }} />
-          </section>
-          ) : starsTab === 'beyond' ? (
-          <section className={cardCls(false, 'panel')}>
-            <h2>Every card, the sixteen and the rest <span className="note">the deck's sixteen, then the behavioural clusters of the census: a cluster no card names is a candidate for one of the ten kinds with no star metric</span></h2>
-            <div dangerouslySetInnerHTML={{ __html: deck.data ? cardDeckHtml(deck.data) : '' }} />
-            <div dangerouslySetInnerHTML={{ __html: census.data ? cardsBeyondHtml(census.data) : '<div class="s">reading the head census…</div>' }} />
-          </section>
-          ) : starsTab === 'personas' ? (
-          <section className={cardCls(false, 'panel')}>
-            <h2>Persona vectors <span className="note">the residual-stream directions for six character traits, read by contrastive system prompts (thorp.persona_vectors): the direction's norm, its projection on a plain prompt, and how far the traits share a direction</span></h2>
-            <div dangerouslySetInnerHTML={{ __html: personas.data ? personasHtml(personas.data) : '<div class="s">reading the persona directions…</div>' }} />
-          </section>
-          ) : starsTab === 'cards' ? (
+          {starsTab === 'cards' ? (
           <>
           <section className={cardCls(false, 'panel')}>
             <h2>The sixteen cards, card by card <span className="note">each card: its suit, its mark (what counts as lit), whether teaching it keeps (keeper, decayer, or never tested), and the best reading any Nothing up my sleeve ship has reached against Qwen3 4B's own</span></h2>
             <div className="scroll"><table id="discCards" className="selbooks"><thead><tr><th>card</th><th>suit</th><th>mark</th><th>keeps</th><th>best Nothing up my sleeve</th><th>Qwen 4B</th></tr></thead><tbody dangerouslySetInnerHTML={{ __html: deck.data ? cardDeckHtml(deck.data) : '<tr><td colspan="6" class="s">reading the deck…</td></tr>' }} /></table></div>
           </section>
-          {census.data ? <div dangerouslySetInnerHTML={{ __html: cardsBeyondHtml(census.data) }} /> : null}
+          <p className="note">The behavioural clusters of Qwen3 4B's census, the cards beyond these sixteen, are in <a href={`${MB}/cards`}>Masaq' Reach</a>.</p>
           </>
-          ) : starsTab === 'heads' ? (
+          ) : (
           <>
-          <section className={cardCls(false, 'panel')}>
-            <h2>Every head, by category <span className="note">the census of all 1,152 heads of Qwen3 4B (thorp.head_census): every kind the toolkit measures, grouped, with the heads at or above each kind's mark, and the heads no card names. Expand a category to list its heads: layer, what names it, and the readings that identify it</span></h2>
-            <div dangerouslySetInnerHTML={{ __html: census.data ? headsCensusHtml(census.data) : '<div class="s">reading the head census…</div>' }} />
-          </section>
           <section className={cardCls(false, 'panel')}>
             <h2>Lit by size <span className="note">every star Nothing up my sleeve measures, by size of ship: a cell is the size's best reading against the star's mark, green where a voyage has lit it (the first voyage and step on hover), shaded by how close it came where none has; the card judge's verdict beside each</span></h2>
             <div className="scroll"><table id="starclassgrid" data-nosort><thead dangerouslySetInnerHTML={{ __html: grid?.head || '' }} /><tbody dangerouslySetInnerHTML={{ __html: grid?.body || '' }} /></table></div>
@@ -843,22 +876,130 @@ export default function Discoveries() {
             <h2>The bridge, layer by layer <span className="note">the bridge card is a curve over layers, not one head: how strongly the answer's position carries the middle term two premises share (the slowest deer), read by the soundings at each layer, in nats; one line per voyage that read it, coloured by size; the dotted line is the provisional threshold. Two hops need it resolved in the middle layers, before the second hop: resolved too late, the chain fails</span></h2>
             <div className="chart" id="bridgechart" />
           </section>
-          <section className={cardCls(false, 'panel')}>
-            <h2>The star chart <span className="note">every kind of attention head described so far. Those Nothing up my sleeve measures carry their state from the ledger; the rest are charted but not yet measured, each with how Nothing up my sleeve could measure it. "Rests on" is the dependency its source reports; a blank means none reported. "Expected from" is the smallest size predicted to reach it (the floor is depth: one hop per layer), set beside the smallest size where a voyage has lit it</span></h2>
-            <div className="handtools" data-filters>
-              <label className="note" htmlFor="headfamily">family</label>
-              <select className={selectCls('')} id="headfamily" data-remember value={family} onChange={(e) => setFamily(e.target.value)}>
-                <option value="">all</option>
-                {(d ? headFamilies(d) : []).map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}
-              </select>
-              <span className="note" id="headcount">{heads?.count || ''}</span>
-            </div>
-            <div className="scroll"><table id="headtable"><thead><tr><th>kind of head</th><th>family</th><th>what it does</th><th>rests on</th><th>expected from</th><th>first lit in</th><th>in Nothing up my sleeve</th><th>first described</th><th>seen in</th></tr></thead><tbody dangerouslySetInnerHTML={{ __html: heads?.body || '' }} /></table></div>
-          </section>
+          <p className="note">Every kind of head attention research has named, with its state in our fleet, is the <a href={MB}>star chart in Masaq' Reach</a>; Qwen3 4B's 1,152 heads and its persona vectors are on <a href={QWEN4B_PAGE}>its own page</a>.</p>
           </>
-          ) : (
+          )}
+        </div>
+
+        {/* every trick known, measured or not — the registry, folded into Skills (10 November) */}
+        <div className={`dsub${sub === 'skills' ? ' active' : ''}`} data-dsub="skills-registry">
+          <section className={cardCls(false, 'panel')}>
+            <h2>Every trick, measured or not <span className="note">the registry, under the ladder: a trick is what a model can do, judged from outside by its bets; open one for the stars that do it and Nothing up my sleeve's progress, size by size. "The field shows it at" is the size band (one order of magnitude, in parameters) where the trick is documented in standard models, not a proven smallest size; hover a band for the detail. "Nothing up my sleeve's goal size" is the size expected to reach it, about an order of magnitude smaller than the field where the depth it needs allows; ◆ marks a gate, performed before a ship moves on to the next waypoint</span></h2>
+            <div className="handtools" data-filters>
+              <label className="note" htmlFor="trickfamily">waypoint</label>
+              <select className={selectCls('')} id="trickfamily" value={waypoint} onChange={(e) => setWaypoint(e.target.value)}>
+                <option value="">all</option>
+                {(d?.waypoints || []).map((w) => <option key={w.key} value={w.key}>{w.name}</option>)}
+              </select>
+              <label className="note" htmlFor="trickband">the field shows it at</label>
+              <select className={selectCls('')} id="trickband" data-remember value={band} onChange={(e) => setBand(e.target.value)}>
+                <option value="">any size</option>
+                {(d ? trickBands(d) : []).map((b) => <option key={b.rank} value={String(b.rank)}>{b.label}</option>)}
+              </select>
+              <span className="note" id="trickcount">{registry?.count || ''}</span>
+            </div>
+            <div className="scroll"><table id="tricktable" className="clickable"><thead><tr><th>waypoint</th><th>trick</th><th>what it does</th><th>the field shows it at</th><th>how sure</th><th>stars needed</th><th>Nothing up my sleeve so far</th><th>Nothing up my sleeve's goal size</th></tr></thead><tbody dangerouslySetInnerHTML={{ __html: registry?.body || '' }} /></table></div>
+            <p className="note mt">Also: <a href={MB}>every kind of head (the star chart, in Masaq' Reach)</a> · <a href={`${DB}/traits`}>traits</a></p>
+          </section>
+        </div>
+      </div>
+
+      {/* ============================== one trick */}
+      <div className={`dview${view === 'trick' ? ' active' : ''}`} data-dview="trick">
+        <h1><a className={crumbCls('back')} href={DB}>← discoveries</a> <span id="tricktitle">{pageInfo?.title || 'reading…'}</span> <span id="trickstate" dangerouslySetInnerHTML={{ __html: pageInfo?.state || '' }} /> <span className="q" id="trickdoes">{pageInfo?.does || ''}</span></h1>
+        <section className={cardCls(false, 'panel')}><div className="rungover" id="trickover" dangerouslySetInnerHTML={{ __html: pageInfo ? (pageInfo.over || '<div class="s">no detail is written for this trick yet</div>') : '<div class="s">reading the trick…</div>' }} /></section>
+        <section className={cardCls(false, 'panel')}>
+          <h2>The stars needed to learn it <span className="note">the mechanisms inside thought to do this trick, each with where it is expected and its state in Nothing up my sleeve</span></h2>
+          <div className="scroll"><table id="trickstars"><thead><tr><th>kind of head</th><th>what it does</th><th>rests on</th><th>expected from</th><th>first lit in</th><th>in Nothing up my sleeve</th></tr></thead><tbody dangerouslySetInnerHTML={{ __html: pageInfo?.stars || '' }} /></table></div>
+        </section>
+        <section className={cardCls(false, 'panel')}>
+          <h2>How Nothing up my sleeve is tracking, size by size <span className="note">each size of ship, how many of its voyages have been measured on this trick and how many performed it; the target is a tenth of the field's size</span></h2>
+          <div className="scroll"><table id="tricktrack"><thead><tr><th>size</th><th>parameters</th><th>against the field</th><th>voyages measured</th><th>performed</th><th>best</th><th>first performed</th></tr></thead><tbody dangerouslySetInnerHTML={{ __html: pageInfo?.track || '' }} /></table></div>
+        </section>
+        <div className="row" id="trickcharts">
+          <section className={cardCls(false, 'panel')} id="trickchartpanel" hidden={!pageInfo?.chart}>
+            <h2>The trick, voyage by voyage <span className="note">its reading at every step, one line per voyage, coloured by size; the amber dotted line is the mark that counts as performed, the grey one the floor (an untrained ship), and labelled lines are outside models</span></h2>
+            <div className="chart tall" id="trickchart" />
+          </section>
+          <section className={cardCls(false, 'panel')} id="trickpairpanel" hidden={!pageInfo?.pair}>
+            <h2 id="trickpairtitle" dangerouslySetInnerHTML={{ __html: pageInfo?.pair?.title || 'Beside it' }} />
+            <div className="chart tall" id="trickpairchart" />
+          </section>
+        </div>
+        <section className={cardCls(false, 'panel')} id="scaffoldpanel" hidden={!scaffRows.length}>
+          <h2>How the scaffold held, across every model <span className="note">pinned heads are a loan: <b>held</b> is the best reading while the heads were pinned, <b>after the fade</b> is the first reading once they were faded out, <b>drop</b> is what the fade cost, and <b>kept</b> is what remains above the untrained floor. A model with no scaffolded voyage is listed as a gap, not left out</span></h2>
+          <div dangerouslySetInnerHTML={{ __html: scaffoldHtml(scaffRows, scaffSummary, rungs, scaffThreshold) }} />
+          <div className="chart tall" id="scaffoldchart" />
+        </section>
+      </div>
+
+      {/* ============================== one chain: the explorer's test told as a climb, keel to explorer */}
+      <div className={`dview${view === 'chain' ? ' active' : ''}`} data-dview="chain">
+        <h1><a className={crumbCls('back')} href={DB}>← discoveries</a> <span id="chaintitle">{chainPage?.title || ''}</span> <span id="chainstrand" dangerouslySetInnerHTML={{ __html: chainPage?.strand || '' }} /></h1>
+        <section className={cardCls(false, 'panel')}><div className="rungover" id="chainover" dangerouslySetInnerHTML={{ __html: chainPage?.over || '' }} /></section>
+        <div className="handtools"><label><input className={checkCls('')} type="checkbox" id="chainrefpage" checked={chainRef} onChange={(e) => setRef(e.target.checked)} /> show the reference ladder <span className="note">(Pythia 14m to 410m and Qwen3 0.6B to 4B beside each step's evidence)</span></label></div>
+        <div id="chainsteps" dangerouslySetInnerHTML={{ __html: chainPage?.steps || '' }} />
+      </div>
+
+      {/* ============================== the traits */}
+      <div className={`dview${view === 'traits' ? ' active' : ''}`} data-dview="traits">
+        <h1><a className={crumbCls('back')} href={DB}>← discoveries</a> Traits <span className="q">can a ship's hidden state tell fiction, verse, first person or a language family apart on books it has never read; found at the threshold, learned when it also clears the floors</span></h1>
+        <div className="handtools"><button className={btnCls('outline', '')} data-essay="traits">Read: how traits are found</button></div>
+        <section className={cardCls(false, 'panel')}><div className="scroll"><table id="traittable" className="clickable"><thead dangerouslySetInnerHTML={{ __html: traits?.head || '' }} /><tbody dangerouslySetInnerHTML={{ __html: traits?.body || '' }} /></table></div></section>
+      </div>
+
+      {domain && (
+        <div className={`dview${view === 'domain' ? ' active' : ''}`} data-dview="domain">
+          <h1><a className={crumbCls('back')} href={DB}>← discoveries</a> {domain.title}</h1>
+          <section className={cardCls(false, 'panel')}>
+            <div className="domainhero">
+              <img src={domain.image} alt="" />
+              <div><div className="k">A door into the discoveries</div><h2>{domain.title}</h2><p>{domain.blurb}</p></div>
+            </div>
+          </section>
+          <section className={cardCls(false, 'panel')}>
+            <h2>The skills in this door <span className="note">every skill charted on the {domain.title.toLowerCase()} step of the ladder; open one for its stars, its readings and its place in the climb</span></h2>
+            {domainSkills.length ? <div className="domainskills">{domainSkills.map((t) => (
+              <a className={`skill${t.fleet ? ' measured' : ''}`} href={`${DB}/${esc(t.key)}`} key={t.key}>
+                <b>{t.gate ? '◆ ' : ''}{t.name}</b><span>{t.does}</span>
+                <em>{t.fleet ? 'measured by Nothing up my sleeve' : 'not measured yet'}{t.target_class ? ` · goal ${t.target_class}` : ''}{t.taught ? ' · taught' : ''}</em>
+              </a>
+            ))}</div> : <div className={emptyCls()}>no skill is charted on this step yet</div>}
+          </section>
+          <section className={cardCls(false, 'panel')}>
+            <h2>Where to go next</h2>
+            <div className="handtools">{domain.links.map(([href, label]) => <a className={btnCls('outline', '')} href={href} key={href}>{label}</a>)}</div>
+          </section>
+        </div>
+      )}
+
+      {/* ============================== Masaq' Reach's discoveries: the head kinds research has named, the cards beyond
+          the sixteen, and the Qwen 4B mapping (12 November: moved out of Demiton's Stars tab) */}
+      <div className={`dview${view === 'masaq' ? ' active' : ''}`} data-dview="masaq">
+        <h1>
+          <a className={crumbCls('back')} href="/orbitals/masaq">← Masaq' Reach</a>{' '}
+          Discoveries{' '}
+          <span className="q">what is known of the outside models and the research field: every kind of attention head the papers have named, the census's clusters beyond our sixteen cards, and the Qwen 4B mapping still to be sorted. What our own ships have found is in <a href={DB}>Demiton</a></span>
+        </h1>
+        <TabNav
+          id="masaqdiscnav"
+          ariaLabel="Masaq' Reach discoveries"
+          items={MASAQ_TABS.map((t) => ({ key: t.key, label: t.label, href: masaqHref(t.key), active: view === 'masaq' && masaqSub === t.key }))}
+        />
+        {masaqSub === 'kinds' ? (
           <>
-            <p className="q dsubintro">The pieces that do not yet have a home in the heads/cards split: the head kinds with no card, the cards with no single head, and the Qwen 4B map the audit will fill.</p>
+            <section className={cardCls(false, 'panel')}>
+              <h2>The star chart <span className="note">every kind of attention head described so far. Those Nothing up my sleeve measures carry their state from the ledger; the rest are charted but not yet measured, each with how Nothing up my sleeve could measure it. "Rests on" is the dependency its source reports; a blank means none reported. "Expected from" is the smallest size predicted to reach it (the floor is depth: one hop per layer), set beside the smallest size where a voyage has lit it</span></h2>
+              <div className="handtools" data-filters>
+                <label className="note" htmlFor="headfamily">family</label>
+                <select className={selectCls('')} id="headfamily" data-remember value={family} onChange={(e) => setFamily(e.target.value)}>
+                  <option value="">all</option>
+                  {(d ? headFamilies(d) : []).map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}
+                </select>
+                <span className="note" id="headcount">{heads?.count || ''}</span>
+              </div>
+              <div className="scroll"><table id="headtable"><thead><tr><th>kind of head</th><th>family</th><th>what it does</th><th>rests on</th><th>expected from</th><th>first lit in</th><th>in Nothing up my sleeve</th><th>first described</th><th>seen in</th></tr></thead><tbody dangerouslySetInnerHTML={{ __html: heads?.body || '' }} /></table></div>
+            </section>
             <section className={cardCls(false, 'panel')}>
               <h2>Head kinds with no card <span className="note">{uncarded.length} of {(d?.known_heads || []).length} known head kinds: charted, but no card names them</span></h2>
               <div className="scroll">
@@ -891,105 +1032,21 @@ export default function Discoveries() {
                 </table>
               </div>
             </section>
-            <section className={cardCls(false, 'panel')}>
-              <h2>Qwen 4B: still to be sorted <span className="note">the audit that fills the per-head and per-card columns</span></h2>
-              <p className="note">The sixteen cards already have Qwen readings (the <a href="/discoveries/stars">cards tab</a>). The twenty-one head kinds do not yet. The MATH-500 head trace is running in the other session; the cause and card audit follows when the GPU is free. When both land, this tab becomes the mapping: per head kind in Qwen, per card in Qwen, and the rows that still have no home.</p>
-            </section>
+            <p className="note">Qwen3 4B's own heads, all 1,152 by category, and its persona vectors are on <a href={QWEN4B_PAGE}>its page in the Reach</a>.</p>
           </>
-          )}
-        </div>
-
-        {/* every trick known, measured or not — the registry, folded into Skills (10 November) */}
-        <div className={`dsub${sub === 'skills' ? ' active' : ''}`} data-dsub="skills-registry">
+        ) : masaqSub === 'cards' ? (
+          <>
+            <p className="q dsubintro">The behavioural clusters of Qwen3 4B's head census: a cluster no card names is a candidate for one of the ten kinds with no star metric. The sixteen themselves, with our ships' best readings, are <a href={`${DB}/stars?tab=cards`}>Demiton's cards</a>.</p>
+            {/* the renderer draws its own panel */}
+            <div dangerouslySetInnerHTML={{ __html: census.data ? cardsBeyondHtml(census.data) : census.error ? `<div class="s">the head census could not be read: ${esc(census.error)}</div>` : '<div class="s">reading the head census…</div>' }} />
+          </>
+        ) : (
           <section className={cardCls(false, 'panel')}>
-            <h2>Every trick, measured or not <span className="note">the registry, under the ladder: a trick is what a model can do, judged from outside by its bets; open one for the stars that do it and Nothing up my sleeve's progress, size by size. "The field shows it at" is the size band (one order of magnitude, in parameters) where the trick is documented in standard models, not a proven smallest size; hover a band for the detail. "Nothing up my sleeve's goal size" is the size expected to reach it, about an order of magnitude smaller than the field where the depth it needs allows; ◆ marks a gate, performed before a ship moves on to the next waypoint</span></h2>
-            <div className="handtools" data-filters>
-              <label className="note" htmlFor="trickfamily">waypoint</label>
-              <select className={selectCls('')} id="trickfamily" value={waypoint} onChange={(e) => setWaypoint(e.target.value)}>
-                <option value="">all</option>
-                {(d?.waypoints || []).map((w) => <option key={w.key} value={w.key}>{w.name}</option>)}
-              </select>
-              <label className="note" htmlFor="trickband">the field shows it at</label>
-              <select className={selectCls('')} id="trickband" data-remember value={band} onChange={(e) => setBand(e.target.value)}>
-                <option value="">any size</option>
-                {(d ? trickBands(d) : []).map((b) => <option key={b.rank} value={String(b.rank)}>{b.label}</option>)}
-              </select>
-              <span className="note" id="trickcount">{registry?.count || ''}</span>
-            </div>
-            <div className="scroll"><table id="tricktable" className="clickable"><thead><tr><th>waypoint</th><th>trick</th><th>what it does</th><th>the field shows it at</th><th>how sure</th><th>stars needed</th><th>Nothing up my sleeve so far</th><th>Nothing up my sleeve's goal size</th></tr></thead><tbody dangerouslySetInnerHTML={{ __html: registry?.body || '' }} /></table></div>
-            <p className="note mt">Also: <a href="/discoveries/stars">every kind of head (the star chart)</a> · <a href="/discoveries/traits">traits</a></p>
+            <h2>Qwen 4B: still to be sorted <span className="note">the audit that fills the per-head and per-card columns</span></h2>
+            <p className="note">The sixteen cards already have Qwen readings (<a href={`${DB}/stars?tab=cards`}>Demiton's cards</a>), and its 1,152 heads are censused (<a href={QWEN4B_PAGE}>its page</a>). The twenty-one head kinds do not yet have per-kind Qwen readings. When the cause and card audit lands, this tab becomes the mapping: per head kind in Qwen, per card in Qwen, and the rows that still have no home.</p>
           </section>
-        </div>
+        )}
       </div>
-
-      {/* ============================== one trick */}
-      <div className={`dview${view === 'trick' ? ' active' : ''}`} data-dview="trick">
-        <h1><a className={crumbCls('back')} href="/discoveries">← discoveries</a> <span id="tricktitle">{pageInfo?.title || 'reading…'}</span> <span id="trickstate" dangerouslySetInnerHTML={{ __html: pageInfo?.state || '' }} /> <span className="q" id="trickdoes">{pageInfo?.does || ''}</span></h1>
-        <section className={cardCls(false, 'panel')}><div className="rungover" id="trickover" dangerouslySetInnerHTML={{ __html: pageInfo ? (pageInfo.over || '<div class="s">no detail is written for this trick yet</div>') : '<div class="s">reading the trick…</div>' }} /></section>
-        <section className={cardCls(false, 'panel')}>
-          <h2>The stars needed to learn it <span className="note">the mechanisms inside thought to do this trick, each with where it is expected and its state in Nothing up my sleeve</span></h2>
-          <div className="scroll"><table id="trickstars"><thead><tr><th>kind of head</th><th>what it does</th><th>rests on</th><th>expected from</th><th>first lit in</th><th>in Nothing up my sleeve</th></tr></thead><tbody dangerouslySetInnerHTML={{ __html: pageInfo?.stars || '' }} /></table></div>
-        </section>
-        <section className={cardCls(false, 'panel')}>
-          <h2>How Nothing up my sleeve is tracking, size by size <span className="note">each size of ship, how many of its voyages have been measured on this trick and how many performed it; the target is a tenth of the field's size</span></h2>
-          <div className="scroll"><table id="tricktrack"><thead><tr><th>size</th><th>parameters</th><th>against the field</th><th>voyages measured</th><th>performed</th><th>best</th><th>first performed</th></tr></thead><tbody dangerouslySetInnerHTML={{ __html: pageInfo?.track || '' }} /></table></div>
-        </section>
-        <div className="row" id="trickcharts">
-          <section className={cardCls(false, 'panel')} id="trickchartpanel" hidden={!pageInfo?.chart}>
-            <h2>The trick, voyage by voyage <span className="note">its reading at every step, one line per voyage, coloured by size; the amber dotted line is the mark that counts as performed, the grey one the floor (an untrained ship), and labelled lines are outside models</span></h2>
-            <div className="chart tall" id="trickchart" />
-          </section>
-          <section className={cardCls(false, 'panel')} id="trickpairpanel" hidden={!pageInfo?.pair}>
-            <h2 id="trickpairtitle" dangerouslySetInnerHTML={{ __html: pageInfo?.pair?.title || 'Beside it' }} />
-            <div className="chart tall" id="trickpairchart" />
-          </section>
-        </div>
-        <section className={cardCls(false, 'panel')} id="scaffoldpanel" hidden={!scaffRows.length}>
-          <h2>How the scaffold held, across every model <span className="note">pinned heads are a loan: <b>held</b> is the best reading while the heads were pinned, <b>after the fade</b> is the first reading once they were faded out, <b>drop</b> is what the fade cost, and <b>kept</b> is what remains above the untrained floor. A model with no scaffolded voyage is listed as a gap, not left out</span></h2>
-          <div dangerouslySetInnerHTML={{ __html: scaffoldHtml(scaffRows, scaffSummary, rungs, scaffThreshold) }} />
-          <div className="chart tall" id="scaffoldchart" />
-        </section>
-      </div>
-
-      {/* ============================== one chain: the explorer's test told as a climb, keel to explorer */}
-      <div className={`dview${view === 'chain' ? ' active' : ''}`} data-dview="chain">
-        <h1><a className={crumbCls('back')} href="/discoveries">← discoveries</a> <span id="chaintitle">{chainPage?.title || ''}</span> <span id="chainstrand" dangerouslySetInnerHTML={{ __html: chainPage?.strand || '' }} /></h1>
-        <section className={cardCls(false, 'panel')}><div className="rungover" id="chainover" dangerouslySetInnerHTML={{ __html: chainPage?.over || '' }} /></section>
-        <div className="handtools"><label><input className={checkCls('')} type="checkbox" id="chainrefpage" checked={chainRef} onChange={(e) => setRef(e.target.checked)} /> show the reference ladder <span className="note">(Pythia 14m to 410m and Qwen3 0.6B to 4B beside each step's evidence)</span></label></div>
-        <div id="chainsteps" dangerouslySetInnerHTML={{ __html: chainPage?.steps || '' }} />
-      </div>
-
-      {/* ============================== the traits */}
-      <div className={`dview${view === 'traits' ? ' active' : ''}`} data-dview="traits">
-        <h1><a className={crumbCls('back')} href="/discoveries">← discoveries</a> Traits <span className="q">can a ship's hidden state tell fiction, verse, first person or a language family apart on books it has never read; found at the threshold, learned when it also clears the floors</span></h1>
-        <div className="handtools"><button className={btnCls('outline', '')} data-essay="traits">Read: how traits are found</button></div>
-        <section className={cardCls(false, 'panel')}><div className="scroll"><table id="traittable" className="clickable"><thead dangerouslySetInnerHTML={{ __html: traits?.head || '' }} /><tbody dangerouslySetInnerHTML={{ __html: traits?.body || '' }} /></table></div></section>
-      </div>
-
-      {domain && (
-        <div className={`dview${view === 'domain' ? ' active' : ''}`} data-dview="domain">
-          <h1><a className={crumbCls('back')} href="/discoveries">← discoveries</a> {domain.title}</h1>
-          <section className={cardCls(false, 'panel')}>
-            <div className="domainhero">
-              <img src={domain.image} alt="" />
-              <div><div className="k">A door into the discoveries</div><h2>{domain.title}</h2><p>{domain.blurb}</p></div>
-            </div>
-          </section>
-          <section className={cardCls(false, 'panel')}>
-            <h2>The skills in this door <span className="note">every skill charted on the {domain.title.toLowerCase()} step of the ladder; open one for its stars, its readings and its place in the climb</span></h2>
-            {domainSkills.length ? <div className="domainskills">{domainSkills.map((t) => (
-              <a className={`skill${t.fleet ? ' measured' : ''}`} href={`/discoveries/${esc(t.key)}`} key={t.key}>
-                <b>{t.gate ? '◆ ' : ''}{t.name}</b><span>{t.does}</span>
-                <em>{t.fleet ? 'measured by Nothing up my sleeve' : 'not measured yet'}{t.target_class ? ` · goal ${t.target_class}` : ''}{t.taught ? ' · taught' : ''}</em>
-              </a>
-            ))}</div> : <div className={emptyCls()}>no skill is charted on this step yet</div>}
-          </section>
-          <section className={cardCls(false, 'panel')}>
-            <h2>Where to go next</h2>
-            <div className="handtools">{domain.links.map(([href, label]) => <a className={btnCls('outline', '')} href={href} key={href}>{label}</a>)}</div>
-          </section>
-        </div>
-      )}
 
       {question && (() => {
         const ch = (chainsApi.data || []).find((x: any) => x.key === question.chain);

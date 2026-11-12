@@ -1,14 +1,5 @@
 ---
-// Discoveries, rendered by its own React island: the index with its four subtabs, one trick, one chain
-// and the traits. The island reads the route itself (the server falls back to this page for every
-// discoveries address). The reader is here because the essays and book links open in it.
-import Layout from '../../layouts/Layout.astro';
-import Discoveries from '../../components/islands/Discoveries';
-import Reader from '../../components/Reader.astro';
+// The old Discoveries page (12 November): it moved into Demiton's orbital, and its Reach panels into Masaq' Reach.
+import DiscoveriesMoved from '../../components/DiscoveriesMoved.astro';
 ---
-<Layout>
-  <main>
-    <Discoveries client:load />
-  </main>
-  <Reader />
-</Layout>
+<DiscoveriesMoved path="/discoveries" />

@@ -187,6 +187,18 @@ the island rewrites). A section with one tab shows no row.
   settings, Forgotten Tomes score and the step each star first lit, the score run by run, first
   light (each star's score against step, threshold dotted), outcomes and levers. A panel only one
   voyage has carries `data-voyage` (the book-value loop's fit).
+- **Discoveries live in the two orbitals** (12 November, Justin: "moved to discoveries from demiton in the demiton
+  orbital and then the discoveries applicable to the labs and research in the masaq orbital"). Demiton's, what our
+  fleet found, is `/orbitals/demiton/discoveries` (the four subtabs below, every trick, chain, door and traits; the
+  shipyard's `/shipyard/charting` is the same page). Its Stars keeps **Lit by size** (the grid, the ten points, 300k
+  against Qwen3 4B, the star cards, the bridge) and **the 16 cards**. Masaq' Reach's is `/orbitals/masaq/discoveries`,
+  a fifth view beside Labs, Research, Models and Embeddings: **Head kinds** (the star chart, the head kinds with no
+  card, the cards with no single head), **Cards beyond the sixteen** (the census's clusters) and **Still to be
+  sorted**. Qwen3 4B's head census and persona vectors are on its own page, `/foreign/qwen3-4b` (Readings; any model
+  with a census shows them). Discoveries is no longer a header tab; each orbital's crumb menu has it. Every old
+  `/discoveries` address is a redirect page (`DiscoveriesMoved.astro`, the map in `lib/discoveryPaths.ts`), and an
+  old `?tab=census|personas|beyond|unsorted` goes to its new home. The paths below are the old ones, read under the
+  Demiton base.
 - **Discoveries** (`#/discoveries`): **Tricks of the trade**, in four subtabs. **Overview**
   (`#/discoveries`: the four questions, the sieve and the jobs the fleet finds). **Stars**
   (`#/discoveries/stars`: a grid of every star Thorp measures by class of ship, each cell the

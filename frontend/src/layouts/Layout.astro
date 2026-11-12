@@ -25,7 +25,7 @@ import Breadcrumbs from '../components/islands/Breadcrumbs';
     <!-- where this page sits, from Places down (lib/crumbs.ts): one trail for every page -->
     <Breadcrumbs client:load initialPath={Astro.url.pathname} />
     <slot />
-    <!-- ⌘K, on every page: type a model, open its chat (components/islands/CommandPalette) -->
+    <!-- ⌘K, on every page: type a place, go to it (components/islands/CommandPalette); chatting is the terminal's ⌘J -->
     <CommandPalette client:idle />
     <!-- the chat console: a carved drawer that slides up from the bottom of every page (⌘J) -->
     <ChatConsole client:idle />

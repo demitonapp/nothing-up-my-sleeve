@@ -277,10 +277,15 @@ def run(name: str, arguments: dict) -> dict:
 
 def tool_format(template: str) -> dict:
     """What a model's chat template says about tools: `format` is the grammar the parser reads (`json`,
-    `qwen-xml`), or None with the reason. A template that never mentions tools takes none."""
+    `qwen-xml`, `bailing-xml`), or None with the reason. A template that never mentions tools takes none."""
     t = template or ""
     if "tools" not in t:
         return {"format": None, "why": "the chat template takes no tools"}
+    # Ling 3.0 / Bailing V3: the template's prose says "function name and arguments", but the grammar it
+    # asks for is XML — name, then <arg_key>/<arg_value> pairs. It was read as JSON, so json.loads() failed
+    # on the name at character 0 and every call came back unknown() (12 November).
+    if "<arg_key>" in t and "<arg_value>" in t:
+        return {"format": "bailing-xml", "arg": "tools", "why": "the template asks for <tool_call>NAME<arg_key>…</arg_key><arg_value>…</arg_value></tool_call> calls"}
     if "<function=" in t and "<parameter=" in t:
         return {"format": "qwen-xml", "arg": "tools", "why": "the template asks for <tool_call><function=…><parameter=…> calls"}
     if "<tool_call>" in t and "arguments" in t:
@@ -294,6 +299,9 @@ def tool_format(template: str) -> dict:
 _CALL = re.compile(r"<tool_call>\s*(.*?)\s*(?:</tool_call>|$)", re.S)
 _FUNC = re.compile(r"<function=([^>\s]+)>\s*(.*?)\s*(?:</function>|$)", re.S)
 _PARAM = re.compile(r"<parameter=([^>\s]+)>\s*(.*?)\s*(?:</parameter>|(?=<parameter=)|$)", re.S)
+# Ling/Bailing: <tool_call>NAME<arg_key>k</arg_key><arg_value>v</arg_value>…</tool_call>
+_BAILING_NAME = re.compile(r"^\s*([A-Za-z_][\w.-]*)")
+_BAILING_ARG = re.compile(r"<arg_key>\s*(.*?)\s*</arg_key>\s*<arg_value>\s*(.*?)\s*</arg_value>", re.S)
 
 
 def _value(text: str) -> Any:
@@ -304,6 +312,24 @@ def _value(text: str) -> Any:
         return text
 
 
+def _json_call(body: str) -> dict | None:
+    """A JSON call (`{"name": ..., "arguments": {...}}`), or None when the body is not one. Some models
+    write `arguments` as a JSON string rather than an object; that is read too, rather than refused."""
+    try:
+        d = json.loads(body)
+    except ValueError:
+        return None
+    if not isinstance(d, dict):
+        return None
+    args = d.get("arguments") or d.get("parameters") or {}
+    if isinstance(args, str):
+        try:
+            args = json.loads(args)
+        except ValueError:
+            args = {}
+    return {"name": str(d.get("name") or ""), "arguments": args if isinstance(args, dict) else {}}
+
+
 def parse_calls(text: str, fmt: str | None) -> list[dict]:
     """The calls in a model's turn, in order: [{"name", "arguments"}]. A call that does not parse is kept with
     an `error`, so the model is told what went wrong instead of the call vanishing."""
@@ -312,11 +338,18 @@ def parse_calls(text: str, fmt: str | None) -> list[dict]:
     calls = []
     for body in _CALL.findall(text):
         if fmt == "json":
-            try:
-                d = json.loads(body)
-                calls.append({"name": str(d.get("name") or ""), "arguments": d.get("arguments") or d.get("parameters") or {}})
-            except (ValueError, AttributeError) as e:
-                calls.append({"name": "", "arguments": {}, "error": f"the call is not JSON: {e}", "raw": body[:300]})
+            call = _json_call(body)
+            calls.append(call if call else {"name": "", "arguments": {}, "error": "the call is not JSON", "raw": body[:300]})
+        elif fmt == "bailing-xml":
+            # a model that wrote JSON anyway is read as JSON, not refused for the template's grammar
+            call = _json_call(body) if body.lstrip().startswith("{") else None
+            if call is None:
+                m = _BAILING_NAME.match(body)
+                if not m:
+                    calls.append({"name": "", "arguments": {}, "error": "no function name in the call", "raw": body[:300]})
+                    continue
+                call = {"name": m.group(1), "arguments": {k: _value(v) for k, v in _BAILING_ARG.findall(body)}}
+            calls.append(call)
         elif fmt == "qwen-xml":
             f = _FUNC.search(body)
             if not f:

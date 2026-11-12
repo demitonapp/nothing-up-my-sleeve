@@ -1,7 +1,7 @@
 // The command palette (11 November, Justin: "can you add a cmd K whereby I can choose type a model to
 // chat to and be navigated to it"): ⌘K or Ctrl+K on any page opens a filter over every model the chat
 // can reach — a Nothing up my sleeve ship with a finished checkpoint, a foreign model with its weights
-// cached — and ⏎ opens that model's chat page, ⇥/↑↓ to move, esc to close.
+// cached — and ⏎ opens the chat console on that model, ⇥/↑↓ to move, esc to close.
 //
 // Mounted in the layout, so it is the same palette everywhere; it reads /api/chat/models the first time
 // it opens, never on page load, and the list is the chat's own list (available, with a target), so the
@@ -28,9 +28,10 @@ export interface Model {
   why: string | null;
 }
 
-/** A model's chat page: the ship's own tab for our ships, the harbour ship's for a foreign one that has
- *  a page, and /chat preselected for a foreign one that does not. The ship key is used as it is written
- *  (`300k:2980e0eca706`): its colon is a legal path character, and percent-encoding it misses the route. */
+/** A model's chat address, as a thread records it: the ship's own tab for our ships, the harbour ship's
+ *  for a foreign one that has a page, and the retired /chat (which now opens the console) for one that
+ *  does not. The ship key is used as it is written (`300k:2980e0eca706`): its colon is a legal path
+ *  character, and percent-encoding it misses the route. */
 export const chatHref = (m: Pick<Model, 'kind' | 'model' | 'ship_key'>): string => {
   if (m.kind === 'foreign') {
     const key = String(m.model || '');
@@ -114,7 +115,11 @@ export default function CommandPalette() {
   const go = (m: Model | undefined): void => {
     if (!m) return;
     setOpen(false);
-    location.assign(chatHref(m));
+    // the terminal is the chat now (12 November, Justin: "we'll only use the terminal"): hand it the model
+    // instead of leaving the page. A foreign model is its id; one of ours is `ship:<key>`.
+    window.dispatchEvent(new CustomEvent('thorp:chat', {
+      detail: { model: m.kind === 'foreign' ? String(m.model || '') : `ship:${m.ship_key}` },
+    }));
   };
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>): void => {

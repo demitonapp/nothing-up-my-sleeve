@@ -1908,7 +1908,7 @@ details.paststandards[open] > summary { margin-bottom: 0; }
 .phaselegend .now, .phaselegend .now b { color: var(--accent); }
 .vasttabletop { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 2px; }
 #vasttimings, #vasttable { font-size: var(--fs-md); }
-#vasttimings { width: 100%; min-width: 1000px; table-layout: fixed; border-collapse: collapse; }
+#vasttimings { width: 100%; min-width: 780px; table-layout: fixed; border-collapse: collapse; }
 #vasttimings th, #vasttable th { padding: 5px 7px; color: var(--muted); font-size: var(--fs-xs); font-weight: 500;
   letter-spacing: .06em; text-transform: uppercase; text-align: right; white-space: nowrap; vertical-align: bottom; }
 #vasttimings th:first-child, #vasttable th:first-child { text-align: left; }
@@ -1924,6 +1924,7 @@ details.paststandards[open] > summary { margin-bottom: 0; }
 #vasttimings td.who .s { white-space: normal; overflow-wrap: anywhere; }
 #vasttimings td.who .phasebar { margin-top: 7px; }
 #vasttimings td.num, #vasttable td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+#vasttimings td.num .s { white-space: normal; overflow-wrap: anywhere; }
 #vasttimings th.sep, #vasttimings td.sep, #vasttable th.sep, #vasttable td.sep { border-left: 1px solid var(--line); }
 #vasttimings tbody tr.now td { background: var(--raise); }
 #vasttimings tbody tr.now td:first-child { box-shadow: inset 2px 0 0 var(--accent); }
@@ -2023,6 +2024,20 @@ ol.goaltext { padding-left: 22px; }
   text-overflow: ellipsis; white-space: nowrap; }
 .chatrailstar { color: var(--accent); margin-right: 4px; }
 
+/* the chat's answer, formatted (lib/richtext.tsx): a model's own paragraphs, lists and headings, read as
+   prose rather than one run of inline spans */
+.rt-p { margin: 0 0 .85em; }
+.rt-p:last-child { margin-bottom: 0; }
+.rt-h { font-weight: 600; margin: .9em 0 .3em; }
+.rt-h[data-l="1"] { font-size: 1.14em; }
+.rt-h[data-l="2"] { font-size: 1.07em; }
+.rt-h[data-l="4"] { font-size: .96em; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.rt-list { margin: .4em 0 .9em; padding-left: 1.3em; }
+.rt-list li { margin: .2em 0; }
+.rt-bq { margin: .6em 0; padding-left: .8em; border-left: 2px solid var(--line); color: var(--muted); }
+.rt-pre { margin: .6em 0; padding: 8px 10px; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--raise); border: 1px solid var(--line); border-radius: 4px; font-size: var(--fs-sm); }
+.rt-code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9em; background: var(--raise); border-radius: 3px; padding: .05em .3em; }
+
 /* the chat console: a carved drawer at the bottom of every page (11 November) */
 .console { position: fixed; left: 0; right: 0; bottom: 0; z-index: 90; pointer-events: none; }
 .consolebar { pointer-events: auto; position: relative; display: flex; align-items: center; gap: 14px;
@@ -2040,7 +2055,7 @@ ol.goaltext { padding-left: 22px; }
 .consolepanel { pointer-events: auto; display: grid; grid-template-rows: auto 1fr auto; height: 0;
   overflow: hidden; background: var(--panel); border-top: 3px solid #6b4527;
   box-shadow: 0 -18px 40px rgba(0,0,0,.45); transition: height .32s cubic-bezier(.22,.9,.24,1); }
-.console.open .consolepanel { height: min(62vh, 560px); }
+.console.open .consolepanel { height: min(var(--consoleh, 72vh), 94vh); }
 .consolehead { display: flex; gap: 10px; align-items: center; padding: 9px 16px;
   border-bottom: 1px solid var(--line); background: linear-gradient(180deg, #4a2f1b, #3d2616); color: #f2e3c6; }
 .consolehead .note { color: #d8c39b; }
@@ -2053,16 +2068,8 @@ ol.goaltext { padding-left: 22px; }
 .consolbtn:disabled { opacity: .5; cursor: default; }
 .consolebody { display: flex; min-height: 0; }
 .consolechat { flex: 1 1 auto; overflow-y: auto; padding: 12px 16px; min-width: 0; }
-.consoleyou { color: var(--muted); margin: 0 0 8px; }
-.consoleanswer { margin: 0 0 10px; }
 .consoleerr { color: var(--bad); }
 
-.consolestatus { display: inline-flex; gap: 8px; align-items: center; margin-left: 8px; font-size: 11px; color: #d8c39b; font-variant-numeric: tabular-nums; }
-.consolestatus .ok { color: var(--good); }
-.consolestatus .warn { color: var(--accent); }
-.consolestatus .think { color: #c9a24a; }
-.consolestatus .dim { color: #8a6a4a; }
-.consolestatus span { white-space: nowrap; }
 .consolstar { background: none; border: 0; padding: 0 2px; font-size: 17px; line-height: 1; cursor: pointer; color: #8a6a25; }
 .consolstar:hover { color: #f6e2a8; }
 .consolstar.on { color: #f6e2a8; }
@@ -2077,8 +2084,6 @@ ol.goaltext { padding-left: 22px; }
 .consoleqitem:hover { border-left-color: #f6e2a8; color: #f6e2a8; }
 .consoledebug { flex: 0 0 42%; min-width: 0; overflow-y: auto; padding: 12px 16px; border-left: 1px solid #6b4527; }
 .consoledebug pre { max-height: 190px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--fs-sm); margin: 4px 0 8px; color: #d8c39b; }
-.consoleanswer > details, .consoleyou > details { margin-top: 4px; }
-.consoleanswer > details pre, .consoleyou > details pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--fs-sm); max-height: 150px; overflow-y: auto; color: #d8c39b; }
 .consolenotes { flex: 0 0 300px; border-left: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; }
 .consolenotesnew { padding: 10px; border-bottom: 1px solid var(--line); display: grid; gap: 6px; }
 .consolenotesnew textarea { width: 100%; background: var(--bg); color: var(--text); border: 1px solid var(--line);
@@ -2098,7 +2103,7 @@ ol.goaltext { padding-left: 22px; }
   .consolenotes { flex: 2 0 150px; border-left: 0; border-top: 1px solid var(--line); }
   .consolechat { flex: 1 1 0; min-height: 64px; }
   .consolebody { flex-direction: column; overflow-y: auto; }
-  .console.open .consolepanel { height: min(74vh, 620px); }
+  .console.open .consolepanel { height: min(var(--consoleh, 84vh), 94vh); }
 }
 
 /* a generated plate drops in here: save it as frontend/public/art/chat-console.png and uncomment these
@@ -2152,9 +2157,6 @@ ol.goaltext { padding-left: 22px; }
 .consolbtn.primary { background: #c9a24a; border-color: #e5c982; color: #0b0a09; font-weight: 700; }
 .consolbtn.primary:hover { background: #e5c982; }
 .consolechat { background: #0b0a09; }
-.consoleyou { color: #a8977a; }
-.consoleanswer { color: #e9e2d3; }
-.consoleanswer b { color: #f2e6cf; letter-spacing: .04em; }
 .consoleinput { border-top: 1px solid #3a2a12; background: #0b0a09; }
 .consoleinput input {
   background: #131110; color: #f2e6cf; border: 1px solid #3a2a12; border-radius: 2px;
@@ -2184,6 +2186,96 @@ ol.goaltext { padding-left: 22px; }
 .consoleswitch.on .consoleswitchlabel { color: #d8b566; }
 .consoleswitch:focus-within .consoleswitchtrack { outline: 1px solid #c9a24a; outline-offset: 2px; }
 .consoleswitch.inert { opacity: .5; cursor: not-allowed; }
+
+/* ---- the console as a reading surface (12 November, Justin: "make the chat terminal much more readable
+   for someone that will spend a lot of time reading the answers"): a measured column of real paragraphs,
+   hairlines between turns, brass labels, and the machine's numbers kept out of the prose. */
+.consolepanel { position: relative; }
+/* the drawer's top edge is its handle: drag it, or focus it and use ↑ ↓ */
+.consoleresize { position: absolute; top: -4px; left: 0; right: 0; height: 11px; z-index: 4;
+  cursor: ns-resize; touch-action: none; }
+.consoleresize::after { content: ''; position: absolute; top: 5px; left: 50%; width: 46px; height: 3px;
+  border-radius: 2px; transform: translateX(-50%); background: #3a2a12; transition: width .15s, background .15s; }
+.consoleresize:hover::after, .consoleresize:focus-visible::after { width: 74px; background: #c9a24a; }
+.consoleresize:focus-visible { outline: none; }
+.console.resizing .consolepanel { transition: none; }
+
+.consolechat { padding: 0 34px; scrollbar-width: thin; scrollbar-color: #3a2a12 transparent;
+  background: radial-gradient(ellipse 62% 70% at 50% 0%, rgba(201, 162, 74, .055), transparent 70%), #0b0a09; }
+.consolechat::-webkit-scrollbar { width: 10px; }
+.consolechat::-webkit-scrollbar-thumb { background: #2e2417; border: 2px solid #0b0a09; border-radius: 5px; }
+.consolechat::-webkit-scrollbar-thumb:hover { background: #4a3a1f; }
+
+/* one column of readable width, whatever the window: about 76 characters at the reader's own size */
+.consoletranscript { max-width: 76ch; margin: 0 auto; padding: 6px 0 14px; font-size: var(--consolefs, 15.5px); }
+.consolemsg { padding: 18px 0 20px; border-top: 1px solid #221a11; }
+.consolemsg:first-child { border-top: 0; padding-top: 10px; }
+.consolemsghead { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin: 0 0 7px; }
+.consolemsgwho { min-width: 0; max-width: 72%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 10.5px; font-weight: 700; letter-spacing: .15em; text-transform: uppercase; color: #c9a24a; }
+.consolemsg.is-you .consolemsgwho { color: #8d7a56; }
+.consolemsgend { margin-left: auto; font-size: 10.5px; letter-spacing: .04em; color: #7c694a; font-variant-numeric: tabular-nums; }
+.consolemsgend.warn { color: #d98b6a; }
+.consolemsgend.dim { color: #6f5d40; }
+
+.consolemsgtext { color: #e9e2d3; font-size: 1em; line-height: 1.72; overflow-wrap: anywhere; text-wrap: pretty; }
+.consolemsg.is-you .consolemsgtext { color: #b9ab90; font-size: .94em; line-height: 1.65; }
+.consolemsgtext > :first-child { margin-top: 0; }
+.consolemsgtext > :last-child { margin-bottom: 0; }
+.consolemsgtext p { margin: 0 0 .95em; }
+.consolemsgtext strong, .consolemsgtext b { color: #f8efdc; font-weight: 650; }
+.consolemsgtext em, .consolemsgtext i { color: #f0e3c4; }
+.consolemsgtext code.rt-code { font-size: .86em; background: #1b1610; border: 1px solid #33281a; padding: .06em .36em; color: #e8d1a0; }
+.consolemsgtext pre.rt-pre { background: #100e0b; border: 1px solid #2a2116; color: #cbbfa8; padding: 10px 12px; margin: .7em 0 1em; }
+.consolemsgtext ul.rt-list, .consolemsgtext ol.rt-list { margin: .35em 0 .95em; padding-left: 1.3em; }
+.consolemsgtext li { margin: .28em 0; padding-left: .1em; }
+.consolemsgtext li::marker { color: #b08f4a; }
+.consolemsgtext blockquote.rt-bq { margin: .7em 0; padding-left: .9em; border-left: 2px solid #4a3a1f; color: #cbbfa8; }
+.consolemsgtext .rt-h { margin: 1.35em 0 .45em; font-size: 1.02em; font-weight: 700; color: #f2e6cf; }
+.consolemsgtext .rt-h[data-l="1"] { font-size: 1.12em; }
+.consolemsgtext .rt-h[data-l="4"] { font-size: .9em; text-transform: uppercase; letter-spacing: .09em; color: #c9a24a; }
+
+/* the machine's own numbers: one quiet line under the answer, never inside it */
+.consolemeta { display: flex; flex-wrap: wrap; align-items: baseline; margin: 11px 0 0; font-size: 11px;
+  line-height: 1.6; color: #7c694a; font-variant-numeric: tabular-nums; }
+.consolemeta > span:not(:last-child)::after { content: '·'; margin-left: 7px; color: #45351d; }
+.consolemeta .ok { color: #7d9a68; }
+.consolemeta .warn { color: #d98b6a; }
+.consolemeta .think { color: #b08f4a; }
+.consolemeta .dim { color: #6f5d40; }
+
+/* the reasoning: a disclosure of its own, set back so it never reads as part of the answer */
+.consolethink { margin: 12px 0 0; }
+.consolethink > summary { width: fit-content; cursor: pointer; font-size: 10.5px; letter-spacing: .12em;
+  text-transform: uppercase; color: #8d7a56; user-select: none; }
+.consolethink > summary:hover { color: #c9a24a; }
+.consolethink > summary .note { color: #6f5d40; text-transform: none; letter-spacing: 0; }
+.consolethink pre { margin: 8px 0 0; padding: 10px 12px; max-height: 300px; overflow: auto;
+  white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: #a8977a; background: #100e0b; border: 1px solid #2a2116; border-left: 2px solid #3a2a12; border-radius: 2px; }
+
+.consoleintro { padding: 34px 0 18px; }
+.consoleintro .consolemsgwho { display: block; margin-bottom: 8px; }
+.consoleintro .note { margin: 0; color: #8d7a56; font-size: 13px; }
+.consolewait { color: #8d7a56; font-size: 12px; margin: 14px 0 0; }
+.consolewarn { margin: 10px 0 0; color: #d98b6a; font-size: 12.5px; }
+
+/* the toolbar's second row, and the reader's own type size */
+.consoleheadbreak { flex-basis: 100%; height: 0; }
+.consolereading { display: inline-flex; gap: 4px; margin-left: auto; }
+.consolereading .consolbtn { padding: 3px 8px; letter-spacing: 0; text-transform: none; font-size: 12px; }
+
+/* the composer belongs to the same column as the answer, so the eye never jumps sideways */
+.consoleinput { max-width: 76ch; width: 100%; margin: 0 auto; font-size: var(--consolefs, 15.5px); }
+.consoleinput input { padding: 9px 12px; }
+.consoleinput .consolbtn { font-size: 11px; }
+
+@media (max-width: 760px) {
+  .consolechat { padding: 0 16px; }
+  .consoletranscript { max-width: none; }
+  .consolemsg { padding: 15px 0 17px; }
+  .consoleinput { max-width: none; padding: 10px 16px; }
+}
 
 /* ---- the shipyard in the new house style (11 November, Justin: "restyle the shipyard"): a dark yard under
    an Orbital, its three sections as brass plates. Risso's ink ground, Drake's yard, the young Culture's

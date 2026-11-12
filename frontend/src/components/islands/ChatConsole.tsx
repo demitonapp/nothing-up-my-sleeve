@@ -10,11 +10,13 @@
 // it as `public/art/chat-console.png`, then enable the two commented rules at the end of the console's
 // block in `styles/global.css`, which paint the bar with the image and hide the drawn grain.
 //
-// It is a compact sibling of /chat: the same /api/chat, the same conversation store (a console chat is a
-// thread, saved and listed on the chat page too), the same context meter, plus notes.
+// It is the chat now (12 November, Justin: "the main chat page can be deprecated. We'll only use the
+// terminal"): the same /api/chat, the same conversation store, the same context meter, plus notes. The
+// /chat address is retired to a notice that hands its model to this console and opens it.
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react';
 import { ContextMeter } from './Chat';
+import RichText from '@/lib/richtext';
 import { autoTitle, getThread, listThreads, markSaved, newId, saveThread, type Thread } from '@/lib/conversations';
 
 interface Model {
@@ -137,6 +139,28 @@ function Woodwork() {
   );
 }
 
+const num = (v: number | null | undefined): string => (v == null ? '–' : v.toLocaleString());
+
+/** The machine's own numbers, kept out of the answer's line: dim, tabular, and quiet under the prose. */
+function SayMeta({ meta, context, budget }: { meta: Meta; context: number | null; budget: number }) {
+  const used = (meta.prompt_tokens ?? 0) + (meta.answer_tokens ?? 0) + (meta.reasoning_tokens ?? 0);
+  const share = context ? Math.round((100 * used) / context) : null;
+  return (
+    <div className="consolemeta">
+      {meta.reasoning_tokens ? (
+        <span className="think">{meta.reasoning_tokens.toLocaleString()} thought{meta.think_capped ? ', capped' : ''}</span>
+      ) : null}
+      <span>{num(meta.prompt_tokens)} → {num(meta.answer_tokens)} tokens</span>
+      {share != null ? <span>{share < 1 && used > 0 ? '<1' : share}% of {Math.round(context! / 1000)}k window</span> : null}
+      {meta.cache_pct != null ? <span className={meta.cached_tokens ? 'ok' : 'dim'}>{meta.cache_pct}% cached</span> : null}
+      {meta.dropped_turns ? <span className="warn">{meta.dropped_turns} turns left out</span> : null}
+      {meta.seconds != null ? <span>{meta.seconds}s</span> : null}
+      {meta.tok_s != null ? <span>{meta.tok_s} tok/s</span> : null}
+      <span className="dim">{num(meta.settings?.max_tokens ?? budget)} budget</span>
+    </div>
+  );
+}
+
 export default function ChatConsole() {
   const [open, setOpen] = useState(false);
   const [models, setModels] = useState<Model[] | null>(null);
@@ -189,6 +213,50 @@ export default function ChatConsole() {
   const [debug, setDebug] = useState(false);
   const [lastReq, setLastReq] = useState<any>(null);
   const [lastReply, setLastReply] = useState<any>(null);
+  // Reading is the console's first job (12 November): the drawer's height and the answer's size belong to
+  // the reader, not to the page, so both are kept in this browser and the panel is dragged by its top edge.
+  const [panelH, setPanelH] = useState(0); // 0: the stylesheet's height
+  const [resizing, setResizing] = useState(false);
+  const [answerFs, setAnswerFs] = useState(15.5);
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const dragRef = useRef<{ y: number; h: number } | null>(null);
+  useEffect(() => {
+    try {
+      const h = Number(localStorage.getItem('thorp.chat.consoleh'));
+      if (h >= 260) setPanelH(h);
+      const fs = Number(localStorage.getItem('thorp.chat.consolefs'));
+      if (fs >= 13 && fs <= 20) setAnswerFs(fs);
+    } catch { /* storage blocked */ }
+  }, []);
+  useEffect(() => {
+    try { if (panelH >= 260) localStorage.setItem('thorp.chat.consoleh', String(Math.round(panelH))); } catch { /* blocked */ }
+  }, [panelH]);
+  useEffect(() => {
+    try { localStorage.setItem('thorp.chat.consolefs', String(answerFs)); } catch { /* blocked */ }
+  }, [answerFs]);
+  const setPanel = (h: number): void => {
+    const max = Math.max(280, window.innerHeight - 40);
+    setPanelH(Math.max(280, Math.min(max, h)));
+  };
+  const onResizeDown = (e: ReactPointerEvent<HTMLDivElement>): void => {
+    dragRef.current = { y: e.clientY, h: panelRef.current?.getBoundingClientRect().height ?? window.innerHeight * 0.72 };
+    setResizing(true);
+    e.currentTarget.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  };
+  const onResizeMove = (e: ReactPointerEvent<HTMLDivElement>): void => {
+    const d = dragRef.current;
+    if (d) setPanel(d.h + (d.y - e.clientY));
+  };
+  const onResizeUp = (e: ReactPointerEvent<HTMLDivElement>): void => {
+    dragRef.current = null;
+    setResizing(false);
+    try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* already gone */ }
+  };
+  const resetPanel = (): void => {
+    setPanelH(0);
+    try { localStorage.removeItem('thorp.chat.consoleh'); } catch { /* blocked */ }
+  };
   const session = useRef(newId());
   // a model picked from a lab page, handed to the console by a `thorp:chat` event (12 November)
   const [wanted, setWanted] = useState('');
@@ -293,6 +361,15 @@ export default function ChatConsole() {
     setThreadId(latest?.id || '');
     setSays(((latest?.messages as unknown as Say[]) || []).slice());
   }, [open, chosen?.kind, chosen?.model, chosen?.ship_key]);
+
+  // a long thread opens on its newest turn, where the reading left off
+  useEffect(() => {
+    if (!open) return;
+    const el = chatBox.current;
+    if (!el) return;
+    const frame = requestAnimationFrame(() => { el.scrollTop = el.scrollHeight; });
+    return () => cancelAnimationFrame(frame);
+  }, [open, threadId]);
 
   // the thinking switch follows the model: a template with an off switch starts on its own default, one
   // that always reasons is on and cannot be turned off, one with no reasoning mode is off and inert
@@ -533,7 +610,11 @@ export default function ChatConsole() {
   };
 
   return (
-    <div className={`console${open ? ' open' : ''}`} aria-label="chat console">
+    <div
+      className={`console${open ? ' open' : ''}${resizing ? ' resizing' : ''}`}
+      aria-label="chat console"
+      style={{ '--consoleh': panelH ? `${Math.round(panelH)}px` : undefined, '--consolefs': `${answerFs}px` } as CSSProperties}
+    >
       <button
         type="button"
         className="consolebar"
@@ -553,7 +634,26 @@ export default function ChatConsole() {
         <span className="consolechevron" aria-hidden="true">{open ? '▾' : '▴'}</span>
       </button>
 
-      <div className="consolepanel" id="consolepanel" role="region" aria-label="chat">
+      <div className="consolepanel" id="consolepanel" role="region" aria-label="chat" ref={panelRef}>
+        {/* the top edge is the drawer's handle: drag it, or focus it and use ↑ ↓ */}
+        <div
+          className="consoleresize"
+          role="separator"
+          aria-orientation="horizontal"
+          aria-label="resize the console"
+          tabIndex={0}
+          title="drag to resize this console · double-click to reset"
+          onPointerDown={onResizeDown}
+          onPointerMove={onResizeMove}
+          onPointerUp={onResizeUp}
+          onPointerCancel={onResizeUp}
+          onDoubleClick={resetPanel}
+          onKeyDown={(e) => {
+            if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+            e.preventDefault();
+            setPanel((panelRef.current?.getBoundingClientRect().height ?? 520) + (e.key === 'ArrowUp' ? 48 : -48));
+          }}
+        />
         <div className="consolehead">
           <label className="note consolepick">
             lab{' '}
@@ -667,6 +767,7 @@ export default function ChatConsole() {
               </select>
             </label>
           ) : null}
+          <span className="consoleheadbreak" aria-hidden="true" />
           <button type="button" className="consolbtn" onClick={() => setNotesOpen((v) => !v)} aria-pressed={notesOpen}>
             Notes{notes.length ? ` (${notes.length})` : ''}
           </button>
@@ -687,60 +788,67 @@ export default function ChatConsole() {
           >Save chat</button>
           {saveMsg ? <span className="note">{saveMsg}</span> : null}
           <button type="button" className="consolbtn" onClick={startNewChat} disabled={!says.length} title="clear this conversation and start a new one">New chat</button>
-          {chosen ? <a className="consolbtn" href={hrefOf(chosen)} title="open this model's chat page">Full page ↗</a> : null}
+          <span className="consolereading" role="group" aria-label="answer text size">
+            <button type="button" className="consolbtn" onClick={() => setAnswerFs((v) => Math.max(13, v - 1))} title="smaller answer text" aria-label="smaller answer text">A−</button>
+            <button type="button" className="consolbtn" onClick={() => setAnswerFs((v) => Math.min(20, v + 1))} title="larger answer text" aria-label="larger answer text">A+</button>
+          </span>
         </div>
 
         <div className="consolebody">
           <div className="consolechat" aria-live="polite" ref={chatBox}>
-            {says.length === 0 ? (
-              <p className="note">{chosen ? `Ask ${chosen.name} something. The answer is its own continuation; the console keeps the thread, and notes beside it.` : 'reading the models…'}</p>
-            ) : null}
-            {says.map((s, i) => (
-              <p key={i} className={s.role === 'you' ? 'consoleyou' : 'consoleanswer'}>
-                <b>{s.role === 'you' ? 'you' : (s.model || 'model')}:</b>{' '}
-                {s.meta?.tool_calls?.length ? <span className="consoletools">{s.meta.tool_calls.map((c, j) => <ToolLine key={j} c={c} />)}</span> : null}
-                {s.text}
-                {s.meta ? (
-                  <span className="consolestatus">
-                    <span className={s.meta.finish === 'length' ? 'warn' : s.meta.finish === 'stopped' ? 'dim' : 'ok'} title={s.meta.finish === 'length' ? 'stopped at the token budget, not at its own end' : s.meta.finish === 'stopped' ? 'stopped by you: what had arrived is kept' : 'ended on its own turn'}>{s.meta.finish === 'length' ? '⏹' : s.meta.finish === 'stopped' ? '◼ stopped' : '✓'}</span>
-                    <span className={s.meta.reasoning_tokens ? 'think' : 'dim'} title={s.meta.reasoning_tokens ? `${s.meta.reasoning_tokens} tokens of thinking${s.meta.think_capped ? ': closed at its cap, not by the model' : ''}` : 'no thinking'}>◆{s.meta.reasoning_tokens ? ` ${s.meta.reasoning_tokens}` : ''}{s.meta.think_capped ? ' capped' : ''}</span>
-                    <span title="prompt → answer tokens">{s.meta.prompt_tokens ?? '–'} → {s.meta.answer_tokens ?? '–'}</span>
-                    {s.meta.cache_pct != null ? (
-                      <span className={s.meta.cached_tokens ? 'ok' : 'dim'} title={`${s.meta.cached_tokens ?? 0} of the prompt's tokens read from the KV cache, not evaluated again`}>⚡ {s.meta.cache_pct}% cached</span>
+            <div className="consoletranscript">
+              {says.length === 0 ? (
+                <div className="consoleintro">
+                  <span className="consolemsgwho">{chosen ? chosen.name : 'the console'}</span>
+                  <p className="note">{chosen ? 'Ask it anything. The answer is its own continuation; the thread is kept, and notes sit beside it.' : 'reading the models…'}</p>
+                </div>
+              ) : null}
+              {says.map((s, i) => (
+                <article key={i} className={`consolemsg ${s.role === 'you' ? 'is-you' : 'is-model'}`}>
+                  <div className="consolemsghead">
+                    <span className="consolemsgwho">{s.role === 'you' ? 'you' : (s.model || 'model')}</span>
+                    {s.meta && (s.meta.finish === 'length' || s.meta.finish === 'stopped') ? (
+                      <span
+                        className={`consolemsgend ${s.meta.finish === 'length' ? 'warn' : 'dim'}`}
+                        title={s.meta.finish === 'length' ? 'stopped at the token budget, not at its own end' : 'stopped by you: what had arrived is kept'}
+                      >{s.meta.finish === 'length' ? 'budget reached' : 'stopped'}</span>
                     ) : null}
-                    {s.meta.dropped_turns ? (
-                      <span className="warn" title={`the ${s.meta.dropped_turns} oldest turns were left out so the thread fits the window`}>−{s.meta.dropped_turns} turns</span>
-                    ) : null}
-                    {chosen?.facts?.context ? (
-                      <span title={`${s.meta.prompt_tokens ?? 0} prompt + ${s.meta.answer_tokens ?? 0} answer + ${s.meta.reasoning_tokens ?? 0} thinking of a ${chosen.facts.context.toLocaleString()}-token window`}>{Math.round(100 * (((s.meta.prompt_tokens ?? 0) + (s.meta.answer_tokens ?? 0) + (s.meta.reasoning_tokens ?? 0)) / chosen.facts.context))}%</span>
-                    ) : null}
-                    {s.meta.seconds != null ? <span title="seconds">{s.meta.seconds}s</span> : null}
-                    <span className="dim" title="the budget this answer had">{s.meta.settings?.max_tokens ?? tokens} max</span>
-                  </span>
-                ) : null}
-                {s.role === 'thorp' && s.meta?.answer_tokens === 0 && s.meta?.finish === 'length' ? (
-                  <span className="note consoleerr"> · the whole {s.meta.settings?.max_tokens ?? tokens}-token budget went to thinking, so no answer was written: raise the budget or turn thinking off</span>
-                ) : null}
-                {s.role === 'thorp' && s.thinking ? (
-                  <details className="consoledebug"><summary>thinking ({s.meta?.reasoning_tokens ?? '–'} tokens)</summary><pre>{s.thinking}</pre></details>
-                ) : null}
-              </p>
-            ))}
-            {live ? (
-              <p className="consoleanswer">
-                <b>{chosen?.name || 'model'}:</b>{' '}
-                {live.tools.length ? <span className="consoletools">{live.tools.map((c, j) => <ToolLine key={j} c={c} />)}</span> : null}
-                {live.text}
-                <span className="consolestatus">
-                  <span className="think">{live.text ? 'writing' : live.thinking ? 'thinking' : 'reading the prompt'}…</span>
-                  {live.n ? <span className="dim">{live.n.toLocaleString()} tokens</span> : null}
-                </span>
-                {live.thinking ? (
-                  <details className="consoledebug" open={!live.text}><summary>thinking…</summary><pre ref={thinkBox}>{live.thinking}</pre></details>
-                ) : null}
-              </p>
-            ) : busy ? <p className="note">sampling…</p> : null}
-            {err ? <p className="note consoleerr">{err}</p> : null}
+                  </div>
+                  {s.meta?.tool_calls?.length ? <div className="consoletools">{s.meta.tool_calls.map((c, j) => <ToolLine key={j} c={c} />)}</div> : null}
+                  <div className="consolemsgtext"><RichText text={s.text} /></div>
+                  {s.role === 'thorp' && s.meta?.answer_tokens === 0 && s.meta?.finish === 'length' ? (
+                    <p className="consolewarn">The whole {s.meta.settings?.max_tokens ?? tokens}-token budget went to thinking, so no answer was written: raise the budget or turn thinking off.</p>
+                  ) : null}
+                  {s.meta ? <SayMeta meta={s.meta} context={chosen?.facts?.context ?? null} budget={tokens} /> : null}
+                  {s.role === 'thorp' && s.thinking ? (
+                    <details className="consolethink">
+                      <summary>thinking<span className="note">{s.meta?.reasoning_tokens ? ` · ${s.meta.reasoning_tokens.toLocaleString()} tokens` : ''}</span></summary>
+                      <pre>{s.thinking}</pre>
+                    </details>
+                  ) : null}
+                </article>
+              ))}
+              {live ? (
+                <article className="consolemsg is-model is-live">
+                  <div className="consolemsghead">
+                    <span className="consolemsgwho">{chosen?.name || 'model'}</span>
+                    <span className="consolemsgend">
+                      {live.text ? 'writing' : live.thinking ? 'thinking' : 'reading the prompt'}…
+                      {live.n ? ` · ${live.n.toLocaleString()} tokens` : ''}
+                    </span>
+                  </div>
+                  {live.tools.length ? <div className="consoletools">{live.tools.map((c, j) => <ToolLine key={j} c={c} />)}</div> : null}
+                  {live.text ? <div className="consolemsgtext"><RichText text={live.text} /></div> : null}
+                  {live.thinking ? (
+                    <details className="consolethink" open={!live.text}>
+                      <summary>thinking…</summary>
+                      <pre ref={thinkBox}>{live.thinking}</pre>
+                    </details>
+                  ) : null}
+                </article>
+              ) : busy ? <p className="note consolewait">sampling…</p> : null}
+              {err ? <p className="consoleerr">{err}</p> : null}
+            </div>
           </div>
           {debug ? (
             <div className="consoledebug">
@@ -815,7 +923,7 @@ export default function ChatConsole() {
           />
           {/* an empty box keeps the last question asked: sending clears the box, so otherwise the button is dead
               exactly when someone wants to keep what they just asked */}
-          <button type="button" className="consolbtn" onClick={() => { setQuestionDraft(input.trim() || lastAsked); setQuestionsOpen(true); }} disabled={!input.trim() && !lastAsked} title={input.trim() || !lastAsked ? 'keep this question in the library' : 'keep your last question in the library'}>keep ?</button>
+          <button type="button" className="consolbtn" onClick={() => { setQuestionDraft(input.trim() || lastAsked); setQuestionsOpen(true); }} disabled={!input.trim() && !lastAsked} title={input.trim() || !lastAsked ? 'keep this question in the library' : 'keep your last question in the library'}>keep</button>
           {busy && live ? (
             <button type="button" className="consolbtn primary" onClick={() => stopper.current?.abort()} title="stop this answer: what has arrived is kept">stop</button>
           ) : (

@@ -1,10 +1,41 @@
 ---
-// The chat page: one finished ship's latest checkpoint, experimental (thorp.chat and /api/chat).
+// The chat page, retired (12 November, Justin: "the main chat page can be deprecated. We'll only use the
+// terminal"): the console at the bottom of every page is the chat. This address is kept so old links and
+// bookmarks still work — it hands the model it names to the console, and opens it.
 import Layout from '../layouts/Layout.astro';
-import Chat from '../components/islands/Chat';
 ---
 <Layout>
   <main>
-    <Chat client:load />
+    <section class="panel">
+      <h2>The chat has moved to the console</h2>
+      <p>The console at the bottom of every page is the chat now. This address is kept only so old links still work.</p>
+      <p><a href="/orbitals">back to the orbitals</a> · <kbd>⌘J</kbd> opens the console on any page</p>
+      <p class="note" id="chatmoved">opening the console…</p>
+    </section>
   </main>
+  <script is:inline>
+    (() => {
+      const q = new URLSearchParams(location.search);
+      const model = q.get('model') || '';
+      const ship = q.get('ship') || '';
+      // the console knows a foreign model by its id, and one of ours by `ship:<key>`
+      const want = model || (ship ? `ship:${ship}` : '');
+      let tries = 0;
+      const note = document.getElementById('chatmoved');
+      const open = () => {
+        // the bar is in the DOM before React has attached its listener, so ask again until the console opens
+        if (!document.querySelector('.consolebar')) {
+          if (tries++ < 80) setTimeout(open, 150);
+          return;
+        }
+        window.dispatchEvent(new CustomEvent('thorp:chat', { detail: { model: want } }));
+        if (document.querySelector('.console.open')) {
+          if (note) note.textContent = 'the console is open at the bottom of the page.';
+          return;
+        }
+        if (tries++ < 80) setTimeout(open, 150);
+      };
+      open();
+    })();
+  </script>
 </Layout>

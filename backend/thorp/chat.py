@@ -1308,6 +1308,9 @@ def foreign_stream(
             res = {"error": c["error"]} if c.get("error") else chat_tools.run(c["name"], c["arguments"])
             results.append(res)
             entry = {"round": rnd, "name": c["name"], "arguments": c["arguments"], "result": res}
+            if c.get("raw"):
+                # what the model actually wrote, when its call did not parse: the console's Debug panel shows it
+                entry["raw"] = c["raw"]
             calls_log.append(entry)
             yield {"event": "tool", **entry}
         msgs = msgs + chat_tools.turns(calls, results, said)

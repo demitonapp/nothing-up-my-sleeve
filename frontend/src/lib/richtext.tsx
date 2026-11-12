@@ -7,8 +7,12 @@
 // every attribute is dropped (no `onerror`, no `href`, no `style`), an unknown tag loses its tag and keeps
 // its words, and everything else stays text. Markdown that other chats' models write — `# heading`,
 // `**bold**`, `code` — is folded in before the tags are read, so one renderer serves both.
+//
+// The answer is read as blocks (12 November): a blank line is a paragraph, a run of `- ` lines is a list,
+// and a heading is a heading. Everything used to be laid out as one run of inline spans, so a model that
+// wrote four paragraphs had them arrive as one wall of text at whatever width the window happened to be.
 
-import type { ReactNode } from 'react';
+import { Fragment, type ReactNode } from 'react';
 
 const HEADINGS: Record<string, number> = { h1: 1, h2: 2, h3: 3, h4: 4 };
 const BLOCK = new Set(['h1', 'h2', 'h3', 'h4', 'p', 'blockquote', 'pre', 'ul', 'ol', 'li', 'br']);
@@ -16,23 +20,32 @@ const ALLOWED = new Set([
   ...BLOCK,
   'strong', 'b', 'em', 'i', 'code', 'span', 'div',
 ]);
+// a block that already carries block-level structure is not wrapped in a <p> again
+const BLOCKISH = /<(?:h[1-4]|p|div|ul|ol|pre|blockquote|li)\b/i;
 
 type El = { tag: string; kids: Node[] };
 type Node = string | El;
 
-/** Markdown a model writes instead of tags, folded into the same whitelist before it is read. */
-/** `- item` and `* item` runs become one list; folded first, so a bullet is never read as *italic*. */
+/** `- item` and `* item` runs become one list, numbered lines an ordered one; folded first, so a bullet
+ *  is never read as *italic*. */
 function foldLists(src: string): string {
   const out: string[] = [];
   let items: string[] = [];
+  let kind: 'ul' | 'ol' | null = null;
   const flush = (): void => {
-    if (items.length) out.push(`<ul>${items.join('')}</ul>`);
+    if (items.length && kind) out.push(`<${kind}>${items.join('')}</${kind}>`);
     items = [];
+    kind = null;
   };
   for (const line of src.split('\n')) {
-    const item = /^\s*[-*]\s+(.*)$/.exec(line);
-    if (item) items.push(`<li>${item[1]}</li>`);
-    else {
+    const ul = /^\s*[-*]\s+(.*)$/.exec(line);
+    const ol = ul ? null : /^\s*\d+[.)]\s+(.*)$/.exec(line);
+    const nextKind = ul ? 'ul' : ol ? 'ol' : null;
+    if (nextKind) {
+      if (kind && kind !== nextKind) flush();
+      kind = nextKind;
+      items.push(`<li>${(ul || ol)![1]}</li>`);
+    } else {
       flush();
       out.push(line);
     }
@@ -100,7 +113,7 @@ function inline(text: string, key: string): ReactNode[] {
     last = re.lastIndex;
     if (m[2] !== undefined) out.push(<strong key={`${key}.s${n++}`}>{m[2]}</strong>);
     else if (m[3] !== undefined) out.push(<em key={`${key}.e${n++}`}>{m[3]}</em>);
-    else if (m[4] !== undefined) out.push(<code className="mono" key={`${key}.c${n++}`}>{m[4]}</code>);
+    else if (m[4] !== undefined) out.push(<code className="rt-code" key={`${key}.c${n++}`}>{m[4]}</code>);
   }
   plain(text.slice(last));
   return out;
@@ -124,24 +137,20 @@ function renderEl(el: El, key: string): ReactNode {
   const level = HEADINGS[el.tag];
   if (level) {
     // never a real <h1>: the page has one, and a chat bubble is not the document's structure
-    return (
-      <div key={key} style={{ fontWeight: 600, fontSize: level === 1 ? '1.05em' : '1em', margin: '8px 0 4px' }}>
-        {kids}
-      </div>
-    );
+    return <div key={key} className="rt-h" data-l={level}>{kids}</div>;
   }
   switch (el.tag) {
     case 'strong': return <strong key={key}>{kids}</strong>;
     case 'b': return <b key={key}>{kids}</b>;
     case 'em': return <em key={key}>{kids}</em>;
     case 'i': return <i key={key}>{kids}</i>;
-    case 'code': return <code className="mono" key={key}>{kids}</code>;
-    case 'pre': return <pre key={key} style={{ margin: '6px 0', whiteSpace: 'pre-wrap' }}>{kids}</pre>;
+    case 'code': return <code className="rt-code" key={key}>{kids}</code>;
+    case 'pre': return <pre className="rt-pre" key={key}>{kids}</pre>;
     case 'br': return <br key={key} />;
     case 'p': case 'div': case 'span': return <span key={key}>{kids}</span>;
-    case 'blockquote': return <blockquote key={key} style={{ margin: '6px 0', paddingLeft: 10, borderLeft: '2px solid var(--line)' }}>{kids}</blockquote>;
-    case 'ul': return <ul key={key} style={{ margin: '6px 0', paddingLeft: 18 }}>{kids}</ul>;
-    case 'ol': return <ol key={key} style={{ margin: '6px 0', paddingLeft: 18 }}>{kids}</ol>;
+    case 'blockquote': return <blockquote className="rt-bq" key={key}>{kids}</blockquote>;
+    case 'ul': return <ul className="rt-list" key={key}>{kids}</ul>;
+    case 'ol': return <ol className="rt-list" key={key}>{kids}</ol>;
     case 'li': return <li key={key}>{kids}</li>;
     default: return <span key={key}>{kids}</span>;
   }
@@ -149,5 +158,22 @@ function renderEl(el: El, key: string): ReactNode {
 
 /** The answer as the page shows it: the whitelist's tags built, everything else left as words. */
 export default function RichText({ text }: { text: string }) {
-  return <>{renderNodes(tokenize(foldMarkdown(text || '')), 'r')}</>;
+  const src = (text || '').replace(/\r\n?/g, '\n').trim();
+  if (!src) return null;
+  // a blank line is the model's own paragraph break: keep it as one on the page
+  const blocks = src.split(/\n[ \t]*\n\s*/);
+  return (
+    <>
+      {blocks.map((block, i) => {
+        const raw = block.trim();
+        if (!raw) return null;
+        const folded = foldMarkdown(raw);
+        const key = `r${i}`;
+        const nodes = renderNodes(tokenize(folded), key);
+        return BLOCKISH.test(folded)
+          ? <Fragment key={key}>{nodes}</Fragment>
+          : <p className="rt-p" key={key}>{nodes}</p>;
+      })}
+    </>
+  );
 }

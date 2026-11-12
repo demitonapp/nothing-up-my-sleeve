@@ -339,6 +339,36 @@ for _key, _rows in ROUNDS.items():
 for _key in FUNDING:
     FUNDING[_key].setdefault("rounds", [])
 
+# What the American houses spend on lobbying Washington, and how much of their revenue is the US government
+# (12 November, Justin: "for the masaq hubs for the US, in their overview page can you add how much they
+# spend on government lobbying and how much of their revenue is garnered from the US government").
+# `lobbying` is the federal Lobbying Disclosure Act total for calendar 2025 in US dollars, as compiled by
+# Bloomberg Government and relayed by Axios and others; None where no figure was found. `gov_revenue_pct` is
+# the share of revenue from the US government, None where the company does not break it out (most do not):
+# the two lab figures are unverified press estimates and say so. Estimates from public reporting, not audits.
+_GOV_BASIS = "Lobbying: federal disclosures for 2025 as compiled by Bloomberg Government and reported by Axios (approximate). Revenue share: companies rarely break it out; a blank means not disclosed."
+GOV: dict[str, dict] = {
+    "meta": {"lobbying": 26_290_000, "gov_revenue_pct": None,
+             "note": "The largest federal lobbying spend of any company in 2025. Revenue is almost wholly advertising; government is not a reported line."},
+    "google": {"lobbying": 13_100_000, "gov_revenue_pct": None,
+               "note": "Alphabet's figure. Google Cloud sells to federal agencies, but Alphabet does not break out government revenue."},
+    "microsoft": {"lobbying": 9_360_000, "gov_revenue_pct": None,
+                  "note": "Federal contracts are a large customer line across Azure and Office, but Microsoft does not disclose the share of revenue."},
+    "nvidia": {"lobbying": 4_900_000, "gov_revenue_pct": None,
+               "note": "About seven times its 2024 spend, mostly on export controls. Its filings do not break out US-government revenue."},
+    "openai": {"lobbying": 3_000_000, "gov_revenue_pct": 5,
+               "note": "Up from $1.76M in 2024. The ~5% revenue share is a press estimate, not a company figure."},
+    "anthropic": {"lobbying": 3_100_000, "gov_revenue_pct": 2,
+                  "note": "Up from $720K in 2024. The ~2% revenue share is a press estimate, not a company figure."},
+    "xai": {"lobbying": None, "gov_revenue_pct": None, "note": "No federal lobbying total found for 2025."},
+    "thinkingmachines": {"lobbying": None, "gov_revenue_pct": None, "note": "No federal lobbying total found for 2025."},
+    "cognition": {"lobbying": None, "gov_revenue_pct": None, "note": "No federal lobbying total found for 2025."},
+    "arcee": {"lobbying": None, "gov_revenue_pct": None, "note": "No federal lobbying total found for 2025."},
+}
+for _row in GOV.values():
+    _row["year"] = 2025
+    _row["basis"] = _GOV_BASIS
+
 # The purpose a house is filtered by on the Labs page (12 November, Justin: "the sorting for labs should not
 # only be about open weights, but we should be able to filter by country and purpose"). One primary purpose
 # each; the prose purpose is in PROFILES.
@@ -553,6 +583,7 @@ def _profile(lab: Lab, rank: int | None = None) -> dict:
         "open": lab.open_weights,
         "focus": FOCUS.get(lab.key, "research"),
         "funding": FUNDING.get(lab.key, _PRIVATE),
+        "gov": GOV.get(lab.key) if lab.country == "us" else None,
         "description": profile.get("description", ""),
         "purpose": profile.get("purpose", ""),
         "flagship": list(lab.flagship),

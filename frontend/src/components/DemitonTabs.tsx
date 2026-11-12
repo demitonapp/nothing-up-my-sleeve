@@ -3,7 +3,7 @@
 // are one orbital's, so the row is shared by the berth, the shipyard, the library and the expeditions.
 import { TabNav } from './TabNav';
 
-export type DemitonView = 'berth' | 'shipyard' | 'library' | 'expeditions';
+export type DemitonView = 'overview' | 'berth' | 'shipyard' | 'library' | 'expeditions';
 
 export default function DemitonTabs({ active }: { active: DemitonView }) {
   return (
@@ -11,7 +11,8 @@ export default function DemitonTabs({ active }: { active: DemitonView }) {
       id="demitontabs"
       ariaLabel="Demiton's views"
       items={[
-        { key: 'berth', label: 'Berth', href: '/orbitals/demiton', active: active === 'berth' },
+        { key: 'overview', label: 'Overview', href: '/orbitals/demiton', active: active === 'overview' },
+        { key: 'berth', label: 'Berth', href: '/orbitals/demiton/berth', active: active === 'berth' },
         { key: 'shipyard', label: 'Shipyard', href: '/shipyard', active: active === 'shipyard' },
         { key: 'library', label: 'Library', href: '/library', active: active === 'library' },
         { key: 'expeditions', label: 'Expeditions', href: '/expeditions', active: active === 'expeditions' },

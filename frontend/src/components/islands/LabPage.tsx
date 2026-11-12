@@ -40,6 +40,9 @@ interface LabData {
   };
   fleet: FleetShip[];
   readings: number;
+  gov?: {
+    lobbying: number | null; gov_revenue_pct: number | null; year: number; note: string; basis: string;
+  } | null;
 }
 
 /** One ship of the house in the Reach, with the two actions a model needs (12 November, Justin: "we should
@@ -85,6 +88,31 @@ function Funding({ f }: { f?: LabData['funding'] }) {
       ) : <p className="note">No disclosed funding rounds.</p>}
       {fund.note ? <p className="note">{fund.note}</p> : null}
       {fund.basis ? <p className="note">{fund.basis}</p> : null}
+    </>
+  );
+}
+
+/** Washington: lobbying spend and the share of revenue from the US government, for the American houses
+ *  (12 November, Justin). Figures are approximate public reporting; a blank is "not disclosed", not zero. */
+function usd(n: number) {
+  return n >= 1e6 ? `$${parseFloat((n / 1e6).toFixed(2))}M` : `$${Math.round(n / 1e3)}K`;
+}
+
+function Washington({ g }: { g?: LabData['gov'] }) {
+  if (!g) return null;
+  return (
+    <>
+      <h2 className="mt">Washington</h2>
+      <div className="labmeta">
+        <span className={pillCls(g.lobbying ? 'accent' : '')}>
+          Federal lobbying {g.year}: {g.lobbying ? usd(g.lobbying) : 'not found'}
+        </span>
+        <span className={pillCls(g.gov_revenue_pct != null ? 'accent' : '')}>
+          Revenue from the US government: {g.gov_revenue_pct != null ? `~${g.gov_revenue_pct}%` : 'not disclosed'}
+        </span>
+      </div>
+      {g.note ? <p className="note">{g.note}</p> : null}
+      {g.basis ? <p className="note">{g.basis}</p> : null}
     </>
   );
 }
@@ -171,6 +199,7 @@ export default function LabPage() {
               <h2 className="mt">Its purpose</h2>
               <p>{d.purpose || 'to build and publish the models the Reach reads.'}</p>
               <Funding f={d.funding} />
+              <Washington g={d.gov} />
               <div className="labmeta">
                 <span className={pillCls(d.open ? 'good' : '')}>{d.open ? 'open weights' : 'closed weights'}</span>
                 <span className={pillCls('')}>{d.focus}</span>

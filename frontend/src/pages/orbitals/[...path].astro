@@ -15,6 +15,7 @@ export function getStaticPaths() {
   for (const h of ['demiton', 'schimint', 'vavatch-end']) {
     paths.push(h, `${h}/ships`, `${h}/shipbuilder`);
   }
+  paths.push('demiton/berth');
   // the trading orbital's old addresses, which the island forwards to /labs and /labs/ships
   paths.push('masaq-reach', 'masaq-reach/ships', 'masaq-reach/labs');
   for (const band of ['xsmall', 'small', 'medium', 'large']) {

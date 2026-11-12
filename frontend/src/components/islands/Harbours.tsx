@@ -156,7 +156,7 @@ export default function Harbours() {
     } else if (!h) {
       cards.innerHTML = `<div class="${emptyCls()}">no harbour called ${harbour}</div>`;
     } else {
-      cards.innerHTML = harbourShipsHtml(data, harbour, band);
+      cards.innerHTML = harbourShipsHtml(data, harbour, band, sub);
       // a band also shows the models we know in it but have not read yet (the leaderboard's candidates),
       // so a pulled model is visible before its reading lands; the read ships stay first
       if (h.foreign && band) {
@@ -190,13 +190,15 @@ export default function Harbours() {
         })
         .catch(() => { scoreAsked.current[preset] = 0; });
     });
-  }, [mine, data, harbour, hasBuilder, h, shipyardLanding, section]);
+  }, [mine, data, harbour, hasBuilder, h, shipyardLanding, section, sub]);
 
   if (!mine) return null;
   const shipyard = path.split('?')[0].replace(/^#/, '').startsWith('/shipyard');
   const sectionName = section === 'training' ? 'Training' : section === 'fitting' ? 'Fitting Out' : section === 'charting' ? 'Charting' : null;
-  const title = sectionName || (shipyard ? 'Shipyard' : harbourTitle(data, harbour) + (bandInfo ? ` · ${bandInfo.name}` : ''));
-  const about = sectionName === 'Training' ? 'the SOPing parties our models train on: the content, the fade, and the content by heart'
+  const demitonBerth = harbour === DEMITON.key && sub === 'berth' && !shipyard;
+  const title = sectionName || (demitonBerth ? 'Berth' : shipyard ? 'Shipyard' : harbourTitle(data, harbour) + (bandInfo ? ` · ${bandInfo.name}` : ''));
+  const about = demitonBerth ? 'the two rings our fleet is built and sailed from, and every ship of it'
+    : sectionName === 'Training' ? 'the SOPing parties our models train on: the content, the fade, and the content by heart'
     : sectionName === 'Fitting Out' ? 'the embeddings, the training content and the scaffolding heads a ship is built from'
     : sectionName === 'Charting' ? 'sorting out the charts the voyage is planned on: the route, the stars, and the suits'
     : shipyard ? 'where a ship is drawn before it is built: the SOP it reads, the stages it must build, and the standard it is held to'
@@ -204,13 +206,13 @@ export default function Harbours() {
   return (
     <div {...sectionProps('sizes')}>
       <SectionNav />
-      {harbour && !shipyard ? <DemitonTabs active="berth" /> : null}
+      {harbour && !shipyard ? <DemitonTabs active={harbour === DEMITON.key && sub !== 'berth' ? 'overview' : 'berth'} /> : null}
       {shipyard ? <DemitonTabs active="shipyard" /> : null}
       {home ? (
         <h1>The orbitals <span className="q">Demiton, our own orbital, and the trading orbital where every other lab and its ships reside</span></h1>
       ) : (
         <h1>
-          {harbour ? <><a className={crumbCls('back')} href={sectionName ? '/shipyard' : bandInfo ? `/orbitals/${encodeURIComponent(harbour)}` : shipyard ? '/orbitals/demiton' : '/orbitals'}>{sectionName ? '← shipyard' : bandInfo ? `← ${harbourTitle(data, harbour)}` : shipyard ? '← demiton' : '← orbitals'}</a> </> : null}
+          {harbour ? <><a className={crumbCls('back')} href={sectionName ? '/shipyard' : bandInfo ? `/orbitals/${encodeURIComponent(harbour)}` : shipyard || demitonBerth ? '/orbitals/demiton' : '/orbitals'}>{sectionName ? '← shipyard' : bandInfo ? `← ${harbourTitle(data, harbour)}` : shipyard || demitonBerth ? '← demiton' : '← orbitals'}</a> </> : null}
           {harbour === DEMITON.key ? <img className="flag" src="/flags/demiton.svg" alt="Demiton · Drake’s arms" title="Demiton · Drake’s arms" loading="lazy" /> : null}{' '}
           {title}{' '}
           <span className="q">{about}</span>

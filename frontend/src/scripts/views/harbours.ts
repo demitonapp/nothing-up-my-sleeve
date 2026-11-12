@@ -22,7 +22,7 @@ export const isOldHarbour = (k: string | null | undefined): boolean => String(k 
 
 export interface HarbourRoute {
   harbour: string | null;
-  sub: 'ships' | 'shipbuilder';
+  sub: 'ships' | 'shipbuilder' | 'berth';
   section: 'training' | 'fitting' | 'charting' | null;
   band: SizeBand | null;
 }
@@ -40,11 +40,11 @@ export const harbourRoute = (path: string): HarbourRoute => {
   // The orbitals' addresses: /orbitals/demiton, /orbitals/masaq-reach, and the old /harbours aliases. A
   // size band may sit directly after the harbour (/masaq-reach/xsmall) or after its ships view
   // (/masaq-reach/ships/xsmall), since the trading orbital's All ships view is its own page.
-  const m = /^\/(?:orbitals|harbours?)\/([^/]+)(?:\/(ships|shipbuilder)(?:\/(xsmall|small|medium|large))?|\/(xsmall|small|medium|large))?/.exec(head);
+  const m = /^\/(?:orbitals|harbours?)\/([^/]+)(?:\/(ships|shipbuilder|berth)(?:\/(xsmall|small|medium|large))?|\/(xsmall|small|medium|large))?/.exec(head);
   if (!m) return { harbour: null, sub: 'ships', section: null, band: null };
   const rawBand = m[3] || m[4];
   const band = rawBand === 'xsmall' || rawBand === 'small' || rawBand === 'medium' || rawBand === 'large' ? (rawBand as SizeBand) : null;
-  return { harbour: harbourKey(decodeURIComponent(m[1])), sub: m[2] === 'shipbuilder' ? 'shipbuilder' : 'ships', section: null, band };
+  return { harbour: harbourKey(decodeURIComponent(m[1])), sub: m[2] === 'shipbuilder' ? 'shipbuilder' : m[2] === 'berth' ? 'berth' : 'ships', section: null, band };
 };
 
 const shipRuns = (ladder: Payload, preset: string): any[] =>
@@ -248,19 +248,38 @@ export function candidateCardsHtml(cands: any[], band: SizeBand, read: any[]): s
 /** Demiton, our own orbital: its two berths and every rung we build, from the 300k to the 350m. The two
  *  berth pages (Schi'mint's training ring and Vavatch End's deep yards) stay reachable from the links; the
  *  blocks beneath them are the same harbour pages' own ship lists, so the fleet is not written twice. */
-export function demitonShipsHtml(ladder: Payload): string {
+export function demitonShipsHtml(ladder: Payload, view: 'overview' | 'berth' = 'overview'): string {
   const hs = (ladder && ladder.harbours) || [];
   const berths = ['schimint', 'vavatch-end'].map((k) => hs.find((x: any) => x.key === k)).filter(Boolean);
-  const links = `<div class="harbourrules" style="grid-column:1/-1"><div class="k">Demiton's yards <span class="s">the shipyard that draws a ship, and the two rings our fleet is built and sailed from</span></div>
-    <div class="hrule"><b>The shipyard</b> <a href="/shipyard">where a ship is drawn before it is built: the SOP it reads, the stages it must build, and the standard it is held to</a></div>
+  // The four sections as image cards (12 November, Justin: "this page should rather have fal images for its
+  // four sections: Berth, Shipyard, Library, Expeditions ... to allow the user to navigate"). The berth has its
+  // own page (/orbitals/demiton/berth, the fleet); the other three open theirs.
+  const sections: [string, string, string, string][] = [
+    ['Berth', 'the two rings our fleet is built and sailed from, and every ship of it', '/orbitals/demiton/berth', 'demiton-berth'],
+    ['Shipyard', 'where a ship is drawn before it is built: the SOP it reads, the stages it must build, and the standard it is held to', '/shipyard', 'demiton-shipyard'],
+    ['Library', 'the books and sources our ships read, and what each one holds', '/library', 'demiton-library'],
+    ['Expeditions', 'the voyages we send out: what is queued, what is running and what came back', '/expeditions', 'demiton-expeditions'],
+  ];
+  const links = `<div class="harbours shipyardgrid demitonyard" style="grid-column:1/-1">${sections.map(([name, about, href, art], i) =>
+    `<a class="${cardCls(true, 'card harbourcard shipyardcard')}" href="${esc(href)}">${artImg(art, 'cardart ship')}
+      <div class="yardplate">
+        <span class="yardnum">${String(i + 1).padStart(2, '0')}</span>
+        <span class="yardrule" aria-hidden="true"></span>
+        <span class="nm">${esc(name)}</span>
+        <span class="job">${esc(about)}</span>
+        <span class="yardopen">open the ${esc(name.toLowerCase())} →</span>
+      </div></a>`).join('')}</div>`;
+  // the overview is the four cards alone; the berth is its own page: the two rings and every ship of the fleet
+  if (view === 'overview') return links;
+  const rings = `<div class="harbourrules" style="grid-column:1/-1"><div class="k">The berths <span class="s">the two rings our fleet is built and sailed from</span></div>
     <div class="hrule"><b>The berths</b> ${berths.map((h: any) => `<a href="/orbitals/${encodeURIComponent(h.key)}">${esc(h.name)} · ${esc(h.aka)}</a>`).join(' · ') || 'the training ring and the deep yards'}</div></div>`;
-  return links + berths.map((h: any) => harbourShipsHtml(ladder, h.key)).join('');
+  return rings + berths.map((h: any) => harbourShipsHtml(ladder, h.key)).join('');
 }
 
 /** One harbour: its depth and every size's draught against it, then its ships, the ones fitting out and
  *  (in the foreign-only Masaq' Reach) the three size bands or the outside models in one of them. */
-export function harbourShipsHtml(ladder: Payload, key: string, band: SizeBand | null = null): string {
-  if (key === DEMITON.key) return demitonShipsHtml(ladder);
+export function harbourShipsHtml(ladder: Payload, key: string, band: SizeBand | null = null, sub = ''): string {
+  if (key === DEMITON.key) return demitonShipsHtml(ladder, sub === 'berth' ? 'berth' : 'overview');
   const hs = (ladder && ladder.harbours) || [];
   const h = hs.find((x: any) => x.key === key);
   if (!h) return `<div class="${emptyCls()}">no harbour called ${esc(key)}${hs.length ? `: ${hs.map((x: any) => esc(x.name)).join(', ')}` : ''}</div>`;

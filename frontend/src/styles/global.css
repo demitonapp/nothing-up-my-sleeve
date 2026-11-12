@@ -1624,7 +1624,7 @@ button[aria-busy="true"] { cursor: progress; opacity: .7; }
 .shipyardgrid .shipyardcard .nm { font-size: clamp(1.5rem, 2.2vw, 2.2rem); }
 .shipyardgrid .shipyardcard .job { font-size: var(--fs-md); line-height: 1.55; }
 @media (max-width: 1000px) {
-  .cards.shipyardgrid, .harbours.shipyardgrid { grid-template-columns: 1fr; }
+  .cards.shipyardgrid, .harbours.shipyardgrid, .harbours.demitonyard { grid-template-columns: 1fr; }
   .shipyardgrid .shipyardcard { min-height: 0; }
 }
 
@@ -1640,6 +1640,8 @@ button[aria-busy="true"] { cursor: progress; opacity: .7; }
 .sophead { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
 .sophead b { font-size: var(--fs-md); }
 .sopgoals { margin: 4px 0 0; padding-left: 18px; line-height: 1.5; }
+.harbours.demitonyard { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.demitonyard .shipyardcard { min-height: 0; }
 .sopgoals li { margin-bottom: 4px; }
 /* the line beneath the cards in play: which open expedition shares the grid, and what its card opens */
 .sopnote { max-width: 680px; margin: -6px 0 20px; color: var(--muted); font-size: var(--fs-sm); }

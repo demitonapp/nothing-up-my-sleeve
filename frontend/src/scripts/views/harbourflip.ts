@@ -3,7 +3,10 @@
 // turned over and which of the five views each shows. `applyHarbourFlips` repaints that state onto freshly
 // written cards; `wireHarbourFlip` is one delegated listener on the cards' container.
 
-import { HARBOUR_VIEWS } from './harbours';
+import { DEMITON, DEMITON_VIEWS, HARBOUR_VIEWS } from './harbours';
+
+/** A card's five views: Demiton's own list, or its harbour's. */
+const viewsOf = (key: string) => (key === DEMITON.key ? DEMITON_VIEWS : HARBOUR_VIEWS[key]);
 
 interface FlipState { on: boolean; view: number }
 const state = new Map<string, FlipState>();
@@ -20,7 +23,7 @@ const load = (img: HTMLImageElement | null): void => {
 /** Paint one card from its kept state: turned or not, which view, which images are fetched. */
 function paint(card: HTMLElement): void {
   const key = card.dataset.harbour || '';
-  const views = HARBOUR_VIEWS[key];
+  const views = viewsOf(key);
   if (!views) return;
   const s = get(key);
   const front = card.querySelector<HTMLElement>('.hfront');
@@ -96,7 +99,7 @@ export function wireHarbourFlip(root: HTMLElement): () => void {
     const s = get(key);
     if (e.key === 'Escape' && s.on) { s.on = false; paint(card); card.querySelector<HTMLElement>('[data-hflip]')?.focus(); return; }
     if (!s.on || (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft')) return;
-    const n = (HARBOUR_VIEWS[key] || []).length;
+    const n = (viewsOf(key) || []).length;
     if (!n) return;
     e.preventDefault();
     s.view = (s.view + (e.key === 'ArrowRight' ? 1 : n - 1)) % n;

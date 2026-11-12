@@ -639,8 +639,26 @@ EMBEDDINGS: dict[str, str] = {
     "wax beside them, exact copying checked letter for letter",
 }
 
-SIZES = {**{k: "landscape_16_9" for k in (*CLASSES, *TESTS, *LABS, *HARBOURS, *HARBOUR_VIEWS, *SHIPBUILDER, *SHIPYARD, *SHIPYARD_SECTIONS, *CHARTING, *POSITIONS, *FOREIGN, *SOP_GOALS, *EXPEDITIONS, *BANDS, *LADDER, *CONSOLE, *EMBEDDINGS)}, **{k: "portrait_4_3" for k in CARDS}, **{k: "portrait_4_3" for k in LOGIC}}
-SUBJECTS = {**TESTS, **LABS, **CLASSES, **HARBOURS, **HARBOUR_VIEWS, **SHIPBUILDER, **SHIPYARD, **SHIPYARD_SECTIONS, **CHARTING, **POSITIONS, **FOREIGN, **CARDS, **LOGIC, **SOP_GOALS, **EXPEDITIONS, **BANDS, **LADDER, **CONSOLE, **EMBEDDINGS}
+# Demiton's four sections as image cards (12 November, Justin: "this page /orbitals/demiton should rather
+# have fal images for its four sections: Berth, Shipyard, Library, Expeditions ... to allow the user to
+# navigate"). Named demiton-<section>; the frontend lists them in DEMITON_SECTIONS (views/harbours.ts).
+DEMITON_SECTIONS: dict[str, str] = {
+    "demiton-berth": "a fitting-out berth along the inner rim of an Orbital at night: small and great wooden "
+    "hulls of every size lying side by side on cradles and at moorings, lanterns at each bow, riggers in the "
+    "masts, a harbour-master with a ledger on the quay, the curved lit bands of the ring overhead",
+    "demiton-shipyard": "a drafting loft above a working shipyard at night: a great table spread with hull "
+    "plans and a ship's lines, brass dividers and a model hull, through a wide window the half-built keel on "
+    "the stocks below with scaffolding and lanterns, a small silver drone perched on the plans",
+    "demiton-library": "a vaulted ship's library at night: towering shelves of folios and rolled charts "
+    "climbing into shadow, a scholar on a rolling ladder with a lantern, a reading desk with an open book "
+    "and a brass armillary sphere, a small silver drone resting on a shelf, one lamp throwing hard shadows",
+    "demiton-expeditions": "a ship's company at the foot of a gangway at night about to sail: the captain "
+    "unrolling a chart of unnamed coasts on a cask-head, sailors loading the last stores by lantern, a great "
+    "galleon behind them with sails loosed, black water ahead and a thin ring of light in the sky",
+}
+
+SIZES = {**{k: "landscape_16_9" for k in (*DEMITON_SECTIONS, *CLASSES,*TESTS, *LABS, *HARBOURS, *HARBOUR_VIEWS, *SHIPBUILDER, *SHIPYARD, *SHIPYARD_SECTIONS, *CHARTING, *POSITIONS, *FOREIGN, *SOP_GOALS, *EXPEDITIONS, *BANDS, *LADDER, *CONSOLE, *EMBEDDINGS)}, **{k: "portrait_4_3" for k in CARDS}, **{k: "portrait_4_3" for k in LOGIC}}
+SUBJECTS = {**DEMITON_SECTIONS, **TESTS, **LABS, **CLASSES, **HARBOURS, **HARBOUR_VIEWS, **SHIPBUILDER, **SHIPYARD, **SHIPYARD_SECTIONS, **CHARTING, **POSITIONS, **FOREIGN, **CARDS, **LOGIC, **SOP_GOALS, **EXPEDITIONS, **BANDS, **LADDER, **CONSOLE, **EMBEDDINGS}
 
 # The twenty subjects the audit found outside the brief (ships/reports/art-audit-2026-11-11.md): rewritten
 # into the three-layer world -- Risso's ink, Drake's voyages, the young Culture's universe -- keeping what

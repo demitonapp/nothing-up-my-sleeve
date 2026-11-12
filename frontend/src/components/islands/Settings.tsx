@@ -1,7 +1,8 @@
 // Settings (/settings, the cog in the header; /api/settings, thorp/dash/settings.py): what the dashboard
 // runs on, one tab per part — Storage, The store, Server and machine, Cost, Switches, Keys and places — each at
 // its own address (/settings/store …) so a tab survives a refresh and can be linked to. Read-only except
-// the store's edit form. Each part is read on its own server-side, so one that failed says why and the
+// the store's edit form and the Server tab's Seats and resources (13 November, Justin: "Move controls, delete":
+// the lane seats, the Vast key and the compute caps moved here from the shipyard's constraints page, which is gone). Each part is read on its own server-side, so one that failed says why and the
 // rest still stands.
 
 import { useEffect, useState } from 'react';
@@ -12,6 +13,8 @@ import { VastPanel } from './VastStats';
 import type { Vast } from './VastStats';
 import { VastTimings } from './VastTimings';
 import { CostTab } from './CostTab';
+import YardConstraints from './YardConstraints';
+import ComputeResources from './ComputeResources';
 import type { Charters } from './VastTimings';
 import { cardCls, btnCls, emptyCls, pillCls } from '@/lib/ui';
 import { routePath, sectionProps, useApi, useRoute } from '@/lib/useApi';
@@ -98,7 +101,7 @@ export default function Settings() {
   const [fresh, setFresh] = useState(0);
   const [perfRange, setPerfRange] = useState<PerfRange>('24h');
   // the Server tab's two machines: this Mac (the performance chart and its facts) and the Vast lane
-  const [machine, setMachine] = useState<'mac' | 'vast'>('mac');
+  const [machine, setMachine] = useState<'mac' | 'vast' | 'seats'>('mac');
   const [storeEdit, setStoreEdit] = useState(false);
   const [storeMode, setStoreMode] = useState<'local' | 'hosted'>('local');
   const [hostedUrl, setHostedUrl] = useState('');
@@ -126,7 +129,7 @@ export default function Settings() {
 
   return (
     <div {...sectionProps('settings')}>
-      <h1>Settings <span className="q">what this dashboard runs on, one tab per part: the disk and what is kept on it, the store, the server and its machine, what the hired GPUs cost, the switches, and the keys and places. Only the store can be changed here; each part says where it is set</span></h1>
+      <h1>Settings <span className="q">what this dashboard runs on, one tab per part: the disk and what is kept on it, the store, the server and its machine, what the hired GPUs cost, the switches, and the keys and places. The store, the lane seats, the Vast key and the compute caps can be changed here; each other part says where it is set</span></h1>
 
       <TabNav
         id="setnav"
@@ -312,6 +315,7 @@ export default function Settings() {
                   items={[
                     { key: 'mac', label: 'Mac mini', active: machine === 'mac', onClick: () => setMachine('mac') },
                     { key: 'vast', label: 'Vast', active: machine === 'vast', onClick: () => setMachine('vast') },
+                    { key: 'seats', label: 'Seats and resources', active: machine === 'seats', onClick: () => setMachine('seats') },
                   ]}
                 />
                 {machine === 'mac' ? (
@@ -330,10 +334,16 @@ export default function Settings() {
                           <dt>machine</dt><dd>{sv.chip}<div className="s">{sv.cores ? `${sv.cores} CPU cores · ` : ''}{sv.gpu_cores ? `${sv.gpu_cores} GPU cores · ` : ''}{sv.memory ? `${Math.round(sv.memory / 2 ** 30)} GB memory · ` : ''}{sv.platform}</div></dd>
                           <dt>lanes</dt><dd>{d.lanes?.error ? <span className="s">{d.lanes.error}</span> : (d.lanes?.lanes || []).map((l) => (
                             <div key={l.lane}><b>{l.lane}</b>: {l.seats} seat{l.seats === 1 ? '' : 's'} <span className="s">{l.out ? `· ${l.out} at sea` : '· in port'}</span></div>
-                          ))}<div className="s">set on the <a href="/expeditions/queue">queue</a></div></dd>
+                          ))}<div className="s">set under <a href="/settings/server">Seats and resources</a>; the queue itself is on <a href="/expeditions/queue">Expeditions, Queue</a></div></dd>
                         </dl>
                       )}
                     </section>
+                  </>
+                ) : machine === 'seats' ? (
+                  <>
+                    <p className="note labnote">Where the yard's compute is set: how many voyages each lane runs at once, the Vast.ai key (never shown back), and each resource's daily and weekly caps. The coordinator and the charter read these rows, so a change takes effect without a restart.</p>
+                    <YardConstraints />
+                    <ComputeResources />
                   </>
                 ) : (
                   <>

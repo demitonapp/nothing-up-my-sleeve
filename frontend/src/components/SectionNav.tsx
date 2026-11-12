@@ -1,7 +1,6 @@
 // The section tabs under the header, for a client island. It reads the live address itself, so an
 // island that pushes a new path (the size page's canonical address, a discoveries tab, an expedition
-// tab) gets the right row and the right active tab without every page wiring it by hand. The static
-// pages use SectionTabs.astro instead (UI.md, "Navigation").
+// tab) gets the right row and the right active tab without every page wiring it by hand.
 import { useEffect, useState } from 'react';
 import { routePath } from '@/lib/useApi';
 import { sectionNavFor } from '@/lib/nav';

@@ -382,8 +382,6 @@ export const RUNG_ART: Record<string, string> = {
 export function shipyardCardsHtml(): string {
   const cards: [string, string, string, string][] = [
     ['berth', 'Berth', 'the two rings our fleet is built and sailed from, and every ship of it', 'demiton-berth'],
-    ['hulls', 'Hull sizes', "each rung's layers, width, heads and head width: the shape a ship is built to, set in Postgres", 'hulls'],
-    ['constraints', 'The yard’s constraints', 'the slipways, the tide, the clerk and the survey dock: the limits on how many voyages the yard can launch, and the levers that move them', 'shipyard'],
   ];
   // the yard's cards are brass plates on a dark ground: a numeral, the name, a hairline rule, the job
   return cards.map(([key, name, about, art], i) => `<a class="${cardCls(true, 'card harbourcard shipyardcard')}" href="/shipyard/${key}">${artImg(art, 'cardart ship')}

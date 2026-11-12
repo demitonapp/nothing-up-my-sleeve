@@ -59,7 +59,7 @@ export const DESTINATIONS: Dest[] = [
   { group: 'The site', label: 'Settings', href: '/settings', note: 'storage, the store, the server and the switches' },
   { group: 'The site', label: 'The bet', href: '/bet' },
 
-  { group: 'Demiton', label: 'Shipyard', href: '/shipyard', note: 'the berth, the SOP, the hull sizes and the standard' },
+  { group: 'Demiton', label: 'Shipyard', href: '/shipyard', note: 'the berth, where the fleet lies' },
   { group: 'Demiton', label: 'Berth', href: '/shipyard/berth', note: 'in the Shipyard: the two rings and every ship of the fleet' },
   { group: 'Demiton', label: 'Library', href: '/library', note: 'the books and sources our ships read' },
   { group: 'Demiton', label: 'Library images', href: '/library/images', note: 'the plates and illustrations' },

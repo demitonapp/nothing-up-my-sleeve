@@ -1971,19 +1971,6 @@ details.paststandards[open] > summary { margin-bottom: 0; }
 #queuetable td:nth-child(2) { max-width: 620px; }
 #queuetable td:nth-child(2) .s { white-space: normal; }
 
-/* the yard's constraints: a shipwright's table of the throughput levers (10 November) */
-.yardtable { width: 100%; }
-.yardtable th { white-space: nowrap; }
-.yardtable td { vertical-align: top; }
-.yardtable td:nth-child(2) { min-width: 240px; }
-
-/* the constraints page: the title is a page title, the long metaphor a quiet subtitle */
-.yardtitle { margin: 10px 0 16px; font-size: var(--fs-2xl); font-weight: 600; letter-spacing: .01em; }
-.yardtitle .q { display: block; max-width: 1100px; margin-top: 8px; font-size: var(--fs-md); font-weight: 400; line-height: 1.5; color: var(--muted); }
-.yardtable { font-size: var(--fs-md); }
-.yardtable th, .yardtable td { padding: 6px 9px; }
-.yardtable td:nth-child(2) { min-width: 250px; }
-
 /* the road's two blocks per waypoint: the floor and the climb (10 November) */
 .chipgroup { display: flex; align-items: flex-start; gap: 8px; margin-top: 4px; }
 .chiplabel { flex: 0 0 62px; padding-top: 3px; font-size: 10px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }

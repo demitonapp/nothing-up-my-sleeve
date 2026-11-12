@@ -57,7 +57,7 @@ export function VastPanel({ vast }: { vast: Vast }) {
       {d.error ? <div className={emptyCls()}>the Vast.ai figures could not be read: {d.error}</div> : (
         <>
           <div className="strip">
-            <Stat k="the key" v={d.key ? 'set' : 'not set'} s={d.key ? <a href="/shipyard/constraints">set on the constraints page</a> : 'the charter cannot hire without it'} />
+            <Stat k="the key" v={d.key ? 'set' : 'not set'} s={d.key ? <a href="/settings/server">set under Seats and resources</a> : 'the charter cannot hire without it'} />
             <Stat k="seats" v={String(d.seats)} s="one instance a seat" />
             <Stat k="the week" v={money(d.week.spent)} s={`of ${money(d.week.budget)} · Monday to Sunday, UTC`} />
             <Stat k="all time" v={money(d.totals.spent)} s={`${d.totals.hires} voyage${d.totals.hires === 1 ? '' : 's'} · ${d.totals.hours} h at sea`} />
@@ -101,7 +101,7 @@ export function VastPanel({ vast }: { vast: Vast }) {
               </tbody>
             </table>
           </div>
-          <p className="note mt">A read is the cheapest offer the last charter quote found for the class, kept whenever a voyage is priced; a voyage is a hire in the spend log, its hours from the hire to the release and its rate the tokens a second that voyage measured. As of {when(d.at)}. The key and the seats are set on <a href="/shipyard/constraints">the shipyard's constraints page</a>.</p>
+          <p className="note mt">A read is the cheapest offer the last charter quote found for the class, kept whenever a voyage is priced; a voyage is a hire in the spend log, its hours from the hire to the release and its rate the tokens a second that voyage measured. As of {when(d.at)}. The key and the seats are set on <a href="/settings/server">Settings, Server and machine, under Seats and resources</a>.</p>
         </>
       )}
     </section>

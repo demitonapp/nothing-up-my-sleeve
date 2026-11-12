@@ -2057,6 +2057,13 @@ ol.goaltext { padding-left: 22px; }
 .rt-h[data-l="4"] { font-size: .96em; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
 .rt-list { margin: .4em 0 .9em; padding-left: 1.3em; }
 .rt-list li { margin: .2em 0; }
+.rt-hr { margin: 1em 0; border: 0; border-top: 1px solid var(--line); }
+.rt-tablewrap { margin: .6em 0 .9em; max-width: 100%; overflow-x: auto; border: 1px solid var(--line); border-radius: 4px; }
+.rt-table { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); line-height: 1.45; }
+.rt-table th { padding: 6px 10px; text-align: left; font-weight: 600; color: var(--muted); font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .05em; background: var(--raise); border-bottom: 1px solid var(--line); white-space: nowrap; }
+.rt-table td { padding: 6px 10px; vertical-align: top; border-top: 1px solid var(--line); }
+.rt-table tr:first-child td { border-top: 0; }
+.rt-table td .rt-code { white-space: nowrap; }
 .rt-bq { margin: .6em 0; padding-left: .8em; border-left: 2px solid var(--line); color: var(--muted); }
 .rt-pre { margin: .6em 0; padding: 8px 10px; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--raise); border: 1px solid var(--line); border-radius: 4px; font-size: var(--fs-sm); }
 .rt-code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9em; background: var(--raise); border-radius: 3px; padding: .05em .3em; }

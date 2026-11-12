@@ -15,16 +15,54 @@
 import { Fragment, type ReactNode } from 'react';
 
 const HEADINGS: Record<string, number> = { h1: 1, h2: 2, h3: 3, h4: 4 };
-const BLOCK = new Set(['h1', 'h2', 'h3', 'h4', 'p', 'blockquote', 'pre', 'ul', 'ol', 'li', 'br']);
+const TABLE = new Set(['table', 'thead', 'tbody', 'tr', 'th', 'td']);
+const BLOCK = new Set(['h1', 'h2', 'h3', 'h4', 'p', 'blockquote', 'pre', 'ul', 'ol', 'li', 'br', 'hr', ...TABLE]);
 const ALLOWED = new Set([
   ...BLOCK,
   'strong', 'b', 'em', 'i', 'code', 'span', 'div',
 ]);
+const VOID = new Set(['br', 'hr']);
 // a block that already carries block-level structure is not wrapped in a <p> again
-const BLOCKISH = /<(?:h[1-4]|p|div|ul|ol|pre|blockquote|li)\b/i;
+const BLOCKISH = /<(?:h[1-4]|p|div|ul|ol|pre|blockquote|li|hr|table)\b/i;
 
 type El = { tag: string; kids: Node[] };
 type Node = string | El;
+
+// a table's separator row: `|---|:---:|---|`, the pipes at the ends optional, at least one dash a cell
+const TABLE_RULE = /^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)+\|?\s*$|^\s*\|\s*:?-+:?\s*\|\s*$/;
+const isRow = (line: string): boolean => /^\s*\|.*\|\s*$/.test(line) || (line.includes('|') && line.trim().split('|').length > 2);
+const cells = (line: string): string[] => {
+  let s = line.trim();
+  if (s.startsWith('|')) s = s.slice(1);
+  if (s.endsWith('|') && !s.endsWith('\\|')) s = s.slice(0, -1);
+  return s.split(/(?<!\\)\|/).map((c) => c.trim().replace(/\\\|/g, '|'));
+};
+
+/** GitHub tables (12 November, Justin: "can you fix the markdown table rendering"): a header row, a
+ *  separator of dashes, then body rows, folded into the whitelist's own table tags. A model's table arrived
+ *  as rows of pipes. Alignment colons are read and dropped (no attribute survives the whitelist); a row
+ *  shorter than the header is padded, a longer one keeps its extra cells. */
+function foldTables(src: string): string {
+  const lines = src.split('\n');
+  const out: string[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (isRow(lines[i]) && i + 1 < lines.length && TABLE_RULE.test(lines[i + 1])) {
+      const head = cells(lines[i]);
+      const body: string[][] = [];
+      let j = i + 2;
+      while (j < lines.length && isRow(lines[j]) && !TABLE_RULE.test(lines[j])) body.push(cells(lines[j++]));
+      const row = (cs: string[], tag: 'th' | 'td'): string => {
+        const padded = cs.length < head.length ? [...cs, ...Array(head.length - cs.length).fill('')] : cs;
+        return `<tr>${padded.map((c) => `<${tag}>${c}</${tag}>`).join('')}</tr>`;
+      };
+      out.push(`<table><thead>${row(head, 'th')}</thead><tbody>${body.map((r) => row(r, 'td')).join('')}</tbody></table>`);
+      i = j - 1;
+      continue;
+    }
+    out.push(lines[i]);
+  }
+  return out.join('\n');
+}
 
 /** `- item` and `* item` runs become one list, numbered lines an ordered one; folded first, so a bullet
  *  is never read as *italic*. */
@@ -55,7 +93,9 @@ function foldLists(src: string): string {
 }
 
 function foldMarkdown(src: string): string {
-  return foldLists(src)
+  // tables first, so a row's pipes are never read as anything else; then a `---` line is a rule, before the
+  // lists, so it is never read as a bullet
+  return foldLists(foldTables(src).replace(/^[ \t]*(?:-{3,}|\*{3,}|_{3,})[ \t]*$/gm, '<hr>'))
     .replace(/^[ \t]*#{1,4}[ \t]+(.+?)[ \t]*$/gm, (_, t: string) => `<h4>${t}</h4>`)
     .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
     .replace(/(^|[\s(])\*([^*\n]+)\*/g, '$1<em>$2</em>')
@@ -82,7 +122,7 @@ function tokenize(src: string): Node[] {
       if (at > 0) stack.length = at; // close the nearest matching open, and anything inside it
       continue;
     }
-    if (tag === 'br' || /\/>$/.test(m[0])) {
+    if (VOID.has(tag) || /\/>$/.test(m[0])) {
       stack[stack.length - 1].kids.push({ tag, kids: [] });
       continue;
     }
@@ -129,7 +169,8 @@ function renderNodes(nodes: Node[], key: string): ReactNode[] {
 
 function renderEl(el: El, key: string): ReactNode {
   // a list's whitespace between items is layout, not content: it must not become a <br>
-  const inList = el.tag === 'ul' || el.tag === 'ol' || el.tag === 'li';
+  // (and a table's whitespace between rows and cells, which React would warn about inside <tr>)
+  const inList = el.tag === 'ul' || el.tag === 'ol' || el.tag === 'li' || (TABLE.has(el.tag) && el.tag !== 'th' && el.tag !== 'td');
   const kids = renderNodes(
     inList ? el.kids.filter((k) => typeof k !== 'string' || k.trim() !== '') : el.kids,
     key,
@@ -152,6 +193,14 @@ function renderEl(el: El, key: string): ReactNode {
     case 'ul': return <ul className="rt-list" key={key}>{kids}</ul>;
     case 'ol': return <ol className="rt-list" key={key}>{kids}</ol>;
     case 'li': return <li key={key}>{kids}</li>;
+    case 'hr': return <hr className="rt-hr" key={key} />;
+    // a table scrolls inside its own frame, so a wide one never widens the chat
+    case 'table': return <div className="rt-tablewrap" key={key}><table className="rt-table">{kids}</table></div>;
+    case 'thead': return <thead key={key}>{kids}</thead>;
+    case 'tbody': return <tbody key={key}>{kids}</tbody>;
+    case 'tr': return <tr key={key}>{kids}</tr>;
+    case 'th': return <th key={key}>{kids}</th>;
+    case 'td': return <td key={key}>{kids}</td>;
     default: return <span key={key}>{kids}</span>;
   }
 }

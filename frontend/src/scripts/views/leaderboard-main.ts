@@ -193,6 +193,20 @@ export function candidatesHtml(cands: any[], sizeClass: string): { head: string;
  *  evaluation set), and Nothing up my sleeve's own reading once the Kipling ARC arm has one. It is a
  *  separate panel because ARC percentages and chaining lift are different scales, not two columns of
  *  one table. */
+/** One Face's own board (13 November): the reference, then the fleet's classes, ranked by that Face's value. */
+export function faceBoardHtml(f: any, key: string, rungs: Rung[]): { head: string; body: string } {
+  const cols: Record<string, string> = { nevermore: 'copy gain', counter: 'sentence-position R²', scales: 'order gain', mover: 'one-hop lift' };
+  const mark = (f.marks || {})[key];
+  const state = (v: number | undefined, held: boolean, near: boolean): string => (v == null ? '<span class="s">–</span>' : `<b class="${held ? 'good' : near ? 'accent' : ''}">${v.toFixed(3)}</b> <span class="s">${held ? '✓ held' : near ? '≈ near the mark' : 'below the mark'}</span>`);
+  const head = `<tr><th>#</th><th>model</th><th>${cols[key] || key} <span class="s">mark ${mark}</span></th><th>the run</th></tr>`;
+  const rows: { cls: string; name: string; v: number | undefined; held: boolean; near: boolean; from: string }[] = [
+    ...(f.reference || []).map((r: any) => ({ cls: 'lb-outside', name: `<a href="/leaderboard/competitor/${encodeURIComponent(r.model)}"><b>${esc(r.label)}</b></a> <span class="${pillCls('blue')}">2–4B</span><div class="s">the reference</div>`, v: r.values?.[key], held: (r.held || []).includes(key), near: (r.near || []).includes(key), from: '' })),
+    ...(f.fleet || []).map((r: any) => ({ cls: 'lb-thorp', name: `${classLink(rungs, r.preset)}<div class="s">best of its ships</div>`, v: r.values?.[key], held: (r.held || []).includes(key), near: (r.near || []).includes(key), from: r.from?.[key] || '' })),
+  ].sort((a, b) => (b.v ?? -Infinity) - (a.v ?? -Infinity));
+  const body = rows.map((r, i) => `<tr class="${r.cls}"><td>${r.v == null ? '–' : i + 1}</td><td>${r.name}</td><td>${state(r.v, r.held, r.near)}</td><td class="s">${esc(r.from)}</td></tr>`).join('')
+    || `<tr><td colspan="4" class="${emptyCls(true)}">no reading of this Face yet</td></tr>`;
+  return { head, body };
+}
 export function reasoningHtml(r: any): { head: string; body: string; count: string } {
   const head = '<tr><th>model</th><th>ARC-AGI-2 <span class="s">pass@2</span></th><th>the reading</th></tr>';
   const published = (r?.published || []).map((x: any) => `<tr class="lb-outside"><td><b>${esc(x.label)}</b><div class="s">${esc(x.model)}</div></td>

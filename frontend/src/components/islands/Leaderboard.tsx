@@ -8,11 +8,15 @@
 
 import { useEffect, useState } from 'react';
 import { cardCls, checkCls, crumbCls, emptyCls, selectCls } from '@/lib/ui';
+import { esc } from '@/lib/format';
 import { TabNav } from '@/components/TabNav';
+import { TestCard } from '@/components/TestCard';
 import { StepsBoard } from '@/components/islands/StepsBoard';
-import { BenchBoard } from '@/components/islands/BenchBoard';
+import { CategoryCards } from '@/components/islands/CategoryCards';
+import { CATEGORY_FACE, TEST_ALIASES, TEST_CATEGORIES } from '@/lib/testCategories';
 import { sectionProps, useApi } from '@/lib/useApi';
-import { bandCardsHtml, boardHtml, candidatesHtml, drawSmokingChart, facesHtml, reasoningHtml, runsHtml, smokingHtml } from '@/scripts/views/leaderboard-main';
+import { bandCardsHtml, boardHtml, candidatesHtml, drawSmokingChart, facesHtml, runsHtml, smokingHtml } from '@/scripts/views/leaderboard-main';
+import { arcAi2Html, ifevalHtml } from '@/scripts/views/leaderboard-steps';
 import { BAND, BANDS, bandOf, sizeOf, type SizeBand } from '@/scripts/views/bands';
 
 export default function Leaderboard({ band }: { band?: SizeBand }) {
@@ -50,9 +54,27 @@ export default function Leaderboard({ band }: { band?: SizeBand }) {
   const boardData = lb.data ? { ...lb.data, table: measured.map((r: any) => ({ ...r, size_class: sizeTab })) } : null;
   const board = boardData ? boardHtml(boardData, sq.data || {}, rungs, showFc, showPy, sizeTab) : null;
   const candidate = lb.data ? candidatesHtml(cands, sizeTab) : null;
-  const reasoning = lb.data?.reasoning ? reasoningHtml(lb.data.reasoning) : null;
   const faces = lb.data?.faces ? facesHtml(lb.data.faces, rungs) : null;
   const smoking = sq.data ? smokingHtml(sq.data) : null;
+  // the landing's boards: the chaining board is the small class's (the only class with a reading);
+  // ARC and IFEval are read across every size the payload holds, with the size in their own column
+  const arcAll = lb.data ? arcAi2Html(lb.data, 'all') : null;
+  const ifevalAll = lb.data ? ifevalHtml(lb.data, 'all') : null;
+  const chainBest = (lb.data?.table || []).filter((r: any) => r.group === 'chaining').sort((a: any, b: any) => b.chaining_lift - a.chaining_lift)[0];
+  const chainStat = chainBest ? `<div class="sqp"><b class="good">${Number(chainBest.chaining_lift).toFixed(3)}</b><span>${esc(chainBest.name)}, the best chaining lift through the door</span></div>` : '';
+  const arcLead = arcAll?.lead || '';
+  const ifevalLead = ifevalAll?.lead || '';
+  const publishedLead = (lb.data?.reasoning?.published || [])[0];
+  const reasonStat = publishedLead ? `<div class="sqp"><b>${Number(publishedLead.score).toFixed(1)}</b><span>${esc(publishedLead.label)}, the published lead; our ARC arm is a pilot</span></div>` : '';
+  const faceReference = (lb.data?.faces?.reference || [])[0];
+  const faceFleet = [...(lb.data?.faces?.fleet || [])].sort((a: any, b: any) => (b.held || []).length - (a.held || []).length)[0];
+  const facesStat = faceReference ? `<div class="sqp"><b>${(faceFleet?.held || []).length} of 4</b><span>${esc(faceFleet?.name || 'our fleet')} holds the most of ours; ${esc(faceReference.label)} holds ${(faceReference.held || []).length} of 4</span></div>` : '';
+  // a category is its own page now (13 November): the landing's old ?test=knowledge addresses forward to it
+  useEffect(() => {
+    if (band) return;
+    const k = new URLSearchParams(window.location.search).get('test');
+    if (k) window.location.replace(`/leaderboard/${TEST_ALIASES[k] || k}`);
+  }, [band]);
 
   useEffect(() => {
     if (!band && sq.data) void drawSmokingChart(sq.data);
@@ -77,16 +99,13 @@ export default function Leaderboard({ band }: { band?: SizeBand }) {
         </>
       ) : (
         <>
-          <h1>Leaderboard <span className="q">the chaining boards by size — extra small under 1B, small 1B to 4B, medium 4B to 32B, large above 32B: the models that chain, ranked by how well; those not chaining yet, ranked by how close; the canonical intelligence ranking, ARC-AGI-2; and the four Faces — the Nevermore, Counter, Scales and Mover — beside Qwen 3 4B. The method is under <a href="/discoveries/tests?test=chaining">Discoveries, Tests: chaining two facts</a></span></h1>
-          <div className="cards bandcards" dangerouslySetInnerHTML={{ __html: lb.data ? bandCardsHtml(lb.data) : '' }} />
+          <h1>Leaderboard <span className="q">one card a category of test — logic, knowledge, reasoning, instruction following, coding, agent, long context and the four Faces (abilities): open a card for its page, with every test in it and the leaderboard on each; the boards by size are folded at the foot. The method is under <a href="/discoveries/tests?test=chaining">Discoveries, Tests: chaining two facts</a></span></h1>
         </>
       )}
 
-      {byStepsBand && <StepsBoard lb={lb.data} error={lb.error} band={sizeTab} />}
-
-      {band && !byStepsBand && <>
-      <section className={cardCls(false, 'panel')}>
-        <h2>Chaining <span className="note">the models through the door, ranked by chaining lift (the mean lift on the four chaining tests): a lift that clears the noise (+0.03), a chaining gain above its noise ({lb.data?.steps?.gain_noise ?? 0.05}) and at least one test performed. {isSmall ? 'The small class is measured on the four chaining tests.' : measuredChaining ? 'This class is measured on the four chaining tests.' : sizeTab === 'medium' ? 'The medium class is the next goal, and has no chaining reading yet.' : `The ${sizeTab} class has no chaining reading yet.`}</span></h2>
+      {band && <CategoryCards lb={lb.data} error={lb.error} band={sizeTab} faces={faces} logicBack={byStepsBand ? undefined : <>
+      <div>
+        <h3 className="tbacktitle">Chaining <span className="note">the models through the door, ranked by chaining lift (the mean lift on the four chaining tests): a lift that clears the noise (+0.03), a chaining gain above its noise ({lb.data?.steps?.gain_noise ?? 0.05}) and at least one test performed. {isSmall ? 'The small class is measured on the four chaining tests.' : measuredChaining ? 'This class is measured on the four chaining tests.' : sizeTab === 'medium' ? 'The medium class is the next goal, and has no chaining reading yet.' : `The ${sizeTab} class has no chaining reading yet.`}</span></h3>
         {!lb.data ? (
           <div className={emptyCls()}>{lb.error ? `the leaderboard could not be read: ${lb.error}` : 'reading the leaderboard…'}</div>
         ) : isSmall ? (
@@ -120,12 +139,12 @@ export default function Leaderboard({ band }: { band?: SizeBand }) {
             <p className="note mt">The four chaining tests are the only public measure. A candidate is a target, not a result: it joins this board only when it has a chaining lift on those tests. The small class's readings stay on their own page.</p>
           </>
         )}
-      </section>
+      </div>
 
-      <section className={cardCls(false, 'panel')}>
-        <h2>{measuredChaining ? 'Approaching chaining' : `The ${cands.length} likeliest ${sizeTab} candidates`} <span className="note">{measuredChaining
+      <div>
+        <h3 className="tbacktitle">{measuredChaining ? 'Approaching chaining' : `The ${cands.length} likeliest ${sizeTab} candidates`} <span className="note">{measuredChaining
           ? "the closest to chaining: the cards every chainer holds, then following one premise. Models not through the door, including those whose tests pass with no chaining gain behind them, ranked by how many of the four necessary cards they hold, then by the logic deck's one-hop lift"
-          : `no ${sizeTab} model has a chaining reading yet; these are the targets to approach, most likely first`}</span></h2>
+          : `no ${sizeTab} model has a chaining reading yet; these are the targets to approach, most likely first`}</span></h3>
         {!lb.data ? null : measuredChaining ? (
           <>
             <div className="scroll">
@@ -147,33 +166,41 @@ export default function Leaderboard({ band }: { band?: SizeBand }) {
             <p className="note mt">The candidates are chosen on the evidence the board already has — the families that chain at 2–4B, the reasoning leaders of the open field, and one boundary case that fits a workstation — not on a chaining reading they do not have. Their order is a working order, not a result. The logic deck's gain and one-hop lift, where held, are the only evidence so far; the four chaining tests have not been run. A candidate enters the chaining board only when it has a chaining lift.</p>
           </>
         )}
-      </section>
+      </div>
 
-      {band === 'medium' && <BenchBoard band={sizeTab} />}
+      </>} />}
 
-      </>}
+      {byStepsBand && <StepsBoard lb={lb.data} error={lb.error} band={sizeTab} />}
 
       {!band && <>
-      <section className={cardCls(false, 'panel')}>
-        <h2>Reasoning <span className="note">the canonical intelligence ranking: ARC-AGI-2, pass@2 on the 120-task evaluation set. It is not comparable with the chaining lift — the chaining tests measure one skill on text, ARC-AGI-2 measures fluid intelligence on grids — so it stays a panel of its own. Published scores are the public leaderboard's, not our measurements; Nothing up my sleeve's reading is the Kipling ARC arm's.</span></h2>
-        <div className="scroll">
-          <table id="lbreasoning" data-nosort>
-            <thead dangerouslySetInnerHTML={{ __html: reasoning?.head || '' }} />
-            <tbody dangerouslySetInnerHTML={{ __html: reasoning?.body || '' }} />
-          </table>
-        </div>
-        <p className="note mt">{lb.data?.reasoning?.about || ''} The chaining board remains the near-term measure; ARC-AGI-2 is the north star the Kipling ARC arm is built towards (<a href="https://arcprize.org/arc-agi">ARC Prize</a>).</p>
-      </section>
-
-      <section className={cardCls(false, 'panel')}>
-        <h2>The four Faces <span className="note">the four Face cards' abilities — the Nevermore's copy gain, the Counter's sentence-position R², the Scales' order gain and the Mover's one-hop lift — beside Qwen 3 4B, the reference chainer. ✓ at the mark, ≈ within 10% of it; a class's cell names the run that gave its best in the title</span></h2>
-        <div className="scroll">
-          <table id="lbfaces" data-nosort>
-            <thead dangerouslySetInnerHTML={{ __html: faces?.head || '' }} />
-            <tbody dangerouslySetInnerHTML={{ __html: faces?.body || '' }} />
-          </table>
-        </div>
-        <p className="note mt">A Face is earned, not pinned: its ability passing is the card (the Nevermore predicts a repeated passage better the second time, the Counter reads how far into a sentence it is, the Scales orders the logic deck, the Mover follows one premise). The Mover is read by its one-hop ability, not its look: in Qwen 3 4B the head that scores highest on the Mover's look is a diffuse, sink-and-delimiter head, and the 300k's is its induction head, so the look is not the card. The fleet's row is each class's best ship for that Face (the run is in the cell's title); the reference is Qwen 3 4B, which itself holds two of the four by the marks and sits a hair under the Counter's.</p>
+      <section className={cardCls(false, 'panel')} id="lbtests">
+        <h2>The categories of test <span className="note">one card a category, with the tests we measure and the published tests beside them: open one for its own page, with every test in it as a card and the leaderboard on each. A published reading is Artificial Analysis's, never ours; the boards by size are folded at the foot of the page</span></h2>
+        {lb.data ? (
+          <div className="testcards">
+            {TEST_CATEGORIES.map((c) => {
+              const f = CATEGORY_FACE[c.key];
+              const stat = { logic: chainStat, knowledge: arcLead, reasoning: reasonStat, instruction: ifevalLead, abilities: facesStat }[c.key];
+              return (
+                <TestCard
+                  key={c.key}
+                  id={c.key}
+                  href={`/leaderboard/${c.key}`}
+                  art={f.art}
+                  plate={c.label}
+                  name={c.label}
+                  tag={f.tag}
+                  about={f.about}
+                  ours={c.ours}
+                  published={c.published}
+                  link={f.link}
+                  stat={stat}
+                />
+              );
+            })}
+          </div>
+        ) : (
+          <div className={emptyCls()}>{lb.error ? `the leaderboard could not be read: ${lb.error}` : 'reading the leaderboard…'}</div>
+        )}
       </section>
 
       <details className={cardCls(false, 'panel lbfold')} id="lbfoldsmoke" onToggle={(e) => { if (e.currentTarget.open && sq.data) void drawSmokingChart(sq.data); }}>
@@ -208,6 +235,11 @@ export default function Leaderboard({ band }: { band?: SizeBand }) {
             <tbody dangerouslySetInnerHTML={{ __html: runs?.body || '' }} />
           </table>
         </div>
+      </details>
+
+      <details className={cardCls(false, 'panel lbfold')} id="lbbands">
+        <summary><h2>The boards by size <span className="note">the full chaining board and the approach board for one class: extra small under 1B, small 1B–4B, medium 4B–32B, large above 32B</span></h2></summary>
+        <div className="cards bandcards" dangerouslySetInnerHTML={{ __html: lb.data ? bandCardsHtml(lb.data) : '' }} />
       </details>
       </>}
     </div>

@@ -9,13 +9,19 @@
 
 import type { ReactNode } from 'react';
 
-export function TestCard({ id, open, setOpen, art, plate, name, tag, about, link, stat, children }: {
-  id: string; open: string | null; setOpen: (v: string | null) => void; art?: string; plate?: string;
+export function TestCard({ id, open = null, setOpen, href, art, plate, name, tag, about, ours, published, pros, cons, link, stat, children }: {
+  id: string; open?: string | null; setOpen?: (v: string | null) => void; art?: string; plate?: string;
   name: string; tag: string; about: string; link: { href: string; label: string }; stat?: string;
-  children: ReactNode;
+  /** A leaderboard category's two lists (lib/testCategories.ts): what we measure, and the published tests beside it. */
+  ours?: string; published?: string;
+  /** What the test is good for and where it misleads (lib/testCatalog.ts), on the face of the card. */
+  pros?: string[]; cons?: string[];
+  /** A card that opens a page instead of turning over (the landing's categories, 13 November). */
+  href?: string;
+  children?: ReactNode;
 }) {
-  const on = open === id;
-  const turn = () => setOpen(on ? null : id);
+  const on = !href && open === id;
+  const turn = () => { if (href) window.location.assign(href); else setOpen?.(on ? null : id); };
   return (
     <div className={`tflip${on ? ' on' : ''}`} id={`test-${id}`}>
       <div className="tflip-inner">
@@ -23,8 +29,8 @@ export function TestCard({ id, open, setOpen, art, plate, name, tag, about, link
           className="tface tfront"
           role="button"
           tabIndex={on ? -1 : 0}
-          aria-pressed={on}
-          aria-label={`Turn the ${name} card over for its board`}
+          aria-pressed={href ? undefined : on}
+          aria-label={href ? `Open ${name}` : `Turn the ${name} card over for its board`}
           onClick={turn}
           onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); turn(); } }}
         >
@@ -37,17 +43,23 @@ export function TestCard({ id, open, setOpen, art, plate, name, tag, about, link
           <div className="tcap">
             <div className="tname">{name}</div>
             <p className="tabout">{about}</p>
+            {ours != null && <p className="tabout"><b>Our measured tests</b> · {ours}</p>}
+            {published != null && <p className="tabout"><b>Published tests</b> · {published}</p>}
+            {pros && pros.length ? <div className="tpc tpros"><b>Pros</b><ul>{pros.map((x) => <li key={x}>{x}</li>)}</ul></div> : null}
+            {cons && cons.length ? <div className="tpc tcons"><b>Cons</b><ul>{cons.map((x) => <li key={x}>{x}</li>)}</ul></div> : null}
             {stat && <div className="tstat sqhead" dangerouslySetInnerHTML={{ __html: stat.split('</div>')[0] + '</div>' }} />}
             <div className="tfoot">
               <a href={link.href} target={link.href.startsWith('http') ? '_blank' : undefined} rel="noreferrer" onClick={(e) => e.stopPropagation()}>{link.label} ↗</a>
-              <span className="tturn" aria-hidden="true">⟲ the board</span>
+              <span className="tturn" aria-hidden="true">{href ? 'open →' : '⟲ the board'}</span>
             </div>
           </div>
         </div>
-        <div className="tface tback" aria-hidden={!on}>
-          <button type="button" className="hflipbtn tbackbtn" onClick={turn} aria-label={`Turn the ${name} card back`}><span className="hflipicon" aria-hidden="true">⟲</span><span>the card</span></button>
-          {children}
-        </div>
+        {href ? null : (
+          <div className="tface tback" aria-hidden={!on}>
+            <button type="button" className="hflipbtn tbackbtn" onClick={turn} aria-label={`Turn the ${name} card back`}><span className="hflipicon" aria-hidden="true">⟲</span><span>the card</span></button>
+            {children}
+          </div>
+        )}
       </div>
     </div>
   );

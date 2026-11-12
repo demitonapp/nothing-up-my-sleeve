@@ -8,7 +8,7 @@ import { esc, fmtParams, signed } from '../../lib/format';
 import { emptyCls, pillCls } from '../../lib/ui';
 import { shipHash } from '../router';
 import { makerLink, minicards } from './leaderboard';
-import { bandOf, sizeOf, type SizeBand } from './bands';
+import { BAND, bandOf, sizeOf, type SizeBand } from './bands';
 
 type Html = { head: string; body: string; lead: string };
 
@@ -114,14 +114,17 @@ export function tenTimesHtml(lb: any, band: SizeBand): Html {
  *  reading too. Ranked by Easy, biggest first; a model whose reading is missing is listed below the
  *  line, never ranked. Both columns are the number of questions the model got right and how many it
  *  had, so a 2,299-question reading can never pass for a 2,376-question one. */
-export function arcAi2Html(lb: any, band: SizeBand): Html {
+export function arcAi2Html(lb: any, band: SizeBand | 'all'): Html {
   const spec = lb.arc_ai2 || {};
   const chance = spec.chance ?? 0.25;
-  const read = (spec.rows || []).filter((r: any) => r.params && bandOf(sizeOf(r)) === band && r.easy && r.easy.accuracy != null);
+  const every = band === 'all';
+  const read = (spec.rows || []).filter((r: any) => r.params && (every || bandOf(sizeOf(r)) === band) && r.easy && r.easy.accuracy != null);
   read.sort((a: any, b: any) => b.easy.accuracy - a.easy.accuracy || (b.challenge?.accuracy ?? 0) - (a.challenge?.accuracy ?? 0) || b.params - a.params);
   // a ship read by `thorp eval` is ranked with the rest; one not read yet stands below the line
   const readShips = new Set(read.filter((r: any) => r.kind === 'thorp').map((r: any) => r.ship_key));
-  const unread = inBand(lb.table, band).filter((r) => isOurs(r) && r.params && !readShips.has(r.ship_key));
+  const pool = every ? (lb.table || []) : inBand(lb.table, band);
+  const unread = pool.filter((r: any) => isOurs(r) && r.params && !readShips.has(r.ship_key));
+  const sizeCell = (r: any): string => every ? `<td>${esc((BAND(bandOf(sizeOf(r))) || { name: '–' }).name)}</td>` : '';
   const pct = (x: number): string => `${(100 * x).toFixed(1)}%`;
   const splitCell = (s: any, primary: boolean): string => {
     if (!s || s.accuracy == null) return '<span class="s">not read</span>';
@@ -134,18 +137,18 @@ export function arcAi2Html(lb: any, band: SizeBand): Html {
       <td>${r.kind === 'thorp'
         ? `<a href="/leaderboard/thorp/${encodeURIComponent(r.ship_key || '')}"><b>${esc(r.name)}</b></a><div class="s">ours · ${r.sailings ?? 1} sailing${(r.sailings ?? 1) === 1 ? '' : 's'} averaged</div>`
         : `<a href="/leaderboard/competitor/${encodeURIComponent(r.model)}"><b>${esc(r.name)}</b></a><div class="s">${makerLink(r.model)}</div>`}</td>
-      <td>${fmtParams(r.params)}</td>
+      <td>${fmtParams(r.params)}</td>${sizeCell(r)}
       <td>${splitCell(r.easy, true)}</td>
       <td>${splitCell(r.challenge, false)}</td></tr>`).join('')
     + unread.map((r: any) => `<tr class="lb-thorp unread"><td>–</td>
       <td><a href="/leaderboard/thorp/${encodeURIComponent(r.ship_key || '')}"><b>${esc(r.name)}</b></a></td>
-      <td>${fmtParams(r.params)}</td>
+      <td>${fmtParams(r.params)}</td>${sizeCell(r)}
       <td colspan="2"><span class="s">not read yet: a ship is read by <code>thorp eval</code> with the arc_ai2 evaluator</span></td></tr>`).join('')
-    || `<tr><td colspan="5" class="${emptyCls(true)}">no model of this size has been read on AI2 ARC yet</td></tr>`;
+    || `<tr><td colspan="${every ? 6 : 5}" class="${emptyCls(true)}">${every ? 'no model has been read on AI2 ARC yet' : 'no model of this size has been read on AI2 ARC yet'}</td></tr>`;
   const best = read[0], over = read.filter((r: any) => r.easy.accuracy > chance);
-  const lead = `<div class="sqp"><b class="${best ? 'good' : 's'}">${best ? pct(best.easy.accuracy) : '–'}</b><span>${best ? `${esc(best.name)} on ARC-Easy, the best of ${read.length} read at this size` : 'nothing read at this size yet'}</span></div>
-    <div class="sqp"><b>${over.length} of ${read.length}</b><span>are above the ${Math.round(100 * chance)}% floor, so the split discriminates across the whole band</span></div>`;
-  const head = '<tr><th>#</th><th>model</th><th>parameters</th><th>ARC-Easy <span class="s">the anchor</span></th><th>ARC-Challenge <span class="s">the floor</span></th></tr>';
+  const lead = `<div class="sqp"><b class="${best ? 'good' : 's'}">${best ? pct(best.easy.accuracy) : '–'}</b><span>${best ? `${esc(best.name)} on ARC-Easy, the best of ${read.length} read${every ? '' : ' at this size'}` : every ? 'nothing read yet' : 'nothing read at this size yet'}</span></div>
+    <div class="sqp"><b>${over.length} of ${read.length}</b><span>are above the ${Math.round(100 * chance)}% floor, so the split discriminates across ${every ? 'every reading' : 'the whole band'}</span></div>`;
+  const head = `<tr><th>#</th><th>model</th><th>parameters</th>${every ? '<th>size</th>' : ''}<th>ARC-Easy <span class="s">the anchor</span></th><th>ARC-Challenge <span class="s">the floor</span></th></tr>`;
   return { head, body, lead };
 }
 
@@ -208,10 +211,11 @@ export async function drawStepsChart(lb: any, band: SizeBand, metric: string): P
  *  strict accuracy on the 541 prompts, the instruction-level reading beside it. A voyage whose training
  *  turns held the official prompts carries the word rigged in its row, always: its number says it learned
  *  the checks, not that it follows instructions. No outside model has been read on IFEval here yet. */
-export function ifevalHtml(lb: any, band: SizeBand): Html {
+export function ifevalHtml(lb: any, band: SizeBand | 'all'): Html {
   const spec = lb.ifeval || {};
   const total = spec.prompts ?? 541;
-  const all = (spec.rows || []).filter((r: any) => r.params && bandOf(r.params) === band);
+  const every = band === 'all';
+  const all = (spec.rows || []).filter((r: any) => r.params && (every || bandOf(r.params) === band));
   const honest = all.filter((r: any) => !r.rigged && r.prompts >= total);
   const rest = all.filter((r: any) => !honest.includes(r));
   const pct = (x: number | null | undefined): string => (x == null ? '–' : `${(100 * x).toFixed(1)}%`);
@@ -224,19 +228,20 @@ export function ifevalHtml(lb: any, band: SizeBand): Html {
   const nameCell = (r: any): string => r.kind === 'thorp'
     ? `${r.ship_key ? `<a href="/leaderboard/thorp/${encodeURIComponent(r.ship_key)}"><b>${esc(r.name)}</b></a>` : `<b>${esc(r.name)}</b>`}${r.rigged ? ` <span class="${pillCls('bad')}">rigged</span>` : ''}<div class="s">ours · ${esc(r.run || '')}</div>`
     : `<a href="/leaderboard/competitor/${encodeURIComponent(r.model)}"><b>${esc(r.name)}</b></a><div class="s">${makerLink(r.model)}</div>`;
+  const sizeCell = (r: any): string => every ? `<td>${esc((BAND(bandOf(r.params)) || { name: '–' }).name)}</td>` : '';
   const row = (r: any, rank: string): string => `<tr class="lb-${r.kind === 'thorp' ? 'thorp' : 'outside'}${rank === '–' ? ' unread' : ''}">
       <td>${rank}</td>
       <td>${nameCell(r)}</td>
-      <td>${fmtParams(r.params)}</td>
+      <td>${fmtParams(r.params)}</td>${sizeCell(r)}
       <td><b>${pct(r.prompt_strict)}</b><div class="s">${r.prompts} of ${total} read${r.prompts < total ? ' · subset' : ''}</div></td>
       <td>${pct(r.instruction_strict)}</td>
       <td><span class="s">${how(r)}</span></td></tr>`;
-  const head = '<tr><th>#</th><th>model</th><th>parameters</th><th>prompt-level strict <span class="s">the board</span></th><th>instruction-level strict</th><th>how it was asked</th></tr>';
+  const head = `<tr><th>#</th><th>model</th><th>parameters</th>${every ? '<th>size</th>' : ''}<th>prompt-level strict <span class="s">the board</span></th><th>instruction-level strict</th><th>how it was asked</th></tr>`;
   const body = honest.map((r: any, i: number) => row(r, String(i + 1))).join('') + rest.map((r: any) => row(r, '–')).join('')
-    || `<tr><td colspan="6" class="${emptyCls(true)}">no model of this size has been read on IFEval yet</td></tr>`;
+    || `<tr><td colspan="${every ? 7 : 6}" class="${emptyCls(true)}">${every ? 'no model has been read on IFEval yet' : 'no model of this size has been read on IFEval yet'}</td></tr>`;
   const best = honest[0];
   const rigged = all.filter((r: any) => r.rigged).length;
-  const lead = `<div class="sqp"><b class="${best ? 'good' : 's'}">${best ? pct(best.prompt_strict) : '–'}</b><span>${best ? `${esc(best.name)} on prompt-level strict, the best of ${honest.length} read on the ${total}` : `no honest reading on the ${total} yet`}</span></div>
+  const lead = `<div class="sqp"><b class="${best ? 'good' : 's'}">${best ? pct(best.prompt_strict) : '–'}</b><span>${best ? `${esc(best.name)} on prompt-level strict, the best of ${honest.length} read on the ${total}${every ? '' : ' at this size'}` : `no honest reading on the ${total} yet`}</span></div>
     <div class="sqp"><b>${rigged} of ${all.length}</b><span>readings are rigged, trained on the official prompts, and stand below the line</span></div>`;
   return { head, body, lead };
 }

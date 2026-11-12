@@ -21,7 +21,7 @@ type Model = (typeof bench.models)[number];
 const pct = (v: number, unit: string): string => (unit === '%' ? `${v.toFixed(1)}%` : String(Math.round(v)));
 
 /** The rows of one test's board: the models of this band, best first, unread last. */
-function boardHtml(test: Test, models: Model[]): { head: string; body: string; lead: string; ranked: number } {
+export function boardHtml(test: Test, models: Model[]): { head: string; body: string; lead: string; ranked: number } {
   const rows = models
     .map((m) => ({ m, v: (test.values as Record<string, number | null>)[m.key] ?? null }))
     .sort((a, b) => (b.v ?? -Infinity) - (a.v ?? -Infinity));
@@ -41,6 +41,34 @@ function boardHtml(test: Test, models: Model[]): { head: string; body: string; l
        <div class="sqp"><b>${ranked.length}</b><span>of ${models.length} medium models have a published reading</span></div>`
     : `<div class="sqp"><b>–</b><span>no published reading for this band</span></div>`;
   return { head, body, lead, ranked: ranked.length };
+}
+
+/** The published tests of one leaderboard category (lib/testCategories.ts), one small board each over every
+ *  outside model that has a reading, for the back of that category's card on /leaderboard. */
+export function PublishedBoards({ keys, band }: { keys: string[]; band?: SizeBand }) {
+  const tests = keys.map((k) => (bench.tests as Test[]).find((t) => t.key === k)).filter((t): t is Test => !!t);
+  if (!tests.length) return null;
+  // on a size page only that band's models; Artificial Analysis's readings here cover the medium class alone
+  const models = (bench.models as Model[]).filter((m) => !band || bandOf(m.params) === band);
+  if (!models.length) return <p className="note mt">No published reading for this size: {esc(bench.source.name)}'s readings here cover only the medium class (4B–32B), so these tests have no outside model to stand beside at this size yet.</p>;
+  return (
+    <>
+      {tests.map((t) => {
+        const b = boardHtml(t, models);
+        return (
+          <div key={t.key}>
+            <h3 className="tbacktitle">Published · {t.name} <span className="note">{esc(bench.source.name)}'s readings, not ours; {t.unit === '%' ? 'percent' : 'Elo'}, higher is better · <a href={t.link.href} target="_blank" rel="noreferrer">{t.link.label} ↗</a></span></h3>
+            <div className="scroll">
+              <table data-nosort>
+                <thead dangerouslySetInnerHTML={{ __html: b.head }} />
+                <tbody dangerouslySetInnerHTML={{ __html: b.body }} />
+              </table>
+            </div>
+          </div>
+        );
+      })}
+    </>
+  );
 }
 
 export function BenchBoard({ band }: { band: SizeBand }) {

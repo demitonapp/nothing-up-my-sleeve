@@ -1,19 +1,24 @@
 ---
-// One size band's leaderboard at its own address (/leaderboard/small): the chaining board and the
+// One size band's leaderboard at its own address (/leaderboard/small), or one category of test
+// (/leaderboard/logic, 13 November): the chaining board and the
 // approach board for that size. The band cards on /leaderboard open these, as the Market Harbour's
 // open a band's ships. The static routes beside this one (competitor/, thorp/, lab/) win over it.
 import Layout from '../../layouts/Layout.astro';
 import Leaderboard from '../../components/islands/Leaderboard';
+import LeaderboardCategory from '../../components/islands/LeaderboardCategory';
 import { BANDS, type SizeBand } from '../../scripts/views/bands';
+import { TEST_CATEGORIES } from '../../lib/testCategories';
 
 export function getStaticPaths() {
-  return BANDS.map((b) => ({ params: { band: b.key } }));
+  return [...BANDS.map((b) => b.key), ...TEST_CATEGORIES.map((c) => c.key)].map((band) => ({ params: { band } }));
 }
 
-const band = Astro.params.band as SizeBand;
+const slug = Astro.params.band as string;
+const category = TEST_CATEGORIES.some((c) => c.key === slug) ? slug : '';
+const band = category ? undefined : (slug as SizeBand);
 ---
 <Layout>
   <main>
-    <Leaderboard client:load band={band} />
+    {category ? <LeaderboardCategory client:load category={category} /> : <Leaderboard client:load band={band} />}
   </main>
 </Layout>

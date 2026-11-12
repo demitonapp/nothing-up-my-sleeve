@@ -17,6 +17,28 @@ def cmd_acquire(a) -> int:
     return 0
 
 
+def cmd_images(a) -> int:
+    from thorp import images
+
+    if a.action == "candidates":
+        for row in images.candidates(a.illustrator, a.limit):
+            print(f"{row['Text#']:>6}  {row['Title'].splitlines()[0][:60]:<60}  {', '.join(images._illustrators(row['Authors']))}")
+        return 0
+    if a.action == "gather":
+        got = images.gather(a.ids, a.illustrator, a.limit, a.per_book)
+        print(f"gathered {len(got)} images into {images.images_dir()}")
+        return 0
+    if a.action == "prune":
+        gone = images.prune()
+        print(f"pruned {len(gone)}: {', '.join(r['path'] for r in gone) or 'nothing'}")
+        return 0
+    s = images.summary()
+    print(f"{s['images']} images from {s['books']} books, {s['bytes'] / 1e6:.1f} MB")
+    for b in s["by_book"]:
+        print(f"{b['images']:>4}  {b['book']:>6}  {b['title'].splitlines()[0][:60]}  ({', '.join(b['illustrators'])})")
+    return 0
+
+
 def cmd_fetch(a) -> int:
     from thorp.sources import gutenberg
 
@@ -686,6 +708,13 @@ def main(argv: list[str] | None = None) -> int:
     s = sub.add_parser("fetch", help="resolve, fetch, strip and register a book list")
     s.add_argument("list")
     s.set_defaults(fn=cmd_fetch)
+    s = sub.add_parser("images", help="the Library's images: gather Gutenberg illustrations, list candidates, summarise")
+    s.add_argument("action", choices=["gather", "candidates", "summary", "prune"])
+    s.add_argument("--ids", type=int, nargs="*", help="Gutenberg ids to gather (otherwise the candidates)")
+    s.add_argument("--illustrator", default="", help="only books with an illustrator whose name contains this")
+    s.add_argument("--limit", type=int, default=3, help="books to take from the candidates")
+    s.add_argument("--per-book", type=int, default=30, help="images to keep from one book at most")
+    s.set_defaults(fn=cmd_images)
     s = sub.add_parser(
         "acquire",
         help="an intake: a book list through the intake gate, fetched, registered, checked",

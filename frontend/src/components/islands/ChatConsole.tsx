@@ -736,7 +736,7 @@ export default function ChatConsole() {
           </label>
           <label
             className={`consoleswitch${toolsOk && useTools ? ' on' : ''}${!toolsOk ? ' inert' : ''}`}
-            title={toolsOk ? `calculate, current_time, board_score and vsm_status: ${toolsInfo?.why || ''}` : (toolsInfo?.why || 'tools are for the foreign ships whose chat template takes them')}
+            title={toolsOk ? `calculate, current_time, board_score and queue_status: ${toolsInfo?.why || ''}` : (toolsInfo?.why || 'tools are for the foreign ships whose chat template takes them')}
           >
             <input
               type="checkbox"

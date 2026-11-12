@@ -67,12 +67,13 @@ SCHEMAS: list[dict] = [
     {
         "type": "function",
         "function": {
-            "name": "vsm_status",
-            "description": "Live status of the Thorp fleet: which training voyages are running (at sea) right "
-            "now and what is next in the queue. Call this whenever the user asks what the fleet, the ships, "
-            "the voyages, the training runs or the queue are doing; you cannot know it any other way. To ask "
-            "about one job (is it running, where is it in the queue, how many are ahead of it), pass its name "
-            "as find.",
+            "name": "queue_status",
+            "description": "Live status of the Thorp queue: what is running (at sea) now, the next lines in the "
+            "queue with the goal each one serves, when the whole queue will finish, and what will have been "
+            "learned by then, goal by goal. Call this whenever the user asks what the fleet, the ships, the "
+            "voyages, the training runs or the queue are doing, when it will be done, or what it will teach "
+            "us; you cannot know it any other way. To ask about one job (is it running, where is it in the "
+            "queue, how many are ahead of it), pass its name as find.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -202,7 +203,112 @@ def _where(find: str, seats: list[dict], names: list[str]) -> dict:
     return {"find": find, "answer": "; ".join(parts), "running": running, "queued": queued}
 
 
-def vsm_status(next: int = 5, find: str | None = None) -> dict:  # noqa: A002 - the argument's name is the model's
+def _clip(s: str | None, n: int = 220) -> str:
+    v = re.sub(r"\s+", " ", str(s or "")).strip()
+    return v if len(v) <= n else v[: n - 1].rstrip() + "…"
+
+
+def _in_words(minutes: float | None) -> str | None:
+    if minutes is None:
+        return None
+    m = max(0.0, float(minutes))
+    return f"{round(m)} min" if m < 90 else f"{m / 60:.1f} h"
+
+
+def _plan() -> dict:
+    """The queue page's own plan (dash.server.api_queue): every line with its lane, its time, when it starts
+    and the goal it serves, and the hours left. One source for the page and the tool, so they never disagree."""
+    from thorp.dash import server
+
+    return server.api_queue()
+
+
+def _goals() -> dict[str, dict]:
+    from thorp import expedition_goals
+
+    return {g["goal_id"]: g for g in expedition_goals.read()}
+
+
+def queue_status(next: int = 5, find: str | None = None) -> dict:  # noqa: A002 - the argument's name is the model's
+    """The queue in one reading (12 November, Justin: "vsm_status(next=5) ... should actually be renamed
+    queue_status and it should return the 5 top rows in the queue and what goals they're trying to achieve as
+    well as the eta for the queue to finish and what the learnings will be at the end of the queue based on all
+    the goals"). What is at sea, the next lines with their goals and start times (the queue page's plan), when
+    the queue finishes, and, goal by goal over the whole queue, what will be known when its last line is home.
+    It only reads; nothing here moves a voyage or the queue."""
+    out = _fleet(next, find)
+    n = out.pop("_n")
+    try:
+        plan = _plan()
+    except Exception as e:  # noqa: BLE001  (no store or no plan: the fleet view still answers)
+        out["eta"] = {"error": f"the queue's plan could not be read: {e.__class__.__name__}"}
+        return out
+    try:
+        goals = _goals()
+    except Exception:  # noqa: BLE001
+        goals = {}
+    rows = [r for r in plan.get("rows") or [] if r.get("n") is not None and r.get("status") != "at sea"]
+
+    def goal_of(r: dict) -> dict | None:
+        s = r.get("serves") or {}
+        return {"goal": s.get("text"), "expedition": s.get("expedition_name")} if s.get("text") else None
+
+    out["next"] = [
+        {
+            "position": r["n"],
+            "name": r.get("name"),
+            "kind": r.get("kind"),
+            "lane": r.get("lane"),
+            "starts_in": ("at least " if r.get("at_least") else "") + (_in_words(r.get("starts_in_min")) or "unknown"),
+            "takes": _in_words(r.get("est_min")) or "unknown",
+            **(goal_of(r) or {"goal": "no goal recorded for this line"}),
+        }
+        for r in rows[:n]
+    ]
+    hours = float(plan.get("hours_left") or 0)
+    untimed = int(plan.get("without_a_time") or 0)
+    finish = time.localtime(time.time() + hours * 3600)
+    out["eta"] = {
+        "hours_left": round(hours, 1),
+        "finishes": time.strftime("%a %d %b %H:%M", finish),
+        "note": f"at least: {untimed} line(s) have no time yet" if untimed else "every line has a time",
+    }
+    # what the queue will have taught by its end: each goal its lines serve, in the order the queue reaches
+    # it, said as the question, how it is measured and why it matters, with when its last line comes home
+    by_goal: dict[str, dict] = {}
+    for r in rows:
+        gid = r.get("goal_id")
+        if not gid:
+            continue
+        end = (r.get("starts_in_min") or 0) + (r.get("est_min") or 0)
+        g = by_goal.setdefault(gid, {"lines": 0, "end": 0.0, "row": r})
+        g["lines"] += 1
+        g["end"] = max(g["end"], end)
+    learnings = []
+    for gid, g in by_goal.items():
+        word = goals.get(gid) or {}
+        serves = g["row"].get("serves") or {}
+        learnings.append({
+            "goal": word.get("text") or serves.get("text") or gid,
+            "expedition": word.get("name") or serves.get("expedition_name"),
+            "lines": g["lines"],
+            "known_in": _in_words(g["end"]),
+            "will_learn": _clip(word.get("why")) or "the goal's reason is not written down",
+            "measured_by": _clip(word.get("detail"), 160),
+            "so_far": _clip(word.get("evidence"), 160) or word.get("status") or "open",
+        })
+    out["learnings"] = learnings
+    untargeted = sum(1 for r in rows if not r.get("goal_id"))
+    head = out["summary"]
+    out["summary"] = (
+        f"{head}; the queue finishes in about {_in_words(hours * 60)} ({out['eta']['finishes']})"
+        f"{', at least' if untimed else ''}, and by then it will have worked on {len(learnings)} goal(s)"
+        + (f"; {untargeted} line(s) serve no recorded goal" if untargeted else "")
+    )
+    return out
+
+
+def _fleet(next: int = 5, find: str | None = None) -> dict:  # noqa: A002
     """S2's view of the fleet (12 November, Justin: "what would be the most basic tool call we could make
     for our VSM system?"): every seat at sea now (thorp.vsm.helms) and the head of the queue
     (s2_coordination.queue_read.pending). It only reads; nothing here moves a voyage or the queue."""
@@ -247,6 +353,7 @@ def vsm_status(next: int = 5, find: str | None = None) -> dict:  # noqa: A002 - 
         "running_now": seats,
         "queue_length": len(pending),
         "next": names[:n],
+        "_n": n,
     }
     # a named job's place, first, so a small model reads the answer before the list (12 November: asked how
     # many lines were ahead of arc-ai2-21m, five models counted the whole queue or the first five instead)
@@ -255,7 +362,7 @@ def vsm_status(next: int = 5, find: str | None = None) -> dict:  # noqa: A002 - 
     return out
 
 
-TOOLS = {"calculate": calculate, "current_time": current_time, "board_score": board_score, "vsm_status": vsm_status}
+TOOLS = {"calculate": calculate, "current_time": current_time, "board_score": board_score, "queue_status": queue_status}
 
 
 def run(name: str, arguments: dict) -> dict:

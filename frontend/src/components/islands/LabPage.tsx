@@ -128,7 +128,7 @@ export default function LabPage() {
   // /masaq/us/arcee"); the old /labs/<key> stays as an alias.
   const inOrbitals = parts[0] === 'orbitals' && parts[1] === 'masaq';
   const keyIndex = inOrbitals ? 3 : parts[0] === 'masaq' ? 2 : parts[0] === 'labs' ? 1 : -1;
-  const key = keyIndex >= 0 && parts[keyIndex] && !['models', 'labs', 'ships'].includes(parts[keyIndex])
+  const key = keyIndex >= 0 && parts[keyIndex] && !['models', 'labs', 'ships', 'embeddings'].includes(parts[keyIndex])
     ? decodeURIComponent(parts[keyIndex]) : '';
   const tab = parts[parts.length - 1] === 'models' ? 'models' : 'overview';
   const base = keyIndex >= 0 && key ? '/' + parts.slice(0, keyIndex + 1).join('/') : '';

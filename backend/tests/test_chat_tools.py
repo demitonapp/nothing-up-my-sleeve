@@ -31,13 +31,13 @@ def test_the_ling_template_is_read_as_its_own_xml_not_json():
 
 def test_a_bailing_call_parses_its_name_and_arg_key_pairs():
     text = (
-        "<tool_call>vsm_status\n"
+        "<tool_call>queue_status\n"
         "<arg_key>find</arg_key>\n<arg_value>arc-ai2-21m</arg_value>\n"
         "<arg_key>next</arg_key>\n<arg_value>3</arg_value>\n"
         "</tool_call>"
     )
     assert chat_tools.parse_calls(text, "bailing-xml") == [
-        {"name": "vsm_status", "arguments": {"find": "arc-ai2-21m", "next": 3}}
+        {"name": "queue_status", "arguments": {"find": "arc-ai2-21m", "next": 3}}
     ]
 
 
@@ -47,8 +47,8 @@ def test_a_bailing_call_with_no_arguments_is_still_a_call():
 
 
 def test_a_bailing_model_that_wrote_json_anyway_is_read_as_json():
-    text = '<tool_call>{"name": "vsm_status", "arguments": {"next": 2}}</tool_call>'
-    assert chat_tools.parse_calls(text, "bailing-xml") == [{"name": "vsm_status", "arguments": {"next": 2}}]
+    text = '<tool_call>{"name": "queue_status", "arguments": {"next": 2}}</tool_call>'
+    assert chat_tools.parse_calls(text, "bailing-xml") == [{"name": "queue_status", "arguments": {"next": 2}}]
 
 
 def test_a_bailing_call_with_no_function_name_is_kept_as_an_error():
@@ -74,8 +74,8 @@ def test_a_json_call_that_does_not_parse_keeps_its_raw_text():
 
 
 def test_the_qwen_xml_grammar_is_unchanged():
-    text = '<tool_call><function=vsm_status><parameter=find>arc-ai2-21m</parameter></function></tool_call>'
-    assert chat_tools.parse_calls(text, "qwen-xml") == [{"name": "vsm_status", "arguments": {"find": "arc-ai2-21m"}}]
+    text = '<tool_call><function=queue_status><parameter=find>arc-ai2-21m</parameter></function></tool_call>'
+    assert chat_tools.parse_calls(text, "qwen-xml") == [{"name": "queue_status", "arguments": {"find": "arc-ai2-21m"}}]
 
 
 def test_a_template_with_no_tools_takes_none():
@@ -83,5 +83,37 @@ def test_a_template_with_no_tools_takes_none():
 
 
 def test_before_calls_keeps_the_prose_and_drops_the_call():
-    assert chat_tools.before_calls('Let me look.\n<tool_call>vsm_status</tool_call>') == "Let me look."
+    assert chat_tools.before_calls('Let me look.\n<tool_call>queue_status</tool_call>') == "Let me look."
     assert chat_tools.before_calls("No call here.") == "No call here."
+
+
+def test_queue_status_gives_rows_goals_eta_and_learnings(monkeypatch):
+    """queue_status (12 November): the next lines with their goals, when the queue finishes, and goal by goal
+    what it will have taught, from the queue page's own plan."""
+    serves = {"text": "Control tokens in our embeddings", "expedition_name": "The Kipling Expedition"}
+    plan = {
+        "hours_left": 10.0,
+        "without_a_time": 1,
+        "rows": [
+            {"n": None, "name": "9m-at-sea", "status": "at sea", "goal_id": "k:2", "serves": serves},
+            {"n": 1, "name": "300k-a", "kind": "voyage", "lane": "mac", "status": "queued", "starts_in_min": 30, "est_min": 33, "goal_id": "k:2", "serves": serves},
+            {"n": 2, "name": "300k-b", "kind": "voyage", "lane": "mac", "status": "queued", "starts_in_min": 63, "est_min": 33, "goal_id": "k:2", "serves": serves},
+            {"n": 3, "name": "a step", "kind": "step", "lane": "mac", "status": "queued", "starts_in_min": 96, "est_min": None},
+        ],
+    }
+    goals = {"k:2": {"text": "Control tokens in our embeddings", "name": "The Kipling Expedition", "why": "how control tokens work",
+                     "detail": "marked against plain, seed for seed", "evidence": "", "status": "open"}}
+    monkeypatch.setattr(chat_tools, "_fleet", lambda next=5, find=None: {"summary": "nothing at sea", "running_now": [], "next": [], "_n": 2})
+    monkeypatch.setattr(chat_tools, "_plan", lambda: plan)
+    monkeypatch.setattr(chat_tools, "_goals", lambda: goals)
+    out = chat_tools.run("queue_status", {"next": 2})
+    assert [r["name"] for r in out["next"]] == ["300k-a", "300k-b"]
+    assert out["next"][0]["goal"] == "Control tokens in our embeddings" and out["next"][0]["starts_in"] == "30 min"
+    assert out["eta"]["hours_left"] == 10.0 and "at least" in out["eta"]["note"]
+    assert out["learnings"] == [{
+        "goal": "Control tokens in our embeddings", "expedition": "The Kipling Expedition", "lines": 2,
+        "known_in": "1.6 h", "will_learn": "how control tokens work", "measured_by": "marked against plain, seed for seed",
+        "so_far": "open",
+    }]
+    assert "1 line(s) serve no recorded goal" in out["summary"] and "_n" not in out
+    assert "vsm_status" not in chat_tools.TOOLS

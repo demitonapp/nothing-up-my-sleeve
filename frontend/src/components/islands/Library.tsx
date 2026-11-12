@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { MouseEvent as ReactMouseEvent } from 'react';
 import BranchConfig, { type ConfigChoices, type SavedConfig } from './BranchConfig';
 import DemitonTabs from '../DemitonTabs';
+import { TabNav } from '../TabNav';
 import { big, periodOf } from '@/lib/format';
 import { libraryBranchHref, libraryBranchOf } from '@/lib/nav';
 import { cardCls, emptyCls, fieldCls, pillCls, selectCls } from '@/lib/ui';
@@ -151,12 +152,39 @@ export default function Library({ initialPath = '/library' }: { initialPath?: st
     history.pushState(null, '', next);
     setPath(next);
   }, []);
-  const branchKey = libraryBranchOf(path);
+  // Two sections (12 November, Justin: "under library ... two sections books and then images which will
+  // be where we start to collect images"): /library is Books, /library/images is Images. 'images' is
+  // taken out of the branch addresses, so no branch can be called that.
+  const imagesView = /^\/(?:library|shelves)\/images\/?$/.test(path.split(/[?#]/)[0]);
+  const branchKey = imagesView ? null : libraryBranchOf(path);
 
   return (
     <div {...sectionProps('shelves')}>
       <DemitonTabs active="library" />
-      <h1>Library <span className="q">every list of books Nothing up my sleeve reads from, is scored on or is drafting: how many books are fetched, about how many tokens they hold, their language families, and the voyages that read them</span></h1>
+      <h1>Library <span className="q">{imagesView
+        ? 'the images Nothing up my sleeve will read: where they come from, the rule they pass, and what is gathered so far'
+        : 'every list of books Nothing up my sleeve reads from, is scored on or is drafting: how many books are fetched, about how many tokens they hold, their language families, and the voyages that read them'}</span></h1>
+      <TabNav
+        id="librarynav"
+        ariaLabel="Library sections"
+        items={[
+          { key: 'books', label: 'Books', href: '/library', active: !imagesView },
+          { key: 'images', label: 'Images', href: '/library/images', active: imagesView },
+        ]}
+      />
+      {imagesView ? <Images /> : <Books browse={browse} library={library} branchKey={branchKey} go={go} />}
+    </div>
+  );
+}
+
+function Books({ browse, library, branchKey, go }: {
+  browse: { data: BrowseData | null; error: string | null };
+  library: { data: LibraryData | null; error: string | null };
+  branchKey: string | null;
+  go: (p: string) => void;
+}) {
+  return (
+    <>
       <section className={cardCls(false, 'panel')} id="browsepanel">
         <h2>The library <span className="note">it starts with branches, each a purpose its books are gathered for (Ogden, the decks, the content experiment...). Open a branch to compose a JSON of choices and save it under a name; the lists it has already sailed stay beneath it, locked</span></h2>
         <div id="browse">
@@ -171,7 +199,101 @@ export default function Library({ initialPath = '/library' }: { initialPath?: st
         </div>
       </section>
       <Shelves data={library.data} error={library.error} />
-    </div>
+    </>
+  );
+}
+
+/** Where image sources stand. Nothing is gathered yet: this is the shelf the first intake will fill. */
+const IMAGE_SOURCES: { name: string; what: string; rule: string; state: string }[] = [
+  { name: 'Gutenberg illustrations', what: 'the plates and figures in the HTML editions of illustrated books', rule: 'English text, a credited illustrator, every named person dead by 1955, 200px a side', state: 'pilot' },
+  { name: 'Internet Archive page scans', what: 'page images of the scanned books, the source of the scanned branch’s text', rule: 'the same period and death rule as the text; one image a page', state: 'not started' },
+  { name: 'Wikimedia Commons', what: 'public-domain prints, maps, diagrams and photographs before 1930', rule: 'a dated, public-domain licence tag; the creator dead by 1955', state: 'not started' },
+  { name: 'Library of Congress, British Library', what: 'digitised period prints, plates and periodicals', rule: 'marked no known restrictions, dated before 1930', state: 'not started' },
+];
+
+interface GatheredImage {
+  id: string; book: number; title: string; illustrators: string[]; caption: string; alt: string;
+  width: number; height: number; page: string; url: string;
+}
+interface ImagesData {
+  images: number; books: number; bytes: number; rule: string;
+  by_book: { book: number; title: string; illustrators: string[]; images: number }[];
+  items: GatheredImage[];
+}
+
+function Images() {
+  const { data, error } = useApi<ImagesData>('/api/images', 30000);
+  const [book, setBook] = useState<number | null>(null);
+  const items = (data?.items || []).filter((i) => book == null || i.book === book);
+  const first = (t: string) => t.split('\n')[0];
+  return (
+    <>
+      <section className={cardCls(false, 'panel')} id="imagespanel">
+        <h2>Images <span className="note">the second shelf of the Library, where the images start to be collected</span></h2>
+        <p className="foaim">
+          Images come under the same rules as the books: every maker dead by 1955, held with where they came
+          from and who made them. The first source is the illustrations in Gutenberg&rsquo;s HTML editions,
+          gathered with <span className="mono">thorp images gather</span>. They are the start of a training shelf
+          for a Nothing up my sleeve image model, and a multimodal embedder (see{' '}
+          <a href="/orbitals/masaq/embeddings#emb-multimodal">the embeddings ontology</a>) can place them in the
+          same space as the text.
+        </p>
+        {error ? (
+          <div className={emptyCls()}>the images could not be read: {error} (restart <span className="mono">thorp dash</span> if this server predates them)</div>
+        ) : !data ? (
+          <div className={emptyCls()}>reading the images…</div>
+        ) : !data.images ? (
+          <div className={emptyCls()}>no images in the library yet: <span className="mono">thorp images gather --illustrator Doré</span></div>
+        ) : (
+          <>
+            <div className="bsummary">
+              <b>{data.images.toLocaleString()}</b> images from <b>{data.books}</b> books · {(data.bytes / 1e6).toFixed(1)} MB
+              {book != null ? <button type="button" className="selchip bclear" onClick={() => setBook(null)}>every book ×</button> : null}
+            </div>
+            <div className="s">{data.rule}</div>
+            <div className="bcards mt">
+              {data.by_book.map((b) => (
+                <button key={b.book} type="button" className={`bcard${book === b.book ? ' on' : ''}`} title={first(b.title)} onClick={() => setBook(book === b.book ? null : b.book)}>
+                  <span className="bname">{cut(first(b.title), 40)}</span>
+                  <span className="bnum">{b.images}<span className="s"> · {b.illustrators.join(', ')}</span></span>
+                </button>
+              ))}
+            </div>
+            <div className="imggrid mt">
+              {items.map((i) => (
+                <figure key={i.id} className="imgcard">
+                  <a href={`/api/image?id=${i.id}`} target="_blank" rel="noreferrer">
+                    <img src={`/api/image?id=${i.id}`} alt={i.alt || i.caption} loading="lazy" width={i.width} height={i.height} />
+                  </a>
+                  <figcaption>
+                    {i.caption || i.alt ? <span>{cut(i.caption || i.alt, 120)}</span> : null}
+                    <span className="s">{i.illustrators.join(', ')} · {cut(first(i.title), 40)} · {i.width}×{i.height}</span>
+                  </figcaption>
+                </figure>
+              ))}
+            </div>
+          </>
+        )}
+      </section>
+      <section className={cardCls(false, 'panel')}>
+        <h2>Where they will come from <span className="note">the sources in mind, each with its rule; none has an intake yet</span></h2>
+        <div className="scroll">
+          <table className="shelftable">
+            <thead><tr><th>source</th><th>what</th><th>rule</th><th>state</th></tr></thead>
+            <tbody>
+              {IMAGE_SOURCES.map((s) => (
+                <tr key={s.name}>
+                  <td><b>{s.name}</b></td>
+                  <td>{s.what}</td>
+                  <td className="s">{s.rule}</td>
+                  <td><span className={pillCls('')}>{s.state}</span></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </>
   );
 }
 

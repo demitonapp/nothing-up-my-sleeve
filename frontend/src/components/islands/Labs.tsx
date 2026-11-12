@@ -14,6 +14,7 @@ import { cardCls, crumbCls, emptyCls, pillCls } from '@/lib/ui';
 import { sectionProps, useApi, useRoute } from '@/lib/useApi';
 import SectionNav from '../SectionNav';
 import { TabNav } from '../TabNav';
+import EmbeddingOntology from './EmbeddingOntology';
 
 interface House {
   rank: number;
@@ -124,8 +125,10 @@ export default function Labs() {
   const modelsView = (inOrbitals && parts[2] === 'models')
     || (!inOrbitals && isMasaq && parts[1] === 'models')
     || (isAlias && parts[1] === 'ships');
-  const detail = (inOrbitals && parts[2] && !['models', 'labs'].includes(parts[2]) && parts[3])
-    || (!inOrbitals && parts[0] === 'masaq' && parts[1] && !['models', 'labs'].includes(parts[1]) && parts[2])
+  // the embeddings ontology (12 November, Justin: "add an embedding tab here /orbitals/masaq")
+  const embeddingsView = (inOrbitals && parts[2] === 'embeddings') || (!inOrbitals && isMasaq && parts[1] === 'embeddings');
+  const detail = (inOrbitals && parts[2] && !['models', 'labs', 'embeddings'].includes(parts[2]) && parts[3])
+    || (!inOrbitals && parts[0] === 'masaq' && parts[1] && !['models', 'labs', 'embeddings'].includes(parts[1]) && parts[2])
     || (isAlias && parts[1] && parts[1] !== 'ships');
   const bandSeg = inOrbitals ? parts[3] : parts[2];
   const band = modelsView && bandSeg && BAND(bandSeg) ? (bandSeg as SizeBand) : null;
@@ -135,7 +138,7 @@ export default function Labs() {
   const [purpose, setPurpose] = useState('');
   const [weights, setWeights] = useState('');
 
-  const { data, error } = useApi<LabsData>('/api/labs', 60000, ours && !modelsView && !detail);
+  const { data, error } = useApi<LabsData>('/api/labs', 60000, ours && !modelsView && !embeddingsView && !detail);
   const ladder = useApi<any>('/api/ladder', 15000, ours && modelsView);
 
   // a house's own page is LabPage's; the grid and the ships view are this island's
@@ -167,12 +170,15 @@ export default function Labs() {
         id="masaqnav"
         ariaLabel="Masaq' Reach views"
         items={[
-          { key: 'labs', label: 'Labs', href: '/orbitals/masaq', active: !modelsView },
+          { key: 'labs', label: 'Labs', href: '/orbitals/masaq', active: !modelsView && !embeddingsView },
           { key: 'models', label: 'Models', href: '/orbitals/masaq/models', active: modelsView },
+          { key: 'embeddings', label: 'Embeddings', href: '/orbitals/masaq/embeddings', active: embeddingsView },
         ]}
       />
 
-      {modelsView ? (
+      {embeddingsView ? (
+        <EmbeddingOntology />
+      ) : modelsView ? (
         ladder.error ? (
           <div className={emptyCls()}>the Reach's ships could not be read: {ladder.error}</div>
         ) : !ladder.data ? (

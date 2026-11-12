@@ -7150,7 +7150,16 @@ class Handler(BaseHTTPRequestHandler):
                 # 12 November, Justin: "8787 shouldn't serve a UI". The page is the Astro dev server on :4321,
                 # which forwards /api here.
                 return self._send(404, API_ONLY, "application/json")
+            if u.path == "/api/image":
+                # a gathered image's bytes, by its id (thorp/images.py); the Library's Images tab shows them
+                from thorp import images
+
+                found = images.file_for(q.get("id", ""))
+                if not found:
+                    return self._json(404, {"error": "no such image"})
+                return self._send(200, found[0].read_bytes(), found[1], cache="max-age=86400")
             routes = {
+                "/api/images": lambda: __import__("thorp.images", fromlist=["summary"]).summary(),
                 "/api/runs": lambda: api_runs(),
                 "/api/waters": api_waters,
                 "/api/metrics": lambda: api_metrics(q["run"], q.get("names", ""), q.get("points", "")),

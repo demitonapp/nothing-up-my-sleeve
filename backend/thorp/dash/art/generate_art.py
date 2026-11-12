@@ -602,8 +602,45 @@ LABS: dict[str, str] = {
     "uncropped clean image with no watermark, no signature, no text and no logo",
 }
 
-SIZES = {**{k: "landscape_16_9" for k in (*CLASSES, *TESTS, *LABS, *HARBOURS, *HARBOUR_VIEWS, *SHIPBUILDER, *SHIPYARD, *SHIPYARD_SECTIONS, *CHARTING, *POSITIONS, *FOREIGN, *SOP_GOALS, *EXPEDITIONS, *BANDS, *LADDER, *CONSOLE)}, **{k: "portrait_4_3" for k in CARDS}, **{k: "portrait_4_3" for k in LOGIC}}
-SUBJECTS = {**TESTS, **LABS, **CLASSES, **HARBOURS, **HARBOUR_VIEWS, **SHIPBUILDER, **SHIPYARD, **SHIPYARD_SECTIONS, **CHARTING, **POSITIONS, **FOREIGN, **CARDS, **LOGIC, **SOP_GOALS, **EXPEDITIONS, **BANDS, **LADDER, **CONSOLE}
+# The embeddings ontology's categories (12 November, Justin: "cards for the embeddings in the culture drake
+# risso style for the major categories"), on Masaq' Reach › Embeddings. Keys are `emb-<node key>` from
+# frontend/src/components/islands/EmbeddingOntology.tsx. Each plate is the category's idea aboard ship: the
+# ship's own grain (inside), a foreign maker's instrument (outside), small hand instruments against a great
+# hired one (small and large), a channel found by chaining marks (reasoning), a tally of words (sparse), a
+# rutter whose every panel knows the whole coast (contextual), the sketch beside the log (multimodal), and two
+# copies compared line by line (the exact-text neighbours).
+EMBEDDINGS: dict[str, str] = {
+    "emb-inside": "inside the hull of a wooden ship at night, the curved ribs and knees of her frame lit by one "
+    "hanging lantern, every timber cut with the shipwright's own chiselled marks, an adze resting on a beam, the "
+    "grain of the oak running the length of her like veins, the ship's own body and nothing brought aboard",
+    "emb-outside": "a ship's master at the chart table holding up a strange brass instrument of foreign make "
+    "to the lantern light, finer and newer than anything aboard, its rings engraved with marks he cannot read, "
+    "his own worn compass and dividers set aside on the chart, a small silver drone hovering at his shoulder",
+    "emb-dense-small": "a ship's log open on a narrow desk in a cramped cabin, a small pocket compass, slim brass "
+    "dividers and a hand lens laid across the page, a single candle, small exact instruments for one man's "
+    "hand, the porthole showing black water and a thin ring of light in the sky",
+    "emb-dense-large": "a great brass armillary sphere mounted on the quarterdeck, taller than a man, two "
+    "sailors straining at the handles to turn it, hired at a far port and lashed down with heavy rope, its "
+    "rings catching the moonlight, the ship's own small instruments dwarfed beside it",
+    "emb-reasoning": "a pilot bent over a chart of a reef-strewn coast tracing a hidden channel, pins set at "
+    "distant soundings and a single taut thread run from mark to mark until the passage appears that no one "
+    "mark shows, the lantern throwing the thread's shadow across the reefs",
+    "emb-sparse": "a purser's tally board and an open ledger by lamplight, each word of a cargo list given its "
+    "own column of notches, a knotted cord laid beside it with one knot to a word, a quill and a ruler pinned "
+    "against a single line of figures",
+    "emb-contextual": "a long rutter of coastal views unrolled along the full length of a table, panel after "
+    "panel of headlands and harbour mouths drawn edge to edge so that every panel joins the next and the whole "
+    "coast reads as one, the navigator's hand resting on the middle panel, a lantern at each end",
+    "emb-multimodal": "an artist aboard ship sketching a newly sighted coastline in ink on the very page where "
+    "the master writes the log, picture and words side by side on one sheet, the real headland visible "
+    "through the open stern window beyond, a small silver drone perched on the window ledge",
+    "emb-neighbours": "two scribes at a candlelit table comparing two copies of the same manuscript line by "
+    "line, a straightedge laid across both pages, one finger stopped on a single matching word, a seal and "
+    "wax beside them, exact copying checked letter for letter",
+}
+
+SIZES = {**{k: "landscape_16_9" for k in (*CLASSES, *TESTS, *LABS, *HARBOURS, *HARBOUR_VIEWS, *SHIPBUILDER, *SHIPYARD, *SHIPYARD_SECTIONS, *CHARTING, *POSITIONS, *FOREIGN, *SOP_GOALS, *EXPEDITIONS, *BANDS, *LADDER, *CONSOLE, *EMBEDDINGS)}, **{k: "portrait_4_3" for k in CARDS}, **{k: "portrait_4_3" for k in LOGIC}}
+SUBJECTS = {**TESTS, **LABS, **CLASSES, **HARBOURS, **HARBOUR_VIEWS, **SHIPBUILDER, **SHIPYARD, **SHIPYARD_SECTIONS, **CHARTING, **POSITIONS, **FOREIGN, **CARDS, **LOGIC, **SOP_GOALS, **EXPEDITIONS, **BANDS, **LADDER, **CONSOLE, **EMBEDDINGS}
 
 # The twenty subjects the audit found outside the brief (ships/reports/art-audit-2026-11-11.md): rewritten
 # into the three-layer world -- Risso's ink, Drake's voyages, the young Culture's universe -- keeping what

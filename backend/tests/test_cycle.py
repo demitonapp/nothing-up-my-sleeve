@@ -486,7 +486,8 @@ def test_a_moving_sync_reports_its_progress_and_finishes():
     box.sync_env(sleep=sleep, clock=clock)
     progress = [m for m in said if m.startswith("[box] env: ")]
     assert len(progress) == 2 and "Downloading torch" in progress[0] and "100.0 MB/s" in progress[1]
-    assert said[-1].startswith("[box] environment synced (45s, 6,100 MB)")
+    assert any(m.startswith("[box] environment synced (45s, 6,100 MB)") for m in said)
+    # the tagger probe follows the sync, so it is not the last line (12 November: shapes must not fail a fit-out)
     assert not any("ssh done" in m for m in said)  # the polls are quiet: the timing table ends the step at "synced"
     assert "nohup" in run.calls[0] and "env.log" in run.calls[0] and "-q" not in run.calls[0]
 
@@ -560,7 +561,7 @@ def test_the_intelligence_audit_is_queued_after_every_five_lines_and_never_twice
     assert not lanes.queue_audit(None, said.append, history=hist, pending_now=[lanes.AUDIT_LINE], every=5)  # one is queued
     assert not lanes.queue_audit(None, said.append, history=hist, pending_now=[], every=0)  # switched off
     ln = lanes.parse(lanes.AUDIT_LINE)
-    assert (ln.lane, ln.kind, ln.timeout) == ("mac", "cmd", 2700)  # the Mac lane, as a step: it has the machine to itself
+    assert (ln.lane, ln.kind, ln.timeout) == ("mac", "intelligence", 2700)  # the Mac lane; its own item type (12 November)
     from thorp.viable.s3_control import purser
 
     assert purser.cmd_minutes(ln) == 20.0  # the queue's clock reads its estimate

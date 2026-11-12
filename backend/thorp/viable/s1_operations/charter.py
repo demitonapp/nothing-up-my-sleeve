@@ -661,6 +661,13 @@ def carried_data(tok_id: str, books: set[str] | None = None) -> list[str]:
         out += [str(f.relative_to(d)) for f in ([p] if p.is_file() else sorted(p.rglob("*"))) if f.is_file()]
     if trim:
         out += text_files(books)
+    # The Gutenberg catalogue is 20 MB and `prepare` needs it to resolve a recipe; the 2.3 GB catalogue cache
+    # stays home. Without this the box fetched it on every fitting out and a flaky connection killed the
+    # voyage (12 November: the gqa hire died in `prepare` on a ChunkedEncodingError).
+    for rel in ("catalogue/pg_catalog.csv", "catalogue/authority.json", "catalogue/hf-files.json"):
+        f = d / rel
+        if f.is_file() and rel not in out:
+            out.append(rel)
     for sub in ("tokenisers", "shards"):
         root = d / sub / tok_id
         if root.exists():
@@ -710,7 +717,11 @@ def code_carried(spec: dict | None = None, run=subprocess.run) -> list[str]:
 
 
 def stage(rid: str) -> Path:
-    """Consistent copies of data/'s SQLite files (the manifest), made with SQLite's backup, for carrying."""
+    """The files carried to a hired box: the manifest, exported from the store when the home no longer keeps a
+    `data/manifest.sqlite` (12 November: the local SQLite copy was retired); any other `data/*.sqlite` is copied
+    consistently. The papers' ledger is written into the same stage by `s2.papers`."""
+    from thorp import manifest_store
+
     st = paths.data_dir() / "charter" / rid / "stage"
     if st.exists():
         shutil.rmtree(st)
@@ -721,6 +732,8 @@ def stage(rid: str) -> Path:
         src.backup(dst)
         src.close()
         dst.close()
+    if not (st / "manifest.sqlite").exists():
+        manifest_store.export_sqlite(st / "manifest.sqlite")
     return st
 
 
@@ -1058,6 +1071,8 @@ def sail(spec_path: str, gpu: str | None = None, vast=None, resolver=None, box_f
                 (st / f"{rid}.yaml").write_text(yaml.safe_dump(spec, sort_keys=False, allow_unicode=True))
                 (st / f"{rid}.papers.json").write_text(json.dumps(store.papers_for_box(), ensure_ascii=False, indent=1))
                 box.put(st, [f"{rid}.yaml", f"{rid}.papers.json"], "data/charter")
+                with contextlib.suppress(OSError):  # the box has them; no 200 MB SQLite copy stays at home
+                    shutil.rmtree(st)
                 _phase(instance, "env")
                 box.sync_env()
                 box.launch(rid)

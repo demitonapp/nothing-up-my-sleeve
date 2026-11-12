@@ -6,14 +6,17 @@ from thorp import labs
 
 
 def test_the_labs_page_has_distinct_houses() -> None:
-    assert len(labs.HOUSES) == 23
-    assert len(set(labs.HOUSES)) == 23
-    known = {lab.key for lab in labs.LABS}
-    assert set(labs.HOUSES) <= known
+    listed = labs.listed()
+    assert len(listed) == 27
+    assert len({lab.key for lab in listed}) == 27
+    known = {lab.key for lab in labs.all()}
+    assert {lab.key for lab in listed} <= known
+    # the leaderboard's two extra houses are rows, but not cards
+    assert {"eleutherai", "huggingface"} <= known - {lab.key for lab in listed}
 
 
 def test_a_house_is_a_lab_and_its_profile_is_complete() -> None:
-    for key in labs.HOUSES:
+    for key in (lab.key for lab in labs.listed()):
         lab = labs.get(key)
         assert lab is not None
         assert lab.short and lab.country and lab.hq and lab.blurb and lab.flagship
@@ -42,6 +45,17 @@ def test_the_new_families_find_their_house() -> None:
     assert labs.lab_of("MolmoWeb-8B").key == "ai2"
     assert labs.lab_of("allenai/OLMo-3-7B").key == "ai2"
     assert labs.lab_of("Holo2-8B").key == "hcompany"
+    # Maincode's ship was already in the Reach before its house had a page
+    assert labs.lab_of("Maincode/Maincoder-1B").key == "maincode"
+    assert labs.lab_of("Maincoder-1B").key == "maincode"
+    # the three regional houses (12 November): the UK, South Africa and South America
+    assert labs.lab_of("GAIA-2").key == "wayve"
+    assert labs.lab_of("LINGO-2").key == "wayve"
+    assert labs.lab_of("InkubaLM-0.4B").key == "lelapa"
+    assert labs.lab_of("Vulavula").key == "lelapa"
+    assert labs.lab_of("S5").key == "maritaca"
+    assert labs.lab_of("S5-nano").key == "maritaca"
+    assert labs.lab_of("Sabiá 4").key == "maritaca"
     # and the old mappings still hold
     assert labs.lab_of("mlx-community/Qwen3-4B-4bit").key == "alibaba"
     assert labs.lab_of("mlx-community/Phi-4-mini-instruct-4bit").key == "microsoft"
@@ -52,4 +66,17 @@ def test_the_new_families_find_their_house() -> None:
 
 
 def test_an_unrelated_model_belongs_to_no_house() -> None:
-    assert labs.lab_of("Maincode/Maincoder-1B") is None
+    assert labs.lab_of("some-lab/Orion-7B") is None
+
+
+def test_the_frontend_house_routes_match_the_store() -> None:
+    """frontend/src/data/labs.json is the route list the Astro pages pre-render; it is written from the
+    store, so a house added to s4.labs must be exported (`python -m thorp.dash.lab_keys`) before a build."""
+    import json
+
+    from thorp import paths
+
+    data = json.loads((paths.FRONTEND / "src" / "data" / "labs.json").read_text())
+    listed = labs.listed()
+    assert [list(x) for x in data["houses"]] == [[lab.country, lab.key] for lab in listed]
+    assert data["keys"] == [lab.key for lab in listed]

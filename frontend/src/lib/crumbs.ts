@@ -97,11 +97,12 @@ const SIZE_OF: Record<string, string> = {
   'towing-tank': '300k', 'measured-mile': '1m', 'sea-trial': '9m', 'coasting-run': '21m', paragraph: '50m', invention: '100m', trader: '350m',
 };
 const BAND: Record<string, string> = { xsmall: 'Extra small', small: 'Small', medium: 'Medium', large: 'Large' };
-const COUNTRY: Record<string, string> = { us: 'US', cn: 'China', fr: 'France', ca: 'Canada', ae: 'UAE', gb: 'UK' };
+const COUNTRY: Record<string, string> = { us: 'US', cn: 'China', fr: 'France', ca: 'Canada', ae: 'UAE', gb: 'UK', au: 'Australia', za: 'South Africa', br: 'Brazil' };
 // a house by its key, as the Reach writes it; any other key is title-cased
 const HOUSE: Record<string, string> = {
   openai: 'OpenAI', xai: 'xAI', zai: 'Z.ai', antgroup: 'Ant Group', deepseek: 'DeepSeek', minimax: 'MiniMax',
   stepfun: 'StepFun', bytedance: 'ByteDance', thinkingmachines: 'Thinking Machines', tii: 'TII', nvidia: 'NVIDIA',
+  maincode: 'Maincode', wayve: 'Wayve', lelapa: 'Lelapa AI', maritaca: 'Maritaca AI',
 };
 const WORDS: Record<string, string> = {
   'liberty-machine': 'Liberty Machine', s1: 'S1 Operations', s2: 'S2 Coordination', s3: 'S3 Control', s4: 'S4 Intelligence', s5: 'S5 Policy', sops: 'SOPs', ifeval: 'IFEval', arc: 'ARC',

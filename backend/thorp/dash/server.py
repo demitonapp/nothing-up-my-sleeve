@@ -680,12 +680,11 @@ def _api_ladder() -> dict:
     fitting = _fitting_out()
     from thorp import foreign, labs
 
-    # the ten houses of the trading orbital, for the home card that opens it (12 November)
-    houses = []
-    for k in labs.HOUSES:
-        house = labs.get(k)
-        if house:
-            houses.append({"key": house.key, "name": house.short or house.name, "flag": house.country, "country_name": house.country_name})
+    # the houses of the trading orbital, for the home card that opens it (12 November)
+    houses = [
+        {"key": house.key, "name": house.short or house.name, "flag": house.country, "country_name": house.country_name}
+        for house in labs.listed()
+    ]
 
     return {
         "rungs": rungs, "runs": runs, "queue": queue, "external": external,
@@ -3354,6 +3353,21 @@ def api_governance() -> dict:
     }
 
 
+def _api_checkpoints() -> dict:
+    from thorp import checkpoints
+
+    return {"audit": checkpoints.audit(), "last_cleanup": checkpoints.last_cleanup()}
+
+
+def api_checkpoints() -> dict:
+    """The fleet's checkpoints on the Liberty Machine's S1 page: what is kept, what is stale, and what the last
+    cleanup freed. The audit is cached for a minute; a cleanup's record invalidates it."""
+    return _fast_cache(
+        "checkpoints", _api_checkpoints, {"audit": None, "last_cleanup": None}, ttl=60.0,
+        watch=paths.data_dir() / "checkpoint-cleanup.json",
+    )  # fmt: skip
+
+
 def api_liberty_machine_cycle() -> dict:
     """The queue's planning cycle on the Liberty Machine page (thorp/viable/s3_control/cycle.py): the six steps, one a
     system; the last turn kept (S3*'s audit, S4's measurements, S5's envelope, the plan and its proposals); and
@@ -4900,6 +4914,31 @@ def api_drone_task(run_id: str) -> dict:
     return {"run": rec}
 
 
+def api_browser_sites() -> dict:
+    """The browser drone's test sites and the signed-in Chrome profile."""
+    from thorp import browser
+
+    return browser.status()
+
+
+def post_browser_signin(body: dict) -> dict:
+    from thorp import browser
+
+    return browser.open_site(str(body.get("site") or ""))
+
+
+def post_browser_check(body: dict) -> dict:
+    from thorp import browser
+
+    return browser.check_site(str(body.get("site") or ""))
+
+
+def post_browser_stop(body: dict) -> dict:
+    from thorp import browser
+
+    return browser.stop()
+
+
 def api_email_accounts() -> dict:
     """The email drone's mailboxes: the providers, the accounts, and whether a Microsoft client id is set."""
     from thorp import email_accounts
@@ -4946,6 +4985,25 @@ def post_email_ms_poll(body: dict) -> dict:
     return email_accounts.ms_poll(
         str(body.get("device_code") or ""), str(body.get("client_id") or ""), body.get("email") or None
     )
+
+
+def api_personaplex() -> dict:
+    """The phone drone's live voice line: PersonaPlex, local, full duplex."""
+    from thorp import personaplex
+
+    return personaplex.status()
+
+
+def post_personaplex_start(body: dict) -> dict:
+    from thorp import personaplex
+
+    return personaplex.start()
+
+
+def post_personaplex_stop(body: dict) -> dict:
+    from thorp import personaplex
+
+    return personaplex.stop()
 
 
 def api_drones_phone() -> dict:
@@ -4995,6 +5053,7 @@ def post_drone_task(body: dict) -> dict:
         url=body.get("url") or None,
         model=body.get("model") or None,
         max_steps=int(body.get("max_steps") or drones.DEFAULT_STEPS),
+        profile=str(body.get("profile") or "fresh"),
     )
     return {"run": rec}
 
@@ -7335,12 +7394,17 @@ class Handler(BaseHTTPRequestHandler):
             "/api/lab_download": post_lab_download,
             "/api/lab_model_queue": post_lab_model_queue,
             "/api/drones/select": post_drone_select,
+            "/api/drones/browser/signin": post_browser_signin,
+            "/api/drones/browser/check": post_browser_check,
+            "/api/drones/browser/stop": post_browser_stop,
             "/api/drones/email/accounts": post_email_account,
             "/api/drones/email/test": post_email_test,
             "/api/drones/email/remove": post_email_remove,
             "/api/drones/email/ms/client": post_email_ms_client,
             "/api/drones/email/ms/start": post_email_ms_start,
             "/api/drones/email/ms/poll": post_email_ms_poll,
+            "/api/drones/phone/personaplex/start": post_personaplex_start,
+            "/api/drones/phone/personaplex/stop": post_personaplex_stop,
             "/api/drones/phone/start": post_phone_start,
             "/api/drones/phone/turn": post_phone_turn,
             "/api/drones/phone/end": post_phone_end,
@@ -7453,6 +7517,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/voyages/where": lambda: api_voyages_where(q.get("runs", "")),
                 "/api/governance": api_governance,
                 "/api/liberty-machine/cycle": api_liberty_machine_cycle,
+                "/api/liberty-machine/checkpoints": api_checkpoints,
                 # the old address keeps working (VSM was renamed the Liberty Machine, 12 November)
                 "/api/vsm/cycle": api_liberty_machine_cycle,
                 "/api/store": api_store,
@@ -7508,7 +7573,9 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/drones": lambda: api_drones(q.get("drone", "browser")),
                 "/api/drones/fleet": api_drone_fleet,
                 "/api/drones/phone": api_drones_phone,
+                "/api/drones/phone/personaplex": api_personaplex,
                 "/api/drones/email/accounts": api_email_accounts,
+                "/api/drones/browser/sites": api_browser_sites,
                 "/api/drones/download": lambda: api_drone_download(q.get("model", "")),
                 "/api/drones/task": lambda: api_drone_task(q.get("id", "")),
                 "/api/tests": api_tests,

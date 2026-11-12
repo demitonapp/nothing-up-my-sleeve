@@ -2932,3 +2932,31 @@ ol.goaltext { padding-left: 22px; }
 .mailcode { font-family: var(--mono, ui-monospace, monospace); font-size: 28px; letter-spacing: .18em; color: var(--accent); }
 .dronemailbehaviour ul { margin: 8px 0 0 18px; }
 .mailservergrid .mailfull { grid-column: 1 / -1; }
+
+/* the browser drone's test sites (12 November) */
+.browsersites { display: grid; gap: 10px; }
+.browsersiteshead { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; flex-wrap: wrap; }
+.browsersiteshead h2 { margin: 0 0 3px; }
+.browsersiteschrome { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.sitegrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 1100px) { .sitegrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 640px) { .sitegrid { grid-template-columns: minmax(0, 1fr); } }
+.sitecard { display: grid; align-content: start; gap: 5px; padding: 12px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--raise); }
+.sitehead { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.sitemark { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 6px; font-weight: 700; font-size: 13px; color: #fff; flex: none; }
+.sitemark.linkedin { background: #0a66c2; }
+.sitemark.x { background: #111; color: #fff; }
+.sitemark.analytics { background: #f9ab00; color: #111; }
+.sitemark.search { background: #de5833; }
+.sitecard p { margin: 0; }
+.sitenote { color: var(--muted); }
+.siteactions { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 4px; }
+.droneprofile { margin-top: 8px; }
+
+/* the phone drone's PersonaPlex live voice (12 November) */
+.livevoice { display: grid; gap: 10px; }
+.livevoicehead { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; flex-wrap: wrap; }
+.livevoicehead h2 { margin: 0 0 3px; }
+.livevoiceactions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.livevoicemeta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.liveframe { width: 100%; height: min(70vh, 720px); border: 1px solid var(--line); border-radius: var(--r-md); background: #000; }

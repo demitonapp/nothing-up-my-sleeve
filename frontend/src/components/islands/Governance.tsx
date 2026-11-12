@@ -13,6 +13,7 @@ import { LIBERTY_MACHINE_SYSTEMS, libertyMachineSystemOf } from '@/lib/nav';
 import { routePath, sectionProps, useApi, useRoute } from '@/lib/useApi';
 import { acquisitionHtml, controlHtml, systemsHtml } from '@/scripts/views/governance';
 import { DronePage, S1Drones } from './DroneFleet';
+import { Checkpoints } from './Checkpoints';
 import { LibertyMachineCards } from './LibertyMachineCards';
 import { LibertyMachineCycle } from './LibertyMachineCycle';
 
@@ -105,6 +106,7 @@ export default function Governance() {
       {/* the fleet first (12 November, Justin: "the cards should be the first thing shown in this page"):
           S1's workers, the browser drone, the email drone and the phone drone, before the band's numbers */}
       {view === 's1' ? <S1Drones /> : null}
+      {view === 's1' ? <Checkpoints /> : null}
       <div className="gview active" data-gview={view}>
         <p className="s gvintro">{INTRO[view]}</p>
         <div id="govbands">

@@ -149,17 +149,17 @@ the island rewrites). A section with one tab shows no row.
   A class opens its page (`#/classes/<class>`, below), whose first tab is its **fleet**: every
   ship of that class. A ship opens its own page.
 - **Masaq' Reach, the trading orbital** (`/orbitals/masaq`): one page with **two views**. **Labs** (`/orbitals/masaq`) is
-  the houses that build the outside ships (`thorp/labs.py` `HOUSES`), one card each: its fal plate in the
+  the houses that build the outside ships (`s4.labs`, read through `thorp/lab_store.py`), one card each: its fal plate in the
   one Risso/Drake/Culture brief (`LABS` in `thorp/dash/art/generate_art.py`), the country flag, the models
   it had shipped by 12 November 2026, and what the Reach holds of it. The houses are **sorted by whether
   they publish weights** (open yards first, closed ones after, each in rank order) and **filtered by
-  country, purpose and weights**: the purpose is `thorp/labs.py` `FOCUS` (frontier, open fleet,
+  country, purpose and weights**: the purpose is the row's `focus` (frontier, open fleet,
   enterprise, agents, research). **Models** (`/orbitals/masaq/models`) is four cards, one per size band, each with
   its art and the count of outside models in it; a card opens `/orbitals/masaq/models/<band>`, the models in that
   band, biggest first, with the bands as a filter. Every house has its own page at
   **`/orbitals/masaq/<country>/<key>`** (e.g. `/orbitals/masaq/us/arcee`; `/masaq/...` and `/labs/...` stay aliases), with **Overview** and **Models** tabs (`.../models`), with its
   description, its purpose, its **funding split** (government vs private, a bar and the numbers, from
-  `thorp/labs.py` `FUNDING`, said plainly to be an estimate from public reporting rather than an audited
+  the row's `funding`, said plainly to be an estimate from public reporting rather than an audited
   cap table), the fleet it has shipped and every one of its ships in the Reach. A ship's card has **chat**
   (it hands the model to the console by name) and **experiments** (its tests and readings on
   `/leaderboard/competitor/<model>`), and the house's readings stay on `/leaderboard/lab/<key>`. Below
@@ -530,6 +530,14 @@ the island rewrites). A section with one tab shows no row.
     the bridge names the later real lines (Twilio Media Streams, SIP/Asterisk), the voice stack (keyboard
     ears, `say` mouth) and the call-safety terms (an AI disclosure, no emergency or premium numbers, a
     do-not-call list, transcription). The chat terminal uses `phone_call`, `phone_say` and `phone_end`.
+  - **Checkpoints** (`Checkpoints.tsx`, `/api/liberty-machine/checkpoints`, `thorp/checkpoints.py`; 12 November,
+    Justin: "audit and review the checkpoints ... update them in the liberty machine and then clean it up").
+    On S1 under the fleet: the saved minds on this Mac against the runs that wrote them — total, kept, stale
+    and free disk, then each set's voyage, class, state, size, latest step, keep/stale verdict and why. A keep
+    is at sea, the latest or best of its class, read by a queued voyage, or finished in the last 24 h; everything
+    else finished is superseded and everything that did not finish is stale. The last cleanup shows what it
+    removed and freed (`data/checkpoint-cleanup.json`). The audit and cleanup are `python -m thorp.checkpoints
+    [clean]`; the page is read-only.
   - **The queue's cycle** (`LibertyMachineCycle.tsx`, `/api/liberty-machine/cycle`, `thorp/viable/s3_control/cycle.py`; 12 November,
     Justin: "make sure that the UI /liberty-machine reflects this"). Between a system's band and its detail, on every
     system tab: a panel with **six steps, one a system** (`ol.cyclesteps`: S3* close the books, S4 refresh the

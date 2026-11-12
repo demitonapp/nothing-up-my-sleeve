@@ -364,6 +364,39 @@ class WagerBet(Base):
     practice: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")  # placed after the pull sailed
 
 
+class LabRecord(Base):
+    """A house of Masaq' Reach: one outside lab, its profile and its funding. The Reach's houses used to be
+    two tuples in `thorp/labs.py`; they are rows now (12 November, Justin: "labs should be in postgres not
+    hardcoded"), read through `thorp/lab_store.py`. `listed` separates the houses the Labs page shows from
+    the ones only the leaderboard names (EleutherAI, Hugging Face)."""
+
+    __tablename__ = "labs"
+    __table_args__ = {"schema": GAME_SCHEMA}
+
+    key: Mapped[str] = mapped_column(Text, primary_key=True)
+    ordinal: Mapped[int] = mapped_column(Integer, unique=True)  # the order the Labs page shows
+    listed: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")  # on the Labs page, or only the leaderboard
+    name: Mapped[str] = mapped_column(Text, unique=True)
+    short: Mapped[str] = mapped_column(Text, default="", server_default="")
+    families: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")  # regexes that match its models
+    orgs: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")  # its Hugging Face organisations
+    url: Mapped[str] = mapped_column(Text, default="", server_default="")  # its model organisation
+    site: Mapped[str] = mapped_column(Text, default="", server_default="")  # its own door
+    country: Mapped[str] = mapped_column(Text, default="", server_default="")  # the flag key in frontend/public/flags
+    country_name: Mapped[str] = mapped_column(Text, default="", server_default="")
+    hq: Mapped[str] = mapped_column(Text, default="", server_default="")
+    founded: Mapped[str] = mapped_column(Text, default="", server_default="")
+    blurb: Mapped[str] = mapped_column(Text, default="", server_default="")  # the card's one line
+    description: Mapped[str] = mapped_column(Text, default="", server_default="")  # the house page's paragraph
+    purpose: Mapped[str] = mapped_column(Text, default="", server_default="")
+    flagship: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")  # the models it had shipped by the as-of date
+    focus: Mapped[str] = mapped_column(Text, default="research", server_default="research")  # frontier, open fleet, enterprise, agents, research
+    open_weights: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    funding: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}")  # the split, its note, and the rounds
+    gov: Mapped[dict | None] = mapped_column(JSONB)  # Washington, for the American houses
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 # ---- the ships (schema `s1`, S1 operations; was `ship`): what a ship is, held in the database, not in code (Justin, 2026-11-08:
 # "these things shouldn't be hardcoded, we have postgres for a reason"; "a ship has characteristics: size,
 # training content, training methodology, voyages, discoveries"). Read through thorp/ship_store.py.

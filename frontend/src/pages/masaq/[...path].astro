@@ -5,15 +5,11 @@
 import Layout from '../../layouts/Layout.astro';
 import Labs from '../../components/islands/Labs';
 import LabPage from '../../components/islands/LabPage';
-
+import labData from '../../data/labs.json';
+// the houses come from frontend/src/data/labs.json, written from thorp.labs.listed() by
+// `python -m thorp.dash.lab_keys` (12 November: the houses left thorp/labs.py for s4.labs)
 export function getStaticPaths() {
-  const houses: [string, string][] = [
-    ['us', 'google'], ['us', 'openai'], ['us', 'anthropic'], ['us', 'meta'], ['cn', 'alibaba'],
-    ['us', 'microsoft'], ['cn', 'deepseek'], ['cn', 'antgroup'], ['fr', 'mistral'], ['us', 'xai'],
-    ['cn', 'moonshot'], ['cn', 'zai'], ['cn', 'minimax'], ['ca', 'cohere'], ['us', 'nvidia'],
-    ['cn', 'stepfun'], ['cn', 'bytedance'], ['us', 'thinkingmachines'], ['ae', 'tii'],
-    ['us', 'cognition'], ['us', 'arcee'], ['us', 'ai2'], ['fr', 'hcompany'],
-  ];
+  const houses = labData.houses as [string, string][];
   const paths: string[] = [
     'labs', 'models', 'embeddings',
     ...houses.map(([country, key]) => `${country}/${key}`),

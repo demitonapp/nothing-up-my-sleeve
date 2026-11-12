@@ -9,6 +9,7 @@
 import { useEffect, useState } from 'react';
 import { artSrc } from '@/scripts/views/helpers';
 import { EmailAccounts } from './EmailAccounts';
+import { LiveVoice } from './LiveVoice';
 import { useApi } from '@/lib/useApi';
 import { btnCls, cardCls, emptyCls, pillCls } from '@/lib/ui';
 
@@ -56,6 +57,7 @@ interface Run {
   question?: string | null;
   thought?: string | null;
   shot?: string | null;
+  profile?: 'fresh' | 'signed-in';
   log: Step[];
 }
 
@@ -101,6 +103,25 @@ interface PhoneCall {
   error?: string | null;
   transcript: PhoneTurn[];
   speak?: boolean;
+}
+
+interface BrowserSite {
+  key: string;
+  label: string;
+  mark: string;
+  tone: string;
+  url: string;
+  goal: string;
+  needs_login: boolean;
+  hint: string;
+  state?: { signed_in: boolean | null; checked: string; url?: string; title?: string; note?: string } | null;
+}
+
+interface BrowserSites {
+  chrome_running: boolean;
+  profile: string;
+  port: number;
+  sites: BrowserSite[];
 }
 
 interface PhoneState {
@@ -233,10 +254,66 @@ function BridgePanel({ bridge, isEmail, waiting }: { bridge?: Bridge | null; isE
   );
 }
 
+/** The four sites the browser drone is tested against, and the signed-in profile they need. */
+function TestSites({ data, busy, onSignIn, onCheck, onRun, onOpenChrome }: {
+  data: BrowserSites | null;
+  busy: boolean;
+  onSignIn: (site: string) => void;
+  onCheck: (site: string) => void;
+  onRun: (site: BrowserSite) => void;
+  onOpenChrome: () => void;
+}) {
+  if (!data) return <div className={emptyCls()}>reading the test sites…</div>;
+  return (
+    <section className={cardCls(false, 'panel browsersites')}>
+      <div className="browsersiteshead">
+        <div>
+          <h2>Test sites</h2>
+          <p className="s">LinkedIn, X and Google Analytics need your own session. Sign in once in the
+            dedicated Chrome profile, then the drone acts inside it — in a window you can watch.</p>
+        </div>
+        <div className="browsersiteschrome">
+          <span className={pillCls(data.chrome_running ? 'good' : '')}>{data.chrome_running ? 'Chrome open' : 'Chrome closed'}</span>
+          <button className={btnCls('ghost')} disabled={busy} onClick={onOpenChrome}>open signed-in Chrome</button>
+        </div>
+      </div>
+      <div className="sitegrid">
+        {data.sites.map((site) => {
+          const verdict = site.state?.signed_in;
+          const tone = verdict === true ? 'good' : verdict === false ? 'bad' : 'accent';
+          const word = verdict === true ? 'signed in' : verdict === false ? 'sign in' : 'not checked';
+          return (
+            <div key={site.key} className={`sitecard ${site.tone}`}>
+              <div className="sitehead">
+                <span className={`sitemark ${site.tone}`}>{site.mark}</span>
+                <b>{site.label}</b>
+                <span className={pillCls(tone)}>{word}</span>
+              </div>
+              <p className="s">{site.hint}</p>
+              {site.state?.note ? <p className="s sitenote">{site.state.note}</p> : null}
+              {site.state?.checked ? <p className="s">checked {ago(site.state.checked)}</p> : null}
+              <div className="siteactions">
+                {site.needs_login ? (
+                  <button className={btnCls('outline')} disabled={busy} onClick={() => onSignIn(site.key)}>open sign-in</button>
+                ) : null}
+                <button className={btnCls('ghost')} disabled={busy} onClick={() => onCheck(site.key)}>check</button>
+                <button className={btnCls('default')} disabled={busy} onClick={() => onRun(site)}>run test</button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 /** The browser drone's own page: the pilot it flies, the task it is given, and the run as it happens. */
 export function DronePage({ drone = 'browser' }: { drone?: string }) {
   const [tick, setTick] = useState(0);
+  const [sitesTick, setSitesTick] = useState(0);
+  const [signedIn, setSignedIn] = useState(true);
   const { data, error } = useApi<Payload>(`/api/drones?drone=${drone}&t=${tick}`, 3500);
+  const sitesApi = useApi<BrowserSites>(drone === 'browser' ? `/api/drones/browser/sites?t=${sitesTick}` : null, 8000);
   const [picked, setPicked] = useState<string | null>(null);
   const [goal, setGoal] = useState('');
   const [url, setUrl] = useState('');
@@ -275,7 +352,10 @@ export function DronePage({ drone = 'browser' }: { drone?: string }) {
 
   const launch = () => act(async () => {
     if (!goal.trim()) throw new Error('give the drone a goal first');
-    const r = await post('/api/drones/task', { goal, url: url.trim() || undefined, model: selected, max_steps: steps });
+    const r = await post('/api/drones/task', {
+      goal, url: url.trim() || undefined, model: selected, max_steps: steps,
+      profile: signedIn ? 'signed-in' : 'fresh',
+    });
     setShow(r.run?.id || null);
   });
 
@@ -289,6 +369,25 @@ export function DronePage({ drone = 'browser' }: { drone?: string }) {
     if (!phoneCall || !line.trim()) return;
     await post('/api/drones/phone/turn', { id: phoneCall.id, text: line.trim() });
     setLine(''); setTick((n) => n + 1);
+  });
+
+  const signIn = (site: string) => act(async () => {
+    await post('/api/drones/browser/signin', { site });
+    setSitesTick((n) => n + 1);
+  });
+
+  const checkSite = (site: string) => act(async () => {
+    const r = await post('/api/drones/browser/check', { site });
+    setMsg(`${r.title || site}: ${r.note || (r.signed_in ? 'signed in' : 'not signed in')}`);
+    setSitesTick((n) => n + 1);
+  });
+
+  const runSite = (site: BrowserSite) => act(async () => {
+    const r = await post('/api/drones/task', {
+      goal: site.goal, url: site.url, model: selected, max_steps: 20, profile: 'signed-in',
+    });
+    setShow(r.run?.id || null);
+    setTick((n) => n + 1);
   });
 
   const hangup = () => act(async () => {
@@ -311,6 +410,17 @@ export function DronePage({ drone = 'browser' }: { drone?: string }) {
       </div>
 
       {isEmail ? <EmailAccounts /> : null}
+      {isPhone ? <LiveVoice /> : null}
+      {d.kind === 'browser' ? (
+        <TestSites
+          data={sitesApi.data}
+          busy={busy}
+          onSignIn={(x) => void signIn(x)}
+          onCheck={(x) => void checkSite(x)}
+          onRun={(x) => void runSite(x)}
+          onOpenChrome={() => void signIn('search')}
+        />
+      ) : null}
 
       <div className="dronegrid">
         <section className={cardCls(false, 'panel dronemodels')}>
@@ -476,8 +586,13 @@ export function DronePage({ drone = 'browser' }: { drone?: string }) {
                 {flying ? 'a task is flying…' : 'launch the drone'}
               </button>
             </div>
-            <p className="s">A launch starts a real Chrome, headless, and gives it {steps} steps. It stops at a
-              sign-in, a payment or an irreversible action and asks you first.</p>
+            <label className="mailcheck droneprofile">
+              <input type="checkbox" checked={signedIn} onChange={(e) => setSignedIn(e.target.checked)} />
+              use the signed-in Chrome profile
+            </label>
+            <p className="s">A launch starts a real Chrome and gives it {steps} steps. The signed-in profile is
+              what LinkedIn, X and Google Analytics need; leave it off for a public page. It stops at a sign-in,
+              a payment or an irreversible action and asks you first.</p>
           </section>
         )}
       </div>
@@ -489,7 +604,7 @@ export function DronePage({ drone = 'browser' }: { drone?: string }) {
           <div className="dronerunhead">
             <h2>Run <span className="mono s">{shown.id}</span></h2>
             <span className={pillCls(RUN_TONE[shown.state] || '')}>{RUN_WORD[shown.state] || shown.state}</span>
-            <span className="s">{shown.model_label} · {shown.steps}/{shown.max_steps} steps · {ago(shown.finished || shown.started)}</span>
+            <span className="s">{shown.model_label} · {shown.steps}/{shown.max_steps} steps · {shown.profile === 'signed-in' ? 'signed-in profile · ' : ''}{ago(shown.finished || shown.started)}</span>
           </div>
           <p className="dronergoal">{shown.goal}</p>
           {shown.state === 'needs_user' && shown.question ? <p className={pillCls('accent')}>asks: {shown.question}</p> : null}

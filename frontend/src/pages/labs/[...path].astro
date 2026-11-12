@@ -1,17 +1,15 @@
 ---
 // The trading orbital's sub-paths as real routes, so a direct load works in dev (production also falls back
-// here): /labs/ships and its four size bands, and one page per house. The keys are thorp/labs.py HOUSES; a
-// house added there needs its key here too, and the island still answers if the route falls back.
+// here): /labs/ships and its four size bands, and one page per house. The keys come from
+// frontend/src/data/labs.json (thorp.labs.listed() through thorp.dash.lab_keys).
 import Layout from '../../layouts/Layout.astro';
 import Labs from '../../components/islands/Labs';
 import LabPage from '../../components/islands/LabPage';
-
+import labData from '../../data/labs.json';
+// the keys come from frontend/src/data/labs.json, written from thorp.labs.listed() by
+// `python -m thorp.dash.lab_keys` (12 November: the houses left thorp/labs.py for s4.labs)
 export function getStaticPaths() {
-  const houses = [
-    'google', 'openai', 'anthropic', 'meta', 'alibaba', 'microsoft', 'deepseek', 'antgroup',
-    'mistral', 'xai', 'moonshot', 'zai', 'minimax', 'cohere', 'nvidia', 'stepfun', 'bytedance',
-    'thinkingmachines', 'tii', 'cognition', 'arcee', 'ai2', 'hcompany',
-  ];
+  const houses: string[] = labData.keys;
   const paths = ['ships', ...houses, ...houses.map((key) => `${key}/models`)];
   for (const band of ['xsmall', 'small', 'medium', 'large']) paths.push(`ships/${band}`);
   return paths.map((path) => ({ params: { path } }));

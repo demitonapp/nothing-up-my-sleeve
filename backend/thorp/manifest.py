@@ -60,11 +60,12 @@ def upsert(book: Book) -> None:
     library from that file, so a book registered only in Postgres would be missing aboard). On a box, or with
     `THORP_LIBRARY_PG=0`, the file is the register and the only write."""
     row = asdict(book)
-    if _pg():  # the one store: a new book is written where the readers look
+    if _pg():  # the one store: a new book is written where the readers look; the box's copy is made at stage()
         from thorp import manifest_store, store
 
         with store.session() as s:
             manifest_store.put_book(s, row)
+        return
     cols = ", ".join(f'"{k}"' for k in row)
     qs = ", ".join("?" for _ in row)
     updates = ", ".join(f'"{k}"=excluded."{k}"' for k in row if k != "id")

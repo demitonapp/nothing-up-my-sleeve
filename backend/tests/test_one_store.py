@@ -51,13 +51,16 @@ def test_the_library_is_the_store_unless_told_or_aboard(home, monkeypatch):
     assert not manifest._pg()
 
 
-def test_a_book_is_written_to_the_store_and_to_the_box_copy(home):
+def test_a_book_is_written_to_the_store_and_exported_for_the_box(home, tmp_path):
     from thorp import manifest_store, paths
 
     manifest.upsert(_book("loc-x", sha1="abc"))
     assert manifest_store.get_book("loc-x")["sha1"] == "abc"
-    con = sqlite3.connect(paths.manifest_path())
-    assert con.execute("select sha1 from books where id='loc-x'").fetchone() == ("abc",)  # charter.stage carries it
+    assert not paths.manifest_path().exists()  # the home keeps no SQLite copy
+    box_copy = tmp_path / "stage" / "manifest.sqlite"
+    assert manifest_store.export_sqlite(box_copy) == 1  # what charter.stage carries
+    con = sqlite3.connect(box_copy)
+    assert con.execute("select sha1 from books where id='loc-x'").fetchone() == ("abc",)
     con.close()
     assert manifest.get("loc-x").sha1 == "abc" and [b.id for b in manifest.all_books()] == ["loc-x"]
     assert manifest.same_text("abc", "loc-other") == "loc-x" and manifest.same_text("abc", "loc-x") is None
@@ -72,9 +75,7 @@ def test_a_store_that_is_down_is_an_error_not_the_file(home, monkeypatch):
         manifest.get("loc-y")  # the file has it; the reader does not go there
     with pytest.raises(store.StoreDown):
         manifest.upsert(_book("loc-z"))
-    con = sqlite3.connect(paths.manifest_path())
-    assert con.execute("select count(*) from books where id='loc-z'").fetchone() == (0,)  # nothing half-written
-    con.close()
+    assert not paths.manifest_path().exists()  # nothing half-written, and no home SQLite copy
 
 
 def test_a_box_keeps_its_sqlite_files(home, monkeypatch):

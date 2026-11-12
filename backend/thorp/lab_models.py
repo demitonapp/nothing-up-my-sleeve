@@ -1,7 +1,7 @@
 """The houses' models on Hugging Face, for a lab's page (12 November, Justin: "within a labs details page ...
 it should list all models that are available on hugging face in a table").
 
-One row per repository the house's Hugging Face organisations publish: its id, downloads, likes, last
+One row per repository the house's Hugging Face organisations publish (`orgs` on its `s4.labs` row): its id, downloads, likes, last
 change, pipeline and parameter count, whether its weights are already cached for chat, and whether the
 Reach has scored it. The list is fetched from the Hub's public API and cached for a few minutes; the
 download itself is `thorp.lab_downloads`.
@@ -15,33 +15,7 @@ import time
 import urllib.parse
 import urllib.request
 
-# the lab key -> its Hugging Face organisations, in the order to ask. Empty for a house that publishes no
-# weights on the Hub (Anthropic, Cognition); the page says so rather than showing a different house's list.
-ORGS: dict[str, tuple[str, ...]] = {
-    "google": ("google", "google-deepmind"),
-    "openai": ("openai",),
-    "meta": ("meta-llama", "facebook"),
-    "alibaba": ("Qwen",),
-    "microsoft": ("microsoft",),
-    "deepseek": ("deepseek-ai",),
-    "antgroup": ("inclusionAI",),
-    "mistral": ("mistralai",),
-    "xai": ("xai-org",),
-    "moonshot": ("moonshotai",),
-    "zai": ("zai-org", "THUDM"),
-    "minimax": ("MiniMaxAI",),
-    "cohere": ("CohereLabs", "CohereForAI"),
-    "nvidia": ("nvidia",),
-    "stepfun": ("stepfun-ai",),
-    "bytedance": ("ByteDance-Seed", "ByteDance"),
-    "thinkingmachines": ("thinkingmachines",),
-    "tii": ("tiiuae",),
-    "arcee": ("arcee-ai",),
-    "ai2": ("allenai",),
-    "hcompany": ("Hcompany",),
-    "anthropic": (),
-    "cognition": (),
-}
+from thorp import lab_store
 
 _CACHE: dict[str, tuple[float, dict]] = {}
 _TTL = 300.0
@@ -164,7 +138,8 @@ def _fetch(org: str, limit: int) -> list[dict]:
 def models(lab: str, limit: int = 200) -> dict:
     """The house's public Hub repositories, biggest by downloads first. Cached five minutes."""
     lab = str(lab or "").strip()
-    orgs = ORGS.get(lab, ())
+    house = lab_store.get(lab)
+    orgs = tuple(house["orgs"]) if house else ()
     if not orgs:
         return {"lab": lab, "orgs": [], "models": [], "error": "this house publishes no weights on the Hub"}
     now = time.time()

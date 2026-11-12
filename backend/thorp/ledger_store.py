@@ -421,11 +421,14 @@ class PgLedger:
         # a literal `%` (a LIKE pattern, 'loop-%') is not a placeholder in SQLite, but psycopg reads it as
         # one; escape it before `?` becomes `%s` (10 November: /api/discoveries 500'd on `like 'loop-%'`)
         q = sql.replace("%", "%%").replace("?", "%s").replace("rowid", "id")
-        return re.sub(
+        q = re.sub(
             r"json_extract\(\s*((?:[A-Za-z_][A-Za-z0-9_]*\.)?spec_json)\s*,\s*'\$\.([^']+)'\s*\)",
             lambda m: f"({m.group(1)}::jsonb #>> '{{" + m.group(2).replace(".", ",") + "}')",
             q,
         )
+        # #>> is text, so a parameter compared with it must be text too: json_extract returned the
+        # JSON value's own type in SQLite, and a vocab compared as an integer 500'd in Postgres (12 November)
+        return re.sub(r"(\([^()]*#>> '\{[^}]+\}'\)) = %s", r"\1 = %s::text", q)
 
     def query(self, sql: str, params: Iterable = ()) -> list[dict]:
         """The readers' raw SQL against s1 (see _translate). A failed read rolls back, so the next one

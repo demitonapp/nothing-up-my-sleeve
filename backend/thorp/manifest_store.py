@@ -13,6 +13,7 @@ module holds the Postgres table those rows move into, and the read-only backfill
 
 from __future__ import annotations
 
+import contextlib
 from pathlib import Path
 
 from sqlalchemy import BigInteger, Float, ForeignKey, Index, Integer, Text, delete, func, select
@@ -232,6 +233,33 @@ def backfill(only: list[str] | None = None, source: Path | None = None, log=prin
         f"{counts['lists']} lists, {counts['list_resolutions']} resolutions"
     )
     return counts
+
+
+def export_sqlite(path: Path) -> int:
+    """Write the box's carried `manifest.sqlite` from the store. The home register is Postgres alone; a hired box
+    reads the SQLite copy `charter.stage` carries, so this is the one place the file is made (12 November: the
+    local `data/manifest.sqlite` was retired, and `stage()` exports this instead)."""
+    import sqlite3
+
+    from thorp import manifest, store
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with contextlib.suppress(OSError):
+        path.unlink()
+    con = sqlite3.connect(path)
+    try:
+        con.executescript(manifest.SCHEMA)
+        with store.session() as s:
+            rows = s.scalars(select(Book).order_by(Book.id)).all()
+            con.executemany(
+                f"insert into books ({', '.join(chr(34) + c + chr(34) for c in BOOK_COLUMNS)}) "
+                f"values ({', '.join('?' for _ in BOOK_COLUMNS)})",
+                [[getattr(b, "book_set" if c == "set" else c) for c in BOOK_COLUMNS] for b in rows],
+            )
+        con.commit()
+        return len(rows)
+    finally:
+        con.close()
 
 
 def verify(source: Path | None = None, log=print) -> bool:

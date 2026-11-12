@@ -39,6 +39,7 @@ import socket
 import subprocess
 import threading
 import time
+import urllib.error
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
@@ -654,14 +655,34 @@ def _chat(port: int, messages: list[dict], max_tokens: int = 1536, thinking: boo
     if thinking is False:
         # Qwen3.5 otherwise writes its reasoning into the answer: a phone turn is one or two sentences
         payload["chat_template_kwargs"] = {"enable_thinking": False}
+    clean = []
+    for m in messages:
+        c = m.get("content")
+        if isinstance(c, dict):
+            c = c.get("text") or json.dumps(c)
+        if c is None:
+            c = ""
+        clean.append({**m, "content": c})
+    payload["messages"] = clean
     body = json.dumps(payload).encode()
     req = urllib.request.Request(
         f"http://127.0.0.1:{port}/v1/chat/completions",
         data=body,
         headers={"Content-Type": "application/json"},
     )
-    with urllib.request.urlopen(req, timeout=900) as r:
-        data = json.loads(r.read().decode())
+    try:
+        with urllib.request.urlopen(req, timeout=900) as r:
+            data = json.loads(r.read().decode())
+    except urllib.error.HTTPError as e:
+        detail = e.read().decode("utf-8", "replace")
+        shape = []
+        for m in messages:
+            c = m.get("content")
+            kind = type(c).__name__
+            n = len(c) if isinstance(c, (str, list)) else None
+            types = [x.get("type") for x in c] if isinstance(c, list) and all(isinstance(x, dict) for x in c) else None
+            shape.append({"role": m.get("role"), "content": kind, "n": n, "parts": types})
+        raise RuntimeError(f"model HTTP {e.code}: {detail[:200]} | messages={shape}") from e
     msg = ((data.get("choices") or [{}])[0].get("message") or {})
     return str(msg.get("content") or msg.get("reasoning_content") or "").strip()
 
@@ -828,10 +849,10 @@ def _trim(messages: list[dict], keep: int = 10) -> list[dict]:
     if len(messages) <= keep + 1:
         return messages
     head, rest = messages[0], messages[1:]
-    task = rest[0] if rest and isinstance(rest[0].get("content"), str) else None
+    task = rest[0].get("content") if rest and isinstance(rest[0].get("content"), str) else None
     rest = rest[-keep:]
-    if task is not None and not (rest and rest[0] is task):
-        rest = [{"role": "user", "content": task}] + rest
+    if task is not None:
+        rest = [{"role": "user", "content": task}] + [m for m in rest if m.get("content") != task]
     seen = 0
     for m in reversed(rest):
         c = m.get("content")
@@ -959,16 +980,35 @@ def _run_browser(record: dict) -> None:
     ]
     facts: list[str] = []
 
+    signed = record.get("profile") == "signed-in"
+    created_page = True
     with sync_playwright() as pw:
         headless = os.environ.get("THORP_DRONE_HEADFUL") != "1"
-        try:
-            browser = pw.chromium.launch(
-                channel="chrome", headless=headless, args=["--disable-blink-features=AutomationControlled"]
-            )
-        except Exception:  # noqa: BLE001  no Chrome installed: the bundled Chromium, if it is there
-            browser = pw.chromium.launch(headless=headless, args=["--disable-blink-features=AutomationControlled"])
-        context = browser.new_context(viewport={"width": width, "height": height})
-        page = context.new_page()
+        browser = None
+        if signed:
+            from thorp import browser as profile_browser
+
+            profile_browser.ensure_chrome(record.get("url") or None)
+            browser = pw.chromium.connect_over_cdp(profile_browser.CDP, no_defaults=True)
+            context = browser.contexts[0] if browser.contexts else browser.new_context(viewport={"width": width, "height": height})
+            page = next((p for p in context.pages if p.url and not p.url.startswith("about:")), None)
+            if page is None:
+                page = context.new_page()
+            else:
+                created_page = False
+            try:
+                page.set_viewport_size({"width": width, "height": height})
+            except Exception:  # noqa: BLE001  a window the browser will not resize is used as it is
+                pass
+        else:
+            try:
+                browser = pw.chromium.launch(
+                    channel="chrome", headless=headless, args=["--disable-blink-features=AutomationControlled"]
+                )
+            except Exception:  # noqa: BLE001  no Chrome installed: the bundled Chromium, if it is there
+                browser = pw.chromium.launch(headless=headless, args=["--disable-blink-features=AutomationControlled"])
+            context = browser.new_context(viewport={"width": width, "height": height})
+            page = context.new_page()
         page.set_default_timeout(20000)
         try:
             _goto(page, record.get("url") or "https://duckduckgo.com/")
@@ -1031,10 +1071,16 @@ def _run_browser(record: dict) -> None:
             record["answer"] = record.get("thought") or ""
             record["error"] = f"stopped after {record['max_steps']} steps without terminate"
         finally:
-            with contextlib.suppress(Exception):
-                context.close()
-            with contextlib.suppress(Exception):
-                browser.close()
+            if signed:
+                # the profile's Chrome is the user's window: leave it open, close only a tab we opened
+                if created_page:
+                    with contextlib.suppress(Exception):
+                        page.close()
+            else:
+                with contextlib.suppress(Exception):
+                    context.close()
+                with contextlib.suppress(Exception):
+                    browser.close()
 
 
 # ---- the runs -----------------------------------------------------------------------------------------
@@ -1056,7 +1102,7 @@ def _save(record: dict) -> None:
             shutil.rmtree(RUNS / "runs" / rid, ignore_errors=True)
 
 
-def start_task(goal: str, url: str | None = None, model: str | None = None, max_steps: int = DEFAULT_STEPS) -> dict:
+def start_task(goal: str, url: str | None = None, model: str | None = None, max_steps: int = DEFAULT_STEPS, profile: str = "fresh") -> dict:
     """Put the browser drone on a task. One at a time: a second ask is refused, not queued."""
     text = str(goal or "").strip()
     if not text:
@@ -1083,6 +1129,7 @@ def start_task(goal: str, url: str | None = None, model: str | None = None, max_
         "finished": None,
         "steps": 0,
         "max_steps": max(1, min(int(max_steps), MAX_STEPS)),
+        "profile": "signed-in" if profile == "signed-in" else "fresh",
         "answer": None,
         "error": None,
         "question": None,

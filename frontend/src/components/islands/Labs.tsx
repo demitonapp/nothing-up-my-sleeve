@@ -61,7 +61,7 @@ const PURPOSES: { key: string; label: string }[] = [
   { key: 'research', label: 'Research' },
 ];
 
-const COUNTRY_SHORT: Record<string, string> = { us: 'US', cn: 'China', fr: 'France', ca: 'Canada', ae: 'UAE' };
+const COUNTRY_SHORT: Record<string, string> = { us: 'US', cn: 'China', fr: 'France', ca: 'Canada', ae: 'UAE', gb: 'UK', au: 'Australia', za: 'South Africa', br: 'Brazil' };
 
 /** One house's plate: rank, name, flag, what it makes, and what the Reach has read of it. Every house has
  *  its own page now, so the card is one door and the page carries the readings link. */

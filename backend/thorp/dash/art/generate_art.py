@@ -632,6 +632,27 @@ LABS: dict[str, str] = {
     "touching one exact mark on it with a long brass pointer, an arched stone bridge strung with lanterns "
     "behind, a thin ring of light in the sky, an uncropped clean image with no watermark, no signature, no "
     "text and no logo",
+    # Maincode (12 November, Justin: "can you add maincoders lab to masaq reach"): a southern yard that
+    # raises its own mainmast, under the four-pointed star of its flag.
+    "lab-maincode": "a shipyard on a cold southern bay at night, black water and a low wind: a tall ship on the "
+    "stocks with her mainmast stepped and her rigging half set, a great white four-pointed star painted on her "
+    "pale sail, shipwrights in long coats working around a forge and a bench of brass instruments, the lanterns "
+    "of a low town along the far shore, a thin ring of light in the sky, an uncropped clean image with no "
+    "watermark, no signature, no text and no logo",
+    # The three regional houses (12 November, Justin: "also add the best lab from the UK and South Africa and
+    # South America"): a pilot that finds its own way, a family hall, and a songbird on a green-and-gold sail.
+    "lab-wayve": "a pilot cutter running through fog on a black sea at night with no chart aboard: a great glass "
+    "lantern at her masthead throwing a long cone of light on the water ahead, a brass wheel turning itself at "
+    "the helm, a low dark coast with the lanterns of a city beyond, a thin ring of light in the sky, an uncropped "
+    "clean image with no watermark, no signature, no text and no logo",
+    "lab-lelapa": "a family compound on a dark southern hillside at night: a low round hall of stone and thatch, a "
+    "small swift ship on the stocks beside it with sails of ochre and indigo, a circle of lanterns and people "
+    "around a fire, the four stars of the Southern Cross above, a thin ring of light in the sky, an uncropped "
+    "clean image with no watermark, no signature, no text and no logo",
+    "lab-maritaca": "a river boatyard beneath a dark tropical hill at night: a swift two-masted ship with sails of "
+    "green and gold, a sabiá bird painted on the main sail, a great brass telescope on the wet quay, fireflies "
+    "and lanterns among the palms, a thin ring of light in the sky, an uncropped clean image with no watermark, "
+    "no signature, no text and no logo",
 }
 
 # The embeddings ontology's categories (12 November, Justin: "cards for the embeddings in the culture drake

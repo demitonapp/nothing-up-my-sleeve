@@ -25,20 +25,39 @@ from pathlib import Path
 
 from thorp import paths
 from thorp.viable.s1_operations import charter as c
-from thorp.viable.s1_operations.vast import Vast
+from thorp.viable.s1_operations.vast import Vast, offer
 from thorp.viable.s3_control import charter as s3
 from thorp.viable.s5_policy import charter as s5
 
 DEFAULT_GPUS = ["RTX 4090", "RTX 5090", "H100 SXM", "H100 PCIE"]
 SMOKE_CODE = """
-import json, torch
+import json, time, torch
 out = {"torch": torch.__version__, "cuda": torch.version.cuda, "available": bool(torch.cuda.is_available())}
 if out["available"]:
+    props = torch.cuda.get_device_properties(0)
     out["device"] = torch.cuda.get_device_name(0)
     out["capability"] = list(torch.cuda.get_device_capability(0))
-    a = torch.randn(2048, 2048, device="cuda", dtype=torch.bfloat16)
-    b = (a @ a).float()
-    out["matmul_mean"] = round(float(b.abs().mean()), 4)
+    out["sm_count"] = props.multi_processor_count
+    out["memory_gb"] = round(props.total_memory / 2 ** 30, 1)
+
+    def bench(dtype, iters, n=8192):
+        a = torch.randn(n, n, device="cuda", dtype=dtype)
+        b = torch.randn(n, n, device="cuda", dtype=dtype)
+        for _ in range(5):
+            a @ b
+        torch.cuda.synchronize()
+        t0 = time.perf_counter()
+        for _ in range(iters):
+            a @ b
+        torch.cuda.synchronize()
+        dt = (time.perf_counter() - t0) / iters
+        return round(2 * n ** 3 / dt / 1e12, 1), round(dt * 1000, 2)
+
+    out["bf16_tflops"], out["bf16_ms"] = bench(torch.bfloat16, 100)
+    torch.backends.cuda.matmul.allow_tf32 = False
+    out["fp32_tflops"], out["fp32_ms"] = bench(torch.float32, 30)
+    out["tflops_note"] = "achieved dense 8192^3 matmul; fp32 with TF32 off"
+
     m = torch.nn.Linear(128, 128, device="cuda")
     x = torch.randn(256, 128, device="cuda")
     loss = (m(x) ** 2).mean()
@@ -60,6 +79,21 @@ def offers_for(v: Vast, gpu: str, terms: dict, relaxed: bool) -> list[dict]:
     return v.search(gpu, t)
 
 
+def raw_offers(v: Vast, gpu: str, cap: float = 3.0) -> list[dict]:
+    """A smoke hire may take an offer S5's voyage filters refuse: unverified, slower than 200 Mbps down, a
+    53 GB disk. It still insists on CUDA 12.8, 35 GB of disk, reliability 0.93 and 100 Mbps each way."""
+    q = {"num_gpus": {"eq": 1}, "rentable": {"eq": True}, "rented": {"eq": False}, "gpu_name": {"eq": gpu},
+         "disk_space": {"gte": 35}, "cuda_max_good": {"gte": 12.8}, "dph_total": {"lte": cap},
+         "order": [["dph_total", "asc"]], "type": "ondemand", "limit": 20}  # fmt: skip
+    try:
+        offs = v.call("POST", "/api/v0/bundles/", q, None).get("offers") or []
+    except Exception:  # noqa: BLE001 - no offers is a result, not a crash
+        return []
+    good = [offer(o, gpu) for o in offs]
+    return sorted([x for x in good if x["reliability"] >= 0.93 and x["inet_down"] >= 100 and x["inet_up"] >= 100],
+                  key=lambda x: x["dph"])  # fmt: skip
+
+
 def smoke(gpu: str, terms: dict) -> dict:
     v = Vast()
     t0 = time.time()
@@ -69,6 +103,10 @@ def smoke(gpu: str, terms: dict) -> dict:
     if not offers:
         relaxed = True
         offers = offers_for(v, gpu, terms, relaxed=True)
+    if not offers:  # no offer inside S5 at all: a smoke hire may take an unverified one
+        offers = raw_offers(v, gpu)
+        if offers:
+            row["smoke_exception"] = "no offer inside S5: unverified/slower/53 GB disk accepted for the smoke"
     row["relaxed"] = relaxed
     if not offers:
         row["status"] = "no offer"
@@ -86,7 +124,8 @@ def smoke(gpu: str, terms: dict) -> dict:
     try:
         print(f"[{gpu}] hiring offer {o['offer_id']} at ${o['dph']:.3f}/h"
               f"{' (relaxed terms)' if relaxed else ''}", flush=True)
-        instance = v.hire(o["offer_id"], terms["image"], int(terms["disk_gb"]), f"thorp:{run_id}")
+        disk = min(40, int(o["disk_gb"])) if o.get("disk_gb") else 40  # the smoke needs the image, not 80 GB
+        instance = v.hire(o["offer_id"], terms["image"], disk, f"thorp:{run_id}")
         row["instance"] = instance
         hire = {"instance": instance, "run_id": run_id, "gpu": gpu, "dph": o["dph"], "started": time.time(),
                 "name": f"smoke {gpu}", "quote_hours": 0.25}  # fmt: skip
@@ -112,8 +151,11 @@ def smoke(gpu: str, terms: dict) -> dict:
         info = json.loads((py.stdout or "").strip().splitlines()[-1])
         row.update({"torch": info.get("torch"), "cuda": info.get("cuda"), "available": info.get("available"),
                     "device": info.get("device"), "capability": info.get("capability"),
-                    "matmul_mean": info.get("matmul_mean"), "train_step_loss": info.get("train_step_loss")})  # fmt: skip
-        row["status"] = "ok" if info.get("available") and info.get("matmul_mean") is not None else "failed: cuda unavailable"
+                    "sm_count": info.get("sm_count"), "memory_gb": info.get("memory_gb"),
+                    "bf16_tflops": info.get("bf16_tflops"), "bf16_ms": info.get("bf16_ms"),
+                    "fp32_tflops": info.get("fp32_tflops"), "fp32_ms": info.get("fp32_ms"),
+                    "train_step_loss": info.get("train_step_loss")})  # fmt: skip
+        row["status"] = "ok" if info.get("available") and info.get("bf16_tflops") else "failed: cuda unavailable"
         row["box"] = {"nproc": box.sh("nproc", timeout=30).stdout.strip(),
                       "mem_gb": box.sh("free -g | awk 'NR==2{print $2}'", timeout=30).stdout.strip(),
                       "disk": box.sh("df -h /root | tail -1", timeout=30).stdout.strip()}  # fmt: skip
@@ -137,7 +179,9 @@ def smoke(gpu: str, terms: dict) -> dict:
         row["cost"] = round(s3.cost_of(hire, ended), 4) if hire else 0.0
         row["wall_s"] = round(ended - t0, 1)
         row["released"] = released
-        print(f"[{gpu}] {row['status']} — {row.get('device', '–')}, {row['wall_s']} s, ${row['cost']:.3f}", flush=True)
+        print(f"[{gpu}] {row['status']} — {row.get('device', '–')}"
+              f"{', ' + str(row['bf16_tflops']) + ' TFLOPS bf16' if row.get('bf16_tflops') else ''}"
+              f", {row['wall_s']} s, ${row['cost']:.3f}", flush=True)  # fmt: skip
     return row
 
 
@@ -156,7 +200,9 @@ def main() -> int:
         out.write_text(json.dumps(results, indent=1))
     print("\n=== summary ===")
     for r in results:
-        print(f"{r['gpu']:12s} {r['status']:8s} {r.get('device', '–'):22s} ${r.get('cost', 0):.3f} {r.get('wall_s', 0):.0f} s")
+        print(f"{r['gpu']:12s} {r['status']:8s} {r.get('device', '–'):22s}"
+              f" {str(r.get('bf16_tflops', '–')) + ' TFLOPS bf16':>18s}"
+              f" ${r.get('cost', 0):.3f} {r.get('wall_s', 0):.0f} s")  # fmt: skip
     print(f"\nwritten to {out}")
     return 0 if all(r["status"] == "ok" for r in results) else 1
 

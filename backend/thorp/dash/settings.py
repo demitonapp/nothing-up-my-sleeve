@@ -635,7 +635,15 @@ def charters(limit: int = 8) -> dict:
             if stop is not None and stop > data_done_i:
                 phases["board"] = float(rel[stop] - rel[data_done_i])
 
-        # the phase still running, timed to now for the live hire and to the next quote for an aborted one
+        # the phase still running: to now for the live hire, to the release for an aborted one, and to the next
+        # quote only when neither is on record. Without this an aborted ssh wait ran to the next hire's quote and
+        # setup could read longer than the hire itself.
+        release_end = None
+        if release:
+            if release.get("ended"):
+                release_end = float(release["ended"])
+            elif release.get("at"):
+                release_end = datetime.fromisoformat(str(release["at"])).timestamp()
         open_key, start_i = None, None
         if data_i is not None and data_done_i is None:
             open_key, start_i = "data", data_i
@@ -652,7 +660,12 @@ def charters(limit: int = 8) -> dict:
 
         started = float(hire.get("started") or (now - rel[-1]))
         if open_key is not None and start_i is not None:
-            end = (now - started) if (live and release is None) else end_rel
+            if release_end is not None:
+                end = release_end - started
+            elif live and release is None:
+                end = now - started
+            else:
+                end = end_rel
             phases[open_key] = max(0.0, end - rel[start_i])
 
         if release:
@@ -673,12 +686,7 @@ def charters(limit: int = 8) -> dict:
             status = "aborted"
 
         # a released hire's own end; a failed one has only the release event's time, which is still the end
-        ended = None
-        if release:
-            if release.get("ended"):
-                ended = float(release["ended"])
-            elif release.get("at"):
-                ended = datetime.fromisoformat(str(release["at"])).timestamp()
+        ended = release_end
         total_s = (ended - started) if ended else (now - started)
         dph = float(hire.get("dph") or offer.group(2))
         sea_name = _CHARTER_SEA.search(block[sea_i][1]).group(1) if sea_i is not None else None

@@ -445,10 +445,12 @@ the island rewrites). A section with one tab shows no row.
   was built, Python and the frameworks, the chip (its CPU and GPU cores) and memory, and each lane's
   seats. **Vast**: **the ship out** when a hire is running (its name, status, elapsed against the quote, the
   task now, its spend, and a task bar with a legend), then **where the time goes**: one row a recent
-  hire, task by task — provision, ssh, code, data, board, env, train and home — parsed from
-  `data/runs/charter.log` and joined to the spend log by instance, grouped under *fit-out* and *the
-  run*, each task's share of the hire a bar, the live hire's open task timed to now, and a red total
-  when the hire ran past its quote. Then **the market**: a stat strip (whether the key is set, the
+  hire in three parts — **setup** (provision, ssh, code, data, the manifest and the torch environment;
+  the heaviest task under its figure, the rest in its tooltip), **training** (the only part that uses
+  the GPU, with its share of the hire) and **home** (the checkpoint and log pull onto this Mac, then the
+  release, so it competes with the Mac lane) — parsed from `data/runs/charter.log` and joined to the
+  spend log by instance, each part's share of the hire a bar, the live hire's open task timed to now,
+  and a red total when the hire ran past its quote. Then **the market**: a stat strip (whether the key is set, the
   seats, the week's spend of its budget, the all-time spend, voyages and hours, and the ships out) and
   a table, one row a GPU chip class the terms allow, grouped *the market* and *the voyages*: its
   ceiling, how many times the market was read and when, the latest price and the host's reliability,

@@ -659,6 +659,8 @@ def charters(limit: int = 8) -> dict:
             raw = str(release.get("status") or "").strip()
             if raw == "overran":
                 status = "overran"
+            elif release.get("why"):  # a hire that ended before its run: refused ssh, a stalled copy
+                status = "aborted"
             elif raw.lower() in ("home", "finished", "released", ""):
                 status = "released"
             else:  # lost, recalled, came in unfinished, gone: the run did not come home

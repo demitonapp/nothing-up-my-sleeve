@@ -96,7 +96,7 @@ cache, and builds the dashboard. `python -m thorp onboard` is the same command o
 environment exists; `thorp onboard --reset` archives the answers and starts again. The store switch
 is also on `/settings`, under **The store**.
 
-The dashboard is an Astro app in `frontend/`. It builds to `backend/thorp/dash/static` (not committed), which `thorp dash` serves beside its JSON API. While working on the page, `pnpm --dir frontend dev` serves it with hot reload on http://localhost:4321 and forwards `/api` to a running `thorp dash`. Its standards are in `backend/thorp/dash/UI.md`.
+The dashboard is an Astro app in `frontend/`. `thorp dash` (port 8787) serves the JSON API only, no page. `pnpm --dir frontend dev` serves the dashboard with hot reload on http://localhost:4321 and forwards `/api` to the running `thorp dash`. Its standards are in `backend/thorp/dash/UI.md`.
 
 `thorp run` on a finished spec prints its ledger row and exits; on a spec with a checkpoint it resumes from the latest one. `thorp eval RUN` re-scores a run's latest checkpoint. Each `?` in `thorp ledger` binds to the latest finished run unless you pass parameters or `--run ID`.
 

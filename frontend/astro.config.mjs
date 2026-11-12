@@ -1,5 +1,5 @@
-// The dashboard (frontend/) builds to backend/thorp/dash/static, which `thorp dash` (server.py) serves beside its JSON API.
-// `pnpm dev` serves the page with hot reload on :4321 and forwards /api to a running `thorp dash`.
+// The dashboard (frontend/) is served by `pnpm dev` on :4321, which forwards /api to a running `thorp dash`.
+// `thorp dash` (:8787) serves the JSON API only, no page.
 // React and Tailwind are here for shadcn/ui (src/components/ui, UI.md "Components").
 import { defineConfig } from 'astro/config';
 import react from '@astrojs/react';

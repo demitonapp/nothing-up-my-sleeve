@@ -27,32 +27,10 @@ from thorp.ledger import connect
 from thorp.store import StoreDown
 from thorp.viable.s4_intelligence import readings
 
-STATIC = Path(__file__).with_name("static")
-TYPES = {
-    ".html": "text/html; charset=utf-8",
-    ".js": "text/javascript; charset=utf-8",
-    ".css": "text/css; charset=utf-8",
-    ".svg": "image/svg+xml",
-    ".png": "image/png",
-    ".ico": "image/x-icon",
-    ".woff2": "font/woff2",
-    ".json": "application/json",
-}
-NOT_BUILT = b"""<!doctype html><meta charset="utf-8"><title>Nothing up my sleeve</title>
-<body style="background:#0e1116;color:#e6edf3;font:14px/1.5 ui-sans-serif,sans-serif;padding:40px">
-<h1 style="font-size:18px">The dashboard is not built yet</h1>
-<p>Build it once (and after any change under thorp/dash/web), then reload:</p>
-<pre style="color:#e3b341">pnpm --dir thorp/dash/web install
-pnpm --dir thorp/dash/web build</pre>
-<p>The JSON API under /api works without it.</p></body>"""
-
-
-def _static(path: str) -> tuple[bytes, str] | None:
-    """A file from the build, never one outside it."""
-    f = (STATIC / path.lstrip("/")).resolve()
-    if not f.is_relative_to(STATIC.resolve()) or not f.is_file():
-        return None
-    return f.read_bytes(), TYPES.get(f.suffix, "application/octet-stream")
+API_ONLY = (
+    b'{"error": "this port serves the JSON API only; the dashboard is the frontend dev server '
+    b'(pnpm --dir frontend dev, http://localhost:4321)"}'
+)
 
 
 def _finite(obj):
@@ -7168,34 +7146,10 @@ class Handler(BaseHTTPRequestHandler):
                 return self._onboard_page(u.path)
             if u.path.startswith("/api/onboard/"):
                 return self._onboard_api(u.path, q)
-            if u.path in ("/", "/index.html"):
-                page = _static("index.html")
-                return (
-                    self._send(200, page[0], page[1])
-                    if page
-                    else self._send(503, NOT_BUILT, "text/html; charset=utf-8")
-                )
             if not u.path.startswith("/api/"):
-                got = _static(u.path)
-                if got is None and not u.path.endswith("/"):
-                    got = _static(u.path + "/index.html")  # Astro's per-route pages (the multi-page build)
-                # a dynamic sub-route (e.g. /discoveries/<trick>) serves its section's shell: the panel is
-                # filled client-side from the JSON API, so the shell is the same for every slug
-                if got is None:
-                    parts = [p for p in u.path.split("/") if p]
-                    while parts and got is None:
-                        parts.pop()
-                        got = _static("/".join(parts) + "/index.html") if parts else _static("index.html")
-                if got is None:
-                    return self._send(404, b"not found", "text/plain")
-                # the build names its assets by content hash, so they never go stale
-                hashed = u.path.startswith("/assets/")
-                return self._send(
-                    200,
-                    got[0],
-                    got[1],
-                    "public, max-age=31536000, immutable" if hashed else "no-store",
-                )
+                # 12 November, Justin: "8787 shouldn't serve a UI". The page is the Astro dev server on :4321,
+                # which forwards /api here.
+                return self._send(404, API_ONLY, "application/json")
             routes = {
                 "/api/runs": lambda: api_runs(),
                 "/api/waters": api_waters,

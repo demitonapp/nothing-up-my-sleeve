@@ -4745,6 +4745,14 @@ def post_chat_question(body: dict) -> dict:
     return {"question": row}
 
 
+def post_chat_question_delete(body: dict) -> dict:
+    """Take one question out of the library."""
+    from thorp import chat_questions
+
+    chat_questions.remove(int(body.get("id") or 0))
+    return {"ok": True}
+
+
 def api_foreign_control_tokens() -> dict:
     """Every read foreign ship's control tokens, for the comparison table on a foreign page."""
     from thorp import foreign
@@ -7796,6 +7804,7 @@ class Handler(BaseHTTPRequestHandler):
             "/api/chat": api_chat,
             "/api/chat/notes": post_chat_note,
             "/api/chat/questions": post_chat_question,
+            "/api/chat/questions/delete": post_chat_question_delete,
             "/api/chat/threads": post_chat_thread,
             "/api/chat/threads/delete": post_chat_thread_delete,
             "/api/expedition_priority": post_expedition_priority,

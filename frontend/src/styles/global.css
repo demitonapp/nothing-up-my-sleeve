@@ -2511,6 +2511,7 @@ ol.goaltext { padding-left: 22px; }
   color: #c9a24a; font-size: 10.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
 .consolecolhead .note { color: #7c694a; font-variant-numeric: tabular-nums; }
 .consolecolhead .consolbtn { margin-left: auto; white-space: nowrap; }
+.consolecolhead .consolbtn + .consolbtn { margin-left: 0; }
 .consolemain .consolehead { overflow-x: auto; scrollbar-width: none; }
 .consolemain .consolehead .consolbtn { white-space: nowrap; flex: none; }
 .consoleheadgap { flex: 1 1 auto; }
@@ -2539,6 +2540,57 @@ ol.goaltext { padding-left: 22px; }
 .consolepastdel { flex: none; background: none; border: 0; color: #6f5d40; cursor: pointer; padding: 0 10px; font-size: 15px; }
 .consolepastdel:hover { color: #d98b6a; }
 .consolepastlist .consolewarn { margin: 6px 8px 10px; }
+
+/* the catalogue (13 November, Justin: "past chats need to have a folder concept for cataloguing"): a folder is a
+   foldable group with a hairline head; a chat is dragged onto one, or filed with its folder button */
+.consolepastsearch { padding: 8px 10px; background: #0e0d0b; border-bottom: 1px solid #1e1811; }
+.consolepastsearch input, .consolefolderform input { width: 100%; min-width: 0; box-sizing: border-box; background: #131110;
+  color: #f2e6cf; border: 1px solid #3a2a12; border-radius: 2px; padding: 6px 9px; font: inherit; font-size: 12.5px; }
+.consolepastsearch input:focus, .consolefolderform input:focus { outline: none; border-color: #c9a24a; }
+.consolefolder { border-radius: 2px; transition: background .15s, box-shadow .15s; }
+.consolefolder + .consolefolder { margin-top: 8px; }
+.consolefolder.drop { background: rgba(201,162,74,.08); box-shadow: inset 0 0 0 1px #c9a24a; }
+.consolefolderhead { display: flex; align-items: center; gap: 2px; border-bottom: 1px solid #221a11; }
+.consolefoldername { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 7px; padding: 7px 6px;
+  background: none; border: 0; cursor: pointer; font: inherit; text-align: left; color: #c9a24a;
+  font-size: 10.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
+.consolefoldername:hover { color: #e5c982; }
+.consolefolder.unfiled .consolefoldername { color: #8d7a56; }
+.consolefoldercaret { width: 9px; flex: none; color: #8d7a56; letter-spacing: 0; }
+.consolefoldertext { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.consolefoldercount { color: #6f5d40; font-weight: 400; letter-spacing: 0; font-variant-numeric: tabular-nums; }
+.consolefolderact { flex: none; background: none; border: 0; color: #6f5d40; cursor: pointer; padding: 2px 6px; font-size: 13px; opacity: 0;
+  transition: opacity .15s; }
+.consolefolderhead:hover .consolefolderact, .consolefolderact:focus-visible { opacity: 1; }
+.consolefolderact:hover { color: #d8b566; }
+.consolefolderempty { margin: 6px 10px 4px 22px; font-size: 11.5px; color: #6f5d40; }
+.consolefolderform { display: flex; align-items: center; gap: 6px; padding: 6px 4px; }
+.consolefolderform.inrow { padding: 2px 8px 8px 10px; }
+.consolefolderform .consolbtn { flex: none; padding: 4px 9px; }
+.consolepastrow[draggable="true"] { cursor: grab; }
+.consolepastrow[draggable="true"]:active { cursor: grabbing; }
+.consolepastfile { flex: none; display: grid; place-items: center; background: none; border: 0; color: #6f5d40; cursor: pointer; padding: 0 4px;
+  opacity: 0; transition: opacity .15s, color .15s; }
+.consolepastrow:hover .consolepastfile, .consolepastfile:focus-visible, .consolepastfile.on { opacity: 1; }
+.consolepastfile:hover, .consolepastfile.on { color: #d8b566; }
+@media (hover: none) { .consolepastfile, .consolefolderact { opacity: 1; } }
+
+/* the Questions folder (13 November): the default folder, pinned first, keeping questions and never chats. It
+   reads as the same kind of folder, with a brass rule down its side and a tag saying what it takes. */
+.consolefolder.questions { margin-bottom: 10px; padding-bottom: 4px; border-left: 2px solid #6b5628; padding-left: 4px; }
+.consolefolder.questions .consolefoldername { color: #e5c982; }
+.consolefoldertag { flex: none; margin-right: 6px; font-size: 10px; letter-spacing: .06em; color: #6f5d40; white-space: nowrap; }
+.consoleqkeep { padding: 8px 4px 2px; }
+.consoleqkeep textarea { width: 100%; box-sizing: border-box; min-height: 52px; resize: vertical; background: #131110; color: #f2e6cf;
+  border: 1px solid #3a2a12; border-radius: 2px; padding: 6px 9px; font: inherit; font-size: 12.5px; line-height: 1.45; }
+.consoleqkeep textarea:focus { outline: none; border-color: #c9a24a; }
+.consoleqkeep .consolefolderform { padding: 6px 0 2px; }
+.consoleqkeep .consolefolderempty { margin-left: 2px; }
+.consoleqgroup { margin-top: 6px; }
+.consoleqgroupname { padding: 6px 8px 2px; font-size: 11px; color: #a8977a; }
+.consoleqgroupname span { color: #6f5d40; font-variant-numeric: tabular-nums; margin-left: 4px; }
+.consoleqtext { font-size: 13px; color: #e9e2d3; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+  overflow: hidden; overflow-wrap: anywhere; }
 
 /* right: settings, a row a control */
 .consolesetlist { flex: 1 1 auto; overflow-y: auto; padding: 4px 16px 16px; background: #0e0d0b;

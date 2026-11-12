@@ -68,3 +68,11 @@ def payload() -> dict:
         "folders": [{"name": k, "count": v} for k, v in sorted(counts.items())],
         "questions": rows,
     }
+
+
+def remove(qid: int) -> None:
+    """Take one question out of the library (13 November: the console's Questions folder forgets one)."""
+    ensure()
+    with store.session() as s:
+        s.execute(text("delete from s4.chat_questions where id = :id"), {"id": int(qid)})
+        s.commit()

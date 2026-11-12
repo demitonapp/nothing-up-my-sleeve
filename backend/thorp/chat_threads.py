@@ -5,6 +5,9 @@ A thread is the same shape the chat keeps in the browser (`lib/conversations.ts`
 its name and kind, the title, whether it is saved, the two timestamps (milliseconds), and the messages
 as JSON. The browser writes one here on every save and reads them back when it syncs, so a chat survives
 a cleared browser and is the same on another one.
+
+A thread can be filed in a folder (13 November, Justin: "past chats need to have a folder concept for
+cataloguing"): `folder` is its name, '' for unfiled. The column is added here, idempotently, like the table.
 """
 
 from __future__ import annotations
@@ -40,6 +43,15 @@ def ensure() -> None:
                 "create index if not exists chat_threads_updated on s4.chat_threads (updated_ms desc)"
             )
         )
+        # looked up first: an `alter table` takes the table's lock even when the column is already there
+        has = s.execute(
+            text(
+                "select 1 from information_schema.columns "
+                "where table_schema = 's4' and table_name = 'chat_threads' and column_name = 'folder'"
+            )
+        ).first()
+        if not has:
+            s.execute(text("alter table s4.chat_threads add column if not exists folder text not null default ''"))
 
 
 def _thread(row) -> dict:
@@ -54,6 +66,7 @@ def _thread(row) -> dict:
         "href": m["href"] or "",
         "title": m["title"] or "",
         "saved": bool(m["saved"]),
+        "folder": m.get("folder") or "",
         "createdAt": int(m["created_ms"] or 0),
         "updatedAt": int(m["updated_ms"] or 0),
         "messages": m["messages"] or [],
@@ -68,10 +81,10 @@ def save(t: dict) -> dict:
     with store.session() as s:
         s.execute(
             text(
-                "insert into s4.chat_threads (id, key, name, kind, model, ship_key, href, title, saved, created_ms, updated_ms, messages) "
-                "values (:id, :key, :name, :kind, :model, :ship, :href, :title, :saved, :created, :updated, cast(:messages as jsonb)) "
+                "insert into s4.chat_threads (id, key, name, kind, model, ship_key, href, title, saved, folder, created_ms, updated_ms, messages) "
+                "values (:id, :key, :name, :kind, :model, :ship, :href, :title, :saved, :folder, :created, :updated, cast(:messages as jsonb)) "
                 "on conflict (id) do update set key=excluded.key, name=excluded.name, kind=excluded.kind, model=excluded.model, "
-                "ship_key=excluded.ship_key, href=excluded.href, title=excluded.title, saved=excluded.saved, "
+                "ship_key=excluded.ship_key, href=excluded.href, title=excluded.title, saved=excluded.saved, folder=excluded.folder, "
                 "created_ms=excluded.created_ms, updated_ms=excluded.updated_ms, messages=excluded.messages"
             ),
             {
@@ -84,6 +97,7 @@ def save(t: dict) -> dict:
                 "href": t.get("href"),
                 "title": t.get("title"),
                 "saved": bool(t.get("saved")),
+                "folder": str(t.get("folder") or "").strip(),
                 "created": int(t.get("createdAt") or 0),
                 "updated": int(t.get("updatedAt") or 0),
                 "messages": json.dumps(t.get("messages") or []),

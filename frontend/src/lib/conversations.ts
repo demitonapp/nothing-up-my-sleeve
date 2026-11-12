@@ -7,6 +7,10 @@
 // the same model starts a new thread instead of overwriting the saved one. Saved threads are never
 // pruned; drafts are, oldest first, once there are more than KEEP_DRAFTS of them.
 //
+// A thread can be filed in a folder (13 November, Justin: "past chats need to have a folder concept for
+// cataloguing"): `folder` is its name, '' or absent for unfiled. A folder exists while a chat is filed in
+// it; one made before anything is filed in it is kept in this browser's folder list until it is.
+//
 // `localStorage`, slot `thorp.chat.threads.v2`; a v1 store (one a model) is migrated once, its
 // conversations arriving as saved threads.
 
@@ -30,6 +34,7 @@ export interface Thread {
   href: string;
   title: string;
   saved: boolean;
+  folder?: string;
   createdAt: number;
   updatedAt: number;
   messages: StoredMessage[];
@@ -41,6 +46,7 @@ const KEEP_DRAFTS = 20;
 const MAX_THREADS = 60;
 const MAX_MESSAGES = 40;
 const EVENT = 'thorp:conversations';
+const FOLDERS = 'thorp.chat.folders.v1';
 
 export const newId = (): string =>
   typeof crypto !== 'undefined' && 'randomUUID' in crypto
@@ -97,8 +103,10 @@ function migrate(): Thread[] {
 }
 
 function write(all: Thread[]): void {
-  const saved = all.filter((t) => t.saved).slice(0, MAX_THREADS);
-  const drafts = all.filter((t) => !t.saved).sort((a, b) => b.updatedAt - a.updatedAt).slice(0, KEEP_DRAFTS);
+  // a chat filed in a folder is kept like a saved one: it was catalogued, so the draft prune leaves it
+  const kept = (t: Thread): boolean => t.saved || !!(t.folder || '').trim();
+  const saved = all.filter(kept).slice(0, MAX_THREADS);
+  const drafts = all.filter((t) => !kept(t)).sort((a, b) => b.updatedAt - a.updatedAt).slice(0, KEEP_DRAFTS);
   const keep = [...saved, ...drafts].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, MAX_THREADS);
   const put = (rows: Thread[]): void => localStorage.setItem(SLOT, JSON.stringify(rows.map(clean)));
   try {
@@ -158,6 +166,60 @@ export function markSaved(id: string, title: string): Thread | undefined {
   return t;
 }
 
+/** File chats in a folder ('' unfiles them). */
+export function fileThreads(ids: string[], folder: string): void {
+  const name = folder.trim();
+  const all = read();
+  const moved: Thread[] = [];
+  for (const t of all) {
+    if (!ids.includes(t.id) || (t.folder || '') === name) continue;
+    t.folder = name;
+    t.updatedAt = Date.now();
+    moved.push(t);
+  }
+  if (!moved.length) return;
+  write(all);
+  moved.forEach(push);
+}
+
+const readFolders = (): string[] => {
+  try {
+    const raw = JSON.parse(localStorage.getItem(FOLDERS) || '[]');
+    return Array.isArray(raw) ? raw.filter((f): f is string => typeof f === 'string' && !!f.trim()) : [];
+  } catch {
+    return [];
+  }
+};
+const writeFolders = (names: string[]): void => {
+  try { localStorage.setItem(FOLDERS, JSON.stringify([...new Set(names)])); } catch { /* blocked */ }
+  window.dispatchEvent(new CustomEvent(EVENT));
+};
+
+/** Every folder: those a chat is filed in, and those made here and not yet used, by name. */
+export const listFolders = (): string[] =>
+  [...new Set([...readFolders(), ...read().map((t) => (t.folder || '').trim()).filter(Boolean)])].sort((a, b) =>
+    a.localeCompare(b, undefined, { sensitivity: 'base' }));
+
+/** A new, empty folder. */
+export function addFolder(name: string): void {
+  const n = name.trim();
+  if (n) writeFolders([...readFolders(), n]);
+}
+
+/** Rename a folder: every chat in it moves with it. */
+export function renameFolder(from: string, to: string): void {
+  const n = to.trim();
+  if (!n || n === from) return;
+  writeFolders([...readFolders().filter((f) => f !== from), n]);
+  fileThreads(read().filter((t) => (t.folder || '') === from).map((t) => t.id), n);
+}
+
+/** Remove a folder. Its chats are kept, unfiled. */
+export function dropFolder(name: string): void {
+  writeFolders(readFolders().filter((f) => f !== name));
+  fileThreads(read().filter((t) => (t.folder || '') === name).map((t) => t.id), '');
+}
+
 export function removeThread(id: string): void {
   write(read().filter((t) => t.id !== id));
   void fetch('/api/chat/threads/delete', {
@@ -182,6 +244,8 @@ export async function syncThreads(): Promise<void> {
     for (const t of incoming) {
       const have = byId.get(t.id);
       if (!have || (t.updatedAt || 0) > (have.updatedAt || 0)) { byId.set(t.id, t); changed = true; }
+      // a folder this browser holds and the server lacks (filed while the server kept no folders): sent again
+      else if ((have.folder || '') !== (t.folder || '')) push(have);
     }
     if (!changed) return;
     write([...byId.values()].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)));

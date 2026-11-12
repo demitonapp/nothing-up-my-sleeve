@@ -17,7 +17,10 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react';
 import { ContextMeter } from './Chat';
 import RichText from '@/lib/richtext';
-import { autoTitle, getThread, listThreads, markSaved, newId, removeThread, saveThread, subscribe, type Thread } from '@/lib/conversations';
+import {
+  addFolder, autoTitle, dropFolder, fileThreads, getThread, listFolders, listThreads, markSaved, newId, removeThread,
+  renameFolder, saveThread, subscribe, type Thread,
+} from '@/lib/conversations';
 
 // The console is three sections you open like an accordion (13 November, Justin: "sections you can click, so
 // for the chat to expand, you click the middle section, and then if you want past chats etc left section and
@@ -212,14 +215,37 @@ export default function ChatConsole() {
   const rootRef = useRef<HTMLDivElement | null>(null);
   // past chats: every thread this browser keeps, newest first, kept current as threads are written
   const [threads, setThreads] = useState<Thread[]>([]);
+  const [folders, setFolders] = useState<string[]>([]);
   useEffect(() => {
-    const sync = (): void => setThreads(listThreads());
+    const sync = (): void => { setThreads(listThreads()); setFolders(listFolders()); };
     sync();
     return subscribe(sync);
   }, []);
   // a past chat opened for another model: loaded once that model is chosen
   const wantThread = useRef('');
   const [pastMsg, setPastMsg] = useState('');
+  // the catalogue (13 November, Justin: "past chats need to have a folder concept for cataloguing"): chats are
+  // filed in folders by dragging a row onto a folder or with its folder button; folders fold shut, and a
+  // search reads titles, models, folders and last lines
+  const [pastQuery, setPastQuery] = useState('');
+  const [folding, setFolding] = useState(''); // the chat whose folder is being chosen
+  const [folderDraft, setFolderDraft] = useState('');
+  const [newFolder, setNewFolder] = useState<string | null>(null);
+  const [renaming, setRenaming] = useState<{ from: string; to: string } | null>(null);
+  const [dropOn, setDropOn] = useState<string | null>(null);
+  const dragId = useRef('');
+  const [shut, setShut] = useState<string[]>([]);
+  useEffect(() => {
+    try {
+      const v = JSON.parse(localStorage.getItem('thorp.chat.foldershut') || '[]');
+      if (Array.isArray(v)) setShut(v.filter((x) => typeof x === 'string'));
+    } catch { /* blocked */ }
+  }, []);
+  const toggleShut = (name: string): void => setShut((v) => {
+    const next = v.includes(name) ? v.filter((x) => x !== name) : [...v, name];
+    try { localStorage.setItem('thorp.chat.foldershut', JSON.stringify(next)); } catch { /* blocked */ }
+    return next;
+  });
   const [models, setModels] = useState<Model[] | null>(null);
   const [err, setErr] = useState('');
   const [pick, setPick] = useState('');
@@ -244,10 +270,12 @@ export default function ChatConsole() {
   const [notes, setNotes] = useState<DbNote[]>([]);
   const [noteMsg, setNoteMsg] = useState('');
   const [saveMsg, setSaveMsg] = useState('');
-  // the question library (11 November): questions kept against folders, loaded from s4.chat_questions
-  const [questionsOpen, setQuestionsOpen] = useState(false);
+  // the question library (11 November): questions kept against groups, loaded from s4.chat_questions. It lives
+  // in the past-chats section as its own default folder (13 November, Justin: "questions need to be moved from
+  // main chat, to the folder section and it's a default folder that allows saving not chats but only questions")
   const [questionDraft, setQuestionDraft] = useState('');
-  const [folder, setFolder] = useState('inbox');
+  const [qGroup, setQGroup] = useState('inbox');
+  const qDraftBox = useRef<HTMLTextAreaElement | null>(null);
   const [qRows, setQRows] = useState<QRow[]>([]);
   const [qFolders, setQFolders] = useState<QFolder[]>([]);
   const [qMsg, setQMsg] = useState('');
@@ -475,8 +503,8 @@ export default function ChatConsole() {
     }
   };
   useEffect(() => {
-    if (questionsOpen) void loadQuestions();
-  }, [questionsOpen]);
+    if (panes.past) void loadQuestions();
+  }, [panes.past]);
 
   const lastAsked = useMemo(() => [...says].reverse().find((s) => s.role === 'you')?.text.trim() || '', [says]);
 
@@ -487,7 +515,7 @@ export default function ChatConsole() {
       const r = await fetch('/api/chat/questions', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ question: q, folder: folder.trim() || 'inbox', model: chosen?.name || null }),
+        body: JSON.stringify({ question: q, folder: qGroup.trim() || 'inbox', model: chosen?.name || null }),
       });
       if (!r.ok) throw new Error(await r.text());
       setQuestionDraft('');
@@ -496,6 +524,32 @@ export default function ChatConsole() {
     } catch (e) {
       setQMsg(`could not save: ${(e as Error).message}`);
     }
+  };
+
+  const forgetQuestion = async (id: number): Promise<void> => {
+    try {
+      const r = await fetch('/api/chat/questions/delete', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+      if (r.status === 404) throw new Error('this dashboard cannot forget questions yet: restart thorp dash');
+      if (!r.ok) throw new Error(await r.text());
+      setQRows((v) => v.filter((x) => x.id !== id));
+      setQMsg('');
+      await loadQuestions();
+    } catch (e) {
+      setQMsg(`could not forget it: ${(e as Error).message}`);
+    }
+  };
+
+  // the input's "keep": the Questions folder opens in the left section with the question ready to save
+  const keepFromInput = (q: string): void => {
+    setQuestionDraft(q);
+    setQMsg('');
+    setPanes((p) => ({ ...p, past: true }));
+    if (shut.includes('~questions')) toggleShut('~questions');
+    window.setTimeout(() => qDraftBox.current?.focus(), 320);
   };
 
   const notesFor = chosen ? (chosen.kind === 'foreign' ? chosen.model : chosen.run?.run) : null;
@@ -708,16 +762,21 @@ export default function ChatConsole() {
     }
   };
 
-  // the threads grouped by model, the model with the newest thread first
-  const pastGroups = (() => {
-    const by = new Map<string, Thread[]>();
-    for (const t of threads) {
-      const list = by.get(t.key);
-      if (list) list.push(t);
-      else by.set(t.key, [t]);
-    }
-    return [...by.values()];
-  })();
+  // the threads by folder: each folder by name, then the unfiled (where a new chat lands) last, so the
+  // catalogue is not pushed off the column by a long inbox; each folder's chats newest first. A search shows
+  // only the folders it finds something in.
+  const pastQ = pastQuery.trim().toLowerCase();
+  const shownThreads = pastQ
+    ? threads.filter((t) => `${t.title} ${t.name} ${t.folder || ''} ${lastLine(t)}`.toLowerCase().includes(pastQ))
+    : threads;
+  const pastGroups = folders.map((f) => ({ name: f, rows: shownThreads.filter((t) => (t.folder || '').trim() === f) }))
+    .concat([{ name: '', rows: shownThreads.filter((t) => !(t.folder || '').trim()) }])
+    .filter((g) => (pastQ ? g.rows.length > 0 : g.name !== '' || g.rows.length > 0 || folders.length > 0));
+  const fileInto = (id: string, folder: string): void => {
+    fileThreads([id], folder);
+    const name = folder.trim() || '~unfiled'; // the folder it went to opens, so the chat is seen to land
+    if (shut.includes(name)) toggleShut(name);
+  };
   const listed = new Set(instruct.map(convoKeyOf));
   const thinkOn = thinkingAuto || (thinkingToggle && think);
   const setSummary = chosen
@@ -803,44 +862,263 @@ export default function ChatConsole() {
           }}
         />
         <div className="consolecols">
-          {/* ---- left: past chats */}
+          {/* ---- left: past chats, catalogued in folders */}
           <section id="consolepast" className={`consolecol consolepast${panes.past ? ' on' : ''}`} aria-label="past chats" inert={!panes.past}>
             <div className="consolecolhead">
               <b>Past chats</b>
               <span className="note">{threads.length}</span>
+              <button type="button" className="consolbtn" onClick={() => setNewFolder((v) => (v === null ? '' : null))} aria-pressed={newFolder !== null} title="make a folder to file chats in">+ Folder</button>
               <button type="button" className="consolbtn" onClick={() => { startNewChat(); setPanes((p) => ({ ...p, chat: true })); }} disabled={busy} title="start a new conversation with this model">+ New chat</button>
             </div>
+            <div className="consolepastsearch">
+              <input
+                type="search"
+                value={pastQuery}
+                onChange={(e) => setPastQuery(e.target.value)}
+                placeholder="search titles, models, folders…"
+                aria-label="search past chats"
+              />
+            </div>
+            <datalist id="consolefolderlist">
+              {folders.map((f) => <option key={f} value={f} />)}
+            </datalist>
             <div className="consolepastlist">
+              {newFolder !== null ? (
+                <form
+                  className="consolefolderform"
+                  onSubmit={(e) => { e.preventDefault(); addFolder(newFolder); setNewFolder(null); }}
+                >
+                  <input
+                    autoFocus
+                    value={newFolder}
+                    onChange={(e) => setNewFolder(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setNewFolder(null); } }}
+                    placeholder="the new folder's name"
+                    aria-label="the new folder's name"
+                  />
+                  <button type="submit" className="consolbtn" disabled={!newFolder.trim()}>make</button>
+                  <button type="button" className="consolepastdel" onClick={() => setNewFolder(null)} aria-label="cancel">×</button>
+                </form>
+              ) : null}
+              {/* the Questions folder: the default folder, pinned first. It holds kept questions, never chats (a
+                  chat dragged over it is not taken), grouped as the library groups them; a question clicked goes
+                  into the chat's box. */}
+              {(() => {
+                const qs = pastQ
+                  ? qRows.filter((r) => `${r.question} ${r.folder} ${r.model || ''}`.toLowerCase().includes(pastQ))
+                  : qRows;
+                if (pastQ && !qs.length) return null;
+                const isShut = !pastQ && shut.includes('~questions');
+                const groups = [...new Set(qs.map((r) => r.folder))].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+                return (
+                  <div className="consolefolder questions">
+                    <div className="consolefolderhead">
+                      <button
+                        type="button"
+                        className="consolefoldername"
+                        onClick={() => toggleShut('~questions')}
+                        aria-expanded={!isShut}
+                        title={isShut ? 'open your kept questions' : 'fold the questions shut'}
+                      >
+                        <span className="consolefoldercaret" aria-hidden="true">{isShut ? '▸' : '▾'}</span>
+                        <span className="consolefoldertext">Questions</span>
+                        <span className="consolefoldercount">{qRows.length}</span>
+                      </button>
+                      <span className="consolefoldertag" title="the default folder: it keeps questions, not chats">questions only</span>
+                    </div>
+                    {isShut ? null : (
+                      <>
+                        <form className="consoleqkeep" onSubmit={(e) => { e.preventDefault(); void keepQuestion(); }}>
+                          <textarea
+                            ref={qDraftBox}
+                            value={questionDraft}
+                            onChange={(e) => setQuestionDraft(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void keepQuestion(); }
+                              else if (e.key === 'Escape' && questionDraft) { e.stopPropagation(); setQuestionDraft(''); }
+                            }}
+                            placeholder="a question to keep… (enter saves, shift-enter a new line)"
+                            rows={2}
+                            aria-label="a question to keep"
+                          />
+                          <div className="consolefolderform">
+                            <input value={qGroup} onChange={(e) => setQGroup(e.target.value)} list="consoleqgroups" placeholder="group" aria-label="the question's group" title="the group it is kept under" />
+                            <button type="submit" className="consolbtn" disabled={!questionDraft.trim()}>save</button>
+                          </div>
+                          <datalist id="consoleqgroups">
+                            {qFolders.map((f) => <option key={f.name} value={f.name} />)}
+                          </datalist>
+                          {qMsg ? <p className="consolefolderempty">{qMsg}</p> : null}
+                        </form>
+                        {qs.length === 0 ? <p className="consolefolderempty">No questions yet: type one above, or use “keep” beside the chat’s box.</p> : null}
+                        {groups.map((name) => {
+                          const rows = qs.filter((r) => r.folder === name);
+                          return (
+                            <div key={name} className="consoleqgroup">
+                              <div className="consoleqgroupname">{name} <span>{rows.length}</span></div>
+                              {rows.map((r) => (
+                                <div key={r.id} className="consolepastrow consoleqline">
+                                  <button
+                                    type="button"
+                                    className="consolepastopen"
+                                    onClick={() => {
+                                      setInput(r.question);
+                                      setPanes((p) => ({ ...p, chat: true }));
+                                      window.setTimeout(() => field.current?.focus(), 320);
+                                    }}
+                                    title="put this question in the chat's box"
+                                  >
+                                    <span className="consoleqtext">{r.question}</span>
+                                    <span className="consolepastmeta">
+                                      {r.model ? `asked of ${r.model}` : 'kept'}{r.created_at ? ` · ${ago(Date.parse(String(r.created_at).replace(' ', 'T')))}` : ''}
+                                    </span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="consolepastdel"
+                                    onClick={() => void forgetQuestion(r.id)}
+                                    title="forget this question"
+                                    aria-label="forget this question"
+                                  >×</button>
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        })}
+                      </>
+                    )}
+                  </div>
+                );
+              })()}
               {pastMsg ? <p className="consolewarn">{pastMsg}</p> : null}
               {threads.length === 0 ? <p className="note consolepastempty">No conversations yet. Ask a model something and it is kept here, in this browser and in Postgres.</p> : null}
-              {pastGroups.map((rows) => (
-                <div key={rows[0].key} className="consolepastgroup">
-                  <div className="consolepastgroupname">{rows[0].name}{listed.has(rows[0].key) ? '' : ' · not on the list now'}</div>
-                  {rows.map((t) => {
-                    const turns = t.messages.filter((m) => m.role === 'you').length;
-                    return (
-                      <div key={t.id} className={`consolepastrow${t.id === threadId ? ' active' : ''}`}>
-                        <button type="button" className="consolepastopen" onClick={() => openThread(t)} disabled={!listed.has(t.key)} title={`open ${t.title || 'this chat'}`}>
-                          <span className="consolepasttitle">
-                            {t.saved ? <span className="consolepaststar" aria-label="saved">★</span> : null}
-                            {t.title || lastLine(t) || 'an untitled chat'}
-                          </span>
-                          <span className="consolepastmeta">{turns} turn{turns === 1 ? '' : 's'} · {ago(t.updatedAt)}{t.id === threadId ? ' · here' : ''}</span>
-                          {lastLine(t) ? <span className="consolepastlast">{lastLine(t)}</span> : null}
-                        </button>
+              {pastQ && !pastGroups.length ? <p className="note consolepastempty">Nothing matches “{pastQuery.trim()}”.</p> : null}
+              {pastGroups.map((g) => {
+                const isShut = !pastQ && shut.includes(g.name || '~unfiled');
+                return (
+                  <div
+                    key={g.name || '~unfiled'}
+                    className={`consolefolder${dropOn === g.name ? ' drop' : ''}${g.name ? '' : ' unfiled'}`}
+                    onDragOver={(e) => {
+                      if (!dragId.current) return;
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = 'move';
+                      if (dropOn !== g.name) setDropOn(g.name);
+                    }}
+                    onDragLeave={(e) => {
+                      if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropOn((d) => (d === g.name ? null : d));
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      const id = dragId.current;
+                      dragId.current = '';
+                      setDropOn(null);
+                      if (id) fileInto(id, g.name);
+                    }}
+                  >
+                    {renaming && renaming.from === g.name && g.name ? (
+                      <form
+                        className="consolefolderform"
+                        onSubmit={(e) => { e.preventDefault(); renameFolder(renaming.from, renaming.to); setRenaming(null); }}
+                      >
+                        <input
+                          autoFocus
+                          value={renaming.to}
+                          onChange={(e) => setRenaming({ from: renaming.from, to: e.target.value })}
+                          onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setRenaming(null); } }}
+                          aria-label={`rename the folder ${g.name}`}
+                        />
+                        <button type="submit" className="consolbtn" disabled={!renaming.to.trim()}>rename</button>
+                        <button type="button" className="consolepastdel" onClick={() => setRenaming(null)} aria-label="cancel">×</button>
+                      </form>
+                    ) : (
+                      <div className="consolefolderhead">
                         <button
                           type="button"
-                          className="consolepastdel"
-                          onClick={() => { if (t.id === threadId) startNewChat(); removeThread(t.id); }}
-                          disabled={busy && t.id === threadId}
-                          title="forget this conversation"
-                          aria-label={`forget ${t.title || 'this chat'}`}
-                        >×</button>
+                          className="consolefoldername"
+                          onClick={() => toggleShut(g.name || '~unfiled')}
+                          aria-expanded={!isShut}
+                          title={isShut ? 'open this folder' : 'fold this folder shut'}
+                        >
+                          <span className="consolefoldercaret" aria-hidden="true">{isShut ? '▸' : '▾'}</span>
+                          <span className="consolefoldertext">{g.name || 'Unfiled'}</span>
+                          <span className="consolefoldercount">{g.rows.length}</span>
+                        </button>
+                        {g.name ? (
+                          <>
+                            <button type="button" className="consolefolderact" onClick={() => setRenaming({ from: g.name, to: g.name })} title="rename this folder" aria-label={`rename the folder ${g.name}`}>✎</button>
+                            <button type="button" className="consolefolderact" onClick={() => dropFolder(g.name)} title="remove this folder: its chats are kept, unfiled" aria-label={`remove the folder ${g.name}`}>×</button>
+                          </>
+                        ) : null}
                       </div>
-                    );
-                  })}
-                </div>
-              ))}
+                    )}
+                    {isShut ? null : g.rows.length === 0 ? (
+                      <p className="consolefolderempty">{g.name ? 'empty: drag a chat here, or use a chat’s folder button' : 'every chat is filed'}</p>
+                    ) : g.rows.map((t) => {
+                      const turns = t.messages.filter((m) => m.role === 'you').length;
+                      const here = listed.has(t.key);
+                      return (
+                        <div key={t.id}>
+                          <div
+                            className={`consolepastrow${t.id === threadId ? ' active' : ''}`}
+                            draggable
+                            onDragStart={(e) => {
+                              dragId.current = t.id;
+                              e.dataTransfer.effectAllowed = 'move';
+                              e.dataTransfer.setData('text/plain', t.title || t.id);
+                            }}
+                            onDragEnd={() => { dragId.current = ''; setDropOn(null); }}
+                          >
+                            <button type="button" className="consolepastopen" onClick={() => openThread(t)} disabled={!here} title={here ? `open ${t.title || 'this chat'} · drag it onto a folder to file it` : `${t.name} is not on the console's list now`}>
+                              <span className="consolepasttitle">
+                                {t.saved ? <span className="consolepaststar" aria-label="saved">★</span> : null}
+                                {t.title || lastLine(t) || 'an untitled chat'}
+                              </span>
+                              <span className="consolepastmeta">{t.name}{here ? '' : ' (not on the list now)'} · {turns} turn{turns === 1 ? '' : 's'} · {ago(t.updatedAt)}{t.id === threadId ? ' · here' : ''}</span>
+                              {lastLine(t) ? <span className="consolepastlast">{lastLine(t)}</span> : null}
+                            </button>
+                            <button
+                              type="button"
+                              className={`consolepastfile${folding === t.id ? ' on' : ''}`}
+                              onClick={() => { setFolding((v) => (v === t.id ? '' : t.id)); setFolderDraft(t.folder || ''); }}
+                              aria-pressed={folding === t.id}
+                              title={t.folder ? `filed in ${t.folder}: move it` : 'file this chat in a folder'}
+                              aria-label={`file ${t.title || 'this chat'} in a folder`}
+                            >
+                              <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M1.5 3.5h4.2l1.4 1.6h7.4v7.9H1.5z" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" /></svg>
+                            </button>
+                            <button
+                              type="button"
+                              className="consolepastdel"
+                              onClick={() => { if (t.id === threadId) startNewChat(); removeThread(t.id); }}
+                              disabled={busy && t.id === threadId}
+                              title="forget this conversation"
+                              aria-label={`forget ${t.title || 'this chat'}`}
+                            >×</button>
+                          </div>
+                          {folding === t.id ? (
+                            <form
+                              className="consolefolderform inrow"
+                              onSubmit={(e) => { e.preventDefault(); fileInto(t.id, folderDraft); setFolding(''); }}
+                            >
+                              <input
+                                autoFocus
+                                list="consolefolderlist"
+                                value={folderDraft}
+                                onChange={(e) => setFolderDraft(e.target.value)}
+                                onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setFolding(''); } }}
+                                placeholder="a folder, new or old; empty unfiles"
+                                aria-label="the folder to file this chat in"
+                              />
+                              <button type="submit" className="consolbtn">{folderDraft.trim() ? 'file' : 'unfile'}</button>
+                            </form>
+                          ) : null}
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
             </div>
           </section>
 
@@ -856,9 +1134,6 @@ export default function ChatConsole() {
               <span className="consoleheadgap" aria-hidden="true" />
               <button type="button" className="consolbtn" onClick={() => setNotesOpen((v) => !v)} aria-pressed={notesOpen}>
                 Notes{notes.length ? ` (${notes.length})` : ''}
-              </button>
-              <button type="button" className="consolbtn" onClick={() => setQuestionsOpen((v) => !v)} aria-pressed={questionsOpen}>
-                Questions{qRows.length ? ` (${qRows.length})` : ''}
               </button>
               <button
                 type="button"
@@ -940,38 +1215,6 @@ export default function ChatConsole() {
                   {lastReply?.meta?.rendered ? <><div className="note">the prompt it received</div><pre>{lastReply.meta.rendered}</pre></> : null}
                 </div>
               ) : null}
-              {questionsOpen ? (
-                <div className="consolenotes consolequestions">
-                  <div className="consoleqnew">
-                    <textarea value={questionDraft} onChange={(e) => setQuestionDraft(e.target.value)} placeholder="a question to keep…" rows={2} aria-label="a question to keep" />
-                    <div className="consoleqrow">
-                      <input value={folder} onChange={(e) => setFolder(e.target.value)} list="qfolders" placeholder="folder" aria-label="folder" />
-                      <datalist id="qfolders">
-                        {qFolders.map((f) => <option key={f.name} value={f.name} />)}
-                      </datalist>
-                      <button type="button" className="consolbtn" onClick={() => void keepQuestion()} disabled={!questionDraft.trim()}>Save question</button>
-                      {qMsg ? <span className="note">{qMsg}</span> : null}
-                    </div>
-                  </div>
-                  <div className="consolenoteslist">
-                    {qRows.length === 0 ? <p className="note">No questions yet.</p> : null}
-                    {qFolders.map((f) => {
-                      const rows = qRows.filter((r) => r.folder === f.name);
-                      return (
-                        <details key={f.name} open>
-                          <summary>{f.name} <span className="note">{rows.length}</span></summary>
-                          {rows.map((r) => (
-                            <button key={r.id} type="button" className="consoleqitem" onClick={() => { setInput(r.question); setQuestionsOpen(false); }} title="put this question in the box">
-                              {r.question}
-                              {r.model ? <span className="note"> · {r.model}</span> : null}
-                            </button>
-                          ))}
-                        </details>
-                      );
-                    })}
-                  </div>
-                </div>
-              ) : null}
               {notesOpen ? (
                 <div className="consolenotes">
                   <div className="consolenotesnew">
@@ -1004,7 +1247,7 @@ export default function ChatConsole() {
               />
               {/* an empty box keeps the last question asked: sending clears the box, so otherwise the button is dead
                   exactly when someone wants to keep what they just asked */}
-              <button type="button" className="consolbtn" onClick={() => { setQuestionDraft(input.trim() || lastAsked); setQuestionsOpen(true); }} disabled={!input.trim() && !lastAsked} title={input.trim() || !lastAsked ? 'keep this question in the library' : 'keep your last question in the library'}>keep</button>
+              <button type="button" className="consolbtn" onClick={() => keepFromInput(input.trim() || lastAsked)} disabled={!input.trim() && !lastAsked} title={input.trim() || !lastAsked ? 'keep this question in the Questions folder' : 'keep your last question in the Questions folder'}>keep</button>
               {busy && live ? (
                 <button type="button" className="consolbtn primary" onClick={() => stopper.current?.abort()} title="stop this answer: what has arrived is kept">stop</button>
               ) : (

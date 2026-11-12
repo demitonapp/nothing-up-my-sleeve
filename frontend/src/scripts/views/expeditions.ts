@@ -288,13 +288,23 @@ export function queueRowsHtml(d: any, rungs: Rung[]): string {
   const rows = (d.rows || []).map((r: any, i: number) => {
     seq += 1;
     // a step opens its own card, as a voyage does (12 November, Justin: "each item in the queue needs to be able
-    // to be opened, currently only voyages can be opened with a modal")
-    const what = ({ investigation: 'an investigation', reading: 'a reading', upkeep: 'upkeep' } as Record<string, string>)[r.what] || 'a step';
-    return r.kind === 'step'
-      ? `<tr class="qstep${r.status === 'at sea' ? ' sel' : ''}" data-qi="${i}" tabindex="0" aria-label="show the card for ${esc(r.name)}" title="show this step's card"><td class="s">${seq}</td><td colspan="4" class="s">${r.status === 'at sea' ? '' : '↳ then '}${what}: <b>${esc(r.name)}</b>${r.goal_id ? ` <span class="${pillCls('accent')}" title="the goal this step serves">${esc(r.goal_id)}</span>` : r.what === 'upkeep' || r.status === 'at sea' ? '' : ` <span class="${pillCls('bad')}" title="every line serves an expedition's goal: thorp queue goal LINE --goal EXPEDITION:N">no goal</span>`}<div class="s">${stepLength(r)}</div></td>
+    // to be opened, currently only voyages can be opened with a modal"). S4's scheduled intelligence audit is
+    // its own item type (12 November): it reads as a Liberty Machine task, not as one more step between voyages.
+    const intel = r.kind === 'intelligence';
+    const what = ({ investigation: 'an investigation', reading: 'a reading', upkeep: 'upkeep', intelligence: 'the intelligence audit' } as Record<string, string>)[r.what] || 'a step';
+    if (r.kind === 'step' || intel) {
+      const label = intel
+        ? `<span class="qintelbadge" title="S4 intelligence: a scheduled Liberty Machine task, not a voyage">S4</span> <b>${esc(r.name)}</b>`
+        : `${what}: <b>${esc(r.name)}</b>`;
+      const goal = r.goal_id
+        ? ` <span class="${pillCls('accent')}" title="the goal this ${intel ? 'task' : 'step'} serves">${esc(r.goal_id)}</span>`
+        : intel || r.what === 'upkeep' || r.status === 'at sea' ? '' : ` <span class="${pillCls('bad')}" title="every line serves an expedition's goal: thorp queue goal LINE --goal EXPEDITION:N">no goal</span>`;
+      const cadence = intel ? ' · a turn of the Liberty Machine planning cycle' : '';
+      return `<tr class="qstep${intel ? ' qintel' : ''}${r.status === 'at sea' ? ' sel' : ''}" data-qi="${i}" tabindex="0" aria-label="show the card for ${esc(r.name)}" title="show ${intel ? 'this Liberty Machine task' : 'this step'}'s card"><td class="s">${seq}</td><td colspan="4" class="s">${r.status === 'at sea' ? '' : intel ? '↳ scheduled: ' : '↳ then '}${label}${goal}<div class="s">${stepLength(r)}${cadence}</div></td>
       <td class="s" title="${r.est_min == null ? 'no time yet' : `about ${Math.round(r.est_min)} min · ${esc(r.est_source || '')}`}">${startsAt(r)}</td>
-      <td class="s">${r.status === 'at sea' ? `<span class="${pillCls('running')}">at sea</span>` : sailsIn(r.starts_in_min, !!r.at_least)}</td></tr>`
-      : `<tr data-qi="${i}" tabindex="0" aria-label="show the card for ${esc(r.name)}" title="show this voyage's card"${r.status === 'at sea' ? ' class="sel"' : ''}><td class="s">${seq}</td>
+      <td class="s">${r.status === 'at sea' ? `<span class="${pillCls('running')}">at sea</span>` : sailsIn(r.starts_in_min, !!r.at_least)}</td></tr>`;
+    }
+    return `<tr data-qi="${i}" tabindex="0" aria-label="show the card for ${esc(r.name)}" title="show this voyage's card"${r.status === 'at sea' ? ' class="sel"' : ''}><td class="s">${seq}</td>
       <td><b>${esc(r.name)}</b>${r.lane && r.lane !== 'mac' ? ` <span class="${pillCls('blue')}" title="sails on the ${esc(r.lane)} lane">${esc(r.lane)}</span>` : ''}${r.purser?.waters === 'foreign' && !r.purser.applied ? ` <span class="${pillCls('')}" title="${esc(r.purser.reason || '')}">purser: abroad</span>` : ''}${r.goal_id ? ` <span class="${pillCls('accent')}" title="the goal this voyage serves">${esc(r.goal_id)}</span>` : ` <span class="${pillCls('bad')}" title="every line serves an expedition's goal: thorp queue goal LINE --goal EXPEDITION:N">no goal</span>`}<div class="s" title="${esc(r.goal || '')}">${esc(queueGoal(r))}</div></td>
       <td>${(() => {
         const rung = rungs.find((x) => x.preset === r.preset);
@@ -857,13 +867,16 @@ export function queueLanesHtml(d: any): string {
   const tickAt: number[] = [];
   for (let m = step; m < total * 0.9; m += step) tickAt.push(m); // clear of the end's own label
   const block = (r: any, i: number, a: number, b: number, ghost = false): string => {
-    const tone = r.kind === 'step' ? 'pstep' : (PRESET_TONE[r.preset] || 'pother');
+    const intel = r.kind === 'intelligence';
+    const tone = intel ? 'pintel' : r.kind === 'step' ? 'pstep' : (PRESET_TONE[r.preset] || 'pother');
     const sea = r.status === 'at sea';
     const p = r.purser || {};
+    const name = intel ? `S4 intelligence: ${r.name}` : r.name;
     const tip = ghost
       ? `${r.name}: the purser would sail it abroad (${p.gpu || 'a hired GPU'}, about ${Math.round(p.foreign_min || 0)} min, $${Number(p.cost || 0).toFixed(2)}), home ${clockAt(b)}. Advice only: it sails on this Mac unless the purser is routing.`
-      : `${r.name}${r.goal_id ? ` · ${r.goal_id}` : ''}${sea ? ' · at sea now' : ` · starts ${clockAt(a)}`} · about ${Math.round(b - a)} min · home ${clockAt(b)}${p.reason ? ` · purser: ${p.reason}` : ''}`;
-    return `<span class="qlblock ${tone}${sea ? ' sea' : ''}${ghost ? ' ghost' : ''}" data-qi="${i}" tabindex="0" role="button" style="left:${pct(a)};width:max(3px, calc(${pct(b)} - ${pct(a)}))" title="${esc(tip)}" aria-label="${esc(tip)}">${esc(r.kind === 'step' ? '' : laneShort(r))}</span>`;
+      : `${name}${r.goal_id ? ` · ${r.goal_id}` : ''}${sea ? ' · at sea now' : ` · starts ${clockAt(a)}`} · about ${Math.round(b - a)} min · home ${clockAt(b)}${p.reason ? ` · purser: ${p.reason}` : ''}`;
+    const label = intel ? 'S4 audit' : r.kind === 'step' ? '' : laneShort(r);
+    return `<span class="qlblock ${tone}${sea ? ' sea' : ''}${ghost ? ' ghost' : ''}" data-qi="${i}" tabindex="0" role="button" style="left:${pct(a)};width:max(3px, calc(${pct(b)} - ${pct(a)}))" title="${esc(tip)}" aria-label="${esc(tip)}">${esc(label)}</span>`;
   };
   const tracks = lanes.map((ln: any) => {
     const mine = rows.map((r, i) => ({ r, i })).filter(({ r }) => (r.lane || 'mac') === ln.lane);
@@ -891,7 +904,7 @@ export function queueLanesHtml(d: any): string {
     return `<div class="qlane"><div class="qlhead"><b>${esc(LANE_NAME[ln.lane] || ln.lane)}</b> <span class="s">${esc(ln.lane)} lane · ${seats}</span><div class="s">${sub}</div></div><div class="qltrack">${grid}${blocks}${ghosts}${empty}</div></div>`;
   }).join('');
   const axis = tickAt.map((m) => `<span class="qltick" style="left:${pct(m)}">${esc(clockAt(m))}</span>`).join('');
-  const legend = [['p300k', '300k'], ['p1m', '1m'], ['p9m', '9m'], ['p21m', '21m and up'], ['pstep', 'a step']]
+  const legend = [['p300k', '300k'], ['p1m', '1m'], ['p9m', '9m'], ['p21m', '21m and up'], ['pstep', 'a step'], ['pintel', 'S4 intelligence']]
     .map(([c, l]) => `<span><i class="qlswatch ${c}"></i>${l}</span>`).join('');
   return `<div class="qlanes" aria-label="the queue by lane"><div class="qlane qlaxisrow"><div class="qlhead"></div><div class="qlaxis"><span class="qltick qlnow">now</span>${axis}<span class="qltick qlend">${esc(clockAt(total))}</span></div></div>${tracks}<div class="qllegend s">${legend}<span><i class="qlswatch p9m sea"></i>at sea</span><span><i class="qlswatch p9m ghost"></i>the purser's advice</span></div></div>`;
 }

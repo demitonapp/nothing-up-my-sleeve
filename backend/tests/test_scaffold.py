@@ -263,11 +263,11 @@ def test_the_heads_distances_are_the_loss_unweighted():
 def test_a_probing_voyage_records_each_heads_distance(library, spec, tmp_thorp, monkeypatch):
     import dataclasses
 
-    from thorp import vsm
+    from thorp import liberty_machine
     from thorp.ledger import Ledger
 
     # this test is the probe's, not the gate's: the standard rule is advisory here
-    monkeypatch.setitem(vsm.POLICIES, "standard", dataclasses.replace(vsm.POLICIES["standard"], enforced=False))
+    monkeypatch.setitem(liberty_machine.POLICIES, "standard", dataclasses.replace(liberty_machine.POLICIES["standard"], enforced=False))
     spec["model"]["preset"] = "300k"  # the smallest class the registry still builds
     for k in ("layers", "width", "heads"):  # its own six layers: the riddle sits at layer 2
         spec["model"].pop(k, None)
@@ -293,10 +293,10 @@ def test_a_probing_voyage_records_each_heads_distance(library, spec, tmp_thorp, 
 def test_a_voyage_without_probes_is_unchanged_and_declares_its_control_tokens(library, spec, tmp_thorp, monkeypatch):
     import dataclasses
 
-    from thorp import vsm
+    from thorp import liberty_machine
     from thorp.ledger import Ledger
 
-    monkeypatch.setitem(vsm.POLICIES, "standard", dataclasses.replace(vsm.POLICIES["standard"], enforced=False))
+    monkeypatch.setitem(liberty_machine.POLICIES, "standard", dataclasses.replace(liberty_machine.POLICIES["standard"], enforced=False))
     spec["model"]["preset"] = "300k"
     spec["tokeniser"]["symbols"] = ["<bos>", "<eos>", "<unk>", "<question>", "<answer>", "<end>"]
     spec["optim"]["scaffold"] = {"weight": 1.0, "hold": 0.2, "fade": 0.5,

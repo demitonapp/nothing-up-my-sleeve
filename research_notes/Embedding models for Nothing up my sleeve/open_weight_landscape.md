@@ -36,7 +36,7 @@ As of mid-October 2026, the open-weight leaders on MTEB English v2 are QZhou-Emb
 
 ### Inferences
 - English v2 is saturated at the top. Six open models sit between 74.6 and 76.0, and the gap between Qwen3-4B and Qwen3-8B (0.6 points) is smaller than the leaderboard's run-to-run noise. Parameter efficiency now separates the models more than raw score does. Jasper-Token-Compression-600M at 74.75 is the stand-out claim, but it needs checking.
-- Thorp's work is English prose. NarrativeQA in LongEmbed (questions over whole books and scripts) is the most relevant public long-document task. Qwen3 retrieval scores (69.4 at 8B) are well ahead of NV-Embed-v2 and stella, which matters more than the overall mean.
+- Nothing up my sleeve's work is English prose. NarrativeQA in LongEmbed (questions over whole books and scripts) is the most relevant public long-document task. Qwen3 retrieval scores (69.4 at 8B) are well ahead of NV-Embed-v2 and stella, which matters more than the overall mean.
 - For clustering specifically, gte-Qwen2-7B and stella score about as well as Qwen3-4B. Clustering scores are bunched (54–59), so the choice of model matters less here than for retrieval.
 
 ### Gaps
@@ -127,7 +127,7 @@ There is thin, indirect evidence that modern embedders hold up on historical tex
 - LongEmbed's NarrativeQA task (questions over full books and scripts, many of them Gutenberg texts) is the nearest standard long-literary retrieval task. — [arXiv 2404.12096](https://arxiv.org/html/2404.12096v3)
 
 ### Inferences
-- Thorp should run its own small evaluation: translation pairs, multiple editions of the same work, and known near-duplicates from Gutenberg. Public benchmarks do not cover the task. The Danish result ("best model depends on task") argues for testing at least three or four candidates rather than trusting MTEB rank.
+- Nothing up my sleeve should run its own small evaluation: translation pairs, multiple editions of the same work, and known near-duplicates from Gutenberg. Public benchmarks do not cover the task. The Danish result ("best model depends on task") argues for testing at least three or four candidates rather than trusting MTEB rank.
 - Pre-1930 English is much closer to modern English than 17th-century Italian is to modern Italian. Given the robustness result, archaic spelling is probably a smaller risk than chunking strategy and context length for whole-book scores.
 
 ### Gaps

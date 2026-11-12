@@ -55,6 +55,16 @@ def test_lines_are_routed_to_their_lanes(harbour):
     assert lanes.command(lanes.parse("vast: fitouts/here", s))[-3:] == ["charter", "sail", "ships/specs/fitouts/here.yaml"]
 
 
+def test_the_intelligence_audit_is_its_own_kind_of_line(harbour):
+    """12 November: S4's scheduled intelligence audit keeps its `cmd:` text but is its own queue item type, so the
+    queue page can draw it apart from a general step."""
+    s = harbour["specs"]
+    ln = lanes.parse(lanes.AUDIT_LINE, s)
+    assert (ln.kind, ln.lane, ln.timeout) == ("intelligence", "mac", 45 * 60)
+    assert lanes.is_intelligence(lanes.AUDIT_LINE) and not lanes.is_intelligence("cmd: echo hi")
+    assert lanes.command(ln) == ln.payload  # it runs as a command: the timeout and the shell are unchanged
+
+
 def test_the_mac_sails_while_a_hired_ship_is_out(harbour):
     for n in ("big", "m1", "m2"):
         _spec(harbour["specs"], n, n)

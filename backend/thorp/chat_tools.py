@@ -68,7 +68,7 @@ SCHEMAS: list[dict] = [
         "type": "function",
         "function": {
             "name": "queue_status",
-            "description": "Live status of the Thorp queue: what is running (at sea) now, the next lines in the "
+            "description": "Live status of the Nothing up my sleeve queue: what is running (at sea) now, the next lines in the "
             "queue with the goal each one serves, when the whole queue will finish, and what will have been "
             "learned by then, goal by goal. Call this whenever the user asks what the fleet, the ships, the "
             "voyages, the training runs or the queue are doing, when it will be done, or what it will teach "
@@ -90,10 +90,10 @@ SCHEMAS: list[dict] = [
     {
         "type": "function",
         "function": {
-            "name": "vsm_status",
-            "description": "The whole of Thorp as a viable system, in one reading: a status line for each of "
+            "name": "liberty_machine_status",
+            "description": "The whole of Nothing up my sleeve as a viable system, in one reading: a status line for each of "
             "its six systems (S1 operations, S2 coordination, S3 control, S3* audit, S4 intelligence, S5 policy) "
-            "and what in each needs attention. Call this when the user asks how Thorp, the VSM or the system "
+            "and what in each needs attention. Call this when the user asks how Nothing up my sleeve, the Liberty Machine or the system "
             "as a whole is doing, what is wrong, or what needs their attention.",
             "parameters": {"type": "object", "properties": {}},
         },
@@ -139,6 +139,90 @@ SCHEMAS: list[dict] = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "browser_task",
+            "description": "Send the browser drone (a real Chrome under Liberty Machine S1 operations) to do something on the "
+            "web: open a page, search, read it, click, fill a form, and come back with the answer. Call this "
+            "whenever the user asks you to look something up on a website, check a page, or carry out a browser "
+            "task. It starts the drone and waits about 25 seconds; if the drone is still flying, the result says "
+            "so and you can call browser_task_status with its id.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "goal": {"type": "string", "description": "what to do, in words, as the user said it"},
+                    "url": {"type": "string", "description": "the page to start on, if the user named one"},
+                    "model": {"type": "string", "description": "a pilot to fly (fara-1.5-9b, fara-1.5-4b, ...); omit for the drone's chosen model"},
+                    "max_steps": {"type": "integer", "description": "how many steps to allow (default 15, at most 30)"},
+                },
+                "required": ["goal"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "browser_task_status",
+            "description": "Check on a browser drone task by its id: whether it is still flying, and its answer, "
+            "question or error when it has landed.",
+            "parameters": {
+                "type": "object",
+                "properties": {"id": {"type": "string", "description": "the run id browser_task returned"}},
+                "required": ["id"],
+            },
+        },
+    },
+
+    {
+        "type": "function",
+        "function": {
+            "name": "phone_call",
+            "description": "Open a phone drone call on the LOCAL TEST LINE only: the person on the other end is "
+            "played at a keyboard, and the drone speaks its replies aloud through this Mac. No real number is "
+            "dialled and no carrier is used. Use it when the user asks to call someone on the test line or to "
+            "rehearse a call. It returns the call id and the drone's opening line; answer as the person with "
+            "phone_say, and hang up with phone_end.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "goal": {"type": "string", "description": "what the call is for, in words, as the user said it"},
+                    "pilot": {"type": "string", "description": "a text pilot (qwen3.5-9b-instruct or qwen3.5-4b-instruct); omit for the drone's chosen one"},
+                },
+                "required": ["goal"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "phone_say",
+            "description": "Say one line as the person on the other end of the phone drone's local test call. The "
+            "drone answers and speaks it aloud. Use the call id phone_call returned.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string", "description": "the call id phone_call returned"},
+                    "text": {"type": "string", "description": "what the person says, in their own words"},
+                },
+                "required": ["id", "text"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "phone_end",
+            "description": "Hang up the phone drone's local test call: the drone says goodbye, the call closes, and "
+            "the transcript is kept.",
+            "parameters": {
+                "type": "object",
+                "properties": {"id": {"type": "string", "description": "the call id"}},
+                "required": ["id"],
+            },
+        },
+    },
+
 ]
 
 _OPS = {
@@ -225,9 +309,14 @@ def board_score(model: str) -> dict:
 
 
 def _queue_line(line: str) -> str:
-    """A queue line as a reader names it: a fitout's name, or what an investigation or command runs."""
+    """A queue line as a reader names it: a fitout's name, S4's scheduled intelligence audit, or what an
+    investigation or command runs."""
     s = str(line).strip()
     if s.startswith("cmd:"):
+        from thorp.viable.s2_coordination.lanes import is_intelligence
+
+        if is_intelligence(s):
+            return "S4 intelligence audit"
         m = re.search(r"investigate run (\S+)", s)
         if m:
             return f"investigation {m.group(1)}"
@@ -282,7 +371,7 @@ def _goals() -> dict[str, dict]:
 
 
 def queue_status(next: int = 5, find: str | None = None) -> dict:  # noqa: A002 - the argument's name is the model's
-    """The queue in one reading (12 November, Justin: "vsm_status(next=5) ... should actually be renamed
+    """The queue in one reading (12 November, Justin: "liberty_machine_status(next=5) ... should actually be renamed
     queue_status and it should return the 5 top rows in the queue and what goals they're trying to achieve as
     well as the eta for the queue to finish and what the learnings will be at the end of the queue based on all
     the goals"). What is at sea, the next lines with their goals and start times (the queue page's plan), when
@@ -302,6 +391,8 @@ def queue_status(next: int = 5, find: str | None = None) -> dict:  # noqa: A002 
     rows = [r for r in plan.get("rows") or [] if r.get("n") is not None and r.get("status") != "at sea"]
 
     def goal_of(r: dict) -> dict | None:
+        if r.get("kind") == "intelligence":
+            return {"goal": "a turn of the Liberty Machine's planning cycle (S4's intelligence audit)", "expedition": "the Liberty Machine"}
         s = r.get("serves") or {}
         return {"goal": s.get("text"), "expedition": s.get("expedition_name")} if s.get("text") else None
 
@@ -362,9 +453,9 @@ def queue_status(next: int = 5, find: str | None = None) -> dict:  # noqa: A002 
 
 def _fleet(next: int = 5, find: str | None = None) -> dict:  # noqa: A002
     """S2's view of the fleet (12 November, Justin: "what would be the most basic tool call we could make
-    for our VSM system?"): every seat at sea now (thorp.vsm.helms) and the head of the queue
+    for our Liberty Machine system?"): every seat at sea now (thorp.liberty_machine.helms) and the head of the queue
     (s2_coordination.queue_read.pending). It only reads; nothing here moves a voyage or the queue."""
-    from thorp import vsm
+    from thorp import liberty_machine
     from thorp.viable.s2_coordination import queue_read
 
     try:
@@ -376,6 +467,7 @@ def _fleet(next: int = 5, find: str | None = None) -> dict:  # noqa: A002
     # every investigation, which runs without the helm (12 November: arc-qwen3-4b had been at sea six
     # hours while this said the fleet was in port)
     from thorp.viable.s2_coordination import queue_store
+    from thorp.viable.s2_coordination.lanes import is_intelligence
 
     seats = []
     for r in queue_store.at_sea():
@@ -386,12 +478,13 @@ def _fleet(next: int = 5, find: str | None = None) -> dict:  # noqa: A002
                 alive = True
         except (OSError, ValueError):
             alive = False
-        name = r.get("name") or _queue_line(r.get("text") or "")
-        kind = "investigation" if "investigate run" in str(r.get("text") or "") else (r.get("kind") or "voyage")
+        text = str(r.get("text") or "")
+        name = r.get("name") or _queue_line(text)
+        kind = "investigation" if "investigate run" in text else "intelligence" if is_intelligence(text) else (r.get("kind") or "voyage")
         seats.append({"name": name, "kind": kind, "since": r.get("started"), "lane": r.get("lane"), "seat": r.get("seat"),
                       **({} if alive else {"note": "its process is gone: the record is stale"})})
     known = {s["name"] for s in seats}
-    for h in vsm.helms():
+    for h in liberty_machine.helms():
         if h.get("name") not in known:
             seats.append({"name": h.get("name"), "kind": h.get("kind"), "since": h.get("since"), "seat": h.get("slot"),
                           "note": "holds the helm outside the queue"})
@@ -416,8 +509,8 @@ def _fleet(next: int = 5, find: str | None = None) -> dict:  # noqa: A002
 
 # ---- the viable system: the whole, one system, and the expedition ---------------------------------------
 #
-# Three readings beside queue_status (12 November, Justin: "i like queue_status, I like vsm_status and then
-# I'd like to be able to check status on each individual System within the VSM and then I'd like to be able
+# Three readings beside queue_status (12 November, Justin: "i like queue_status, I like liberty_machine_status and then
+# I'd like to be able to check status on each individual System within the Liberty Machine and then I'd like to be able
 # to query expeditions for example how we're tracking against our v0.1"). Each only reads. Each answer opens
 # with a `summary` in words, as queue_status does, because a small model reads the words and miscounts lists.
 
@@ -436,7 +529,7 @@ _KEPT: dict[str, tuple[float, Any]] = {}
 
 def _kept(key: str, read, ttl: float = 120.0):
     """A slow reading kept for `ttl` seconds, so a second question in the same conversation does not wait
-    for it again (vsm.audit() takes seven to ten seconds: its cleaning audit resolves two book lists)."""
+    for it again (liberty_machine.audit() takes seven to ten seconds: its cleaning audit resolves two book lists)."""
     now = time.time()
     hit = _KEPT.get(key)
     if hit and now - hit[0] < ttl:
@@ -447,9 +540,9 @@ def _kept(key: str, read, ttl: float = 120.0):
 
 
 def _audit() -> dict:
-    from thorp import vsm
+    from thorp import liberty_machine
 
-    return _kept("audit", vsm.audit)
+    return _kept("audit", liberty_machine.audit)
 
 
 def _cycle() -> dict:
@@ -468,9 +561,9 @@ def _lanes() -> list[dict]:
 
 
 def _lints() -> list[str]:
-    from thorp import vsm
+    from thorp import liberty_machine
 
-    return list(vsm.lint_queue())
+    return list(liberty_machine.lint_queue())
 
 
 def _jobs() -> list[dict]:
@@ -506,19 +599,19 @@ def _launch() -> dict:
 
 def _expeditions() -> dict[str, dict]:
     """Every expedition in the code, with its name, what it is for and where it is now."""
-    from thorp import fleet, vsm
+    from thorp import fleet, liberty_machine
 
-    states = vsm.expedition_states()
+    states = liberty_machine.expedition_states()
     return {k: {"name": e.name, "goal": e.goal, "state": states.get(k) or e.status} for k, e in fleet.EXPEDITIONS.items()}
 
 
 def _gate_log() -> list[dict]:
-    from thorp import vsm
+    from thorp import liberty_machine
 
-    return vsm.gate_log(400)
+    return liberty_machine.gate_log(400)
 
 
-# vsm.audit()'s `refused_lately` counts the gate's last 400 decisions, which went back five days on
+# liberty_machine.audit()'s `refused_lately` counts the gate's last 400 decisions, which went back five days on
 # 12 November: Ling read "stores (30)" as thirty refusals lately. The tool counts a day of them itself.
 GATE_DAY_HOURS = 24
 
@@ -816,7 +909,7 @@ def _system_key(system: Any) -> str | None:
     return next((k for k, names in _SYSTEM_ALIASES.items() if s in names), None)
 
 
-def vsm_status() -> dict:
+def liberty_machine_status() -> dict:
     """The whole viable system in one reading: a line for each of S1 to S5 and S3* (the audit), and what in
     each needs attention. It only reads."""
     w = _World()
@@ -842,14 +935,14 @@ def vsm_status() -> dict:
 
 def system_status(system: str = "") -> dict:
     """One system of the viable system, in detail. It only reads."""
-    from thorp import vsm
+    from thorp import liberty_machine
 
     key = _system_key(system)
     if key is None:
         return {"error": f"no system called {system!r}; the systems are " + ", ".join(f"{k} ({n})" for k, n in SYSTEM_NAMES.items())}
     w = _World()
     d = _SYSTEMS[key](w)
-    out = {"system": key, "name": SYSTEM_NAMES[key], "purpose": vsm.SYSTEMS[key.rstrip("*")].purpose if key != "S3*" else
+    out = {"system": key, "name": SYSTEM_NAMES[key], "purpose": liberty_machine.SYSTEMS[key.rstrip("*")].purpose if key != "S3*" else
            "independent of the gate: the last cycle's plan against what happened, and the queued runs that break a policy", **d}  # fmt: skip
     if w.unread:
         out["could_not_read"] = w.unread
@@ -1031,14 +1124,74 @@ def expedition_status(find: str | None = None) -> dict:
     }
 
 
+def browser_task(goal: str, url: str | None = None, model: str | None = None, max_steps: int = 15) -> dict:
+    """The chat terminal's way to put the browser drone on a task (thorp/drones.py). It waits a little;
+    a task still flying is reported by id, and browser_task_status reads it again."""
+    from thorp import drones
+
+    try:
+        rec = drones.run_task(str(goal or ""), url=url or None, model=model or None, max_steps=int(max_steps))
+    except ValueError as e:
+        return {"error": str(e)}
+    return drones.summary(rec)
+
+
+def browser_task_status(id: str = "") -> dict:  # noqa: A002 - the argument's name is the model's
+    """One browser drone run, by id."""
+    from thorp import drones
+
+    rec = drones.task(str(id or ""))
+    if rec is None:
+        return {"error": f"no browser drone run {id!r}"}
+    return drones.summary(rec)
+
+
+def phone_call(goal: str, pilot: str | None = None) -> dict:
+    """Open a local test call (thorp/phone.py): no number, no carrier; the person is the keyboard."""
+    from thorp import phone
+
+    try:
+        call = phone.start(str(goal or ""), pilot=pilot or None)
+    except ValueError as e:
+        return {"error": str(e)}
+    return {**phone.summary(call), "opening": (call.get("transcript") or [{}])[0].get("text")}
+
+
+def phone_say(id: str = "", text: str = "") -> dict:  # noqa: A002 - the argument's name is the model's
+    """The person's line on a local test call; the drone answers and speaks."""
+    from thorp import phone
+
+    try:
+        call = phone.say(str(id or ""), str(text or ""))
+    except (ValueError, LookupError) as e:
+        return {"error": str(e)}
+    return phone.summary(call)
+
+
+def phone_end(id: str = "") -> dict:  # noqa: A002
+    """Hang up a local test call."""
+    from thorp import phone
+
+    try:
+        call = phone.end(str(id or ""))
+    except LookupError as e:
+        return {"error": str(e)}
+    return phone.summary(call)
+
+
 TOOLS = {
     "calculate": calculate,
     "current_time": current_time,
     "board_score": board_score,
     "queue_status": queue_status,
-    "vsm_status": vsm_status,
+    "liberty_machine_status": liberty_machine_status,
     "system_status": system_status,
     "expedition_status": expedition_status,
+    "browser_task": browser_task,
+    "browser_task_status": browser_task_status,
+    "phone_call": phone_call,
+    "phone_say": phone_say,
+    "phone_end": phone_end,
 }
 
 

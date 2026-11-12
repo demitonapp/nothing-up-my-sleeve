@@ -21,12 +21,25 @@ def _wall_rate(r: dict) -> float | None:
     readings brought the voyage to about 126k; a quote at the steps' rate gives a deadline it cannot meet)."""
     with contextlib.suppress(Exception):
         from thorp.ledger import reader
+        from thorp.viable.s4_intelligence import hires
 
         run = reader().get_run(r["run_id"]) or {}
-        secs = float(r["ended"]) - float(r["started"]) - s5.SETUP_HOURS * 3600
+        # the seconds it really trained, where the hire's steps were timed (12 November: the constant charged a
+        # 42-minute set-up as 21, and the 50m's 5090 read a quarter slower than it was); else the old allowance
+        secs = hires.train_seconds(r) or (float(r["ended"]) - float(r["started"]) - s5.SETUP_HOURS * 3600)
         if run.get("tokens_seen") and secs > 60:
             return float(run["tokens_seen"]) / secs
     return None
+
+
+def setup_hours(gpu: str) -> float:
+    """The hours a hire of this class spends not training, out and home: measured (s4 hires.setup), else S5's
+    constant. A measurement that cannot be read costs the constant, never the quote."""
+    with contextlib.suppress(Exception):
+        from thorp.viable.s4_intelligence import hires
+
+        return float(hires.setup(gpu)["total_min"]) / 60
+    return float(s5.SETUP_HOURS)
 
 
 def throughput(gpu: str, preset: str) -> float | None:
@@ -86,22 +99,23 @@ def price(cfg, preset: str, tokens: int, o: dict) -> dict:
     before that, at the FLOP guess or this Mac's own rate, whichever is slower (a GPU is not assumed faster than
     the Mac until it has shown it)."""
     tps = throughput(o["gpu"], preset)
+    setup_h = setup_hours(o["gpu"])
     if tps:
-        hours = tokens / tps / 3600 + s5.SETUP_HOURS
+        hours = tokens / tps / 3600 + setup_h
         how = f"measured {tps:,.0f} tokens/s"
     else:
         tf = s5.EFFECTIVE_TFLOPS.get(o["gpu"], 40.0)
-        hours = s3.estimate(cfg, tokens, tf, o["dph"], s5.SETUP_HOURS)["hours"]
+        hours = s3.estimate(cfg, tokens, tf, o["dph"], setup_h)["hours"]
         how = f"guessed {tf:.0f} effective TFLOP/s"
         mac = mac_rate(preset)
-        if mac and tokens / mac / 3600 + s5.SETUP_HOURS > hours:
-            hours = tokens / mac / 3600 + s5.SETUP_HOURS
+        if mac and tokens / mac / 3600 + setup_h > hours:
+            hours = tokens / mac / 3600 + setup_h
             how = f"unmeasured: at this Mac's {mac:,.0f} tokens/s, evals included (the guess was {tf:.0f} TFLOP/s)"
         sc = scaled(o["gpu"], cfg, preset)
-        if sc and tokens / sc[0] / 3600 + s5.SETUP_HOURS > hours:
-            hours = tokens / sc[0] / 3600 + s5.SETUP_HOURS
+        if sc and tokens / sc[0] / 3600 + setup_h > hours:
+            hours = tokens / sc[0] / 3600 + setup_h
             how = f"unmeasured at this size: scaled by FLOPs from its {sc[1]}'s {sc[0]:,.0f} tokens/s here (the guess was {tf:.0f} TFLOP/s)"
-    return {**o, "hours": hours, "cost": hours * o["dph"], "speed": how}
+    return {**o, "hours": hours, "cost": hours * o["dph"], "speed": how, "setup_hours": setup_h}
 
 
 def quotes(vast, cfg, preset: str, tokens: int, terms: dict, gpus: list[str] | None = None) -> list[dict]:

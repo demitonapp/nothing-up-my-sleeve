@@ -9,7 +9,7 @@ on about 11B unique pre-1900 tokens, TypewriterLM on 54B tokens of English befor
 
 ## The rule applied
 
-Thorp's S5 *period* policy (`thorp/vsm.py`): English text printed before 1930, with every person in
+Thorp's S5 *period* policy (`thorp/liberty_machine.py`): English text printed before 1930, with every person in
 the authors field dead by 1955. That is Australia's public-domain line. Tokens are estimated as
 bytes ÷ 3.6, the mean for fetched English Gutenberg text under Thorp's 16,384-piece tokeniser. OCR
 text will differ somewhat. Counts quoted in another tokeniser's tokens are given as published,

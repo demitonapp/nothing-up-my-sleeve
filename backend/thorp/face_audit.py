@@ -250,7 +250,7 @@ def run(model: str = "mlx-community/Qwen3-4B-4bit", *, context: int = 256, k: in
     t0 = time.time()
     if source == "thorp":
         raise NotImplementedError(
-            "the Thorp/300k source is the next audit: its checkpoint loader and tokeniser are not wired in "
+            "the Nothing up my sleeve/300k source is the next audit: its checkpoint loader and tokeniser are not wired in "
             "yet; the outside-model audit is what the Qwen/Phi comparison needs first"
         )
     key = model.replace("/", "--")
@@ -379,7 +379,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--controls", type=int, default=10)
     ap.add_argument("--faces", default=",".join(FACES_DEFAULT), help="comma-separated Face keys")
     ap.add_argument("--source", default="outside", choices=["outside", "thorp"])
-    ap.add_argument("--run", default=None, help="the Thorp run id (the 300k source, not wired in yet)")
+    ap.add_argument("--run", default=None, help="the Nothing up my sleeve run id (the 300k source, not wired in yet)")
     ap.add_argument("--dry", action="store_true", help="load, baseline and targets only")
     ap.add_argument("--fresh", action="store_true", help="ignore an existing JSONL and start over")
     a = ap.parse_args(argv)

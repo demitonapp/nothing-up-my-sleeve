@@ -217,7 +217,7 @@
       ['Cluster', !!st.exists, st.cluster || 'data/postgres'],
       ['Server', !!st.running, `port ${st.port || 5433}`],
       ['Database', !!st.reachable, st.database || 'thorp'],
-      ['Thorp schema', !!st.schema, st.schema || 'not migrated'],
+      ['Nothing up my sleeve schema', !!st.schema, st.schema || 'not migrated'],
     ];
     $('#storestatus').innerHTML = items
       .map(
@@ -712,7 +712,7 @@
       try {
         const out = await api('store/test', { url });
         $('#storetestmsg').textContent = out.ok
-          ? `Answers: PostgreSQL ${out.version || '?'}${out.schema ? `, schema ${out.schema}` : ', no Thorp schema yet'}`
+          ? `Answers: PostgreSQL ${out.version || '?'}${out.schema ? `, schema ${out.schema}` : ', no Nothing up my sleeve schema yet'}`
           : `No answer: ${out.error || 'unknown error'}`;
       } catch (e) {
         $('#storetestmsg').textContent = e.message;

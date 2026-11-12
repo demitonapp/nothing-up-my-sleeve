@@ -1,6 +1,6 @@
-"""Alembic's environment for Thorp's Postgres models (thorp/viable/s3_control/models.py).
+"""Alembic's environment for Nothing up my sleeve's Postgres models (thorp/viable/s3_control/models.py).
 
-The database is Thorp's own cluster: THORP_PG, or postgresql://thorp@localhost:5433/thorp (fitout_store.url()).
+The database is Nothing up my sleeve's own cluster: THORP_PG, or postgresql://thorp@localhost:5433/thorp (fitout_store.url()).
 
     uv run alembic upgrade head                          # bring the database to the latest models
     uv run alembic revision --autogenerate -m "what"     # after changing the models
@@ -32,7 +32,7 @@ def _url() -> str:
 
 
 def _include(obj, name, type_, reflected, compare_to):
-    """Only Thorp's own schemas (the fitouts, the Wager, the ships, and one per viable system); any other table is not ours."""
+    """Only Nothing up my sleeve's own schemas (the fitouts, the Wager, the ships, and one per viable system); any other table is not ours."""
     return type_ != "table" or getattr(obj, "schema", None) in OURS
 
 

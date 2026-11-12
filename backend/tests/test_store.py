@@ -8,7 +8,7 @@ import json
 import pytest
 from sqlalchemy import create_engine, select
 
-from thorp import paths, store, store_import, vsm
+from thorp import paths, store, store_import, liberty_machine
 from thorp.viable.records import GateDecision, Helm
 from thorp.viable.s3_control import charter as s3
 from thorp.viable.s4_intelligence import market as s4
@@ -57,15 +57,15 @@ def test_the_import_brings_every_file_in_once(old_files):
                      "charter-log.jsonl": 2, "charter-market.jsonl": 1}  # fmt: skip
     assert set(store_import.run(log=lambda *a: None).values()) == {0}  # again: nothing doubled
     # and read back from the store, in the shapes the readers have always had
-    assert vsm._enforcement() == {"stores": True, "intake": False}
-    assert vsm.enforced("stores") and vsm._exceptions() == {
+    assert liberty_machine._enforcement() == {"stores": True, "intake": False}
+    assert liberty_machine.enforced("stores") and liberty_machine._exceptions() == {
         "stores": {"reason": "queued before", "adopted": "16:11, Justin", "runs": ["a", "b"], "patterns": ["c-*"],
                    "follow_ups": "later"}
     }
-    assert vsm.excepted("stores", {"name": "c-7"}) == "queued before"
+    assert liberty_machine.excepted("stores", {"name": "c-7"}) == "queued before"
     t = s5.terms()
     assert t["weekly_budget"] == 40 and t["gpus"]["RTX 4090"] == 0.45 and t["gpus"]["RTX 5090"] == s5.DEFAULTS["gpus"]["RTX 5090"]
-    log = vsm.gate_log()
+    log = liberty_machine.gate_log()
     assert [r["name"] for r in log] == ["v2", "v1"]  # newest first
     assert log[1] == {"at": "2026-11-07T18:54:41", "name": "v1", "ship": "S", "where": "voyage", "verdict": "passed",
                       "decisions": [{"policy": "stores", "how": "excepted", "why": "queued before"}]}  # fmt: skip
@@ -78,7 +78,7 @@ def test_the_import_brings_every_file_in_once(old_files):
 def test_a_change_to_a_file_after_the_import_is_brought_in(old_files):
     store_import.run(log=lambda *a: None)
     _write(old_files, "policies.json", {"stores": False, "intake": False})
-    assert store_import.run(log=lambda *a: None)["policies.json"] == 1 and not vsm.enforced("stores")
+    assert store_import.run(log=lambda *a: None)["policies.json"] == 1 and not liberty_machine.enforced("stores")
 
 
 def test_retired_files_are_read_by_nothing(old_files):
@@ -87,7 +87,7 @@ def test_retired_files_are_read_by_nothing(old_files):
     # a stray file written by old code after the cutover changes nothing: the store is read, not the file
     _write(old_files, "policies.json", {"stores": False})
     _write(old_files, "charter.json", {"weekly_budget": 1})
-    assert vsm.enforced("stores") and s5.terms()["weekly_budget"] == 40
+    assert liberty_machine.enforced("stores") and s5.terms()["weekly_budget"] == 40
 
 
 def test_no_silent_fallback_when_the_store_is_down(tmp_thorp, monkeypatch, spec):
@@ -96,9 +96,9 @@ def test_no_silent_fallback_when_the_store_is_down(tmp_thorp, monkeypatch, spec)
     monkeypatch.setattr(store, "engine", lambda: down)
     assert store.ping() and "cannot be reached" in store.ping()
     with pytest.raises(store.StoreDown):
-        vsm._enforcement()
+        liberty_machine._enforcement()
     with pytest.raises(store.StoreDown):  # the gate cannot record its decision, so it makes none: no voyage sails
-        vsm.gate(spec)
+        liberty_machine.gate(spec)
     with pytest.raises(store.StoreDown):
         s5.terms()
     with pytest.raises(store.StoreDown):
@@ -106,15 +106,15 @@ def test_no_silent_fallback_when_the_store_is_down(tmp_thorp, monkeypatch, spec)
 
 
 def test_the_gate_records_each_decision_and_each_policys_part(spec):
-    vsm.gate(spec, where="fitout builder")
+    liberty_machine.gate(spec, where="fitout builder")
     with store.session() as s:
         d = s.scalars(select(GateDecision)).one()
         assert (d.name, d.place, d.verdict, d.source) == (spec["name"], "fitout builder", "passed", "here")
-    assert vsm.gate_log(1)[0]["where"] == "fitout builder"
+    assert liberty_machine.gate_log(1)[0]["where"] == "fitout builder"
 
 
 def test_a_box_sails_under_papers_and_its_decisions_come_home_once(tmp_path, monkeypatch, spec):
-    vsm.set_switch("intake", False, "a test")
+    liberty_machine.set_switch("intake", False, "a test")
     s5.set_term("weekly_budget", 25, "a test")
     papers = tmp_path / "rid.papers.json"
     papers.write_text(json.dumps(store.papers_for_box()))
@@ -123,26 +123,26 @@ def test_a_box_sails_under_papers_and_its_decisions_come_home_once(tmp_path, mon
     down = create_engine("postgresql+psycopg://thorp@localhost:1/thorp", connect_args={"connect_timeout": 1})
     with monkeypatch.context() as m:  # aboard, the store is out of reach, and is never asked
         m.setattr(store, "engine", lambda: down)
-        assert vsm._enforcement() == {"intake": False} and s5.terms()["weekly_budget"] == 25
-        vsm.gate(spec)
+        assert liberty_machine._enforcement() == {"intake": False} and s5.terms()["weekly_budget"] == 25
+        liberty_machine.gate(spec)
     monkeypatch.delenv("THORP_PAPERS")
     log = papers.with_name("rid.papers.gate-log.jsonl")  # store.papers_log() aboard
     assert json.loads(log.read_text().splitlines()[0])["verdict"] == "passed"
-    assert vsm.gate_log() == []  # not home yet
+    assert liberty_machine.gate_log() == []  # not home yet
     assert store.fold_gate_log(log, source="box papers rid") == 1
     assert store.fold_gate_log(log, source="box papers rid") == 0  # brought home twice (every pull): kept once
-    assert vsm.gate_log()[0]["name"] == spec["name"]
+    assert liberty_machine.gate_log()[0]["name"] == spec["name"]
 
 
 def test_the_helm_is_recorded_while_held_and_cleared_after(tmp_thorp):
-    assert vsm.helm() is None
-    with vsm.at_sea("a voyage", kind="voyage"):
-        h = vsm.helm()
+    assert liberty_machine.helm() is None
+    with liberty_machine.at_sea("a voyage", kind="voyage"):
+        h = liberty_machine.helm()
         assert h["name"] == "a voyage" and h["kind"] == "voyage"
         with store.session() as s:
             assert s.get(Helm, "mac").name == "a voyage"
         assert not (paths.data_dir() / "helm.json").exists()  # at home the record is in s2, not a file
-    assert vsm.helm() is None
+    assert liberty_machine.helm() is None
     with store.session() as s:
         assert s.get(Helm, "mac") is None
 
@@ -151,7 +151,7 @@ def test_s5_decisions_are_made_in_words(capsys):
     from thorp import cli
 
     assert cli.main(["s5", "switch", "stores", "off", "--words", "Justin, a test"]) == 0
-    assert not vsm.enforced("stores")
+    assert not liberty_machine.enforced("stores")
     assert cli.main(["s5", "term", "voyage_budget", "12", "--words", "Justin, a test"]) == 0
     assert s5.terms()["voyage_budget"] == 12
     with pytest.raises(KeyError):
@@ -168,18 +168,18 @@ def test_the_dashboard_reads_the_same_store_and_says_when_it_is_down(monkeypatch
 
     from thorp.dash import server
 
-    vsm.gate(spec)  # a decision the gate made is the one the governance page shows
+    liberty_machine.gate(spec)  # a decision the gate made is the one the governance page shows
     srv = ThreadingHTTPServer(("127.0.0.1", 0), server.Handler)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     base = f"http://127.0.0.1:{srv.server_address[1]}"
     try:
         assert _json.load(urllib.request.urlopen(base + "/api/store")) == {"up": True, "why": None}
-        assert vsm.gate_log(1)[0]["name"] == spec["name"]
+        assert liberty_machine.gate_log(1)[0]["name"] == spec["name"]
         down = create_engine("postgresql+psycopg://thorp@localhost:1/thorp", connect_args={"connect_timeout": 1})
         monkeypatch.setattr(store, "engine", lambda: down)
         d = _json.load(urllib.request.urlopen(base + "/api/store"))
         assert d["up"] is False and "cannot be reached" in d["why"]
-        monkeypatch.setattr(server, "api_governance", lambda: vsm.gate_log())
+        monkeypatch.setattr(server, "api_governance", lambda: liberty_machine.gate_log())
         with pytest.raises(urllib.error.HTTPError) as e:
             urllib.request.urlopen(base + "/api/governance")
         assert e.value.code == 503 and _json.load(e.value)["store"] == "down"

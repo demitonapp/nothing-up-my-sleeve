@@ -69,7 +69,7 @@ def page_bytes() -> bytes:
         return page_path().read_bytes()
     except OSError:
         return (
-            b"<!doctype html><meta charset=utf-8><title>Thorp first run</title>"
+            b"<!doctype html><meta charset=utf-8><title>Nothing up my sleeve first run</title>"
             b"<p>The onboarding page is missing from this install. Run "
             b"<code>thorp onboard</code> from a checkout with <code>thorp/onboard/web</code>.</p>"
         )

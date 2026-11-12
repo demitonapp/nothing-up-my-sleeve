@@ -56,7 +56,7 @@ def main() -> int:
     ap.add_argument("--all-discovery", action="store_true", help="every discovery test in the chains")
     a = ap.parse_args()
     tests = [x for t in a.test for x in t.split(",") if x]
-    from thorp import fleet, vsm
+    from thorp import fleet, liberty_machine
 
     if a.all_discovery:
         tests = [k for c in fleet.chains() for k in c if fleet.TRICKS[k].evaluator == "discovery"]
@@ -75,7 +75,7 @@ def main() -> int:
             file=sys.stderr,
         )
         return 2
-    with vsm.at_sea(f"score {a.model} on {', '.join(tests)}", kind="score"):
+    with liberty_machine.at_sea(f"score {a.model} on {', '.join(tests)}", kind="score"):
         return score(a.model, tests)
 
 

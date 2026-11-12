@@ -63,11 +63,11 @@ class StoresRuleError(ValueError):
 
 
 def enforced() -> bool:
-    """Whether the rule is switched on: S5's switch for the policy 'stores' (thorp/vsm.py,
+    """Whether the rule is switched on: S5's switch for the policy 'stores' (thorp/liberty_machine.py,
     s5.policy_switches); off until Justin decides what happens to the runs queued before it (15:55)."""
-    from thorp import vsm
+    from thorp import liberty_machine
 
-    return vsm.enforced("stores")
+    return liberty_machine.enforced("stores")
 
 
 _TEXTS_CACHE: dict[tuple[str, int], set[str]] = {}

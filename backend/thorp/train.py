@@ -245,15 +245,15 @@ def prepare(
     """`sailed` is the run this spec was read from when the spec has since been changed (a rescore swaps the
     eval sets, which moves run_id(spec)): its checkpoint says which tokeniser the voyage was trained with."""
     d = spec["data"]
-    # S3, the gate (thorp/vsm.py): every enforced S5 policy applied to a new run, before it reads a page. A rescore
+    # S3, the gate (thorp/liberty_machine.py): every enforced S5 policy applied to a new run, before it reads a page. A rescore
     # re-runs prepare with the spec's eval sets changed, which changes run_id(spec): the run is known by definition,
     # so the reader passes `known=True` rather than letting the gate mistake it for a new voyage (8 November: three
     # eval commands refused for a fitout their run already sailed under).
-    from thorp import vsm
+    from thorp import liberty_machine
 
     if known is None:
         known = reader().get_run(run_id(spec)) is not None
-    for note in vsm.gate(spec, known_run=known):
+    for note in liberty_machine.gate(spec, known_run=known):
         log(f"S3 gate: {note}")
     # a line a step, so silence is never ambiguous: three voyages went quiet here for five minutes and were
     # read as hung (9 November). Each stage resolves once, and says how many books it found.
@@ -2098,11 +2098,11 @@ def score(
 
 
 def run(spec_path: str | Path, rec: Ledger | None = None) -> dict:
-    """One voyage. S2 (thorp/vsm.py): it takes the helm first, so one voyage is at sea at a time."""
-    from thorp import vsm
+    """One voyage. S2 (thorp/liberty_machine.py): it takes the helm first, so one voyage is at sea at a time."""
+    from thorp import liberty_machine
 
     name = load_spec(spec_path).get("name") or str(spec_path)
-    with vsm.at_sea(name):
+    with liberty_machine.at_sea(name):
         return _run(spec_path, rec)
 
 

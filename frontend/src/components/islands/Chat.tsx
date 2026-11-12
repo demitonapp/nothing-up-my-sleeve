@@ -475,7 +475,7 @@ ${m.reasoning}` : ''))
   };
 
   // /chat?ship=<ship_key> and /chat?model=<key> preselect a target (the old ship-page links), then
-  // the saved default, then the largest Thorp ship. It is chosen once: changing the select afterwards
+  // the saved default, then the largest Nothing up my sleeve ship. It is chosen once: changing the select afterwards
   // must not be overridden by the default.
   useEffect(() => {
     if (embedded || !available.length || !defaultLoaded || picked.current) return;
@@ -503,7 +503,7 @@ ${m.reasoning}` : ''))
     setBusy(true);
     setNote('');
     try {
-      // the thread so far goes to every ship: a foreign one renders it in its own template, a Thorp ship has
+      // the thread so far goes to every ship: a foreign one renders it in its own template, a Nothing up my sleeve ship has
       // it written as the turns its voyage read (thorp.chat.prompt_for), the oldest dropped when it no longer fits
       const history = (historyArg ?? msgsRef.current.slice(0, -1)).map((h) => ({ role: h.role === 'you' ? 'user' : 'assistant', text: h.text }));
       const body = selected.kind === 'foreign'

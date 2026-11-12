@@ -1,6 +1,6 @@
 """the queue's planning cycle, and what the judge said
 
-12 November (Justin: "talk me through how in our VSM the optimal way to schedule the queue every 12 hours to
+12 November (Justin: "talk me through how in our Liberty Machine the optimal way to schedule the queue every 12 hours to
 maximise speed and maintain the cost ceilings"; "build it").
 
 `s3.cycles` is one row a turn of the cycle: what S3* found when it set the last cycle's plan against what

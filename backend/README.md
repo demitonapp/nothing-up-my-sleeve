@@ -1,4 +1,4 @@
-# Thorp: the backend
+# Nothing up my sleeve: the backend
 
 The Python package (`thorp/`), its tests, scripts and the Alembic migrations of the Postgres fitout store.
 The project, the dashboard (`../frontend/`) and the ships (`../ships/`) are described in `../README.md`.

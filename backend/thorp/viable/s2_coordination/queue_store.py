@@ -43,7 +43,7 @@ class QueueLine(Base):
 
     position: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     text: Mapped[str] = mapped_column(Text)
-    kind: Mapped[str] = mapped_column(Text)  # spec, cmd, wait or hold
+    kind: Mapped[str] = mapped_column(Text)  # spec, cmd, intelligence, wait or hold
     payload: Mapped[str] = mapped_column(Text)  # the spec path under specs/, the shell command, or the voyage waited for
     lane: Mapped[str] = mapped_column(Text)  # mac or vast
     added_by: Mapped[str | None] = mapped_column(Text)
@@ -84,7 +84,7 @@ class AtSea(Base):
     text: Mapped[str] = mapped_column(Text)  # the line as it was queued
     lane: Mapped[str] = mapped_column(Text)  # mac or vast
     seat: Mapped[int] = mapped_column(Integer, default=0)  # the lane's seat (the helm slot on the Mac)
-    kind: Mapped[str] = mapped_column(Text)  # spec or cmd (a wait: never goes to sea)
+    kind: Mapped[str] = mapped_column(Text)  # spec, cmd or intelligence (a wait: never goes to sea)
     name: Mapped[str | None] = mapped_column(Text)  # the voyage's name, when the line is a voyage
     run_id: Mapped[str | None] = mapped_column(Text)  # its run id: where an adopted voyage's outcome is read
     pid: Mapped[int | None] = mapped_column(Integer)  # null between the take and the launch
@@ -108,12 +108,16 @@ def _specs() -> Path:
 
 
 def parse_line(text: str) -> dict:
-    """One queue line, read the way `lanes.parse` reads it, without loading the spec (no mlx, no torch)."""
-    from thorp.viable.s2_coordination.lanes import split_lane
+    """One queue line, read the way `lanes.parse` reads it, without loading the spec (no mlx, no torch).
+
+    S4's scheduled intelligence audit keeps its `cmd:` prefix but is its own kind (`intelligence`), so the queue
+    page can draw it apart from a general step (12 November)."""
+    from thorp.viable.s2_coordination.lanes import is_intelligence, split_lane
 
     lane, s = split_lane(text)  # `vast: <spec>`, or any lane s2.lane_defs names (11 November, item 11)
     if s.startswith("cmd:"):
-        return {"kind": "cmd", "payload": s[len("cmd:") :].strip(), "lane": lane}
+        kind = "intelligence" if is_intelligence(s) else "cmd"
+        return {"kind": kind, "payload": s[len("cmd:") :].strip(), "lane": lane}
     if s.startswith("wait:"):
         return {"kind": "wait", "payload": s[len("wait:") :].strip(), "lane": lane}
     if s.startswith("hold:"):
@@ -199,13 +203,15 @@ def verify(queue: Path | None = None, done: Path | None = None) -> bool:
 
 
 def _rows(s) -> list[dict]:
-    """The pending lines, in order, inside an open session."""
+    """The pending lines, in order, inside an open session. The kind is read from the line's text, not trusted to
+    the stored column: an intelligence audit queued by a coordinator older than the item type was stored as `cmd`,
+    and every reader should see it for what it is (the column is rewritten on the next queue edit)."""
     rows = s.scalars(select(QueueLine).order_by(QueueLine.position)).all()
     return [
         {
             "position": r.position,
             "text": r.text,
-            "kind": r.kind,
+            "kind": parse_line(r.text)["kind"],
             "payload": r.payload,
             "lane": r.lane,
             "goal_id": r.goal_id,
@@ -324,7 +330,8 @@ def goal_of_line(text: str) -> str | None:
 
 def needs_goal(parsed: dict) -> bool:
     """Every spec and cmd line serves a goal (Justin, 12 November: "all items in the queue need an expedition and
-    goal code. like knockout:3"); a wait or a hold is a rule about other lines, and upkeep serves the queue."""
+    goal code. like knockout:3"); a wait or a hold is a rule about other lines, and upkeep and S4's intelligence
+    audit serve the queue itself, not an expedition's goal."""
     return parsed["kind"] in ("spec", "cmd") and not any(m in parsed["payload"] for m in MAINTENANCE)
 
 

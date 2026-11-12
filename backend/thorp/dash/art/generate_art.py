@@ -621,6 +621,17 @@ LABS: dict[str, str] = {
     "lab-arcee": "a small yard of patchwork hulls at night: a ship with sails sewn from many pale panels, a "
     "rack of small hulls waiting beside her, one lantern on the wet boards, a thin ring of light in the sky, an "
     "uncropped clean image with no watermark, no signature, no text and no logo",
+    # Ai2 and H Company (12 November, Justin: "add the labs behind molmo web and holo ... with a fal image")
+    "lab-ai2": "an open boathouse on a dark northern bay at night with every door and shutter thrown wide: a "
+    "ship on the stocks with half her planking left off so her keel and ribs stand bare, her sails the pink of "
+    "a dawn sky, shipwrights in long coats beside a long table of open ledgers, each plank's timber and "
+    "origin written out for anyone to read, dark pines behind, one lantern, a thin ring of light in the sky, "
+    "an uncropped clean image with no watermark, no signature, no text and no logo",
+    "lab-hcompany": "a mapmaker's atelier on a stone quay beside a dark river in Paris at night: a lean cutter "
+    "on the stocks with sails of deep green and cream, a huge painted chart on the wall and a young pilot "
+    "touching one exact mark on it with a long brass pointer, an arched stone bridge strung with lanterns "
+    "behind, a thin ring of light in the sky, an uncropped clean image with no watermark, no signature, no "
+    "text and no logo",
 }
 
 # The embeddings ontology's categories (12 November, Justin: "cards for the embeddings in the culture drake
@@ -676,11 +687,11 @@ DEMITON_SECTIONS: dict[str, str] = {
     "demiton-expeditions": "a ship's company at the foot of a gangway at night about to sail: the captain "
     "unrolling a chart of unnamed coasts on a cask-head, sailors loading the last stores by lantern, a great "
     "galleon behind them with sails loosed, black water ahead and a thin ring of light in the sky",
-    # the VSM (12 November, Justin: "VSM should have it's own card here http://localhost:4321/orbitals/demiton
+    # the Liberty Machine (12 November, Justin: "Liberty Machine should have it's own card here http://localhost:4321/orbitals/demiton
     # with a fal image"): Beer's five systems as a flagship's council, each at its own post around one table
     # the first draw hung an electric pendant lamp; a second, pushed to "Elizabethan", came out grey with a
     # cowboy hat. This keeps the first's colour and night sea and says the lantern outright
-    "demiton-vsm": "the great cabin of a flagship at night as its council sits around one long table under a "
+    "demiton-liberty-machine": "the great cabin of a flagship at night as its council sits around one long table under a "
     "single swinging ship's lantern with a candle inside: the captain at its head with the sealed articles "
     "of the voyage under his hand, the purser with an open ledger and an iron strongbox, the sailing master "
     "with brass dividers over a chart, the boatswain with a coiled line, through the stern windows a "
@@ -688,32 +699,65 @@ DEMITON_SECTIONS: dict[str, str] = {
     "a small silver drone perched on the back of the captain's chair",
 }
 
-# The VSM page's five cards, one a system (12 November, Justin: "http://localhost:4321/vsm should have 5 cards
-# with a fal image for each level"). Each system as the post aboard that does its work; named vsm-s1 … vsm-s5,
-# listed in the frontend's VsmCards.tsx.
-VSM_SYSTEMS: dict[str, str] = {
-    "vsm-s1": "the main deck of a great wooden ship at work by lantern-light at night: sailors hauling on a "
+# The Liberty Machine page's five cards, one a system (12 November, Justin: "http://localhost:4321/liberty-machine should have 5 cards
+# with a fal image for each level"). Each system as the post aboard that does its work; named liberty-machine-s1 … liberty-machine-s5,
+# listed in the frontend's LibertyMachineCards.tsx.
+LIBERTY_MACHINE_SYSTEMS: dict[str, str] = {
+    "liberty-machine-s1": "the main deck of a great wooden ship at work by lantern-light at night: sailors hauling on a "
     "line together, a man aloft loosing a sail, stores being swung aboard in a cargo net, the hatch open on "
     "a hold stacked with casks and bound books, the curved lit band of an Orbital ring overhead",
     # the first draw gave a modern lighthouse and electric quay lamps: the fire basket and torches are said
-    "vsm-s2": "a harbour mouth at night in deep blues and amber seen from a pilot's rowing boat: a pilot "
+    "liberty-machine-s2": "a harbour mouth at night in deep blues and amber seen from a pilot's rowing boat: a pilot "
     "standing in the stern with a raised lantern signalling, two great wooden galleons easing through the "
     "narrow channel one behind the other, an old stone watchtower on the mole with an iron fire basket "
     "burning at its top, pitch torches along the quay, black water and reflected firelight, the thin ring "
     "of an Orbital in the sky",
-    "vsm-s3": "a purser's cabin below decks at night: the purser at a narrow desk counting coin from an iron "
+    "liberty-machine-s3": "a purser's cabin below decks at night: the purser at a narrow desk counting coin from an iron "
     "strongbox into a ledger by a single candle, a second officer leaning over his shoulder checking the "
     "figures with a finger on the page, a ship's papers sealed with wax, keys on a ring, deep shadow",
-    "vsm-s4": "a lookout high in the crow's nest of a wooden ship at night with a long brass spyglass to his "
+    "liberty-machine-s4": "a lookout high in the crow's nest of a wooden ship at night with a long brass spyglass to his "
     "eye, far off on the horizon the lit sails of strange foreign ships and an unknown coast, a small silver "
     "drone hovering beside him, the thin ring of an Orbital arcing across the stars",
-    "vsm-s5": "an admiral alone at a carved desk in a stern cabin at night pressing his seal into hot red wax "
+    "liberty-machine-s5": "an admiral alone at a carved desk in a stern cabin at night pressing his seal into hot red wax "
     "on the articles of the voyage, a single candle, a quill and inkhorn, a sword hung on the bulkhead, "
     "through the leaded window the fleet's lanterns at anchor and the faint ring of an Orbital",
 }
 
-SIZES = {**{k: "landscape_16_9" for k in (*DEMITON_SECTIONS, *VSM_SYSTEMS, *CLASSES,*TESTS, *LABS, *HARBOURS, *HARBOUR_VIEWS, *SHIPBUILDER, *SHIPYARD, *SHIPYARD_SECTIONS, *CHARTING, *POSITIONS, *FOREIGN, *SOP_GOALS, *EXPEDITIONS, *BANDS, *LADDER, *CONSOLE, *EMBEDDINGS)}, **{k: "portrait_4_3" for k in CARDS}, **{k: "portrait_4_3" for k in LOGIC}}
-SUBJECTS = {**DEMITON_SECTIONS, **VSM_SYSTEMS, **TESTS, **LABS, **CLASSES, **HARBOURS, **HARBOUR_VIEWS, **SHIPBUILDER, **SHIPYARD, **SHIPYARD_SECTIONS, **CHARTING, **POSITIONS, **FOREIGN, **CARDS, **LOGIC, **SOP_GOALS, **EXPEDITIONS, **BANDS, **LADDER, **CONSOLE, **EMBEDDINGS}
+# The fleet under S1 (12 November, Justin: "under Liberty Machine S1 Operations we have a fleet of drones. The first
+# drone in the fleet will be the browser drone ... with a fal image in our style"). The browser drone is
+# the Culture's small silver ovoid at work: no propellers, one lens, reading a page the way a navigator
+# reads a chart. It is the drone the art has been placing in the rigging all along, given a job.
+DRONES: dict[str, str] = {
+    "drone-browser": "the chart room of a great wooden ship at night: a small silver ovoid drone with no "
+    "propellers and a single dark glass lens at its front hovering low above an open chart spread on the "
+    "table, a thin cone of pale light from the lens falling across the chart and picking out a coastline "
+    "and its soundings, brass dividers, a sandglass and an open ship's log beside it, one hanging lantern "
+    "with a candle throwing hard shadows across the table and the beams, through the stern windows the "
+    "thin ring of an Orbital standing where a moon would be over black water",
+    # D2, the email drone (12 November): the same ovoid at the writing desk, reading a letter rather than
+    # a chart. The letter rack, the wax seal and the inkhorn are the age of sail's own mail.
+    "drone-email": "the great cabin of a flagship at night, in the foreground a small matte silver metal "
+    "ovoid machine, smooth and seamless and about the size of a melon, resting on the writing desk beside "
+    "an open letter, a single dark glass lens set into its front like an eye, clearly a machine and not a "
+    "lamp, a thin cone of pale light from that lens falling across the letter and its broken red wax seal, "
+    "a brass rack of sealed letters and a bundle tied with ribbon behind it, a quill and an inkhorn, a "
+    "sandglass and a folded reply on the desk, a candle in a brass holder at the left throwing hard "
+    "shadows across the cabin and the carved chair, no hanging lamp, through the stern windows a thin "
+    "luminous ring standing where a moon would be over black water, no moon",
+    # D3, the phone drone: the same ovoid beside the age of sail's telephone, a brass speaking trumpet.
+    "drone-phone": "the great cabin of a flagship at night, in the foreground a small matte silver metal "
+    "ovoid machine, smooth and seamless and about the size of a melon, resting on the desk beside a long "
+    "straight brass speaking trumpet of the Elizabethan age, plain and conical with no cord, no wire, no "
+    "handle and no mouthpiece, clearly an instrument of the age of sail and not a modern telephone, a "
+    "single dark glass lens set into the ovoid's front like an eye turned toward the trumpet's mouth, a "
+    "thin cone of pale light from that lens falling across the brass, a signal lantern with a candle at "
+    "the left throwing hard shadows across the cabin, a coiled line of rope and a sealed dispatch beside "
+    "them, no hanging lamp, through the stern windows a thin luminous ring standing where a moon would be "
+    "over black water, no moon, no electrical cord, no plastic",
+}
+
+SIZES = {**{k: "landscape_16_9" for k in (*DEMITON_SECTIONS, *LIBERTY_MACHINE_SYSTEMS, *DRONES, *CLASSES,*TESTS, *LABS, *HARBOURS, *HARBOUR_VIEWS, *SHIPBUILDER, *SHIPYARD, *SHIPYARD_SECTIONS, *CHARTING, *POSITIONS, *FOREIGN, *SOP_GOALS, *EXPEDITIONS, *BANDS, *LADDER, *CONSOLE, *EMBEDDINGS)}, **{k: "portrait_4_3" for k in CARDS}, **{k: "portrait_4_3" for k in LOGIC}}
+SUBJECTS = {**DEMITON_SECTIONS, **LIBERTY_MACHINE_SYSTEMS, **DRONES, **TESTS, **LABS, **CLASSES, **HARBOURS, **HARBOUR_VIEWS, **SHIPBUILDER, **SHIPYARD, **SHIPYARD_SECTIONS, **CHARTING, **POSITIONS, **FOREIGN, **CARDS, **LOGIC, **SOP_GOALS, **EXPEDITIONS, **BANDS, **LADDER, **CONSOLE, **EMBEDDINGS}
 
 # The twenty subjects the audit found outside the brief (ships/reports/art-audit-2026-11-11.md): rewritten
 # into the three-layer world -- Risso's ink, Drake's voyages, the young Culture's universe -- keeping what

@@ -1,5 +1,5 @@
 // Settings (/settings, the cog in the header; /api/settings, thorp/dash/settings.py): what the dashboard
-// runs on, one tab per part — Storage, The store, Server and machine, Switches, Keys and places — each at
+// runs on, one tab per part — Storage, The store, Server and machine, Cost, Switches, Keys and places — each at
 // its own address (/settings/store …) so a tab survives a refresh and can be linked to. Read-only except
 // the store's edit form. Each part is read on its own server-side, so one that failed says why and the
 // rest still stands.
@@ -11,6 +11,7 @@ import type { PerfRange } from './Performance';
 import { VastPanel } from './VastStats';
 import type { Vast } from './VastStats';
 import { VastTimings } from './VastTimings';
+import { CostTab } from './CostTab';
 import type { Charters } from './VastTimings';
 import { cardCls, btnCls, emptyCls, pillCls } from '@/lib/ui';
 import { routePath, sectionProps, useApi, useRoute } from '@/lib/useApi';
@@ -49,11 +50,12 @@ interface SettingsData {
 }
 
 /** The page's tabs, in order: the addresses are the island's own (the catch-all page serves them). */
-type View = 'storage' | 'store' | 'server' | 'switches' | 'keys';
+type View = 'storage' | 'store' | 'server' | 'cost' | 'switches' | 'keys';
 const TABS: { view: View; label: string; href: string }[] = [
   { view: 'storage', label: 'Storage', href: '/settings' },
   { view: 'store', label: 'The store', href: '/settings/store' },
   { view: 'server', label: 'Server and machine', href: '/settings/server' },
+  { view: 'cost', label: 'Cost', href: '/settings/cost' },
   { view: 'switches', label: 'Switches', href: '/settings/switches' },
   { view: 'keys', label: 'Keys and places', href: '/settings/keys' },
 ];
@@ -124,7 +126,7 @@ export default function Settings() {
 
   return (
     <div {...sectionProps('settings')}>
-      <h1>Settings <span className="q">what this dashboard runs on, one tab per part: the disk and what is kept on it, the store, the server and its machine, the switches, and the keys and places. Only the store can be changed here; each part says where it is set</span></h1>
+      <h1>Settings <span className="q">what this dashboard runs on, one tab per part: the disk and what is kept on it, the store, the server and its machine, what the hired GPUs cost, the switches, and the keys and places. Only the store can be changed here; each part says where it is set</span></h1>
 
       <TabNav
         id="setnav"
@@ -227,7 +229,7 @@ export default function Settings() {
 
             {view === 'store' ? (
               <section className={cardCls(false, 'panel')}>
-                <h2>The store <span className="note">Postgres: the ledger, the library, the queue and the VSM's records. Its address comes from <code>THORP_PG</code> or the install file; this one is {pg?.mode === 'hosted' ? 'hosted' : 'local'}</span></h2>
+                <h2>The store <span className="note">Postgres: the ledger, the library, the queue and the Liberty Machine's records. Its address comes from <code>THORP_PG</code> or the install file; this one is {pg?.mode === 'hosted' ? 'hosted' : 'local'}</span></h2>
                 {!pg || (pg.error && !pg.url) ? <Failed what="the store" error={pg?.error || 'no answer'} /> : (
                   <>
                     <dl className="setlist">
@@ -342,6 +344,8 @@ export default function Settings() {
               </>
             ) : null}
 
+            {view === 'cost' ? <CostTab /> : null}
+
             {view === 'switches' ? (
               <section className={cardCls(false, 'panel')}>
                 <h2>Switches <span className="note">the environment <code>thorp dash</code> was started with; a dash is the default. Set them where the server is launched (<code>.claude/launch.json</code>, or the shell)</span></h2>
@@ -389,7 +393,7 @@ export default function Settings() {
                 ) : (
                   <Failed what="the places" error={d.paths.error} />
                 )}
-                <p className="note mt">The rules a voyage sails under are not here: the policies and their switches are on <a href="/vsm/s5">the VSM, S5</a>, and the standing queue and its seats on <a href="/expeditions/queue">Expeditions, Queue</a>.</p>
+                <p className="note mt">The rules a voyage sails under are not here: the policies and their switches are on <a href="/orbitals/demiton/liberty-machine/s5">the Liberty Machine, S5</a>, and the standing queue and its seats on <a href="/expeditions/queue">Expeditions, Queue</a>.</p>
               </section>
             ) : null}
           </>

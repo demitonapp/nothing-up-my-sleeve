@@ -26,6 +26,8 @@ export interface Charter {
   phases: Record<CharterPhase, number | null>;
   open: CharterPhase | null;
   note: string | null;
+  /** what the environment sync last said, while it runs: megabytes in, the rate, uv's last line */
+  detail?: string | null;
 }
 
 export interface Charters {
@@ -144,6 +146,11 @@ function LiveHire({ c }: { c: Charter }) {
       </div>
       <CatBar c={c} big />
       <Legend c={c} values />
+      {c.detail ? (
+        <div className={`vastdetail s mt${/NOTHING MOVED/.test(c.detail) ? ' stalled' : ''}`} title="polled from the box every 15 s; a sync that takes nothing in for 3 minutes is stopped as stalled">
+          <b>Environment:</b> {c.detail}
+        </div>
+      ) : null}
     </section>
   );
 }

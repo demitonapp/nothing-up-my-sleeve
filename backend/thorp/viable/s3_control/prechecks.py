@@ -9,9 +9,9 @@ from thorp.viable.precheck_item import Context, Item
 
 
 def _period(ctx: Context):
-    from thorp import vsm
+    from thorp import liberty_machine
 
-    deaths = vsm._deaths()
+    deaths = liberty_machine._deaths()
     bad = [b for b in ctx.books if b in deaths and deaths[b] > 1955]
     return float(len(bad)), {"books": len(ctx.books), "breaking": bad[:20]}
 

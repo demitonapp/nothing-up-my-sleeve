@@ -95,9 +95,9 @@ def main() -> None:
     if a.no_helm:
         score(a.model, per, a.batch, not a.no_save)
         return
-    from thorp import vsm
+    from thorp import liberty_machine
 
-    with vsm.at_sea(f"score {a.model} on BLiMP", kind="score"):
+    with liberty_machine.at_sea(f"score {a.model} on BLiMP", kind="score"):
         score(a.model, per, a.batch, not a.no_save)
 
 

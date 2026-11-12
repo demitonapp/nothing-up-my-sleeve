@@ -1,8 +1,8 @@
-"""The first run's catalogue: Thorp's own classes, and the outside instruct models it can fetch.
+"""The first run's catalogue: Nothing up my sleeve's own classes, and the outside instruct models it can fetch.
 
 Two axes, deliberately kept apart:
 
-- **classes** are Thorp's own models (`300k` ... `350m`): what a Mac sails.
+- **classes** are Nothing up my sleeve's own models (`300k` ... `350m`): what a Mac sails.
 - **bands** are the outside models' sizes (`xsmall` ... `large`): what the dashboard talks to.
 
 The outside list is curated, not a Hugging Face search. Every entry is MLX-ready, instruct-tuned, and
@@ -22,7 +22,7 @@ BANDS = [
         "key": "xsmall",
         "name": "Extra small",
         "range": "under 1B",
-        "about": "under a billion parameters: the smallest instruct models, and the size of Thorp's own keel",
+        "about": "under a billion parameters: the smallest instruct models, and the size of Nothing up my sleeve's own keel",
     },
     {
         "key": "small",
@@ -34,7 +34,7 @@ BANDS = [
         "key": "medium",
         "name": "Medium",
         "range": "4B – 32B",
-        "about": "the middle of the field: above every ship Thorp has built",
+        "about": "the middle of the field: above every ship Nothing up my sleeve has built",
     },
     {
         "key": "large",
@@ -45,7 +45,7 @@ BANDS = [
 ]
 BAND_KEYS = tuple(b["key"] for b in BANDS)
 
-# Thorp's own classes: the store names and describes them (`s1.sizes`); this is the bootstrap copy the
+# Nothing up my sleeve's own classes: the store names and describes them (`s1.sizes`); this is the bootstrap copy the
 # first-run page can draw before the store exists. Once the store answers, its rows win.
 CLASSES = [
     {
@@ -349,7 +349,7 @@ def band_counts() -> dict[str, int]:
 
 
 def class_rows(sizes: list[dict] | None = None) -> list[dict]:
-    """Thorp's classes, from the store when it answers and from this bootstrap list before it does."""
+    """Nothing up my sleeve's classes, from the store when it answers and from this bootstrap list before it does."""
     rows = {c["preset"]: dict(c) for c in CLASSES}
     if sizes:
         for s in sizes:

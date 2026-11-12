@@ -3,7 +3,7 @@
 The quote (`estimate`) is the voyage's training arithmetic (6 FLOPs a parameter a token, the output layer and
 attention counted, an allowance for the evaluators and the scaffold's own passes) over what the GPU class
 delivers, plus the hours of making the ship ready and bringing it home, at the offer's price. `violations` holds
-a quote to S5's terms (thorp/viable/s5_policy/charter.py); the gate asks it through vsm.POLICIES["charter"].
+a quote to S5's terms (thorp/viable/s5_policy/charter.py); the gate asks it through liberty_machine.POLICIES["charter"].
 
 The spend log (s3.spend_events in Postgres) is S3's account of the money: one line when a ship is hired, one when it is
 released with what it cost. The week's spend counts what is released this week and what is still out, accruing.
@@ -92,6 +92,38 @@ def insert(line: dict) -> None:
         s.add(SpendEvent(at=datetime.fromisoformat(line["at"]), event=line["event"],
                          instance=None if line.get("instance") is None else int(line["instance"]),
                          run_id=line.get("run_id"), detail=json.loads(json.dumps(rest, default=str))))  # fmt: skip
+
+
+def reprice(instance: int, dph: float) -> None:
+    """Correct a hire to the rate Vast.ai is actually charging.
+
+    The offer's `dph` is the GPU's price; the instance's `dph_total` adds its disk and bandwidth (12 November:
+    the bridge was quoted and logged at $0.349/h while the instance was billed at $0.369/h). The hired line and,
+    once it exists, the released line are both corrected, so the week's spend and the release's cost use the
+    real rate. A released line's cost is recomputed from its own start and end."""
+    from sqlalchemy import select
+
+    from thorp import store
+    from thorp.viable.records import SpendEvent
+
+    rate = float(dph)
+    if rate <= 0:
+        return
+    with store.session() as s:
+        rows = s.scalars(
+            select(SpendEvent).where(
+                SpendEvent.instance == int(instance), SpendEvent.event.in_(("hired", "released"))
+            )
+        ).all()
+        for r in rows:
+            detail = dict(r.detail or {})
+            old = float(detail.get("dph") or 0.0)
+            if old and abs(old - rate) > 1e-9:
+                detail.setdefault("repriced_from", old)
+            detail["dph"] = rate
+            if r.event == "released" and detail.get("started") is not None and detail.get("ended") is not None:
+                detail["cost"] = max(0.0, (float(detail["ended"]) - float(detail["started"])) / 3600) * rate
+            r.detail = detail
 
 
 def log() -> list[dict]:

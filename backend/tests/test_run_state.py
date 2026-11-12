@@ -88,11 +88,11 @@ def test_a_spec_names_its_expedition_and_the_label_is_the_fallback():
     assert fleet.unknown_expedition({"expedition": "kipling"}) is None
     assert fleet.unknown_expedition({}) is None
     assert "does not exist" in fleet.unknown_expedition({"expedition": "atlantis"})
-    from thorp import vsm
+    from thorp import liberty_machine
 
-    assert vsm._pre_registered({"ship": "SOP v0.0.7 at 9m", "expedition": "kipling"}) == []
-    assert "does not exist" in vsm._pre_registered({"ship": "SOP v0.0.7 at 9m", "expedition": "atlantis"})[0]
-    assert vsm._pre_registered({"ship": "nothing known"}) == ["belongs to no expedition"]
+    assert liberty_machine._pre_registered({"ship": "SOP v0.0.7 at 9m", "expedition": "kipling"}) == []
+    assert "does not exist" in liberty_machine._pre_registered({"ship": "SOP v0.0.7 at 9m", "expedition": "atlantis"})[0]
+    assert liberty_machine._pre_registered({"ship": "nothing known"}) == ["belongs to no expedition"]
 
 
 def test_the_queue_refuses_an_expedition_that_does_not_exist(tmp_path, monkeypatch):

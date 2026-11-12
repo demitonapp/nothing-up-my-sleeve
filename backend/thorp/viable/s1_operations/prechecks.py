@@ -1,7 +1,7 @@
 """S1 operations: run a fitout's prechecks before it sails. Every item of every system (S5's cleaning standard,
 S3*'s audit, S3's library, S2's tokeniser, S4's planned next steps) is read for the fitout as its voyages
 will sail it, each reading is recorded in Postgres, and the fitout is marked ready when every required item
-passes. The S3 gate (thorp/vsm.py, policy 'prechecks') lets a voyage sail only when its fitout is ready.
+passes. The S3 gate (thorp/liberty_machine.py, policy 'prechecks') lets a voyage sail only when its fitout is ready.
 
     uv run python -m thorp.viable.s1_operations.prechecks ogden-v0-1
 """

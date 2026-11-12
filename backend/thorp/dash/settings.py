@@ -54,7 +54,7 @@ DATA_PARTS = (
     (
         "postgres",
         "The store's files",
-        "Postgres's own data directory: the ledger, the library, the queue and the VSM's records",
+        "Postgres's own data directory: the ledger, the library, the queue and the Liberty Machine's records",
     ),
     ("texts", "Texts", "the books as fetched, a file a book"),
     ("shards", "Shards", "the books tokenised and packed for training"),
@@ -615,7 +615,12 @@ def charters(limit: int = 8) -> dict:
             _charter_find(block, lambda m: "tar done" in m or "rsync done" in m, (data_i or 0) + 1) if data_i is not None else None
         )
         env_i = _charter_find(block, lambda m: "syncing the box's environment" in m)
-        env_done_i = _charter_find(block, lambda m: "[box] ssh done" in m, (env_i or 0) + 1) if env_i is not None else None
+        env_done_i = (
+            _charter_find(block, lambda m: "[box] environment synced" in m or "[box] ssh done" in m, (env_i or 0) + 1)
+            if env_i is not None else None
+        )  # fmt: skip
+        # what the environment sync last said (its progress, 12 November): shown on the live hire while it runs
+        env_said = next((m[len("[box] env: "):] for _, m in reversed(block) if m.startswith("[box] env: ")), None)
         home_i = _charter_find(block, lambda m: "bringing it home" in m)
         release_i = _charter_find(block, lambda m: "released;" in m)
 
@@ -706,6 +711,7 @@ def charters(limit: int = 8) -> dict:
             "phases": {k: (round(v) if v is not None else None) for k, v in phases.items()},
             # only a hire still out has a task running now: an aborted one's last task is where it died
             "open": open_key if release is None else None,
+            "detail": env_said if (open_key == "env" and release is None) else None,
             "note": note,
         })
 

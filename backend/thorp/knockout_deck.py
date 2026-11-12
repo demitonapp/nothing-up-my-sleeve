@@ -205,10 +205,10 @@ def read(name: str, k: int = K, controls: int = CONTROLS, log=print) -> dict:
 
 
 if __name__ == "__main__":
-    from thorp import vsm
+    from thorp import liberty_machine
 
     for name in sys.argv[1:]:
-        with vsm.at_sea(f"knock the deck out of {name}", kind="score"):
+        with liberty_machine.at_sea(f"knock the deck out of {name}", kind="score"):
             r = read(name)
         for c, v in sorted(r["verdict"].items(), key=lambda x: -x[1]["drop"]):
             print(f"  {c:22} drop {v['drop']:+.3f} [{v['band'][0]:+.3f}, {v['band'][1]:+.3f}] random {v['largest_random']:+.3f}"

@@ -2,7 +2,7 @@
 
 The 11 November status pass: `s1.expedition_status` holds the six-state value the Expeditions page shows
 (`at sea`, `under way`, `in port`, `home`, `paused`, `awaiting orders`). The coordinator writes it when
-the helm or the queue moves (`vsm.refresh_expedition_states`); the page reads it. Additive: one table.
+the helm or the queue moves (`liberty_machine.refresh_expedition_states`); the page reads it. Additive: one table.
 
 Revision ID: r9n2o5p8q1s4
 Revises: q8m1n4o7p0r3

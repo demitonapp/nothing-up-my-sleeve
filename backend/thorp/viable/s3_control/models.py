@@ -4,7 +4,7 @@ tables; nothing else does (Justin, 2026-11-07: "use alembic to manage the python
 
 Schema `s3` (S3 control; `fitout` until the systems took their schemas, 8 November):
 - `fitouts`, `stages`: the fitout and its stages in order.
-- `precheck_items`: the catalogue of checks (what is measured, the pass rule, the VSM system that owns it).
+- `precheck_items`: the catalogue of checks (what is measured, the pass rule, the Liberty Machine system that owns it).
 - `fitout_prechecks`: which items a fitout must pass (required) or carries as planned.
 - `precheck_results`: every reading, kept; the views `current_results` (the latest per fitout and item) and
   `readiness` (per fitout: required, passed, outstanding, planned, and whether it may sail) are made in the
@@ -158,7 +158,7 @@ class PrecheckItem(Base):
     key: Mapped[str] = mapped_column(Text, primary_key=True)  # e.g. clean.quotes, library.period
     name: Mapped[str] = mapped_column(Text)
     about: Mapped[str] = mapped_column(Text)  # what it checks and why
-    system: Mapped[str] = mapped_column(Text)  # the VSM system that owns it
+    system: Mapped[str] = mapped_column(Text)  # the Liberty Machine system that owns it
     kind: Mapped[str] = mapped_column(Text)
     measure: Mapped[str] = mapped_column(Text)  # what the value is
     comparator: Mapped[str] = mapped_column(Text)

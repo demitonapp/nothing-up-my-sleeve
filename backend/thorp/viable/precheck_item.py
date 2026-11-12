@@ -1,5 +1,5 @@
 """A precheck item: one measured condition a fitout must meet before it may sail (Justin, 2026-11-07: "these
-cleanup tasks should be in a data model ... a fitout can have precheck items"). Each system of the VSM defines
+cleanup tasks should be in a data model ... a fitout can have precheck items"). Each system of the Liberty Machine defines
 the items it owns in its own folder (s5_policy/prechecks.py, s3_control/prechecks.py, ...); s1_operations runs
 them for a fitout and records every reading in Postgres (s3_control/fitout_store.py).
 """

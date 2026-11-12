@@ -1,8 +1,8 @@
-"""Cleaning versions (thorp/cleaning.py) and the S5 policy 'clean' (thorp/vsm.py)."""
+"""Cleaning versions (thorp/cleaning.py) and the S5 policy 'clean' (thorp/liberty_machine.py)."""
 
 import pytest
 
-from thorp import cleaning, tokeniser, train, vsm
+from thorp import cleaning, tokeniser, train, liberty_machine
 
 PROSE = (
     "It was the best of times, it was the worst of times, it was the age of\n"
@@ -72,6 +72,6 @@ def test_raw_moves_no_id_and_a_cleaning_does():
 
 def test_the_clean_policy():
     spec = {"name": "new-voyage-s1", "data": {"recipe": "r.csv"}}
-    assert vsm._cleaned(spec)  # a new voyage on raw text breaks it
-    assert vsm._cleaned({**spec, "data": {"recipe": "r.csv", "clean": cleaning.CURRENT}}) == []
-    assert "clean" in vsm.POLICIES and vsm.POLICIES["clean"].opt_in
+    assert liberty_machine._cleaned(spec)  # a new voyage on raw text breaks it
+    assert liberty_machine._cleaned({**spec, "data": {"recipe": "r.csv", "clean": cleaning.CURRENT}}) == []
+    assert "clean" in liberty_machine.POLICIES and liberty_machine.POLICIES["clean"].opt_in

@@ -263,7 +263,7 @@ def backfill(conn) -> dict:
 
 def of(run_id: str) -> dict | None:
     """A run's state, reason, heartbeat and when the state was written; None when it has no row (or no store).
-    The helper for S3/S4 (vsm) and the dashboard: read this rather than parsing `s1.runs.status`."""
+    The helper for S3/S4 (the Liberty Machine) and the dashboard: read this rather than parsing `s1.runs.status`."""
     return of_many([run_id]).get(run_id)
 
 

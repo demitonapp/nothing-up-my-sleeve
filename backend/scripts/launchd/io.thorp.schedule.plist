@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<!-- Thorp's schedule (S2): every minute, fire the jobs that are due (thorp/viable/s2_coordination/schedule.py).
+<!-- Nothing up my sleeve's schedule (S2): every minute, fire the jobs that are due (thorp/viable/s2_coordination/schedule.py).
      Installed only with Justin's word:
        mkdir -p data/runs/schedule; cp backend/scripts/launchd/io.thorp.schedule.plist ~/Library/LaunchAgents/
        launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/io.thorp.schedule.plist

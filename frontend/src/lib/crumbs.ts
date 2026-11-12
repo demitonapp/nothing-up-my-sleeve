@@ -1,13 +1,14 @@
 // The breadcrumb trail (12 November, Justin: "can we have breadcrumbs throughout the UI for ease of
 // navigation"). One function reads an address and says where it sits in the site, from Places down, so
 // every page gets the same trail from the layout instead of each island writing its own "← back" link.
-// The tree is the site's as it stands today (lib/nav.ts, DemitonTabs): Orbitals holds Demiton and Masaq'
-// Reach; Demiton holds the berth, the shipyard, the library, the expeditions (with the queue),
-// its classes and every ship; Masaq' Reach holds the labs, the models and the embeddings. Old addresses
-// (/harbours, /masaq, /labs, /voyages, /shelves, /governance) sit where their pages now live.
+// The tree is the site's as it stands today (lib/nav.ts): Orbitals holds Demiton and Masaq'
+// Reach; Demiton holds the berth, the shipyard, the library, the expeditions (with the queue), the
+// Liberty Machine, its classes and every ship; Masaq' Reach holds the labs, the models and the
+// embeddings. Old addresses (/harbours, /masaq, /labs, /voyages, /shelves, /governance, /vsm) sit where
+// their pages now live.
 // Pure: no DOM, no React.
 
-import { navPath } from './nav';
+import { LIBERTY_MACHINE_SYSTEMS, libertyMachineHref, navPath } from './nav';
 
 export interface Crumb {
   label: string;
@@ -25,15 +26,15 @@ export interface MenuItem {
   note?: string;
 }
 
-// Demiton's quick ways on: its views (DemitonTabs), the queue and the VSM inside the expeditions, every
-// ship, and its classes smallest first, by their canonical address
+// Demiton's quick ways on: its views, the queue and the Liberty Machine inside the orbital, every ship,
+// and its classes smallest first, by their canonical address
 const DEMITON_MENU: MenuItem[] = [
   { label: 'Overview', href: '/orbitals/demiton', group: 'The orbital' },
   { label: 'Berth', href: '/orbitals/demiton/berth' },
   { label: 'Shipyard', href: '/shipyard' },
   { label: 'Library', href: '/library' },
   { label: 'Images', href: '/library/images', note: 'in the Library' },
-  { label: 'VSM', href: '/vsm', note: 'its own way in' },
+  { label: 'Liberty Machine', href: '/orbitals/demiton/liberty-machine' },
   { label: 'Expeditions', href: '/expeditions', group: 'At sea' },
   { label: 'Queue', href: '/expeditions/queue' },
   { label: 'Every ship', href: '/ships' },
@@ -73,6 +74,14 @@ const LIBRARY: Crumb = { label: 'Library', href: '/library' };
 const SHIPYARD: Crumb = { label: 'Shipyard', href: '/shipyard' };
 const MODELS: Crumb = { label: 'Models', href: '/orbitals/masaq/models' };
 
+// The Liberty Machine is breadcrumb-controlled: it has no section tabs, so its crumb carries the
+// overview and the five systems (12 November).
+const LIBERTY_MACHINE_MENU: MenuItem[] = [
+  { label: 'Overview', href: '/orbitals/demiton/liberty-machine', group: 'The Liberty Machine' },
+  ...LIBERTY_MACHINE_SYSTEMS.map((s) => ({ label: `${s.label} ${s.name}`, href: libertyMachineHref(s.key) })),
+];
+const LIBERTY_MACHINE: Crumb = { label: 'Liberty Machine', href: '/orbitals/demiton/liberty-machine', menu: LIBERTY_MACHINE_MENU };
+
 // a class's address by its slug or its size (router.ts CLASS_RENAMES): the trail names it the same way
 const CLASS: Record<string, string> = {
   '300k': 'The towing tank', 'towing-tank': 'The towing tank', seedling: 'The towing tank', keel: 'The towing tank',
@@ -95,7 +104,7 @@ const HOUSE: Record<string, string> = {
   stepfun: 'StepFun', bytedance: 'ByteDance', thinkingmachines: 'Thinking Machines', tii: 'TII', nvidia: 'NVIDIA',
 };
 const WORDS: Record<string, string> = {
-  vsm: 'VSM', s1: 'S1 Operations', s2: 'S2 Coordination', s3: 'S3 Control', s4: 'S4 Intelligence', s5: 'S5 Policy', sops: 'SOPs', ifeval: 'IFEval', arc: 'ARC',
+  'liberty-machine': 'Liberty Machine', s1: 'S1 Operations', s2: 'S2 Coordination', s3: 'S3 Control', s4: 'S4 Intelligence', s5: 'S5 Policy', sops: 'SOPs', ifeval: 'IFEval', arc: 'ARC',
   'at-sea': 'At sea', 'quantum-tests': 'Quantum tests', 'two-facts': 'Two facts', mtsp: 'MTSP',
 };
 
@@ -174,6 +183,12 @@ export function crumbsFor(path: string): Crumb[] {
     if (!b) return out;
     if (b === 'demiton') {
       out.push(DEMITON);
+      if (c === 'liberty-machine') {
+        out.push(LIBERTY_MACHINE);
+        const sys = d === 'control' ? 's3' : d === 'acquisition' ? 's1' : d;
+        if (sys) add(labelOf(sys), libertyMachineHref(sys));
+        return out;
+      }
       if (c === 'berth') add('Berth', '/orbitals/demiton/berth');
       else if (c === 'ships') add('Every ship', '/ships');
       else if (c === 'shipbuilder') out.push(SHIPYARD);
@@ -218,11 +233,12 @@ export function crumbsFor(path: string): Crumb[] {
     return out;
   }
 
-  // the VSM is a way in of its own (12 November), not a page of Demiton's expeditions
-  if (a === 'vsm' || a === 'governance') {
-    add('VSM', '/vsm');
+  // the Liberty Machine sits under Demiton (12 November); its crumb's menu is the navigation and the
+  // page shows no section tabs. The old flat addresses answer the same trail.
+  if (a === 'liberty-machine' || a === 'governance' || a === 'vsm') {
+    out.push(ORBITALS, DEMITON, LIBERTY_MACHINE);
     const sys = b === 'control' ? 's3' : b === 'acquisition' ? 's1' : b;
-    if (sys) add(labelOf(sys), `/vsm/${sys}`);
+    if (sys) add(labelOf(sys), libertyMachineHref(sys));
     return out;
   }
 

@@ -3,7 +3,7 @@ intake end to end on a stand-in source, the observer on the older fetch paths, a
 
 
 from thorp import acquisition as acq
-from thorp import manifest, vsm
+from thorp import manifest, liberty_machine
 from thorp.sources import base
 
 
@@ -75,9 +75,9 @@ def test_the_intake_gate_applies_thorps_policies_to_a_book(tmp_thorp):
 
 
 def test_the_intake_gate_can_be_switched_off_by_s5(tmp_thorp):
-    from thorp import vsm
+    from thorp import liberty_machine
 
-    vsm.set_switch("intake", False, "a test")
+    liberty_machine.set_switch("intake", False, "a test")
     v = acq.admit(_c(published=1931))
     assert v.admitted and v.notes == ["printed-before-1930: printed in 1931"]
 
@@ -166,17 +166,17 @@ def test_the_voyage_gate_keeps_a_record_of_every_decision(tmp_thorp):
         "fitout": {"key": "keel-cards-cause", "variation": "t"},
         "data": {"recipe": "lists/none.csv", "clean": "unwrap-v2"},
     }
-    vsm.gate(spec, where="fitout builder")
+    liberty_machine.gate(spec, where="fitout builder")
     bare = {k: v for k, v in spec.items() if k != "fitout"}
     try:
-        vsm.gate(bare)
-    except vsm.GateRefused:
+        liberty_machine.gate(bare)
+    except liberty_machine.GateRefused:
         pass
-    log = vsm.gate_log()
+    log = liberty_machine.gate_log()
     assert [x["verdict"] for x in log][:2] == ["refused", "passed"]
     assert log[0]["decisions"][-1]["policy"] == "fitout" and log[1]["where"] == "fitout builder"
     assert (
-        vsm.gate(spec, known_run=True) == [] and len(vsm.gate_log()) == 2
+        liberty_machine.gate(spec, known_run=True) == [] and len(liberty_machine.gate_log()) == 2
     )  # a resumed voyage is not asked again
 
 
@@ -185,26 +185,26 @@ def test_only_the_ogden_fitout_sails(tmp_thorp, monkeypatch):
     import dataclasses
 
     monkeypatch.setitem(  # enforced, as it is outside the tests (conftest makes it advisory elsewhere)
-        vsm.POLICIES, "ogden", dataclasses.replace(vsm.POLICIES["ogden"], enforced=True)
+        liberty_machine.POLICIES, "ogden", dataclasses.replace(liberty_machine.POLICIES["ogden"], enforced=True)
     )
-    assert vsm.enforced("ogden")
+    assert liberty_machine.enforced("ogden")
     spec = {
         "name": "t",
         "ship": "Fitout: test",
         "data": {"recipe": "lists/none.csv", "clean": "unwrap-v2"},
     }
     for key in ("ogden", "ogden-v0-1"):
-        assert vsm._ogden_only({**spec, "fitout": {"key": key}}) == []
-    assert vsm._ogden_only(
+        assert liberty_machine._ogden_only({**spec, "fitout": {"key": key}}) == []
+    assert liberty_machine._ogden_only(
         {**spec, "fitout": {"key": "ogdenish"}}
     )  # a version is ogden-<something>
     keel = {**spec, "fitout": {"key": "keel-cards-cause", "variation": "t"}}
     try:
-        vsm.gate(keel)
+        liberty_machine.gate(keel)
         raise AssertionError("the gate let a keel voyage sail")
-    except vsm.GateRefused as e:
+    except liberty_machine.GateRefused as e:
         assert "'ogden'" in str(e)
-    assert vsm.gate_log()[0]["decisions"][-1] == {
+    assert liberty_machine.gate_log()[0]["decisions"][-1] == {
         "policy": "ogden",
         "how": "refused",
         "why": "sails on the fitout 'keel-cards-cause'; only the Ogden fitout sails",

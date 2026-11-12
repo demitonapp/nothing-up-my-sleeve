@@ -1,5 +1,5 @@
 """Name the fitout of every voyage in the standing queue (2026-11-07 18:10, Justin: "for the others assign
-them a fitout, no run occurs without a named fitout"; S5 policy 'fitout', thorp/vsm.py).
+them a fitout, no run occurs without a named fitout"; S5 policy 'fitout', thorp/liberty_machine.py).
 
 Each queued spec that names no fitout gets `fitout: {key, variation}` appended (fleet.assign_fitout: a
 voyage compiled from a fitout is that fitout; every other is a variation of one of the two four-cards

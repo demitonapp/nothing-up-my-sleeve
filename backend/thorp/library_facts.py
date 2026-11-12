@@ -42,7 +42,7 @@ CHARS_PER_WORD = 5.7  # the library's own estimate (scripts/make_ogden_v02.py)
 # credited name with no role, else the first credited name with dates (an editor, for a volume by "Various").
 FLORUIT_AGE = 40
 LATE_BEFORE_DEATH = 25
-GATE_DEATH_LIMIT = 1955  # S5 'period': no credited name dead after this (vsm._period_only)
+GATE_DEATH_LIMIT = 1955  # S5 'period': no credited name dead after this (liberty_machine._period_only)
 
 _YEAR = r"(\d{1,4})\??(?:\s*(BC))?"
 _LIFE = re.compile(rf"{_YEAR}\s*-\s*(?:{_YEAR})?")
@@ -80,7 +80,7 @@ def credits(authors: str) -> list[dict]:
 
 
 def gate_death(authors: str) -> int | None:
-    """The latest death year the period gate sees (vsm._deaths, the same pattern): over every credited name."""
+    """The latest death year the period gate sees (liberty_machine._deaths, the same pattern): over every credited name."""
     ys = [int(y) for y in re.findall(r"\d{4}-(\d{4})", authors or "")]
     return max(ys) if ys else None
 

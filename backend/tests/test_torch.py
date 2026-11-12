@@ -33,14 +33,14 @@ from thorp.models.backend import backend_of  # noqa: E402
 def _cpu(monkeypatch):
     import dataclasses
 
-    from thorp import vsm
+    from thorp import liberty_machine
 
     monkeypatch.setenv("THORP_DEVICE", "cpu")
     monkeypatch.delenv("THORP_BACKEND", raising=False)
     # these tests are the loop's, not the gate's: the standard rule (every voyage names an SOP version) is advisory
     # here, as in test_scaffold's voyages. Until 11 November every voyage in this file was refused at the gate, so
     # no torch voyage was being tested at all.
-    monkeypatch.setitem(vsm.POLICIES, "standard", dataclasses.replace(vsm.POLICIES["standard"], enforced=False))
+    monkeypatch.setitem(liberty_machine.POLICIES, "standard", dataclasses.replace(liberty_machine.POLICIES["standard"], enforced=False))
     torch.manual_seed(0)
     before = mx.default_device()
     mx.set_default_device(mx.cpu)

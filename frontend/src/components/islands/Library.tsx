@@ -6,7 +6,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { MouseEvent as ReactMouseEvent } from 'react';
 import BranchConfig, { type ConfigChoices, type SavedConfig } from './BranchConfig';
-import DemitonTabs from '../DemitonTabs';
 import { TabNav } from '../TabNav';
 import { big, periodOf } from '@/lib/format';
 import { libraryBranchHref, libraryBranchOf } from '@/lib/nav';
@@ -160,7 +159,6 @@ export default function Library({ initialPath = '/library' }: { initialPath?: st
 
   return (
     <div {...sectionProps('shelves')}>
-      <DemitonTabs active="library" />
       <h1>Library <span className="q">{imagesView
         ? 'the images Nothing up my sleeve will read: where they come from, the rule they pass, and what is gathered so far'
         : 'every list of books Nothing up my sleeve reads from, is scored on or is drafting: how many books are fetched, about how many tokens they hold, their language families, and the voyages that read them'}</span></h1>

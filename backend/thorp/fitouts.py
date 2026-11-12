@@ -272,11 +272,11 @@ def queue(key: str, preset: str, seeds: tuple[int, ...] = (1, 2), where: str = "
     lines = []
     out = paths.resolve("specs/fitouts")
     out.mkdir(parents=True, exist_ok=True)
-    from thorp import vsm
+    from thorp import liberty_machine
 
     built = [s for seed in seeds for s in compile_for(key, preset, seed)]
     for s in built:  # S3 before the queue: a fitout the gate would refuse is not queued at all
-        vsm.gate(s, where="fitout builder")
+        liberty_machine.gate(s, where="fitout builder")
     for s in built:
         p = out / f"{s['name']}.yaml"
         if not p.exists():

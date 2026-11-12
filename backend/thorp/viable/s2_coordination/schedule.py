@@ -1,5 +1,5 @@
 """S2: Nothing up my sleeve's own schedule (Justin, 8 November: "thorps schedules tasks shouldn't be in claude code, but rather part of
-our VSM model and in postgres"). The jobs are rows in s2.schedule_jobs, every firing a row in s2.schedule_firings, and
+our Liberty Machine model and in postgres"). The jobs are rows in s2.schedule_jobs, every firing a row in s2.schedule_firings, and
 the judge of a job that needs judgment is S5's choice in s5.judges ("Nothing up my sleeves most capable model should judge it, claude
 initially but eventually a thorp model").
 

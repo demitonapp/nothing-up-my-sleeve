@@ -1,5 +1,5 @@
 """S5: the charter's terms, the rules a voyage on a rented GPU sails under (2026-11-08, Justin: "i'm going to use
-vast.ai can you build the code via the VSM system in order to leverage vast.ai").
+vast.ai can you build the code via the Liberty Machine system in order to leverage vast.ai").
 
 A chartered voyage sails on a GPU hired from Vast.ai's marketplace instead of this Mac's: the same spec, on the
 torch backend (thorp/train_torch.py), its rows and checkpoints brought home to the ledger. The terms are S5's: which
@@ -11,7 +11,7 @@ a row in s5.charter_terms (the latest per term in force, every change kept, in w
     uv run thorp charter term weekly_budget 40 --words "Justin, 8 November: ..."
     uv run thorp charter term gpus '{"RTX 4090": 0.45, "RTX 5090": 0.70}' --words "..."
 
-The policy that holds a voyage to these terms is vsm.POLICIES["charter"] (checked by S3, thorp/viable/s3_control/
+The policy that holds a voyage to these terms is liberty_machine.POLICIES["charter"] (checked by S3, thorp/viable/s3_control/
 charter.py); the rest of the charter is S1 (thorp/viable/s1_operations/charter.py: the voyage), S2 (s2_coordination/
 charter.py: one charter at a time, the ledger brought home), S3* (s3star_audit/charter.py: nothing hired is
 forgotten) and S4 (s4_intelligence/market.py: the market read).
@@ -34,9 +34,15 @@ DEFAULTS: dict = {
     "min_reliability": 0.98,
     "min_inet_down_mbps": 200,
     "min_inet_up_mbps": 100,
-    "min_cuda": 12.8,  # torch 2.15's wheels
+    # a floor only: the charter hires no host whose driver is older than the CUDA the lock's torch is built
+    # against (s1 vast.required_cuda: 13.2 for torch 2.15's wheels on 12 November, when this still said 12.8)
+    "min_cuda": 12.8,
     "disk_gb": 80,
     "image": "pytorch/pytorch:2.7.1-cuda12.8-cudnn9-runtime",
+    # the prebuilt box image (backend/box/Dockerfile, built on GitHub when the lock changes): the charter hires
+    # `<this>:lock-<the lock's hash>` when it is published, so a box arrives with torch aboard; else `image` above
+    # and the whole environment synced on the box. Empty turns it off.
+    "box_image": "ghcr.io/demitonapp/thorp-box",
     # the money: one voyage's quote, the week's spend (Monday to Sunday, UTC), and the credit kept in hand
     "voyage_budget": 10.0,
     "weekly_budget": 30.0,
@@ -55,6 +61,17 @@ DEFAULTS: dict = {
     # a hire only when it brings the voyage home at least this much sooner, in hours and as a share of its wait
     "margin_hours": 1.0,
     "margin_fraction": 0.25,
+    # the queue's planning cycle (12 November, Justin: "the optimal way to schedule the queue every 12 hours to
+    # maximise speed and maintain the cost ceilings"): every this many hours S3* closes the last cycle's books,
+    # S4 folds in what was measured, and the purser plans the next. The week's budget is released a cycle at a
+    # time (what is left over the cycles left), so no cycle can spend the rest of the week's money.
+    "cycle_hours": 12.0,
+    # the breaker (S2): this many fit-outs failing in a row on a charter lane pauses it, so a dead hour is not
+    # repeated down the queue. A box that fails before its voyage sails is retried abroad, not sailed here.
+    "box_failures_before_pause": 2,
+    # S4's intelligence audit (the judge, Qwen3.8 27B, and a turn of the cycle) is queued at the top of the Mac lane
+    # after this many lines have ended, so the 15 GB model has the Mac to itself; 0 never queues it
+    "intelligence_audit_every": 5,
 }
 
 PURSER_MODES = ("off", "advisory", "routing")
@@ -103,7 +120,7 @@ def terms() -> dict:
 
 
 def check(spec: dict) -> list[str]:
-    """The policy's check (vsm.POLICIES["charter"]): a spec that asks for a charter carries its quote (written by
+    """The policy's check (liberty_machine.POLICIES["charter"]): a spec that asks for a charter carries its quote (written by
     s1_operations.charter.quote before the gate is asked), and the quote must keep the terms. A spec that asks for
     none is not governed."""
     ch = spec.get("charter")

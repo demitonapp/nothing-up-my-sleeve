@@ -29,9 +29,9 @@ def ships(tmp_path, monkeypatch):
 @pytest.fixture
 def advisory_standard(monkeypatch):
     """The loop's tests, not the gate's: the SOP rule is advisory here (as in test_torch and test_scaffold)."""
-    from thorp import vsm
+    from thorp import liberty_machine
 
-    monkeypatch.setitem(vsm.POLICIES, "standard", dataclasses.replace(vsm.POLICIES["standard"], enforced=False))
+    monkeypatch.setitem(liberty_machine.POLICIES, "standard", dataclasses.replace(liberty_machine.POLICIES["standard"], enforced=False))
 
 
 @pytest.fixture

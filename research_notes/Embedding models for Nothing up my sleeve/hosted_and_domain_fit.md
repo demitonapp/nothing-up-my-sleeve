@@ -50,7 +50,7 @@ The current hosted line-up is Gemini Embedding 2 (8,192-token input, $0.20/M, or
 ## A2. Cost to embed 1B tokens
 
 ### Takeaway
-Embedding 1B tokens costs roughly $10 (OpenAI 3-small batch) to $200 (Gemini 2 standard). For top-tier quality it is about $65 to $100 with a batch API: OpenAI 3-large batch $65, Voyage 4-large batch about $80, Gemini 2 batch $100. These are small sums next to Thorp's GPU spend, so price should not decide the choice. Fit to the task and long-input handling should.
+Embedding 1B tokens costs roughly $10 (OpenAI 3-small batch) to $200 (Gemini 2 standard). For top-tier quality it is about $65 to $100 with a batch API: OpenAI 3-large batch $65, Voyage 4-large batch about $80, Gemini 2 batch $100. These are small sums next to Nothing up my sleeve's GPU spend, so price should not decide the choice. Fit to the task and long-input handling should.
 
 ### Cited Findings
 Arithmetic: 1,000M tokens × the list price per M, using the prices cited in A1.
@@ -90,7 +90,7 @@ No hosted model embeds a whole book (100K to 300K tokens) in one vector. The res
 ## B2. Historical / pre-1930 / literary English
 
 ### Takeaway
-Direct evidence on modern embedding APIs for 19th-century English is thin. Historical-IR work warns that neural models lean on contemporary language patterns, and period-trained models (Living with Machines) improve historical tasks. No study was found that benchmarks Gemini, Voyage, Cohere or OpenAI on pre-1930 prose, so Thorp would need its own small eval.
+Direct evidence on modern embedding APIs for 19th-century English is thin. Historical-IR work warns that neural models lean on contemporary language patterns, and period-trained models (Living with Machines) improve historical tasks. No study was found that benchmarks Gemini, Voyage, Cohere or OpenAI on pre-1930 prose, so Nothing up my sleeve would need its own small eval.
 
 ### Cited Findings
 - A retrieval benchmark built on the British Library BL19 collection (more than 35,000 works, 1700 to 1899) argues neural re-rankers rely on contemporary linguistic patterns, uses BM25 as its baseline, and notes that scarce relevance labels make fine-tuning risky. — [arXiv 2601.11874](https://arxiv.org/html/2601.11874v1)
@@ -119,7 +119,7 @@ General semantic embeddings are good at topic and paraphrase similarity but "con
 - Unsupervised bitext mining via dual-pivot transfer reaches state of the art. — [ACL 2022](https://aclanthology.org/2022.acl-long.595)
 
 ### Inferences
-- For Thorp's "second translation of a held-out book" test: two English translations of the same foreign work are a monolingual paraphrase problem at passage level, and modern semantic embeddings should do well on it (inferred). Passage-alignment scoring in the Vecalign style would be stronger than whole-book cosine.
+- For Nothing up my sleeve's "second translation of a held-out book" test: two English translations of the same foreign work are a monolingual paraphrase problem at passage level, and modern semantic embeddings should do well on it (inferred). Passage-alignment scoring in the Vecalign style would be stronger than whole-book cosine.
 - Retellings, which share plot but differ in wording, are harder. They need chunk-level semantic matching, and style-insensitive semantic embeddings are an asset here.
 - For "literary-style or authorship clustering", do not expect any hosted API to do well. Use style embeddings (from the STEB family) or classic stylometry, or report this as a known limit.
 

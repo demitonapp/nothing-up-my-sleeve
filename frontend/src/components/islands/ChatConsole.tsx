@@ -295,10 +295,10 @@ export default function ChatConsole() {
   }, []);
 
   // Only models that answer: an outside instruction-tuned model, or a Demiton leg that was taught turns (the 9m's
-  // talk legs, 12 November). A base checkpoint continues prose instead of answering, so a Thorp row of one would be a lie.
+  // talk legs, 12 November). A base checkpoint continues prose instead of answering, so a Nothing up my sleeve row of one would be a lie.
   // The choice is a sequence — the lab first, then the model within it (11 November, Justin: "in the model
   // selection it's a sequence. Choose the lab. and then choose the relevant model. Only show instruct
-  // models, so no Thorp model exists yet").
+  // models, so no Nothing up my sleeve model exists yet").
   const instruct = useMemo(
     () => (models || []).filter((m) => m.available && (m.talks || (m.kind === 'foreign' && m.model && m.facts?.tuning === 'instruct'))),
     [models],
@@ -766,7 +766,7 @@ export default function ChatConsole() {
           </label>
           <label
             className={`consoleswitch${toolsOk && useTools ? ' on' : ''}${!toolsOk ? ' inert' : ''}`}
-            title={toolsOk ? `calculate, current_time, board_score, queue_status, vsm_status, system_status and expedition_status: ${toolsInfo?.why || ''}` : (toolsInfo?.why || 'tools are for the foreign ships whose chat template takes them')}
+            title={toolsOk ? `calculate, current_time, board_score, queue_status, liberty_machine_status, system_status, expedition_status, browser_task and browser_task_status: ${toolsInfo?.why || ''}` : (toolsInfo?.why || 'tools are for the foreign ships whose chat template takes them')}
           >
             <input
               type="checkbox"

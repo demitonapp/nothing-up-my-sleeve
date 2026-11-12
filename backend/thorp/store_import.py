@@ -23,7 +23,7 @@ from pathlib import Path
 
 from sqlalchemy import select
 
-from thorp import paths, store, vsm
+from thorp import paths, store, liberty_machine
 from thorp.viable.records import (
     CharterTerm,
     MarketRead,
@@ -97,16 +97,16 @@ def charter_terms(p: Path) -> int:
 
 def gate_log(p: Path) -> int:
     """Each decision as often as the log has it (two alike in one second are two decisions)."""
-    have = Counter(_key(r) for r in vsm.gate_log(10**9))
+    have = Counter(_key(r) for r in liberty_machine.gate_log(10**9))
     n = 0
     for r in _lines(p):
         if not r.get("verdict"):
             continue
-        r = {**r, "at": _utc(r["at"]).astimezone().strftime(vsm.GATE_TIME)}
+        r = {**r, "at": _utc(r["at"]).astimezone().strftime(liberty_machine.GATE_TIME)}
         if have[_key(r)]:
             have[_key(r)] -= 1
             continue
-        n += vsm.insert_gate_decision(r, source="imported")
+        n += liberty_machine.insert_gate_decision(r, source="imported")
     return n
 
 

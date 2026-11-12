@@ -16,7 +16,7 @@ sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent))
 
 from grade_chains import _external  # noqa: E402
 
-from thorp import vsm  # noqa: E402
+from thorp import liberty_machine  # noqa: E402
 from thorp.evaluators.logic import CROWNS, CROWNS_KEY, crowns_readings, load_deck, score_deck  # noqa: E402
 
 RELATIONS = ("order", "cause", "membership", "proportion", "counterfactual")
@@ -34,7 +34,7 @@ def gain(items: dict, rel: str, idx=None) -> float:
 def main(names: list[str]) -> None:
     rng = np.random.default_rng(0)
     for name in names:
-        with vsm.at_sea(f"read the logic deck on {name}", kind="score"):
+        with liberty_machine.at_sea(f"read the logic deck on {name}", kind="score"):
             t0 = time.time()
             model, tok = _external(name)
             r = score_deck(model, tok, load_deck())

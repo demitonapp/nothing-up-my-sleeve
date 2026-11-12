@@ -1,4 +1,4 @@
-"""Chat with a finished Thorp run's latest checkpoint, shared by the CLI and the dash.
+"""Chat with a finished Nothing up my sleeve run's latest checkpoint, shared by the CLI and the dash.
 
 Experimental: the model is a small GPT trained on Ogden, not an instruction-tuned assistant. A run
 trained on v0.1.4 has seen the ``<question>/<answer>`` pieces; a run without a chat/QA arm will
@@ -100,7 +100,7 @@ def load(run_name: str, step: int | None = None):
         return got
 
 
-# How a Thorp ship's answer is drawn (11 November, the talk leg): from the likeliest pieces only, and not the
+# How a Nothing up my sleeve ship's answer is drawn (11 November, the talk leg): from the likeliest pieces only, and not the
 # piece it has just written. A 9m sampled over its whole vocabulary wanders, and greedy it loops; the outside
 # models at the same table are sampled by their own libraries' defaults (foreign_answer).
 DECODING = {"top_k": 40, "top_p": 0.9, "repetition_penalty": 1.15}
@@ -157,7 +157,7 @@ def fit_exchanges(spec: dict, tok, question: str, exchanges: list[tuple[str, str
         dropped += 1
 
 
-# the answer's room when a conversation is fitted to the window: a Thorp ship's replies are a sentence or two,
+# the answer's room when a conversation is fitted to the window: a Nothing up my sleeve ship's replies are a sentence or two,
 # and the console asks for a share of the window that would leave no room for the thread at all
 ANSWER_ROOM = 160
 
@@ -689,7 +689,7 @@ def _quant(model_id: str) -> str:
 def _own_tokens(tok, text: str) -> int:
     try:
         return len(tok.encode(text, add_special_tokens=False))
-    except TypeError:  # our own tokeniser takes no such switch and adds nothing: every Thorp answer counted 0
+    except TypeError:  # our own tokeniser takes no such switch and adds nothing: every Nothing up my sleeve answer counted 0
         try:
             return len(tok.encode(text))
         except Exception:  # noqa: BLE001
@@ -1144,7 +1144,7 @@ def foreign_stream(
     tools: bool = False,
 ):
     """One answer from a foreign ship's own MLX weights, as it is written (11 November, Justin:
-    "stream the tokens"): the model's continuation, not a Thorp checkpoint. A generator of events:
+    "stream the tokens"): the model's continuation, not a Nothing up my sleeve checkpoint. A generator of events:
 
       {"event": "start", ...}                          once the prompt is rendered and matched
       {"event": "delta", "kind": "reasoning" | "answer", "text": ..., "n": tokens so far}

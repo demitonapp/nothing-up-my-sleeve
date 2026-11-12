@@ -6,7 +6,6 @@ import { useEffect, useRef, useState } from 'react';
 import { crumbCls, emptyCls } from '@/lib/ui';
 import { sectionProps, useApi, useRoute } from '@/lib/useApi';
 import SectionNav from '../SectionNav';
-import DemitonTabs from '../DemitonTabs';
 import { DEMITON, candidateCardsHtml, classScoreHtml, harbourAbout, harbourCardsHtml, harbourKey, harbourRoute, harbourShipsHtml, harbourTitle, isOldHarbour, shipyardCardsHtml } from '@/scripts/views/harbours';
 import { applyHarbourFlips, wireHarbourFlip } from '@/scripts/views/harbourflip';
 import { BAND } from '@/scripts/views/bands';
@@ -206,8 +205,6 @@ export default function Harbours() {
   return (
     <div {...sectionProps('sizes')}>
       <SectionNav />
-      {harbour && !shipyard ? <DemitonTabs active={harbour === DEMITON.key && sub !== 'berth' ? 'overview' : 'berth'} /> : null}
-      {shipyard ? <DemitonTabs active="shipyard" /> : null}
       {home ? (
         <h1>The orbitals <span className="q">Demiton, our own orbital, and the trading orbital where every other lab and its ships reside</span></h1>
       ) : (

@@ -1,4 +1,6 @@
-# Thorp
+# Nothing up my sleeve
+
+(Code name `thorp` until the package, the CLI and the `THORP_*` variables move to `sleeve`; the commands below still say `thorp`.)
 
 A small language model trained only on books printed before 1930 whose authors died by 1955. Experiments hold the model still and change the books, scoring each shelf by how well the model predicts held-out books (the "hole cards"), in bits per byte.
 
@@ -88,7 +90,7 @@ A path a spec or a script names (`lists/...`, `specs/...`, `scripts/...`) is fou
 folder (`thorp/paths.py`: `resolve` and `ROUTER`), so specs read the same as before the split.
 
 **First run on a fresh Mac.** `uv run --project backend thorp onboard` starts the setup page on
-`127.0.0.1`, opens the default browser and walks through four choices: whether to sail Thorp's own
+`127.0.0.1`, opens the default browser and walks through four choices: whether to sail Nothing up my sleeve's own
 ships (and which class), which outside instruct models to download, where the records live (local
 Postgres now; hosted later) and then the install. It creates `data/postgres` if the Postgres binaries
 are already installed, runs the migrations, downloads the chosen MLX models into the Hugging Face
@@ -98,14 +100,27 @@ is also on `/settings`, under **The store**.
 
 The dashboard is an Astro app in `frontend/`. `thorp dash` (port 8787) serves the JSON API only, no page. `pnpm --dir frontend dev` serves the dashboard with hot reload on http://localhost:4321 and forwards `/api` to the running `thorp dash`. Its standards are in `backend/thorp/dash/UI.md`.
 
+The fleet's browser drone (Liberty Machine → **S1 Operations** → D1, `/orbitals/demiton/liberty-machine/operations/browser`) drives a real headless Chrome with a
+`llama.cpp` server: it needs `llama-server` on `PATH` (Homebrew's `llama.cpp`) and Google Chrome installed,
+and the drone page downloads its own weights into `data/models/`. Fara1.5-9B (Q4_K_M and its vision
+projector, about 6.8 GB) is the recommended pilot; Fara1.5-4B is the small one. The chat terminal calls the
+same drone with the `browser_task` tool. The **D2 email drone** (`/orbitals/demiton/liberty-machine/operations/email`) is the fleet's
+second card: it has its own text pilots (Qwen3.5 9B or 4B, downloaded from its page) and a **mail bridge**
+panel; its transport — SMTP/IMAP, Gmail or Outlook OAuth, or a signed-in Chrome profile — is not chosen yet.
+The **D3 phone drone** (`/liberty-machine/operations/phone`) is the third: it is on the **local test line**
+— you type the other person's turns, the text pilot answers, and macOS `say` speaks the reply. No carrier,
+no number, no microphone yet; a real line (Twilio or SIP) comes later behind the same safety terms: an AI
+disclosure, no emergency or premium numbers, a do-not-call list, and every call transcribed. The chat
+terminal calls it with `phone_call`, `phone_say` and `phone_end`.
+
 `thorp run` on a finished spec prints its ledger row and exits; on a spec with a checkpoint it resumes from the latest one. `thorp eval RUN` re-scores a run's latest checkpoint. Each `?` in `thorp ledger` binds to the latest finished run unless you pass parameters or `--run ID`.
 
 ## Layout
 
-- `backend/thorp/`: the harness (see `DECISIONS.md` for every choice the brief left open); `backend/thorp/onboard/` the first-run wizard (`thorp onboard`: catalogue, downloads, local Postgres, the standalone page); `backend/thorp/config.py` the install's own store choice; `backend/thorp/viable/` the code laid out by VSM system (S1 to S5) with the Postgres fitout store; `backend/migrations/` and `backend/alembic.ini` its Alembic migrations. `backend/thorp/gather.py` is acquisition's S1 over a bulk corpus, `backend/thorp/sources/catalog.py` and `bulk.py` its S4 (the sources, their walls and their adapters).
+- `backend/thorp/`: the harness (see `DECISIONS.md` for every choice the brief left open); `backend/thorp/onboard/` the first-run wizard (`thorp onboard`: catalogue, downloads, local Postgres, the standalone page); `backend/thorp/config.py` the install's own store choice; `backend/thorp/viable/` the code laid out by Liberty Machine system (S1 to S5) with the Postgres fitout store; `backend/migrations/` and `backend/alembic.ini` its Alembic migrations. `backend/thorp/gather.py` is acquisition's S1 over a bulk corpus, `backend/thorp/sources/catalog.py` and `bulk.py` its S4 (the sources, their walls and their adapters).
 - `backend/scripts/`: the spec writers (`make_*.py`), the pool and shelf cutters, and the queues (`queue.sh`, the standing queue).
 - `backend/tests/`: the test suite.
 - `frontend/`: the dashboard page (Astro): `src/pages/index.astro` the shell, `src/components/` one per tab, `src/scripts/dashboard.js` the panels, `src/lib/` the shared pieces (DataTable, charts, formatters, the book reader), `src/styles/global.css` the tokens.
 - `ships/specs/`: run specs, and `queue.txt` (the standing queue) and `queue-done.txt`. `ships/lists/`: the libraries (the stores, the Ogden corpus), the hole cards, the Forgotten Tomes, and `overrides.csv` (title, author → Gutenberg id). `ships/fitouts/`: the saved fitouts (in git since the split; they were in `data/`). `ships/plans/`, `ships/reports/`.
-- `data/` (not committed): catalogue, texts, tokenisers, shards, checkpoints, `manifest.sqlite`, run logs, `postgres/` (Thorp's own Postgres cluster).
+- `data/` (not committed): catalogue, texts, tokenisers, shards, checkpoints, `manifest.sqlite`, run logs, `postgres/` (Nothing up my sleeve's own Postgres cluster).
 - `ledger.sqlite` (not committed since 2026-11-07): every run, metric, eval and artifact.

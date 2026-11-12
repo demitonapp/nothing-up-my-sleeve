@@ -1,5 +1,5 @@
-r"""Nothing up my sleeve as a viable system (2026-11-07, Justin: "how do those types of rules get governed? We need to
-implement Beer's VSM, making sure this codebase for running Nothing up my sleeve has the S1 to S5 units encoded into its
+r"""Nothing up my sleeve as the Liberty Machine: a viable system (2026-11-07, Justin: "how do those types of rules get governed? We need to
+implement Beer's Viable System Model, making sure this codebase for running Nothing up my sleeve has the S1 to S5 units encoded into its
 way of operating").
 
 Stafford Beer's Viable System Model, mapped onto Nothing up my sleeve, each system with its members in the codebase:
@@ -22,7 +22,7 @@ Stafford Beer's Viable System Model, mapped onto Nothing up my sleeve, each syst
 - **S5, policy**: Nothing up my sleeve's identity: the POLICIES below, each adopted by Justin on a date, enforced or
   advisory; DECISIONS.md is S5's record. A policy changes only by a new entry there and here.
 
-    uv run python -m thorp.vsm audit     # S3*: the whole system's state, S1 to S5
+    uv run python -m thorp.liberty_machine audit     # S3*: the whole system's state, S1 to S5
 """
 
 from __future__ import annotations
@@ -74,8 +74,10 @@ SYSTEMS: dict[str, System] = {
                 "s2.queue_lines",
                 "thorp/ledger.py",
                 "data/ships.json",
-                "thorp/vsm.py lint_queue",
+                "thorp/liberty_machine.py lint_queue",
                 "thorp/viable/s2_coordination/charter.py",
+                "thorp/viable/s2_coordination/lanes.py",
+                "thorp/viable/s2_coordination/schedule.py",
             ),
         ),
         System(
@@ -83,11 +85,15 @@ SYSTEMS: dict[str, System] = {
             "Control",
             "the gate every run passes, the opt-in bargain, and the audit (S3*)",
             (
-                "thorp/vsm.py gate, audit",
+                "thorp/liberty_machine.py gate, audit",
                 "thorp/stores.py",
                 "tests/",
                 "thorp/viable/s3_control/charter.py",
+                "thorp/viable/s3_control/purser.py",
+                "thorp/viable/s3_control/cycle.py",
+                "s3.cycles",
                 "thorp/viable/s3star_audit/charter.py",
+                "thorp/viable/s3star_audit/cycle.py",
             ),
         ),
         System(
@@ -103,13 +109,16 @@ SYSTEMS: dict[str, System] = {
                 "thorp/smoking_qwen.py",
                 "thorp/knockout.py",
                 "thorp/viable/s4_intelligence/market.py",
+                "thorp/viable/s4_intelligence/hires.py",
+                "thorp/viable/s4_intelligence/judge.py",
+                "s4.judgments",
             ),
         ),
         System(
             "S5",
             "Policy",
             "Nothing up my sleeve's identity: the rules, adopted by Justin, recorded in DECISIONS.md",
-            ("thorp/vsm.py POLICIES", "DECISIONS.md", "thorp/viable/s5_policy/charter.py"),
+            ("thorp/liberty_machine.py POLICIES", "DECISIONS.md", "thorp/viable/s5_policy/charter.py", "s5.judges"),
         ),
     )
 }

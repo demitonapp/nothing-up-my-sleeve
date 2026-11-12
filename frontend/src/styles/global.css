@@ -59,6 +59,7 @@ nav.trail li + li::before { content: "›"; color: var(--muted); margin: 0 8px; 
 nav.trail a { color: var(--muted); text-decoration: none; }
 nav.trail a:hover, nav.trail a:focus-visible { color: var(--accent); }
 nav.trail [aria-current="page"] { color: var(--text); overflow-wrap: anywhere; }
+@media (max-width: 640px) { nav.trail { padding: 6px 16px; } }
 /* a crumb with quick ways on (Demiton, Masaq' Reach): a button that drops a menu */
 nav.trail .trailhas { position: relative; }
 nav.trail .trailbtn { display: inline-flex; align-items: center; gap: 5px; padding: 1px 6px; margin: -1px -6px; border: 1px solid transparent; border-radius: 4px; background: none; color: var(--muted); font: inherit; cursor: pointer; }
@@ -75,7 +76,6 @@ nav.trail .trailmenu a:hover, nav.trail .trailmenu a:focus-visible { background:
 nav.trail .trailmenu a[aria-current="page"] { color: var(--accent); }
 nav.trail .trailmenu a[aria-current="page"]::after { content: "here"; margin-left: auto; color: var(--muted); font-size: var(--fs-xs); }
 nav.trail .trailmenu a[aria-current="page"] .s { display: none; }
-@media (max-width: 640px) { nav.trail { padding: 6px 16px; } }
 /* the trail says where a page sits, so the old one-step "← back" links in a page's title are not drawn;
    a title that is itself a trail (h1.crumbs) keeps its links */
 main h1 > a.back, .section h1 > a.back { display: none; }
@@ -154,6 +154,12 @@ a.crumb:not(:empty)::after { content: ' ›'; }
 #queuetable .qgoal { min-width: 320px; max-width: 560px; white-space: normal; }
 #queuetable .qfit { min-width: 220px; max-width: 320px; white-space: normal; }
 #queuetable tr.qstep td { padding-top: 2px; padding-bottom: 2px; font-style: italic; }
+/* S4's scheduled intelligence audit is its own item type (12 November): a tinted row and its S4 badge, so a Liberty Machine
+   task never reads as one more step between voyages */
+#queuetable tr.qstep.qintel td { font-style: normal; background: color-mix(in srgb, var(--c8) 9%, transparent); }
+#queuetable tr.qstep.qintel td:first-child { box-shadow: inset 3px 0 var(--c8); }
+.qintelbadge { display: inline-block; margin-right: 4px; padding: 0 6px; border-radius: var(--r-pill); background: var(--c8);
+               color: var(--bg); font-size: var(--fs-xs); font-style: normal; font-weight: 700; letter-spacing: .04em; vertical-align: 1px; }
 /* the queue's complete column: the voyage's step of its schedule, the same bar its card draws */
 #queuetable .qcomplete { white-space: nowrap; }
 #queuetable .qprog { display: flex; align-items: center; gap: 6px; }
@@ -976,6 +982,24 @@ main a.pc2-more:hover { color: #000; }
 .govvoy { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .govsep { width: 14px; }
 .govlints { margin: 0; padding-left: 18px; }
+/* the queue's cycle on the Liberty Machine page (LibertyMachineCycle.tsx): six steps, one a system, this tab's marked */
+#libertymachinecycle { display: grid; gap: 12px; min-width: 0; }
+.cyclesteps { list-style: none; margin: 6px 0 0; padding: 0; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
+.cyclesteps li { border: 1px solid var(--line); border-radius: var(--r-md); padding: 8px 10px; min-width: 0; display: grid; gap: 4px; align-content: start; }
+.cyclesteps li.here { border-color: var(--accent); background: var(--raise); }
+.cyclesteps .cyclestephead { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; font-size: var(--fs-md); }
+.cyclesteps .s { color: var(--muted); font-size: var(--fs-sm); }
+#libertymachinecycle table { width: 100%; border-collapse: collapse; font-size: var(--fs-md); }
+#libertymachinecycle th { padding: 5px 8px; color: var(--muted); font-size: var(--fs-xs); font-weight: 500; text-align: left; text-transform: uppercase; letter-spacing: .04em; border-bottom: 1px solid var(--line); white-space: nowrap; }
+#libertymachinecycle td { padding: 7px 8px; border-top: 1px solid var(--line); vertical-align: top; }
+#libertymachinecycle td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+#libertymachinecycle td .s, #libertymachinecycle td.s { color: var(--muted); font-size: var(--fs-sm); }
+#libertymachinecycle td.over, #libertymachinecycle td.over .s { color: var(--bad); }
+#libertymachinecycle tr.now > td { background: var(--raise); }
+#libertymachinecycle .govstat > b { overflow-wrap: anywhere; }
+#libertymachinecycle .govstat { max-width: 360px; }
+@media (max-width: 1100px) { .cyclesteps { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 640px) { .cyclesteps { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .govexc { color: var(--text); }
 .fboptin { margin-top: 6px; }
 
@@ -1160,19 +1184,14 @@ button[aria-busy="true"] { cursor: progress; opacity: .7; }
 #voyages .vtab, #voyages .qview { display: none; }
 #voyages .vtab.active, #voyages .qview.active { display: block; }
 #voyages .qswitch { display: inline-flex; gap: 4px; margin: 4px 0 12px; }
-/* The two tab rows above an Expeditions or VSM page (12 November, Justin: "fix the sub tabs"): Demiton's
-   views, then the Expeditions' own. Each is an inline row, so in the island's plain wrapper they ran
-   together on one line, two Overviews side by side. Stacked (`.navstack`, the same grid a `.section`
-   is), the upper row sits on a rule and the lower is set smaller and close under it, so it reads as
-   belonging to the tab above. The VSM page has the same two rows inside its section. */
-.navstack { display: grid; gap: 16px; margin-bottom: 16px; }
-#demitontabs:has(+ #expeditions-nav) { display: flex; width: auto; border-bottom: 1px solid var(--line); padding-bottom: 5px; }
-#demitontabs + #expeditions-nav { display: flex; width: auto; margin-top: -12px; }
-#demitontabs + #expeditions-nav > a { font-size: var(--fs-sm); padding-block: 2px; }
+/* Demiton's views used to be a row of tabs above the page (Overview, Berth, Shipyard, Library,
+   Expeditions). They are reached from the orbital's cards and the breadcrumb's quick menu now, so
+   the row is gone (12 November, Justin: "these headings shouldn't appear ... it should be managed by
+   the breadcrumbs"). */
 /* a grid stretches its items, which makes a row's height definite, and a tab is 100% of it tall: on a
-   phone, where a row wraps, its second line then hung out of the row and over what came next (Demiton's
-   row, an expedition's nine tabs, the VSM's five systems). Every tab row in a section is its own height. */
-.section > .subnav, .navstack > .subnav { align-self: start; }
+   phone, where a row wraps, its second line then hung out of the row and over what came next (an
+   expedition's nine tabs, the Liberty Machine's five systems). Every tab row in a section is its own height. */
+.section > .subnav { align-self: start; }
 /* The Overview's jump row: under the sticky header as the page scrolls (--hdr-h is the header's height,
    set by the row itself), over the page's own colour so the charter passes beneath it. */
 .pagejump { position: sticky; top: var(--hdr-h, 57px); z-index: 4; display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
@@ -1489,7 +1508,6 @@ button[aria-busy="true"] { cursor: progress; opacity: .7; }
 .embsub .q { color: var(--muted); font-weight: 400; margin-left: 8px; }
 .embrule { margin: 0; color: var(--muted); font-size: var(--fs-sm); line-height: 1.5; }
 .embrule b { color: var(--accent); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; margin-right: 6px; }
-@media (max-width: 700px) { .embnode.d1 { padding-left: 8px; } }
 /* the Library's Images tab: gathered illustrations as a contact sheet */
 .imggrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
 .imgcard { margin: 0; display: grid; gap: 6px; align-content: start; }
@@ -1499,6 +1517,7 @@ button[aria-busy="true"] { cursor: progress; opacity: .7; }
 .embcats { display: grid; gap: 10px; margin-top: 10px; }
 .embcat .labhead .s { color: var(--muted); font-size: var(--fs-sm); margin-left: auto; }
 .embnode { scroll-margin-top: 80px; }
+@media (max-width: 700px) { .embnode.d1 { padding-left: 8px; } }
 .labfilters { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; }
 .labfilters .k { color: var(--muted); font-size: var(--fs-sm); text-transform: uppercase; letter-spacing: .06em; }
 .labfilters button { font: inherit; cursor: pointer; background: var(--panel); color: var(--text); border-color: var(--line); }
@@ -1679,6 +1698,8 @@ button[aria-busy="true"] { cursor: progress; opacity: .7; }
 .cards.shipyardgrid, .harbours.shipyardgrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; align-items: stretch; }
 .shipyardgrid .shipyardcard { min-height: 58vh; padding: 22px 24px; align-content: start; }
 .shipyardgrid .shipyardcard .cardart.ship { width: calc(100% + 48px); margin: -22px -24px 14px; aspect-ratio: 16 / 9; }
+.harbours.demitonyard { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.demitonyard .shipyardcard { min-height: 0; }
 .shipyardgrid .shipyardcard .nm { font-size: clamp(1.5rem, 2.2vw, 2.2rem); }
 .shipyardgrid .shipyardcard .job { font-size: var(--fs-md); line-height: 1.55; }
 @media (max-width: 1000px) {
@@ -1698,8 +1719,6 @@ button[aria-busy="true"] { cursor: progress; opacity: .7; }
 .sophead { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
 .sophead b { font-size: var(--fs-md); }
 .sopgoals { margin: 4px 0 0; padding-left: 18px; line-height: 1.5; }
-.harbours.demitonyard { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-.demitonyard .shipyardcard { min-height: 0; }
 .sopgoals li { margin-bottom: 4px; }
 /* the line beneath the cards in play: which open expedition shares the grid, and what its card opens */
 .sopnote { max-width: 680px; margin: -6px 0 20px; color: var(--muted); font-size: var(--fs-sm); }
@@ -1974,6 +1993,25 @@ details.paststandards[open] > summary { margin-bottom: 0; }
 /* the Vast tab (12 November): the ship out and its task bar, then the hires' table */
 .phasebar { display: flex; height: 8px; width: 100%; margin: 7px 0 2px; border-radius: 4px; background: var(--raise); overflow: hidden; }
 .phasebar i { display: block; height: 100%; }
+.vastdetail { font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.vastdetail.stalled, .vastdetail.stalled b { color: var(--bad); }
+/* the Cost tab (CostTab.tsx): spend by hour, day, week or month, a stacked bar a bucket */
+.costchart { display: grid; grid-template-columns: auto 1fr; gap: 8px; margin-top: 12px; }
+.costaxis { display: flex; flex-direction: column; justify-content: space-between; height: 180px; margin-top: -7px; text-align: right; font-variant-numeric: tabular-nums; }
+.costaxis span { line-height: 14px; }
+.costbars { display: grid; gap: 2px; align-items: end; height: 180px; margin-bottom: 30px; border-bottom: 1px solid var(--line);
+  background: linear-gradient(to bottom, var(--line) 1px, transparent 1px) 0 0 / 100% 90px repeat-y; }
+.costcol { position: relative; display: flex; flex-direction: column; justify-content: flex-end; height: 180px; min-width: 0; cursor: default; }
+.costcol:hover .coststack { opacity: .8; }
+.coststack { display: flex; flex-direction: column-reverse; gap: 2px; min-height: 0; max-width: 40px; width: 100%; margin: 0 auto; }
+.coststack i { display: block; min-height: 2px; }
+.coststack i:last-child { border-radius: 4px 4px 0 0; }
+.costcol.now .coststack { outline: 1px dashed var(--accent); outline-offset: 2px; }
+.costlabel { position: absolute; top: 186px; left: 50%; transform: translateX(-50%); white-space: nowrap; font-size: var(--fs-xs); }
+#settings .costtable th { text-align: left; color: var(--muted); font-weight: 500; font-size: var(--fs-xs); padding: 5px 8px; border-bottom: 1px solid var(--line); }
+#settings .costtable th.num { text-align: right; }
+#settings .costtable td { padding: 6px 8px; border-top: 1px solid var(--line); vertical-align: top; }
+.costdot { display: inline-block; width: 8px; height: 8px; border-radius: 2px; vertical-align: middle; }
 .phasebar.big { height: 12px; margin-top: 16px; }
 .vastnow .vastnowhead { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; flex-wrap: wrap; }
 .vastnow .vastnowid { min-width: 300px; }
@@ -2756,6 +2794,7 @@ ol.goaltext { padding-left: 22px; }
 .qlblock.p21m, .qlswatch.p21m { background: var(--c6); }
 .qlblock.pother, .qlswatch.pother { background: var(--c11); }
 .qlblock.pstep, .qlswatch.pstep { background: var(--track); color: var(--text); }
+.qlblock.pintel, .qlswatch.pintel { background: var(--c8); color: var(--bg); }
 .qlblock.sea, .qlswatch.sea { box-shadow: inset 0 0 0 2px var(--accent); background-image: repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.18) 0 6px, transparent 6px 12px); }
 .qlblock.ghost, .qlswatch.ghost { background: transparent; color: var(--c5); box-shadow: inset 0 0 0 1.5px var(--c5); background-image: none; }
 .qlempty { position: absolute; inset: 0; display: flex; align-items: center; padding: 0 10px; color: var(--muted); font-size: var(--fs-xs); font-style: italic; }
@@ -2767,9 +2806,129 @@ ol.goaltext { padding-left: 22px; }
   .qlaxisrow .qlhead { display: none; }
   .qllegend { padding-left: 0; }
 }
-/* Demiton's five cards: the VSM joins the Berth, Shipyard, Library and Expeditions (12 November). Below
+/* Demiton's five cards: the Liberty Machine joins the Berth, Shipyard, Library and Expeditions (12 November). Below
    1000px the shared rule above keeps them one to a row. */
 @media (min-width: 1001px) { .harbours.demitonyard.five { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (min-width: 1400px) { .harbours.demitonyard.five { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
 /* five across, a long name ("Coordination", "Intelligence") must fit the plate */
 .harbours.demitonyard.five .yardplate .nm { font-size: clamp(1.05rem, 1.3vw, 1.45rem); overflow-wrap: anywhere; }
+
+/* ---- the drone fleet (12 November): S1's workers, the browser drone first ---- */
+.dronefleet { margin: 4px 0 18px; }
+.dronefleethead { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 10px; }
+.dronefleethead h2 { margin: 0; }
+.harbours.demitonyard.one { grid-template-columns: minmax(0, 460px); }
+.dronecard .dronecardline { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 2px; }
+.dronecard .dronecardline .s { color: #b9a681; }
+.dronecard .dronecardline b { color: #f2e6cf; font-weight: 600; }
+
+.dronepage { display: grid; gap: 14px; }
+.dronepage h1 { margin-bottom: 2px; }
+.dronepagebar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.dronegrid { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+@media (max-width: 900px) { .dronegrid { grid-template-columns: minmax(0, 1fr); } }
+
+.dronemodels h2, .dronelaunch h2, .dronerun h2, .droneruns h2 { margin: 0 0 4px; }
+.dronemodelrows { display: grid; gap: 8px; margin-top: 10px; }
+.dronemodel { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; gap: 10px; align-items: start; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--raise); }
+.dronemodel.on { border-color: var(--accent); box-shadow: inset 2px 0 0 var(--accent); }
+.dronemodel input[type='radio'] { margin-top: 3px; accent-color: var(--accent); }
+.dronemodel input[type='radio']:disabled { opacity: .35; }
+.dronemodelhead { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.dronemodelbody p { margin: 4px 0 0; }
+.dronemodelsrc { color: var(--muted); font-size: var(--fs-xs); opacity: .8; }
+.dronemodel > button { align-self: start; }
+.dronenotflyable { margin-top: 10px; color: var(--muted); }
+
+.dronelaunch { display: grid; gap: 6px; align-content: start; }
+.dronelabel { font-size: var(--fs-sm); color: var(--muted); margin-top: 6px; }
+.dronetext { width: 100%; box-sizing: border-box; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 8px 10px; font: inherit; font-size: var(--fs-md); resize: vertical; }
+.dronetext:focus { outline: none; border-color: var(--accent); }
+.dronelaunchrow { display: flex; align-items: center; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+.dronesteps { width: 70px; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: var(--r-sm); padding: 5px 8px; font: inherit; font-size: var(--fs-md); }
+
+.dronerunhead { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.dronerunhead h2 { margin: 0; }
+.dronergoal { font-size: var(--fs-lg); margin: 6px 0; }
+.dronerunanswer { border-left: 2px solid var(--good); padding: 4px 0 4px 10px; margin: 8px 0; color: var(--text); white-space: pre-wrap; }
+.dronerunbody { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; margin-top: 10px; align-items: start; }
+@media (max-width: 900px) { .dronerunbody { grid-template-columns: minmax(0, 1fr); } }
+.droneshotwrap { background: #000; border: 1px solid var(--line); border-radius: var(--r-md); overflow: hidden; }
+.droneshot { display: block; width: 100%; height: auto; }
+.dronelog { margin: 0; padding-left: 20px; display: grid; gap: 8px; max-height: 420px; overflow: auto; }
+.dronelog li { line-height: 1.45; }
+.dronelog li.bad { color: var(--bad); }
+.dronethought { color: var(--muted); margin-top: 2px; }
+.droneruns .sel { background: var(--raise); }
+
+/* the fleet's grid and the email drone's mail bridge (12 November) */
+ .harbours.demitonyard.fleet { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 1200px) { .harbours.demitonyard.fleet { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 760px) { .harbours.demitonyard.fleet { grid-template-columns: minmax(0, 1fr); } }
+.dronemailoptions { margin: 8px 0 10px 18px; display: grid; gap: 6px; color: var(--muted); font-size: var(--fs-sm); line-height: 1.5; }
+.dronemailbridge code { color: var(--text); background: var(--raise); padding: 1px 5px; border-radius: 4px; }
+.dronesub { margin: 12px 0 0; font-size: var(--fs-md); color: var(--text); text-transform: uppercase; letter-spacing: .06em; }
+
+/* the phone drone's local test line (12 November) */
+.dronetranscript { max-height: 360px; overflow: auto; display: grid; gap: 8px; margin: 10px 0; padding-right: 4px; }
+.droneturn { border-left: 2px solid var(--line); padding: 2px 0 2px 10px; }
+.droneturn.drone { border-color: var(--accent); }
+.droneturn.person { border-color: var(--blue); }
+.dronerole { font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.droneturn p { margin: 2px 0; }
+.droneturnform { display: flex; gap: 8px; margin-top: 8px; }
+.droneturnform .dronetext { flex: 1; }
+
+/* mailboxes on the email drone's page (12 November) */
+.emailaccounts { display: grid; gap: 12px; }
+.emailaccountshead { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.emailaccountshead h2 { margin: 0 0 4px; }
+.mailaccounts { display: grid; gap: 8px; }
+.mailaccount { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--raise); }
+.mailaccount.error { border-color: color-mix(in srgb, var(--bad) 45%, var(--line)); }
+.mailaccounthead { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.mailaccountbody p { margin: 3px 0 0; }
+.mailaccountactions { display: flex; gap: 4px; }
+.mailerror { color: var(--bad); overflow-wrap: anywhere; }
+.mailmark { width: 28px; height: 28px; border-radius: 7px; display: inline-grid; place-items: center; font-weight: 700; font-size: 15px; flex: none; }
+.mailmark.ms { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 2px; padding: 5px; background: #1b1b1b; }
+.mailmark.ms i { display: block; }
+.mailmark.ms i:nth-child(1) { background: #f25022; }
+.mailmark.ms i:nth-child(2) { background: #7fba00; }
+.mailmark.ms i:nth-child(3) { background: #00a4ef; }
+.mailmark.ms i:nth-child(4) { background: #ffb900; }
+.mailmark.google { color: #4285f4; background: #fff; border-radius: 50%; font-family: Arial, sans-serif; }
+.mailmark.proton { color: #fff; background: linear-gradient(145deg, #6d4aff, #8b5cf6); clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); border-radius: 0; }
+.mailempty { display: grid; gap: 10px; }
+.mailprovidergrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
+.mailprovider { display: grid; justify-items: start; gap: 6px; text-align: left; padding: 14px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--bg); color: var(--text); cursor: pointer; }
+.mailprovider:hover { border-color: var(--accent); }
+.mailprovider .s { color: var(--muted); }
+.mailproviderhow { font-size: var(--fs-xs); color: var(--accent); text-transform: uppercase; letter-spacing: .05em; }
+
+.mailbackdrop { position: fixed; inset: 0; z-index: 80; background: rgb(0 0 0 / 65%); display: grid; place-items: center; padding: 20px; }
+.maildialog { width: min(620px, 96vw); max-height: 90vh; overflow: auto; display: grid; gap: 8px; padding: 18px 20px 20px; border: 1px solid var(--line); border-radius: var(--r-lg, 12px); background: var(--panel); box-shadow: 0 24px 70px rgb(0 0 0 / 55%); }
+.maildialoghead { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.maildialoghead h2 { margin: 0; }
+.mailchoices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.mailchoice { display: flex; align-items: flex-start; gap: 8px; text-align: left; padding: 10px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--bg); color: var(--text); cursor: pointer; }
+.mailchoice.on { border-color: var(--accent); box-shadow: inset 2px 0 0 var(--accent); }
+.mailchoice b { display: block; font-size: var(--fs-md); }
+.mailchoice .s { display: block; color: var(--muted); font-size: var(--fs-xs); line-height: 1.35; }
+.mailsteps { border-left: 2px solid var(--accent); padding: 4px 0 4px 10px; }
+.mailsteps p { margin: 3px 0; color: var(--muted); font-size: var(--fs-sm); line-height: 1.5; }
+.mailsteps a { font-size: var(--fs-sm); color: var(--accent); }
+.mailclientrow { display: flex; gap: 6px; align-items: center; }
+.mailadvanced summary { cursor: pointer; color: var(--muted); font-size: var(--fs-sm); margin-top: 4px; }
+.mailservergrid { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 8px; margin-top: 8px; }
+.mailservergrid label { display: grid; gap: 3px; font-size: var(--fs-xs); color: var(--muted); }
+.mailcheck { display: flex !important; align-items: center; gap: 5px; align-self: end; padding-bottom: 6px; }
+.maildialogactions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+.mailresult { border: 1px solid var(--line); border-radius: var(--r-md); padding: 10px 12px; }
+.mailresult.ok { border-color: color-mix(in srgb, var(--good) 50%, var(--line)); }
+.mailresult.bad { border-color: color-mix(in srgb, var(--bad) 50%, var(--line)); }
+.mailresult p { margin: 3px 0 0; }
+.maildevice { border: 1px dashed var(--line); border-radius: var(--r-md); padding: 12px; display: grid; gap: 6px; justify-items: start; }
+.mailcode { font-family: var(--mono, ui-monospace, monospace); font-size: 28px; letter-spacing: .18em; color: var(--accent); }
+.dronemailbehaviour ul { margin: 8px 0 0 18px; }
+.mailservergrid .mailfull { grid-column: 1 / -1; }

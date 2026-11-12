@@ -1,9 +1,9 @@
 r"""Acquisition: acquiring and cleaning books, as a viable system of its own (2026-11-07, Justin: "have the
-cleaning and acquiring of books built out as per Beer's VSM ... and then I want to be able to see that in the
+cleaning and acquiring of books built out as per Beer's Viable System Model ... and then I want to be able to see that in the
 UI").
 
 Beer's model is recursive: each operation in S1 is itself a viable system. Nothing up my sleeve's S1 has two operations, the
-voyages (training, thorp/vsm.py) and acquisition (the books the voyages read). Acquisition's five systems:
+voyages (training, thorp/liberty_machine.py) and acquisition (the books the voyages read). Acquisition's five systems:
 
 - **S1, operations**: intakes. An intake (`intake(list)`, `thorp acquire LIST`) puts every row of a book list
   through the intake gate, fetches what is admitted, registers it in the manifest and checks that it cleans.
@@ -21,13 +21,13 @@ voyages (training, thorp/vsm.py) and acquisition (the books the voyages read). A
   independent of the gate.
 - **S4, intelligence**: the sources beyond Gutenberg (SOURCES_KNOWN, from plans/corpus-ceiling.md) and how
   much of the legal Gutenberg is fetched (`ceiling()`).
-- **S5, policy**: RULES. Each serves one of Nothing up my sleeve's S5 policies (vsm.POLICIES: decks, period, clean) or is
+- **S5, policy**: RULES. Each serves one of Nothing up my sleeve's S5 policies (liberty_machine.POLICIES: decks, period, clean) or is
   proposed and awaits Justin's adoption, as an entry in DECISIONS.md.
 
 Cleaning is not repeated here. It happens when a book is read (thorp/cleaning.py through sources.load_text;
 S5 policy 'clean'), so the source's own text stays the record. An intake checks that each book it admits
 cleans under the current version (deterministically) and records how its line breaks change; the audit
-(vsm.clean_audit) does the same for the stores.
+(liberty_machine.clean_audit) does the same for the stores.
 
     uv run thorp acquire LIST [--dry-run] [--limit N]   # S1: an intake
     uv run python -m thorp.acquisition audit             # S3*: the library's state
@@ -85,7 +85,7 @@ SYSTEMS = [
         "members": [
             "thorp/acquisition.py admit, audit",
             "thorp/cleaning.py",
-            "thorp/vsm.py clean_audit",
+            "thorp/liberty_machine.py clean_audit",
         ],
     },
     {
@@ -98,7 +98,7 @@ SYSTEMS = [
         "key": "S5",
         "name": "Policy",
         "purpose": "what may enter the library: Nothing up my sleeve's S5 policies applied to books, and rules proposed to Justin",
-        "members": ["thorp/acquisition.py RULES", "thorp/vsm.py POLICIES", "DECISIONS.md"],
+        "members": ["thorp/acquisition.py RULES", "thorp/liberty_machine.py POLICIES", "DECISIONS.md"],
     },
 ]
 
@@ -207,7 +207,7 @@ def _norm_title(t: str) -> str:
 
 @functools.cache
 def _deck_titles() -> dict[str, str]:
-    """Every held-out deck's titles (the hole cards and the Forgotten Tomes), as vsm._decks_refused reads them."""
+    """Every held-out deck's titles (the hole cards and the Forgotten Tomes), as liberty_machine._decks_refused reads them."""
     out = {}
     for deck in ("lists/hole-cards.csv", "lists/hole-cards-v2.csv", "lists/hole-cards-unseen.csv"):
         p = paths.resolve(deck)
@@ -428,7 +428,7 @@ class Rule:
     statement: str
     serves: (
         str | None
-    )  # the Nothing up my sleeve S5 policy it applies to books (vsm.POLICIES); None: proposed, awaiting Justin
+    )  # the Nothing up my sleeve S5 policy it applies to books (liberty_machine.POLICIES); None: proposed, awaiting Justin
     when: str  # "before fetch" or "after fetch"
     check: Callable[[Candidate], list[str]]
 
@@ -530,9 +530,9 @@ RULES: dict[str, Rule] = {
 def enforced() -> bool:
     """The intake gate refuses on adopted rules unless Justin switches it off (S5's switch "intake",
     s5.policy_switches)."""
-    from thorp import vsm
+    from thorp import liberty_machine
 
-    return bool(vsm._enforcement().get("intake", True))
+    return bool(liberty_machine._enforcement().get("intake", True))
 
 
 @dataclass
@@ -1010,7 +1010,7 @@ def audit(sample: int = 24) -> dict:
     """S3*: the library's state, independent of the gate. Every registered book read against every rule the
     manifest can answer; duplicate texts; missing files; for a sample, whether the source's text still hashes
     as registered and whether a source's boilerplate survived; and the cleaning audit of the stores."""
-    from thorp import vsm
+    from thorp import liberty_machine
 
     books = manifest.all_books()
     by_rule: dict[str, list[dict]] = {k: [] for k, r in RULES.items() if r.when == "before fetch"}
@@ -1054,7 +1054,7 @@ def audit(sample: int = 24) -> dict:
     for t in totals.values():
         t["tokens_est"] = int(t["bytes"] / BYTES_PER_TOKEN)
     try:
-        cleaning = vsm.clean_audit()
+        cleaning = liberty_machine.clean_audit()
     except Exception as e:  # noqa: BLE001
         cleaning = {"error": str(e)}
     return {
@@ -1145,7 +1145,7 @@ def ceiling() -> dict:
 def coordination() -> dict:
     """S2: who holds the intake lock, who holds the GPU's helm (acquisition never takes it), the request
     interval, and each source's cache."""
-    from thorp import vsm
+    from thorp import liberty_machine
     from thorp.sources import base
 
     caches = []
@@ -1160,7 +1160,7 @@ def coordination() -> dict:
             caches.append({"source": d.name, "files": n, "bytes": size})
     return {
         "intake": holder(),
-        "helm": vsm.helm(),
+        "helm": liberty_machine.helm(),
         "request_interval_s": base.REQUEST_INTERVAL_S,
         "caches": caches,
     }
@@ -1184,7 +1184,7 @@ def summary() -> dict:
 
 def payload(log_limit: int = 60) -> dict:
     """Acquisition's five systems for the dashboard (/api/acquisition); the audit (S3*) is served apart, warm."""
-    from thorp import vsm
+    from thorp import liberty_machine
 
     log = read_log()
     refused_by_rule: dict[str, int] = {}
@@ -1215,8 +1215,8 @@ def payload(log_limit: int = 60) -> dict:
             {
                 **{k: v for k, v in asdict(r).items() if k != "check"},
                 "adopted": r.adopted,
-                "policy_adopted": vsm.POLICIES[r.serves].adopted
-                if r.serves in vsm.POLICIES
+                "policy_adopted": liberty_machine.POLICIES[r.serves].adopted
+                if r.serves in liberty_machine.POLICIES
                 else None,
             }
             for r in RULES.values()

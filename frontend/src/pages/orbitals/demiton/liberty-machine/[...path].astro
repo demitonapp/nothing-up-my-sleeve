@@ -1,0 +1,19 @@
+---
+// The Liberty Machine's five systems, a page each (12 November), under Demiton's address:
+// /orbitals/demiton/liberty-machine is the overview (the five cards), /orbitals/demiton/liberty-machine/operations
+// … /s5 a system's own page; /control and /acquisition answer as S3's and S1's. The old flat and
+// /governance addresses redirect here (astro.config.mjs). The island reads the route (useRoute).
+import Layout from '../../../../layouts/Layout.astro';
+import Governance from '../../../../components/islands/Governance';
+import Reader from '../../../../components/Reader.astro';
+
+export function getStaticPaths() {
+  return ['operations', 's2', 's3', 's4', 's5', 'control', 'acquisition', 'operations/browser', 'operations/email', 'operations/phone'].map((path) => ({ params: { path } }));
+}
+---
+<Layout>
+  <main>
+    <Governance client:load />
+  </main>
+  <Reader />
+</Layout>

@@ -87,7 +87,12 @@ at sea) how far it has come as a progress bar with its percent and steps, when i
 current pace (and the queue's own estimate when that differs), then its latest readings and card marks.
 The card is drawn from `/api/queue`'s per-row `detail`, read
 from the spec, so it is the same information the at-sea cards show without leaving the queue. It is a
-native `<dialog>` (Escape, the × or the backdrop closes it; the row is reachable by keyboard). **Plans** (`/expeditions/plans`) is
+native `<dialog>` (Escape, the × or the backdrop closes it; the row is reachable by keyboard). A row is a
+voyage, a step (an investigation, a reading, the coordinator's upkeep) or **S4's scheduled intelligence
+audit**, the queue's own item type: it is tinted with an S4 badge and reads as a Liberty Machine task, not as one more
+step, its swimlane block has its own colour and the legend names it, and its card says when S2 queues it
+and links to S4 (`/orbitals/demiton/liberty-machine/s4`) rather than claiming an expedition goal (`/api/queue` `kind: "intelligence"`).
+**Plans** (`/expeditions/plans`) is
 the standards whose voyages are home, kept as cards under **Earlier standards** (10 November,
 Justin: "move ogden from here to the plans tab"), folded shut and naming the standards inside, above
 **every expedition** as cards in three collapsible bands (11 November, Justin: "collapsible sections
@@ -102,7 +107,7 @@ expedition's **state** is S2's view (since 16:35), worked out from the helm and 
 hand-set word (`declared`, on hover): at sea (at most one), under way, in port, home, paused, and
 **awaiting orders** in the warning colour (declared running with nothing at sea or queued: stalled,
 or done and not closed). The voyage at the **helm** (name, kind, pid, since) shows beside the voyage
-at sea, and in the VSM's S2. A ship's
+at sea, and in the Liberty Machine's S2. A ship's
 page shows its voyage's **library aboard** (`/api/voyage/<run_id>/library`: each library's stage,
 where it came from, books and hash; its opt-in and refusals), and each voyage chip carries where its
 reading came from (`/api/voyages/where`).
@@ -111,10 +116,13 @@ reading came from (`/api/voyages/where`).
 
 The site is organised the way the project is: the orbitals (Demiton, our own, and Masaq' Reach, where
 every other lab and its ships reside), the ships, the voyages they sail on, and the discoveries followed
-across all of them. The header holds three ways in: **Places** (the orbitals), **Discoveries** and
-**Leaderboard**. **Expeditions** and **Library** are not header tabs: they are Demiton's views (12
-November, Justin: "expeditions also moves under the demiton orbital"), beside its **Berth** and
-**Shipyard**. **VSM** stays a tab under Expeditions. **Chat** is not a header tab but an action on a
+across all of them. The header holds four ways in: **Places** (the orbitals), **Discoveries**,
+**Leaderboard** and **Liberty Machine**. **Expeditions**, **Library** and **Liberty Machine** are not
+Demiton's header tabs: they are its views (12 November, Justin: "expeditions also moves under the demiton
+orbital"; "for this url .../liberty-machine it should be behind the demiton orbital url structure"),
+beside its **Berth** and **Shipyard**. The Liberty Machine's address is therefore
+`/orbitals/demiton/liberty-machine`; the header's Liberty Machine tab is a shortcut into that tree, and
+the page has no section tabs of its own: its breadcrumb menu carries the overview and the five systems. **Chat** is not a header tab but an action on a
 ship's page, Nothing up my sleeve and foreign alike (`/chat?ship=` and `/chat?model=`). Places has one
 way in, **Orbitals** (`/orbitals`, home; `/` answers it too, and the old `/harbours` addresses are aliases
 the island rewrites). A section with one tab shows no row.
@@ -125,13 +133,12 @@ the island rewrites). A section with one tab shows no row.
   with **Schi'mint** (the training ring) and **Vavatch End** (the deep yards) as its berths. **Masaq'
   Reach** is the trading orbital: every other lab and its ships, none of them ours to build. Each is a
   card that flips to five views; Demiton opens `/orbitals/demiton`, the trading orbital opens `/orbitals/masaq`.
-  Demiton's own row is **Berth · Shipyard · Library · Expeditions**: the berth is its fleet (Schi'mint
-  and Vavatch End, with their ships), the shipyard is `/shipyard`, the library is `/library`, and the
-  expeditions are `/expeditions` (their Overview, Queue and VSM tabs stay under it). The two rows
-  are stacked, Demiton's on a rule and the Expeditions' own set smaller and close under it (12 November,
-  Justin: "fix the sub tabs"; in the island's plain wrapper the two inline rows had run together on one
-  line, two Overviews side by side), and every tab row in a section keeps its own height, so a row that
-  wraps on a phone no longer hangs over what follows. The Overview carries a jump row under its title
+  Demiton's views are its five cards: **Berth** (its fleet: Schi'mint and Vavatch End, with their ships),
+  **Shipyard** (`/shipyard`), **Library** (`/library`), **Expeditions** (`/expeditions`, its Overview and
+  Queue tabs under it) and **Liberty Machine** (`/orbitals/demiton/liberty-machine`). There is no tab row
+  above them (12 November, Justin: "these headings shouldn't appear ... it should be managed by the
+  breadcrumbs"): the Demiton crumb's quick menu carries the same views. Every tab row in a section keeps
+  its own height, so a row that wraps on a phone no longer hangs over what follows. The Overview carries a jump row under its title
   (**On this page**: the fleet, the master charter, every goal's part, the preparations, the earlier
   drafts, the table, each with its count) that stays under the header as the page scrolls, marks the
   part being read and opens a folded part before scrolling to it. The Queue's own switch is a segmented
@@ -428,9 +435,20 @@ the island rewrites). A section with one tab shows no row.
   without `/api/bet` shows an Empty state saying to restart `thorp dash`.
 - **Settings** (`/settings`, the cog at the top right of the header, lit on its own page and on all of its
   tabs with no tab lit; `thorp/dash/settings.py`, `/api/settings`): what the dashboard runs on, read-only,
-  in five tabs under one line row (`#setnav`), each at its own address so a tab survives a refresh:
+  in six tabs under one line row (`#setnav`), each at its own address so a tab survives a refresh:
   **Storage** (`/settings`), **The store** (`/settings/store`), **Server and machine** (`/settings/server`),
-  **Switches** (`/settings/switches`) and **Keys and places** (`/settings/keys`). **Storage**: a stat
+  **Cost** (`/settings/cost`), **Switches** (`/settings/switches`) and **Keys and places**
+  (`/settings/keys`). **Cost** (`CostTab.tsx`, `/api/settings/cost?by=hour|day|week|month`,
+  `thorp/dash/cost.py`; 12 November, Justin: "add a cost tab", "by hour, by day, by week, by month"): what
+  the GPUs hired from Vast.ai cost, from S3's spend log, each hire's cost spread over the time it was hired.
+  A stat strip (this hour, today, this week of its budget, this month, all time), the week as one bar of
+  its budget, and a note when the budget's own figure differs (a ship released by hand logged no cost).
+  Then **spend over time**: four toggles (by hour: 48 hours; by day: 30 days; by week: 12 weeks, Monday to
+  Sunday UTC as the budget counts; by month: 12 months), a stacked bar a bucket in three kinds (trained
+  `--blue`, never trained `--accent`, smoke tests `--c5`; a 2px gap between segments; the bucket running
+  now outlined), each bar's split in its tooltip, and every bucket with spend in a folded table. Beside each
+  other, **what it bought** and **by GPU class**; then **the costliest hires**. Only the spend log's money
+  is here: this Mac's electricity is not measured. **Storage**: a stat
   strip (the space Nothing up my sleeve keeps, the disk's free space, the biggest part, the voyages with
   checkpoints, the outside models downloaded), the disk as one bar (ours, everything else, free), then a
   table of the parts biggest first (the outside models' Hugging Face cache, the checkpoints, the store's
@@ -470,11 +488,11 @@ the island rewrites). A section with one tab shows no row.
   server was started with, a dash for a default, and what each does. **Keys and places**: whether each key
   (`FAL_KEY`, `VAST_API_KEY`, `HF_TOKEN`) is set, never its value, and where the repository, data, ships,
   ledger, checkpoints and model cache live. Nothing is deleted from this page; the store's address is the
-  one thing changed here (a switch in the store tab), and the policies stay on the VSM's S5 and the seats
+  one thing changed here (a switch in the store tab), and the policies stay on the Liberty Machine's S5 and the seats
   on the queue. A part that cannot be read says why and the rest still stands.
-- **VSM** (`/vsm`, a tab under Expeditions; `thorp/vsm.py`, `/api/governance`): Thorp's rules
+- **Liberty Machine** (`/orbitals/demiton/liberty-machine`, under Demiton; `thorp/liberty_machine.py`, `/api/governance`): Thorp's rules
   as Beer's Viable System Model, five Card bands from S5 at the top to S1, each with its name, purpose,
-  its code as Badge chips and its live numbers from `vsm.audit()`. S5 policy: each policy's
+  its code as Badge chips and its live numbers from `liberty_machine.audit()`. S5 policy: each policy's
   statement, when Justin adopted it, and an enforced or advisory Badge. S4 intelligence: the
   competitors and the reference ladder, linked to the leaderboard. S3 control: per policy, the
   queued runs breaking it and those excepted with the exception's reason (the stores policy large;
@@ -483,18 +501,58 @@ the island rewrites). A section with one tab shows no row.
   acquisition's S1 below it: the library by source and set, the intakes (a dry run marked), and every
   book's verdict newest first with why.
   Read-only: a policy is switched in `s5.policy_switches` (`thorp s5 switch`), by Justin.
-  The Expeditions sub-tabs stay on the page (`#vnav`: Overview, Queue, Plans, VSM active), then five
-  system tabs (a line Tabs nav, `#govnav`), one per system: **S1 Operations** (`/vsm`, the S1 band and
-  acquisition's S1 below), **S2 Coordination** (`/vsm/s2`, the band and acquisition's S2), **S3
-  Control** (`/vsm/s3`, the band, the control detail and acquisition's S3), **S4 Intelligence**
-  (`/vsm/s4`, the band and acquisition's S4) and **S5 Policy** (`/vsm/s5`, the band and acquisition's
-  S5). The old `/governance` addresses redirect to `/vsm` (`/governance/control` to `/vsm/s3`,
-  `/governance/acquisition` to `/vsm`).
+  The Liberty Machine has no section tabs: the trail reads Orbitals › Demiton › Liberty Machine, and that
+  crumb's menu carries the overview and the five systems. A system page reads Orbitals › Demiton ›
+  Liberty Machine › S1 Operations. The menu is **S1 Operations**
+  (`/orbitals/demiton/liberty-machine/operations`, the S1 band and acquisition's S1 below), **S2
+  Coordination** (`/orbitals/demiton/liberty-machine/s2`, the band and acquisition's S2), **S3 Control**
+  (`/orbitals/demiton/liberty-machine/s3`, the band, the control detail and acquisition's S3), **S4
+  Intelligence** (`/orbitals/demiton/liberty-machine/s4`, the band and acquisition's S4) and **S5
+  Policy** (`/orbitals/demiton/liberty-machine/s5`, the band and acquisition's S5). The old
+  `/liberty-machine`, `/vsm` and `/governance` addresses redirect into that tree (`/vsm/control` and
+  `/governance/control` to `.../s3`, `/vsm/acquisition` and `/governance/acquisition` to `.../operations`).
+  - **The fleet** (`DroneFleet.tsx`, `/api/drones`, `thorp/drones.py`; 12 November, Justin: "under Liberty Machine S1
+    Operations we have a fleet of drones. The first drone in the fleet will be the browser drone"). On S1's
+    page under the band, one card a drone (`/api/drones/fleet`): its fal plate, its number, its job, whether
+    it is flying and the pilot it flies. **D1 Browser drone** (`drone-browser`) opens
+    `/orbitals/demiton/liberty-machine/operations/browser`: the **pilots** it may fly (a GGUF and its vision projector, downloaded
+    from the Hub by the page; Fara1.5-9B recommended, 4B the small one, Holo3.1-9B and GUI-Owl-1.5-8B
+    experimental), the task form, and the run as it happens — each step's action and thought, the last
+    screenshot, and the answer, question or error. A run is a real headless Chrome at 1440x900 driven by a
+    `llama.cpp` server, one pilot in memory at a time. The chat terminal calls it with `browser_task` and
+    reads it again with `browser_task_status`. **D2 Email drone** (`drone-email`,
+    `/orbitals/demiton/liberty-machine/operations/email`) flies a text pilot instead (Qwen3.5 9B or 4B) and shows the **mail bridge**:
+    the three ways into a mailbox (SMTP+IMAP, Gmail or Outlook OAuth, a signed-in Chrome profile) and the
+    fact that none is chosen yet. Its page has no task form until the bridge is configured. **D3 Phone drone**
+    (`drone-phone`, `/liberty-machine/operations/phone`) is on the **local test line**: the person's turns are
+    typed, the text pilot answers, and macOS `say` speaks the reply — no carrier, no number, no microphone.
+    The page's **Test call** panel starts a call, sends each person turn, keeps the transcript and hangs up;
+    the bridge names the later real lines (Twilio Media Streams, SIP/Asterisk), the voice stack (keyboard
+    ears, `say` mouth) and the call-safety terms (an AI disclosure, no emergency or premium numbers, a
+    do-not-call list, transcription). The chat terminal uses `phone_call`, `phone_say` and `phone_end`.
+  - **The queue's cycle** (`LibertyMachineCycle.tsx`, `/api/liberty-machine/cycle`, `thorp/viable/s3_control/cycle.py`; 12 November,
+    Justin: "make sure that the UI /liberty-machine reflects this"). Between a system's band and its detail, on every
+    system tab: a panel with **six steps, one a system** (`ol.cyclesteps`: S3* close the books, S4 refresh the
+    picture, S5 set the envelope, S3 make the plan, S2 sail it, S1 measure), each with one live line; the
+    steps of the tab's own system take the accent border. Under it the line "last turn · next · judge".
+    Then that system's own part, as panels: **S1** what a hire writes down (how many classes the charter has
+    timed itself, a link to Settings → Server → Vast); **S2** the turn on the schedule (the job, its next
+    turn, its last firing, whether the schedule's tick is loaded; a red alert when it is not; the lane lints;
+    what is not built yet); **S3** S3*'s findings and its table of hires (quoted, took, set-up and home,
+    billed, how it ended; a figure over its quote by a quarter is red), then the plan (lines queued, all on
+    this Mac, voyages abroad, held by the allowance; the fleets table, one ship to four, the chosen row
+    marked and those beyond the terms said so; the lines called foreign with why; the proposals, headed
+    "Proposed, not done"); **S4** what a hire really takes (each class's set-up, home, overhead a hire,
+    fit-outs failed, and where the figure comes from; an overhead a quarter over S5's constant is red) and
+    the judge (its name, whether it may run now and why not, the judgments with what a person had already
+    said beside each, the fit-outs waiting); **S5** the envelope (left of the week, this cycle's allowance,
+    the quotes it carries at the overrun, one voyage, ships at once, the lane) and the proposals addressed
+    to S5. Read-only: a turn is taken by the schedule or `thorp cycle run`, a term by `thorp charter terms`.
   - **S3 control** builds out the S3 band: a summary band (policies enforced, queued voyages an enforced
     policy would refuse, bargains, decisions recorded and refusals among them); **the gate** (a table per
     policy: statement and adoption, enforced or advisory, whether it admits an opt-in, and over the queue
     the voyages breaking it, excepted and bargained, with refusals over the gate's last 400 decisions);
-    **its decisions** (`vsm.gate_log()`, `s3.gate_decisions` in Postgres: when, voyage, asked by a voyage or the
+    **its decisions** (`liberty_machine.gate_log()`, `s3.gate_decisions` in Postgres: when, voyage, asked by a voyage or the
     fitout builder, the verdict Badge, and each policy that spoke with how: refused, bargain, excepted,
     advisory); **the bargains** and **the exceptions** side by side (the opt-in reasons grouped, each
     group's voyages one ghost Button open; each written exception's reason, adoption, names and
@@ -504,7 +562,7 @@ the island rewrites). A section with one tab shows no row.
     paragraph, raw → cleaned, and whether cleaning gives the same text every time) and the library audit.
   - **Acquisition** is the books the voyages read as a viable system one level down
     (`thorp/acquisition.py`, `/api/acquisition`, its audit `/api/acquisition/audit` kept warm). Its five
-    systems sit in the VSM's same-numbered tabs, below each band: **S5** the rules (which policy each
+    systems sit in the Liberty Machine's same-numbered tabs, below each band: **S5** the rules (which policy each
     serves and when adopted, or proposed); **S4** the legal Gutenberg against what is in the library
     (big numbers and a meter), what is reachable beyond it, and the sources table (holds, after Thorp's
     rule, licence, access, the wall where there is one, and a status Badge: admitted, gated, walled, or
@@ -514,7 +572,7 @@ the island rewrites). A section with one tab shows no row.
     files, a sample re-hashed and checked for boilerplate) with the cleaning audit; **S2** the intake
     lock's holder, the helm (acquisition never takes it), the request interval, each source's cache;
     **S1** the library by source and set, the intakes (a dry run marked), and every book's verdict
-    newest first with why. There is no acquisition tab of its own: the whole acquisition is the VSM's
+    newest first with why. There is no acquisition tab of its own: the whole acquisition is the Liberty Machine's
     five systems at the next level down (Beer's recursion). Empty states name the command:
     `uv run thorp acquire lists/<list>.csv [--dry-run]` for a list, and
     `uv run thorp gather SOURCE [--limit N] [--dry-run]` for a bulk corpus (`thorp gather --list`).
@@ -539,7 +597,7 @@ the island rewrites). A section with one tab shows no row.
   aim, positions and tack; below, the total tokens and how much of it is the repetition engine.
   **Save** posts to `fitouts.save` (a readable error if it doesn't validate); **Queue** builds the
   saved fitout for a class (the first four rungs) with its seeds, at the top or the end of the queue.
-  The queue passes the S3 gate first: a refusal (`vsm.GateRefused`) shows its own words. The ship's
+  The queue passes the S3 gate first: a refusal (`liberty_machine.GateRefused`) shows its own words. The ship's
   stores (`lists/stores/`) head the palette, since a fitout that reads only them passes the stores
   rule; any other shelf opens an **opt-in** field for the reason in words (`opt_in` on the fitout)
   (`fitouts.queue`), only after a confirmation, since it changes what the Mac trains next. The saved

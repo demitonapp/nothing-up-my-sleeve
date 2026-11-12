@@ -1,4 +1,4 @@
-"""Nothing up my sleeve as a viable system, laid out by system (Justin, 2026-11-07: "structure it like VSM in the file directory").
+"""Nothing up my sleeve as a viable system, laid out by system (Justin, 2026-11-07: "structure it like Liberty Machine in the file directory").
 
 Each folder is one of Beer's systems and holds the code it owns:
 
@@ -9,5 +9,5 @@ Each folder is one of Beer's systems and holds the code it owns:
 - s4_intelligence: the outside view and the next version (planned prechecks and the measurements behind them)
 - s5_policy: the standards (what clean text is; the policies Justin adopts)
 
-The older single-file map (thorp/vsm.py) keeps the policies, the gate and the helm until they move here.
+The older single-file map (thorp/liberty_machine.py) keeps the policies, the gate and the helm until they move here.
 """

@@ -1,18 +1,20 @@
-// The VSM (UI.md "VSM"), as a client island, a way in of its own (12 November, Justin: "need pages for
-// each vsm system and then move it up a level out of expeditions into it's own top level item"). /vsm is
-// the overview, the five systems as image cards (VsmCards.tsx); /vsm/s1 … /vsm/s5 is one system's own page —
+// The Liberty Machine (UI.md "Liberty Machine"), as a client island, a way in of its own (12 November, Justin: "need pages for
+// each Liberty Machine system and then move it up a level out of expeditions into it's own top level item"). /orbitals/demiton/liberty-machine is
+// the overview, the five systems as image cards (LibertyMachineCards.tsx); /orbitals/demiton/liberty-machine/operations … /orbitals/demiton/liberty-machine/s5 is one system's own page —
 // S1 operations, S2 coordination, S3 control, S4 intelligence, S5 policy — with its band from the audit;
 // S3's page carries the gate and the audit, S1's carries acquisition. The dense tables live
-// in views/governance.ts.
+// in views/governance.ts. Between a system's band and its detail sits the queue's planning cycle
+// (LibertyMachineCycle.tsx): the six steps on every tab, then that system's own part of the turn.
 
 import { useEffect, useState } from 'react';
 import type { MouseEvent as ReactMouseEvent } from 'react';
 import { emptyCls } from '@/lib/ui';
-import { VSM_SYSTEMS, vsmSystemOf } from '@/lib/nav';
+import { LIBERTY_MACHINE_SYSTEMS, libertyMachineSystemOf } from '@/lib/nav';
 import { routePath, sectionProps, useApi, useRoute } from '@/lib/useApi';
 import { acquisitionHtml, controlHtml, systemsHtml } from '@/scripts/views/governance';
-import SectionNav from '../SectionNav';
-import { VsmCards } from './VsmCards';
+import { DronePage, S1Drones } from './DroneFleet';
+import { LibertyMachineCards } from './LibertyMachineCards';
+import { LibertyMachineCycle } from './LibertyMachineCycle';
 
 type View = 's1' | 's2' | 's3' | 's4' | 's5';
 const INTRO: Record<View, string> = {
@@ -30,19 +32,27 @@ const openInReader = async (id: string): Promise<void> => {
 
 export default function Governance() {
   const route = useRoute();
-  // null is the overview (/vsm); a system's address is its own page
+  // null is the overview (/orbitals/demiton/liberty-machine); a system's address is its own page
   const [view, setView] = useState<View | null>(null);
   const [open, setOpen] = useState<Set<string>>(new Set());
 
-  useEffect(() => { setView(vsmSystemOf(route)); }, [route]);
+  useEffect(() => { setView(libertyMachineSystemOf(route)); }, [route]);
   useEffect(() => {
-    const onPop = () => setView(vsmSystemOf(routePath()));
+    const onPop = () => setView(libertyMachineSystemOf(routePath()));
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
   }, []);
 
+  // a drone's own page is not the system's: it reads /api/drones, not the audit
+  const parts = route.split('/').filter(Boolean);
+  const at = parts[0] === 'orbitals' && parts[1] === 'demiton' ? 2 : 0;
+  const droneKey = parts[at] === 'liberty-machine' && parts[at + 1] === 'operations'
+    && ['browser', 'email', 'phone'].includes(parts[at + 2] || '')
+    ? parts[at + 2]
+    : null;
+  const isDrone = droneKey !== null;
   // the overview reads nothing: the audit is a system page's
-  const on = view !== null;
+  const on = view !== null && !isDrone;
   const gov = useApi<any>(on ? '/api/governance' : null, 30000);
   const exps = useApi<{ key: string; name: string }[]>(on ? '/api/expeditions' : null, 60000);
   const acq = useApi<any>(on ? '/api/acquisition' : null, 30000);
@@ -54,7 +64,8 @@ export default function Governance() {
   const control = view === 's3' && gov.data && acq.data && au.data ? controlHtml(gov.data, acq.data, au.data, open) : '';
   const acqReady = Boolean(acq.data) && (view !== 's1' || Boolean(au.data));
   const acqBand = view && view !== 's3' && acqReady ? acquisitionHtml(acq.data, au.data, open, view.toUpperCase()) : '';
-  const html = band + control + acqBand;
+  const below = control + acqBand;
+  const html = band + below;
   const error = gov.error || acq.error || (view === 's1' || view === 's3' ? au.error : null);
 
   const onClick = (e: ReactMouseEvent) => {
@@ -70,25 +81,37 @@ export default function Governance() {
     if (b) { e.preventDefault(); void openInReader(b.dataset.book!); }
   };
 
-  if (view === null) {
+  if (isDrone) {
     return (
       <div {...sectionProps('governance')}>
-        <SectionNav />
-        <h1>VSM <span className="q">how Thorp governs itself, as Beer's Viable System Model: five systems, each with a page of its own. Read-only: a policy is switched on or off by Justin</span></h1>
-        <VsmCards />
+        <DronePage drone={droneKey ?? 'browser'} />
       </div>
     );
   }
-  const sys = VSM_SYSTEMS.find((x) => x.key === view)!;
+
+  if (view === null) {
+    return (
+      <div {...sectionProps('governance')}>
+        <h1>Liberty Machine <span className="q">how Thorp governs itself, as Beer's Viable System Model: five systems, each with a page of its own. Read-only: a policy is switched on or off by Justin</span></h1>
+        <LibertyMachineCards />
+      </div>
+    );
+  }
+  const sys = LIBERTY_MACHINE_SYSTEMS.find((x) => x.key === view)!;
 
   return (
     <div {...sectionProps('governance')}>
-      <SectionNav />
-      <h1>{sys.label} {sys.name} <span className="q">one of the VSM's five systems: what it does, and its live numbers</span></h1>
+      <h1>{sys.label} {sys.name} <span className="q">one of the Liberty Machine's five systems: what it does, its live numbers, and its part in the queue's planning cycle</span></h1>
+      {/* the fleet first (12 November, Justin: "the cards should be the first thing shown in this page"):
+          S1's workers, the browser drone, the email drone and the phone drone, before the band's numbers */}
+      {view === 's1' ? <S1Drones /> : null}
       <div className="gview active" data-gview={view}>
         <p className="s gvintro">{INTRO[view]}</p>
         <div id="govbands">
-          {error && !html ? <div className={emptyCls()}>the VSM could not be read: {error}</div> : html ? <div onClick={onClick} dangerouslySetInnerHTML={{ __html: html }} /> : <div className={emptyCls()}>reading the audit…</div>}
+          {error && !html ? <div className={emptyCls()}>the Liberty Machine could not be read: {error}</div> : html ? <div onClick={onClick} dangerouslySetInnerHTML={{ __html: band }} /> : <div className={emptyCls()}>reading the audit…</div>}
+          {/* the queue's planning cycle: the six steps on every tab, then this system's own part of it */}
+          <LibertyMachineCycle tab={view.toUpperCase() as 'S1' | 'S2' | 'S3' | 'S4' | 'S5'} />
+          {below ? <div onClick={onClick} dangerouslySetInnerHTML={{ __html: below }} /> : null}
         </div>
       </div>
     </div>

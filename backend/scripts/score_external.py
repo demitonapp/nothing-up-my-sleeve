@@ -1,21 +1,21 @@
-"""Score an outside model (such as Qwen 3.8 27B) on a Thorp deck in bits per byte, the way Thorp's
+"""Score an outside model (such as Qwen 3.8 27B) on a Nothing up my sleeve deck in bits per byte, the way Nothing up my sleeve's
 ce_bpb scores its own runs (2026-11-06; DECISIONS.md, "Thorp against Qwen").
 
     uv run --group compare python scripts/score_external.py MODEL LIST [--window 1024] [--batch 4]
 
 MODEL is a Hugging Face id or local path that mlx-lm can load (for example
-mlx-community/Qwen3.8-27B-4bit); LIST is a Thorp book list (for example lists/hole-cards-unseen.csv),
-resolved and fetched exactly as Thorp resolves it. Each book's text is the same stripped text Thorp
+mlx-community/Qwen3.8-27B-4bit); LIST is a Nothing up my sleeve book list (for example lists/hole-cards-unseen.csv),
+resolved and fetched exactly as Nothing up my sleeve resolves it. Each book's text is the same stripped text Nothing up my sleeve
 scores. The book is tokenised whole with the model's own tokeniser, a start token is put in front
 (so the first token is predicted too), and the sequence is cut into non-overlapping windows of
 WINDOW predictions, each starting from an empty context, as ce_bpb does. bits per byte = total
-nats / (UTF-8 bytes x ln 2), so the number is comparable with Thorp's whatever the tokenisers.
+nats / (UTF-8 bytes x ln 2), so the number is comparable with Nothing up my sleeve's whatever the tokenisers.
 
 Keeps s4.outside_readings <model>__<list> (was data/compare/<model>__<list>.json) (per book: nats, tokens, bytes, bits per byte; the means;
 the settings) and prints a table.
 
 A model mlx-lm cannot load (Maincode/Maincoder-1B) is built from its weights by scripts/mlx_ports.py. The
-scoring takes S2's helm (thorp/vsm.py at_sea, kind "score"): it waits in port while a voyage is at sea,
+scoring takes S2's helm (thorp/liberty_machine.py at_sea, kind "score"): it waits in port while a voyage is at sea,
 and the next voyage waits for it.
 """
 
@@ -69,10 +69,10 @@ def main() -> None:
     ap.add_argument("--clean", default="raw")
     a = ap.parse_args()
 
-    from thorp import vsm
+    from thorp import liberty_machine
 
     # S2: one GPU, so one job at sea; this waits in port for the voyage at sea, and the next voyage for it
-    with vsm.at_sea(f"score {a.model} on {Path(a.list).stem}", kind="score"):
+    with liberty_machine.at_sea(f"score {a.model} on {Path(a.list).stem}", kind="score"):
         score(a)
 
 

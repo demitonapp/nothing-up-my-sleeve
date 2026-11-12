@@ -1,5 +1,5 @@
 """S1: a chartered voyage, the same voyage on a GPU hired from Vast.ai (2026-11-08, Justin: "i'm going to use vast.ai
-can you build the code via the VSM system in order to leverage vast.ai").
+can you build the code via the Liberty Machine system in order to leverage vast.ai").
 
     thorp charter quote ships/specs/<voyage>.yaml        what it would cost on each class the terms allow
     thorp charter sail  ships/specs/<voyage>.yaml        hire, sail, bring home, release
@@ -12,7 +12,7 @@ The voyage, in order, each step owned by its system:
    steps left from its last checkpoint, so a voyage cut short by a lost ship sails on from where it was.
 2. **Quoted** (S4, s4_intelligence.market): the cheapest offer of each class the terms allow, priced for this
    voyage's tokens; the cheapest voyage is chosen.
-3. **Gated** (S3 for S5, vsm.POLICIES["charter"]): the quote against the terms (the ceiling an hour, a verified and
+3. **Gated** (S3 for S5, liberty_machine.POLICIES["charter"]): the quote against the terms (the ceiling an hour, a verified and
    reliable host, the voyage's budget, the week's, the account's credit, the ships already out). Refused, nothing
    is hired.
 4. **Hired** (S1, a berth held by S2): the instance created with the label `thorp:<run id>`, logged in S3's spend
@@ -51,6 +51,7 @@ import shutil
 import signal
 import sqlite3
 import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -96,6 +97,81 @@ class NotAttachable(RuntimeError):
     """`attach` found no ship to take up: no such hire, its charter still alive, or the instance not up."""
 
 
+# ---------------------------------------------------------------- where a hire's time goes
+
+
+class Phases:
+    """Where one hire's time went, measured by the charter itself as it passes each step (12 November, Justin:
+    "Vast needs to make measurements not only on processing but also setup times").
+
+    The dashboard's timing table reads the same steps back out of `data/runs/charter.log`; this is the record:
+    it is written on the hire's `released` line in S3's spend log, so S4 can plan on a measured set-up instead of
+    S5's constant, and so the rate at sea is the voyage's tokens over its *training* seconds, not over the hire
+    less a guess. The names are the timing table's: provision, ssh, code, data, board (the manifest, the spec and
+    the papers), env, then train and home. `mb` is what each transfer carried.
+
+    A hire that ends before `train` never sailed: `failed_in` names the step it died in."""
+
+    SETUP = ("provision", "ssh", "code", "data", "board", "env", "fitout")
+
+    def __init__(self, started: float, clock=time.time):
+        self.clock, self.at, self.open = clock, float(started), "provision"
+        self.seconds: dict[str, float] = {}
+        self.mb: dict[str, float] = {}
+
+    def mark(self, name: str, mb: float | None = None) -> None:
+        """The step now beginning: the one before it ends here."""
+        now = self.clock()
+        if self.open:
+            self.seconds[self.open] = self.seconds.get(self.open, 0.0) + max(0.0, now - self.at)
+        self.open, self.at = name, now
+        if mb is not None:
+            self.mb[name] = round(float(mb), 1)
+
+    @property
+    def sailed(self) -> bool:
+        return self.open in ("train", "home") or "train" in self.seconds
+
+    def record(self, ended: float | None = None) -> dict:
+        """The hire's timing as the spend log keeps it (the open step closed at `ended`, nothing changed here)."""
+        ended = self.clock() if ended is None else float(ended)
+        secs = dict(self.seconds)
+        if self.open:
+            secs[self.open] = secs.get(self.open, 0.0) + max(0.0, ended - self.at)
+        return {
+            "phases": {k: round(v, 1) for k, v in secs.items()},
+            "mb": dict(self.mb),
+            "setup_s": round(sum(v for k, v in secs.items() if k in self.SETUP), 1),
+            "train_s": round(secs.get("train", 0.0), 1) if self.sailed else None,
+            "home_s": round(secs["home"], 1) if "home" in secs else None,
+            "sailed": self.sailed,
+            "failed_in": None if self.sailed else self.open,
+        }
+
+    @classmethod
+    def taken_up(cls, started: float, at_sea: float | None, clock=time.time) -> Phases:
+        """For `attach`: the steps before it are not known one by one, only that the fit-out ran from the hire to
+        the `at sea` mark (when there is one) and the voyage has been training since."""
+        ph = cls(started, clock)
+        if at_sea is not None and at_sea >= ph.at:
+            ph.seconds["fitout"] = at_sea - ph.at
+            ph.open, ph.at = "train", float(at_sea)
+        else:
+            ph.open = "fitout"
+        return ph
+
+
+_PHASES: dict[int, Phases] = {}  # by instance: the hires this process is sailing
+
+
+def _phase(instance, name: str, mb: float | None = None) -> None:
+    """Mark a step of this hire; a timing must never cost the voyage."""
+    with contextlib.suppress(Exception):
+        ph = _PHASES.get(int(instance))
+        if ph is not None:
+            ph.mark(name, mb)
+
+
 # ---------------------------------------------------------------- the box
 
 
@@ -106,6 +182,62 @@ class NotAttachable(RuntimeError):
 FITOUT_MINUTES = 30.0
 
 
+def lock_tag(lock: Path | None = None) -> str | None:
+    """The box image's tag for this lock: `lock-` and the first 12 hex of backend/uv.lock's sha256, as the workflow
+    that builds it (.github/workflows/box-image.yml) names it. None when the lock cannot be read."""
+    import hashlib
+
+    try:
+        return "lock-" + hashlib.sha256((lock or paths.ROOT / "backend" / "uv.lock").read_bytes()).hexdigest()[:12]
+    except OSError:
+        return None
+
+
+def image_exists(ref: str, get=None) -> bool:
+    """Whether a public image is in its registry (ghcr.io's anonymous pull token, then the manifest). False on any
+    failure: a charter never hires an image it could not see."""
+    import requests
+
+    try:
+        name, tag = ref.split("/", 1)[1].rsplit(":", 1)
+        host = ref.split("/", 1)[0]
+        get = get or requests.get
+        tok = get(f"https://{host}/token", params={"scope": f"repository:{name}:pull"}, timeout=15).json().get("token")
+        r = get(f"https://{host}/v2/{name}/manifests/{tag}", timeout=15, headers={
+            "Authorization": f"Bearer {tok}",
+            "Accept": "application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.list.v2+json, "
+                      "application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json"})  # fmt: skip
+        return r.status_code == 200
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def box_image(t: dict, exists=image_exists) -> tuple[str, str]:
+    """The image a hire sails with, and why: the prebuilt box image for the lock this charter carries
+    (S5's `box_image`, tagged by `lock_tag`), where it has been published; else the terms' plain `image`, on
+    which the box syncs its whole environment as before (12 November, Justin: "lets do a pre built image")."""
+    repo, tag = str(t.get("box_image") or ""), lock_tag()
+    if not repo:
+        return t["image"], "no box image in the terms: the environment is synced on the box"
+    if not tag:
+        return t["image"], "the lock cannot be read: the environment is synced on the box"
+    ref = f"{repo}:{tag}"
+    if exists(ref):
+        return ref, "prebuilt for this lock: torch is already aboard"
+    return t["image"], f"{ref} is not published yet (built on GitHub when the lock changes): the environment is synced on the box"
+
+
+ENV_POLL_S = 15.0  # how often the environment sync is looked at
+ENV_STALL_S = 180.0  # a sync whose network and cache have not moved for this long is stalled
+
+
+def _num(v: str) -> float:
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return 0.0
+
+
 def fitout_limit() -> float:
     raw = os.environ.get("THORP_FITOUT_MINUTES")
     if raw is None:
@@ -114,6 +246,13 @@ def fitout_limit() -> float:
         return max(0.0, float(raw)) * 60
     except ValueError:
         return FITOUT_MINUTES * 60
+
+
+# macOS's tar packs a file's extended attributes (com.apple.provenance, on nearly everything) as a hidden AppleDouble
+# twin, `._name`, and its own listing hides them. On the box they unpack as real files: on 12 November
+# `ships/lists/tricks/._again.csv` and 26 more were read by a `glob("*.csv")` and the voyage died at sea on
+# `UnicodeDecodeError ... Mac OS X`. Neither the twins nor the attributes go aboard.
+TAR = ["tar", "--no-mac-metadata", "--no-xattrs"] if sys.platform == "darwin" else ["tar"]
 
 
 def _size(root: Path, rels: list[str]) -> int:
@@ -159,8 +298,14 @@ class Box:
         took = f" ({time.time() - t0:.1f}s)" if t0 else ""
         self.log(f"[box] {what}{took}")
 
-    def sh(self, cmd: str, check: bool = True, timeout: float | None = 600) -> subprocess.CompletedProcess:
+    def sh(self, cmd: str, check: bool = True, timeout: float | None = 600, quiet: bool = False) -> subprocess.CompletedProcess:
         t0 = time.time()
+        if quiet:  # a poll: its result is what the caller logs (12 November: the environment's progress)
+            say, self.log = self.log, None
+            try:
+                return self.sh(cmd, check=check, timeout=timeout)
+            finally:
+                self.log = say
         self._say(f"ssh: {cmd[:100]}")
         limit = self._limit(timeout or 600)
         try:
@@ -207,10 +352,11 @@ class Box:
         self._say(f"tar {len(rels)} files ({size / 1e6:.1f} MB) to {dst or '/'}")
         lst = paths.data_dir() / "charter" / f"tar-{os.getpid()}.txt"
         lst.write_text("\n".join(rels) + "\n")
-        tar_cmd = ["tar", "czf", "-", "-C", str(root), f"--files-from={lst}"]
-        remote = f"mkdir -p {REMOTE}/{dst} && tar xzf - -C {REMOTE}/{dst}"
+        tar_cmd = TAR + ["-czf", "-", "-C", str(root), f"--files-from={lst}"]
+        remote = (f"mkdir -p {REMOTE}/{dst} && tar xzf - -C {REMOTE}/{dst}; s=$?; "
+                  f"find {REMOTE}/{dst} -name '._*' -type f -delete; exit $s")  # no AppleDouble twin is left aboard
         limit = self._limit(timeout)
-        send = subprocess.Popen(tar_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        send = subprocess.Popen(tar_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env={**os.environ, "COPYFILE_DISABLE": "1"})
         try:
             r = self.run(["ssh", *self.opts, f"root@{self.host}", remote], stdin=send.stdout, capture_output=True,
                          text=True, timeout=limit)  # fmt: skip
@@ -272,9 +418,80 @@ class Box:
             timeout=900,
         )
 
-    def sync_env(self) -> None:
+    def sync_env(self, sleep=time.sleep, every_s: float = ENV_POLL_S, stall_s: float = ENV_STALL_S, clock=time.time) -> None:
+        """`uv sync --group torch` on the box, watched (12 November, Justin: "is there any way we can have some form
+        of visibility into the environment sync if it gets stuck?"). It runs in the background on the box, writing
+        uv's own lines to data/charter/env.log; every `every_s` the charter reads how many megabytes uv's cache and
+        the venv hold, how many the box's network has taken in, and uv's last line, and logs them as
+        `[box] env: ...`, so the Vast page shows what it is doing. A sync whose network and cache have not moved
+        for `stall_s` is stopped as stalled, not waited on until the fit-out deadline; one that is slow but moving
+        runs on. The fit-out deadline still bounds the whole."""
         self._say("syncing the box's environment (uv sync --group torch): this is the step that stalled on 8 November")
-        self.sh(f"cd {REMOTE} && ~/.local/bin/uv sync --project backend --group torch -q", timeout=1800)
+        t0 = clock()
+        log, done = f"{REMOTE}/data/charter/env.log", f"{REMOTE}/data/charter/env.exit"
+        # --inexact keeps the tagger group a pre-built image carries: the shapes evaluator needs it, but a
+        # GitHub 504 while fetching that wheel must not hold a GPU (it did before 9 November).
+        inner = f"cd {REMOTE} && ~/.local/bin/uv sync --project backend --group torch --inexact > {log} 2>&1; echo $? > {done}"
+        self.sh(f"rm -f {done}; nohup sh -c {shlex.quote(inner)} > /dev/null 2>&1 < /dev/null &", timeout=120, quiet=True)
+        probe = (f"cat {done} 2>/dev/null; echo '|'; du -sm ~/.cache/uv {REMOTE}/backend/.venv 2>/dev/null | awk '{{s+=$1}} END {{print s+0}}';"
+                 " echo '|'; awk 'NR>2 && $1 !~ /^lo:/ {s+=$2} END {print s+0}' /proc/net/dev; echo '|';"
+                 f" tail -c 2000 {log} 2>/dev/null | tr '\\r' '\\n' | grep -v '^ *$' | tail -n 1")
+        last_net, last_mb, moved_at, first_net = None, None, clock(), None
+        while True:
+            sleep(every_s)
+            r = self.sh(probe, check=False, timeout=60, quiet=True)
+            parts = [x.strip() for x in (r.stdout or "").split("|")]
+            if r.returncode != 0 or len(parts) < 4:
+                if clock() - moved_at > stall_s:
+                    raise BoxError(f"the environment sync could not be watched for {stall_s:.0f} s (ssh exit {r.returncode}): the box stopped answering")
+                continue
+            code, mb, net, line = parts[0], _num(parts[1]), _num(parts[2]), parts[3][-160:]
+            if code:
+                took = clock() - t0
+                if code.strip() != "0":
+                    tail = self.sh(f"tail -n 15 {log}", check=False, timeout=60, quiet=True).stdout or ""
+                    self._say(f"env: uv sync failed (exit {code}): {tail.strip()[-600:]}")
+                    raise BoxError(f"uv sync on the box failed (exit {code}): {tail.strip()[-300:]}")
+                self._say(f"environment synced ({took:.0f}s, {mb:,.0f} MB)")
+                self.sync_tagger()
+                return
+            first_net = net if first_net is None else first_net
+            rate = (net - last_net) / 1e6 / every_s if last_net is not None and net >= last_net else None
+            if last_net is None or net != last_net or mb != last_mb:
+                moved_at = clock()
+            still = clock() - moved_at
+            self._say(f"env: {mb:,.0f} MB in uv's cache and venv, {(net - first_net) / 1e6:,.0f} MB taken in"
+                      + (f" at {rate:.1f} MB/s" if rate is not None else "")
+                      + (f"; NOTHING MOVED FOR {still:.0f}s" if still >= every_s * 2 else "")
+                      + (f"; uv: {line}" if line else ""))  # fmt: skip
+            if still > stall_s:
+                self.sh("pkill -f 'uv sync' || true", check=False, timeout=60, quiet=True)
+                raise BoxError(f"the environment sync stalled: nothing came in for {still:.0f} s ({mb:,.0f} MB in the cache; uv's last line: {line or 'none'})")
+            last_net, last_mb = net, mb
+
+    def sync_tagger(self) -> None:
+        """Install the shapes tagger (`en-core-web-sm`, its own dependency group) if the box does not have it.
+
+        The tagger is needed at sea: every light evaluation runs `shapes`, and without the pinned model each
+        reading failed with `Can't find model 'en_core_web_sm'` (12 November: the bridge's whole run lost its
+        shapes). It is kept out of the main sync because the wheel is hosted on GitHub and a 504 there once held
+        a box's set-up for half an hour. So: use the image's copy when it has one, otherwise fetch it with a
+        five-minute bound, and never fail the fit-out for it."""
+        probe = (f"cd {REMOTE} && backend/.venv/bin/python -c 'import en_core_web_sm' >/dev/null 2>&1 && echo present || "
+                 "(timeout 300 ~/.local/bin/uv sync --project backend --group tagger --inexact "
+                 "> data/charter/tagger.log 2>&1; echo $?)")  # fmt: skip
+        try:
+            r = self.sh(probe, check=False, timeout=330, quiet=True)
+            code = ((r.stdout or "").strip().splitlines() or [""])[-1].strip()
+        except Exception as e:  # noqa: BLE001 - a missing tagger must never stop a voyage
+            self._say(f"shapes tagger not installed ({e!r}); the voyage sails without shape readings")
+            return
+        if code in ("present", "0"):
+            self._say("shapes tagger ready")
+            return
+        tail = self.sh(f"tail -n 4 {REMOTE}/data/charter/tagger.log", check=False, timeout=60, quiet=True).stdout or ""
+        self._say(f"shapes tagger not installed (exit {code or '?'}); the voyage sails without shape readings: "
+                  f"{tail.strip()[-400:]}")  # fmt: skip
 
     def launch(self, rid: str) -> None:
         inner = (
@@ -389,10 +606,10 @@ def quote(spec_path: str, gpu: str | None = None, vast=None, resolver=None, log=
 
 
 def gate(spec: dict, q: dict) -> None:
-    """S3 asks S5's charter policy of the chosen quote (vsm.gate_one: refused, nothing is hired)."""
-    from thorp import vsm
+    """S3 asks S5's charter policy of the chosen quote (liberty_machine.gate_one: refused, nothing is hired)."""
+    from thorp import liberty_machine
 
-    vsm.gate_one("charter", {**spec, "charter": {**(spec.get("charter") or {}), "quote": q}}, where="charter")
+    liberty_machine.gate_one("charter", {**spec, "charter": {**(spec.get("charter") or {}), "quote": q}}, where="charter")
 
 
 # ---------------------------------------------------------------- the voyage
@@ -451,6 +668,47 @@ def carried_data(tok_id: str, books: set[str] | None = None) -> list[str]:
     return out
 
 
+def voyage_lists(spec: dict) -> list[str]:
+    """Every list the voyage's spec reads, as paths from the repository root: its stages' shelves, its recipe, the
+    decks it refuses and is scored on, what it reads first and what its tokeniser was trained on."""
+    d, out = spec.get("data") or {}, []
+    names = [st.get("recipe") for st in d.get("stages") or []] + [d.get("recipe"), d.get("first")]
+    names += list(d.get("refuse") or []) + list((spec.get("eval") or {}).get("sets") or [])
+    train_on = (spec.get("tokeniser") or {}).get("train_on")
+    if train_on and train_on != "recipe":
+        names.append(train_on)
+    for n in names:
+        if not n or not isinstance(n, str):
+            continue
+        with contextlib.suppress(Exception):
+            f = paths.resolve(n)
+            if f.is_file():
+                rel = str(f.relative_to(paths.ROOT))
+                if rel not in out:
+                    out.append(rel)
+    return out
+
+
+def code_carried(spec: dict | None = None, run=subprocess.run) -> list[str]:
+    """The code the box sails with: what git tracks under backend/ and ships/, what it does not yet track there
+    (a module written today and not committed is still imported by the files that are), and the voyage's own
+    lists whether git keeps them or not. 12 November: the first voyage to reach the sea on the trimmed cargo
+    died in its first second, `FileNotFoundError: ships/lists/ogden-v0.1.4.csv`: the list every v0.0.6 voyage
+    reads is in .gitignore, and only tracked files were carried."""
+    def ls(*flags: str) -> list[str]:
+        r = run(["git", "ls-files", *flags, "backend", "ships"], cwd=paths.ROOT, capture_output=True, text=True, check=True)
+        return [f for f in r.stdout.split("\n") if f]
+
+    files = ls()
+    with contextlib.suppress(Exception):  # untracked and not ignored: new source, never a secret or a build
+        files += [f for f in ls("--others", "--exclude-standard") if f not in files]
+    files = [f for f in files if (paths.ROOT / f).is_file()]  # tracked but deleted in the working tree: nothing to carry
+    for f in voyage_lists(spec or {}):
+        if f not in files:
+            files.append(f)
+    return files
+
+
 def stage(rid: str) -> Path:
     """Consistent copies of data/'s SQLite files (the manifest), made with SQLite's backup, for carrying."""
     st = paths.data_dir() / "charter" / rid / "stage"
@@ -499,15 +757,37 @@ def bring_home(box, rid: str, start: int, rec: Ledger, hire: dict, commit: str) 
     if box.get(f"data/charter/{rid}.papers.gate-log.jsonl", gate_log):  # the box's gate decisions, into s3.gate_decisions
         store.fold_gate_log(gate_log, source=f"box papers {rid}")
     led = paths.data_dir() / "charter" / rid / "box-ledger.sqlite"
-    if not box.get("ledger.sqlite", led):
-        return {}
-    for side in ("-wal", "-shm"):  # the box's ledger is in WAL mode: its last rows may be in the -wal file
-        box.get(f"ledger.sqlite{side}", led.with_name(led.name + side))
+    # The box's ledger is open in WAL mode while the voyage trains. rsyncing the file (and hoping the -wal came
+    # with it) produced a malformed database on the bridge's homecoming (12 November: 220k metrics recovered from
+    # its dump). Ask SQLite for a consistent snapshot instead; a box whose python cannot make one falls back to
+    # the old copy, and s2.bring_home recovers a malformed copy from its dump.
+    snap_rel = f"data/charter/{rid}.ledger.snapshot.sqlite"
+    snap = paths.data_dir() / "charter" / rid / "box-ledger.snapshot.sqlite"
+    made = False
+    with contextlib.suppress(Exception):
+        inner = (
+            "import sqlite3; s=sqlite3.connect('ledger.sqlite'); "
+            f"d=sqlite3.connect('{snap_rel}'); s.backup(d); d.close(); s.close()"
+        )
+        box.sh(f"cd {REMOTE} && backend/.venv/bin/python -c {shlex.quote(inner)}", timeout=300)
+        made = box.get(snap_rel, snap)
+        box.sh(f"rm -f {snap_rel}", check=False, timeout=60, quiet=True)
+    if made:
+        led = snap
+    else:
+        if not box.get("ledger.sqlite", led):
+            return {}
+        for side in ("-wal", "-shm"):  # a raw fallback: its last rows may be in the -wal file
+            box.get(f"ledger.sqlite{side}", led.with_name(led.name + side))
     try:
         return s2.bring_home(led, rid, start, rec, commit=commit,
                              hardware=f"{_box_hardware(led, rid)} · vast.ai instance {hire['instance']} at ${hire['dph']:.3f}/h")  # fmt: skip
     except LookupError:
         return {}
+    finally:
+        if made:
+            with contextlib.suppress(OSError):
+                snap.unlink()
 
 
 def _register_home(rec: Ledger, rid: str, log) -> None:
@@ -524,10 +804,28 @@ def _register_home(rec: Ledger, rid: str, log) -> None:
         log(f"charter: {row.get('name')} not registered with its ship: {e!r}")
 
 
+def _drop_queued_home(hire: dict, log) -> None:
+    """Remove the queued line that asked for a voyage now home: a recovery (`thorp charter attach`) finishes a
+    line the coordinator had already requeued after an earlier failure, and leaving it would sail the finished run
+    again (12 November: the bridge finished on the 4090 while its queue line waited at the top)."""
+    with contextlib.suppress(Exception):
+        from thorp.viable.s2_coordination import queue_store
+
+        for row in queue_store.lines():
+            if row.get("kind") == "spec" and queue_store.name_of(row) == hire.get("name"):
+                if queue_store.drop(row["text"]):
+                    log(f"charter: removed {row['text']!r} from the queue: its run is home")
+
+
 def _box_hardware(led: Path, rid: str) -> str:
-    con = sqlite3.connect(f"file:{led}?mode=ro", uri=True)
-    r = con.execute("select hardware from runs where run_id=?", (rid,)).fetchone()
-    con.close()
+    try:
+        con = sqlite3.connect(f"file:{led}?mode=ro", uri=True)
+        try:
+            r = con.execute("select hardware from runs where run_id=?", (rid,)).fetchone()
+        finally:
+            con.close()
+    except sqlite3.Error:  # a raw fallback for a malformed ledger: the fold's recovery will read it
+        return "torch"
     return (r[0] if r and r[0] else "torch").replace("unknown (FileNotFoundError) · ", "")
 
 
@@ -659,10 +957,16 @@ def _release(vast, hire: dict, status: str, rec: Ledger, log) -> tuple[float, bo
     except Exception as e:  # noqa: BLE001
         released = False
         log(f"charter: RELEASE FAILED for instance {instance} ({e!r}): thorp charter audit --release-orphans")
+    timing: dict = {}
+    with contextlib.suppress(Exception):  # where the hire's time went (Phases); never worth the release
+        ph = _PHASES.pop(int(instance), None)
+        if ph is not None:
+            timing = ph.record(ended)
     if released:
         rate = _measured_rate(rec, rid, int(hire.get("start_step") or 0))
         s3.record("released", instance=instance, run_id=rid, gpu=hire.get("gpu"), dph=hire["dph"], preset=hire.get("preset"),
-                  started=hire["started"], ended=ended, cost=s3.cost_of(hire, ended), status=status, tokens_per_s=rate)  # fmt: skip
+                  started=hire["started"], ended=ended, cost=s3.cost_of(hire, ended), status=status, tokens_per_s=rate,
+                  name=hire.get("name"), **timing)  # fmt: skip
     s2.note(rid, event="released" if released else "release failed", instance=instance, status=status)
     return ended, released
 
@@ -702,7 +1006,9 @@ def sail(spec_path: str, gpu: str | None = None, vast=None, resolver=None, box_f
     log(f"charter: {q['gpu']} offer {q['offer_id']} at ${q['dph']:.3f}/h, about {q['hours']:.1f} h, ${q['cost']:.2f} ({q['speed']})")
     commit = train.git_commit()
     with s2.berth(t["max_instances"], rid):
-        instance = vast.hire(q["offer_id"], t["image"], int(t["disk_gb"]), LABEL + rid)
+        image, why_image = box_image(t)
+        log(f"charter: image {image} ({why_image})")
+        instance = vast.hire(q["offer_id"], image, int(t["disk_gb"]), LABEL + rid)
         # the instance is on record against its run from here: in the voyage's own log (a file) and then in
         # S3's spend log, with all `attach` needs to take the ship up again (the step it set out from, the
         # quote's hours, the commit). The hire is inside the `try` now: a spend log that could not be
@@ -714,11 +1020,17 @@ def sail(spec_path: str, gpu: str | None = None, vast=None, resolver=None, box_f
         with _recallable(log) as guard:
             try:
                 hire = s3.record("hired", **{k: v for k, v in hire.items() if k != "started"}, offer=q["offer_id"],
-                                 started=hire["started"], quote=q["cost"], quote_hours=q["hours"], commit=commit)  # fmt: skip
+                                 started=hire["started"], quote=q["cost"], quote_hours=q["hours"], commit=commit,
+                                 setup_assumed_h=q.get("setup_hours"))  # fmt: skip
+                _PHASES[int(instance)] = Phases(hire["started"])  # provision runs from the hire
                 key = _public_key(t)
                 if key:
                     vast.attach_ssh(instance, key)
                 inst = vast.wait_running(instance, sleep=sleep)
+                actual = float(inst.get("dph_total") or 0.0)
+                if actual > 0 and abs(actual - float(hire.get("dph") or 0.0)) > 1e-9:
+                    s3.reprice(instance, actual)
+                    hire["dph"] = actual
                 box = (box_factory or (lambda i: Box(i["ssh_host"], i["ssh_port"])))(inst)
                 try:
                     box.log = log
@@ -727,12 +1039,18 @@ def sail(spec_path: str, gpu: str | None = None, vast=None, resolver=None, box_f
                 except Exception:
                     pass
                 log(f"charter: instance {instance} is up ({inst.get('ssh_host')}:{inst.get('ssh_port')}); waiting for its ssh")
+                _phase(instance, "ssh")
                 tries = box.wait_ssh(sleep=sleep, on_denied=(lambda: vast.attach_ssh(instance, key)) if key else None)
                 log(f"charter: ssh answered (try {tries}); fitting out")
+                _phase(instance, "code")
                 box.bootstrap()
-                code = subprocess.run(["git", "ls-files", "backend", "ships"], cwd=paths.ROOT, capture_output=True, text=True, check=True).stdout.split()
+                code = code_carried(spec)
+                _phase(instance, "code", _size(paths.ROOT, code) / 1e6)
                 box.put_tar(paths.ROOT, code)  # one stream: rsync'ing 20k small files took most of an hour on 9 November
-                box.put_tar(paths.data_dir(), carried_data(q0["prep"].tokeniser.id, voyage_books(q0["prep"])) + checkpoints_carried(rid, spec, rec), "data")  # the data too, as one stream (8,907 files took 16 min by rsync)
+                aboard = carried_data(q0["prep"].tokeniser.id, voyage_books(q0["prep"])) + checkpoints_carried(rid, spec, rec)
+                _phase(instance, "data", _size(paths.data_dir(), aboard) / 1e6)
+                box.put_tar(paths.data_dir(), aboard, "data")  # the data too, as one stream (8,907 files took 16 min by rsync)
+                _phase(instance, "board")
                 st = stage(rid)
                 s2.papers(st / "ledger.sqlite", spec, rid, rec)
                 box.put(st, sorted(f.name for f in st.glob("*.sqlite") if f.name != "ledger.sqlite"), "data")
@@ -740,17 +1058,27 @@ def sail(spec_path: str, gpu: str | None = None, vast=None, resolver=None, box_f
                 (st / f"{rid}.yaml").write_text(yaml.safe_dump(spec, sort_keys=False, allow_unicode=True))
                 (st / f"{rid}.papers.json").write_text(json.dumps(store.papers_for_box(), ensure_ascii=False, indent=1))
                 box.put(st, [f"{rid}.yaml", f"{rid}.papers.json"], "data/charter")
+                _phase(instance, "env")
                 box.sync_env()
                 box.launch(rid)
+                # the fit-out is over: its deadline bounds fitting out only. Left set, it refused every poll, pull
+                # and the bringing home 30 minutes after fitting out began (12 November: the bridge trained on a
+                # 4090 while its charter was told "fitting out ran past its deadline" for 23 minutes on end)
+                with contextlib.suppress(Exception):
+                    box.deadline = None
+                _phase(instance, "train")
                 log(f"charter: {spec.get('name')} is at sea on instance {instance}")
                 deadline = time.time() + q["hours"] * float(t["overrun"]) * 3600
                 with contextlib.suppress(Exception):  # the deadline on record, for an `attach`; never worth the voyage
                     s3.record("at sea", instance=instance, run_id=rid, deadline=deadline)
                 status, counts = _watch(box, rid, p["start"], rec, hire, commit, deadline, log, sleep, poll_s)
+                _phase(instance, "home")
                 counts = _last_pull(box, rid, p["start"], rec, hire, commit, log, sleep)
                 _register_home(rec, rid, log)
                 if status == "home" and (rec.get_run(rid) or {}).get("status") != "finished":
                     status = "came in unfinished"  # the box's voyage stopped short (its checkpoint is home: sail again)
+                if status == "home":
+                    _drop_queued_home(hire, log)
             except Recalled as e:
                 status = f"recalled ({e})"
                 log(f"charter: {e} while instance {instance} is hired: releasing it (what it had pulled home is kept)")
@@ -820,22 +1148,35 @@ def attach(which: str | int, vast=None, box_factory=None, rec: Ledger | None = N
             raise NotAttachable(f"instance {instance} is not up at Vast.ai (it says {inst.get('actual_status')!r}): nothing was "
                                 "touched. `thorp charter audit` closes the log for a ship that is gone, and "
                                 "`--release-orphans` releases one that is there")  # fmt: skip
+        actual = float(inst.get("dph_total") or 0.0)
+        if actual > 0 and abs(actual - float(hire.get("dph") or 0.0)) > 1e-9:
+            s3.reprice(instance, actual)
+            hire["dph"] = actual
         deadline = _deadline(hire, t)
         start, commit = int(hire.get("start_step") or 0), hire.get("commit") or train.git_commit()
         box = (box_factory or (lambda i: Box(i["ssh_host"], i["ssh_port"])))(inst)
         with contextlib.suppress(Exception):
             box.log = log
         s2.note(rid, event="attached", instance=instance)
+        with contextlib.suppress(Exception):  # the fit-out's length is the hire to its `at sea` mark, when it left one
+            from datetime import datetime
+
+            seas = [r for r in s3.log() if r["event"] == "at sea" and r.get("instance") == instance]
+            sea = datetime.fromisoformat(str(seas[-1]["at"])).timestamp() if seas else None
+            _PHASES[instance] = Phases.taken_up(float(hire["started"]), sea)
         log(f"charter: attached to instance {instance} ({hire.get('name')}, run {rid[:12]}), hired "
             f"{(time.time() - float(hire['started'])) / 3600:.1f} h ago; its deadline is {time.strftime('%d %b %H:%M', time.localtime(deadline))}")  # fmt: skip
         status, counts = "lost", {}
         with _recallable(log) as guard:
             try:
                 status, counts = _watch(box, rid, start, rec, hire, commit, deadline, log, sleep, poll_s)
+                _phase(instance, "home")
                 counts = _last_pull(box, rid, start, rec, hire, commit, log, sleep)
                 _register_home(rec, rid, log)
                 if status == "home" and (rec.get_run(rid) or {}).get("status") != "finished":
                     status = "came in unfinished"
+                if status == "home":
+                    _drop_queued_home(hire, log)
             except Recalled as e:
                 status = f"recalled ({e})"
                 log(f"charter: {e} while instance {instance} is hired: releasing it (what it had pulled home is kept)")

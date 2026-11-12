@@ -551,14 +551,14 @@ def cmd_s5(a) -> int:
         print("an S5 decision is recorded in Justin's words: --words", file=sys.stderr)
         return 2
     if a.what == "switch":
-        from thorp import vsm
+        from thorp import liberty_machine
 
         if a.value not in ("on", "off"):
             print("thorp s5 switch POLICY on|off", file=sys.stderr)
             return 2
-        vsm.set_switch(a.key, a.value == "on", a.words)
+        liberty_machine.set_switch(a.key, a.value == "on", a.words)
     elif a.what == "except":
-        from thorp import vsm
+        from thorp import liberty_machine
 
         if not a.reason:
             print("an exception says why: --reason", file=sys.stderr)
@@ -570,7 +570,7 @@ def cmd_s5(a) -> int:
             patterns = (val,)
         else:
             runs = (val,)
-        n = vsm.except_policy(a.key, reason=a.reason, adopted=a.words, runs=runs, patterns=patterns)
+        n = liberty_machine.except_policy(a.key, reason=a.reason, adopted=a.words, runs=runs, patterns=patterns)
         print(f"S5: '{a.key}' does not govern {n} match(es)")
     else:
         from thorp.viable.s5_policy import charter as s5
@@ -700,6 +700,21 @@ def cmd_select(a) -> int:
         by="thorp select compose",
     )
     return 0 if r["passed"] or a.dry_run else 1
+
+
+def cmd_lane(a) -> int:
+    """Open or pause a lane in s2.lane_defs; the coordinator reads it on its next loop."""
+    from thorp.viable.s2_coordination import lanes
+
+    if a.what != "show" and not lanes.set_lane(a.lane, a.what == "open", a.why):
+        print(f"no lane {a.lane!r}; the lanes are {', '.join(lanes.lane_defs(fresh=True))}")
+        return 1
+    d = lanes.lane_defs(fresh=True).get(a.lane)
+    if d is None:
+        print(f"no lane {a.lane!r}")
+        return 1
+    print(f"{d.lane}: {'open' if d.enabled else 'paused'} ({d.kind}, {d.seats} seat(s)); {d.note}")
+    return 0
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -929,6 +944,18 @@ def main(argv: list[str] | None = None) -> int:
         fn=lambda a: __import__("thorp.viable.s2_coordination.schedule", fromlist=["main"]).main(
             a.rest
         )
+    )
+    s = sub.add_parser("lane", help="open or pause a lane of the queue (S2): thorp lane vast open | pause --why ...")
+    s.add_argument("lane")
+    s.add_argument("what", choices=["open", "pause", "show"], nargs="?", default="show")
+    s.add_argument("--why", default="", help="for `pause`: the reason, kept on the lane's note")
+    s.set_defaults(fn=cmd_lane)
+    s = sub.add_parser(
+        "cycle", help="the queue's planning cycle (S3): show the plan now, run a turn, put it on the schedule"
+    )
+    s.add_argument("rest", nargs=argparse.REMAINDER)
+    s.set_defaults(
+        fn=lambda a: __import__("thorp.viable.s3_control.cycle", fromlist=["main"]).main(a.rest)
     )
     s = sub.add_parser(
         "version", help="a plan's version, 1.2.3 (journey, content, parameters): show one, assign one"

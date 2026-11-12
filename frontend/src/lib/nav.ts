@@ -3,7 +3,7 @@
 // static pages read this file, so a section's tabs cannot drift from page to page (UI.md,
 // "Navigation"). Pure logic only: no DOM, no React.
 
-export type MainKey = 'places' | 'expeditions' | 'discoveries' | 'leaderboard' | 'library' | 'vsm';
+export type MainKey = 'places' | 'expeditions' | 'discoveries' | 'leaderboard' | 'library' | 'liberty-machine';
 
 export interface MainTab {
   key: MainKey;
@@ -39,12 +39,12 @@ export const MAIN_TABS: MainTab[] = [
   },
   { key: 'discoveries', label: 'Discoveries', href: '/discoveries', title: '', match: ['/discoveries'] },
   { key: 'leaderboard', label: 'Leaderboard', href: '/leaderboard', title: '', match: ['/leaderboard'] },
-  // the VSM is a way in of its own (12 November, Justin: "need pages for each vsm system and then move it up a
-  // level out of expeditions into it's own top level item"): it governs the whole of Thorp, not a voyage
+  // the Liberty Machine is a way in of its own (12 November, Justin: "need pages for each Liberty Machine system and then move it up a
+  // level out of expeditions into it's own top level item"): it governs the whole of Nothing up my sleeve, not a voyage
   {
-    key: 'vsm', label: 'VSM', href: '/vsm',
-    title: 'the VSM: how Thorp governs itself, in five systems (S1 operations, S2 coordination, S3 control with the audit, S4 intelligence, S5 policy)',
-    match: ['/vsm', '/governance'],
+    key: 'liberty-machine', label: 'Liberty Machine', href: '/orbitals/demiton/liberty-machine',
+    title: 'the Liberty Machine: how Nothing up my sleeve governs itself, in five systems (S1 operations, S2 coordination, S3 control with the audit, S4 intelligence, S5 policy)',
+    match: ['/orbitals/demiton/liberty-machine', '/governance', '/vsm'],
   },
 ];
 
@@ -82,7 +82,7 @@ export function mainTabFor(path: string): MainKey {
   const p = navPath(path);
   if (at(p, '/discoveries')) return 'discoveries';
   if (at(p, '/leaderboard')) return 'leaderboard';
-  if (at(p, '/vsm') || at(p, '/governance')) return 'vsm';
+  if (at(p, '/orbitals/demiton/liberty-machine') || at(p, '/governance') || at(p, '/vsm')) return 'liberty-machine';
   // Expedition and Library addresses are Demiton's views now (12 November), so Places is the way in.
   return 'places';
 }
@@ -125,9 +125,9 @@ const expeditionsSection = (p: string): SectionNav => {
   };
 };
 
-/** The VSM's own pages: the overview (the five cards) and one page a system. The old addresses answer:
- *  /vsm/control is S3's, /vsm/acquisition S1's, and /governance the VSM's. */
-export const VSM_SYSTEMS: { key: 's1' | 's2' | 's3' | 's4' | 's5'; label: string; name: string }[] = [
+/** The Liberty Machine's own pages: the overview (the five cards) and one page a system. The old addresses answer:
+ *  /orbitals/demiton/liberty-machine/control is S3's, /orbitals/demiton/liberty-machine/acquisition S1's, and /governance the Liberty Machine's. */
+export const LIBERTY_MACHINE_SYSTEMS: { key: 's1' | 's2' | 's3' | 's4' | 's5'; label: string; name: string }[] = [
   { key: 's1', label: 'S1', name: 'Operations' },
   { key: 's2', label: 'S2', name: 'Coordination' },
   { key: 's3', label: 'S3', name: 'Control' },
@@ -135,25 +135,29 @@ export const VSM_SYSTEMS: { key: 's1' | 's2' | 's3' | 's4' | 's5'; label: string
   { key: 's5', label: 'S5', name: 'Policy' },
 ];
 
-export const vsmSystemOf = (path: string): 's1' | 's2' | 's3' | 's4' | 's5' | null => {
-  const p = navPath(path).replace(/^\/governance/, '/vsm');
-  const m = /^\/vsm\/(s[1-5])\b/.exec(p);
-  if (m) return m[1] as 's1' | 's2' | 's3' | 's4' | 's5';
-  if (at(p, '/vsm/control')) return 's3';
-  if (at(p, '/vsm/acquisition')) return 's1';
-  return null;
-};
+/** One system's address: S1 is Operations, so its page is /orbitals/demiton/liberty-machine/operations; the other four
+ *  keep their S-number (12 November, Justin: "this url ... should not be s1 but rather ... operations"). */
+export const libertyMachineHref = (key: string): string =>
+  key === 's1' ? '/orbitals/demiton/liberty-machine/operations' : `/orbitals/demiton/liberty-machine/${key}`;
 
-const vsmSection = (p: string): SectionNav => {
-  const sys = vsmSystemOf(p);
-  return {
-    key: 'vsm',
-    label: 'VSM',
-    items: [
-      { key: 'overview', label: 'Overview', href: '/vsm', active: sys === null },
-      ...VSM_SYSTEMS.map((s) => ({ key: s.key, label: `${s.label} ${s.name}`, href: `/vsm/${s.key}`, active: sys === s.key })),
-    ],
-  };
+export const libertyMachineSystemOf = (path: string): 's1' | 's2' | 's3' | 's4' | 's5' | null => {
+  // both addresses are read: /liberty-machine (12 November, Justin's own) and the Demiton alias
+  // /orbitals/demiton/liberty-machine. The segment after the machine names the system, so a prefix
+  // can be added or moved without a regular expression that a replacement can break.
+  let p = navPath(path);
+  for (const prefix of ['/governance', '/vsm', '/orbitals/demiton/liberty-machine']) {
+    if (p === prefix || p.startsWith(prefix + '/')) {
+      p = '/liberty-machine' + p.slice(prefix.length);
+      break;
+    }
+  }
+  const parts = p.split('/').filter(Boolean);
+  if (parts[0] !== 'liberty-machine') return null;
+  const seg = parts[1] || '';
+  if (seg === 'operations' || seg === 'acquisition') return 's1';
+  if (seg === 'control') return 's3';
+  if (/^s[1-5]$/.test(seg)) return seg as 's1' | 's2' | 's3' | 's4' | 's5';
+  return null;
 };
 
 // the overview doors: a domain is read on the overview, a trick and its chain on the skills ladder
@@ -185,14 +189,15 @@ const discoveriesSection = (p: string): SectionNav => {
 /**
  * The tabs a page shows under the header, or null when the section is one page (Leaderboard,
  * Library) and has nothing to switch between. The same function serves the islands and the static
- * pages, so a page cannot forget its section's row.
+ * pages, so a page cannot forget its section's row. The Liberty Machine returns null: its crumb's
+ * menu is the navigation (12 November).
  */
 export function sectionNavFor(path: string): SectionNav | null {
   const p = navPath(path);
   if (p === '/' || at(p, '/shipyard') || at(p, '/orbitals') || at(p, '/harbours') || at(p, '/harbors') || at(p, '/ships')
     || at(p, '/sizes') || at(p, '/classes') || at(p, '/rung') || at(p, '/foreign') || at(p, '/labs')) return placesSection(p);
   if (at(p, '/expeditions') || at(p, '/voyages')) return expeditionsSection(p);
-  if (at(p, '/vsm') || at(p, '/governance')) return vsmSection(p);
+  if (at(p, '/orbitals/demiton/liberty-machine') || at(p, '/governance') || at(p, '/vsm')) return null;
   if (at(p, '/discoveries')) return discoveriesSection(p);
   return null;
 }

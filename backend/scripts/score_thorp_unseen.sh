@@ -1,5 +1,5 @@
 #!/bin/sh
-# Score every finished Thorp run's latest checkpoint on the unseen deck (ships/lists/hole-cards-unseen.csv),
+# Score every finished Nothing up my sleeve run's latest checkpoint on the unseen deck (ships/lists/hole-cards-unseen.csv),
 # for the comparison with Qwen (DECISIONS.md, "Thorp against Qwen"). Log: data/runs/unseen-<run>.out
 cd "$(dirname "$0")/../.." || exit 1  # the repository root: backend/, ships/, data/
 for rid in $(uv run --project backend python -c "

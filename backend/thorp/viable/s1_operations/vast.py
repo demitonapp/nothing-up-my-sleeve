@@ -17,9 +17,9 @@ were ambiguous (the gpu_name spelling, "RTX 4090" or "RTX_4090"; the credit fiel
 from __future__ import annotations
 
 import json
-import os
 import time
 from collections.abc import Callable
+from pathlib import Path
 
 from thorp import paths
 
@@ -67,6 +67,22 @@ def http_transport(key: str | None = None, retries: int = 4) -> Transport:
     return call
 
 
+def required_cuda(lock: Path | None = None) -> float:
+    """The CUDA the box's torch is built against, read from backend/uv.lock (`nvidia-cuda-runtime`, as
+    major.minor), or 0.0 when the lock cannot be read. A host's driver must support at least this: on 12 November
+    a voyage reached the sea on a host whose driver stopped at CUDA 12.8 and died in `torch._C._cuda_init()`
+    ("The NVIDIA driver on your system is too old (found version 12080)"), because the lock had moved to the
+    CUDA 13.2 wheels while S5's `min_cuda` still said 12.8. The lock is the truth; the term is only a floor."""
+    import re
+
+    try:
+        text = (lock or Path(__file__).resolve().parents[3] / "uv.lock").read_text(encoding="utf-8")
+    except OSError:
+        return 0.0
+    m = re.search(r'name = "nvidia-cuda-runtime(?:-cu\d+)?"\s*\nversion = "(\d+)\.(\d+)', text)
+    return float(f"{m.group(1)}.{m.group(2)}") if m else 0.0
+
+
 class Vast:
     def __init__(self, transport: Transport | None = None):
         self.call = transport or http_transport()
@@ -83,7 +99,8 @@ class Vast:
             "inet_down": {"gte": float(terms["min_inet_down_mbps"])},
             "inet_up": {"gte": float(terms["min_inet_up_mbps"])},
             "disk_space": {"gte": float(terms["disk_gb"])},
-            "cuda_max_good": {"gte": float(terms["min_cuda"])},
+            # the driver must carry the torch the box installs (the lock), whatever the term's floor says
+            "cuda_max_good": {"gte": max(float(terms["min_cuda"]), required_cuda())},
             "dph_total": {"lte": float(terms["gpus"][gpu])},
             "order": [["dph_total", "asc"]],
             "type": "ondemand",

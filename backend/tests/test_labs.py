@@ -6,8 +6,8 @@ from thorp import labs
 
 
 def test_the_labs_page_has_distinct_houses() -> None:
-    assert len(labs.HOUSES) == 21
-    assert len(set(labs.HOUSES)) == 21
+    assert len(labs.HOUSES) == 23
+    assert len(set(labs.HOUSES)) == 23
     known = {lab.key for lab in labs.LABS}
     assert set(labs.HOUSES) <= known
 
@@ -39,6 +39,9 @@ def test_the_new_families_find_their_house() -> None:
     assert labs.lab_of("Falcon-3").key == "tii"
     assert labs.lab_of("SWE-1.5").key == "cognition"
     assert labs.lab_of("Arcee-Fusion").key == "arcee"
+    assert labs.lab_of("MolmoWeb-8B").key == "ai2"
+    assert labs.lab_of("allenai/OLMo-3-7B").key == "ai2"
+    assert labs.lab_of("Holo2-8B").key == "hcompany"
     # and the old mappings still hold
     assert labs.lab_of("mlx-community/Qwen3-4B-4bit").key == "alibaba"
     assert labs.lab_of("mlx-community/Phi-4-mini-instruct-4bit").key == "microsoft"

@@ -37,6 +37,8 @@ ORGS: dict[str, tuple[str, ...]] = {
     "thinkingmachines": ("thinkingmachines",),
     "tii": ("tiiuae",),
     "arcee": ("arcee-ai",),
+    "ai2": ("allenai",),
+    "hcompany": ("Hcompany",),
     "anthropic": (),
     "cognition": (),
 }

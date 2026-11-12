@@ -44,4 +44,4 @@ jobs:
             ghcr.io/demitonapp/thorp-box:latest
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
-            org.opencontainers.image.description=Thorp's box: the torch environment a hired GPU sails with
+            org.opencontainers.image.description=Nothing up my sleeve's box: the torch environment a hired GPU sails with

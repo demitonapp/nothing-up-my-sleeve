@@ -19,7 +19,7 @@ says how a book's text is changed before anything (a tokeniser, a shard, a score
 
 The version is named in the spec (`data.clean`), hashed into the run id, carried in the tokeniser's
 settings (so a cleaned tokeniser, and its shards, live apart from the raw ones), and applied to the
-held-out decks the voyage is scored on. S5 policy 'clean' (thorp/vsm.py) governs it.
+held-out decks the voyage is scored on. S5 policy 'clean' (thorp/liberty_machine.py) governs it.
 """
 
 from __future__ import annotations

@@ -4,7 +4,7 @@ Stage 1 — **fingerprints**: one forward per probe, capturing every head's atte
 summarising each head by what it looks at: the previous token, the first token (sink), the token that
 followed the last occurrence of this one (induction), the same token elsewhere (copy), fixed offsets,
 and its profile by relative distance. Also the two structural questions: whether the four query heads
-inside a KV group look alike (would Thorps' suit-grouped GQA suit this model?), and how the heads sit
+inside a KV group look alike (would Nothing up my sleeve's suit-grouped GQA suit this model?), and how the heads sit
 on RoPE's distance bands.
 
 Stage 2 — **ablation**: each head's slice of the attention output zeroed, one at a time, and the loss

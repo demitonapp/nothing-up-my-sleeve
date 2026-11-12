@@ -95,10 +95,10 @@ def papers_log() -> Path:
 def papers_for_box() -> dict:
     """What a voyage aboard reads, from the store: S5's switches, exceptions and charter terms, S1's frozen stores and
     the sizes (fleet reads the ladder as it is imported, so every evaluator that imports it needs them)."""
-    from thorp import vsm
+    from thorp import liberty_machine
 
     return {"written": datetime.now().astimezone().isoformat(timespec="seconds"),
-            "switches": vsm._enforcement(), "exceptions": vsm._exceptions(), "charter_terms": _charter_overrides(), "stores": _stores(), "sizes": _sizes()}  # fmt: skip
+            "switches": liberty_machine._enforcement(), "exceptions": liberty_machine._exceptions(), "charter_terms": _charter_overrides(), "stores": _stores(), "sizes": _sizes()}  # fmt: skip
 
 
 def _sizes() -> list[dict]:
@@ -121,7 +121,7 @@ def _charter_overrides() -> dict:
 
 def fold_gate_log(path: Path, source: str) -> int:
     """A box's gate decisions, brought home into s3.gate_decisions (each once: a line already folded is skipped)."""
-    from thorp import vsm
+    from thorp import liberty_machine
 
     if not path.exists():
         return 0
@@ -131,5 +131,5 @@ def fold_gate_log(path: Path, source: str) -> int:
             r = json.loads(ln)
         except ValueError:
             continue
-        n += vsm.insert_gate_decision(r, source=source, once=True)
+        n += liberty_machine.insert_gate_decision(r, source=source, once=True)
     return n

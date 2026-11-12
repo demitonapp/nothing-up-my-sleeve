@@ -1,6 +1,6 @@
 # Running text embedding models locally on Apple Silicon (as of 12 Nov 2026)
 
-Scope: which current embedding models run well on an M-series Mac, through what tooling, at what speed and memory, with what quantisation; precision pitfalls; and a rough time and cost estimate for embedding ~1B tokens on a Mac versus a rented RTX 4090 or H100. Written for Thorp, which trains small LMs with MLX on the same Mac, so the embedding job must not take over the GPU.
+Scope: which current embedding models run well on an M-series Mac, through what tooling, at what speed and memory, with what quantisation; precision pitfalls; and a rough time and cost estimate for embedding ~1B tokens on a Mac versus a rented RTX 4090 or H100. Written for Nothing up my sleeve, which trains small LMs with MLX on the same Mac, so the embedding job must not take over the GPU.
 
 Overall caveat: published Apple Silicon *embedding* throughput figures are scarce and mostly anecdotal. Most "tokens/s on M4" figures online are decode (generation) speeds, which say nothing about encoder throughput. Treat every Mac figure below as an order of magnitude only, and plan a 10-minute local benchmark before committing.
 
@@ -42,9 +42,9 @@ Qwen3-Embedding (0.6B/4B/8B), the Jina v5 text models and EmbeddingGemma 2 have 
 - BGE-M3 has 568M parameters, is 1024-d and takes up to 8192 tokens of input. — [Bekko paper, arXiv 2607.25180](https://arxiv.org/html/2607.25180v1)
 
 ### Inferences
-- For Thorp, the most practical MLX-native path is `mlx-embeddings` with Qwen3-Embedding-0.6B (Qwen3 architecture, listed) or BGE-M3 (XLM-R, listed). EmbeddingGemma on MLX depends on community conversions, and I could not confirm the architecture in mlx-embeddings' documented list. Run it before relying on it.
+- For Nothing up my sleeve, the most practical MLX-native path is `mlx-embeddings` with Qwen3-Embedding-0.6B (Qwen3 architecture, listed) or BGE-M3 (XLM-R, listed). EmbeddingGemma on MLX depends on community conversions, and I could not confirm the architecture in mlx-embeddings' documented list. Run it before relying on it.
 - Ollama and LM Studio are convenient but add an HTTP server and their own GPU scheduling. For a batch job over tens of thousands of books, a direct Python loop (MLX, or sentence-transformers on MPS) gives more control over batch size and throttling.
-- EmbeddingGemma 2's Apache 2.0 licence and 270M text-only tower make it the cleanest "300M-class" choice for licensing. Jina v5 is CC-BY-NC, which may matter if Thorp's outputs are ever commercial.
+- EmbeddingGemma 2's Apache 2.0 licence and 270M text-only tower make it the cleanest "300M-class" choice for licensing. Jina v5 is CC-BY-NC, which may matter if Nothing up my sleeve's outputs are ever commercial.
 
 ### Gaps
 - I could not confirm whether mlx-embeddings has added Gemma or EmbeddingGemma 2 since the README was fetched. The README has no release history.
@@ -117,7 +117,7 @@ Never run EmbeddingGemma (v1 or v2) in float16; use bf16 or fp32. This matters o
   - Jina v4 works well only at its trained dims; e.g. 131-d is much worse. — [Jina GGUF article](https://jina.ai/news/optimizing-ggufs-for-decoder-only-embedding-models)
 
 ### Inferences
-- For Thorp's per-book distinctness and similarity use, storing 256-d (or 512-d) fp16/int8 vectors per sampled chunk is ample; binary is worth it only if the index grows to hundreds of millions of vectors.
+- For Nothing up my sleeve's per-book distinctness and similarity use, storing 256-d (or 512-d) fp16/int8 vectors per sampled chunk is ample; binary is worth it only if the index grows to hundreds of millions of vectors.
 - If EmbeddingGemma is converted to MLX locally, pass `--dtype bfloat16` explicitly and sanity-check outputs for NaN and for cosine agreement with the sentence-transformers reference on a few hundred chunks.
 - Qwen3-Embedding needs left padding and last-token pooling. A wrong padding side in a hand-rolled MLX batch loop is a likely silent-quality bug (inference from the card's examples).
 
@@ -145,7 +145,7 @@ On an H100, a ~0.6B encoder embeds 1B tokens in well under an hour for about $1.
 - Runpod: for Qwen3-Embedding-0.6B, vLLM beats TEI by a median 2.6× in bulk mode (8B: 2.9×). For BGE-M3 the two engines tie (1.08×). On consumer 4090/3090 the engines are near parity for 8B. — [Runpod](https://www.runpod.io/blog/gpu-embedding-workloads-benchmark)
 - EmbeddingGemma-300m on CUDA: 1,678 docs/s (Bekko paper; the GPU and protocol are given in the paper's CUDA setup, and documents are NQ-length, not 512 tokens). — [Bekko paper](https://arxiv.org/html/2607.25180v1)
 - Mac anchors are the M4 Max MPS docs/s and M2 Max MLX tok/s figures in the throughput section. — [Bekko paper](https://arxiv.org/html/2607.25180v1); [jakedahn/qwen3-embeddings-mlx](https://github.com/jakedahn/qwen3-embeddings-mlx)
-- An earlier Thorp note (Vast lane) quotes about 1 h / $0.36 for a 9m training job on a 4090; this is project context, not an embedding figure. — internal memory file `vast-lane-idle-why.md`
+- An earlier Nothing up my sleeve note (Vast lane) quotes about 1 h / $0.36 for a 9m training job on a 4090; this is project context, not an embedding figure. — internal memory file `vast-lane-idle-why.md`
 
 ### Inferences (my arithmetic from the cited anchors; order of magnitude only)
 - **H100, 600M-class (BGE-M3 / Qwen3-0.6B):** 1,240 texts/s × 512 tokens ≈ 635K tok/s, so 1B tokens takes about **26 min**, about **$1.5** per Runpod. With vLLM, Qwen3-0.6B may be faster still (2.6× over TEI on the same card).
@@ -157,7 +157,7 @@ On an H100, a ~0.6B encoder embeds 1B tokens in well under an hour for about $1.
   - E5-large M4 Max anecdote (3.1K tok/s): about **90 h**.
   - Planning figure: **roughly 10–25 h of full GPU** on a Max-class chip; longer on base or Pro chips with fewer GPU cores.
 - **M-series Mac, 300M-class:** roughly half the 600M figure, so **5–12 h** of full GPU on a Max-class chip.
-- **GPU sharing:** MLX has no priority scheduling between processes, so a concurrent embedding job slows training step by step. A previous Thorp measurement (memory `m6-training-throughput.md`) already identifies GPU sharing as a main source of waste. Workable options:
+- **GPU sharing:** MLX has no priority scheduling between processes, so a concurrent embedding job slows training step by step. A previous Nothing up my sleeve measurement (memory `m6-training-throughput.md`) already identifies GPU sharing as a main source of waste. Workable options:
   - **(a)** Run embedding only in gaps between training runs.
   - **(b)** Embed a sample (for example 2–5 chunks of 512 tokens per book × tens of thousands of books ≈ 50–100M tokens, which is under 1–2 h locally at the anchors above).
   - **(c)** Run on CPU via ONNX/OpenVINO for small models. The Bekko paper reports OpenVINO CPU-on-Mac numbers, but I did not extract them.

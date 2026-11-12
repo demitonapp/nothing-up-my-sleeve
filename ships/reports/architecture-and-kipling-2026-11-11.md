@@ -97,7 +97,7 @@ a migration plan. Item 2 changes the coordinator, which only takes effect at its
   Postgres, the library to SQLite (`manifest.py:73-75`).
 - The fitout builder and the Navigator's Wager still write `ships/specs/queue.txt` (`fitouts.py:289-299`,
   `wager.py:534-545`), which the coordinator no longer reads. About ten readers still read that file,
-  including the queue lint and the audit (`vsm.py:938`, `:1046`, `:1059`, `:1123`).
+  including the queue lint and the audit (`liberty_machine.py:938`, `:1046`, `:1059`, `:1123`).
 - `data/manifest.sqlite` has 12,791 books; `s1.books` has 12,790.
 - Fix: one `queue.pending()` and `queue.add()` over the store; delete the file readers and writers; make the
   library Postgres-only; rename the SQLite files `.imported`.

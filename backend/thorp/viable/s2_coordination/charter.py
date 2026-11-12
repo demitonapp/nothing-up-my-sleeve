@@ -2,7 +2,7 @@
 
 - **The berths**: no more ships hired at once than the terms allow (s5_policy.charter "max_instances"). Each
   charter holds a berth (a lock file) from its quote to its ship's release, so two `thorp charter sail` cannot
-  both read "none out" and both hire. A charter does not take this Mac's helm (vsm.at_sea): its voyage is at sea
+  both read "none out" and both hire. A charter does not take this Mac's helm (liberty_machine.at_sea): its voyage is at sea
   on another GPU, and the standing queue keeps sailing here.
 - **The ship's papers** (`papers`): a small ledger carried aboard, holding only what the voyage looks up: its own
   run row (so the box's gate knows the run S3 already passed here) and the runs it is seeded from, taught by or
@@ -19,7 +19,7 @@ import sqlite3
 from pathlib import Path
 
 from thorp import paths
-from thorp.ledger import reader, connect
+from thorp.ledger import connect, reader
 
 
 class NoBerth(RuntimeError):
@@ -216,6 +216,49 @@ def _fold_pg(src: sqlite3.Connection, rid: str, lo: int, run_row: dict) -> tuple
     return counts, done
 
 
+def _quick_ok(path: Path) -> bool:
+    """Whether SQLite thinks the file is whole. A copy taken while a WAL-mode ledger was being written can fail
+    this even though most of its rows are recoverable (12 November: 220,143 of the bridge's metrics were)."""
+    try:
+        con = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+        try:
+            return str(con.execute("pragma quick_check").fetchone()[0]).lower() == "ok"
+        finally:
+            con.close()
+    except sqlite3.DatabaseError:
+        return False
+
+
+def _recover_sqlite(path: Path) -> Path | None:
+    """A readable copy of a malformed ledger, made from SQLite's own dump.
+
+    `sqlite3 .dump` stops at the first bad page and ends in `ROLLBACK`; the statements before it are still the
+    rows it could read, so committing them keeps the run and almost every metric. The recovered file is checked
+    with `quick_check` before it is used. The CLI's `.recover` would be better, but the SQLite shipped on this
+    Mac does not have it (12 November)."""
+    import subprocess
+
+    out = path.with_name(path.name + ".recovered")
+    with contextlib.suppress(OSError):
+        out.unlink()
+    try:
+        dump = subprocess.run(["sqlite3", str(path), ".dump"], capture_output=True, text=True, timeout=900)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    sql = (dump.stdout or "").replace("ROLLBACK; -- due to errors", "COMMIT;")
+    if "CREATE TABLE" not in sql:
+        return None
+    try:
+        load = subprocess.run(["sqlite3", str(out)], input=sql, capture_output=True, text=True, timeout=900)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if load.returncode != 0 or not _quick_ok(out):
+        with contextlib.suppress(OSError):
+            out.unlink()
+        return None
+    return out
+
+
 def bring_home(box_ledger: Path, rid: str, leg_start: int, rec=None, **run_fields) -> dict:
     """The voyage's rows from the box's ledger into this one. What this ledger holds after `leg_start` (all of it
     when the leg set out from step 0) is the box's when the fold is done; `run_fields` (the commit, the hardware) are
@@ -228,6 +271,13 @@ def bring_home(box_ledger: Path, rid: str, leg_start: int, rec=None, **run_field
     from thorp.ledger import DualRecorder, Ledger
 
     rec = rec or reader()
+    box_ledger = Path(box_ledger)
+    recovered = None
+    if not _quick_ok(box_ledger):
+        recovered = _recover_sqlite(box_ledger)
+        if recovered is not None:
+            print(f"[charter] {box_ledger.name} was malformed; recovered it from its dump for the fold", flush=True)
+            box_ledger = recovered
     src = sqlite3.connect(f"file:{box_ledger}?mode=ro", uri=True)
     try:
         src.row_factory = sqlite3.Row
@@ -247,6 +297,9 @@ def bring_home(box_ledger: Path, rid: str, leg_start: int, rec=None, **run_field
         return {**counts, "fold": done}
     finally:
         src.close()
+        if recovered is not None:
+            with contextlib.suppress(OSError):
+                recovered.unlink()
 
 
 def note(rid: str, **fields) -> None:

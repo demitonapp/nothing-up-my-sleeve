@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import json
 import re
-import sqlite3
 from functools import lru_cache
 
 from thorp import paths
@@ -524,7 +523,7 @@ def queue(round_key: str) -> dict:
     the end of the standing queue. A voyage already written (one of Ogden's own) is queued as it is."""
     import yaml
 
-    from thorp import vsm
+    from thorp import liberty_machine
     from thorp.viable.s3_control.models import WagerRound
 
     with _store().session() as s, s.begin():
@@ -545,7 +544,7 @@ def queue(round_key: str) -> dict:
         queued = queue_read.pending()
         if line in queued:
             raise ValueError(f"{spec['name']} is already in the queue")
-        vsm.gate(spec)  # S3 before the queue: a refused voyage is not queued
+        liberty_machine.gate(spec)  # S3 before the queue: a refused voyage is not queued
         p = paths.resolve(f"specs/{line}.yaml")
         if not p.exists():
             p.write_text(

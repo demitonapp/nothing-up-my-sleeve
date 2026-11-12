@@ -128,8 +128,8 @@ def read(name: str, log=print) -> dict:
 if __name__ == "__main__":
     import sys
 
-    from thorp import vsm
+    from thorp import liberty_machine
 
     for name in sys.argv[1:]:
-        with vsm.at_sea(f"read the deck on {name}", kind="score"):
+        with liberty_machine.at_sea(f"read the deck on {name}", kind="score"):
             read(name)

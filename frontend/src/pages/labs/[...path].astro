@@ -10,7 +10,7 @@ export function getStaticPaths() {
   const houses = [
     'google', 'openai', 'anthropic', 'meta', 'alibaba', 'microsoft', 'deepseek', 'antgroup',
     'mistral', 'xai', 'moonshot', 'zai', 'minimax', 'cohere', 'nvidia', 'stepfun', 'bytedance',
-    'thinkingmachines', 'tii', 'cognition', 'arcee',
+    'thinkingmachines', 'tii', 'cognition', 'arcee', 'ai2', 'hcompany',
   ];
   const paths = ['ships', ...houses, ...houses.map((key) => `${key}/models`)];
   for (const band of ['xsmall', 'small', 'medium', 'large']) paths.push(`ships/${band}`);

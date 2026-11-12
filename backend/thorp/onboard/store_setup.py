@@ -404,7 +404,7 @@ def switch(mode: str, url: str = "") -> dict:
         )
     if not probe.get("schema"):
         raise SetupError(
-            f"the store at {_safe(target)} answers but has no Thorp schema. Run the migrations there "
+            f"the store at {_safe(target)} answers but has no Nothing up my sleeve schema. Run the migrations there "
             "first (thorp store setup), then switch."
         )
     config.set_store(mode, "" if mode == "local" and target == local_url() else target)

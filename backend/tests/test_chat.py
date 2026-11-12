@@ -122,7 +122,7 @@ def test_the_thinking_is_closed_at_its_cap_only_when_it_is_still_open():
     assert run([5, 5, 5, 5, 5, 5]) == ([None] * 6, False)
 
 
-# ---------------------------------------------------------------- a Thorp ship asked mid-conversation (12 November)
+# ---------------------------------------------------------------- a Nothing up my sleeve ship asked mid-conversation (12 November)
 
 MARKED = {"data": {"recipe": "lists/conversations-marked-v1.csv", "clean": "marks-v1", "turns": "marks"},
           "model": {"context": 1024}}  # fmt: skip
@@ -173,5 +173,5 @@ def test_the_oldest_exchanges_are_dropped_whole_to_fit_the_window():
 
 
 def test_our_tokeniser_counts_an_answer():
-    # encode() takes no add_special_tokens: every Thorp answer used to be counted as 0 pieces
+    # encode() takes no add_special_tokens: every Nothing up my sleeve answer used to be counted as 0 pieces
     assert chat._own_tokens(_Tok(), "four") == 4

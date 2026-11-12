@@ -115,7 +115,7 @@ def verdict(
 
 def audit(*, now: datetime | None = None) -> list[dict]:
     """Run both tests on every item that has not sailed, and write each verdict with its reason."""
-    from thorp import vsm
+    from thorp import liberty_machine
 
     now = now or datetime.now(UTC)
     out, verdicts = [], {}
@@ -127,7 +127,7 @@ def audit(*, now: datetime | None = None) -> list[dict]:
             refusals = [f"no spec at ships/specs/{it.line}.yaml"]
         else:
             # the gate's read-only twin: an advisory is not a refusal, and nothing is written to the gate's log
-            refusals = vsm.gate_refusals(spec)
+            refusals = liberty_machine.gate_refusals(spec)
         state, why = verdict(
             gate=refusals,
             decision=it.decision,

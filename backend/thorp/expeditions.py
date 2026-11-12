@@ -184,13 +184,13 @@ def _seats() -> set[str]:
     """The runs that hold a helm seat now (S2): the authority on what is actually at sea. A run killed
     with a signal never writes a finish, so the ledger can say running for a voyage that stopped hours ago."""
     try:
-        from thorp import store, vsm
+        from thorp import store, liberty_machine
         from thorp.viable.records import Lane
 
         with store.session() as s:
             row = s.get(Lane, "mac")
             n = (row.seats if row else 1) or 1
-        return {str(h.get("name")) for h in vsm.helms(n) if h.get("name")}
+        return {str(h.get("name")) for h in liberty_machine.helms(n) if h.get("name")}
     except Exception:  # noqa: BLE001
         return set()
 
@@ -354,7 +354,7 @@ def overview() -> dict:
 
     import yaml
 
-    from thorp import vsm
+    from thorp import liberty_machine
 
     at_sea = _rows(
         "select run_id, name, ship, started from runs where status='running' order by started desc"
@@ -396,7 +396,7 @@ def overview() -> dict:
             )
         ] += 1
     keys = list(fleet.EXPEDITIONS) + (["(no expedition)"] if "(no expedition)" in queued else [])
-    states = vsm.expedition_states()
+    states = liberty_machine.expedition_states()
     exps = []
     for k in keys:
         e = fleet.EXPEDITIONS.get(k)
@@ -477,13 +477,13 @@ def overview() -> dict:
         "at_sea": [
             {**r, "expedition": fleet.expedition_of_run(r)} for r in at_sea
         ],
-        "helm": vsm.helm(),
+        "helm": liberty_machine.helm(),
         "queue": {
             "voyages": sum(len(v) for v in queued.values()),
             "steps": steps,
             "hours_left": round(minutes / 60, 1),
             "voyages_without_a_time": unknown,
-            "lints": vsm.lint_queue(),
+            "lints": liberty_machine.lint_queue(),
         },
         "expeditions": exps,
     }

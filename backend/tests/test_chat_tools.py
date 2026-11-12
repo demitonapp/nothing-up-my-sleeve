@@ -120,7 +120,7 @@ def test_queue_status_gives_rows_goals_eta_and_learnings(monkeypatch):
     assert "1 line(s) serve no recorded goal" in out["summary"] and "_n" not in out
 
 
-# ---- vsm_status, system_status, expedition_status (12 November) -------------------------------------------
+# ---- liberty_machine_status, system_status, expedition_status (12 November) -------------------------------------------
 
 AUDIT = {
     "S1": {"expeditions": {"kipling": "at sea", "ogden": "home"}, "acquisition": {"books": 19506}},
@@ -169,9 +169,9 @@ def _world(monkeypatch, **over):
         monkeypatch.setattr(chat_tools, name, fn)
 
 
-def test_vsm_status_gives_a_line_a_system_and_names_what_needs_attention(monkeypatch):
+def test_liberty_machine_status_gives_a_line_a_system_and_names_what_needs_attention(monkeypatch):
     _world(monkeypatch)
-    out = chat_tools.run("vsm_status", {})
+    out = chat_tools.run("liberty_machine_status", {})
     assert [s["system"] for s in out["systems"]] == ["S1", "S2", "S3", "S3*", "S4", "S5"]
     by = {s["system"]: s for s in out["systems"]}
     assert "1 job(s) at sea now (9m-cand)" in by["S1"]["status"] and by["S1"]["attention"] == []
@@ -186,7 +186,7 @@ def test_a_reading_that_fails_is_named_and_the_rest_still_answer(monkeypatch):
         raise RuntimeError("no store")
 
     _world(monkeypatch, _cycle=boom)
-    out = chat_tools.run("vsm_status", {})
+    out = chat_tools.run("liberty_machine_status", {})
     assert out["could_not_read"] == ["cycle: RuntimeError: no store"]
     s3 = next(s for s in out["systems"] if s["system"] == "S3")
     assert "no planning cycle has been kept yet" in s3["status"] and "9 of" not in s3["status"]

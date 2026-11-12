@@ -169,6 +169,18 @@ LABS: tuple[Lab, ...] = (
         founded="2023", site="https://www.arcee.ai",
         blurb="the small-yard house: Arcee's AFM and Fusion, open models built by merging and training at the small end.",
         flagship=("Arcee Fusion", "AFM-4.5B")),
+    # Ai2 and H Company joined on 12 November (Justin: "add the labs behind molmo web and holo"), the makers
+    # of the two open browser agents the Reach compared with Microsoft's Fara.
+    Lab("ai2", "Allen Institute for AI", ("molmo", "olmo", r"\btulu", "allenai", "ai2"), "https://huggingface.co/allenai",
+        short="Ai2", country="us", country_name="United States", hq="Seattle",
+        founded="2014", site="https://allenai.org",
+        blurb="the open-book house: Ai2's MolmoWeb, Molmo and OLMo, built in the open down to the data and the training code.",
+        flagship=("MolmoWeb", "Molmo 2", "OLMo 3")),
+    Lab("hcompany", "H Company", (r"\bholo", "hcompany", "surfer-h"), "https://huggingface.co/Hcompany",
+        short="H Company", country="fr", country_name="France", hq="Paris",
+        founded="2023", site="https://www.hcompany.ai",
+        blurb="the pointer house: Holo, the open models that read a screen and find the one thing to click, behind the Surfer agents.",
+        flagship=("Holo4", "Holo3.1", "Holo2")),
 )
 
 # A house is sorted with the open yards first (12 November, Justin: "the labs need to be sorted by whether
@@ -201,6 +213,8 @@ HOUSES: tuple[str, ...] = (
     "tii",
     "cognition",
     "arcee",
+    "ai2",
+    "hcompany",
 )
 AS_OF = "2026-11-12"
 TOP = 5
@@ -232,6 +246,20 @@ FUNDING["tii"] = {
     "kind": "government",
     "note": "TII is part of Abu Dhabi's Advanced Technology Research Council: the emirate funds the institute and its Falcon programme directly.",
     "basis": "TII and Abu Dhabi government statements to 12 November 2026; an estimate, not an audited cap table.",
+}
+FUNDING["ai2"] = {
+    "government": 10,
+    "private": 90,
+    "kind": "nonprofit",
+    "note": "A nonprofit institute founded by Paul Allen and funded mainly by his philanthropy. Since August 2025 the National Science Foundation has added $75M over five years (with NVIDIA's $77M in technology) for the OMAI open-model programme, so a small public share beside the private one.",
+    "basis": "NSF and NVIDIA announcement as reported in August 2025; the share is my rough estimate, as Ai2's budget is not broken out.",
+}
+FUNDING["hcompany"] = {
+    "government": 5,
+    "private": 95,
+    "kind": "mostly private",
+    "note": "Venture-funded: a $220M seed in May 2024, part of it convertible debt. Bpifrance, the French state's investment bank, is one of the investors, a small public share; the rest is private.",
+    "basis": "Press reports of the May 2024 round; an estimate, not an audited cap table.",
 }
 FUNDING["mistral"] = {
     "government": 10,
@@ -333,6 +361,12 @@ ROUNDS: dict[str, list[dict]] = {
     "arcee": [
         {"date": "2024–25", "round": "Private rounds", "amount": "undisclosed", "valuation": "—", "investors": "no disclosed lead"},
     ],
+    "ai2": [
+        {"date": "2025-08", "round": "NSF and NVIDIA award", "amount": "$152M", "valuation": "—", "investors": "NSF $75M over five years; NVIDIA $77M in technology and resources (OMAI programme)"},
+    ],
+    "hcompany": [
+        {"date": "2024-05", "round": "Seed", "amount": "$220M", "valuation": "—", "investors": "Accel, UiPath, Bpifrance, Eric Schmidt, Xavier Niel, Amazon, FirstMark, Elaia, Eurazeo; part convertible debt, as reported"},
+    ],
 }
 for _key, _rows in ROUNDS.items():
     FUNDING[_key]["rounds"] = _rows
@@ -364,6 +398,7 @@ GOV: dict[str, dict] = {
     "thinkingmachines": {"lobbying": None, "gov_revenue_pct": None, "note": "No federal lobbying total found for 2025."},
     "cognition": {"lobbying": None, "gov_revenue_pct": None, "note": "No federal lobbying total found for 2025."},
     "arcee": {"lobbying": None, "gov_revenue_pct": None, "note": "No federal lobbying total found for 2025."},
+    "ai2": {"lobbying": None, "gov_revenue_pct": None, "note": "No federal lobbying total found for 2025. A nonprofit, with a National Science Foundation award rather than government revenue."},
 }
 for _row in GOV.values():
     _row["year"] = 2025
@@ -394,6 +429,8 @@ FOCUS: dict[str, str] = {
     "cognition": "agents",
     "thinkingmachines": "research",
     "tii": "research",
+    "ai2": "research",
+    "hcompany": "agents",
 }
 
 # The lab page's two paragraphs (12 November, Justin: "each lab will have their own page with a description of
@@ -483,6 +520,14 @@ PROFILES: dict[str, dict[str, str]] = {
     "arcee": {
         "description": "Arcee AI is the New York house that builds small open models by merging and training at the small end. Its AFM and Fusion lines are made to run on a single deck.",
         "purpose": "to make a small open model that punches above its weight.",
+    },
+    "ai2": {
+        "description": "Ai2, the Allen Institute for AI, is the Seattle nonprofit that publishes everything: weights, training data and code. Its OLMo language models and Molmo vision models are fully open, and MolmoWeb is an open agent that drives a browser from screenshots alone, in 4B and 8B sizes.",
+        "purpose": "to keep a fully open line at the frontier, so the field can inspect and rebuild what it uses.",
+    },
+    "hcompany": {
+        "description": "H Company is the Paris house behind Holo, a family of open vision models that read a screen and find the element to act on, and the Surfer agents built on them. Several of its models are open-weight; some larger ones carry their own licences.",
+        "purpose": "to make the eyes and hands for computer-use agents, small enough to run on one deck.",
     },
 }
 

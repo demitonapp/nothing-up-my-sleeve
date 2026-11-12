@@ -62,11 +62,11 @@ def test_add_keeps_the_order_at_the_top_and_skips_what_is_queued(ships):
 
 
 def test_the_fitout_builder_queues_into_the_store(ships, monkeypatch):
-    from thorp import fitouts, vsm
+    from thorp import fitouts, liberty_machine
 
     built = [{"name": f"fu-k@300k-s{sd}", "seed": sd} for sd in (1, 2)]
     monkeypatch.setattr(fitouts, "compile_for", lambda key, preset, seed: [b for b in built if b["seed"] == seed])
-    monkeypatch.setattr(vsm, "gate", lambda spec, where=None: None)
+    monkeypatch.setattr(liberty_machine, "gate", lambda spec, where=None: None)
     queue_store.add("fitouts/already-there", require_goal=False)
     assert fitouts.queue("k", "300k", seeds=(1, 2), where="top") == ["fitouts/fu-k@300k-s1", "fitouts/fu-k@300k-s2"]
     assert queue_store.pending_texts() == ["fitouts/fu-k@300k-s1", "fitouts/fu-k@300k-s2", "fitouts/already-there"]
@@ -76,7 +76,7 @@ def test_the_fitout_builder_queues_into_the_store(ships, monkeypatch):
 
 
 def test_the_wager_gates_then_queues_into_the_store(ships, monkeypatch):
-    from thorp import vsm
+    from thorp import liberty_machine
     from thorp.viable.s4_intelligence import wager
 
     spec = {"name": "fu-ogden-pull", "seed": 1}
@@ -88,7 +88,7 @@ def test_the_wager_gates_then_queues_into_the_store(ships, monkeypatch):
     monkeypatch.setattr(wager, "_ogden_specs", ogden)
     monkeypatch.setattr(wager, "_voyage", lambda name: None)
     gated = []
-    monkeypatch.setattr(vsm, "gate", lambda s, where=None: gated.append(s["name"]))
+    monkeypatch.setattr(liberty_machine, "gate", lambda s, where=None: gated.append(s["name"]))
     queue_store.add("fitouts/first", require_goal=False)
     assert wager.queue("r1") == {"queued": "fu-ogden-pull", "position": 2}
     assert gated == ["fu-ogden-pull"]
@@ -101,20 +101,20 @@ def test_the_wager_gates_then_queues_into_the_store(ships, monkeypatch):
         raise RuntimeError("refused")
 
     queue_store.drop("fitouts/fu-ogden-pull")
-    monkeypatch.setattr(vsm, "gate", refuse)
+    monkeypatch.setattr(liberty_machine, "gate", refuse)
     with pytest.raises(RuntimeError):
         wager.queue("r1")
     assert queue_store.pending_texts() == ["fitouts/first"]  # a refused voyage is not queued
 
 
 def test_the_lint_and_the_states_read_the_store(ships):
-    from thorp import expeditions, vsm
+    from thorp import expeditions, liberty_machine
 
     (ships / "specs" / "fitouts" / "fu-here.yaml").write_text("name: fu-here\nseed: 1\n")
     queue_store.add("fitouts/nope", require_goal=False)
     queue_store.add("hold: before the 21m")
     queue_store.add("fitouts/fu-here", require_goal=False)
-    found = vsm.lint_queue()
+    found = liberty_machine.lint_queue()
     assert "fitouts/nope: no spec file" in found
     assert not any("hold:" in f for f in found)  # a hold names a decision, not a spec
     assert "fu-here" in expeditions._queued()

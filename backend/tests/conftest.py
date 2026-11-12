@@ -67,7 +67,7 @@ def _store_clean(_store_migrated):
     from thorp.viable.s2_coordination import queue_store
 
     # the ledger's per-thread Postgres reader keeps its transaction open between queries; a previous test's
-    # reader would hold s1.runs and this truncate would wait on it for ever (11 November: test_vsm hung there)
+    # reader would hold s1.runs and this truncate would wait on it for ever (11 November: test_liberty_machine hung there)
     close_reader()
     tables = ", ".join(
         f"{t.schema}.{t.name}"
@@ -84,14 +84,19 @@ def _ogden_rule_advisory_in_tests(monkeypatch):
     (the gate notes it), except in its own test, which enforces it again."""
     import dataclasses
 
-    from thorp import vsm
+    from thorp import liberty_machine
 
     monkeypatch.setitem(
-        vsm.POLICIES, "ogden", dataclasses.replace(vsm.POLICIES["ogden"], enforced=False)
+        liberty_machine.POLICIES, "ogden", dataclasses.replace(liberty_machine.POLICIES["ogden"], enforced=False)
     )
     # S5 'prechecks' (19:45) reads the real fitout store in Postgres: advisory in tests for the same reason
     monkeypatch.setitem(
-        vsm.POLICIES, "prechecks", dataclasses.replace(vsm.POLICIES["prechecks"], enforced=False)
+        liberty_machine.POLICIES, "prechecks", dataclasses.replace(liberty_machine.POLICIES["prechecks"], enforced=False)
+    )
+    # S5 'standard' reads the SOP register in Postgres, which the test store does not seed: advisory in tests,
+    # so a gate test is about the policy it names. The register itself is tested in test_sop.py.
+    monkeypatch.setitem(
+        liberty_machine.POLICIES, "standard", dataclasses.replace(liberty_machine.POLICIES["standard"], enforced=False)
     )
 
 
@@ -189,7 +194,7 @@ def spec(monkeypatch):
     voyage sailed on this spec was refused at the gate, and the resume, growth and charter tests tested nothing)."""
     import dataclasses
 
-    from thorp import vsm
+    from thorp import liberty_machine
 
-    monkeypatch.setitem(vsm.POLICIES, "standard", dataclasses.replace(vsm.POLICIES["standard"], enforced=False))
+    monkeypatch.setitem(liberty_machine.POLICIES, "standard", dataclasses.replace(liberty_machine.POLICIES["standard"], enforced=False))
     return copy.deepcopy(BASE_SPEC)

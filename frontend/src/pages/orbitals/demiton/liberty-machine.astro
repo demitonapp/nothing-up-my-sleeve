@@ -1,0 +1,15 @@
+---
+// The Liberty Machine page (/orbitals/demiton/liberty-machine), one of Demiton's views and nested
+// under its address: the five systems, each with a page of its own. It shows no section tabs; the
+// orbital's card and the breadcrumb's menu are the way in (astro.config.mjs redirects the old
+// /orbitals/demiton/liberty-machine, /vsm and /governance addresses here).
+import Layout from '../../../layouts/Layout.astro';
+import Governance from '../../../components/islands/Governance';
+import Reader from '../../../components/Reader.astro';
+---
+<Layout>
+  <main>
+    <Governance client:load />
+  </main>
+  <Reader />
+</Layout>

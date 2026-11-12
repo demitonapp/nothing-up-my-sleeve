@@ -168,11 +168,11 @@ def cmd_tutor(a) -> None:
     from mlx_lm import load
     from mlx_lm.sample_utils import make_sampler
 
-    from thorp import vsm
+    from thorp import liberty_machine
 
     sp = _sp()
     stats = Counter()
-    with vsm.at_sea("logic-tutor: the tutor writes", kind="teach"):
+    with liberty_machine.at_sea("logic-tutor: the tutor writes", kind="teach"):
         model, tok = load(a.model)
         sampler = make_sampler(temp=a.temp, top_p=0.95)
         t0 = time.time()

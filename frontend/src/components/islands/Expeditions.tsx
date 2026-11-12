@@ -11,7 +11,6 @@ import { routePath, useApi, useRoute } from '@/lib/useApi';
 import { esc, fmt } from '@/lib/format';
 import { starHeadline } from '@/scripts/views/helpers';
 import SectionNav from '../SectionNav';
-import DemitonTabs from '../DemitonTabs';
 import { TabNav } from '../TabNav';
 import Launch from './Launch';
 import type { LaunchPayload } from './Launch';
@@ -486,7 +485,7 @@ function useQueueDialog(onClose: () => void) {
   return ref;
 }
 
-const STEP_WHAT: Record<string, string> = { investigation: 'investigation', reading: 'reading', upkeep: 'upkeep', step: 'step' };
+const STEP_WHAT: Record<string, string> = { investigation: 'investigation', reading: 'reading', upkeep: 'upkeep', step: 'step', intelligence: 'S4 intelligence' };
 const qvMin = (m: number): string => (m < 1 ? 'under a minute' : m < 90 ? `${Math.round(m)} min` : `${(m / 60).toFixed(1)} h`);
 
 /** One step in the queue (an investigation, a reading, the coordinator's upkeep, any other command), opened as a
@@ -498,6 +497,7 @@ function QueueStepDialog({ row, onClose }: { row: any; onClose: () => void }) {
   const d = row?.detail || {};
   const inv = d.investigation || null;
   const rd = d.reading || null;
+  const intel = d.intelligence || null;
   const serves = row?.serves || null;
   const atSea = row?.status === 'at sea';
   const when = atSea
@@ -514,7 +514,9 @@ function QueueStepDialog({ row, onClose }: { row: any; onClose: () => void }) {
       : `${row.name.split(':')[0]} read on an outside model, ${rd.model}, so our ships can be set beside it on the leaderboard. It trains nothing.`
     : row?.what === 'upkeep'
       ? 'The coordinator restarts itself between two lines, so it runs the code on disk rather than the code it was started with. Whatever is at sea is adopted by the new coordinator and keeps going.'
-      : null;
+      : row?.what === 'intelligence'
+        ? (intel?.what || 'A turn of the queue\'s planning cycle with the judge: S3*\'s audit, S4\'s measurements, the envelope, the plan, and the judge\'s reading of every fit-out that died and has not been read.')
+        : null;
   return (
     <dialog ref={ref} className="qv-dialog" aria-labelledby="qstitle" onClick={(e) => { if (e.target === ref.current) onClose(); }}>
       <div className="qvwrap" onClick={(e) => e.stopPropagation()}>
@@ -547,6 +549,13 @@ function QueueStepDialog({ row, onClose }: { row: any; onClose: () => void }) {
             <VRow k="deadline">{d.deadline ? <>{d.deadline}<span className="s"> · stopped if it runs longer, and the queue goes on</span></> : <span className="s">none</span>}</VRow>
           </VSection>
 
+          {intel ? <VSection title="The Liberty Machine task">
+            <VRow k="system">S4 intelligence<span className="s"> · S2 schedules it</span></VRow>
+            <VRow k="cadence">{intel.every > 0 ? `after every ${intel.every} line${intel.every === 1 ? '' : 's'} have ended` : 'S5 has switched it off'}</VRow>
+            <VRow k="does">a turn of the planning cycle, with the judge</VRow>
+            <VRow k="page"><a href="/orbitals/demiton/liberty-machine/s4">S4 intelligence →</a></VRow>
+          </VSection> : null}
+
           <VSection title="The goal it serves">
             {serves ? <>
               <VRow k="goal">{serves.id}</VRow>
@@ -555,7 +564,9 @@ function QueueStepDialog({ row, onClose }: { row: any; onClose: () => void }) {
               <VRow k="state">{serves.status}</VRow>
             </> : row.what === 'upkeep'
               ? <p className="s">The queue's own upkeep: it serves no expedition.</p>
-              : <p className="s">No goal yet: every line serves one (thorp queue goal LINE --goal EXPEDITION:N).</p>}
+              : row.what === 'intelligence'
+                ? <p className="s">A Liberty Machine task: it serves S4 and the queue's own cycle, not an expedition's goal.</p>
+                : <p className="s">No goal yet: every line serves one (thorp queue goal LINE --goal EXPEDITION:N).</p>}
           </VSection>
 
           {inv ? <VSection title="The investigation" wide>
@@ -1454,11 +1465,7 @@ export default function Expeditions() {
   // ---- the shell
   return (
     <div onClick={onBookClick}>
-      {/* two rows, stacked: each is an inline row, so side by side in a plain wrapper they ran together on one line */}
-      <div className="navstack">
-        <DemitonTabs active="expeditions" />
-        <SectionNav />
-      </div>
+      <SectionNav />
       {/* ------------------------------------------------ the queue and the expeditions */}
       <div className={`section${isOverview || isQueue || isList ? ' active' : ''}`} id="voyages">
         <h1>{isQueue

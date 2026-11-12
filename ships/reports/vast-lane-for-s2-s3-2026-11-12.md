@@ -156,7 +156,7 @@ Five 9m arms share the tokeniser and data. If they sail as a group, setup is pai
 `+ setup` overstates the cost and time of lines 2–5, and the "home X hours sooner" test is wrong for them.
 The group is also the best way to lift a 9m's duty from ~25% to ~50–65%.
 
-## 5. For S5 — terms and VSM records
+## 5. For S5 — terms and Liberty Machine records
 
 **Terms to change or add** (names are proposals):
 
@@ -169,7 +169,7 @@ The group is also the best way to lift a 9m's duty from ~25% to ~50–65%.
   otherwise.
 - `purser` stays `routing`; `foreign_expeditions` currently `table_talk`, `kipling`, `card_census`.
 
-**VSM lints/records to add:**
+**Liberty Machine lints/records to add:**
 
 - S2: a routed line pinned `mac:` with no `at sea` event (box failure); a lane paused with queued lines; a
   `lane_defs`/`s2.lanes` seat mismatch; a home pull while the Mac lane is training; a hire out with no berth.

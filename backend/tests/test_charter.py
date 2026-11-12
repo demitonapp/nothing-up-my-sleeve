@@ -14,7 +14,7 @@ import pytest
 
 torch = pytest.importorskip("torch")
 
-from thorp import paths, train, vsm  # noqa: E402
+from thorp import paths, train, liberty_machine  # noqa: E402
 from thorp.ledger import Ledger  # noqa: E402
 from thorp.viable.s1_operations import charter as s1  # noqa: E402
 from thorp.viable.s1_operations.vast import Vast  # noqa: E402
@@ -36,7 +36,7 @@ class FakeMarket:
 
     def __init__(self, offers=None, credit=50.0, spelling="RTX 4090"):
         base = dict(verified=True, rentable=True, rented=False, reliability=0.995, inet_down=900.0, inet_up=500.0,
-                    disk_space=200.0, cuda_max_good=12.9, num_gpus=1)  # fmt: skip
+                    disk_space=200.0, cuda_max_good=13.4, num_gpus=1)  # fmt: skip
         self.offers = offers or [
             {**base, "id": 11, "gpu_name": spelling, "dph_total": 0.62},
             {**base, "id": 12, "gpu_name": spelling, "dph_total": 0.38},
@@ -232,13 +232,13 @@ def test_each_term_is_held():
 
 
 def test_the_charter_policy_governs_only_chartered_voyages(spec, tmp_thorp):
-    assert "charter" in vsm.POLICIES and vsm.POLICIES["charter"].enforced
-    assert vsm.POLICIES["charter"].check(spec) == []
+    assert "charter" in liberty_machine.POLICIES and liberty_machine.POLICIES["charter"].enforced
+    assert liberty_machine.POLICIES["charter"].check(spec) == []
     assert train.run_id({**spec, "charter": {"quote": {"cost": 1}}}) == train.run_id(spec)  # where it sails moves no id
     bad = {"gpu": "RTX 4090", "dph": 0.9, "verified": True, "reliability": 0.99, "inet_down": 500, "inet_up": 300, "cost": 1.0}
-    with pytest.raises(vsm.GateRefused, match="ceiling"):
+    with pytest.raises(liberty_machine.GateRefused, match="ceiling"):
         s1.gate(spec, bad)
-    assert vsm.gate_log(1)[0]["where"] == "charter" and vsm.gate_log(1)[0]["verdict"] == "refused"
+    assert liberty_machine.gate_log(1)[0]["where"] == "charter" and liberty_machine.gate_log(1)[0]["verdict"] == "refused"
 
 
 @pytest.mark.parametrize("positions", ["learned", "rope"])
@@ -315,7 +315,7 @@ def test_a_chartered_voyage_sails_and_comes_home(library, spec, tmp_thorp, monke
 
     with store.session() as ss:
         aboard = ss.scalars(select(GateDecision).where(GateDecision.source == f"box papers {rid}")).all()
-    assert aboard == [] and [d["where"] for d in vsm.gate_log()] == ["charter", "voyage"]  # both asked at home
+    assert aboard == [] and [d["where"] for d in liberty_machine.gate_log()] == ["charter", "voyage"]  # both asked at home
     # home: the run finished in this ledger, its rows and checkpoints, the hire on its hardware line
     run = rec.get_run(rid)
     assert run["status"] == "finished" and "vast.ai instance" in run["hardware"] and "torch" in run["hardware"]
@@ -336,7 +336,7 @@ def test_a_chartered_voyage_sails_and_comes_home(library, spec, tmp_thorp, monke
 def test_a_charter_over_its_budget_hires_nothing(library, spec, tmp_thorp):
     small_terms(tmp_thorp, voyage_budget=0.0001)
     market = FakeMarket()
-    with pytest.raises(vsm.GateRefused, match="budget"):
+    with pytest.raises(liberty_machine.GateRefused, match="budget"):
         s1.sail(write_spec(spec, tmp_thorp), vast=Vast(market), resolver=library["resolver"], log=lambda *a: None)
     assert not [c for c in market.calls if c[0] == "PUT"] and s3.log() == []
 

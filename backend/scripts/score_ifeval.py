@@ -120,9 +120,9 @@ def main() -> None:
     if a.no_helm:
         score(a.model, a.limit, a.max_new, not a.no_save, chat)
         return
-    from thorp import vsm
+    from thorp import liberty_machine
 
-    with vsm.at_sea(f"score {a.model} on IFEval", kind="score"):
+    with liberty_machine.at_sea(f"score {a.model} on IFEval", kind="score"):
         score(a.model, a.limit, a.max_new, not a.no_save, chat)
 
 

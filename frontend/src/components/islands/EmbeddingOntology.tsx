@@ -2,7 +2,7 @@
 // /orbitals/masaq with the ontology of embeddings underneath"). Two families that must not be confused:
 // the embeddings inside a ship (its own, period-pure, trained on our books) and the embedding models
 // outside it (modern instruments that curate the library and never feed a period-pure score). The
-// candidates and their numbers are the 12 November research (reports/Embedding models for Thorp.md),
+// candidates and their numbers are the 12 November research (reports/Embedding models for Nothing up my sleeve.md),
 // written here by hand: a reading, not a measurement, until the Gutenberg pair test has run.
 
 import { artSrc } from '@/scripts/views/helpers';
@@ -50,7 +50,7 @@ const ONTOLOGY: Node[] = [
   {
     key: 'inside',
     name: 'Inside a ship',
-    what: "The ship's own vectors, learned from our books alone. They are part of the kernel: the thing Thorp is building.",
+    what: "The ship's own vectors, learned from our books alone. They are part of the kernel: the thing Nothing up my sleeve is building.",
     rule: 'Period-pure. Nothing from a modern model is copied into them: no weights, no geometry, no distillation.',
     models: [
       {
@@ -128,7 +128,7 @@ const ONTOLOGY: Node[] = [
             key: 'nemotron-8b', name: 'llama-embed-nemotron-8b', house: 'NVIDIA', href: '/orbitals/masaq/us/nvidia',
             params: '8B', dims: '4,096', context: '32K', licence: 'non-commercial',
             lane: 'vast', status: 'later', jobs: ['a second large reading'],
-            note: 'Among the multilingual leaders. Allowed now that Thorp is non-commercial; Vast only.',
+            note: 'Among the multilingual leaders. Allowed now that Nothing up my sleeve is non-commercial; Vast only.',
           },
         ],
       },
@@ -217,7 +217,7 @@ const ONTOLOGY: Node[] = [
     what: 'Exact-text instruments. They stay: shingles catch copied text, embeddings catch the same story in other words.',
     models: [
       {
-        key: 'shingles', name: '5-word shingles', house: 'Thorp',
+        key: 'shingles', name: '5-word shingles', house: 'Nothing up my sleeve',
         params: '—', dims: 'a set of hashes', context: 'the whole book', licence: 'ours',
         lane: 'mac', status: 'in use', jobs: ['held-out books at intake'],
         note: '35% of the shorter text’s shingles shared flags a deck book (acquisition.py).',
@@ -315,7 +315,7 @@ export default function EmbeddingOntology() {
     <>
       <p className="note labnote">
         An embedding is a passage, a piece or an image written as a list of numbers, placed so that things
-        that mean alike sit close. Thorp has two kinds and keeps them apart: the ship&rsquo;s own, which are the
+        that mean alike sit close. Nothing up my sleeve has two kinds and keeps them apart: the ship&rsquo;s own, which are the
         kernel, and outside models, which only help curate the library. The lanes are where each runs: the
         Mac between voyages, Vast for a full pass, or a hosted API. None has yet been tested on pre-1930
         English; the Gutenberg pair test decides.{' '}

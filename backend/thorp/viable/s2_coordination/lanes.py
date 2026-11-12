@@ -1,5 +1,5 @@
 """S2: the coordinator. One standing queue, two lanes: this Mac and a GPU hired from Vast.ai (2026-11-08, Justin:
-"we'll need to build the VSM coordinator that then coordinates between vast and then running on this mac").
+"we'll need to build the Liberty Machine coordinator that then coordinates between vast and then running on this mac").
 
 The standing queue (ships/specs/queue.txt) keeps its rules: a line is taken from the top of its lane, removed when
 it starts, and written to queue-done.txt with its exit status when it ends; the file can be edited while the queue
@@ -16,7 +16,7 @@ runs. What the coordinator adds:
 - **No key, no loss.** Without a Vast.ai key the Vast lane's lines stay in the queue, untouched, and the Mac lane
   goes on.
 - **The Mac lane** waits, as queue.sh did, while a `thorp run` or `thorp eval` started outside the queue is at
-  sea (the helm, vsm.at_sea, is still taken by the voyage itself).
+  sea (the helm, liberty_machine.at_sea, is still taken by the voyage itself).
 - **What is out:** s2.lanes (Postgres) names each lane's line, its process and since when (the dashboard and the
   S2 lint read it). The queue file's edits are made under a lock (specs/queue.txt.lock).
 - **What is at sea is a row** (11 November, the architecture audit's item 2). A line that starts moves from
@@ -206,11 +206,21 @@ def slots_of(lane: str) -> int:
     return 1
 
 
+# S4's scheduled intelligence audit is written as a `cmd:` line (AUDIT_LINE below), so every reader that knows a
+# line by its text still sees a command; its *kind* is its own, so the queue page can draw it apart from a step.
+INTELLIGENCE_MARK = "thorp.viable.s3_control.cycle run --judge"
+
+
+def is_intelligence(text: str) -> bool:
+    """Whether a queue line is S4's scheduled intelligence audit (the queue's own item, not a general step)."""
+    return INTELLIGENCE_MARK in text
+
+
 @dataclass
 class Line:
     text: str  # the line as written in the queue
     lane: str  # "mac" or "vast"
-    kind: str  # "spec", "cmd", "wait" or "hold"
+    kind: str  # "spec", "cmd", "intelligence", "wait" or "hold"
     payload: (
         str  # the spec's path under specs/ (no .yaml), the shell command, or the voyage waited for
     )
@@ -241,13 +251,14 @@ def parse(text: str, specs: Path | None = None) -> Line:
     lane, s = split_lane(text)  # `vast: <spec>`, or any lane s2.lane_defs names (11 November, item 11)
     if s.startswith("cmd:"):
         body = s[len("cmd:") :].strip()
+        kind = "intelligence" if is_intelligence(s) else "cmd"
         # cmd:[timeout=90m] <command>: a queued audit gets a deadline; a bare cmd: keeps running until it
         # ends (the old behaviour). Seconds, minutes (the default) or hours.
         m = re.match(r"\[timeout=(\d+)([smh]?)\]\s*(.+)$", body)
         if m:
             seconds = int(m.group(1)) * {"s": 1, "m": 60, "h": 3600}[m.group(2) or "m"]
-            return Line(text.strip(), lane, "cmd", m.group(3).strip(), timeout=seconds)
-        ln = Line(text.strip(), lane, "cmd", body)
+            return Line(text.strip(), lane, kind, m.group(3).strip(), timeout=seconds)
+        ln = Line(text.strip(), lane, kind, body)
         with contextlib.suppress(Exception):
             from thorp import investigate
 
@@ -514,9 +525,9 @@ def blocked(ln: Line, above: list[Line], at_sea: list[Line]) -> str | None:
         # the wait would call it docked (9 November: the 21m, started by hand, was declared docked
         # while it was still training). The helm is the authority.
         with contextlib.suppress(Exception):
-            from thorp import vsm
+            from thorp import liberty_machine
 
-            if (vsm.helm() or {}).get("name") == name:
+            if (liberty_machine.helm() or {}).get("name") == name:
                 return f"waiting for {name} to dock"
         return None
     if ln.kind != "spec":
@@ -547,7 +558,7 @@ def next_for(
 
 def command(ln: Line) -> list[str] | str:
     """What a lane runs for a line: the voyage (here, or chartered), or the shell command."""
-    if ln.kind == "cmd":
+    if ln.kind in ("cmd", "intelligence"):
         return ln.payload
     spec = f"ships/specs/{ln.payload}.yaml"
     kind = kind_of(ln.lane)
@@ -816,9 +827,9 @@ def _covered(running: dict | None = None) -> tuple[set, set]:
     seats this coordinator is watching. A run so covered is never a ghost though it holds no helm here (11
     November: a chartered voyage's row comes home 'running' with each pull and never takes this Mac's helm, so a
     coordinator restarted mid-charter would have closed it)."""
-    from thorp import vsm
+    from thorp import liberty_machine
 
-    live = {h.get("name") for h in vsm.helms(8)}
+    live = {h.get("name") for h in liberty_machine.helms(8)}
     held: set = set()
     with contextlib.suppress(Exception):
         from thorp.viable.s2_coordination import queue_store
@@ -1022,7 +1033,7 @@ def _adopt(running: dict, specs: Path, done: Path, root: Path, say) -> None:
         if not text or not pid or (text, pid) in seen or pid in _children:
             continue
         ln = line_of(text)
-        if ln.kind not in ("cmd", "spec"):
+        if ln.kind not in ("cmd", "intelligence", "spec"):
             continue
         lane = e.get("lane") if e.get("lane") in lane_names() else ln.lane
         started = e.get("started") or e.get("since")
@@ -1036,6 +1047,193 @@ def _adopt(running: dict, specs: Path, done: Path, root: Path, say) -> None:
             seat(lane, ln, pid, started, e.get("since_ts"), e.get("slot"), row)
         else:
             lost(lane, ln, pid, started, None)
+
+
+PAUSED = " | paused "  # what a pause adds to a lane's note, and an opening takes off again
+SANK_S = 600.0  # a chartered voyage released within ten minutes of reaching the sea never trained
+
+
+def set_lane(lane: str, enabled: bool, why: str = "") -> bool:
+    """Open or pause a lane in s2.lane_defs (the coordinator reads it again on its next loop). A pause keeps its
+    reason on the lane's note (`... | paused 14:02: two fit-outs failed in a row`); an opening takes it off.
+    False when there is no such lane."""
+    from sqlalchemy import text
+
+    with store.session() as s:
+        row = s.execute(text("select note from s2.lane_defs where lane = :lane"), {"lane": lane}).first()
+        if row is None:
+            return False
+        note = (row[0] or "").split(PAUSED)[0]
+        if not enabled:
+            note += f"{PAUSED}{time.strftime('%d %b %H:%M')}: {why or 'by hand'}"
+        s.execute(text("update s2.lane_defs set enabled = :on, note = :note where lane = :lane"),
+                  {"on": enabled, "note": note, "lane": lane})  # fmt: skip
+    _DEFS.update(at=float("-inf"))
+    return True
+
+
+def how_it_ended(ln: Line, since_ts: float, log: list[dict] | None = None) -> str:
+    """How a chartered line that exited non-zero ended, from S3's spend log since it started:
+
+    - `sank-at-once`: its hire reached the sea and was released within `SANK_S` of it: the voyage never trained
+      (12 November: a list the box was not sent, then a driver too old for the box's torch; both died in the
+      first minutes and would have died the same way with every voyage behind them);
+    - `voyage-failed`: its hire reached the sea (an `at sea` line) and sailed a while, so the voyage itself failed;
+    - `fitout-failed`: a ship was hired and never sailed (a dead box, a refused ssh, a stalled copy, the fit-out's
+      deadline): the voyage never got a GPU;
+    - `not-hired`: nothing was hired (no offer inside the terms, the charter's gate, no credit)."""
+    from datetime import datetime
+
+    from thorp.viable.s3_control import charter as s3
+
+    def at(r) -> float:
+        try:
+            return datetime.fromisoformat(str(r.get("at"))).timestamp()
+        except ValueError:
+            return 0.0
+
+    mine = [r for r in (s3.log() if log is None else log) if r.get("run_id") == ln.run_id and at(r) >= since_ts - 5]
+    seas = [r for r in mine if r["event"] == "at sea"]
+    if seas:
+        ends = [float(r.get("ended") or at(r)) for r in mine if r["event"] == "released"]
+        if ends and max(ends) - at(seas[-1]) < SANK_S:
+            return "sank-at-once"
+        return "voyage-failed"
+    return "fitout-failed" if any(r["event"] == "hired" for r in mine) else "not-hired"
+
+
+def _retry_abroad(queue: Path, ln: Line, say) -> None:
+    """A routed voyage whose box failed before it sailed (or that sank at once) goes back to the top as written,
+    unpinned: the voyage never got a GPU, so it is the box that is retried, not this Mac that pays (12 November:
+    the 9m candidate and the bridge were both pinned to the Mac by a dead box)."""
+    from thorp.viable.s2_coordination import queue_store
+
+    try:
+        if _queue_pg():
+            queue_store.add(ln.text, top=True, goal_id=queue_store.goal_of_line(ln.text), require_goal=False)
+        else:
+            append(queue, ln.text)
+        say(f"[vast] {ln.text}: it never trained; requeued at the top to sail abroad again")
+    except Exception as e:  # noqa: BLE001 - the history keeps the failure; a person can requeue it
+        say(f"[vast] {ln.text}: its box failed and it could not be requeued: {e}")
+
+
+def box_failure_limit() -> int:
+    """S5's `box_failures_before_pause`: fit-outs that may fail in a row on a lane before it is paused."""
+    try:
+        from thorp.viable.s5_policy import charter as s5
+
+        return max(1, int(s5.terms().get("box_failures_before_pause", 2)))
+    except Exception:  # noqa: BLE001 - no terms to read: two
+        return 2
+
+
+def _charter_ended(queue: Path, lane: str, seat: dict, code: int, failures: dict[str, int], say) -> None:
+    """A chartered line has ended. A box that failed before the voyage sailed is retried abroad (if the purser
+    sent it) and counted; `box_failure_limit()` of them in a row pauses the lane, so a bad hour is not repeated
+    down the queue (12 November: the bridge was started the minute the candidate's box died). A voyage that
+    sailed and failed, or was never hired, comes home pinned to this Mac as before."""
+    ln = seat["line"]
+    if code == 0:
+        failures[lane] = 0
+        return
+    try:
+        how = how_it_ended(ln, float(seat.get("since_ts") or 0.0))
+    except Exception as e:  # noqa: BLE001 - the spend log cannot be read: the old rule
+        say(f"[{lane}] {ln.text}: how it ended could not be read ({e}); it comes home")
+        how = "voyage-failed"
+    if how not in ("fitout-failed", "sank-at-once"):
+        if how == "voyage-failed":
+            failures[lane] = 0  # the box was sound
+        if ln.routed:
+            _come_home(queue, ln, say)
+        return
+    failures[lane] = failures.get(lane, 0) + 1
+    limit = box_failure_limit()
+    what = "the box failed before the voyage sailed" if how == "fitout-failed" else "the voyage sank within minutes of sailing"
+    say(f"[{lane}] {ln.text}: {what} (failure abroad {failures[lane]} of {limit} in a row)")
+    if ln.routed:
+        _retry_abroad(queue, ln, say)
+    if failures[lane] >= limit:
+        why = f"{failures[lane]} hires failed in a row before training (the last: {ln.name or ln.text}, {how})"
+        try:
+            set_lane(lane, False, why)
+            say(f"[{lane}] PAUSED: {why}. Its lines wait; open it again with `thorp lane {lane} open`")
+        except Exception as e:  # noqa: BLE001
+            say(f"[{lane}] {why}, and the lane could not be paused: {e}")
+        failures[lane] = 0
+
+
+# S4's intelligence audit as a line of the queue (12 November, Justin: "in the queue we need to schedule the qwen
+# 27B intelligence audit in the queue as it needs resources to run. So perhaps after every 5 voyages/runs/
+# investigations?"). The judge is a 15 GB model on a 32 GB Mac: as a `cmd:` line on the Mac lane it has the machine
+# to itself, as any step does, and never trains beside a voyage. It takes a turn of the queue's cycle with the
+# judge (s3_control/cycle.py): S3*'s audit, S4's measurements, the plan, and the judge's reading of every fit-out
+# that died and has not been read. It keeps the `cmd:` prefix, so every reader that knows a line by its text still
+# sees a command; `parse` gives it the kind `intelligence`, its own item type, for the queue page (12 November).
+AUDIT_LINE = ("cmd: [timeout=45m] PYTHONPATH=backend backend/.venv/bin/python -m thorp.viable.s3_control.cycle run "
+              "--judge --queued  # estimate 20m")  # fmt: skip
+
+
+def audit_every() -> int:
+    """S5's `intelligence_audit_every`: lines that end between two audits (0 never queues one)."""
+    try:
+        from thorp.viable.s5_policy import charter as s5
+
+        return max(0, int(s5.terms().get("intelligence_audit_every", 5)))
+    except Exception:  # noqa: BLE001 - no terms to read: five
+        return 5
+
+
+def lines_since_audit(history: list[dict]) -> int:
+    """The lines that have ended since the last audit (any lane, any kind; a coordinator's own restart and a
+    `wait:` do not count). Read from the history, so a coordinator restarted between two audits counts on."""
+    n = 0
+    for h in reversed(history):
+        text = str(h.get("text") or "")
+        if INTELLIGENCE_MARK in text:
+            break
+        if "restart_coordinator.sh" in text or text.startswith("wait:"):
+            continue
+        n += 1
+    return n
+
+
+def queue_audit(queue: Path, say, history: list[dict] | None = None, pending_now: list[str] | None = None,
+                every: int | None = None) -> bool:  # fmt: skip
+    """Put the audit at the top of the queue when `every` lines have ended since the last one and none is queued
+    or at sea. It goes on the Mac lane, so it sails when the Mac is next free. True when it was queued."""
+    every = audit_every() if every is None else every
+    if every <= 0:
+        return False
+    try:
+        if history is None:
+            from thorp.viable.s2_coordination import queue_read
+
+            history = queue_read.history()
+        n = lines_since_audit(history)
+        if n < every:
+            return False
+        if pending_now is None:
+            pending_now = pending(queue)
+        sea = []
+        with contextlib.suppress(Exception):
+            from thorp.viable.s2_coordination import queue_store
+
+            sea = [r["text"] for r in queue_store.at_sea()]
+        if any(INTELLIGENCE_MARK in t for t in list(pending_now) + sea):
+            return False
+        if _queue_pg():
+            from thorp.viable.s2_coordination import queue_store
+
+            queue_store.add(AUDIT_LINE, top=True, require_goal=False)
+        else:
+            append(queue, AUDIT_LINE)
+        say(f"[mac] {n} lines have ended since the last intelligence audit: the audit is queued at the top (S4's judge, on the Mac alone)")
+        return True
+    except Exception as e:  # noqa: BLE001 - an audit that cannot be queued must never stop the queue
+        say(f"S2: the intelligence audit could not be queued: {e}")
+        return False
 
 
 def _come_home(queue: Path, ln: Line, say) -> None:
@@ -1099,7 +1297,7 @@ def run(queue: Path | None = None, done: Path | None = None, root: Path | None =
                 parents=True, exist_ok=True
             )  # a voyage's log folder is made here, never forgotten
             out = open(out_path, "w")  # noqa: SIM115
-        elif ln.kind == "cmd":
+        elif ln.kind in ("cmd", "intelligence"):
             # a queued audit or probe gets its own log, not the coordinator's: `cmd:` output interleaved
             # into queue.out is unreadable exactly when the audit is the thing you are watching for
             slug = re.sub(r"[^A-Za-z0-9_.-]+", "-", ln.payload).strip("-")[:70] or "cmd"
@@ -1137,6 +1335,7 @@ def run(queue: Path | None = None, done: Path | None = None, root: Path | None =
     told: dict[str, str | None] = {lane: None for lane in lane_names()}
     swept = float("-inf")  # when the heartbeats were last swept (the first sweep is in the first loop)
     attempts: dict[str, int] = {}
+    box_failures: dict[str, int] = {}  # fit-outs failed in a row, a charter lane (the breaker)
     # adopt what the last coordinator left at sea: every at-sea row, then the old pid file
     try:
         _adopt(running, specs, done, root, say)
@@ -1150,9 +1349,9 @@ def run(queue: Path | None = None, done: Path | None = None, root: Path | None =
         # the expedition states are a column now (s1.expedition_status): the coordinator writes them as
         # the helm and the queue move, and the pages read them rather than deriving them
         try:
-            from thorp import vsm
+            from thorp import liberty_machine
 
-            vsm.refresh_expedition_states()
+            liberty_machine.refresh_expedition_states()
         except Exception as e:  # noqa: BLE001 - a status write must never stop the queue
             say(f"S2: could not write the expedition states: {e}")
         finally:
@@ -1195,8 +1394,12 @@ def run(queue: Path | None = None, done: Path | None = None, root: Path | None =
                     _children.discard(seat["proc"].pid)
                     attempts.pop(seat["line"].text, None)
                     seats.remove(seat)
-                    if code != 0 and seat["line"].routed:
+                    if kind_of(lane) == "charter" and seat["line"].kind == "spec":
+                        _charter_ended(queue, lane, seat, code, box_failures, say)
+                    elif code != 0 and seat["line"].routed:
                         _come_home(queue, seat["line"], say)
+                    if not custom:  # every few lines, S4's audit (not in a test's custom launch)
+                        queue_audit(queue, say)
         # a run whose heartbeat stopped with nothing at sea covering it is lost (11 November, item 11)
         if time.monotonic() - swept > SWEEP_EVERY_S:
             swept = time.monotonic()

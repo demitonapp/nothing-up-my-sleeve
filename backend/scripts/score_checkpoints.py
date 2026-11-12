@@ -41,7 +41,7 @@ class _Only:
 
 
 def main(run: str, evaluators: list[str], dry: bool = False, only: str | None = None, last: bool = False) -> int:
-    from thorp import train, vsm
+    from thorp import train, liberty_machine
     from thorp.ledger import Ledger, spec_of
 
     rec = Ledger()
@@ -81,7 +81,7 @@ def main(run: str, evaluators: list[str], dry: bool = False, only: str | None = 
         print(f"  would read steps {todo}", flush=True)
         return 0
     spec["eval"] = {**spec["eval"], "evaluators": list(evaluators)}
-    with vsm.at_sea(f"score {row['name']} with {'+'.join(evaluators)}", kind="score"):
+    with liberty_machine.at_sea(f"score {row['name']} with {'+'.join(evaluators)}", kind="score"):
         prep = train.prepare(spec, log=lambda *a: None)
         for step in todo:
             ckpt = root / f"step-{step}"

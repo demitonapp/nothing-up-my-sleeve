@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex" />
-    <title>Thorp · first run</title>
+    <title>Nothing up my sleeve · first run</title>
     <link rel="stylesheet" href="/onboard/app.css" />
   </head>
   <body>
@@ -50,7 +50,7 @@
             <div class="panel">
               <h2>What setup does</h2>
               <ol class="plain">
-                <li>Asks whether you’ll sail Thorp’s own ships, and which class.</li>
+                <li>Asks whether you’ll sail Nothing up my sleeve’s own ships, and which class.</li>
                 <li>Downloads the outside instruct models you pick.</li>
                 <li>Sets up the records store — local Postgres for now, hosted later.</li>
                 <li>Builds the dashboard, then hands you the keys.</li>
@@ -67,13 +67,13 @@
           <div class="kicker">First run · 2 of 5</div>
           <h1>Will you sail ships on this Mac?</h1>
           <p class="lede">
-            Sailing means training one of Thorp’s own models — a voyage. It uses the GPU and can run for
+            Sailing means training one of Nothing up my sleeve’s own models — a voyage. It uses the GPU and can run for
             minutes or hours. It is separate from the outside models you’ll chat to next.
           </p>
           <div class="choicegrid" id="sailchoice">
             <button type="button" class="choice" data-sail="yes">
               <b>Yes, I’ll sail</b>
-              <span>Train Thorp’s own classes here, starting with the keel.</span>
+              <span>Train Nothing up my sleeve’s own classes here, starting with the keel.</span>
             </button>
             <button type="button" class="choice" data-sail="no">
               <b>No, just chat</b>
@@ -100,7 +100,7 @@
           <div class="kicker">First run · 3 of 5</div>
           <h1>What do you want to talk to?</h1>
           <p class="lede">
-            These are outside instruct models, not Thorp’s own ships. Thorp’s models are built to be read;
+            These are outside instruct models, not Nothing up my sleeve’s own ships. Nothing up my sleeve’s models are built to be read;
             these are built to answer. Pick a size band, then the models in it.
           </p>
           <div class="bandgrid" id="bandcards"></div>
@@ -129,7 +129,7 @@
 
         <section class="step" data-step="store" hidden>
           <div class="kicker">First run · 4 of 5</div>
-          <h1>Where should Thorp keep its records?</h1>
+          <h1>Where should Nothing up my sleeve keep its records?</h1>
           <p class="lede">
             The ledger, the library, the queue and your settings live in Postgres. The store holds
             records, not weights: checkpoints, books and model files stay on this Mac’s disk either way.
@@ -145,7 +145,7 @@
             <button type="button" class="storecard" data-store="hosted" disabled>
               <span class="tag">Coming later</span>
               <b>Hosted Postgres</b>
-              <span>Hosted Thorp will point at a managed store.</span>
+              <span>Hosted Nothing up my sleeve will point at a managed store.</span>
               <span class="s">Not available yet; local is the way in for now.</span>
             </button>
           </div>

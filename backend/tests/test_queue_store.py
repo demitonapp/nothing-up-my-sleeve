@@ -46,6 +46,19 @@ def test_parse_line_mirrors_lanes(tmp_path):
     }
 
 
+def test_the_intelligence_audit_is_its_own_item_type():
+    """12 November: S4's scheduled intelligence audit is stored as `intelligence`, not as one more `cmd:` step."""
+    from thorp.viable.s2_coordination import lanes
+
+    parsed = queue_store.parse_line(lanes.AUDIT_LINE)
+    assert parsed["kind"] == "intelligence" and parsed["lane"] == "mac"
+    queue_store.add(lanes.AUDIT_LINE, require_goal=False)
+    assert [(r["kind"], r["text"]) for r in queue_store.lines()] == [("intelligence", lanes.AUDIT_LINE)]
+    row = queue_store.take_to_sea(lanes.AUDIT_LINE)  # the item type goes to sea with it
+    assert queue_store.at_sea()[0]["kind"] == "intelligence"
+    queue_store.from_sea(row)
+
+
 def test_a_line_is_queued_or_at_sea_or_in_the_history():
     """11 November: the take and the at-sea row are one transaction, and so are the history and the row's end."""
     from sqlalchemy import select

@@ -78,6 +78,13 @@ def test_the_margin_and_the_days_allowance_hold_a_hire_back():
     assert poor.waters == "local" and "allowance" in poor.reason
 
 
+def test_the_intelligence_audit_takes_the_mac_as_a_command():
+    """12 November: S4's audit is its own queue item type, but the purser still times it as a command and never
+    sends it abroad."""
+    audit = calls([lanes.parse(lanes.AUDIT_LINE)], world())[0]
+    assert audit.waters == "local" and audit.local_min == 10.0  # the test's cmd_estimate
+
+
 def test_the_allowance_releases_a_day_at_a_time():
     w = world(week_spent=2.0)
     assert abs(purser.allowance_at(MONDAY, w) - 28 / 7) < 1e-9

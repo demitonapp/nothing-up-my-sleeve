@@ -1,5 +1,5 @@
 """The dashboard: the Astro build in ./static (source in ./web) plus JSON read straight from the
-ledger. Standard library only; `pnpm --dir thorp/dash/web build` makes the page.
+ledger. Standard library only; `pnpm --dir frontend build` makes the page (into dash/static, ignored).
 
 Endpoints: /api/runs, /api/metrics?run=, /api/evals?run=, /api/run?run= (headline numbers,
 latest samples, probes, recipe composition, traits and tokeniser stats, which the panels need),
@@ -17,6 +17,7 @@ import re
 import socket
 import sqlite3
 import time
+from datetime import UTC, datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
@@ -869,7 +870,7 @@ _ATLAS_CACHE: dict = {"at": 0.0, "value": None}
 def api_lanes() -> dict:
     """The lanes' concurrency, read from Postgres: s2.lanes says how many seats each lane runs and what is
     out; s2.helm says which seats are at sea (9 November, Justin: "all this should be stored in postgres")."""
-    from thorp import paths, store, vsm
+    from thorp import paths, store, liberty_machine
     from thorp.viable.records import Lane
 
     with store.session() as s:
@@ -878,7 +879,7 @@ def api_lanes() -> dict:
             for r in s.query(Lane)
         ]
     by = {r["lane"]: r for r in lanes}
-    seats = vsm.helms()
+    seats = liberty_machine.helms()
     return {
         "helm_seats": len(seats),
         "mac_seats": (by.get("mac") or {}).get("seats", 1),
@@ -912,10 +913,10 @@ def api_at_sea(expedition: str = "kipling") -> dict:
 
     runs = _runs_rows()
     # a killed run still says running in the ledger; the seats are the authority (as in api_queue)
-    from thorp import vsm
+    from thorp import liberty_machine
 
     try:
-        live = {h.get("name") for h in vsm.helms(8)}
+        live = {h.get("name") for h in liberty_machine.helms(8)}
     except Exception:  # noqa: BLE001
         live = set()
     import time
@@ -3339,18 +3340,28 @@ def api_store() -> dict:
 
 
 def api_governance() -> dict:
-    """Nothing up my sleeve's rules as Beer's Viable System Model (thorp/vsm.py): the five systems (S1 operations to
+    """Nothing up my sleeve's rules as Beer's Viable System Model (thorp/liberty_machine.py): the five systems (S1 operations to
     S5 policy) with their code, and the live audit: the voyages, the queue's collisions, each policy's
     enforcement and the queued runs that break it, the outside world Nothing up my sleeve measures itself against.
     Read-only: switching a policy is Justin's S5 decision, recorded in s5.policy_switches (`thorp s5 switch`)."""
     import dataclasses
 
-    from thorp import vsm
+    from thorp import liberty_machine
 
     return {
-        "systems": [dataclasses.asdict(s) for s in vsm.SYSTEMS.values()],
-        "audit": vsm.audit(),
+        "systems": [dataclasses.asdict(s) for s in liberty_machine.SYSTEMS.values()],
+        "audit": liberty_machine.audit(),
     }
+
+
+def api_liberty_machine_cycle() -> dict:
+    """The queue's planning cycle on the Liberty Machine page (thorp/viable/s3_control/cycle.py): the six steps, one a
+    system; the last turn kept (S3*'s audit, S4's measurements, S5's envelope, the plan and its proposals); and
+    what is true now: the judge S5 chose and what it has said, the schedule's job, each GPU class's measured
+    set-up. Read-only: a turn is taken by the schedule or `thorp cycle run`."""
+    from thorp.viable.s3_control import cycle
+
+    return cycle.payload()
 
 
 def api_acquisition() -> dict:
@@ -3505,7 +3516,8 @@ def _api_queue() -> dict:
     """The queue as a table (Justin, 17:05: "view the queue so each voyage with its goal"): the voyage at
     sea, then every line of specs/queue.txt in order, each voyage with its goal (its spec's question),
     its expedition, class and seed, and about when it sails (each queued voyage before it at its class's
-    mean wall time over finished voyages); a `cmd:` line is a step between voyages."""
+    mean wall time over finished voyages); a `cmd:` line is a step between voyages, except S4's scheduled
+    intelligence audit, which is its own item type (`kind: "intelligence"`, 12 November)."""
     import yaml
 
     from thorp import fleet
@@ -3521,10 +3533,10 @@ def _api_queue() -> dict:
     # killed 9m arms as at sea). The seats are the authority, the ledger the record. Read every helm slot,
     # not the lane's seat count: the manual survivors can sit in slot 3 while a two-seat lane reads 1-2,
     # and the release then disappeared from this page (10 November).
-    from thorp import vsm
+    from thorp import liberty_machine
 
     try:
-        seats = {h.get("name") for h in vsm.helms(8)}
+        seats = {h.get("name") for h in liberty_machine.helms(8)}
         helm_known = True
     except Exception:  # noqa: BLE001  (no store on a box)
         seats, helm_known = set(), False
@@ -3540,8 +3552,39 @@ def _api_queue() -> dict:
         except OSError:
             return False
 
+    # a voyage on a hired GPU holds no seat on this Mac's helm, and its ledger row says whatever its last sailing
+    # said until the box's first rows come home (12 November: the bridge training on a 4090 was missing from this
+    # page, its row still "failed: UnicodeDecodeError" from the attempt before). The coordinator's at-sea record
+    # is the authority for a charter lane.
+    from thorp.viable.s2_coordination import queue_store as _qs0
+
+    try:
+        charter_sea = {x["name"]: x for x in _qs0.at_sea() if x.get("name") and (x.get("lane") or "mac") != "mac"}
+    except Exception:  # noqa: BLE001  (no store on a box)
+        charter_sea = {}
+    # A voyage under `thorp charter attach` is outside the coordinator's at-sea rows (it was launched by a charter
+    # that died, or by an earlier attach). The spend log knows its hire; without it the page showed the bridge as
+    # its old failed attempt while it was training on a 4090 (12 November). Add those live hires here.
+    with contextlib.suppress(Exception):
+        from thorp.viable.s3_control import charter as _s3live
+
+        for h in _s3live.out_now():
+            nm = h.get("name")
+            if not nm or nm in charter_sea:
+                continue
+            try:
+                started = datetime.fromtimestamp(float(h.get("started")), UTC).isoformat()
+            except (TypeError, ValueError):
+                started = None
+            charter_sea[nm] = {"name": nm, "run_id": h.get("run_id"), "started": started,
+                               "lane": "vast", "instance": h.get("instance")}  # fmt: skip
     newest: dict[str, dict] = {}
     for r in all_runs:
+        if r["name"] in charter_sea:
+            cur = newest.get(r["name"])
+            if cur is None or str(r.get("started") or "") > str(cur.get("started") or ""):
+                newest[r["name"]] = r
+            continue
         # an empty helm means nothing is at sea, not every stale `running` row: when the queue is down the
         # seat set is empty, and `(seats and ...)` used to be False, so the killed 9m arms came back
         # (10 November). Only a helm that could not be read falls back to the ledger. A live run log
@@ -3553,7 +3596,23 @@ def _api_queue() -> dict:
         cur = newest.get(r["name"])
         if cur is None or str(r.get("started") or "") > str(cur.get("started") or ""):
             newest[r["name"]] = r
+    for name, x in charter_sea.items():  # a first sailing abroad: nothing in the ledger yet
+        if name not in newest:
+            newest[name] = {"name": name, "ship": "", "started": x.get("started"), "run_id": x.get("run_id"),
+                            "spec_json": None, "status": "running"}  # fmt: skip
     sea = list(newest.values())
+    # what each hire abroad is doing: its hire's start and quote, and whether it has reached the sea yet
+    hire_of: dict[str, dict] = {}
+    if charter_sea:
+        with contextlib.suppress(Exception):
+            from thorp.viable.s3_control import charter as _s3
+
+            log_ = _s3.log()
+            for h in _s3.out_now(log_):
+                nm = h.get("name")
+                if nm in charter_sea:
+                    sailed = any(e["event"] == "at sea" and e.get("instance") == h["instance"] for e in log_)
+                    hire_of[nm] = {**h, "phase": "training" if sailed else "fitting out"}
 
     fitout_names: dict[str, str | None] = {}
 
@@ -3603,7 +3662,6 @@ def _api_queue() -> dict:
         }
 
     import time as _time
-    from datetime import datetime, timezone
 
     from thorp.viable.s2_coordination import lanes as lane_mod
 
@@ -3627,7 +3685,9 @@ def _api_queue() -> dict:
             d = datetime.fromisoformat(str(started).replace("Z", "+00:00"))
         except ValueError:
             return None
-        return max(0.0, (datetime.now(d.tzinfo or timezone.utc) - d).total_seconds() / 60)
+        if d.tzinfo is None:  # the coordinator writes local naive times; the ledger writes UTC-aware ones
+            d = d.replace(tzinfo=UTC)
+        return max(0.0, (datetime.now(UTC) - d).total_seconds() / 60)
 
     # the goal of each line at sea, carried from its queued row (s2.at_sea.goal_id, 12 November). A line that
     # sails leaves s2.queue_lines, so the queued lines alone gave every row at sea no goal.
@@ -3640,6 +3700,7 @@ def _api_queue() -> dict:
     sea_goal_by_name = {r["name"]: r.get("goal_id") for r in _sea_rows if r.get("name") and r.get("goal_id")}
     sea_goal_by_text = {r["text"]: r.get("goal_id") for r in _sea_rows if r.get("goal_id")}
     sea_lane_by_name = {r["name"]: r.get("lane") or "mac" for r in _sea_rows if r.get("name")}
+    sea_lane_by_name.update({k: v.get("lane") or "vast" for k, v in charter_sea.items() if v.get("name")})
 
     rows = []
     for run in sea:
@@ -3667,6 +3728,16 @@ def _api_queue() -> dict:
             with contextlib.suppress(Exception):
                 r["goal_id"] = _qs._goal_of_spec(spec_path)
         est, source = times.estimate(name, spec)
+        h = hire_of.get(name)
+        if name in charter_sea:
+            # abroad: timed from the hire, against its quote, not this Mac's time for the voyage
+            started = (datetime.fromtimestamp(float(h["started"]), timezone.utc).isoformat() if h and h.get("started")
+                       else charter_sea[name].get("started"))  # fmt: skip
+            r["started"] = started
+            if h and h.get("quote_hours"):
+                est, source = float(h["quote_hours"]) * 60, f"the hire's quote, on an {h.get('gpu')}"
+            r["abroad"] = {"gpu": (h or {}).get("gpu"), "phase": (h or {}).get("phase") or "hiring",
+                           "dph": (h or {}).get("dph"), "instance": (h or {}).get("instance")}  # fmt: skip
         r["est_min"], r["est_source"] = est, source
         rows.append(r)
         if est is not None:
@@ -3704,8 +3775,11 @@ def _api_queue() -> dict:
         """A step's words, not its command line: an investigation says which investigation, and any other
         step says which script or module it runs (11 November: rows 3 and 4 read `PYTHONPATH=backend`); an
         evaluation names the ship and what reads it, a scorer the model it scores (12 November: four IFEval
-        readings were each called `thorp`)."""
+        readings were each called `thorp`). S4's scheduled intelligence audit is its own item type, named as
+        itself (12 November)."""
         cmd = _bare(cmd)
+        if lane_mod.is_intelligence(cmd):
+            return "the intelligence audit", "intelligence"
         if MAINTENANCE_RE.search(cmd):
             return "restart the coordinator", "upkeep"
         m = re.search(r"-m\s+thorp\s+eval\s+(\S+)(?:.*--evaluators\s+(\S+))?", cmd)
@@ -3782,6 +3856,18 @@ def _api_queue() -> dict:
         cmd = _bare(line[4:])
         inv = _inv.of_line(line)
         out: dict = {"command": cmd, "deadline": _deadline(line, inv)}
+        if lane_mod.is_intelligence(line):
+            every = 5
+            with contextlib.suppress(Exception):
+                every = lane_mod.audit_every()
+            out["intelligence"] = {
+                "system": "S4",
+                "title": "the queue's intelligence audit",
+                "every": every,
+                "what": "A turn of the queue's planning cycle with the judge: S3*'s audit, S4's measurements, "
+                        "S5's envelope, S3's plan, and the judge's reading of every fit-out that died and has not "
+                        "been read. S2 queues it at the top of the queue; it takes the Mac to itself.",
+            }
         if inv is not None:
             try:
                 stand = _inv.standing(str(inv.get("name")))
@@ -3824,9 +3910,10 @@ def _api_queue() -> dict:
             continue
         est, source, is_max = _cmd_estimate(line)
         label, what = _cmd_label(line[4:].strip())
+        kind = "intelligence" if lane_mod.is_intelligence(line) else "step"
         gone = _since_min(out_.get("since"))
         left = max(0.0, est - (gone or 0.0)) if est is not None else None
-        rows.insert(0, {"n": None, "kind": "step", "name": label, "what": what, "cmd": _bare(line[4:]),
+        rows.insert(0, {"n": None, "kind": kind, "name": label, "what": what, "cmd": _bare(line[4:]),
                         "detail": _step_detail(line), "line": line,
                         "goal_id": line_goals.get(line), "status": "at sea", "lane": lane,
                         "started": out_.get("since"), "est_min": est, "est_source": source, "est_is_max": is_max,
@@ -3853,7 +3940,8 @@ def _api_queue() -> dict:
             cmd = ln[4:].strip()
             label, what = _cmd_label(cmd)
             est, source, is_max = _cmd_estimate(ln)
-            r = {"n": i, "kind": "step", "name": label, "what": what, "cmd": _bare(cmd), "line": ln,
+            kind = "intelligence" if lane_mod.is_intelligence(ln) else "step"
+            r = {"n": i, "kind": kind, "name": label, "what": what, "cmd": _bare(cmd), "line": ln,
                  "detail": _step_detail(ln), "goal_id": line_goals.get(ln), "status": "queued", "lane": "mac",
                  "est_min": est, "est_source": source, "est_is_max": is_max}
             if est is None:
@@ -4778,6 +4866,137 @@ def post_lab_download(body: dict) -> dict:
             model, lab, label=body.get("label"), params=body.get("params")
         )
     }
+
+
+# ---- the drone fleet (thorp/drones.py, 12 November) ----------------------------------------------------
+
+
+def api_drones(drone: str = "browser") -> dict:
+    """The fleet under S1: the drones, the pilots each may fly, and the browser drone's recent runs."""
+    from thorp import drones
+
+    return drones.payload(drone)
+
+
+def api_drone_fleet() -> dict:
+    """The fleet as cards, for S1's page."""
+    from thorp import drones
+
+    return drones.fleet_payload()
+
+
+def api_drone_download(model: str) -> dict:
+    from thorp import drones
+
+    return {"download": drones.download_status(model)}
+
+
+def api_drone_task(run_id: str) -> dict:
+    from thorp import drones
+
+    rec = drones.task(run_id)
+    if rec is None:
+        raise LookupError(f"no drone run {run_id!r}")
+    return {"run": rec}
+
+
+def api_email_accounts() -> dict:
+    """The email drone's mailboxes: the providers, the accounts, and whether a Microsoft client id is set."""
+    from thorp import email_accounts
+
+    return email_accounts.list_payload()
+
+
+def post_email_account(body: dict) -> dict:
+    from thorp import email_accounts
+
+    return email_accounts.save_password(
+        str(body.get("provider") or ""), str(body.get("email") or ""), str(body.get("password") or ""),
+        label=body.get("label") or None, body=body,
+    )
+
+
+def post_email_test(body: dict) -> dict:
+    from thorp import email_accounts
+
+    return email_accounts.test_account(str(body.get("id") or ""))
+
+
+def post_email_remove(body: dict) -> dict:
+    from thorp import email_accounts
+
+    return email_accounts.remove_account(str(body.get("id") or ""))
+
+
+def post_email_ms_client(body: dict) -> dict:
+    from thorp import email_accounts
+
+    return email_accounts.set_ms_client(str(body.get("client_id") or ""))
+
+
+def post_email_ms_start(body: dict) -> dict:
+    from thorp import email_accounts
+
+    return email_accounts.ms_start(body.get("client_id") or None)
+
+
+def post_email_ms_poll(body: dict) -> dict:
+    from thorp import email_accounts
+
+    return email_accounts.ms_poll(
+        str(body.get("device_code") or ""), str(body.get("client_id") or ""), body.get("email") or None
+    )
+
+
+def api_drones_phone() -> dict:
+    """The phone drone's local test line: the open call, the calls kept, the bridge."""
+    from thorp import phone
+
+    return phone.payload()
+
+
+def post_phone_start(body: dict) -> dict:
+    from thorp import phone
+
+    return {"call": phone.start(str(body.get("goal") or ""), pilot=body.get("pilot") or None, speak=bool(body.get("speak", True)))}
+
+
+def post_phone_turn(body: dict) -> dict:
+    from thorp import phone
+
+    return {"call": phone.say(str(body.get("id") or ""), str(body.get("text") or ""))}
+
+
+def post_phone_end(body: dict) -> dict:
+    from thorp import phone
+
+    return {"call": phone.end(str(body.get("id") or ""))}
+
+
+def post_drone_select(body: dict) -> dict:
+    """Choose the model a drone flies. Only a downloaded pilot can be chosen."""
+    from thorp import drones
+
+    return drones.select(str(body.get("drone") or "browser"), str(body.get("model") or ""))
+
+
+def post_drone_download(body: dict) -> dict:
+    from thorp import drones
+
+    return {"download": drones.start_download(str(body.get("model") or ""))}
+
+
+def post_drone_task(body: dict) -> dict:
+    """Put the browser drone on a task. It starts in the background; the page polls its run."""
+    from thorp import drones
+
+    rec = drones.start_task(
+        str(body.get("goal") or ""),
+        url=body.get("url") or None,
+        model=body.get("model") or None,
+        max_steps=int(body.get("max_steps") or drones.DEFAULT_STEPS),
+    )
+    return {"run": rec}
 
 
 def post_lab_model_queue(body: dict) -> dict:
@@ -7115,6 +7334,18 @@ class Handler(BaseHTTPRequestHandler):
             "/api/charter/sign": post_charter_sign,
             "/api/lab_download": post_lab_download,
             "/api/lab_model_queue": post_lab_model_queue,
+            "/api/drones/select": post_drone_select,
+            "/api/drones/email/accounts": post_email_account,
+            "/api/drones/email/test": post_email_test,
+            "/api/drones/email/remove": post_email_remove,
+            "/api/drones/email/ms/client": post_email_ms_client,
+            "/api/drones/email/ms/start": post_email_ms_start,
+            "/api/drones/email/ms/poll": post_email_ms_poll,
+            "/api/drones/phone/start": post_phone_start,
+            "/api/drones/phone/turn": post_phone_turn,
+            "/api/drones/phone/end": post_phone_end,
+            "/api/drones/download": post_drone_download,
+            "/api/drones/task": post_drone_task,
         }
         if u.path not in posts:
             return self._send(404, b"not found", "text/plain")
@@ -7152,6 +7383,11 @@ class Handler(BaseHTTPRequestHandler):
                 # 12 November, Justin: "8787 shouldn't serve a UI". The page is the Astro dev server on :4321,
                 # which forwards /api here.
                 return self._send(404, API_ONLY, "application/json")
+            if u.path == "/api/drones/shot":
+                from thorp import drones
+
+                got = drones.shot(q.get("id", ""))
+                return self._send(200, got[0], got[1], cache="no-store")
             if u.path == "/api/image":
                 # a gathered image's bytes, by its id (thorp/images.py); the Library's Images tab shows them
                 from thorp import images
@@ -7216,6 +7452,9 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/library_trigrams": lambda: api_shelf_trigrams(q["path"]),
                 "/api/voyages/where": lambda: api_voyages_where(q.get("runs", "")),
                 "/api/governance": api_governance,
+                "/api/liberty-machine/cycle": api_liberty_machine_cycle,
+                # the old address keeps working (VSM was renamed the Liberty Machine, 12 November)
+                "/api/vsm/cycle": api_liberty_machine_cycle,
                 "/api/store": api_store,
                 "/api/acquisition": api_acquisition,
                 "/api/acquisition/audit": api_acquisition_audit,
@@ -7266,6 +7505,12 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/lab_models": lambda: api_lab_models(q.get("lab", "")),
                 "/api/lab_download": lambda: api_lab_download(q.get("model", "")),
                 "/api/lab_model_tests": lambda: api_lab_model_tests(q.get("model", "")),
+                "/api/drones": lambda: api_drones(q.get("drone", "browser")),
+                "/api/drones/fleet": api_drone_fleet,
+                "/api/drones/phone": api_drones_phone,
+                "/api/drones/email/accounts": api_email_accounts,
+                "/api/drones/download": lambda: api_drone_download(q.get("model", "")),
+                "/api/drones/task": lambda: api_drone_task(q.get("id", "")),
                 "/api/tests": api_tests,
                 "/api/bridge": api_bridge,
                 "/api/leaderboard/internal": api_leaderboard_internal,
@@ -7273,6 +7518,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/bet": api_bet,
                 "/api/settings": lambda: api_settings(q.get("fresh", "")),
                 "/api/settings/perf": lambda: api_settings_perf(q.get("range", "24h")),
+                "/api/settings/cost": lambda: api_settings_cost(q.get("by", "day")),
                 "/api/climb": lambda: api_climb(q.get("runs", "")),
                 "/api/shelf": lambda: api_shelf(q["run"]),
                 "/api/book": lambda: api_book(q["id"], q.get("offset", 0), q.get("length", 20000)),
@@ -7386,6 +7632,14 @@ def api_settings(fresh: str = "") -> dict:
     from thorp.dash import settings
 
     return settings.payload(fresh=fresh in ("1", "true", "yes"))
+
+
+def api_settings_cost(by: str = "day") -> dict:
+    """The settings page's Cost tab (thorp.dash.cost): what the hired GPUs cost, spread over the hours they ran and
+    summed by hour, day, week (the budget's Monday-to-Sunday UTC week) or month, with the budget beside it."""
+    from thorp.dash import cost
+
+    return cost.payload(by)
 
 
 def api_settings_perf(range_: str = "24h") -> dict:

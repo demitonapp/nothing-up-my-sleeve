@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Chat with a finished Thorp run's latest checkpoint. Experimental.
+"""Chat with a finished Nothing up my sleeve run's latest checkpoint. Experimental.
 
 The model is a small GPT trained on Ogden, not an instruction-tuned assistant. Without a chat/QA
 arm it will continue prose rather than answer. The prompt is wrapped the way the voyage was taught:
@@ -38,7 +38,7 @@ def print_audit(a: dict) -> None:
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description="Chat with a finished Thorp checkpoint.")
+    ap = argparse.ArgumentParser(description="Chat with a finished Nothing up my sleeve checkpoint.")
     ap.add_argument("--run", default=None, help="the run name (see --models)")
     ap.add_argument("--step", type=int, default=None, help="a checkpoint step, else the latest")
     ap.add_argument("--prompt", default=None, help="one question, then exit")

@@ -15,7 +15,7 @@ Phase 1, the small state that used to be JSON and JSONL in data/:
 - **S5:** `policy_switches` (S5's switch over a policy's default; was policies.json), `policy_exceptions` and
   `policy_exception_matches` (the runs a policy does not govern, by name or pattern, and why; was
   policy-exceptions.json), `charter_terms` (each change to a charter term, the latest in force; was charter.json).
-  The policies themselves (statement, check, default) stay in code (vsm.POLICIES): they are checks, not data.
+  The policies themselves (statement, check, default) stay in code (liberty_machine.POLICIES): they are checks, not data.
 """
 
 from __future__ import annotations
@@ -172,6 +172,28 @@ class Allocation(Base):
     reason: Mapped[str] = mapped_column(Text)
 
 
+class Cycle(Base):
+    """One turn of the queue's planning cycle (S3, thorp/viable/s3_control/cycle.py; S5's `cycle_hours`, twelve):
+    what S3* found setting the last plan against what happened, what S4 had measured, the envelope S5 allowed,
+    the plan the purser made and what it proposes to S5. The purser steers inside it every five minutes; this is
+    the record a person, and the next cycle's audit, reads."""
+
+    __tablename__ = "cycles"
+    __table_args__ = (Index("cycles_at", "at"), {"schema": S3})
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    hours: Mapped[float] = mapped_column(Float)  # the cycle's length when it ran (S5's cycle_hours)
+    how: Mapped[str] = mapped_column(Text, default="by hand", server_default="by hand")  # scheduled, or by hand
+    audit: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}")  # S3*: plan against actual
+    measured: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}")  # S4: set-up, failures, rates
+    envelope: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}")  # S5: the ceilings in force
+    plan: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}")  # S3: the fleets tried, the one chosen
+    proposals: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")  # to S5: Justin signs
+    judged: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")  # the judgments made this turn
+    seconds: Mapped[float | None] = mapped_column(Float)
+
+
 # ---------------------------------------------------------------- S3*, audit
 
 
@@ -214,11 +236,31 @@ class MarketRead(Base):
     cost: Mapped[float | None] = mapped_column(Float)
 
 
+class Judgment(Base):
+    """One thing S5's judge (s5.judges) was asked that a number cannot say: today, why a fit-out died
+    (thorp/viable/s4_intelligence/judge.py). `known` is what a person had already said the cause was, where one
+    did, so the judge can be read against it; `said` is all the model said, `verdict` what was read out of it."""
+
+    __tablename__ = "judgments"
+    __table_args__ = (Index("judgments_subject", "kind", "subject", "at"), {"schema": S4})
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    judge: Mapped[str] = mapped_column(Text)
+    kind: Mapped[str] = mapped_column(Text)  # fitout
+    subject: Mapped[str] = mapped_column(Text)  # the instance
+    known: Mapped[str | None] = mapped_column(Text)
+    verdict: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}")
+    said: Mapped[str] = mapped_column(Text, default="", server_default="")
+    seconds: Mapped[float | None] = mapped_column(Float)
+    outcome: Mapped[str] = mapped_column(Text, default="ok", server_default="ok")  # ok, unreadable, failed, timeout
+
+
 # ---------------------------------------------------------------- S5, policy
 
 
 class PolicySwitch(Base):
-    """S5's switch over a policy's default (vsm.POLICIES): enforced or not, and in whose words."""
+    """S5's switch over a policy's default (liberty_machine.POLICIES): enforced or not, and in whose words."""
 
     __tablename__ = "policy_switches"
     __table_args__ = {"schema": S5}
@@ -555,8 +597,8 @@ def tables():
 
 class ScheduledJob(Base):
     """S2: a job Nothing up my sleeve runs on a schedule (Justin, 8 November: "thorps schedules tasks shouldn't be in claude code, but
-    rather part of our VSM model and in postgres"). A cron (five fields, this Mac's local time) or one time; a job is
-    either a command, or a prompt put to the judge (S5's choice of Nothing up my sleeve's most capable model). `system` is the VSM
+    rather part of our Liberty Machine model and in postgres"). A cron (five fields, this Mac's local time) or one time; a job is
+    either a command, or a prompt put to the judge (S5's choice of Nothing up my sleeve's most capable model). `system` is the Liberty Machine
     system that owns the job's purpose; `limits` its bounds (max_minutes, cwd)."""
 
     __tablename__ = "schedule_jobs"

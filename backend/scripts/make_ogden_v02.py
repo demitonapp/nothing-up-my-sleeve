@@ -24,7 +24,7 @@ import random
 import re
 
 from thorp import logic_tutor as lt
-from thorp import manifest, ogden, paths, vsm
+from thorp import manifest, ogden, paths, liberty_machine
 from thorp.paths import ROUTER as ROOT
 from thorp.sources import load_text
 
@@ -55,7 +55,7 @@ def books() -> tuple[list[dict], list[dict]]:
     scored_ids = {r["book"] for r in v1_scored}
     scored_titles = {norm(r["title"]) for r in v1_scored}
     judge = ids_of("lists/hole-cards-unseen.csv") | ids_of("lists/hole-cards.csv") | ids_of("lists/hole-cards-v2.csv")
-    deaths = vsm._deaths()
+    deaths = liberty_machine._deaths()
     scores, keep, seen = [], [], set()
     for b in sorted(manifest.all_books(), key=lambda b: b.id):
         if b.language != "en" or b.set != "recipe" or b.id in scored_ids or b.id in judge or CONTROL.search(b.title or ""):

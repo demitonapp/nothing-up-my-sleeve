@@ -137,9 +137,9 @@ def main() -> None:
     if a.no_helm:
         score(a.model, configs, per, a.batch, not a.no_save, a.dtype, parts, not a.no_board)
         return
-    from thorp import vsm
+    from thorp import liberty_machine
 
-    with vsm.at_sea(f"score {a.model} on AI2 ARC", kind="score"):
+    with liberty_machine.at_sea(f"score {a.model} on AI2 ARC", kind="score"):
         score(a.model, configs, per, a.batch, not a.no_save, a.dtype, parts, not a.no_board)
 
 

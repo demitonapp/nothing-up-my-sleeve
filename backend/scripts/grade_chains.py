@@ -1,6 +1,6 @@
 """Grade the discovery chains (2026-11-07, Justin: "each test must get harder as it moves up the
 classes of ships"). Scores every chain's rungs on the reference ladder (fleet.REFERENCE_LADDER) and
-on the named Thorp runs, applies fleet.grading to each chain, and keeps the chain grades in the store (s4.outside_readings, "chain-grades"; was data/compare/chain-grades.json)
+on the named Nothing up my sleeve runs, applies fleet.grading to each chain, and keeps the chain grades in the store (s4.outside_readings, "chain-grades"; was data/compare/chain-grades.json)
 ({models: {model: {trick: {lift, score, performed}}}, chains: {bettor test: grading}}) for the
 dashboard. Usage: uv run --group compare python scripts/grade_chains.py [thorp run names...]
 """
@@ -112,7 +112,7 @@ def main(runs: list[str]) -> None:
                 "items": r["items"],
                 "sha": dsha,
             }
-        # the cards (thorp/evaluators/cards.py), read inside the model: Thorp's own GPT directly, an
+        # the cards (thorp/evaluators/cards.py), read inside the model: Nothing up my sleeve's own GPT directly, an
         # outside model through thorp.inside.Inside
         csha = dsha + "-cards4"
         if deck and cached.get("cards", {}).get("sha") == csha:

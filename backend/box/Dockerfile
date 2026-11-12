@@ -19,6 +19,7 @@ ENV PATH="/root/.local/bin:${PATH}" UV_LINK_MODE=copy UV_COMPILE_BYTECODE=1
 
 WORKDIR /root/thorp
 COPY backend/pyproject.toml backend/uv.lock backend/
-RUN uv sync --project backend --group torch --frozen --no-install-project \
+RUN uv sync --project backend --group torch --group tagger --frozen --no-install-project \
+    && backend/.venv/bin/python -c "import spacy; spacy.load('en_core_web_sm'); print('tagger', spacy.__version__)" \
     && rm -rf /root/.cache/uv \
     && backend/.venv/bin/python -c "import torch; print('torch', torch.__version__, 'cuda', torch.version.cuda)"

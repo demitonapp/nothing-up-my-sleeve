@@ -17,11 +17,15 @@ and each hired ship comes free. For each eligible voyage, estimate:
 - *local:* when a Mac seat is free (and what it reads from is home), plus its time here (the queue page's own
   clock, dash/timing.RunTimes: the median of like voyages);
 - *foreign:* when a ship is free, plus its time here divided by the class's **measured** speed-up for that
-  size, plus the set-up hours, priced at the market's last price for the class.
+  size, plus the class's **measured** overhead (set-up and home: s4 hires.setup, the median of its last hires
+  that sailed; S5's constant only where nothing has been measured), priced at the market's last price.
 
 It sails abroad when it comes home sooner by the margin (`margin_hours` and `margin_fraction` of its wait), its
-cost keeps one voyage's budget, and the spend planned so far stays within the **day's allowance** (what is left
-of the week's budget spread over the days left, so Monday cannot spend Sunday's money). Otherwise it stays local.
+cost keeps one voyage's budget, and the spend planned so far stays within the **cycle's allowance** (what is left
+of the week's budget spread over the planning cycles left in it: S5's `cycle_hours`, twelve, so Monday cannot spend
+Sunday's money; twenty-four gives the day's allowance this began with). A hire is counted against the allowance at
+its quote times S5's `overrun` (12 November: "it charges every hire at one and a half times its quote"), so the
+ceiling holds even if every ship is brought home at its deadline. Otherwise it stays local.
 
 **The speed-up is measured, never assumed.** A class's measured rate on a size (s4 market.throughput, from the
 spend log) over this Mac's *best* rate on that size (any finished MLX voyage). Taking the Mac's best errs slow:
@@ -85,22 +89,74 @@ class World:
     ship_free: list[float]  # when each ship the terms allow is free
     home_at: dict[str, float] = field(default_factory=dict)  # voyages at sea: when each is home, by name
     foreign_ok: bool = True  # the Vast lane is enabled and has a key
+    setup_min: dict[str, float] = field(default_factory=dict)  # gpu: its measured overhead (set-up and home), minutes
+    reserve: float = 1.0  # a hire counts against the allowance at its cost times this (S5's overrun)
+    cycle_spent: float = 0.0  # dollars the hires of the cycle now running have cost so far (inside week_spent)
+    cycle_held: float = 0.0  # and what is still held for the ships out: their quotes times the reserve, less that
     two_at_once: frozenset = frozenset({"300k"})  # presets that may share the Mac with a second of their size
 
 
 def allowance_at(t: float, w: World) -> float:
     """The money the purser may have committed by a voyage sailing at `t`: this week's remaining budget spread
-    evenly over its days left (today counted), so each day releases its share; a voyage planned into next week
-    draws on next week's budget in the same way."""
+    evenly over its planning cycles left (the one now running counted), so each cycle releases its share and what
+    one does not spend the next may; a voyage planned into next week draws on next week's budget in the same way.
+    A cycle is S5's `cycle_hours` (24 where the terms name none: the day's allowance)."""
     weekly = float(w.terms.get("weekly_budget", 0.0))
-    remaining = max(0.0, weekly - float(w.week_spent))
+    # what this cycle has already spent and holds comes off its own share: without that every re-plan after a
+    # ship came home found a whole new share waiting (12 November: three 9m voyages called foreign in one cycle
+    # whose share carried two), and the cycle's ceiling was only a ceiling on what was planned at once
+    spent, held = max(0.0, float(w.cycle_spent)), max(0.0, float(w.cycle_held))
+    remaining = max(0.0, weekly - float(w.week_spent) + spent)  # what was left of the week when this cycle began
+    cycle = max(1.0, float(w.terms.get("cycle_hours", 24.0))) * 3600
     now = datetime.fromtimestamp(w.now, UTC)
-    today = datetime(now.year, now.month, now.day, tzinfo=UTC).timestamp()
-    days_left = 7 - now.weekday()  # Monday to Sunday (UTC), the spend log's week
-    day = max(0, int((t - today) // 86400))
-    if day < days_left:
-        return remaining * min(1.0, (day + 1) / days_left)
-    return remaining + weekly * min(1.0, (day - days_left + 1) / 7)
+    monday = (datetime(now.year, now.month, now.day, tzinfo=UTC).timestamp() - now.weekday() * 86400)  # the spend log's week
+    per_week = max(1, round(7 * 86400 / cycle))
+    this = int((w.now - monday) // cycle)  # the cycle now running, counted from Monday 00:00 UTC
+    left = max(1, per_week - this)
+    k = max(0, int((t - monday) // cycle) - this)  # cycles from now until the voyage sails
+    if k < left:
+        return max(0.0, remaining * min(1.0, (k + 1) / left) - spent - held)
+    return max(0.0, remaining - spent - held) + weekly * min(1.0, (k - left + 1) / per_week)
+
+
+def cycle_start(now: float, terms: dict) -> float:
+    """When the cycle now running began (cycles are counted from Monday 00:00 UTC, the spend log's week)."""
+    cycle = max(1.0, float(terms.get("cycle_hours", 24.0))) * 3600
+    d = datetime.fromtimestamp(now, UTC)
+    monday = datetime(d.year, d.month, d.day, tzinfo=UTC).timestamp() - d.weekday() * 86400
+    return monday + int((now - monday) // cycle) * cycle
+
+
+def cycle_money(log: list[dict], now: float, terms: dict) -> tuple[float, float]:
+    """(spent, held) for the cycle now running, from S3's spend log: what its hires have cost so far (a ship still
+    out at what it has run up), and what is still held for the ships out (each quote times S5's overrun, less
+    what it has run up)."""
+    start, reserve = cycle_start(now, terms), max(1.0, float(terms.get("overrun", 1.0)))
+    gone = {r["instance"]: r for r in log if r["event"] == "released" and r.get("instance") is not None}
+    spent = held = 0.0
+    for h in log:
+        if h["event"] != "hired" or h.get("instance") is None or float(h.get("started") or 0.0) < start:
+            continue
+        r = gone.get(h["instance"])
+        if r is not None:
+            cost = r.get("cost")
+            if cost is None and r.get("at") and h.get("dph"):  # released by hand: its words only
+                with contextlib.suppress(Exception):
+                    cost = (datetime.fromisoformat(str(r["at"])).timestamp() - float(h["started"])) / 3600 * float(h["dph"])
+            spent += float(cost or 0.0)
+        else:
+            run_up = max(0.0, (now - float(h["started"])) / 3600) * float(h.get("dph") or 0.0)
+            spent += run_up
+            held += max(0.0, float(h.get("quote") or 0.0) * reserve - run_up)
+    return spent, held
+
+
+def cycles_left(w: World) -> int:
+    """The planning cycles left in this week, the one now running counted."""
+    cycle = max(1.0, float(w.terms.get("cycle_hours", 24.0))) * 3600
+    now = datetime.fromtimestamp(w.now, UTC)
+    monday = datetime(now.year, now.month, now.day, tzinfo=UTC).timestamp() - now.weekday() * 86400
+    return max(1, max(1, round(7 * 86400 / cycle)) - int((w.now - monday) // cycle))
 
 
 def _fmt_h(minutes: float) -> str:
@@ -123,7 +179,9 @@ def plan(lines: list, w: World, estimate, cmd_estimate, eligible) -> list[Call]:
     margin_h = float(t.get("margin_hours", 1.0))
     margin_f = float(t.get("margin_fraction", 0.25))
     voyage_budget = float(t.get("voyage_budget", 0.0))
-    setup_min = 60.0 * _setup_hours()
+    const_min = 60.0 * _setup_hours()  # S5's constant, for a class with no measurement in the world
+    overhead = lambda gpu: float(w.setup_min.get(gpu, const_min))  # noqa: E731
+    reserve = max(1.0, float(w.reserve or 1.0))
     out: list[Call] = []
 
     def ready(ln) -> float:
@@ -155,7 +213,7 @@ def plan(lines: list, w: World, estimate, cmd_estimate, eligible) -> list[Call]:
             mac[:] = [max(m, until) for m in mac]
             out.append(Call(text, None, None, None, "local", f"waits for {ln.payload}"))
             continue
-        if kind == "cmd":
+        if kind in ("cmd", "intelligence"):
             dur = float(cmd_estimate(ln) or DEFAULT_CMD_MIN)
             end = sail_here(dur, w.now, None)
             out.append(Call(text, None, None, None, "local", "a command runs here", local_min=dur,
@@ -165,7 +223,7 @@ def plan(lines: list, w: World, estimate, cmd_estimate, eligible) -> list[Call]:
         local_min, _src = estimate(ln)
         exp, why_not = eligible(ln)
         if getattr(ln, "lane", "mac") != "mac":  # pinned abroad (`vast:` or a torch spec): it takes a ship
-            dur = _foreign_minutes(local_min, preset, w, setup_min)
+            dur = _foreign_minutes(local_min, preset, w, const_min)
             i = min(range(len(ships)), key=lambda k: ships[k])
             start = max(ships[i], ready(ln))
             ships[i] = start + (dur or 0) * 60
@@ -193,7 +251,7 @@ def plan(lines: list, w: World, estimate, cmd_estimate, eligible) -> list[Call]:
                 sp = w.speedups.get((gpu, preset or ""))
                 if not sp or sp <= 1.0:
                     continue
-                dur = local_min / sp + setup_min
+                dur = local_min / sp + overhead(gpu)
                 i = min(range(len(ships)), key=lambda k: ships[k])
                 start = max(ships[i], ready(ln))
                 cand = {"gpu": gpu, "dur": dur, "home": start + dur * 60, "start": start, "seat": i,
@@ -212,8 +270,9 @@ def plan(lines: list, w: World, estimate, cmd_estimate, eligible) -> list[Call]:
             call.foreign_home_min, call.cost, call.allowance = _mins(best["home"], w.now), best["cost"], allow
             if best["cost"] > voyage_budget:
                 reason = f"abroad it would cost ${best['cost']:.2f}, over one voyage's ${voyage_budget:.2f}"
-            elif best["cost"] > allow:
-                reason = f"abroad it would cost ${best['cost']:.2f}, over the ${allow:.2f} left in the day's allowance"
+            elif best["cost"] * reserve > allow:
+                held = f" (counted at ${best['cost'] * reserve:.2f}, the quote times the overrun)" if reserve > 1 else ""
+                reason = f"abroad it would cost ${best['cost']:.2f}{held}, over the ${allow:.2f} left in the cycle's allowance"
             elif gain < margin_h * 60 or gain < margin_f * wait:
                 reason = (f"abroad it is home only {_fmt_h(max(gain, 0))} sooner (the margin is {margin_h:g} h "
                           f"and {margin_f:.0%} of its {_fmt_h(wait)} wait)")  # fmt: skip
@@ -221,7 +280,7 @@ def plan(lines: list, w: World, estimate, cmd_estimate, eligible) -> list[Call]:
                 call.waters = "foreign"
                 call.reason = (f"foreign: home {_fmt_h(gain)} sooner on an {best['gpu']} for ${best['cost']:.2f}, "
                                f"inside the ${allow:.2f} the allowance has left (measured {best['speedup']:.1f}x)")  # fmt: skip
-                committed += best["cost"]
+                committed += best["cost"] * reserve
                 ships[best["seat"]] = best["home"]
                 if ln.name:
                     home[ln.name] = best["home"]
@@ -239,12 +298,16 @@ def _mins(t: float, now: float) -> float | None:
     return None if math.isinf(t) else max(0.0, (t - now) / 60)
 
 
-def _foreign_minutes(local_min, preset, w: World, setup_min: float) -> float | None:
-    """A pinned voyage's time abroad, for the ships' schedule: at the best measured class, else as here."""
+def _foreign_minutes(local_min, preset, w: World, const_min: float) -> float | None:
+    """A pinned voyage's time abroad, for the ships' schedule: at the best measured class (with that class's
+    measured overhead), else as here."""
     if local_min is None:
         return None
-    sps = [sp for (g, p), sp in w.speedups.items() if p == (preset or "") and g in w.prices and sp > 0]
-    return local_min / max(sps) + setup_min if sps else local_min + setup_min
+    sps = [(sp, g) for (g, p), sp in w.speedups.items() if p == (preset or "") and g in w.prices and sp > 0]
+    if not sps:
+        return local_min + const_min
+    sp, g = max(sps)
+    return local_min / sp + float(w.setup_min.get(g, const_min))
 
 
 def _setup_hours() -> float:
@@ -295,6 +358,20 @@ def mac_best_rates(rows: list[dict]) -> dict[str, float]:
         rate = float(r["tokens_seen"]) / (float(r["wall_minutes"]) * 60)
         best[m["preset"]] = max(best.get(m["preset"], 0.0), rate)
     return best
+
+
+def overheads(terms: dict) -> dict[str, float]:
+    """Each class's measured overhead in minutes, set-up and home (s4 hires.setup); a class that cannot be read is
+    left out, and the plan charges it S5's constant."""
+    out: dict[str, float] = {}
+    with contextlib.suppress(Exception):
+        from thorp.viable.s4_intelligence import hires
+
+        rows = hires.timings()
+        for gpu in terms.get("gpus") or {}:
+            with contextlib.suppress(Exception):
+                out[gpu] = float(hires.setup(gpu, rows=rows)["total_min"])
+    return out
 
 
 def prices(terms: dict) -> dict[str, float]:
@@ -379,7 +456,7 @@ def world(lines_at_sea: list[dict] | None = None, now: float | None = None) -> t
     for r in sea:
         ln = lanes.parse(r["text"])
         gone = (now - float(r.get("started_ts") or now)) / 60
-        if ln.kind == "cmd":
+        if ln.kind in ("cmd", "intelligence"):
             est = cmd_minutes(ln) or DEFAULT_CMD_MIN
         else:
             est = times.estimate(ln.name or "", ln.spec or {})[0] or 0.0
@@ -392,9 +469,14 @@ def world(lines_at_sea: list[dict] | None = None, now: float | None = None) -> t
             si += 1
         if ln.name:
             home[ln.name] = end
+    spent, held = 0.0, 0.0
+    with contextlib.suppress(Exception):
+        spent, held = cycle_money(s3.log(), now, terms)
     w = World(
         now=now,
         terms=terms,
+        cycle_spent=spent,
+        cycle_held=held,
         week_spent=s3.week_spent(),
         speedups=speedups(terms, mac_best_rates(rows)),
         prices=prices(terms),
@@ -403,6 +485,8 @@ def world(lines_at_sea: list[dict] | None = None, now: float | None = None) -> t
         home_at=home,
         foreign_ok=bool("vast" in defs and defs["vast"].enabled and lanes.has_key()),
         two_at_once=frozenset(lanes.TWO_AT_ONCE),
+        setup_min=overheads(terms),
+        reserve=float(terms.get("overrun", 1.0)),
     )
     return w, times
 

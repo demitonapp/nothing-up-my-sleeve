@@ -1,5 +1,5 @@
 """The four positions at the 1m, as fitouts and voyages (DECISIONS.md, "Four positions at the 1m"; Justin, 2026-11-08: "queue
-em, the vsm should pick them up"). Augustus's arm is Ogden v0.1 + De Morgan's tutor at 2% (`ogden-v0-1-maths2`, written and
+em, the Liberty Machine should pick them up"). Augustus's arm is Ogden v0.1 + De Morgan's tutor at 2% (`ogden-v0-1-maths2`, written and
 queued by the Phaleron plan); this writes the other three the same way, on Ogden v0.1 and the same 1m, so the four are read
 against one another and against the plain Augustus (the control): Ogden v0.1 + Plato's primer, + Francis's primer, and + Diderot's
 slice (a matched draw of other books, equal by kind), each about 0.8M words, 2% of the reading.
@@ -83,7 +83,7 @@ def spec_for(key: str, who: str, p: dict) -> dict:
 
 
 def main(queue: bool = False) -> int:
-    from thorp import vsm
+    from thorp import liberty_machine
     from thorp.viable.s1_operations import prechecks
     from thorp.viable.s2_coordination import queue_read
     from thorp.viable.s3_control import compose
@@ -116,7 +116,7 @@ def main(queue: bool = False) -> int:
         if not (tagger.meta(key) or {}).get("books") == len(ctx.books):
             tagger.extend_lexicon("ogden-v0-1", extra, len(ctx.books), ctx.clean, key)  # v0.1's counts, the new books tagged on top
         prechecks.run(key, by="make_position_fitouts")
-        vsm.gate(s, where="the four positions")
+        liberty_machine.gate(s, where="the four positions")
     if queue:
         for who, _key, s in lines:
             # the four positions at the 1m (DECISIONS.md, "Four positions at the 1m"; Justin, 8 November: "queue em")
@@ -128,7 +128,7 @@ def main(queue: bool = False) -> int:
 def more_seeds(seed: int) -> int:
     """The same four voyages at another seed (a position counts at a size only on two): each seed-1 spec copied with the seed
     and the name's suffix changed (Augustus's is the maths arm), through the gate, and put at the end of the queue."""
-    from thorp import vsm
+    from thorp import liberty_machine
     from thorp.viable.s2_coordination import queue_read
 
     keys = ("ogden-v0-1-maths2", *(f"ogden-v0-1-{p['slug']}" for p in POSITIONS.values()))
@@ -137,7 +137,7 @@ def more_seeds(seed: int) -> int:
         s["name"], s["seed"] = f"fu-{key}@1m-pre-s{seed}", seed
         out = paths.resolve(f"specs/fitouts/{s['name']}.yaml")
         out.write_text(f"# the four positions at the 1m, seed {seed} (DECISIONS.md): built by scripts/make_position_fitouts.py --seed {seed}\n" + yaml.safe_dump(s, sort_keys=False, width=100))
-        vsm.gate(s, where="the four positions, a second seed")
+        liberty_machine.gate(s, where="the four positions, a second seed")
         # a position counts at a size only on two seeds (DECISIONS.md; Justin, 8 November: "Queue seeds now")
         queue_read.add([f"fitouts/{s['name']}"])  # the store's queue (11 November)
         print(f"queued {s['name']}")

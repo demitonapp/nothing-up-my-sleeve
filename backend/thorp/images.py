@@ -12,7 +12,7 @@ outside the repository like the texts; each kept image is one line of data/image
 where it came from, who made it, its caption, size and hash. Decorations (initials, rules, tailpieces)
 are left out by size.
 
-Not yet under acquisition's VSM: no intake lock, no S3 audit, no Postgres table. This is the pilot that
+Not yet under acquisition's Liberty Machine: no intake lock, no S3 audit, no Postgres table. This is the pilot that
 shows what is there; moving it under the intake gate is the next step once the shelf is worth keeping.
 
 Usage:

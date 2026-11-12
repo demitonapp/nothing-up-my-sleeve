@@ -89,6 +89,7 @@ def envelope(w) -> dict:
         "cycle_share": allow + float(w.cycle_spent) + float(w.cycle_held),
         "voyage_budget": float(t.get("voyage_budget", 0.0)), "max_instances": int(t.get("max_instances", 1)),
         "lane_enabled": bool(w.foreign_ok), "purser": str(t.get("purser") or "off"),
+        "weekly_only": purser.weekly_only(t),
         "foreign_expeditions": list(t.get("foreign_expeditions") or []),
         "margin_hours": float(t.get("margin_hours", 1.0)), "margin_fraction": float(t.get("margin_fraction", 0.25)),
     }  # fmt: skip
@@ -192,7 +193,12 @@ def proposals(env: dict, rows: list[dict], pick: dict, missing: dict[str, dict],
         out.append({"to": "S4", "what": f"sail one {preset} abroad with its control, to measure it",
                     "why": f"no class has sailed a {preset}, so {m['lines']} voyage(s) ({m['mac_hours']:.1f} h of this Mac) "
                            "cannot be sent abroad: a class is never assumed faster than the Mac"})  # fmt: skip
-    if held:
+    if held and env.get("weekly_only"):
+        out.append({"to": "S5", "what": "the week's budget is the binding ceiling",
+                    "why": f"{held} more voyage(s) would sail abroad this week but for it: the plan commits "
+                           f"${chosen['cost'] * env['overrun']:.2f} of the ${env['cycle_allowance']:.2f} left (hires "
+                           f"counted at {env['overrun']:g} times their quote); the budget comes back on Monday"})  # fmt: skip
+    elif held:
         out.append({"to": "S5", "what": "the cycle's allowance is the binding ceiling",
                     "why": f"{held} more voyage(s) would sail abroad this cycle but for it: the plan commits "
                            f"${chosen['cost'] * env['overrun']:.2f} of ${env['cycle_allowance']:.2f} (hires counted at "
@@ -238,7 +244,8 @@ def make_plan(now: float | None = None) -> dict:
         "stay": sum(1 for c in calls if c.waters == "local"),
         "unmeasured": missing, "lints": lints, "lane_enabled": env["lane_enabled"],
     }  # fmt: skip
-    held = sum(1 for c in calls if c.waters == "local" and "cycle's allowance" in (c.reason or ""))
+    words = purser.ceiling_words(w.terms)
+    held = sum(1 for c in calls if c.waters == "local" and words in (c.reason or ""))
     plan["held_by_allowance"] = held
     return {"measured": measured, "envelope": env, "plan": plan, "proposals": proposals(env, rows, pick, missing, lints, held)}
 
@@ -360,10 +367,16 @@ def payload() -> dict:
 
 def _print(made: dict) -> None:
     env, plan = made["envelope"], made["plan"]
-    print(f"S5 envelope: ${env['week_left']:.2f} of the week left over {env['cycles_left']} cycle(s): "
-          f"${env['cycle_allowance']:.2f} left this cycle of its ${env['cycle_share']:.2f} share "
-          f"(${env['cycle_spent']:.2f} spent, ${env['cycle_held']:.2f} held; ${env['spendable']:.2f} of quotes at {env['overrun']:g}x); "
-          f"{env['max_instances']} ship(s) allowed; the Vast lane is {'open' if env['lane_enabled'] else 'closed'}")  # fmt: skip
+    if env.get("weekly_only"):
+        print(f"S5 envelope: the week's budget alone: ${env['cycle_allowance']:.2f} of ${env['weekly_budget']:.2f} "
+              f"may still be committed (${env['week_spent']:.2f} spent, ${env['cycle_held']:.2f} held for ships out; "
+              f"${env['spendable']:.2f} of quotes at {env['overrun']:g}x); "
+              f"{env['max_instances']} ship(s) allowed; the Vast lane is {'open' if env['lane_enabled'] else 'closed'}")  # fmt: skip
+    else:
+        print(f"S5 envelope: ${env['week_left']:.2f} of the week left over {env['cycles_left']} cycle(s): "
+              f"${env['cycle_allowance']:.2f} left this cycle of its ${env['cycle_share']:.2f} share "
+              f"(${env['cycle_spent']:.2f} spent, ${env['cycle_held']:.2f} held; ${env['spendable']:.2f} of quotes at {env['overrun']:g}x); "
+              f"{env['max_instances']} ship(s) allowed; the Vast lane is {'open' if env['lane_enabled'] else 'closed'}")  # fmt: skip
     print("S4 measured:")
     for c in made["measured"]["classes"]:
         rate = "-" if c["failure_rate"] is None else f"{c['failure_rate']:.0%}"

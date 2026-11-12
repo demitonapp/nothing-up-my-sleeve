@@ -170,6 +170,27 @@ def test_the_weeks_budget_is_released_a_cycle_at_a_time():
     assert purser.allowance_at(MONDAY, day) == 4.0
 
 
+def test_under_a_weekly_release_the_whole_week_is_spendable_in_any_cycle():
+    # 12 November, Justin: "i prefer just the weekly limit": what is left of the week, in the first cycle and the last
+    weekly = {**TERMS, "budget_release": "week"}
+    w = world(terms=weekly, week_spent=2.0)  # the week here is $28
+    assert purser.allowance_at(MONDAY, w) == 26.0
+    assert purser.allowance_at(MONDAY + 6.9 * 24 * H, w) == 26.0
+    assert purser.allowance_at(MONDAY + 7.5 * 24 * H, w) == 26.0 + 28.0  # next week's budget, whole, from Monday
+    # what is held for a ship out still comes off it (its run-up is already in the week's spend)
+    out = world(terms=weekly, week_spent=2.0, cycle_spent=1.0, cycle_held=0.5)
+    assert purser.allowance_at(MONDAY, out) == 25.5
+    # the money's cycle is the week: a ship hired last cycle and still out is held against it
+    assert purser.cycle_start(MONDAY + 3.5 * 24 * H, weekly) == MONDAY
+    # three hires at $0.81 (the overrun counted) all fit the week where the cycle's $2 held the third back
+    lines = [voyage("a"), voyage("b"), voyage("c")]
+    calls = purser.plan(lines, world(terms=weekly, ship_free=[MONDAY] * 3, reserve=1.5), estimate, lambda ln: 30.0, eligible)
+    assert [c.waters for c in calls] == ["foreign", "foreign", "foreign"]
+    poor = purser.plan(lines, world(terms=weekly, week_spent=26.9, ship_free=[MONDAY] * 3, reserve=1.5), estimate,
+                       lambda ln: 30.0, eligible)  # fmt: skip
+    assert [c.waters for c in poor] == ["foreign", "local", "local"] and "the week's budget" in poor[1].reason
+
+
 def test_a_hire_counts_against_the_allowance_at_its_quote_times_the_overrun():
     lines = [voyage("a"), voyage("b"), voyage("c")]
     # each costs (240 / 4 + 21) / 60 * 0.4 = $0.54; the cycle's allowance is $2

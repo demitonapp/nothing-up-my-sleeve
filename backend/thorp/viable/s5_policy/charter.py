@@ -66,6 +66,11 @@ DEFAULTS: dict = {
     # S4 folds in what was measured, and the purser plans the next. The week's budget is released a cycle at a
     # time (what is left over the cycles left), so no cycle can spend the rest of the week's money.
     "cycle_hours": 12.0,
+    # how the week's budget is released (12 November, Justin: "the daily limit on vast is overkill, i prefer just
+    # the weekly limit"): `week`, the whole of what is left of the week may be spent in any cycle, so the only
+    # ceiling is `weekly_budget` (with `voyage_budget` and the overrun reserve); `cycle`, what is left spread over
+    # the cycles left in the week, as it was built. The cycle still plans every `cycle_hours`; only the money changes.
+    "budget_release": "week",
     # the breaker (S2): this many fit-outs failing in a row on a charter lane pauses it, so a dead hour is not
     # repeated down the queue. A box that fails before its voyage sails is retried abroad, not sailed here.
     "box_failures_before_pause": 2,

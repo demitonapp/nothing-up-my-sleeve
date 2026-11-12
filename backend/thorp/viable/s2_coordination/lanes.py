@@ -1024,6 +1024,11 @@ def _adopt(running: dict, specs: Path, done: Path, root: Path, say) -> None:
         seen.add((r["text"], r["pid"]))
         ln = line_of(r["text"], r["name"], r["run_id"])
         lane = r["lane"] if r["lane"] in lane_names() else ln.lane
+        if kind_of(lane) == "charter" and ln.lane != lane and ln.kind == "spec":
+            # sailing abroad though its text does not send it there: the purser routed it (12 November). Kept, so
+            # a failure abroad after a restart is retried abroad or comes home, as it would have before the restart,
+            # rather than recorded and dropped from the queue.
+            ln.lane, ln.routed = lane, True
         if r["pid"] and _alive(r["pid"]) and _is_that_job(r["pid"], ln):
             seat(lane, ln, r["pid"], r["started"], r["started_ts"], r["seat"], r["id"])
         else:

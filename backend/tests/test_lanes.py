@@ -300,6 +300,29 @@ def test_a_restart_adopts_a_live_voyage_and_reads_its_outcome_from_the_ledger(ha
     assert pid not in lanes._children
 
 
+def test_an_adopted_voyage_the_purser_sent_abroad_still_comes_home_when_it_fails(harbour, monkeypatch):
+    # 12 November: a restart under a routed hire forgot it was routed, so its failure abroad was recorded and the
+    # line dropped; the row's lane says where it sailed, and its text that nothing pinned it there
+    from thorp.viable.s2_coordination import queue_store
+
+    _spec(harbour["specs"], "fitouts/big", "big")
+    pid = _orphan("sh -c 'sleep 0.6; true' thorp charter sail ships/specs/fitouts/big.yaml")
+    queue_store.to_sea("fitouts/big", lane="vast", kind="spec", name="big", run_id="r-big", pid=pid,
+                       started="2026-11-12T16:00:00", started_ts=time.time())  # fmt: skip
+    monkeypatch.setattr(lanes, "_ledger_status", lambda rid, name=None, since=None: "failed: overran")
+    monkeypatch.setattr(lanes, "how_it_ended", lambda ln, since_ts, log=None: "voyage-failed")
+    sailed = []
+
+    def launch(ln):
+        sailed.append(ln.text)
+        return subprocess.Popen(["true"])
+
+    said = _restart(harbour, launch=launch)
+    assert any("adopted fitouts/big" in m for m in said)
+    assert sailed == ["mac: fitouts/big"]  # home, pinned to this Mac, as before the restart
+    assert any("did not come home from abroad" in m for m in said)
+
+
 def test_an_adopted_voyage_that_died_is_unfinished_not_a_success(harbour, monkeypatch):
     ln = lanes.parse("cmd: echo x", harbour["specs"])
     assert lanes._outcome(ln) == "adopted:exit-unknown" and lanes._outcome(ln, gone=True) == "lost"

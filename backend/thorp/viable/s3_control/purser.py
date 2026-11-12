@@ -96,11 +96,24 @@ class World:
     two_at_once: frozenset = frozenset({"300k"})  # presets that may share the Mac with a second of their size
 
 
+def weekly_only(terms: dict) -> bool:
+    """S5's `budget_release` is `week`: the week's budget is the one ceiling, released whole, not a cycle at a time
+    (12 November, Justin: "the daily limit on vast is overkill, i prefer just the weekly limit"). A world whose
+    terms name no release keeps the cycle's allowance, as it was built."""
+    return str(terms.get("budget_release") or "cycle") == "week"
+
+
+def ceiling_words(terms: dict) -> str:
+    """What the allowance is called in a call's reason (the cycle's turn counts the calls it held by these words)."""
+    return "the week's budget" if weekly_only(terms) else "the cycle's allowance"
+
+
 def allowance_at(t: float, w: World) -> float:
     """The money the purser may have committed by a voyage sailing at `t`: this week's remaining budget spread
     evenly over its planning cycles left (the one now running counted), so each cycle releases its share and what
     one does not spend the next may; a voyage planned into next week draws on next week's budget in the same way.
-    A cycle is S5's `cycle_hours` (24 where the terms name none: the day's allowance)."""
+    A cycle is S5's `cycle_hours` (24 where the terms name none: the day's allowance). Under `budget_release:
+    week` the whole of what is left of the week is released at once, and next week's whole budget from Monday."""
     weekly = float(w.terms.get("weekly_budget", 0.0))
     # what this cycle has already spent and holds comes off its own share: without that every re-plan after a
     # ship came home found a whole new share waiting (12 November: three 9m voyages called foreign in one cycle
@@ -114,16 +127,21 @@ def allowance_at(t: float, w: World) -> float:
     this = int((w.now - monday) // cycle)  # the cycle now running, counted from Monday 00:00 UTC
     left = max(1, per_week - this)
     k = max(0, int((t - monday) // cycle) - this)  # cycles from now until the voyage sails
+    if weekly_only(w.terms):
+        return max(0.0, remaining - spent - held) + (weekly if k >= left else 0.0)
     if k < left:
         return max(0.0, remaining * min(1.0, (k + 1) / left) - spent - held)
     return max(0.0, remaining - spent - held) + weekly * min(1.0, (k - left + 1) / per_week)
 
 
 def cycle_start(now: float, terms: dict) -> float:
-    """When the cycle now running began (cycles are counted from Monday 00:00 UTC, the spend log's week)."""
+    """When the cycle now running began (cycles are counted from Monday 00:00 UTC, the spend log's week). Under
+    `budget_release: week` the money's cycle is the week, so a ship hired last cycle and still out is held too."""
     cycle = max(1.0, float(terms.get("cycle_hours", 24.0))) * 3600
     d = datetime.fromtimestamp(now, UTC)
     monday = datetime(d.year, d.month, d.day, tzinfo=UTC).timestamp() - d.weekday() * 86400
+    if weekly_only(terms):
+        return monday
     return monday + int((now - monday) // cycle) * cycle
 
 
@@ -272,14 +290,14 @@ def plan(lines: list, w: World, estimate, cmd_estimate, eligible) -> list[Call]:
                 reason = f"abroad it would cost ${best['cost']:.2f}, over one voyage's ${voyage_budget:.2f}"
             elif best["cost"] * reserve > allow:
                 held = f" (counted at ${best['cost'] * reserve:.2f}, the quote times the overrun)" if reserve > 1 else ""
-                reason = f"abroad it would cost ${best['cost']:.2f}{held}, over the ${allow:.2f} left in the cycle's allowance"
+                reason = f"abroad it would cost ${best['cost']:.2f}{held}, over the ${allow:.2f} left in {ceiling_words(w.terms)}"
             elif gain < margin_h * 60 or gain < margin_f * wait:
                 reason = (f"abroad it is home only {_fmt_h(max(gain, 0))} sooner (the margin is {margin_h:g} h "
                           f"and {margin_f:.0%} of its {_fmt_h(wait)} wait)")  # fmt: skip
             else:
                 call.waters = "foreign"
                 call.reason = (f"foreign: home {_fmt_h(gain)} sooner on an {best['gpu']} for ${best['cost']:.2f}, "
-                               f"inside the ${allow:.2f} the allowance has left (measured {best['speedup']:.1f}x)")  # fmt: skip
+                               f"inside the ${allow:.2f} {ceiling_words(w.terms)} has left (measured {best['speedup']:.1f}x)")  # fmt: skip
                 committed += best["cost"] * reserve
                 ships[best["seat"]] = best["home"]
                 if ln.name:

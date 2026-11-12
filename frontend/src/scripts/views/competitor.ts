@@ -11,7 +11,7 @@ type Payload = any;
 const LOGIC_VARIANTS: [string, string][] = [['lift_one_hop', 'one hop'], ['lift_both', 'two hops (both premises)'], ['lift_three_hop', 'three hops'], ['lift_first', 'first premise only'], ['lift_second', 'second premise only'], ['lift_swapped', 'premises swapped'], ['lift_padded', 'a third fact added']];
 const DECK: [string, string][] = [['previous_word', 'Previous-word'], ['nevermore', 'Nevermore (induction)'], ['mover', 'Mover'], ['comparator', 'Comparator'], ['bridge', 'Bridge']];
 
-const classLink = (preset: string, name?: string): string => (preset ? `<a href="/harbours">${esc(preset)}${name ? ` · ${esc(name)}` : ''}</a>` : '–');
+const classLink = (preset: string, name?: string): string => (preset ? `<a href="/orbitals">${esc(preset)}${name ? ` · ${esc(name)}` : ''}</a>` : '–');
 const makerOf = (m: string): string => (m || '').split('/')[0] || '';
 
 export interface CompetitorHtml {

@@ -1,0 +1,21 @@
+---
+// The orbitals at their own address (12 November, Justin: "/harbours/demiton shouldn't have harbour but
+// rather orbital"): Demiton and Masaq' Reach, each a flip card. / still answers the same page; /harbours
+// is kept as an alias by the island, which rewrites the address to /orbitals.
+import Layout from '../../layouts/Layout.astro';
+import Harbours from '../../components/islands/Harbours';
+import SizePage from '../../components/islands/SizePage';
+import ShipPage from '../../components/islands/ShipPage';
+import RunsPage from '../../components/islands/RunsPage';
+import Reader from '../../components/Reader.astro';
+---
+
+<Layout>
+  <main>
+    <Harbours client:load />
+    <SizePage client:load />
+    <ShipPage client:load />
+    <RunsPage client:load />
+  </main>
+  <Reader />
+</Layout>

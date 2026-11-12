@@ -10,6 +10,8 @@ import Performance from './Performance';
 import type { PerfRange } from './Performance';
 import { VastPanel } from './VastStats';
 import type { Vast } from './VastStats';
+import { VastTimings } from './VastTimings';
+import type { Charters } from './VastTimings';
 import { cardCls, btnCls, emptyCls, pillCls } from '@/lib/ui';
 import { routePath, sectionProps, useApi, useRoute } from '@/lib/useApi';
 import { shipHash } from '@/scripts/router';
@@ -43,6 +45,7 @@ interface SettingsData {
   environment: { error?: string; switches: { name: string; value: string | null; about: string }[]; keys: { name: string; set: boolean; about: string }[] };
   lanes: { error?: string; lanes: { lane: string; seats: number; out: string | null }[] };
   vast: Vast;
+  charters: Charters;
 }
 
 /** The page's tabs, in order: the addresses are the island's own (the catch-all page serves them). */
@@ -92,6 +95,8 @@ export default function Settings() {
   const [view, setView] = useState<View>('storage');
   const [fresh, setFresh] = useState(0);
   const [perfRange, setPerfRange] = useState<PerfRange>('24h');
+  // the Server tab's two machines: this Mac (the performance chart and its facts) and the Vast lane
+  const [machine, setMachine] = useState<'mac' | 'vast'>('mac');
   const [storeEdit, setStoreEdit] = useState(false);
   const [storeMode, setStoreMode] = useState<'local' | 'hosted'>('local');
   const [hostedUrl, setHostedUrl] = useState('');
@@ -298,25 +303,42 @@ export default function Settings() {
 
             {view === 'server' ? (
               <>
-                <Performance range={perfRange} onRange={setPerfRange} />
-                <section className={cardCls(false, 'panel')}>
-                  <h2>Server and machine <span className="note">the process answering this page, and what it runs on</span></h2>
-                  {!sv || sv.error ? <Failed what="the server" error={sv?.error || 'no answer'} /> : (
-                    <dl className="setlist">
-                      <dt>version</dt><dd>thorp {sv.version || '–'}</dd>
-                      <dt>commit</dt><dd><code>{sv.commit || '–'}</code> on {sv.branch || '–'}{sv.uncommitted ? <span className="s"> · {sv.uncommitted} file{sv.uncommitted === 1 ? '' : 's'} changed since</span> : null}<div className="s">{sv.commit_subject}{sv.commit_at ? ` · ${new Date(sv.commit_at).toLocaleString()}` : ''}</div></dd>
-                      <dt>started</dt><dd>{when(sv.started)} <span className="s">up {span(sv.uptime)} · pid {sv.pid}</span></dd>
-                      <dt>dashboard built</dt><dd>{sv.built ? when(sv.built) : <span className="s">not built: <code>pnpm --dir frontend build</code></span>}</dd>
-                      <dt>Python</dt><dd>{sv.python} <span className="s"><code>{sv.executable}</code></span></dd>
-                      <dt>frameworks</dt><dd>{Object.entries(sv.frameworks).map(([k, v]) => <span key={k} className={pillCls('')} title={v ? '' : 'not installed here'}>{k} {v || '–'}</span>)}</dd>
-                      <dt>machine</dt><dd>{sv.chip}<div className="s">{sv.cores ? `${sv.cores} CPU cores · ` : ''}{sv.gpu_cores ? `${sv.gpu_cores} GPU cores · ` : ''}{sv.memory ? `${Math.round(sv.memory / 2 ** 30)} GB memory · ` : ''}{sv.platform}</div></dd>
-                      <dt>lanes</dt><dd>{d.lanes?.error ? <span className="s">{d.lanes.error}</span> : (d.lanes?.lanes || []).map((l) => (
-                        <div key={l.lane}><b>{l.lane}</b>: {l.seats} seat{l.seats === 1 ? '' : 's'} <span className="s">{l.out ? `· ${l.out} at sea` : '· in port'}</span></div>
-                      ))}<div className="s">set on the <a href="/expeditions/queue">queue</a></div></dd>
-                    </dl>
-                  )}
-                </section>
-                {d.vast ? <VastPanel vast={d.vast} /> : <Failed what="the Vast.ai figures" error="no vast part in /api/settings: restart thorp dash" />}
+                <TabNav
+                  id="servernav"
+                  ariaLabel="Server and machine"
+                  tablist
+                  items={[
+                    { key: 'mac', label: 'Mac mini', active: machine === 'mac', onClick: () => setMachine('mac') },
+                    { key: 'vast', label: 'Vast', active: machine === 'vast', onClick: () => setMachine('vast') },
+                  ]}
+                />
+                {machine === 'mac' ? (
+                  <>
+                    <Performance range={perfRange} onRange={setPerfRange} />
+                    <section className={cardCls(false, 'panel')}>
+                      <h2>Mac mini <span className="note">the process answering this page, and what it runs on</span></h2>
+                      {!sv || sv.error ? <Failed what="the server" error={sv?.error || 'no answer'} /> : (
+                        <dl className="setlist">
+                          <dt>version</dt><dd>thorp {sv.version || '–'}</dd>
+                          <dt>commit</dt><dd><code>{sv.commit || '–'}</code> on {sv.branch || '–'}{sv.uncommitted ? <span className="s"> · {sv.uncommitted} file{sv.uncommitted === 1 ? '' : 's'} changed since</span> : null}<div className="s">{sv.commit_subject}{sv.commit_at ? ` · ${new Date(sv.commit_at).toLocaleString()}` : ''}</div></dd>
+                          <dt>started</dt><dd>{when(sv.started)} <span className="s">up {span(sv.uptime)} · pid {sv.pid}</span></dd>
+                          <dt>dashboard built</dt><dd>{sv.built ? when(sv.built) : <span className="s">not built: <code>pnpm --dir frontend build</code></span>}</dd>
+                          <dt>Python</dt><dd>{sv.python} <span className="s"><code>{sv.executable}</code></span></dd>
+                          <dt>frameworks</dt><dd>{Object.entries(sv.frameworks).map(([k, v]) => <span key={k} className={pillCls('')} title={v ? '' : 'not installed here'}>{k} {v || '–'}</span>)}</dd>
+                          <dt>machine</dt><dd>{sv.chip}<div className="s">{sv.cores ? `${sv.cores} CPU cores · ` : ''}{sv.gpu_cores ? `${sv.gpu_cores} GPU cores · ` : ''}{sv.memory ? `${Math.round(sv.memory / 2 ** 30)} GB memory · ` : ''}{sv.platform}</div></dd>
+                          <dt>lanes</dt><dd>{d.lanes?.error ? <span className="s">{d.lanes.error}</span> : (d.lanes?.lanes || []).map((l) => (
+                            <div key={l.lane}><b>{l.lane}</b>: {l.seats} seat{l.seats === 1 ? '' : 's'} <span className="s">{l.out ? `· ${l.out} at sea` : '· in port'}</span></div>
+                          ))}<div className="s">set on the <a href="/expeditions/queue">queue</a></div></dd>
+                        </dl>
+                      )}
+                    </section>
+                  </>
+                ) : (
+                  <>
+                    {d.charters ? <VastTimings data={d.charters} /> : <Failed what="the hires' timings" error="no charters part in /api/settings: restart thorp dash" />}
+                    {d.vast ? <VastPanel vast={d.vast} /> : <Failed what="the market's figures" error="no vast part in /api/settings: restart thorp dash" />}
+                  </>
+                )}
               </>
             ) : null}
 

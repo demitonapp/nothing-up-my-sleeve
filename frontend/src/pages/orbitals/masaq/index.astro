@@ -1,0 +1,15 @@
+---
+// Masaq' Reach, the trading orbital, under Demiton's parent address (12 November, Justin: "clicking masaq
+// card in /orbitals ... should open /orbitals/masaq"). Two views: /orbitals/masaq is Labs,
+// /orbitals/masaq/models is the size cards; a house is /orbitals/masaq/<country>/<key>.
+import Layout from '../../../layouts/Layout.astro';
+import Labs from '../../../components/islands/Labs';
+import LabPage from '../../../components/islands/LabPage';
+---
+
+<Layout>
+  <main>
+    <Labs client:load />
+    <LabPage client:load />
+  </main>
+</Layout>

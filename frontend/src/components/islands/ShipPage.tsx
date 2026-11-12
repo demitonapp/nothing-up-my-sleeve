@@ -178,7 +178,7 @@ export default function ShipPage() {
   return (
     <div {...sectionProps('ship')} ref={root}>
       <SectionNav />
-      <h1><a className={crumbCls('back')} href="/harbours">← harbours</a> <a className={crumbCls('crumb')} id="shipclass" /> <span id="shipname" /> <span id="shiptags" /> <span className="q" id="shipfitout" /></h1>
+      <h1><a className={crumbCls('back')} href="/orbitals">← orbitals</a> <a className={crumbCls('crumb')} id="shipclass" /> <span id="shipname" /> <span id="shiptags" /> <span className="q" id="shipfitout" /></h1>
       <div className="sailings"><span className="k">voyages</span><span id="sailings" /><span className="sub" id="title" /></div>
       <section className={cardCls(false, 'panel')} id="stagepanel" hidden>
         <h2>Stages <span className="note">this voyage read its libraries in stages, in order, under one learning-rate schedule; each step chart below shows them as bands</span></h2>

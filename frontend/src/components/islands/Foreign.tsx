@@ -65,7 +65,7 @@ export default function Foreign() {
     <div {...sectionProps('foreign')}>
       <SectionNav />
       <h1>
-        <a className={crumbCls('back')} href={band ? `/harbours/masaq-reach/${band.key}` : '/harbours/masaq-reach'} title={band ? `back to Masaq' Reach's ${band.name} band` : "back to Masaq' Reach"}>← {band ? band.name : "Masaq' Reach"}</a>{' '}
+        <a className={crumbCls('back')} href={band ? `/orbitals/masaq/models/${band.key}` : '/orbitals/masaq/models'} title={band ? `back to Masaq' Reach's ${band.name} band` : "back to Masaq' Reach"}>← {band ? band.name : "Masaq' Reach"}</a>{' '}
         <span>{d?.label || key || 'foreign ship'}</span>{' '}
         <span className="q">
           {d ? (

@@ -431,6 +431,46 @@ def test_the_real_box_speaks_ssh_and_rsync(tmp_thorp):
     assert rs[1][-2] == f"root@ssh9.vast.ai:{s1.REMOTE}/ledger.sqlite"
 
 
+def test_a_dead_box_cannot_hold_a_transfer_forever(tmp_thorp):
+    """12 November: the 9m candidate's manifest rsync sat on a box whose ssh had died for 18 minutes, and no
+    step had a timeout; the hire only ended when the charter was killed by hand."""
+    import subprocess
+
+    seen = []
+
+    def run(argv, **kw):
+        seen.append((argv, kw))
+        raise subprocess.TimeoutExpired(argv, kw.get("timeout") or 0)
+
+    b = s1.Box("ssh9.vast.ai", 40123, run=run)
+    with pytest.raises(s1.BoxError, match="stopped reading"):
+        b.put(tmp_thorp, ["a/b.txt"], "data")
+    argv, kw = seen[-1]
+    assert kw["timeout"] == 1800 and "--timeout=120" in argv and "--contimeout=30" in argv
+
+
+def test_fitting_out_has_a_deadline(tmp_thorp):
+    """The whole fit-out is bounded: a box that stops reading is released, not waited on until the quote is gone."""
+    import subprocess
+    import time
+
+    def run(argv, **kw):
+        return subprocess.CompletedProcess(argv, 0, stdout="", stderr="")
+
+    b = s1.Box("ssh9.vast.ai", 40123, run=run)
+    b.deadline = time.time() - 1
+    with pytest.raises(s1.BoxError, match="deadline"):
+        b.sh("true")
+
+
+def test_the_fitout_limit_reads_the_switch(monkeypatch):
+    assert s1.fitout_limit() == 30 * 60
+    monkeypatch.setenv("THORP_FITOUT_MINUTES", "45")
+    assert s1.fitout_limit() == 45 * 60
+    monkeypatch.setenv("THORP_FITOUT_MINUTES", "0")
+    assert s1.fitout_limit() == 0
+
+
 def test_the_box_waits_for_ssh_and_attaches_the_key_again(tmp_thorp):
     """The first real charter (2026-11-08): Vast.ai said "running", the first ssh failed (255) and the fit-out gave up."""
     import subprocess

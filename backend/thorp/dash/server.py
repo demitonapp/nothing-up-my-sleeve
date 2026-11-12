@@ -706,7 +706,7 @@ def _api_ladder() -> dict:
     for k in labs.HOUSES:
         house = labs.get(k)
         if house:
-            houses.append({"key": house.key, "name": house.short or house.name, "flag": house.country})
+            houses.append({"key": house.key, "name": house.short or house.name, "flag": house.country, "country_name": house.country_name})
 
     return {
         "rungs": rungs, "runs": runs, "queue": queue, "external": external,
@@ -4731,11 +4731,132 @@ def api_lab(key: str) -> dict:
 
 
 def api_labs() -> dict:
-    """The Labs page (thorp.labs): the ten houses that made the outside models, their profiles and what the
+    """The Labs page (thorp.labs): the houses that made the outside models, their profiles and what the
     Reach holds of each, with the other houses the leaderboard keeps named beneath them."""
     from thorp import labs
 
     return labs.houses()
+
+
+def api_lab_models(lab: str) -> dict:
+    """A house's public Hugging Face repositories (thorp.lab_models), each with what the Reach has scored of
+    it and whether its weights are cached for chat (12 November)."""
+    from thorp import lab_downloads, lab_models
+    from thorp.viable.s4_intelligence import readings, tests_store
+
+    out = lab_models.models(lab)
+    try:
+        grades = (readings.chain_grades().get("models") or {})
+    except Exception:  # noqa: BLE001  the table still lists without the store
+        grades = {}
+    tests = tests_store.rows()
+    for m in out["models"]:
+        got = grades.get(m["model"]) or {}
+        m["scored"] = sum(1 for t in tests if t["key"] in got)
+        m["tests"] = len(tests)
+        m["download"] = lab_downloads.status(m["model"])
+    return out
+
+
+def api_tests() -> dict:
+    """Every test in the store (thorp.viable.s4_intelligence.tests_store), in fleet's order."""
+    from thorp.viable.s4_intelligence import tests_store
+
+    return {"tests": tests_store.rows()}
+
+
+def api_lab_model_tests(model: str) -> dict:
+    """One model's tests, with whether the Reach has a reading for each."""
+    from thorp import lab_downloads
+    from thorp.viable.s4_intelligence import tests_store
+
+    rows = tests_store.for_model(model)
+    return {
+        "model": model,
+        "tests": rows,
+        "scored": sum(1 for r in rows if r.get("scored")),
+        "download": lab_downloads.status(model),
+    }
+
+
+def api_lab_download(model: str) -> dict:
+    from thorp import lab_downloads
+
+    return {"download": lab_downloads.status(model)}
+
+
+def post_lab_download(body: dict) -> dict:
+    """Download a Hugging Face model and add it to the chat terminal (thorp.lab_downloads)."""
+    from thorp import lab_downloads
+
+    model = str(body.get("model") or "").strip()
+    lab = str(body.get("lab") or "").strip()
+    if not model:
+        raise ValueError("no model")
+    return {
+        "download": lab_downloads.start(
+            model, lab, label=body.get("label"), params=body.get("params")
+        )
+    }
+
+
+def post_lab_model_queue(body: dict) -> dict:
+    """Queue the chosen tests as investigations at the bottom of the expeditions queue: one spec and one
+    queue line per test, so each is a step the coordinator can sail on its own."""
+    import re
+
+    import yaml
+
+    from thorp import investigate
+    from thorp.viable.s2_coordination import queue_store
+    from thorp.viable.s4_intelligence import tests_store
+
+    model = str(body.get("model") or "").strip()
+    lab = str(body.get("lab") or "").strip()
+    wanted = [str(x).strip() for x in (body.get("tests") or []) if str(x).strip()]
+    if not model or not wanted:
+        raise ValueError("a model and at least one test are needed")
+    known = {r["key"]: r for r in tests_store.rows()}
+    unknown = [t for t in wanted if t not in known]
+    if unknown:
+        raise ValueError(f"no test {', '.join(unknown)}")
+    unsupported = [t for t in wanted if known[t]["evaluator"] not in ("discovery", "logic")]
+    if unsupported:
+        raise ValueError(
+            "these tests keep their own scorer and cannot be queued here: " + ", ".join(unsupported)
+        )
+    slug = re.sub(r"[^a-z0-9]+", "-", f"{lab}-{model}".lower()).strip("-")[:80]
+    folder = investigate.folder()
+    folder.mkdir(parents=True, exist_ok=True)
+    queued, skipped = [], []
+    for test in wanted:
+        name = f"score-{slug}-{test}"[:120]
+        spec = {
+            "kind": "investigation",
+            "name": name,
+            "expedition": "knockout",
+            "goal": "knockout:8",
+            "ship": f"Masaq' Reach: {model} on {known[test]['name']}",
+            "question": f"What does {model} score on {known[test]['name']} ({test})?",
+            "subject": model,
+            "run": ["-m", "thorp.score_tests", "{subject}", "--test", test],
+            "estimate": "20m",
+            "timeout": "2h",
+            "readings": [f"tests-{model}-{test}"],
+        }
+        (folder / f"{name}.yaml").write_text(
+            yaml.safe_dump(spec, sort_keys=False, allow_unicode=True), encoding="utf-8"
+        )
+        investigate.load(name)
+        line = investigate.queue_line(name)
+        try:
+            queue_store.add(line, goal_id="knockout:8")
+            queued.append(name)
+        except ValueError as e:
+            skipped.append(f"{name}: {e}")
+    if queued:
+        queue_store.export()
+    return {"queued": queued, "skipped": skipped, "model": model, "tests": wanted}
 
 
 CENSUS_CARDS = ("previous_word", "nevermore", "mover", "comparator")
@@ -7012,6 +7133,8 @@ class Handler(BaseHTTPRequestHandler):
             "/api/chat/threads/delete": post_chat_thread_delete,
             "/api/expedition_priority": post_expedition_priority,
             "/api/charter/sign": post_charter_sign,
+            "/api/lab_download": post_lab_download,
+            "/api/lab_model_queue": post_lab_model_queue,
         }
         if u.path not in posts:
             return self._send(404, b"not found", "text/plain")
@@ -7175,6 +7298,10 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/thorp": lambda: api_thorp(q["ship"]),
                 "/api/lab": lambda: api_lab(q["lab"]),
                 "/api/labs": api_labs,
+                "/api/lab_models": lambda: api_lab_models(q.get("lab", "")),
+                "/api/lab_download": lambda: api_lab_download(q.get("model", "")),
+                "/api/lab_model_tests": lambda: api_lab_model_tests(q.get("model", "")),
+                "/api/tests": api_tests,
                 "/api/bridge": api_bridge,
                 "/api/leaderboard/internal": api_leaderboard_internal,
                 "/api/smoking_qwen": api_smoking_qwen,

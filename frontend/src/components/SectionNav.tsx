@@ -13,6 +13,8 @@ export default function SectionNav() {
   useEffect(() => setReady(true), []);
   if (!ready) return null;
   const section = sectionNavFor(routePath());
-  if (!section) return null;
+  // a section with one way in needs no row: the header already says where you are (12 November, the
+  // orbitals have no siblings now that the shipyard is inside Demiton and the labs inside Masaq' Reach)
+  if (!section || section.items.length < 2) return null;
   return <TabNav items={section.items} id={`${section.key}-nav`} ariaLabel={`${section.label} sections`} />;
 }

@@ -109,34 +109,55 @@ reading came from (`/api/voyages/where`).
 
 ## Navigation
 
-The site is organised the way the project is: classes of ship (model sizes), the ships of each
-class (runs), the voyages they sail on, and the discoveries followed across all of them. The header
-holds five ways in, always: **Places** (the classes and ships, the shipyard and the labs; the old
-"Classes"), **Expeditions**
-(the standards, queue and plans; the old "Voyages"), **Discoveries**, **Leaderboard** (the chaining
-boards, the four Faces and the outside ships) and **Library** (the shelves and books). **VSM**
-(the five systems S1–S5, the gate and the audit) is a tab under **Expeditions**; **Chat** is not a
-header tab but an action on a ship's page, Nothing up my sleeve and foreign alike (`/chat?ship=` and
-`/chat?model=`). The five were consolidated from seven on 11 November (the $100 tab went first).
-Places' own row is **Orbitals · Shipyard · Labs**.
+The site is organised the way the project is: the orbitals (Demiton, our own, and Masaq' Reach, where
+every other lab and its ships reside), the ships, the voyages they sail on, and the discoveries followed
+across all of them. The header holds three ways in: **Places** (the orbitals), **Discoveries** and
+**Leaderboard**. **Expeditions** and **Library** are not header tabs: they are Demiton's views (12
+November, Justin: "expeditions also moves under the demiton orbital"), beside its **Berth** and
+**Shipyard**. **VSM** stays a tab under Expeditions. **Chat** is not a header tab but an action on a
+ship's page, Nothing up my sleeve and foreign alike (`/chat?ship=` and `/chat?model=`). Places has one
+way in, **Orbitals** (`/orbitals`, home; `/` answers it too, and the old `/harbours` addresses are aliases
+the island rewrites). A section with one tab shows no row.
 
-- **Orbitals** (`/harbours`, home): the two orbitals (12 November, Justin: "the analogy is orbitals for
+- **Orbitals** (`/orbitals`, home): the two orbitals (12 November, Justin: "the analogy is orbitals for
   the homepage. The demiton orbital and then the trading orbital where all the other labs and their
   ships reside"). **Demiton** is our own: the lab and every ship it builds, from the 300k to the 350m,
   with **Schi'mint** (the training ring) and **Vavatch End** (the deep yards) as its berths. **Masaq'
   Reach** is the trading orbital: every other lab and its ships, none of them ours to build. Each is a
-  card that flips to five views; Demiton opens `/harbours/demiton` (its fleet, with its berth links), the
-  trading orbital opens `/labs`. The old harbour pages stay reachable from Demiton's berths.
+  card that flips to five views; Demiton opens `/orbitals/demiton`, the trading orbital opens `/orbitals/masaq`.
+  Demiton's own row is **Berth · Shipyard · Library · Expeditions**: the berth is its fleet (Schi'mint
+  and Vavatch End, with their ships), the shipyard is `/shipyard`, the library is `/library`, and the
+  expeditions are `/expeditions` (their Overview, Queue and VSM tabs stay under it). The old
+  `/harbours/...` pages stay reachable as aliases; `/harbours/<harbour>` rewrites to
+  `/orbitals/<harbour>`, and `/harbours/masaq-reach...` forwards to the trading orbital's own page.
 - **Classes** (`#/classes`, home): one card per class of ship, each a model size with one job.
   A class opens its page (`#/classes/<class>`, below), whose first tab is its **fleet**: every
   ship of that class. A ship opens its own page.
-- **Labs** (`/labs`, the third tab under Places): **the trading orbital**. The ten houses that build the
-  outside ships (`thorp/labs.py` `HOUSES`), one card each: its fal plate in the one Risso/Drake/Culture
-  brief (`LABS` in `thorp/dash/art/generate_art.py`), the country flag, the models it had shipped by
-  12 November 2026, and what the Reach holds of it. A house with readings opens its lab page
-  (`/leaderboard/lab/<key>`); one without opens its own site, so no card lands on an empty page.
-  EleutherAI and Hugging Face are named beneath as also in the Reach. The order is a reading of the
-  reach of each house's releases, not a score; the Reach keeps the only scores.
+- **Masaq' Reach, the trading orbital** (`/orbitals/masaq`): one page with **two views**. **Labs** (`/orbitals/masaq`) is
+  the houses that build the outside ships (`thorp/labs.py` `HOUSES`), one card each: its fal plate in the
+  one Risso/Drake/Culture brief (`LABS` in `thorp/dash/art/generate_art.py`), the country flag, the models
+  it had shipped by 12 November 2026, and what the Reach holds of it. The houses are **sorted by whether
+  they publish weights** (open yards first, closed ones after, each in rank order) and **filtered by
+  country, purpose and weights**: the purpose is `thorp/labs.py` `FOCUS` (frontier, open fleet,
+  enterprise, agents, research). **Models** (`/orbitals/masaq/models`) is four cards, one per size band, each with
+  its art and the count of outside models in it; a card opens `/orbitals/masaq/models/<band>`, the models in that
+  band, biggest first, with the bands as a filter. Every house has its own page at
+  **`/orbitals/masaq/<country>/<key>`** (e.g. `/orbitals/masaq/us/arcee`; `/masaq/...` and `/labs/...` stay aliases), with **Overview** and **Models** tabs (`.../models`), with its
+  description, its purpose, its **funding split** (government vs private, a bar and the numbers, from
+  `thorp/labs.py` `FUNDING`, said plainly to be an estimate from public reporting rather than an audited
+  cap table), the fleet it has shipped and every one of its ships in the Reach. A ship's card has **chat**
+  (it hands the model to the console by name) and **experiments** (its tests and readings on
+  `/leaderboard/competitor/<model>`), and the house's readings stay on `/leaderboard/lab/<key>`. Below
+  them, **All its models on Hugging Face** (`/api/lab_models`, `thorp.lab_models`) lists the house's public
+  Hub repositories with their size, the month and year they were first published, downloads, likes, pipeline, how many of the tests it has a reading on, with a search, two platform filters (Mac: MLX/GGUF; NVIDIA: NVFP4/FP8/CUDA), a kind filter (base, instruct, reasoning, general, other), a size range and an MLX/GGUF/NVIDIA count in the note, and sortable headers,
+  and two actions: download (`/api/lab_download`, `thorp.lab_downloads`, which registers the weights so the
+  chat console lists them) and tests. **Tests** (`/api/tests`, `s4.tests`, synced from `thorp.fleet` by
+  `tests_store`) shows every test with its chain, rung, evaluator and reading; the unscored ones are ticked,
+  and **Queue** (`/api/lab_model_queue`) writes one investigation spec per chosen test and appends its line
+  to the bottom of the expeditions queue (`investigate` + `queue_store`). Tests with their own scorer (ARC,
+  IFEval, the nevermore/crowns probes) are shown but not queued here. EleutherAI and Hugging Face are named
+  beneath the houses as also in the Reach. The order is a reading of the reach of each house's releases, not
+  a score; the Reach keeps the only scores.
 - **Voyages** (`#/voyages`): the campaigns several ships sail on to find something
   (`thorp/fleet.py` `VOYAGES`): one card each with its goal, status, fleet and headline. A voyage
   (`#/voyages/<key>`) has one template: what it is and what it found (a finished voyage's
@@ -411,7 +432,8 @@ Places' own row is **Orbitals · Shipyard · Labs**.
   voyages' folders, named from the ledger and linked to their ship pages) and **the outside models**
   (each model in the cache, biggest first). **The store**: Postgres's address (no password), whether it
   answers, its version, size and ten biggest tables, and which of the ledger, the library and the queue
-  it holds. **Server and machine**: above the facts, **the performance chart** — the machine and this
+  it holds. **Server and machine**: two subtabs (`#servernav`), **Mac mini** and **Vast**.
+  **Mac mini**: above the facts, **the performance chart** — the machine and this
   server as four lines over the last hour, day or week (a row of range tabs: a minute, five minutes or half
   an hour a point): the machine's **GPU utilisation** (IOAccelerator, the gold area) and **memory in use**
   of its total (vm_stat's wired, anonymous and compressed pages, the blue line on the right axis), beside
@@ -421,13 +443,20 @@ Places' own row is **Orbitals · Shipyard · Labs**.
   running. Sampled every twenty seconds by `thorp.dash.perf` into `data/dash/perf.jsonl` and kept eight
   days. Then the version, commit and files changed since, when the server started and when the dashboard
   was built, Python and the frameworks, the chip (its CPU and GPU cores) and memory, and each lane's
-  seats. Then **Vast.ai**: a stat strip (whether the key is set, the seats, the week's spend of its
-  budget, the all-time spend, voyages and hours, and the ships out) and a table, one row a GPU chip class
-  the terms allow: its ceiling, how many times the market was read and when, the latest price and the
-  host's reliability, the range (min, median, max), the voyages hired with any still out, the hours, the
-  money spent, and the last measured rate (or the TFLOP/s guess when that class has never sailed). The
-  terms' classes come first, then any class the spend log knows; it is read from the store
-  (`s4.market_reads`, `s3.spend_events`, `s5.charter`), never the API. **Switches**: every `THORP_*` the
+  seats. **Vast**: **the ship out** when a hire is running (its name, status, elapsed against the quote, the
+  task now, its spend, and a task bar with a legend), then **where the time goes**: one row a recent
+  hire, task by task — provision, ssh, code, data, board, env, train and home — parsed from
+  `data/runs/charter.log` and joined to the spend log by instance, grouped under *fit-out* and *the
+  run*, each task's share of the hire a bar, the live hire's open task timed to now, and a red total
+  when the hire ran past its quote. Then **the market**: a stat strip (whether the key is set, the
+  seats, the week's spend of its budget, the all-time spend, voyages and hours, and the ships out) and
+  a table, one row a GPU chip class the terms allow, grouped *the market* and *the voyages*: its
+  ceiling, how many times the market was read and when, the latest price and the host's reliability,
+  the range (min, median, max), the voyages hired with any still out, the hours, the money spent, and
+  the last measured rate (or the TFLOP/s guess when that class has never sailed). The terms' classes
+  come first, then any class the spend log knows; it is read from the store (`s4.market_reads`,
+  `s3.spend_events`, `s5.charter`), never the API.
+  **Switches**: every `THORP_*` the
   server was started with, a dash for a default, and what each does. **Keys and places**: whether each key
   (`FAL_KEY`, `VAST_API_KEY`, `HF_TOKEN`) is set, never its value, and where the repository, data, ships,
   ledger, checkpoints and model cache live. Nothing is deleted from this page; the store's address is the

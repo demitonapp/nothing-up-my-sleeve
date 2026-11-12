@@ -144,3 +144,54 @@ def test_vast_assembles_the_panel_without_the_key(monkeypatch):
     assert v["out"] == 0 and v["chips"][0]["gpu"] == "RTX 4090"
     # the key is never sent, only whether it is there
     assert "secret-key-value" not in json.dumps(v)
+
+
+def test_charter_phases_from_its_own_log(tmp_path, monkeypatch):
+    """Where a hire's time went, from the charter's log: a 55-minute data tar, then the board, the torch
+    environment, the run and the bring-home, each timed; joined to the spend log by instance for its name,
+    quote and release."""
+    from thorp import paths
+    from thorp.viable.s3_control import charter as s3
+
+    (tmp_path / "runs").mkdir()
+    (tmp_path / "runs" / "charter.log").write_text(
+        "\n".join([
+            "[09:32:54] charter: RTX 4090 offer 54486157 at $0.363/h, about 1.0 h, $0.36 (measured 126,021 tokens/s)",
+            "[09:33:19] charter: instance 60277983 is up (ssh3.vast.ai:10126); waiting for its ssh",
+            "[09:33:40] charter: ssh answered (try 2); fitting out",
+            "[09:33:40] [box] ssh: set -e; command -v rsync",
+            "[09:33:52] [box] ssh done, exit 0 (11.9s)",
+            "[09:33:52] [box] tar 1089 files to /",
+            "[09:34:03] [box] tar done (1089 files) (11.0s)",
+            "[09:34:04] [box] tar 9543 files to data",
+            "[10:29:35] [box] tar done (9543 files) (3331.8s)",
+            "[10:29:36] [box] rsync 1 files to data",
+            "[10:35:36] [box] rsync done (1 files) (360.0s)",
+            "[10:35:36] [box] rsync 1 files to /",
+            "[10:35:43] [box] rsync done (1 files) (7.0s)",
+            "[10:35:43] [box] syncing the box's environment (uv sync --group torch)",
+            "[10:35:44] [box] ssh: cd /root/thorp && ~/.local/bin/uv sync",
+            "[10:41:46] [box] ssh done, exit 0 (362.2s)",
+            "[10:41:47] charter: 9m@v0.0.6-candidate is at sea on instance 60277983",
+            "[11:00:00] charter: past 1.5 h (the quote times the overrun): bringing it home",
+            "[11:08:00] charter: 9m@v0.0.6-candidate overran; instance 60277983 released; $0.55 for 1.58 h",
+        ]) + "\n"
+    )
+    start = 1_794_439_974.0
+    monkeypatch.setattr(paths, "data_dir", lambda: tmp_path)
+    monkeypatch.setattr(s3, "log", lambda: [
+        {"at": "2026-11-12T09:32:55+10:00", "event": "hired", "instance": 60277983, "gpu": "RTX 4090",
+         "dph": 0.362962962962963, "quote_hours": 0.9806948517975024, "name": "9m@v0.0.6-candidate",
+         "started": start},
+        {"at": "2026-11-12T11:08:00+10:00", "event": "released", "instance": 60277983,
+         "started": start, "ended": start + 5700, "cost": 0.55, "status": "overran", "tokens_per_s": 126021},
+    ])
+
+    c = settings.charters()["charters"][0]
+    assert (c["name"], c["status"], c["gpu"], c["quote_hours"]) == ("9m@v0.0.6-candidate", "overran", "RTX 4090", 0.981)
+    assert (c["phases"]["provision"], c["phases"]["ssh"], c["phases"]["code"]) == (25, 21, 11)
+    assert c["phases"]["data"] == 3332  # the 55-minute tar, the phase the page exists to name
+    assert c["phases"]["board"] == 368  # the manifest and the spec, from the data's end to uv sync
+    assert c["phases"]["env"] == 362
+    assert (c["phases"]["train"], c["phases"]["home"]) == (1093, 480)
+    assert (c["total_s"], c["cost"], c["open"]) == (5700, 0.55, None)

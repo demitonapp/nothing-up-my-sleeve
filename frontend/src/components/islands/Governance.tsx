@@ -9,6 +9,7 @@ import { emptyCls } from '@/lib/ui';
 import { routePath, sectionProps, useApi, useRoute } from '@/lib/useApi';
 import { acquisitionHtml, controlHtml, systemsHtml } from '@/scripts/views/governance';
 import SectionNav from '../SectionNav';
+import DemitonTabs from '../DemitonTabs';
 import { TabNav } from '../TabNav';
 
 type View = 's1' | 's2' | 's3' | 's4' | 's5';
@@ -85,6 +86,7 @@ export default function Governance() {
 
   return (
     <div {...sectionProps('governance')}>
+      <DemitonTabs active="expeditions" />
       <SectionNav />
       <h1>VSM <span className="q">Nothing up my sleeve's rules as Beer's Viable System Model, in five systems: S1 operations (the expeditions, and acquisition: the books they read), S2 coordination (one GPU, one queue), S3 control (the gate every voyage passes, and the audit), S4 intelligence (the outside world) and S5 policy (the identity, Justin's rules). Read-only: a policy is switched on or off by Justin in data/policies.json</span></h1>
       <TabNav

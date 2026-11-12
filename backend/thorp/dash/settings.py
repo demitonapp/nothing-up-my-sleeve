@@ -16,6 +16,9 @@ Read-only, except for the store switch: this module reads what the dashboard run
 - **lanes**: how many seats each lane runs.
 - **vast**: Vast.ai by GPU class: the terms' ceilings, the market's price reads (count, range, the latest
   price and reliability) and the voyages hired (the spend log: count, hours, spend, the last measured rate).
+- **charters**: the Vast lane's recent hires, task by task (provision, ssh, code, data, board, env, train,
+  home), parsed from `data/runs/charter.log` and joined to the spend log by instance; the live hire's open
+  task is timed to now, so the page says where an hour of hire is going while it goes.
 
 Each part is read on its own and says why when it cannot be, so a store that is down still shows the disk.
 The sizes are cached for a minute: `du` over the texts is the only slow read here.
@@ -25,6 +28,7 @@ from __future__ import annotations
 
 import os
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -508,6 +512,197 @@ def vast() -> dict:
     }
 
 
+# ---- the Vast lane, task by task (12 November)
+
+_CHARTER_STAMP = re.compile(r"^\[(\d\d):(\d\d):(\d\d)\]\s?(.*)$")
+_CHARTER_OFFER = re.compile(r"charter: (.+?) offer \d+ at \$([\d.]+)/h, about ([\d.]+) h, \$([\d.]+)")
+_CHARTER_UP = re.compile(r"charter: instance (\d+) is up")
+_CHARTER_SEA = re.compile(r"charter: (.+?) is at sea on instance (\d+)")
+_CHARTER_SECONDS = re.compile(r"\((\d+(?:\.\d+)?)s\)\s*$")
+
+def _charter_find(block: list[tuple[int, str]], pred, after: int = 0):
+    """The first line at or after `after` whose message `pred` accepts."""
+    for i in range(after, len(block)):
+        if pred(block[i][1]):
+            return i
+    return None
+
+
+def _charter_span(block: list[tuple[int, str]], rel: list[int], a: int | None, b: int | None) -> float | None:
+    """Seconds between two lines: the duration the charter printed when it printed one."""
+    if a is None or b is None or b <= a:
+        return None
+    m = _CHARTER_SECONDS.search(block[b][1])
+    return float(m.group(1)) if m else float(rel[b] - rel[a])
+
+
+def charters(limit: int = 8) -> dict:
+    """The Vast lane's hires, task by task: how long the box took to come up, to answer ssh, to take the
+    code, the data, the manifest and the papers, to sync its environment, to train, and to come home.
+
+    Parsed from `data/runs/charter.log` (the charter writes each step's start and its duration there,
+    flushed as it runs), joined to the spend log by instance number for the hire's date, cost, name and
+    why it ended. The last block is live: its open phase is timed to now. A hire that ended before its
+    run (a refused ssh, a stalled copy) is kept as `aborted`, with the release's own words in `note`:
+    that wasted hour is exactly what this page is for.
+    """
+    from datetime import datetime
+
+    from thorp.viable.s3_control import charter as s3
+
+    now = time.time()
+    stamp = lambda: datetime.now().astimezone().isoformat(timespec="seconds")  # noqa: E731
+    try:
+        lines = (paths.data_dir() / "runs" / "charter.log").read_text(errors="ignore").splitlines()
+    except OSError:
+        return {"at": stamp(), "charters": []}
+
+    events = s3.log()
+    hires = {e["instance"]: e for e in events if e.get("event") == "hired" and e.get("instance") is not None}
+    releases = {e["instance"]: e for e in events if e.get("event") == "released" and e.get("instance") is not None}
+
+    # one block a hire: it begins at that hire's quote (the offer line) and runs to the next quote
+    blocks: list[list[tuple[int, str]]] = []
+    for raw in lines:
+        m = _CHARTER_STAMP.match(raw)
+        if not m:
+            continue
+        t = int(m.group(1)) * 3600 + int(m.group(2)) * 60 + int(m.group(3))
+        msg = m.group(4)
+        if _CHARTER_OFFER.search(msg):
+            blocks.append([])
+        if blocks:
+            blocks[-1].append((t, msg))
+
+    out: list[dict] = []
+    for n, block in enumerate(blocks):
+        offer = _CHARTER_OFFER.search(block[0][1])
+        if not offer:
+            continue
+        # seconds since the quote, a day added when the clock wraps past midnight
+        base = block[0][0]
+        rel: list[int] = []
+        day = 0
+        for t, _ in block:
+            if rel and t + day < rel[-1] + base:
+                day += 86400
+            rel.append(t + day - base)
+        # where the block ends: the next hire's quote, or now while it is the last one
+        end_rel = rel[-1]
+        if n + 1 < len(blocks) and blocks[n + 1]:
+            nxt = blocks[n + 1][0][0]
+            end_rel = max(end_rel, nxt + (86400 if nxt < base else 0) - base)
+        live = n == len(blocks) - 1
+
+        instance = None
+        for _, msg in block:
+            m = _CHARTER_UP.search(msg)
+            if m:
+                instance = int(m.group(1))
+                break
+        hire = hires.get(instance) if instance is not None else None
+        if hire is None:
+            continue  # a hire that never reached an instance: nothing to time
+        release = releases.get(instance)
+
+        up_i = _charter_find(block, lambda m: _CHARTER_UP.search(m))
+        ssh_i = _charter_find(block, lambda m: "charter: ssh answered" in m)
+        sea_i = _charter_find(block, lambda m: _CHARTER_SEA.search(m))
+        code_i = _charter_find(block, lambda m: "[box] tar" in m and "files to /" in m)
+        code_done_i = _charter_find(block, lambda m: "tar done" in m, (code_i or 0) + 1) if code_i is not None else None
+        data_i = _charter_find(block, lambda m: "[box]" in m and "files to data" in m)
+        data_done_i = (
+            _charter_find(block, lambda m: "tar done" in m or "rsync done" in m, (data_i or 0) + 1) if data_i is not None else None
+        )
+        env_i = _charter_find(block, lambda m: "syncing the box's environment" in m)
+        env_done_i = _charter_find(block, lambda m: "[box] ssh done" in m, (env_i or 0) + 1) if env_i is not None else None
+        home_i = _charter_find(block, lambda m: "bringing it home" in m)
+        release_i = _charter_find(block, lambda m: "released;" in m)
+
+        phases: dict[str, float | None] = {
+            "provision": _charter_span(block, rel, 0, up_i),
+            "ssh": _charter_span(block, rel, up_i, ssh_i),
+            "code": _charter_span(block, rel, code_i, code_done_i),
+            "data": _charter_span(block, rel, data_i, data_done_i),
+            "board": None,
+            "env": _charter_span(block, rel, env_i, env_done_i),
+            "train": _charter_span(block, rel, sea_i, home_i or release_i),
+            "home": _charter_span(block, rel, home_i, release_i),
+        }
+        # the board: the manifest, the spec and the papers, from the data's end to the environment's start
+        if data_done_i is not None:
+            stop = env_i if env_i is not None else sea_i
+            if stop is not None and stop > data_done_i:
+                phases["board"] = float(rel[stop] - rel[data_done_i])
+
+        # the phase still running, timed to now for the live hire and to the next quote for an aborted one
+        open_key, start_i = None, None
+        if data_i is not None and data_done_i is None:
+            open_key, start_i = "data", data_i
+        elif up_i is not None and ssh_i is None:
+            open_key, start_i = "ssh", up_i
+        elif data_done_i is not None and env_i is None and sea_i is None:
+            open_key, start_i = "board", data_done_i
+        elif env_i is not None and env_done_i is None:
+            open_key, start_i = "env", env_i
+        elif sea_i is not None and home_i is None and release_i is None:
+            open_key, start_i = "train", sea_i
+        elif home_i is not None and release_i is None:
+            open_key, start_i = "home", home_i
+
+        started = float(hire.get("started") or (now - rel[-1]))
+        if open_key is not None and start_i is not None:
+            end = (now - started) if (live and release is None) else end_rel
+            phases[open_key] = max(0.0, end - rel[start_i])
+
+        if release:
+            raw = str(release.get("status") or "").strip()
+            if raw == "overran":
+                status = "overran"
+            elif raw.lower() in ("home", "finished", "released", ""):
+                status = "released"
+            else:  # lost, recalled, came in unfinished, gone: the run did not come home
+                status = "aborted"
+        elif sea_i is not None:
+            status = "at sea"
+        elif live:
+            status = "fitting out"
+        else:
+            status = "aborted"
+
+        # a released hire's own end; a failed one has only the release event's time, which is still the end
+        ended = None
+        if release:
+            if release.get("ended"):
+                ended = float(release["ended"])
+            elif release.get("at"):
+                ended = datetime.fromisoformat(str(release["at"])).timestamp()
+        total_s = (ended - started) if ended else (now - started)
+        dph = float(hire.get("dph") or offer.group(2))
+        sea_name = _CHARTER_SEA.search(block[sea_i][1]).group(1) if sea_i is not None else None
+        note = (release.get("why") or release.get("status")) if release and status == "aborted" else None
+        out.append({
+            "name": hire.get("name") or sea_name or f"instance {instance}",
+            "instance": instance,
+            "gpu": hire.get("gpu") or offer.group(1),
+            "dph": round(dph, 4),
+            "quote_hours": round(float(hire.get("quote_hours") or offer.group(3)), 3),
+            "quote_cost": round(float(offer.group(4)), 2),
+            "started": datetime.fromtimestamp(started).astimezone().isoformat(timespec="seconds"),
+            "status": status,
+            "total_s": round(total_s),
+            "cost": round(float(release["cost"]) if release and release.get("cost") is not None else total_s / 3600 * dph, 2),
+            "rate": round(float(release["tokens_per_s"])) if release and release.get("tokens_per_s") else None,
+            "phases": {k: (round(v) if v is not None else None) for k, v in phases.items()},
+            # only a hire still out has a task running now: an aborted one's last task is where it died
+            "open": open_key if release is None else None,
+            "note": note,
+        })
+
+    out.reverse()
+    return {"at": stamp(), "charters": out[:limit]}
+
+
 def _part(fn):
     try:
         return fn()
@@ -530,4 +725,5 @@ def payload(fresh: bool = False) -> dict:
         "environment": _part(environment),
         "lanes": _part(lanes),
         "vast": _part(vast),
+        "charters": _part(charters),
     }

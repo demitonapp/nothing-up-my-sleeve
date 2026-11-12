@@ -316,8 +316,9 @@ def known_cached() -> dict[str, str]:
 
 
 def chat_targets() -> list[dict]:
-    """The Market Harbour's read ships plus the pulled twins without readings: chat is about the
-    weights, not the readings, so a base and its instruct twin are both selectable."""
+    """The Market Harbour's read ships plus the pulled twins without readings, and the houses' models
+    pulled from their Hugging Face page: chat is about the weights, not the readings, so a base and its
+    instruct twin are both selectable."""
     out = {m["key"]: m for m in models()}
     for key, model in known_cached().items():
         if key in out:
@@ -332,6 +333,35 @@ def chat_targets() -> list[dict]:
             "lab_name": LABS[lab],
             "flag": FLAGS[lab][0],
             "flag_name": FLAGS[lab][1],
+            "harbour": "masaq-reach",
+            "read": False,
+            "chained": False,
+        }
+    # a model downloaded from a lab's Hub table (thorp.lab_downloads): its lab may be one of the newer
+    # houses, so the profile in thorp.labs supplies the name and flag when foreign.LABS does not.
+    from thorp import lab_downloads
+
+    for row in lab_downloads.downloaded():
+        key = row.get("key") or _key(row["model"])
+        if key in out or not row.get("model"):
+            continue
+        lab = str(row.get("lab") or "independent")
+        house = None
+        try:
+            from thorp import labs as houses
+
+            house = houses.get(lab)
+        except Exception:  # noqa: BLE001
+            house = None
+        out[key] = {
+            "key": key,
+            "label": row.get("label") or _label(row["model"]),
+            "model": row["model"],
+            "params": row.get("params") or _params().get(row["model"]),
+            "lab": lab,
+            "lab_name": (house.short or house.name) if house else LABS.get(lab, lab),
+            "flag": (house.country if house else FLAGS.get(lab, ("independent", ""))[0]),
+            "flag_name": (house.country_name if house else FLAGS.get(lab, ("", "independent labs"))[1]),
             "harbour": "masaq-reach",
             "read": False,
             "chained": False,

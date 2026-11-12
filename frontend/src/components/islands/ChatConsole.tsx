@@ -190,12 +190,27 @@ export default function ChatConsole() {
   const [lastReq, setLastReq] = useState<any>(null);
   const [lastReply, setLastReply] = useState<any>(null);
   const session = useRef(newId());
+  // a model picked from a lab page, handed to the console by a `thorp:chat` event (12 November)
+  const [wanted, setWanted] = useState('');
   const field = useRef<HTMLInputElement | null>(null);
   const said = useRef<Say[]>([]);
 
   useEffect(() => {
     said.current = says;
   }, [says]);
+
+  // The lab pages' "chat" action (12 November): a lab's ship is added to the terminal by name. The console
+  // opens at once; the model is selected when its list arrives, so a slow /api/chat/models does not lose it.
+  useEffect(() => {
+    const onChat = (e: Event): void => {
+      const d = (e as CustomEvent).detail || {};
+      if (d.model) setWanted(String(d.model));
+      if (d.refresh) setModels(null); // a model just downloaded: read the list again
+      setOpen(true);
+    };
+    window.addEventListener('thorp:chat', onChat);
+    return () => window.removeEventListener('thorp:chat', onChat);
+  }, []);
 
   // Only models that answer: an outside instruction-tuned model, or a Demiton leg that was taught turns (the 9m's
   // talk legs, 12 November). A base checkpoint continues prose instead of answering, so a Thorp row of one would be a lie.
@@ -242,6 +257,15 @@ export default function ChatConsole() {
   }, [labs, lab, instruct, defaultKey]);
   // a checkpoint belongs to the model it was chosen for
   useEffect(() => { setStep(''); }, [chosen?.ship_key]);
+
+  useEffect(() => {
+    if (!wanted || !instruct.length) return;
+    const m = instruct.find((x) => x.model === wanted || convoKeyOf(x) === wanted);
+    if (!m) return;
+    setLab(labOf(m));
+    setPick(convoKeyOf(m));
+    setWanted('');
+  }, [instruct, wanted]);
 
   useEffect(() => {
     if (!open || models) return;

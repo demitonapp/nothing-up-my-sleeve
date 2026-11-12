@@ -33,18 +33,12 @@ export interface SectionNav {
 
 export const MAIN_TABS: MainTab[] = [
   {
-    key: 'places', label: 'Places', href: '/harbours',
-    title: 'the places: Demiton\'s orbital and the trading orbital, where every other lab and its ships reside',
-    match: ['/harbours', '/harbors', '/ships', '/sizes', '/classes', '/rung', '/foreign', '/shipyard', '/labs'],
-  },
-  {
-    key: 'expeditions', label: 'Expeditions', href: '/expeditions',
-    title: 'the expeditions: what each standard went out to find, and the VSM (the five systems)',
-    match: ['/expeditions', '/voyages', '/vsm', '/governance'],
+    key: 'places', label: 'Places', href: '/orbitals',
+    title: 'the places: Demiton\'s orbital (its berth, shipyard, library and expeditions) and the trading orbital, where every other lab and its ships reside',
+    match: ['/orbitals', '/harbours', '/harbors', '/ships', '/sizes', '/classes', '/rung', '/foreign', '/shipyard', '/masaq', '/labs', '/expeditions', '/vsm', '/governance', '/library', '/shelves'],
   },
   { key: 'discoveries', label: 'Discoveries', href: '/discoveries', title: '', match: ['/discoveries'] },
   { key: 'leaderboard', label: 'Leaderboard', href: '/leaderboard', title: '', match: ['/leaderboard'] },
-  { key: 'library', label: 'Library', href: '/library', title: '', match: ['/library', '/shelves'] },
 ];
 
 /** A path as the router reads it: no query, no leading hash, no trailing slash. */
@@ -79,10 +73,9 @@ const at = (p: string, base: string): boolean => p === base || p.startsWith(base
  *  where they are reached from. */
 export function mainTabFor(path: string): MainKey {
   const p = navPath(path);
-  if (at(p, '/expeditions') || at(p, '/voyages') || at(p, '/vsm') || at(p, '/governance')) return 'expeditions';
   if (at(p, '/discoveries')) return 'discoveries';
   if (at(p, '/leaderboard')) return 'leaderboard';
-  if (at(p, '/library') || at(p, '/shelves')) return 'library';
+  // Expedition, VSM and Library addresses are Demiton's views now (12 November), so Places is the way in.
   return 'places';
 }
 
@@ -90,14 +83,13 @@ const placesSection = (p: string): SectionNav => {
   // The shipyard is not a way in of its own (12 November, Justin: "the shipyard is only within demiton's
   // orbital"): it is a page under Demiton, reached from /harbours/demiton's yards, and /shipyard keeps
   // Orbitals lit. The old harbour shipbuilder addresses are Demiton's too.
-  const labs = at(p, '/labs');
+  // Places has one way in now (12 November): the two orbitals. The shipyard is inside Demiton, and the
+  // labs are inside Masaq' Reach's two views, so neither is a tab of its own.
   return {
     key: 'places',
     label: 'Places',
     items: [
-      { key: 'harbours', label: 'Orbitals', href: '/harbours', active: !labs },
-      // the houses that build the outside ships: the labs page (12 November, Justin)
-      { key: 'labs', label: 'Labs', href: '/labs', active: labs },
+      { key: 'harbours', label: 'Orbitals', href: '/orbitals', active: true },
     ],
   };
 };
@@ -163,7 +155,7 @@ const discoveriesSection = (p: string): SectionNav => {
  */
 export function sectionNavFor(path: string): SectionNav | null {
   const p = navPath(path);
-  if (p === '/' || at(p, '/shipyard') || at(p, '/harbours') || at(p, '/harbors') || at(p, '/ships')
+  if (p === '/' || at(p, '/shipyard') || at(p, '/orbitals') || at(p, '/harbours') || at(p, '/harbors') || at(p, '/ships')
     || at(p, '/sizes') || at(p, '/classes') || at(p, '/rung') || at(p, '/foreign') || at(p, '/labs')) return placesSection(p);
   if (at(p, '/expeditions') || at(p, '/voyages') || at(p, '/vsm') || at(p, '/governance')) return expeditionsSection(p);
   if (at(p, '/discoveries')) return discoveriesSection(p);

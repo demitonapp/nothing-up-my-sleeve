@@ -61,8 +61,8 @@ _FALLBACK = (
     {"key": "vavatch-end", "name": "Vavatch End", "aka": "the deep yards", "lane": "vast", "where": "GPUs hired from Vast.ai",
      "about": "The yard at the edge of the new worlds: our own 50m, 100m and 350m are built here, the ships too deep for Schi'mint and too big for this Mac.",
      "depth": None, "ship_builder": "", "foreign": False},
-    {"key": "masaq-reach", "name": "Masaq' Reach", "aka": "the market ring", "lane": "foreign", "where": "the Reach",
-     "about": "Where every civilisation's ships come to trade: every foreign ship is read on our decks, and none of them is ours to build.",
+    {"key": "masaq-reach", "name": "Masaq' Reach", "aka": "the trading orbital", "lane": "foreign", "where": "the Reach",
+     "about": "where every other lab and its ships reside: every foreign ship is read on our decks, and none of them is ours to build.",
      "depth": None, "ship_builder": "", "foreign": True},
 )  # fmt: skip
 

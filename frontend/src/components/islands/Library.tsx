@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { MouseEvent as ReactMouseEvent } from 'react';
 import BranchConfig, { type ConfigChoices, type SavedConfig } from './BranchConfig';
+import DemitonTabs from '../DemitonTabs';
 import { big, periodOf } from '@/lib/format';
 import { libraryBranchHref, libraryBranchOf } from '@/lib/nav';
 import { cardCls, emptyCls, fieldCls, pillCls, selectCls } from '@/lib/ui';
@@ -154,6 +155,7 @@ export default function Library({ initialPath = '/library' }: { initialPath?: st
 
   return (
     <div {...sectionProps('shelves')}>
+      <DemitonTabs active="library" />
       <h1>Library <span className="q">every list of books Nothing up my sleeve reads from, is scored on or is drafting: how many books are fetched, about how many tokens they hold, their language families, and the voyages that read them</span></h1>
       <section className={cardCls(false, 'panel')} id="browsepanel">
         <h2>The library <span className="note">it starts with branches, each a purpose its books are gathered for (Ogden, the decks, the content experiment...). Open a branch to compose a JSON of choices and save it under a name; the lists it has already sailed stay beneath it, locked</span></h2>

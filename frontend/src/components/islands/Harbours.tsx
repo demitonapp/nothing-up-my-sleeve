@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import { crumbCls, emptyCls } from '@/lib/ui';
 import { sectionProps, useApi, useRoute } from '@/lib/useApi';
 import SectionNav from '../SectionNav';
+import DemitonTabs from '../DemitonTabs';
 import { DEMITON, candidateCardsHtml, classScoreHtml, harbourAbout, harbourCardsHtml, harbourKey, harbourRoute, harbourShipsHtml, harbourTitle, isOldHarbour, shipyardCardsHtml } from '@/scripts/views/harbours';
 import { applyHarbourFlips, wireHarbourFlip } from '@/scripts/views/harbourflip';
 import { BAND } from '@/scripts/views/bands';
@@ -14,7 +15,7 @@ import { mountShipbuilder } from '@/scripts/views/shipbuilder';
 /** Every address this island answers: the home page, the harbours, and their ships/builder pages. */
 export const isHarboursPage = (path: string): boolean => {
   const p = path.split('?')[0].replace(/^#/, '');
-  return p === '' || p === '/' || /^\/harbours?(\/|$)/.test(p) || p === '/ships' || p === '/classes' || p === '/sizes' || p === '/rung' || p === '/shipyard' || p.startsWith('/shipyard/');
+  return p === '' || p === '/' || /^\/orbitals(\/|$)/.test(p) || /^\/harbours?(\/|$)/.test(p) || p === '/ships' || p === '/classes' || p === '/sizes' || p === '/rung' || p === '/shipyard' || p.startsWith('/shipyard/');
 };
 
 /** The harbour cards' first row stands clear of the chat console's bar (11 November, Justin: "the cards need
@@ -81,7 +82,28 @@ export default function Harbours() {
     const asGiven = m ? decodeURIComponent(m[1]) : '';
     if (asGiven && isOldHarbour(asGiven)) {
       const rest = m && m[2] ? m[2] : '';
-      history.replaceState(null, '', `/harbours/${harbourKey(asGiven)}${rest}`);
+      history.replaceState(null, '', `/orbitals/${harbourKey(asGiven)}${rest}`);
+    }
+  }, [path]);
+
+  // The orbitals' addresses (12 November, Justin: "/harbours/demiton shouldn't have harbour but rather
+  // orbital"). /harbours becomes /orbitals in place; the trading orbital is the Labs page, so its old
+  // Masaq addresses hand over to /labs and /labs/ships, where its two views live.
+  useEffect(() => {
+    const p = path.split('?')[0].replace(/^#/, '');
+    const masaq = /^\/(?:orbitals|harbours?)\/masaq-reach(?:\/(.*))?$/.exec(p);
+    if (masaq) {
+      const rest = masaq[1] ? '/' + masaq[1] : '';
+      const next = rest.startsWith('/ships')
+        ? '/orbitals/masaq/models' + rest.replace(/^\/ships/, '')
+        : /^\/(xsmall|small|medium|large)$/.test(rest)
+          ? '/orbitals/masaq/models' + rest
+          : '/orbitals/masaq';
+      location.replace(next + location.search);
+      return;
+    }
+    if (p === '/harbours' || p.startsWith('/harbours/')) {
+      history.replaceState(null, '', p.replace(/^\/harbours/, '/orbitals') + location.search);
     }
   }, [path]);
   const bandInfo = BAND(band);
@@ -182,11 +204,14 @@ export default function Harbours() {
   return (
     <div {...sectionProps('sizes')}>
       <SectionNav />
+      {harbour && !shipyard ? <DemitonTabs active="berth" /> : null}
+      {shipyard ? <DemitonTabs active="shipyard" /> : null}
       {home ? (
         <h1>The orbitals <span className="q">Demiton, our own orbital, and the trading orbital where every other lab and its ships reside</span></h1>
-      ) : shipyard && !sectionName ? null : (
+      ) : (
         <h1>
-          {harbour ? <><a className={crumbCls('back')} href={sectionName ? '/shipyard' : bandInfo ? `/harbours/${encodeURIComponent(harbour)}` : '/harbours'}>{sectionName ? '← shipyard' : bandInfo ? `← ${harbourTitle(data, harbour)}` : shipyard ? '← places' : '← orbitals'}</a> </> : null}
+          {harbour ? <><a className={crumbCls('back')} href={sectionName ? '/shipyard' : bandInfo ? `/orbitals/${encodeURIComponent(harbour)}` : shipyard ? '/orbitals/demiton' : '/orbitals'}>{sectionName ? '← shipyard' : bandInfo ? `← ${harbourTitle(data, harbour)}` : shipyard ? '← demiton' : '← orbitals'}</a> </> : null}
+          {harbour === DEMITON.key ? <img className="flag" src="/flags/demiton.svg" alt="Demiton · Drake’s arms" title="Demiton · Drake’s arms" loading="lazy" /> : null}{' '}
           {title}{' '}
           <span className="q">{about}</span>
         </h1>

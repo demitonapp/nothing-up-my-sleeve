@@ -564,6 +564,42 @@ LABS: dict[str, str] = {
     "lab-xai": "a black forge on a dark plain at night: a stark black-hulled sloop on the stocks, a single white X "
     "painted on her pale sail, an iron furnace throwing sparks, a lone figure in a long coat, one thin ring of "
     "light in the sky, an uncropped clean image with no watermark, no signature, no text and no logo",
+    "lab-moonshot": "a moonlit boatyard on a dark Chinese river at night: a swift three-masted junk with pale "
+    "silver sails bearing a single crescent moon, silver-white trim on her hull, a round moon gate in the yard "
+    "wall, lanterns along the wet quay, a low full moon and one thin ring of light in the sky, an uncropped "
+    "clean image with no watermark, no signature, no text and no logo",
+    "lab-zai": "a lantern-lit observatory-yard on a dark Chinese hill at night: a lean three-masted junk with "
+    "deep violet sails bearing a single gold lantern emblem, a great brass armillary sphere on the wet quay, "
+    "paper lanterns along the rail, a thin ring of light in the sky, an uncropped clean image with no "
+    "watermark, no signature, no text and no logo",
+    "lab-minimax": "a twin-hulled boatyard on a dark Chinese river at night: two narrow hulls joined by a "
+    "moonlit deck, sails of teal and red, a beam of projector light cutting across the black water, red paper "
+    "lanterns, a thin ring of light in the sky, an uncropped clean image with no watermark, no signature, no "
+    "text and no logo",
+    "lab-cohere": "a northern stone harbour at night under a pale aurora: a lean grey-hulled ship with a pale "
+    "sail divided into a grid of small panes, a brass reading lamp on the snow-dusted quay, dark pines behind, "
+    "a thin ring of light in the sky, an uncropped clean image with no watermark, no signature, no text and no logo",
+    "lab-nvidia": "a forge-yard lit by green fire at night: a black-hulled ship with sails the colour of dark "
+    "green glass, a great anvil and iron gears on the quay, sparks rising, a thin ring of light in the sky, an "
+    "uncropped clean image with no watermark, no signature, no text and no logo",
+    "lab-stepfun": "a stair of stone quays climbing a dark cliff at night: a ship at each step, the highest "
+    "with pale sails marked by a single silver step, lanterns on the wet stone, a thin ring of light in the sky, "
+    "an uncropped clean image with no watermark, no signature, no text and no logo",
+    "lab-bytedance": "an orchard-yard at night: a ship with sails of pale seed-pod white, a great round seed "
+    "vault door in the yard wall, lanterns among the trees, a thin ring of light in the sky, an uncropped "
+    "clean image with no watermark, no signature, no text and no logo",
+    "lab-thinkingmachines": "a workshop of ink and brass at night: a ship with black ink-dark sails and brass "
+    "ribs on the stocks, a drafting table and open notebooks, a single lamp throwing hard shadows, a thin ring "
+    "of light in the sky, an uncropped clean image with no watermark, no signature, no text and no logo",
+    "lab-tii": "a desert harbour under a field of stars: a lean dhow-like ship with pale sails bearing a falcon "
+    "silhouette, black water and pale sand, a low moon, a thin ring of light in the sky, an uncropped clean "
+    "image with no watermark, no signature, no text and no logo",
+    "lab-cognition": "a chart room of brass and clockwork at night: a ship model with clockwork gears in its "
+    "hull on a navigator's table, open charts and dividers, a single lamp, a thin ring of light in the sky, an "
+    "uncropped clean image with no watermark, no signature, no text and no logo",
+    "lab-arcee": "a small yard of patchwork hulls at night: a ship with sails sewn from many pale panels, a "
+    "rack of small hulls waiting beside her, one lantern on the wet boards, a thin ring of light in the sky, an "
+    "uncropped clean image with no watermark, no signature, no text and no logo",
 }
 
 SIZES = {**{k: "landscape_16_9" for k in (*CLASSES, *TESTS, *LABS, *HARBOURS, *HARBOUR_VIEWS, *SHIPBUILDER, *SHIPYARD, *SHIPYARD_SECTIONS, *CHARTING, *POSITIONS, *FOREIGN, *SOP_GOALS, *EXPEDITIONS, *BANDS, *LADDER, *CONSOLE)}, **{k: "portrait_4_3" for k in CARDS}, **{k: "portrait_4_3" for k in LOGIC}}

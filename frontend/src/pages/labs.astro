@@ -1,13 +1,15 @@
 ---
-// The Labs tab under Places: the ten houses that build the outside ships, each with its fal plate in
-// the dashboard's one ink (backend/thorp/dash/art/generate_art.py, LABS). It answers /labs; the island
-// reads /api/labs and opens a house's lab page, or its own door when the Reach has no readings yet.
+// Masaq' Reach, the trading orbital (12 November, Justin: "/labs should be the orbital/masaq reach with the
+// view on the labs"). It has two views: /labs is the houses, /labs/ships is every outside ship. A house
+// opens /labs/<key>, its own page. The islands read the route; only the one that answers it renders.
 import Layout from '../layouts/Layout.astro';
 import Labs from '../components/islands/Labs';
+import LabPage from '../components/islands/LabPage';
 ---
 
 <Layout>
   <main>
     <Labs client:load />
+    <LabPage client:load />
   </main>
 </Layout>

@@ -53,7 +53,7 @@ export function VastPanel({ vast }: { vast: Vast }) {
   const d = vast;
   return (
     <section className={cardCls(false, 'panel')}>
-      <h2>Vast.ai <span className="note">the market's price reads and the voyages hired, per GPU chip class the charter's terms allow. Read from the store, never the API, so it is as fresh as the last quote or hire; the key is only ever said to be present</span></h2>
+      <h2>The market <span className="note">the price reads and the voyages hired, per GPU chip class the charter's terms allow. Read from the store, never the API, so it is as fresh as the last quote or hire; the key is only ever said to be present</span></h2>
       {d.error ? <div className={emptyCls()}>the Vast.ai figures could not be read: {d.error}</div> : (
         <>
           <div className="strip">
@@ -67,26 +67,30 @@ export function VastPanel({ vast }: { vast: Vast }) {
             <table id="vasttable" data-nosort>
               <thead>
                 <tr>
-                  <th>chip class</th>
-                  <th>reads</th>
-                  <th>price now</th>
-                  <th>the range <span className="s">min · median · max</span></th>
-                  <th>voyages</th>
-                  <th>hours</th>
-                  <th>spent</th>
-                  <th>the last rate</th>
+                  <th rowSpan={2} scope="col">chip class</th>
+                  <th colSpan={3} scope="colgroup" className="grp">the market</th>
+                  <th colSpan={4} scope="colgroup" className="grp sep">the voyages</th>
+                </tr>
+                <tr>
+                  <th scope="col">reads</th>
+                  <th scope="col">price now</th>
+                  <th scope="col">the range <span className="s">min · median · max</span></th>
+                  <th scope="col" className="sep">voyages</th>
+                  <th scope="col">hours</th>
+                  <th scope="col">spent</th>
+                  <th scope="col">the last rate</th>
                 </tr>
               </thead>
               <tbody>
                 {d.chips.map((c) => (
-                  <tr key={c.gpu}>
+                  <tr key={c.gpu} className={c.out ? 'out' : ''}>
                     <td><b>{c.gpu}</b>{c.ceiling != null ? <div className="s">ceiling {money(c.ceiling)} an hour</div> : null}</td>
                     <td className="num">{c.reads ? <>{c.reads}<div className="s">{when(c.last_read)}</div></> : <span className="s">never read</span>}</td>
                     <td className="num">{money(c.price, 3)}{c.price != null
                       ? <div className="s">rel {c.reliability != null ? c.reliability.toFixed(3) : '–'}</div>
                       : null}</td>
                     <td className="num">{c.min != null ? `${money(c.min, 3)} – ${money(c.max, 3)}` : '–'}{c.min != null ? <div className="s">median {money(c.median, 3)}</div> : null}</td>
-                    <td className="num">{c.hires || <span className="s">–</span>}{c.out ? <span className={pillCls('accent')}>{c.out} out</span> : null}</td>
+                    <td className="num sep">{c.hires || <span className="s">–</span>}{c.out ? <span className={pillCls('accent')}>{c.out} out</span> : null}</td>
                     <td className="num">{c.hours ? `${c.hours.toFixed(1)} h` : '–'}</td>
                     <td className="num">{c.hours || c.spent ? money(c.spent) : '–'}</td>
                     <td className="num">{tokens(c.rate)}{c.rate != null

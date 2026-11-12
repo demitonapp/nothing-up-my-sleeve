@@ -1,0 +1,35 @@
+---
+// The orbital sub-paths as real routes, so a direct load works in dev (production also falls back here).
+// /orbitals/demiton is Demiton's fleet; the old Masaq addresses hand over to /labs, the trading orbital's
+// own page, in the island. The islands read the route; only the one that answers it renders.
+import Layout from '../../layouts/Layout.astro';
+import Harbours from '../../components/islands/Harbours';
+import SizePage from '../../components/islands/SizePage';
+import ShipPage from '../../components/islands/ShipPage';
+import RunsPage from '../../components/islands/RunsPage';
+import Reader from '../../components/Reader.astro';
+
+export function getStaticPaths() {
+  const paths: string[] = [];
+  // Demiton and its two berths
+  for (const h of ['demiton', 'schimint', 'vavatch-end']) {
+    paths.push(h, `${h}/ships`, `${h}/shipbuilder`);
+  }
+  // the trading orbital's old addresses, which the island forwards to /labs and /labs/ships
+  paths.push('masaq-reach', 'masaq-reach/ships', 'masaq-reach/labs');
+  for (const band of ['xsmall', 'small', 'medium', 'large']) {
+    paths.push(`masaq-reach/${band}`, `masaq-reach/ships/${band}`);
+  }
+  return paths.map((path) => ({ params: { path } }));
+}
+---
+
+<Layout>
+  <main>
+    <Harbours client:load />
+    <SizePage client:load />
+    <ShipPage client:load />
+    <RunsPage client:load />
+  </main>
+  <Reader />
+</Layout>

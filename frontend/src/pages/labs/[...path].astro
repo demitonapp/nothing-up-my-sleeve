@@ -1,0 +1,26 @@
+---
+// The trading orbital's sub-paths as real routes, so a direct load works in dev (production also falls back
+// here): /labs/ships and its four size bands, and one page per house. The keys are thorp/labs.py HOUSES; a
+// house added there needs its key here too, and the island still answers if the route falls back.
+import Layout from '../../layouts/Layout.astro';
+import Labs from '../../components/islands/Labs';
+import LabPage from '../../components/islands/LabPage';
+
+export function getStaticPaths() {
+  const houses = [
+    'google', 'openai', 'anthropic', 'meta', 'alibaba', 'microsoft', 'deepseek', 'antgroup',
+    'mistral', 'xai', 'moonshot', 'zai', 'minimax', 'cohere', 'nvidia', 'stepfun', 'bytedance',
+    'thinkingmachines', 'tii', 'cognition', 'arcee',
+  ];
+  const paths = ['ships', ...houses, ...houses.map((key) => `${key}/models`)];
+  for (const band of ['xsmall', 'small', 'medium', 'large']) paths.push(`ships/${band}`);
+  return paths.map((path) => ({ params: { path } }));
+}
+---
+
+<Layout>
+  <main>
+    <Labs client:load />
+    <LabPage client:load />
+  </main>
+</Layout>

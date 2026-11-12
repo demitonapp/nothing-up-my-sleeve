@@ -44,7 +44,10 @@ export default defineConfig({
     // (the browser then asks for the old bundle: "504 Outdated Optimize Dep")
     optimizeDeps: {
       include: ['react', 'react-dom', 'react-dom/client', 'radix-ui',
-                'class-variance-authority', 'clsx', 'tailwind-merge', 'lucide-react'],
+                'class-variance-authority', 'clsx', 'tailwind-merge', 'lucide-react',
+                // the chart modules are imported on demand (lib/echarts), so without these the first
+                // chart in an open tab re-optimises the deps and the import 504s: a blank chart
+                'echarts/core', 'echarts/charts', 'echarts/components', 'echarts/renderers'],
     },
     server: { proxy: { '/api': 'http://localhost:8787' } },
     build: { chunkSizeWarningLimit: 5000 },  // ECharts is split into several large modules, on purpose

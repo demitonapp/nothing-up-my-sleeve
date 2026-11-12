@@ -73,6 +73,9 @@ PULL_EVERY_MIN = 20
 NOT_CARRIED = {
     "checkpoints", "runs", "compare", "loop", "postgres", "secrets", "shards", "tokenisers", "charter",
     "acquisition", "helm.lock", "helm.json", "gate-log.jsonl", "postgres.log", "postgres-init.log", "lanes.json", "lanes.lock",
+    # the sources' catalogues, the classics shelf and the local foreign models are not what a voyage trains or
+    # reads on: carrying them put 8.4 GB of the 9.07 GB the 9m candidate uploaded aboard (12 November)
+    "catalogue", "classics", "models",
 }  # fmt: skip
 
 
@@ -96,17 +99,58 @@ class NotAttachable(RuntimeError):
 # ---------------------------------------------------------------- the box
 
 
+# The fitting-out deadline: the whole of bootstrap, code, data, papers and environment. A box that stops reading
+# must not sit behind a hire's quote (12 November: a dead box held rsync for 18 minutes, and the overrun guard
+# only runs after "at sea"). THORP_FITOUT_MINUTES overrides it; 0 removes it (a very large checkpoint on a slow
+# link, deliberately).
+FITOUT_MINUTES = 30.0
+
+
+def fitout_limit() -> float:
+    raw = os.environ.get("THORP_FITOUT_MINUTES")
+    if raw is None:
+        return FITOUT_MINUTES * 60
+    try:
+        return max(0.0, float(raw)) * 60
+    except ValueError:
+        return FITOUT_MINUTES * 60
+
+
+def _size(root: Path, rels: list[str]) -> int:
+    """The bytes a transfer carries, for the log and the timing table (a file that vanished is left out)."""
+    total = 0
+    for rel in rels:
+        try:
+            total += (root / rel).stat().st_size
+        except OSError:
+            pass
+    return total
+
+
 class Box:
     """The hired machine, reached by ssh and rsync as root (Vast.ai's SSH)."""
 
     def __init__(self, host: str, port: int, key_file: str | None = None, run=subprocess.run, log=None):
         self.host, self.port, self.run = host, int(port), run
         self.log = log  # every step says when it starts and how long it took (9 November: a silent box looked stuck)
+        self.deadline: float | None = None  # the end of fitting out, set by sail; no step may run past it
         kh = paths.data_dir() / "charter" / "known_hosts"
         kh.parent.mkdir(parents=True, exist_ok=True)
         # BatchMode: never stop at a prompt (a passphrase comes from the agent or the keychain, or not at all)
         self.opts = ["-p", str(self.port), "-o", "StrictHostKeyChecking=accept-new", "-o", f"UserKnownHostsFile={kh}",
-                     "-o", "ServerAliveInterval=30", "-o", "ConnectTimeout=20", "-o", "BatchMode=yes"] + (["-i", key_file] if key_file else [])  # fmt: skip
+                     "-o", "ServerAliveInterval=15", "-o", "ServerAliveCountMax=3", "-o", "ConnectTimeout=20",
+                     "-o", "BatchMode=yes"] + (["-i", key_file] if key_file else [])  # fmt: skip
+
+    def _limit(self, default: float) -> float:
+        """How long one step may take: its own bound, never past the fitting-out deadline."""
+        if self.deadline is None:
+            return default
+        left = self.deadline - time.time()
+        if left <= 0:
+            raise BoxError(
+                f"fitting out ran past its deadline ({FITOUT_MINUTES:.0f} min, THORP_FITOUT_MINUTES to change it): releasing the box"
+            )
+        return min(default, left)
 
     def _say(self, what: str, t0: float | None = None) -> None:
         """One line of the box's log: what it is doing, and how long that took."""
@@ -115,10 +159,15 @@ class Box:
         took = f" ({time.time() - t0:.1f}s)" if t0 else ""
         self.log(f"[box] {what}{took}")
 
-    def sh(self, cmd: str, check: bool = True, timeout: float | None = None) -> subprocess.CompletedProcess:
+    def sh(self, cmd: str, check: bool = True, timeout: float | None = 600) -> subprocess.CompletedProcess:
         t0 = time.time()
         self._say(f"ssh: {cmd[:100]}")
-        r = self.run(["ssh", *self.opts, f"root@{self.host}", cmd], check=False, capture_output=True, text=True, timeout=timeout)
+        limit = self._limit(timeout or 600)
+        try:
+            r = self.run(["ssh", *self.opts, f"root@{self.host}", cmd], check=False, capture_output=True, text=True, timeout=limit)
+        except subprocess.TimeoutExpired as e:
+            self._say(f"ssh did not answer in {limit:.0f}s", t0)
+            raise BoxError(f"ssh {self.host}:{self.port} did not answer in {limit:.0f}s (ran: {cmd[:120]})") from e
         self._say(f"ssh done, exit {r.returncode}", t0)
         if r.returncode != 0:
             tail = ((r.stderr or "") + "\n" + (r.stdout or "")).strip()[-800:]
@@ -148,43 +197,71 @@ class Box:
     def _rsh(self) -> str:
         return "ssh " + " ".join(shlex.quote(o) for o in self.opts)
 
-    def put_tar(self, root: Path, rels: list[str], dst: str = "") -> None:
+    def put_tar(self, root: Path, rels: list[str], dst: str = "", timeout: float = 1800) -> None:
         """The files `rels` to REMOTE/dst as **one tar over ssh** (9 November: rsync'ing 20,000 small files to the box
-        took most of an hour; a single stream is minutes). Bytes are equal; the transfer is one connection."""
+        took most of an hour; a single stream is minutes). Bytes are equal; the transfer is one connection, and it
+        may not run forever: a box that stops reading is a failed fit-out, not a hire to wait on (12 November)."""
         if not rels:
             return
-        t0 = time.time()
-        self._say(f"tar {len(rels)} files to {dst or '/'}")
+        t0, size = time.time(), _size(root, rels)
+        self._say(f"tar {len(rels)} files ({size / 1e6:.1f} MB) to {dst or '/'}")
         lst = paths.data_dir() / "charter" / f"tar-{os.getpid()}.txt"
         lst.write_text("\n".join(rels) + "\n")
         tar_cmd = ["tar", "czf", "-", "-C", str(root), f"--files-from={lst}"]
         remote = f"mkdir -p {REMOTE}/{dst} && tar xzf - -C {REMOTE}/{dst}"
+        limit = self._limit(timeout)
         send = subprocess.Popen(tar_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        r = self.run(["ssh", *self.opts, f"root@{self.host}", remote], stdin=send.stdout, capture_output=True, text=True)
-        send.stdout.close()
-        send.wait()
-        lst.unlink(missing_ok=True)
-        self._say(f"tar done ({len(rels)} files)", t0)
+        try:
+            r = self.run(["ssh", *self.opts, f"root@{self.host}", remote], stdin=send.stdout, capture_output=True,
+                         text=True, timeout=limit)  # fmt: skip
+        except subprocess.TimeoutExpired as e:
+            self._say(f"tar did not finish in {limit:.0f}s", t0)
+            raise BoxError(
+                f"tar upload of {size / 1e6:.1f} MB did not finish in {limit:.0f}s: the box stopped reading"
+            ) from e
+        finally:
+            send.stdout.close()
+            if send.poll() is None:
+                send.kill()
+            send.wait()
+            lst.unlink(missing_ok=True)
+        self._say(f"tar done ({len(rels)} files, {size / 1e6:.1f} MB)", t0)
         if r.returncode != 0:
             raise BoxError(f"tar upload failed: {(r.stderr or '').strip()[-400:]}")
 
-    def put(self, root: Path, rels: list[str], dst: str = "") -> None:
-        """The files `rels` (relative to `root`) to REMOTE/dst, their paths kept."""
+    def put(self, root: Path, rels: list[str], dst: str = "", timeout: float = 1800) -> None:
+        """The files `rels` (relative to `root`) to REMOTE/dst, their paths kept. Rsync's own `--timeout` ends a
+        connection that stops moving, and the whole step is bounded too (12 November: a dead box held the 211 MB
+        manifest for 18 minutes with no timeout at all)."""
         if not rels:
             return
+        size = _size(root, rels)
         lst = paths.data_dir() / "charter" / f"files-{os.getpid()}.txt"
         lst.write_text("\n".join(rels) + "\n")
         target = f"root@{self.host}:{REMOTE}/{dst}".rstrip("/") + "/"
         t0 = time.time()
-        self._say(f"rsync {len(rels)} files to {dst or '/'}")
-        self.run(["rsync", "-a", "--partial", "-e", self._rsh(), f"--files-from={lst}", f"{root}/", target], check=True)
-        self._say(f"rsync done ({len(rels)} files)", t0)
-        lst.unlink(missing_ok=True)
+        self._say(f"rsync {len(rels)} files ({size / 1e6:.1f} MB) to {dst or '/'}")
+        try:
+            self.run(["rsync", "-a", "--partial", "--timeout=120", "--contimeout=30", "-e", self._rsh(),
+                      f"--files-from={lst}", f"{root}/", target], check=True, timeout=self._limit(timeout))  # fmt: skip
+        except subprocess.TimeoutExpired as e:
+            self._say(f"rsync did not finish in {timeout:.0f}s", t0)
+            raise BoxError(
+                f"rsync of {size / 1e6:.1f} MB did not finish in {self._limit(timeout):.0f}s: the box stopped reading"
+            ) from e
+        finally:
+            lst.unlink(missing_ok=True)
+        self._say(f"rsync done ({len(rels)} files, {size / 1e6:.1f} MB)", t0)
 
-    def get(self, src: str, dst: Path) -> bool:
-        """REMOTE/src (a folder or a file) to dst; False when it is not there yet."""
+    def get(self, src: str, dst: Path, timeout: float = 900) -> bool:
+        """REMOTE/src (a folder or a file) to dst; False when it is not there yet. Bounded, and rsync's own
+        `--timeout` ends a silent connection (12 November)."""
         dst.parent.mkdir(parents=True, exist_ok=True)
-        r = self.run(["rsync", "-a", "--partial", "-e", self._rsh(), f"root@{self.host}:{REMOTE}/{src}", str(dst)], check=False)
+        try:
+            r = self.run(["rsync", "-a", "--partial", "--timeout=120", "--contimeout=30", "-e", self._rsh(),
+                          f"root@{self.host}:{REMOTE}/{src}", str(dst)], check=False, timeout=self._limit(timeout))  # fmt: skip
+        except subprocess.TimeoutExpired as e:
+            raise BoxError(f"rsync pull of {src} did not finish in {self._limit(timeout):.0f}s") from e
         return r.returncode == 0
 
     def bootstrap(self) -> None:
@@ -645,6 +722,8 @@ def sail(spec_path: str, gpu: str | None = None, vast=None, resolver=None, box_f
                 box = (box_factory or (lambda i: Box(i["ssh_host"], i["ssh_port"])))(inst)
                 try:
                     box.log = log
+                    limit = fitout_limit()
+                    box.deadline = time.time() + limit if limit else None  # fitting out ends here, whatever step it is in
                 except Exception:
                     pass
                 log(f"charter: instance {instance} is up ({inst.get('ssh_host')}:{inst.get('ssh_port')}); waiting for its ssh")

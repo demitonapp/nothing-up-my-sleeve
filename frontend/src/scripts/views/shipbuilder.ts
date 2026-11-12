@@ -58,7 +58,7 @@ export async function mountShipbuilder(
   const opts = vs.map((v: string) => `<option value="${esc(v)}"${v === cur ? ' selected' : ''}>v${esc(v)}${v === cur ? ' · in force' : ''}</option>`).join('');
   const SECTION_NAME: Record<string, string> = { training: 'Training', fitting: 'Fitting Out', charting: 'Charting' };
   // the trail up: the shipyard sits beside the harbours, not under one, so it is harbours > shipyard > section
-  const crumb = embedded ? '' : `<div class="bcrumb"><a class="crumb" href="/harbours">harbours</a> <a class="crumb" href="/shipyard">shipyard</a> <b>${esc(section ? (SECTION_NAME[section] || section) : 'shipbuilder')}</b></div>`;
+  const crumb = embedded ? '' : `<div class="bcrumb"><a class="crumb" href="/orbitals">orbitals</a> <a class="crumb" href="/shipyard">shipyard</a> <b>${esc(section ? (SECTION_NAME[section] || section) : 'shipbuilder')}</b></div>`;
   el.innerHTML = `<section class="hmpanel">
     ${crumb}
     <figure class="sbbanner">${artImg('shipyard', 'shipbuilderart')}<figcaption><b>The shipyard</b> <span>· the SOP: what the ship reads, what it must build, and what it is made of</span></figcaption></figure>

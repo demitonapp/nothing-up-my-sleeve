@@ -1,0 +1,16 @@
+---
+// Masaq' Reach, the trading orbital at its own root (12 November, Justin: "when clicking masaq reach on
+// the orbitals page it opens the url with labs. the url should be .../masaq/ and then show labs in one
+// sub tab and models in another sub tab with cards representing the size"). Two views: /masaq/ is the
+// Labs grid, /masaq/models is the size cards; a house is /masaq/<country>/<key>.
+import Layout from '../../layouts/Layout.astro';
+import Labs from '../../components/islands/Labs';
+import LabPage from '../../components/islands/LabPage';
+---
+
+<Layout>
+  <main>
+    <Labs client:load />
+    <LabPage client:load />
+  </main>
+</Layout>

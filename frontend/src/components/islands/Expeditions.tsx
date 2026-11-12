@@ -11,6 +11,7 @@ import { routePath, useApi, useRoute } from '@/lib/useApi';
 import { esc, fmt } from '@/lib/format';
 import { starHeadline } from '@/scripts/views/helpers';
 import SectionNav from '../SectionNav';
+import DemitonTabs from '../DemitonTabs';
 import { TabNav } from '../TabNav';
 import Launch from './Launch';
 import type { LaunchPayload } from './Launch';
@@ -1381,6 +1382,7 @@ export default function Expeditions() {
   // ---- the shell
   return (
     <div onClick={onBookClick}>
+      <DemitonTabs active="expeditions" />
       <SectionNav />
       {/* ------------------------------------------------ the queue and the expeditions */}
       <div className={`section${isOverview || isQueue || isList ? ' active' : ''}`} id="voyages">

@@ -134,8 +134,9 @@ export default function Breadcrumbs({ initialPath = '/' }: { initialPath?: strin
   }, []);
 
   const trail = crumbsFor(path);
-  // one crumb is the page itself and says nothing the header does not: no trail
-  if (trail.length < 2) return null;
+  // one crumb is the page itself and says nothing the header does not: no trail, unless that crumb has
+  // somewhere to switch to (the Orbitals page's own crumb, its orbitals menu)
+  if (trail.length < 2 && !trail[0]?.menu?.length) return null;
   return (
     <nav className="trail" aria-label="Breadcrumb" ref={trailRef}>
       <ol>

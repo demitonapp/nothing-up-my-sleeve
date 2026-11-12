@@ -57,7 +57,15 @@ const MASAQ_MENU: MenuItem[] = [
   { label: 'Large', href: '/orbitals/masaq/models/large' },
 ];
 
-const ORBITALS: Crumb = { label: 'Orbitals', href: '/orbitals' };
+// switching between the orbitals (12 November, Justin: "the breadcrumb for orbital also needs to have a
+// dropdown so i can quickly switch between orbitals"): the two the Orbitals page holds, ours and the Reach
+const ORBITALS_MENU: MenuItem[] = [
+  { label: 'Every orbital', href: '/orbitals', group: 'The orbitals' },
+  { label: 'Demiton', href: '/orbitals/demiton', note: 'our own' },
+  { label: "Masaq' Reach", href: '/orbitals/masaq', note: 'the trading orbital' },
+];
+
+const ORBITALS: Crumb = { label: 'Orbitals', href: '/orbitals', menu: ORBITALS_MENU };
 const DEMITON: Crumb = { label: 'Demiton', href: '/orbitals/demiton', menu: DEMITON_MENU };
 const MASAQ: Crumb = { label: "Masaq' Reach", href: '/orbitals/masaq', menu: MASAQ_MENU };
 const EXPEDITIONS: Crumb = { label: 'Expeditions', href: '/expeditions' };

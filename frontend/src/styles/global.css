@@ -2667,11 +2667,20 @@ ol.goaltext { padding-left: 22px; }
 /* a tool call in the chat console (ChatConsole.tsx ToolLine, 12 November): the call and what it returned,
    one line each, in the brass of the console's own switches; an error in the console's red */
 .consoletools { display: flex; flex-direction: column; gap: 4px; margin: 4px 0 6px; }
-.consoletool { display: flex; flex-wrap: wrap; gap: 2px 8px; align-items: baseline; padding: 4px 9px; border: 1px solid rgba(201, 162, 74, .45); border-left-width: 3px; border-radius: 6px; background: rgba(28, 24, 19, .55); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: var(--fs-xs); line-height: 1.45; }
-.consoletoolname { color: #c9a24a; }
-.consoletoolres { color: var(--muted); overflow-wrap: anywhere; }
+.consoletool { padding: 4px 9px; border: 1px solid rgba(201, 162, 74, .45); border-left-width: 3px; border-radius: 6px; background: rgba(28, 24, 19, .55); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: var(--fs-xs); line-height: 1.45; }
+.consoletool > summary { cursor: pointer; list-style: none; display: flex; gap: 2px 8px; align-items: baseline; min-width: 0; }
+.consoletool > summary::-webkit-details-marker { display: none; }
+.consoletool > summary::before { content: '▸'; color: #c9a24a; flex: none; }
+.consoletool[open] > summary::before { content: '▾'; }
+.consoletoolname { color: #c9a24a; flex: none; }
+.consoletoolhead { color: var(--muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.consoletool[open] .consoletoolhead { white-space: normal; overflow-wrap: anywhere; }
+.consoletoolres { color: var(--muted); overflow-wrap: anywhere; margin-top: 6px; padding-top: 6px; border-top: 1px solid rgba(201, 162, 74, .2); display: grid; gap: 4px; max-height: 360px; overflow: auto; }
+.consoletoolfield { display: grid; grid-template-columns: minmax(90px, max-content) 1fr; gap: 8px; }
+.consoletoolfield b { color: #c9a24a; font-weight: 500; }
+.consoletoolfield pre { margin: 0; white-space: pre-wrap; font: inherit; }
 .consoletool.bad { border-color: rgba(248, 81, 73, .55); }
-.consoletool.bad .consoletoolres { color: var(--bad); }
+.consoletool.bad .consoletoolhead, .consoletool.bad .consoletoolres { color: var(--bad); }
 
 /* ---- the one expedition on the Expeditions landing (Launch.tsx, 12 November): its phases, the fleet, the
    master charter signed off row by row, and every goal's part. The page's own ink, brass and bone. */

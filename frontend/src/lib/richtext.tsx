@@ -97,8 +97,9 @@ function foldMarkdown(src: string): string {
   // lists, so it is never read as a bullet
   return foldLists(foldTables(src).replace(/^[ \t]*(?:-{3,}|\*{3,}|_{3,})[ \t]*$/gm, '<hr>'))
     .replace(/^[ \t]*#{1,4}[ \t]+(.+?)[ \t]*$/gm, (_, t: string) => `<h4>${t}</h4>`)
-    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-    .replace(/(^|[\s(])\*([^*\n]+)\*/g, '$1<em>$2</em>')
+    // a lone * inside bold is a character, not a marker: "**S3* — Audit**" (the audit system's name) is bold
+    .replace(/\*\*((?:[^*\n]|\*(?!\*))+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/(^|[\s(])\*([^*\s][^*\n]*?)\*(?![\w*])/g, '$1<em>$2</em>')
     .replace(/`([^`\n]+)`/g, '<code>$1</code>');
 }
 
@@ -137,7 +138,8 @@ function tokenize(src: string): Node[] {
 /** Inline markdown that survives the tree walk: **bold**, *italic*, `code`, and the line breaks. */
 function inline(text: string, key: string): ReactNode[] {
   const out: ReactNode[] = [];
-  const re = /(\*\*([^*]+)\*\*|\*([^*\n]+)\*|`([^`\n]+)`)/g;
+  // italic opens only after a space, a bracket or the start, so the * in "S3*" is never an opener
+  const re = /(\*\*((?:[^*\n]|\*(?!\*))+?)\*\*|(?<![\w*])\*([^*\s][^*\n]*?)\*(?![\w*])|`([^`\n]+)`)/g;
   let last = 0;
   let m: RegExpExecArray | null;
   let n = 0;
@@ -212,9 +214,33 @@ function renderEl(el: El, key: string): ReactNode {
   }
 }
 
+const listKind = (line: string | undefined): 'ul' | 'ol' | null =>
+  line === undefined ? null : /^\s*[-*]\s+/.test(line) ? 'ul' : /^\s*\d+[.)]\s+/.test(line) ? 'ol' : null;
+
+/** A "loose" list, its items a blank line apart, made tight before the text is cut into paragraphs, so it
+ *  stays one list (12 November: Ling's "1. … 2. … 3." with a blank line between each came out as seven
+ *  lists, every one numbered 1). */
+export function tightenLists(src: string): string {
+  const lines = src.split('\n');
+  const out: string[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (!lines[i].trim() && out.length) {
+      let j = i + 1;
+      while (j < lines.length && !lines[j].trim()) j++;
+      const before = listKind(out[out.length - 1]);
+      if (before && before === listKind(lines[j])) {
+        i = j - 1; // skip the blank run: the next item follows straight on
+        continue;
+      }
+    }
+    out.push(lines[i]);
+  }
+  return out.join('\n');
+}
+
 /** The answer as the page shows it: the whitelist's tags built, everything else left as words. */
 export default function RichText({ text }: { text: string }) {
-  const src = (text || '').replace(/\r\n?/g, '\n').trim();
+  const src = tightenLists((text || '').replace(/\r\n?/g, '\n').trim());
   if (!src) return null;
   // a blank line is the model's own paragraph break: keep it as one on the page
   const blocks = src.split(/\n[ \t]*\n\s*/);

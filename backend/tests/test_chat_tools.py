@@ -9,6 +9,8 @@ on the name at character 0, and four rounds of `unknown() → the call is not JS
 
 from __future__ import annotations
 
+import time
+
 from thorp import chat_tools
 
 # the shape of the Ling template's tools block, cut to what the detector reads
@@ -157,6 +159,7 @@ def _world(monkeypatch, **over):
         "_lints": lambda: [],
         "_jobs": lambda: [{"key": "queue-cycle", "enabled": True, "when": "0 6,18 * * *", "next": "18:00", "last": None}],
         "_hires": lambda: [],
+        "_gate_log": lambda: [],
         "_terms": lambda: {"weekly_budget": 30, "voyage_budget": 10, "max_instances": 1, "purser": "routing"},
         "_launch": lambda: LAUNCH,
         "_fleet": lambda next=5, find=None: {"summary": "", "running_now": [{"name": "9m-cand", "kind": "voyage"}], "queue_length": 58, "next": [], "_n": 1},
@@ -173,7 +176,7 @@ def test_vsm_status_gives_a_line_a_system_and_names_what_needs_attention(monkeyp
     by = {s["system"]: s for s in out["systems"]}
     assert "1 job(s) at sea now (9m-cand)" in by["S1"]["status"] and by["S1"]["attention"] == []
     assert by["S2"]["attention"] == ["the vast lane is paused: 12 Nov 12:33: the driver is too old"]
-    assert "proposal to S5: allow 2 ships at once" in by["S3"]["attention"]
+    assert f"proposal to S5 (cycle {chat_tools._clock('2026-11-12T11:56')}): allow 2 ships at once" in by["S3"]["attention"]
     assert "1 queued run(s) break the sop policy" in by["S3*"]["attention"]
     assert out["summary"].startswith("4 of 6 systems need attention") and "could_not_read" not in out
 
@@ -236,14 +239,15 @@ def test_expedition_status_reads_v01_its_charter_its_open_goals_and_its_fleet(mo
     _expedition_world(monkeypatch)
     out = chat_tools.run("expedition_status", {})
     assert out["summary"].startswith("Nothing up my sleeve v0.1 is in Test voyages (not frozen: the draft standard is SOP v0.0.6)")
-    assert "1 of 3 parameters of the master charter are signed, 1 are ready" in out["summary"]
+    assert "of the master charter's 3 parameters, 1 are signed, 1 are ready" in out["summary"]
     assert out["ready_to_sign"] == ["the ship: layers"]
     assert out["goals_still_deciding"] == [{
         "goal_id": "kipling:8", "goal": "The hull: deep against wide", "status": "open", "expedition": "The Kipling Expedition",
         "decides": ["ship.width"], "queued_for_it": 1, "at_sea_for_it": ["9m-hull-a"]}]
     assert out["fleet"] == [{"class": "9m",
-                             "base": "the v0.1 ship 9m@v0.1 is not laid yet (no spec written) (only a rehearsal, 9m@v0.0.6, is home)",
-                             "instruct": "the v0.1 ship 9m@v0.1-instruct is not laid yet (no spec written) (no rehearsal has sailed)"}]
+                             "base": "9m@v0.1 is not laid yet. Its latest rehearsal, 9m@v0.0.6, is home.",
+                             "instruct": "9m@v0.1-instruct is not laid yet. No rehearsal has sailed."}]
+    assert "1 wait on an open goal" in out["summary"] and "none of the fleet's 2 v0.1 ships is home" in out["summary"]
     assert out["goals_still_deciding"][0]["goal_id"] == "kipling:8"
     assert chat_tools.run("expedition_status", {"find": "v0.1"})["summary"] == out["summary"]
 
@@ -258,6 +262,46 @@ def test_expedition_status_finds_a_preparation_a_goal_or_a_class(monkeypatch):
     assert chat_tools.run("expedition_status", {"find": "window"})["goals"][0]["goal_id"] == "kipling:9"
     assert chat_tools.run("expedition_status", {"find": "9m"})["summary"].startswith("the 9m class of Nothing up my sleeve v0.1")
     assert "nothing called 'zzz'" in chat_tools.run("expedition_status", {"find": "zzz"})["error"]
+
+
+def test_what_ling_misread_on_12_november_is_said_so_it_cannot_be(monkeypatch):
+    """Read against the live store at 12:45: the 11:56 cycle's "open the Vast lane" passed on with the lane
+    open; "refused lately" counting five days of gate decisions; two H100s that never sailed shown as
+    measured; the judge read as being at sea."""
+    now = time.time()
+    stamp = lambda hours_ago: time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime(now - hours_ago * 3600))  # noqa: E731
+    gate = [
+        {"at": stamp(1), "decisions": [{"policy": "stores", "how": "refused"}]},
+        {"at": stamp(30), "decisions": [{"policy": "stores", "how": "refused"}, {"policy": "clean", "how": "refused"}]},
+    ]
+    cycle = {**CYCLE, "last": {**CYCLE["last"], "proposals": [
+        {"to": "S2", "what": "open the Vast lane", "why": "it is closed"},
+        {"to": "S5", "what": "allow 2 ships at once", "why": "home sooner"},
+    ]}, "judge_can_run": [False, "9m@v0.0.6-candidate (9m) is at sea on this Mac: the judge waits for a smaller harbour"],
+        "to_judge": [{"name": "x", "judged": False}],
+        "classes": CYCLE["classes"] + [{"gpu": "H100 SXM", "hires": 0, "sailed": 0, "failed": 0, "overhead_min": 6.2, "own": False}]}
+    cycle["classes"] = [{**cycle["classes"][0], "own": True}, cycle["classes"][1]]
+    _world(monkeypatch, _cycle=lambda: cycle, _gate_log=lambda: gate, _lanes=lambda: [{"lane": "vast", "kind": "charter", "seats": 1, "open": True, "note": ""}])
+    s3 = chat_tools.run("system_status", {"system": "S3"})
+    assert [p["what"] for p in s3["proposals"]] == ["allow 2 ships at once"]
+    assert s3["gate"]["refused_in_the_last_24_hours"] == {"stores": 1}
+    assert "in the last 24 hours the gate refused runs under stores (1)" in s3["summary"]
+    s4 = chat_tools.run("system_status", {"system": "S4"})
+    assert "set-up overhead measured: RTX 4090 6.2 min (H100 SXM never sailed: assumed the same as the others)" in s4["summary"]
+    assert s4["attention"][0].startswith("the judge qwen3.8-27b is waiting: it runs on this Mac and needs the memory")
+
+
+def test_an_answer_left_inside_an_unclosed_thinking_block_is_the_answer():
+    """12 November: after expedition_status's result, Ling wrote its whole answer inside the <think> the
+    template opened and ended its turn, so the console showed an empty answer and 861 tokens of thinking."""
+    from thorp.chat import answer_left_in_thinking
+
+    said = "Here's the current expedition status ... Bottom line: the expedition is active."
+    assert answer_left_in_thinking(said, said, "", "on", True)
+    assert not answer_left_in_thinking(said, said, "", "on", False)  # cut off by the budget: still thinking
+    assert not answer_left_in_thinking("I'll look.</think>", "I'll look.", "", "on", True)  # closed, and said nothing
+    assert not answer_left_in_thinking(said, said, "an answer", "on", True)
+    assert not answer_left_in_thinking(said, "", said, "off", True)
 
 
 def test_every_tool_has_a_schema_and_ling_can_call_the_new_ones():

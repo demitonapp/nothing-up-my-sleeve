@@ -512,6 +512,33 @@ def _expeditions() -> dict[str, dict]:
     return {k: {"name": e.name, "goal": e.goal, "state": states.get(k) or e.status} for k, e in fleet.EXPEDITIONS.items()}
 
 
+def _gate_log() -> list[dict]:
+    from thorp import vsm
+
+    return vsm.gate_log(400)
+
+
+# vsm.audit()'s `refused_lately` counts the gate's last 400 decisions, which went back five days on
+# 12 November: Ling read "stores (30)" as thirty refusals lately. The tool counts a day of them itself.
+GATE_DAY_HOURS = 24
+
+
+def _refused_today(log: list[dict], now: float | None = None) -> dict[str, int]:
+    since = (now or time.time()) - GATE_DAY_HOURS * 3600
+    out: dict[str, int] = {}
+    for g in log:
+        try:
+            at = time.mktime(time.strptime(str(g.get("at"))[:19], "%Y-%m-%dT%H:%M:%S"))
+        except ValueError:
+            continue
+        if at < since:
+            continue
+        for d in g.get("decisions") or []:
+            if d.get("how") == "refused":
+                out[d.get("policy")] = out.get(d.get("policy"), 0) + 1
+    return out
+
+
 def _goal_rows() -> list[dict]:
     from thorp import expedition_goals
 
@@ -536,6 +563,7 @@ class _World:
             "terms": (lambda: _terms(), {}),
             "launch": (lambda: _launch(), {}),
             "fleet": (lambda: _fleet(1), {}),
+            "gate": (lambda: _gate_log(), []),
         }
 
     def get(self, name: str) -> Any:
@@ -622,19 +650,39 @@ def _last_cycle(w: _World) -> dict:
     return w.get("cycle").get("last") or {}
 
 
+def _answered(p: dict, w: _World) -> bool:
+    """A cycle's proposal that the world has answered since: "open the Vast lane" once it is open (Ling
+    passed the 11:56 cycle's proposal on at 12:45, with the lane open since 12:3x)."""
+    m = re.match(r"open the (\w+) lane", str(p.get("what") or ""), re.I)
+    if m:
+        return any(ln["lane"].lower() == m.group(1).lower() and ln["open"] for ln in w.get("lanes"))
+    return False
+
+
 def _proposals(w: _World, to: str | None = None) -> list[dict]:
+    """The last cycle's proposals still standing, each with the cycle it came from."""
+    at = _clock(_last_cycle(w).get("at"))
     return [
-        {"to": p.get("to"), "what": p.get("what"), "why": _clip(p.get("why"), 200)}
+        {"to": p.get("to"), "what": p.get("what"), "why": _clip(p.get("why"), 200), "from_the_cycle_at": at}
         for p in _last_cycle(w).get("proposals") or []
-        if to is None or p.get("to") == to
+        if (to is None or p.get("to") == to) and not _answered(p, w)
     ]
+
+
+def _clock(at: Any) -> str | None:
+    """A cycle's time as a person says it: 'today 11:56', not '2026-11-12T11:56+10:00'."""
+    s = str(at or "")
+    m = re.match(r"(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})", s)
+    if not m:
+        return s or None
+    return f"today {m.group(2)}" if m.group(1) == time.strftime("%Y-%m-%d") else f"{m.group(1)} {m.group(2)}"
 
 
 def _s3(w: _World) -> dict:
     a3 = w.get("audit").get("S3") or {}
     pol = a3.get("policies") or {}
     on = [k for k, p in pol.items() if p.get("enforced")]
-    refused = {k: p["refused_lately"] for k, p in pol.items() if p.get("refused_lately")}
+    refused = _refused_today(w.get("gate"))
     last = _last_cycle(w)
     env, plan = last.get("envelope") or {}, last.get("plan") or {}
     chosen = next((o for o in plan.get("options") or [] if o.get("ships") == plan.get("ships")), {})
@@ -648,14 +696,15 @@ def _s3(w: _World) -> dict:
     return {
         "summary": _words(
             f"{len(on)} of {len(pol)} policies are enforced at the gate" if pol else None,
-            f"the gate refused runs lately under {', '.join(f'{k} ({n})' for k, n in refused.items())}" if refused else "the gate has refused nothing lately" if pol else None,
+            f"in the last {GATE_DAY_HOURS} hours the gate refused runs under {', '.join(f'{k} ({n})' for k, n in refused.items())}" if refused
+            else f"the gate refused nothing in the last {GATE_DAY_HOURS} hours" if pol else None,
             f"{_usd(env.get('week_spent'))} of the week's {_usd(env.get('weekly_budget'))} is spent and this cycle may commit {_usd(env.get('cycle_allowance'))}" if env else "no planning cycle has been kept yet",
             f"the purser is {env.get('purser')}" if env else None,
-            f"the last cycle ({last.get('at')}, {last.get('how')}) plans {plan.get('ships')} hired ship(s): {len(plan.get('abroad') or [])} voyage(s) abroad and {plan.get('stay')} on this Mac" if plan else None,
-            f"{len(proposals)} proposal(s) wait for Justin" if proposals else None,
+            f"the last cycle ({_clock(last.get('at'))}, {last.get('how')}) plans {plan.get('ships')} hired ship(s): {len(plan.get('abroad') or [])} voyage(s) abroad and {plan.get('stay')} on this Mac" if plan else None,
+            f"{len(proposals)} proposal(s) from that cycle wait for Justin" if proposals else None,
         ),
-        "attention": [f"proposal to {p['to']}: {p['what']}" for p in proposals],
-        "gate": {"enforced": on, "advisory": [k for k in pol if k not in on], "refused_lately": refused,
+        "attention": [f"proposal to {p['to']} (cycle {p['from_the_cycle_at']}): {p['what']}" for p in proposals],
+        "gate": {"enforced": on, "advisory": [k for k in pol if k not in on], f"refused_in_the_last_{GATE_DAY_HOURS}_hours": refused,
                  "runs_not_finished": a3.get("runs_not_finished")},  # fmt: skip
         "budget": budget,
         "last_cycle": (
@@ -702,20 +751,29 @@ def _s4(w: _World) -> dict:
     fails = c.get("failures") or {}
     classes = [
         {"gpu": x.get("gpu"), "hires": x.get("hires"), "sailed": x.get("sailed"), "failed": x.get("failed"),
-         "overhead_minutes": round(x["overhead_min"], 1) if x.get("overhead_min") is not None else None, "source": _clip(x.get("source"), 90)}  # fmt: skip
+         "overhead_minutes": round(x["overhead_min"], 1) if x.get("overhead_min") is not None else None,
+         # a class none of whose hires has sailed borrows the others' median: said, so it is not read as a
+         # measurement (the H100s read "measured 6.2 min" on 12 November, never having been hired)
+         "measured": bool(x.get("own")), "source": _clip(x.get("source"), 120)}  # fmt: skip
         for x in c.get("classes") or []
     ]
+    measured = [f"{x['gpu']} {x['overhead_minutes']} min" for x in classes if x["measured"] and x["overhead_minutes"] is not None]
+    assumed = [x["gpu"] for x in classes if not x["measured"]]
     judge = c.get("judge") or {}
     can = c.get("judge_can_run") or [None, ""]
     waiting = sum(1 for x in c.get("to_judge") or [] if not x.get("judged"))
+    # the judge is a model on this Mac and a voyage holds the memory it needs; said with the judge as the
+    # subject, since Ling read "the judge ... 9m@... is at sea on this Mac" as the judge being at sea
+    blocked = f"the judge {judge.get('name')} is waiting: it runs on this Mac and needs the memory, and {_clip(can[1], 140)}"
     return {
         "summary": _words(
             f"{fails.get('failed')} of {fails.get('hires')} GPU hires never sailed, {_usd(fails.get('wasted_cost'))} wasted" if fails.get("hires") else "no GPU hire is on record",
-            "measured overhead: " + ", ".join(f"{x['gpu']} {x['overhead_minutes']} min" for x in classes if x["overhead_minutes"] is not None) if classes else None,
-            (f"the judge is {judge.get('name')}" + ("" if can[0] else f", which cannot run now ({_clip(can[1], 120)})") + f"; {waiting} failed fit-out(s) wait for it") if judge else "no judge is chosen",
+            ("set-up overhead measured: " + ", ".join(measured) if measured else "no set-up overhead measured yet")
+            + (f" ({', '.join(assumed)} never sailed: assumed the same as the others)" if assumed else "") if classes else None,
+            (f"the judge is {judge.get('name')}" + ("" if can[0] else f" and cannot run yet ({_clip(can[1], 120)})") + f"; {waiting} failed fit-out(s) wait for its verdict") if judge else "no judge is chosen",
             f"{len(a4.get('competitors') or [])} competitors and {len(a4.get('reference_ladder') or [])} reference models are read" if a4 else None,
         ),
-        "attention": ([f"the judge cannot run now: {_clip(can[1], 160)}"] if judge and can[0] is False and waiting else []),
+        "attention": ([blocked] if judge and can[0] is False and waiting else []),
         "gpu_classes": classes,
         "hire_failures": {k: fails.get(k) for k in ("hires", "failed") if fails.get(k) is not None} | (
             {"wasted": _usd(fails.get("wasted_cost")), "wasted_minutes": round(fails.get("wasted_min") or 0)} if fails else {}
@@ -845,8 +903,8 @@ def _role(part: dict) -> str:
 
 
 _SHIP_STATE = {
-    "not laid": "is not laid yet (no spec written)",
-    "laid": "is laid (its spec is written) but has not sailed",
+    "not laid": "is not laid yet",
+    "laid": "is laid but has not sailed",
     "queued": "is queued",
     "at sea": "is at sea now",
     "home": "is home",
@@ -854,15 +912,15 @@ _SHIP_STATE = {
 
 
 def _ship_words(cell: dict) -> str:
-    """A v0.1 ship and its last rehearsal said apart, so a rehearsal that is home is never read as the v0.1
-    ship being home (Ling read '9m@v0.1: not laid; latest rehearsal 9m@v0.0.6 (home)' as 'the 9m is home')."""
+    """A v0.1 ship and its last rehearsal in two plain sentences, so a rehearsal's state is never read as
+    the v0.1 ship's. Ling read '9m@v0.1: not laid; latest rehearsal 9m@v0.0.6 (home)' as 'the 9m is home',
+    and a nested '(only a rehearsal, 21m@v0.0.6, is laid (its spec is written) ...)' as '21m@v0.1 is laid'."""
     if not cell.get("ship"):
         return cell.get("why") or cell.get("state") or "none"
     st = _SHIP_STATE.get(cell.get("state") or "", f"is {cell.get('state')}")
     reh = (cell.get("rehearsals") or [None])[0]
-    return f"the v0.1 ship {cell['ship']} {st}" + (
-        f" (only a rehearsal, {reh['name']}, {_SHIP_STATE.get(reh['state'], 'is ' + str(reh['state']))})" if reh else " (no rehearsal has sailed)"
-    )
+    tail = f" Its latest rehearsal, {reh['name']}, {_SHIP_STATE.get(reh['state'], 'is ' + str(reh['state']))}." if reh else " No rehearsal has sailed."
+    return f"{cell['ship']} {st}.{tail}"
 
 
 def expedition_status(find: str | None = None) -> dict:
@@ -917,8 +975,9 @@ def expedition_status(find: str | None = None) -> dict:
             prep = (p.get("preparations") or {}).get(key) or {}
             count = {s: sum(1 for x in mine if x["status"] == s) for s in ("done", "partly", "open", "dropped")}
             return {
+                # said as a preparation first: Ling read Kipling as "the first fleet launch for v0.1" (12 November)
                 "summary": _words(
-                    f"{exps[key]['name']} is {exps[key]['state']}",
+                    f"{exps[key]['name']} is one of the preparations for {version}, not the launch itself; it is {exps[key]['state']}",
                     f"{count['done']} of {len(mine)} goal(s) done, {count['partly']} partly, {count['open']} open" + (f", {count['dropped']} dropped" if count["dropped"] else "") if mine else "it states no goals",
                     f"{prep['blocking']} of its goals still hold up a parameter of {version}" if prep.get("blocking") else f"none of its goals holds up {version}",
                     f"{sum(v['queued_for_it'] for v in views)} queued line(s) serve it",
@@ -948,10 +1007,10 @@ def expedition_status(find: str | None = None) -> dict:
     return {
         "summary": _words(
             f"{version} is in {', '.join(active) or 'no phase'}" + ("" if p.get("frozen") else f" (not frozen: the draft standard is SOP v{p.get('draft')})"),
-            f"{r.get('signed')} of {r.get('params')} parameters of the master charter are signed, {r.get('ready')} are ready for Justin to sign and {r.get('waiting')} wait on a goal"
+            f"of the master charter's {r.get('params')} parameters, {r.get('signed')} are signed, {r.get('ready')} are ready for Justin to sign and {r.get('waiting')} wait on an open goal"
             + (f", {r.get('drifted')} drifted since signing" if r.get("drifted") else ""),
             f"{r.get('blocking')} goal(s) that decide a parameter are still open",
-            f"{r.get('home')} of the fleet's {r.get('ships')} ships are home",
+            f"none of the fleet's {r.get('ships')} v0.1 ships is home" if not r.get("home") else f"{r.get('home')} of the fleet's {r.get('ships')} v0.1 ships are home",
         ),
         "phases": [{"phase": x["name"], "state": x["state"], "note": x["note"]} for x in phases],
         "charter": {k: r.get(k) for k in ("params", "signed", "ready", "waiting", "drifted")},

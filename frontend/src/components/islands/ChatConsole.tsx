@@ -52,16 +52,29 @@ interface Live { text: string; thinking: string; n: number; tools: ToolCall[] }
 interface ToolCall { round: number; name: string; arguments: Record<string, unknown>; result: Record<string, unknown> }
 
 /** A tool call as a line in the thread: the call, then what it returned (or its error). */
+/** One tool call, folded (12 November, Justin: "tool calls text need be able to be collapsible"): closed,
+ *  the call and its result's one-line summary; open, every field of the result, one a line. */
 function ToolLine({ c }: { c: ToolCall }) {
   const args = Object.entries(c.arguments || {}).map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(', ');
   const res = c.result || {};
   const bad = 'error' in res;
-  const shown = bad ? String(res.error) : Object.entries(res).map(([k, v]) => `${k}: ${typeof v === 'string' ? v : JSON.stringify(v)}`).join(' · ');
+  const head = bad ? String(res.error) : typeof res.summary === 'string' ? res.summary : typeof res.answer === 'string' ? res.answer : '';
+  const fields = Object.entries(res).filter(([k]) => !(k === 'summary' && !bad));
   return (
-    <span className={`consoletool${bad ? ' bad' : ''}`} title={JSON.stringify(c, null, 2)}>
-      <span className="consoletoolname">⚙ {c.name || 'unknown'}({args})</span>
-      <span className="consoletoolres">→ {shown}</span>
-    </span>
+    <details className={`consoletool${bad ? ' bad' : ''}`}>
+      <summary>
+        <span className="consoletoolname">⚙ {c.name || 'unknown'}({args})</span>
+        {head ? <span className="consoletoolhead">→ {head}</span> : null}
+      </summary>
+      <div className="consoletoolres">
+        {fields.map(([k, v]) => (
+          <div key={k} className="consoletoolfield">
+            <b>{k}</b>
+            {typeof v === 'string' ? <span>{v}</span> : <pre>{JSON.stringify(v, null, 2)}</pre>}
+          </div>
+        ))}
+      </div>
+    </details>
   );
 }
 

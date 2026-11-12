@@ -698,10 +698,25 @@ def _own_tokens(tok, text: str) -> int:
         return 0
 
 
+_THINK_CLOSES = ("</think>", "<|end_of_thought|>", "<channel|>")
+
+
+def answer_left_in_thinking(text: str, reasoning: str, reply: str, thinking: str, model_ended: bool) -> bool:
+    """Whether a turn's thinking is really its answer: thinking was on, the model ended the turn itself,
+    the thinking was never closed and nothing came after it. A turn cut off by the budget is not one."""
+    return bool(
+        not reply
+        and reasoning
+        and thinking in ("on", "auto")
+        and model_ended
+        and not any(mk in text for mk in _THINK_CLOSES)
+    )
+
+
 def _split_reasoning(text: str, thinking: str) -> tuple[str, str]:
     """(reasoning, answer) from a continuation: the trace is what came before the closing think
     marker; with no marker and thinking on, the whole continuation is still reasoning."""
-    for marker in ("</think>", "<|end_of_thought|>", "<channel|>"):
+    for marker in _THINK_CLOSES:
         if marker in text:
             head, _, tail = text.rpartition(marker)
             return head.strip(), tail.strip()
@@ -1198,6 +1213,7 @@ def foreign_stream(
         fmt = None
     calls_log: list[dict] = []
     reasonings: list[str] = []
+    answered_in_thinking = False
     seconds_all, total_tokens_all = 0.0, 0
     first_cached, first_pct, first_ids = None, None, None
     for rnd in range(TOOL_ROUNDS + 1):
@@ -1293,6 +1309,13 @@ def foreign_stream(
                 ended = True
                 break
         reasoning, reply = _split_reasoning(str(answer), state)
+        # after a tool result the template opens <think> again, and Ling 3.0 Tiny can write its whole answer
+        # inside it and end its turn without closing it (12 November: "whats the expedition status" came back
+        # with 861 tokens filed as thinking and an empty answer). A turn the model ended itself, whose thinking
+        # was never closed, is taken as its answer, and the reply says so; a turn cut off by the budget is not.
+        if answer_left_in_thinking(str(answer), reasoning, reply, state, ended or live.ended or finish == "stop"):
+            reply, reasoning = reasoning, ""
+            answered_in_thinking = True
         if reasoning:
             reasonings.append(reasoning)
         seconds_all += seconds
@@ -1347,6 +1370,8 @@ def foreign_stream(
                 "dropped_turns": dropped,
                 # whether the thinking was closed at its cap rather than by the model
                 "think_capped": bool(capper is not None and capper.forced),
+                # the model wrote its answer inside a thinking block it never closed, and ended its turn
+                "answer_in_thinking": answered_in_thinking,
                 # the tool calls the model made, each with its result, in order (thorp/chat_tools.py)
                 "tool_calls": calls_log,
                 "tool_rounds": len({c["round"] for c in calls_log}),

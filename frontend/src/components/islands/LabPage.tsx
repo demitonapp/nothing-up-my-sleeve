@@ -177,6 +177,7 @@ export default function LabPage() {
       </h1>
       <TabNav
         id="labnav"
+        className="subnav pintabs"
         ariaLabel="the house's views"
         items={[
           { key: 'overview', label: 'Overview', href: base, active: tab === 'overview' },
@@ -208,6 +209,10 @@ export default function LabPage() {
               </div>
             </section>
           </div>
+            </>
+          ) : (
+            <>
+          {/* its ships open the Models tab (12 November, Justin: "move Its ships section to the Models tab") */}
           <section className={cardCls(false, 'panel')}>
             <h2>
               Its ships{' '}
@@ -236,9 +241,8 @@ export default function LabPage() {
               <a href="/orbitals/masaq">back to the houses →</a>
             </p>
           </section>
+          <LabModels lab={d.key} ships={fleet} />
             </>
-          ) : (
-            <LabModels lab={d.key} ships={fleet} />
           )}
         </>
       )}

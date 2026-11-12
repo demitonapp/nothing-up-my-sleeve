@@ -12,11 +12,54 @@ import { navPath } from './nav';
 export interface Crumb {
   label: string;
   href: string;
+  /** Quick ways on from this crumb, shown as a dropdown when it is chosen (12 November, Justin: "if i
+   *  select masaq reach then a dropdown should appear with quick options to navigate, same thing for
+   *  demiton's orbital"). A `group` starts a new labelled section of the menu. */
+  menu?: MenuItem[];
 }
 
+export interface MenuItem {
+  label: string;
+  href: string;
+  group?: string;
+  note?: string;
+}
+
+// Demiton's quick ways on: its views (DemitonTabs), the queue and the VSM inside the expeditions, every
+// ship, and its classes smallest first, by their canonical address
+const DEMITON_MENU: MenuItem[] = [
+  { label: 'Overview', href: '/orbitals/demiton', group: 'The orbital' },
+  { label: 'Berth', href: '/orbitals/demiton/berth' },
+  { label: 'Shipyard', href: '/shipyard' },
+  { label: 'Library', href: '/library' },
+  { label: 'Images', href: '/library/images', note: 'in the Library' },
+  { label: 'Expeditions', href: '/expeditions', group: 'At sea' },
+  { label: 'Queue', href: '/expeditions/queue' },
+  { label: 'VSM', href: '/vsm' },
+  { label: 'Every ship', href: '/ships' },
+  { label: 'The towing tank', href: '/ships/300k', note: '300k', group: 'The classes' },
+  { label: 'The measured mile', href: '/ships/1m', note: '1m' },
+  { label: 'The sea trial', href: '/ships/9m', note: '9m' },
+  { label: 'The coasting run', href: '/ships/21m', note: '21m' },
+  { label: 'The paragraph', href: '/ships/50m', note: '50m' },
+  { label: 'Invention', href: '/ships/100m', note: '100m' },
+  { label: 'The trader', href: '/ships/350m', note: '350m' },
+];
+
+// Masaq' Reach's quick ways on: its three views, and the models by size band
+const MASAQ_MENU: MenuItem[] = [
+  { label: 'Labs', href: '/orbitals/masaq', group: 'The Reach' },
+  { label: 'Models', href: '/orbitals/masaq/models' },
+  { label: 'Embeddings', href: '/orbitals/masaq/embeddings' },
+  { label: 'Extra small', href: '/orbitals/masaq/models/xsmall', group: 'Models by size' },
+  { label: 'Small', href: '/orbitals/masaq/models/small' },
+  { label: 'Medium', href: '/orbitals/masaq/models/medium' },
+  { label: 'Large', href: '/orbitals/masaq/models/large' },
+];
+
 const ORBITALS: Crumb = { label: 'Orbitals', href: '/orbitals' };
-const DEMITON: Crumb = { label: 'Demiton', href: '/orbitals/demiton' };
-const MASAQ: Crumb = { label: "Masaq' Reach", href: '/orbitals/masaq' };
+const DEMITON: Crumb = { label: 'Demiton', href: '/orbitals/demiton', menu: DEMITON_MENU };
+const MASAQ: Crumb = { label: "Masaq' Reach", href: '/orbitals/masaq', menu: MASAQ_MENU };
 const EXPEDITIONS: Crumb = { label: 'Expeditions', href: '/expeditions' };
 const LIBRARY: Crumb = { label: 'Library', href: '/library' };
 const SHIPYARD: Crumb = { label: 'Shipyard', href: '/shipyard' };

@@ -48,13 +48,33 @@ header { padding: 14px 20px; border-bottom: 1px solid var(--line); display: flex
          align-items: baseline; gap: 16px; flex-wrap: wrap; position: sticky; top: 0; background: var(--bg); z-index: 5; }
 header h1 { margin: 0; font-size: var(--fs-xl); letter-spacing: .02em; }
 /* the breadcrumb trail under the header, on every page (components/islands/Breadcrumbs, lib/crumbs.ts) */
-nav.trail { padding: 8px 20px; border-bottom: 1px solid var(--line); font-size: var(--fs-sm); }
+nav.trail { padding: 8px 20px; border-bottom: 1px solid var(--line); font-size: var(--fs-sm);
+            /* pinned just under the sticky header (its height measured by the island into --header-h) */
+            position: sticky; top: var(--header-h, 57px); z-index: 4; background: var(--bg); }
+/* a page's own tabs, pinned under the trail as the page scrolls (--pin-top: the header and the trail) */
+.pintabs { position: sticky; top: var(--pin-top, 93px); z-index: 3; background: var(--bg); }
 nav.trail ol { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 0; }
 nav.trail li { display: inline-flex; align-items: baseline; min-width: 0; }
 nav.trail li + li::before { content: "›"; color: var(--muted); margin: 0 8px; opacity: .7; }
 nav.trail a { color: var(--muted); text-decoration: none; }
 nav.trail a:hover, nav.trail a:focus-visible { color: var(--accent); }
 nav.trail [aria-current="page"] { color: var(--text); overflow-wrap: anywhere; }
+/* a crumb with quick ways on (Demiton, Masaq' Reach): a button that drops a menu */
+nav.trail .trailhas { position: relative; }
+nav.trail .trailbtn { display: inline-flex; align-items: center; gap: 5px; padding: 1px 6px; margin: -1px -6px; border: 1px solid transparent; border-radius: 4px; background: none; color: var(--muted); font: inherit; cursor: pointer; }
+nav.trail .trailbtn svg { opacity: .7; transition: transform .12s; }
+nav.trail .trailbtn:hover, nav.trail .trailbtn:focus-visible, nav.trail .trailbtn[aria-expanded="true"] { color: var(--accent); border-color: var(--line); background: var(--raise); }
+nav.trail .trailbtn[aria-expanded="true"] svg { transform: rotate(180deg); }
+nav.trail .trailbtn[aria-current="page"] { color: var(--text); }
+nav.trail .trailmenu { position: absolute; top: calc(100% + 6px); left: -6px; z-index: 30; min-width: 220px; max-height: min(70vh, 520px); overflow-y: auto; padding: 6px; display: grid; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; box-shadow: 0 10px 28px rgba(0, 0, 0, .45); }
+nav.trail .trailgroup { padding: 8px 10px 4px; color: var(--muted); font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .06em; }
+nav.trail .trailgroup:first-child { padding-top: 4px; }
+nav.trail .trailmenu a { display: flex; justify-content: space-between; gap: 12px; padding: 6px 10px; border-radius: 4px; color: var(--text); }
+nav.trail .trailmenu a .s { color: var(--muted); }
+nav.trail .trailmenu a:hover, nav.trail .trailmenu a:focus-visible { background: var(--raise); color: var(--accent); outline: none; }
+nav.trail .trailmenu a[aria-current="page"] { color: var(--accent); }
+nav.trail .trailmenu a[aria-current="page"]::after { content: "here"; margin-left: auto; color: var(--muted); font-size: var(--fs-xs); }
+nav.trail .trailmenu a[aria-current="page"] .s { display: none; }
 @media (max-width: 640px) { nav.trail { padding: 6px 16px; } }
 /* the trail says where a page sits, so the old one-step "← back" links in a page's title are not drawn;
    a title that is itself a trail (h1.crumbs) keeps its links */
@@ -1445,6 +1465,7 @@ button[aria-busy="true"] { cursor: progress; opacity: .7; }
 .embsub .q { color: var(--muted); font-weight: 400; margin-left: 8px; }
 .embrule { margin: 0; color: var(--muted); font-size: var(--fs-sm); line-height: 1.5; }
 .embrule b { color: var(--accent); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; margin-right: 6px; }
+@media (max-width: 700px) { .embnode.d1 { padding-left: 8px; } }
 /* the Library's Images tab: gathered illustrations as a contact sheet */
 .imggrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
 .imgcard { margin: 0; display: grid; gap: 6px; align-content: start; }

@@ -7,6 +7,7 @@
 // tests, chaining two facts), then the field's discoveries. The data is lib/fieldMap.ts. Links are plain addresses
 // under Demiton's discoveries, which the Discoveries island follows in place.
 
+import { useEffect } from 'react';
 import { crumbCls, emptyCls, pillCls, cardCls } from '@/lib/ui';
 import { DEMITON_DISCOVERIES as DB } from '@/lib/discoveryPaths';
 import { AXES, axisBySlug, discoveriesIn, oursIn, slugOf, type MapAxis, type OurWork } from '@/lib/fieldMap';
@@ -56,6 +57,19 @@ function OursCards({ ours }: { ours: OurWork[] }) {
 
 /** An axis (its categories as cards) or one category of it (our sections there, then the field's discoveries). */
 export function FieldMapView({ slug, cat }: { slug: string; cat: string | null }) {
+  // a search (the ⌘K palette) opens a discovery's card as #<key>: the page is drawn after the browser looked for the
+  // anchor, so scroll to it once it is here, and outline it for a moment so the eye finds it
+  useEffect(() => {
+    const id = decodeURIComponent(window.location.hash.slice(1));
+    const el = id ? document.getElementById(id) : null;
+    if (!el) return;
+    el.scrollIntoView({ block: 'center' });
+    el.style.outline = '2px solid var(--accent)';
+    // and again once the plates above it (our sections' images) have had a moment to load and push it down
+    const again = window.setTimeout(() => el.scrollIntoView({ block: 'center' }), 450);
+    const t = window.setTimeout(() => { el.style.outline = ''; }, 2400);
+    return () => { window.clearTimeout(again); window.clearTimeout(t); };
+  }, [slug, cat]);
   const axis = axisBySlug(slug);
   if (!axis) return <div className={emptyCls()}>no such axis: {slug}</div>;
   const category = cat ? axis.categories.find((c) => slugOf(c) === cat || c.key === cat) || null : null;

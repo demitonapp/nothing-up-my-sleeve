@@ -12,6 +12,9 @@ import foreign from '@/data/foreign.json';
 import { fieldCls } from '@/lib/ui';
 import { LIBERTY_MACHINE_SYSTEMS, libertyMachineHref } from '@/lib/nav';
 import { TEST_CATEGORIES } from '@/lib/testCategories';
+import { AXES, DISCOVERIES, KINDS, OBJECTS, OURS, slugOf } from '@/lib/fieldMap';
+import { TRICKS, WAYPOINTS } from '@/lib/fieldTricks';
+import { CHAIN_KEYS, DEMITON_DISCOVERIES as DB } from '@/lib/discoveryPaths';
 
 /** The foreign ships with a page of their own (data/foreign.json, written from thorp.foreign.models).
  *  Kept for `chatHref`, not for the palette's list. */
@@ -47,7 +50,44 @@ export interface Dest {
   note?: string;
   /** Extra words a reader may type for this place (the label and note are searched too). */
   keywords?: string;
+  /** Shown only once something is typed: the long lists (every discovery, every trick) would bury the places. */
+  searchOnly?: boolean;
+  /** The entry's own key (a trick's few_shot, a discovery's two-hop-curse): typed in full, it ranks first. */
+  key?: string;
 }
+
+// Everything in Demiton's discoveries, searchable (13 November, Justin: "cmd k needs to be able to search all the
+// discoveries"): the two axes and their categories, our own sections, the field's discoveries (each opens its card
+// on its kind-of-claim page), every trick and the explorer's four chains. Built from the map's own data, so a new
+// discovery or trick is found without an edit here.
+const kindName = (k: string): string => (KINDS.find((c) => c.key === k) || { name: k }).name;
+const objectName = (k: string): string => (OBJECTS.find((c) => c.key === k) || { name: k }).name;
+const kindSlug = (k: string): string => { const c = KINDS.find((x) => x.key === k); return c ? slugOf(c) : k; };
+const waypointName = (k: string): string => (WAYPOINTS.find((w) => w.key === k) || { name: k }).name;
+
+const DISCOVERY_DESTS: Dest[] = [
+  ...AXES.flatMap((a) => [
+    { group: 'Discoveries', label: a.name, href: `${DB}/${a.slug}`, note: `axis ${a.n}: ${a.question}`, keywords: a.categories.map((c) => c.name).join(' ') },
+    ...a.categories.map((c) => ({
+      group: 'Discoveries', label: `${a.name} · ${c.name}`, href: `${DB}/${a.slug}/${slugOf(c)}`, note: c.question, keywords: c.about,
+    })),
+  ]),
+  ...OURS.map((o) => ({
+    group: 'Discoveries', label: o.title, href: o.href, note: `from our fleet · ${kindName(o.kind)} · ${objectName(o.object)}`, keywords: o.about,
+  })),
+  ...CHAIN_KEYS.map((k) => {
+    const t = TRICKS.find((x) => x.key === k);
+    return { group: 'Discoveries', label: `${t ? t.name : k}: the climb`, href: `${DB}/chains/${k}`, note: 'one of the explorer’s four discovery chains, rung by rung', keywords: `chain ${k}` };
+  }),
+  ...DISCOVERIES.map((d) => ({
+    group: 'Field discoveries', label: d.title, href: `${DB}/kind-of-claim/${kindSlug(d.kind)}#${d.key}`,
+    note: `${d.source} · ${kindName(d.kind)} · ${objectName(d.object)}`, keywords: d.finding, key: d.key, searchOnly: true,
+  })),
+  ...TRICKS.map((t) => ({
+    group: 'Tricks of the trade', label: t.name, href: t.href,
+    note: `${waypointName(t.waypoint)} · ${t.source || 'our own test'}`, keywords: t.does, key: t.key, searchOnly: true,
+  })),
+];
 
 /** The places the palette can take you. Grouped in the order below; the top-level ways in come first,
  *  then Demiton's views, the ships, Masaq' Reach, the discoveries and the leaderboard boards. */
@@ -94,11 +134,8 @@ export const DESTINATIONS: Dest[] = [
   { group: 'Masaq’ Reach', label: 'Models', href: '/orbitals/masaq/models', note: 'every outside model by size band' },
   { group: 'Masaq’ Reach', label: 'Embeddings', href: '/orbitals/masaq/embeddings', note: 'the embeddings ontology' },
 
-  { group: 'Discoveries', label: 'Discoveries', href: '/orbitals/demiton/discoveries', note: 'what our fleet found' },
-  { group: 'Discoveries', label: 'Tests', href: '/orbitals/demiton/discoveries/tests', note: 'the four questions, the logic and cause decks' },
-  { group: 'Discoveries', label: 'Skills', href: '/orbitals/demiton/discoveries/skills', note: 'the ladder and every trick' },
-  { group: 'Discoveries', label: 'Stars', href: '/orbitals/demiton/discoveries/stars', note: 'the heads our ships lit and the sixteen cards' },
-  { group: 'Discoveries', label: 'Head kinds', href: '/orbitals/demiton/discoveries/head-kinds', note: 'every kind research has named, the cards beyond the sixteen and the Qwen mapping' },
+  { group: 'Discoveries', label: 'Discoveries', href: '/orbitals/demiton/discoveries', note: 'what our fleet found, and the field’s discoveries on two axes' },
+  ...DISCOVERY_DESTS,
 
   ...TEST_CATEGORIES.map((c) => ({
     group: 'Leaderboard', label: c.label, href: `/leaderboard/${c.key}`,
@@ -115,15 +152,22 @@ export const DESTINATIONS: Dest[] = [
  *  a word of the label, then the label anywhere, then the note; groups stay in their own order, so the
  *  headers never interleave. Pure, so the ranking can be read without a browser. */
 export function filterDestinations(dests: Dest[], q: string): Dest[] {
-  const needle = q.trim().toLowerCase();
-  if (!needle) return dests;
+  // underscores and hyphens read as spaces, so "few shot" finds few_shot and "two hop" the two-hop curse
+  const norm = (s: string): string => s.toLowerCase().replace(/[_\-·]+/g, ' ');
+  const needle = norm(q.trim());
+  if (!needle) return dests.filter((d) => !d.searchOnly);
+  const words = needle.split(/\s+/).filter(Boolean);
   const score = (d: Dest): number => {
-    const label = d.label.toLowerCase();
-    if (label.startsWith(needle)) return 0;
+    const label = norm(d.label);
+    if (label.startsWith(needle) || (d.key && norm(d.key) === needle)) return 0;
     if (label.split(/[^a-z0-9]+/).some((w) => w.startsWith(needle))) return 1;
     if (label.includes(needle)) return 2;
-    if (`${d.note || ''} ${d.keywords || ''}`.toLowerCase().includes(needle)) return 3;
-    if (d.group.toLowerCase().includes(needle)) return 4;
+    const rest = norm(`${d.note || ''} ${d.keywords || ''} ${d.key || ''}`);
+    if (rest.includes(needle)) return 3;
+    // every word of the query somewhere in the entry, in any order (13 November: a long list is searched by words)
+    const all = `${label} ${rest} ${norm(d.group)}`;
+    if (words.length > 1 && words.every((w) => all.includes(w))) return 3;
+    if (norm(d.group).includes(needle)) return 4;
     return -1;
   };
   const groups = new Map<string, Dest[]>();
@@ -215,7 +259,7 @@ export default function CommandPalette() {
           value={q}
           onChange={(e) => { setQ(e.target.value); setAt(0); }}
           onKeyDown={onKeyDown}
-          placeholder="Where to? Type a place, page or section…"
+          placeholder="Where to? Type a place, a page, a discovery or a trick…"
           aria-label="where to navigate"
           aria-controls="cmdkrows"
           autoComplete="off"

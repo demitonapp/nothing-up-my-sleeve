@@ -13,6 +13,8 @@
 // The old /discoveries addresses still answer: each is sent to its new home by `newHome`, so the links already out
 // in the world (and in the ledger's essays) keep working.
 
+import tricks from '../data/tricks.json';
+
 export const DEMITON_DISCOVERIES = '/orbitals/demiton/discoveries';
 /** The Reach's old discoveries address: it forwards to HEAD_KINDS (13 November, Justin: "discoveries should be moved
  *  to the demiton orbital", then "remove it" from Masaq' Reach: the head kinds, the cards beyond the sixteen and the
@@ -27,12 +29,11 @@ export const QWEN4B_PAGE = '/foreign/qwen3-4b';
 export const MASAQ_SUBS = ['kinds', 'cards', 'unsorted'] as const;
 export type MasaqSub = (typeof MASAQ_SUBS)[number];
 
-/** Every trick and chain page a static build must know of (the island reads the path; this is only the list). */
-export const TRICK_KEYS = ['copying', 'spelling', 'successor', 'kin_test', 'pedigree_test', 'fire_test', 'workshop_test', 'counting_test',
-  'period_test', 'breeders_test', 'smiths_test', 'gap_test', 'nature_test', 'mill_test', 'between_test', 'malthus_test',
-  'rumford_test', 'triads_test', 'again_test', 'refrain_test', 'seasons_test', 'pigeonhole_test', 'lucretius_test',
-  'recurrence_test', 'logic_test', 'crowns_test', 'origin_test', 'energy_test', 'mendeleev_gaps', 'geometry_test'];
-export const CHAIN_KEYS = ['origin_test', 'energy_test', 'mendeleev_gaps', 'recurrence_test'];
+/** Every trick and chain page a static build must know of: the registries' own lists (data/tricks.json, written by
+ *  `python -m thorp.dash.trick_keys` from KNOWN_TRICKS and fleet.CHAINS; 13 November: the hand-typed list had 30 of
+ *  the 65 tricks, so a pasted address for any other was a 404). */
+export const TRICK_KEYS: string[] = tricks.tricks;
+export const CHAIN_KEYS: string[] = tricks.chains;
 /** The paths under a discoveries base, for getStaticPaths: the tabs, the old aliases, the doors, every trick and chain. */
 export const DISCOVERY_PATHS = ['overview', 'two-facts', 'physics', 'maths', 'reasoning', 'philosophy', 'mathematics', 'skills',
   'quantum-tests', 'tests', 'quantum', 'registry', 'stars', 'cards', 'traits', 'head-kinds', 'head-kinds/cards', 'head-kinds/unsorted', ...TRICK_KEYS, ...CHAIN_KEYS.map((k) => `chains/${k}`)];

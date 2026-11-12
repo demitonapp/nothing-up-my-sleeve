@@ -10,7 +10,9 @@ cd "$(dirname "$0")/../.." || exit 1  # the repository root: backend/, ships/, d
 # launchd starts the queue with a 256-file soft limit (launchctl limit maxfiles: 256 unlimited); sharding
 # 592-618 books, or two 300k lines at once, exhausted it and every run died with OSError(24) at 22:03
 # (10 November). Raise it for the coordinator and every child it launches.
-ulimit -n 8192
+# The soft limit only (13 November): `ulimit -n` set the hard limit to 8,192 too, so no voyage could hold more, and the
+# 50m's shelf opens 25,327 books' shards ("Too many open files" at its first batch). launchd's hard limit is unlimited.
+ulimit -S -n 65536 2>/dev/null || ulimit -n 8192
 # two 300k seats need two helm records (the launchd default is one, so the dashboard showed one
 # at sea while the coordinator counted two); the manual runs inherited this from the shell.
 export THORP_HELM_SLOTS=2

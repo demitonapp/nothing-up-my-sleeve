@@ -2804,6 +2804,9 @@ ol.goaltext { padding-left: 22px; }
 .domainskills .skill .bears { color: var(--text); margin-top: 4px; }
 .partstable td { vertical-align: top; line-height: 1.5; }
 .partstable td.partname { color: #c9a24a; text-transform: uppercase; letter-spacing: .1em; font-size: 11px; font-weight: 700; white-space: nowrap; }
+.chartertable td.signoff select { font-size: var(--fs-xs); margin-left: 4px; background: transparent; color: inherit; border: 1px solid var(--line); border-radius: 4px; padding: 2px 4px; }
+.chartertable tr.charterrow.part-signed th[scope=row] { color: #c9b98a; }
+#voyages .panel table.chartertable td.heldclass { color: #9bbf7f; }
 .partstable tr.first td { border-top: 1px solid #3a2a12; }
 #launchparts > section { margin-top: 12px; }
 #voyages .expcard .foot.prepline { border-top: 1px solid #2a1d0d; margin-top: 8px; padding-top: 8px; }

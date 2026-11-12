@@ -14,7 +14,7 @@ type GoalRef = { goal_id: string; text: string; status: string; expedition?: str
 type Signed = { values: Record<string, string | null>; by: string; note: string; at: string | null };
 type ParamRow = {
   key: string; name: string; leg: boolean; values: Record<string, string | null>; goals: GoalRef[];
-  state: 'signed' | 'drifted' | 'ready' | 'waiting'; signed: Signed | null;
+  state: 'signed' | 'part-signed' | 'drifted' | 'ready' | 'waiting'; signed: Signed | null;
 };
 type Rehearsal = { name: string; sop: string; state: string; ft: number | null };
 type Cell = { ship: string | null; state: string; why?: string; spec?: boolean; rehearsals: Rehearsal[]; rehearsal_count?: number };
@@ -25,7 +25,7 @@ type Part = {
 export type LaunchPayload = {
   version: string; name: string; frozen: boolean; draft: string; store: boolean;
   phases: { key: string; name: string; state: 'done' | 'active' | 'ahead'; note: string }[];
-  readiness: { params: number; signed: number; drifted: number; ready: number; waiting: number; blocking: number; ships: number; home: number };
+  readiness: { params: number; signed: number; 'part-signed'?: number; drifted: number; ready: number; waiting: number; blocking: number; ships: number; home: number };
   fleet: { class: string; voyages: number; mean_minutes: number | null; base: Cell; instruct: Cell }[];
   charter: { columns: { class: string; base: string | null; leg: string | null }[]; groups: { key: string; name: string; params: ParamRow[] }[] };
   parts: Part[]; part_words: Record<string, string>; parts_proposed: boolean;
@@ -67,6 +67,8 @@ function ShipCell({ c }: { c: Cell }) {
  *  master charter; without it, the overview: the expedition's head and every goal's part. */
 export default function Launch({ data, onChange, section = null }: { data: LaunchPayload; onChange: (d: LaunchPayload) => void; section?: string | null }) {
   const [busy, setBusy] = useState<string | null>(null);
+  // which classes a row's sign-off covers (12 November: signing by class); a row not in the map signs every class
+  const [only, setOnly] = useState<Record<string, string>>({});
   const [err, setErr] = useState('');
   const classes = data.charter.columns.map((c) => c.class);
   const r = data.readiness;
@@ -90,12 +92,12 @@ export default function Launch({ data, onChange, section = null }: { data: Launc
     };
   }, [data]);
 
-  const sign = async (param: string, on: boolean): Promise<void> => {
+  const sign = async (param: string, on: boolean, classes?: string[]): Promise<void> => {
     setBusy(param);
     setErr('');
     try {
       const res = await fetch('/api/charter/sign', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ param, sign: on }),
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ param, sign: on, ...(classes ? { classes } : {}) }),
       });
       const j = await res.json();
       if (!res.ok) throw new Error(j?.error || `${res.status}`);
@@ -111,7 +113,7 @@ export default function Launch({ data, onChange, section = null }: { data: Launc
     const shown = classes.map((c) => p.values[c]);
     const have = shown.filter((v) => v != null);
     if (!have.length) return <td colSpan={classes.length} className="s">{p.leg ? 'no return leg written yet' : 'no fitout to read it from'}</td>;
-    if (have.length === classes.length && have.every((v) => v === have[0])) {
+    if (p.state !== 'part-signed' && have.length === classes.length && have.every((v) => v === have[0])) {
       return <td colSpan={classes.length} className="same"><b>{have[0]}</b> <span className="s">at every class</span></td>;
     }
     // a value one class holds alone is the row's question: mark it
@@ -120,12 +122,25 @@ export default function Launch({ data, onChange, section = null }: { data: Launc
     return classes.map((c) => {
       const v = p.values[c];
       const odd = v != null && most > 1 && count(v) < most;
-      return <td key={c} className={v == null ? 's' : odd ? 'odd' : ''} title={odd ? 'differs from the other classes' : undefined}>{v ?? '–'}</td>;
+      const held = p.state === 'part-signed' && p.signed?.values && c in p.signed.values;
+      return <td key={c} className={[v == null ? 's' : odd ? 'odd' : '', held ? 'heldclass' : ''].filter(Boolean).join(' ')}
+        title={held ? `signed for the ${c}` : odd ? 'differs from the other classes' : undefined}>{v ?? '–'}</td>;
     });
   };
 
   const signCell = (p: ParamRow) => {
-    const waitingOn = p.goals.filter((g) => g.status === 'open' || g.status === 'partly').map((g) => g.goal_id).join(', ');
+    const waitingOn = p.goals.filter((g) => g.status === 'open' || g.status === 'partly').map((g) => g.goal_id).join(', ')
+      || (classes.every((c) => p.values[c] == null) ? 'a fitout that writes it' : '');
+    // the classes a sign-off can still cover: those not signed, with a value to sign
+    const open = classes.filter((c) => !(p.signed?.values && c in p.signed.values) && p.values[c] != null);
+    const pick = only[p.key] || '';
+    const picker = open.length > 1 ? (
+      <select aria-label={`which classes to sign for ${p.name}`} value={pick} onChange={(e) => setOnly({ ...only, [p.key]: e.target.value })}>
+        <option value="">{p.state === 'part-signed' ? 'the rest' : 'every class'}</option>
+        {open.map((c) => <option key={c} value={c}>{c} only</option>)}
+      </select>
+    ) : null;
+    const signWhat = (): string[] | undefined => (pick ? [pick] : p.state === 'part-signed' ? open : undefined);
     if (p.state === 'signed' || p.state === 'drifted') {
       const was = Object.entries(p.signed?.values || {}).filter(([, v]) => v != null).map(([c, v]) => `${c}: ${v}`).join(' · ');
       return <>
@@ -135,15 +150,19 @@ export default function Launch({ data, onChange, section = null }: { data: Launc
         <button type="button" className={btnCls('outline')} disabled={busy === p.key} onClick={() => void sign(p.key, false)}>take back</button>
       </>;
     }
+    const heldNames = Object.keys(p.signed?.values || {}).join(', ');
     return <>
-      <span className={pillCls(p.state === 'ready' ? 'accent' : '')} title={p.state === 'ready' ? 'nothing in preparation is left to settle it' : `waiting on ${waitingOn}`}>{p.state}</span>{' '}
-      <button type="button" className={btnCls('outline')} disabled={busy === p.key} onClick={() => void sign(p.key, true)}
-        title={p.state === 'waiting' ? `signs it before ${waitingOn} is settled` : undefined}>{busy === p.key ? 'signing…' : 'sign off'}</button>
+      <span className={pillCls(p.state === 'ready' ? 'accent' : p.state === 'part-signed' ? 'good' : '')}
+        title={p.state === 'ready' ? 'nothing in preparation is left to settle it' : p.state === 'part-signed' ? `signed for ${heldNames}${waitingOn ? `; the rest wait on ${waitingOn}` : ''}` : `waiting on ${waitingOn}`}>{p.state}</span>{' '}
+      {open.length ? <>{picker}{' '}
+        <button type="button" className={btnCls('outline')} disabled={busy === p.key} onClick={() => void sign(p.key, true, signWhat())}
+          title={p.state === 'waiting' ? `signs it before ${waitingOn} is settled` : undefined}>{busy === p.key ? 'signing…' : 'sign off'}</button></> : null}
+      {p.state === 'part-signed' ? <> <button type="button" className={btnCls('outline')} disabled={busy === p.key} onClick={() => void sign(p.key, false)}>take back</button></> : null}
     </>;
   };
 
   // what the field says on a row (lib/charterResearch.ts): the discoveries that bear on it, each with what it means at
-  // the fleet's sizes, then the question the map does not answer. A row the map is silent on says so.
+  // the fleet's sizes, then the question the reading could not answer. A row the map is silent on says so.
   const fieldRow = (p: ParamRow) => {
     const says = bearingsOn(p.key);
     const gaps = gapsOn(p.key);
@@ -157,7 +176,7 @@ export default function Launch({ data, onChange, section = null }: { data: Launc
               </li>
             ))}
           </ul> : <div><span className="fk">the field</span> <span className="s">no discovery on the map bears on this row</span></div>}
-          {gaps.map((g) => <div key={g.key} className="gap"><span className="fk">not on the map</span> {g.question} <span className="s">{g.why}</span></div>)}
+          {gaps.map((g) => <div key={g.key} className="gap"><span className="fk">only a voyage can say</span> {g.question} <span className="s">{g.why}</span></div>)}
         </td>
       </tr>
     );
@@ -245,11 +264,11 @@ export default function Launch({ data, onChange, section = null }: { data: Launc
 
       {/* ---- the research against the charter: what the map leaves open, and the rows the bar needs */}
       {overview ? <details className="expgroup" id="launchresearch">
-        <summary><h2 className="band">The field against the charter <span className="q">{BEARINGS.length} discoveries bear on {tally.covered} of {r.params} rows · {GAPS.length} questions the map does not answer · {MISSING_ROWS.length} rows the bar needs and the charter lacks</span></h2></summary>
+        <summary><h2 className="band">The field against the charter <span className="q">{BEARINGS.length} discoveries bear on {tally.covered} of {r.params} rows · {GAPS.length} questions only a voyage can answer · {MISSING_ROWS.length} rows the bar needs and the charter lacks</span></h2></summary>
         <section className={cardCls(false, 'panel')}>
-          <h2>Not on the map <span className="note">what a waiting row asks that no discovery in Demiton's discoveries answers: a reading pass, before a voyage is spent on it. Each row of the charter carries the discoveries that do bear on it, on its own page</span></h2>
+          <h2>Only a voyage can say <span className="note">what the reading pass of 12 November could not answer: nobody has published it at the fleet's sizes. Each opens with what was read. Each row of the charter carries the discoveries that do bear on it, on its own page</span></h2>
           <div className="scroll"><table className="partstable" data-nosort>
-            <thead><tr><th>the question</th><th>rows it holds</th><th>what we have</th></tr></thead>
+            <thead><tr><th>the question</th><th>rows it holds</th><th>what was read, and what we have</th></tr></thead>
             <tbody>
               {GAPS.map((g) => (
                 <tr key={g.key}>

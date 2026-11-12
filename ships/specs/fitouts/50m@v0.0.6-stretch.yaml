@@ -1,0 +1,112 @@
+# ships/specs/fitouts: voyage D (12 November, kipling:9; Justin: "yeah 4096 on the 50m", then "Sail C, D, E and G").
+# 50m@v0.0.6 with ONE thing changed: model.stretch, the window lengthened from 1,024 to 4,096 for the last 5% of the
+# steps (thorp/data.py Stretched; the field trains short and stretches late, NeoBERT 5% more steps, with every
+# published case under a billion parameters an encoder). The same tokens a step (32,768: 32 windows of 1,024, then 8
+# of 4,096), so the schedule and the scaffold's fractions are unchanged; the pull is zero by 60%, and the long steps
+# draw no pinned head's map. It also measures what a 50m step at 4,096 takes on a hired GPU (mem_gb), which no voyage
+# has. The hole cards are read at the ship's base window (1,024), like for like with 50m@v0.0.6; reading both at
+# 4,096 is a separate rescore once both are home.
+name: 50m@v0.0.6-stretch
+expedition: kipling
+goal: 9
+ship: 'SOP v0.0.6 at 50m (36 layers, stretched to 4,096)'
+experiment: 'Fitout ogden-v0-1: one fixed Ogden corpus for every class; what cards and stars form at each size?'
+question: 'Voyage D: 50m@v0.0.6 with its window lengthened from 1,024 to 4,096 pieces for the last 5% of the voyage, the same tokens a step. Does a small decoder stretched late use the longer window (its bits a byte read at 4,096 against 50m@v0.0.6 read at 4,096), what does it cost at 1,024, and how much memory does a 50m step at 4,096 take on a hired GPU? Otherwise 50m@v0.0.6: Ogden v0.1, the shared tokeniser, four passes, the same four metre
+  cards pinned in the same layers and, where the size has room, the comparator as a riddle; full weight to 10%
+  of the voyage, faded to zero by 60%, then content alone. Which of the five cards is held by heart, and what
+  does it cost the language?'
+data:
+  recipe: lists/ogden-v0.1.csv
+  passes: 4
+  stages:
+  - name: ogden
+    recipe: lists/ogden-v0.1.csv
+    passes: 4
+  order: shuffled
+  refuse:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+  - lists/hole-cards-unseen.csv
+  clean: unwrap-v2
+tokeniser:
+  kind: spm-bpe
+  vocab: 2048
+  byte_fallback: true
+  train_on: lists/ogden-v0.1.csv
+model:
+  family: gpt
+  preset: 50m
+  context: 1024
+  positions: rope
+  stretch:
+    to: 4096
+    at: 0.95
+optim:
+  name: adamw
+  lr: 0.0006
+  betas:
+  - 0.9
+  - 0.95
+  weight_decay: 0.1
+  warmup_steps: 400
+  schedule: cosine
+  min_lr_ratio: 0.1
+  batch_tokens: 32768
+  grad_clip: 1.0
+  precision: bf16
+  scaffold:
+    weight: 1.0
+    hold: 0.10
+    fade: 0.60
+    heads:
+    - layer: 0
+      head: 0
+      card: previous_word
+    - layer: 0
+      head: 1
+      card: delimiter
+    - layer: 24
+      head: 2
+      card: induction
+    - layer: 24
+      head: 3
+      card: duplicate_word
+    riddles:
+      comparator:
+        layer: 12
+        head: 2
+        items: 16
+        pool: 2048
+eval:
+  sets:
+  - lists/hole-cards-unseen.csv
+  every_steps: 640
+  evaluators:
+  - ce_bpb
+  - discovery
+  - logic
+  - stars
+  - nevermore
+  - cards
+  - shapes
+  - pips
+  - soundings
+  light:
+    every_steps: 64
+    evaluators:
+    - stars
+    - nevermore
+    - cards
+    - logic
+    - shapes
+    - pips
+checkpoint:
+  every_steps: 640
+sop: '0.0.6'
+departures:
+- "the post-training SOP: the deck stage read after the four pretraining passes, with the pull off"
+- 'the stretch: model.stretch lengthens the window to 4,096 for the last 5% of the steps (data.Stretched); the base window and every other block are the standard''s'
+seed: 1
+# the deep 50m ran out of memory on an RTX 4090 (24 GB) twice on 12 November, drawing the scaffold's maps over 36
+# layers; the class is named so the hire takes a 32 GB card (gpu, a label: the run id does not move)
+gpu: RTX 5090

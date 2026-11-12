@@ -393,7 +393,8 @@ export default function ChatConsole() {
   useEffect(() => {
     setThink(thinking?.mode === 'none' ? false : (thinking?.default ?? false));
   }, [chosen?.ship_key, chosen?.model, thinking?.mode, thinking?.default]);
-  const toolsInfo = chosen?.kind === 'foreign' ? chosen?.facts?.tools : null;
+  // a ship of ours taught the tool leg says so in its facts too (13 November): the switch is the same for both
+  const toolsInfo = chosen?.facts?.tools ?? null;
   const toolsOk = !!toolsInfo?.format;
 
   const loadQuestions = async (): Promise<void> => {
@@ -525,7 +526,9 @@ export default function ChatConsole() {
         .map((s) => ({ role: s.role === 'you' ? 'user' : 'assistant', text: s.text }));
       const body = chosen.kind === 'foreign'
         ? { model: chosen.model, q, tokens, temperature: 0.7, thinking: think ? 'on' : 'off', think_tokens: thinkCap, history, tools: toolsOk && useTools ? 'on' : 'off' }
-        : { run: chosen.run?.run, q, tokens, temperature: 0.7, history, ...(step ? { step } : {}) };
+        : { run: chosen.run?.run, q, tokens, temperature: 0.7, history, ...(step ? { step } : {}),
+            // a ship taught to think or to call (13 November): the same two switches the foreign ships take
+            ...(thinkingToggle ? { thinking: think ? 'on' : 'off' } : {}), ...(toolsOk ? { tools: useTools ? 'on' : 'off' } : {}) };
       setLastReq(body);
       // the answer comes a line an event (/api/chat/stream): shown as it is written, and stoppable
       const ctl = new AbortController();
@@ -766,7 +769,7 @@ export default function ChatConsole() {
           </label>
           <label
             className={`consoleswitch${toolsOk && useTools ? ' on' : ''}${!toolsOk ? ' inert' : ''}`}
-            title={toolsOk ? `calculate, current_time, board_score, queue_status, liberty_machine_status, system_status, expedition_status, browser_task and browser_task_status: ${toolsInfo?.why || ''}` : (toolsInfo?.why || 'tools are for the foreign ships whose chat template takes them')}
+            title={toolsOk ? (chosen?.kind === 'foreign' ? `calculate, current_time, board_score, queue_status, liberty_machine_status, system_status, expedition_status, browser_task and browser_task_status: ${toolsInfo?.why || ''}` : (toolsInfo?.why || '')) : (toolsInfo?.why || 'tools are for the foreign ships whose chat template takes them, and our ships taught the tool leg')}
           >
             <input
               type="checkbox"

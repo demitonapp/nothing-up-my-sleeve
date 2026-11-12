@@ -85,6 +85,19 @@ def test_another_window_is_refused_unless_it_is_declared():
     assert any("lr" in f for f in sop.check(spec))
 
 
+def test_another_rate_is_refused_unless_it_is_declared():
+    """The rate and the warm-up are a declarable block (`field: optim`, 12 November, the sweep at the 300k and the
+    1m): it excuses those two and nothing else."""
+    spec = _spec()
+    spec["optim"]["lr"] = spec["optim"]["lr"] / 2
+    spec["optim"]["warmup_steps"] = 411
+    assert any("lr" in f for f in sop.check(spec)) and any("warmup" in f for f in sop.check(spec))
+    spec["departures"] = [{"field": "optim", "why": "the rate swept"}]
+    assert sop.check(spec) == []
+    spec["model"]["context"] = 2048
+    assert any("context 2048" in f for f in sop.check(spec))
+
+
 def test_a_voyage_named_to_the_sop_must_carry_the_scaffold_phase():
     spec = _spec()
     del spec["optim"]["scaffold"]

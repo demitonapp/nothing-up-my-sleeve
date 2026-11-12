@@ -68,11 +68,17 @@ def _honoured() -> frozenset[str]:
         "data tokeniser model optim eval checkpoint seed sop departures seeded_from transplant ledger".split()
         # goal: the expedition goal a voyage serves, read by the queue (queue_store, priorities.py), never the loop
         + ["goal"]
+        # the 50m's abilities as a leg declares them (12 November, kipling:14): read by the charter and the evaluators,
+        # never by the loop, which trains a leg on its stages alone
+        + ["thinking", "tools"]
+        + under("thinking", "open close share")
+        + under("tools", "set about")
         # (data.turns: the turn format the voyage was taught, read by thorp/turns.py for the evaluators, not here)
         + under("data", "recipe passes order refuse clean opt_in first first_repeats stages turns")
         + under("data.stages[]", "name recipe passes")
         # eval.offline (11 November, item 5): those evaluators are scored later from saved weights (train.score)
-        + under("eval", "sets every_steps evaluators light options offline")
+        # eval.targets (12 November, the charter's bar): the marks a ship is judged against, read by the charter
+        + under("eval", "sets every_steps evaluators light options offline targets")
         + under("eval.light", "every_steps evaluators")
         # keep_last / keep_every: checkpoint retention, train.retain, called by both loops (11 November, item 10)
         + under("checkpoint", "every_steps keep_last keep_every")
@@ -82,7 +88,9 @@ def _honoured() -> frozenset[str]:
         # how many steps' metrics are written at once (ledger.MetricBuffer, 11 November): when, never what
         + under("ledger", "flush_every")
         # cache_gb is MLX's free-buffer cache (train._run): there is nothing of it to honour here
-        + under("model", "family preset context positions backend layers width heads kv_heads cache_gb")
+        + under("model", "family preset context positions backend layers width heads kv_heads cache_gb stretch")
+        # the window lengthened for the voyage's end (data.Stretched, 12 November): both loops read it
+        + under("model.stretch", "to at")
         + under(
             "optim",
             "name lr betas weight_decay warmup_steps schedule min_lr_ratio batch_tokens grad_clip precision "
@@ -707,6 +715,10 @@ def _train(spec: dict, prep, rec: Ledger, buf, stop_after: int | None, log) -> d
             first=prep.first,
             first_repeats=spec["data"].get("first_repeats", 1),
         )
+    # the window lengthened for the voyage's end, when the spec says so (data.stretched; 12 November, kipling:9)
+    stream = data.stretched(
+        stream, spec, tok.id, list(prep.stage_recipes) if stages else [list(prep.recipe)], families
+    )
     total = stream.total_steps
 
     dev = device()
@@ -843,11 +855,13 @@ def _train(spec: dict, prep, rec: Ledger, buf, stop_after: int | None, log) -> d
 
     def loss_fn(x, y, sw: float, hw, rb: dict, on):
         dist = []  # each pinned head's distance from its card, whatever the weight (the probe phase reads it)
-        if picks and not sample:
+        # the stretch's long windows read no pinned head's map (train.py's rule, data.Stretched)
+        long = x.shape[1] > int(m["context"])
+        if picks and not sample and not long:
             logits, pats = model.forward_attending(x, picks)
             dist = scaffold_head_losses(pats, x, sc, teacher_targets(teacher, x, sc), flags)
             sl = scaffold_loss(pats, x, sc, on=on if staged else None, weights=hw, per_head=dist)
-        elif picks:
+        elif picks and not long:
             logits = fwd(x)
             xs = x[: int(sample["windows"]), : int(sample["length"])]
             _, pats = model.forward_attending(xs, picks)

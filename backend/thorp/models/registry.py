@@ -38,6 +38,19 @@ PRESETS: dict[str, dict] = {
 }
 
 
+# What every hull is built with and no spec can change (12 November, Justin: "resolve this", of a charter with no row
+# for any of it). Both kernels build exactly this (gpt_mlx.py, gpt_torch.py), and tests/test_hull_fixed.py builds a
+# small ship in each and checks the words against the weights. The master charter reads its rows from here
+# (thorp/launch.py), so a part given a switch later (the gated feed-forward layer, say) moves to GPTConfig and its row
+# to the spec's own value.
+HULL: dict[str, str] = {
+    "feed_forward": "plain: GELU at 4x the width",
+    "norm": "before each sublayer: LayerNorm",
+    "embeddings": "tied: one table reads the pieces and writes them",
+    "biases": "none",
+}
+
+
 class _Ladder(Sequence):
     """The ladder: every size, smallest first, read from Postgres (`s1.sizes`, thorp/ship_store.py), not
     written here. Each is a dict: preset, name, role (and job, the same), overview, kind, vocab, where,

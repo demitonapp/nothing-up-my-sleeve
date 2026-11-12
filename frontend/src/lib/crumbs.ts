@@ -143,7 +143,7 @@ const LB_CATEGORY: Record<string, string> = {
 
 const CHARTER_PAGE: Record<string, string> = {
   fleet: 'The fleet', ship: 'The ship', tokeniser: 'The tokeniser', reads: 'What it reads', scaffold: 'The scaffold',
-  training: 'The training', 'return-leg': 'The return leg',
+  training: 'The training', 'return-leg': 'The return leg', bar: 'The bar',
 };
 
 export const labelOf = (seg: string): string => {

@@ -30,7 +30,9 @@ def test_only_the_voyages_books_are_carried(tmp_path, monkeypatch):
     out = set(c.carried_data("tokA", ids))
     assert {"texts/gutenberg/1.txt", "texts/gutenberg/79560.txt", "texts/local/tutor-1.txt"} <= out
     assert not {"texts/gutenberg/2.txt", "texts/local/shuf-pg9.txt"} & out  # books it does not read stay home
-    assert {"shards/tokA/s.bin", "tokenisers/tokA/m.model"} <= out
+    assert "tokenisers/tokA/m.model" in out
+    # a voyage's own books' shards only (13 November): a shard not of its books stays home, made again on the box if needed
+    assert "shards/tokA/s.bin" not in out
     # the sources' catalogues and the classics shelf are acquisition's, not the voyage's (12 November: 8.4 GB of a
     # 9.07 GB upload was these two)
     assert not any(f.startswith(("secrets/", "checkpoints/", "shards/tokB", "catalogue/", "classics/")) for f in out)

@@ -275,7 +275,9 @@ def check(spec: dict) -> list[str]:
     size = (spec.get("model") or {}).get("preset")
     params_size = (std.get("sizes") or {}).get(str(size))
     optim = spec.get("optim") or {}
-    if params_size:
+    # the rate and the warm-up are a declarable block too (12 November, the charter's training rows: "Finish the charter
+    # trials"): a sweep that says `field: optim` and why keeps the rest of the standard
+    if params_size and not departed("optim"):
         if float(optim.get("lr", 0)) != float(params_size["lr"]):
             out.append(f"lr {optim.get('lr')}; SOP v{version} at {size} is {params_size['lr']}")
         if int(optim.get("warmup_steps", 0)) != int(params_size["warmup_steps"]):

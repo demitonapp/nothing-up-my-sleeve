@@ -1,0 +1,11 @@
+{
+ "version": "50m-shelf-v1",
+ "about": "the 50m's shelf (voyage E): lists/library-en-v1.csv and lists/science-arc-v1.csv together",
+ "parts": {
+  "library-en-v1": 8964,
+  "science-arc-v1": 16363
+ },
+ "books": 25327,
+ "terms": "the science sentences are AI2's, for non-commercial research use only and never redistributed",
+ "sha1": "5a796fae66d73341d9fdbdf8dbc0f202c647aa7d"
+}

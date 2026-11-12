@@ -1,0 +1,128 @@
+# ships/specs/fitouts: voyage C's tool leg (12 November, kipling:14; Justin: "Yes, those eight"). The rehearsal at the 9m
+# of what the 50m's instruct ship will be taught: 9m@v0.0.6-fleetmarks given the tool lessons
+# (backend/scripts/make_tool_corpus.py), kept apart from the reasoning leg because reasoning traces among a small tool
+# caller's lessons sent it into output that never ended. It needs its seed home and the corpus written first.
+name: 9m@v0.0.6-fleetmarks-tools
+expedition: kipling
+goal: 14
+ship: 'SOP v0.0.6 at 9m (the tool leg, on the fleet''s marks)'
+experiment: 'The tool leg (kipling:14): can a small ship learn to call one of a fixed set of tools when a question needs
+  it, with the right arguments, and to answer at once when it does not?'
+question: 'The tool leg at 9m, on 9m@v0.0.6-fleetmarks: the tool lessons (lists/tools-marked-v1.csv: eight tools, the
+  call and its result made by code, the question from the teacher''s patterns, one lesson in eight wanting no tool),
+  the pull off, at a learning rate of 0.0003. Read every 100 steps on 200 held-out questions in wordings it never
+  trained on: the exact call, the right tool, and the right refusal (thorp/evaluators/tools.py); with the hole cards
+  beside them. The field: the smallest published tool caller, 90M, reads 41% on the standard test, and calls over
+  several turns are out of reach at that size.'
+departures:
+- field: content
+  why: the tool leg reads its lessons, not Ogden
+- field: training
+  why: 'seeded from 9m@v0.0.6-fleetmarks, the pull off: a leg after pretraining, not a fresh voyage'
+- field: tokeniser
+  why: 'the seed''s: the fleet''s eleven marks as single pieces'
+- field: optim
+  why: '0.0003 with 50 steps of warm-up, the conversation leg''s rate (0.001 cost the 9m''s language on the talk pair)'
+milestones:
+- at: 0.5
+  metric: eval/hole-cards-unseen/bpb_mean
+  at_most: 2.4
+  if_missed: recall
+  why: a catastrophe guard, not a target, the conversation leg's own kind
+tools:
+  set:
+  - calculate
+  - current_time
+  - days_between
+  - define
+  - board_score
+  - queue_status
+  - liberty_machine_status
+  - expedition_status
+data:
+  recipe: lists/tools-marked-v1.csv
+  passes: 4
+  order: shuffled
+  refuse:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+  - lists/hole-cards-unseen.csv
+  clean: marks-v1
+  turns: marks
+  opt_in: 'the tool leg (kipling:14): eight tools, calls and results made by code'
+tokeniser:
+  kind: spm-bpe
+  vocab: 2048
+  byte_fallback: true
+  train_on: lists/ogden-v0.1.csv
+  symbols:
+  - "<bos>"
+  - "<eos>"
+  - "<question>"
+  - "<answer>"
+  - "<end>"
+  - "<premise>"
+  - "<sep>"
+  - "<conclusion>"
+  - "<think>"
+  - "<call>"
+  - "<result>"
+model:
+  family: gpt
+  preset: 9m
+  context: 1024
+  positions: rope
+optim:
+  name: adamw
+  lr: 0.0003
+  betas:
+  - 0.9
+  - 0.95
+  weight_decay: 0.1
+  warmup_steps: 50
+  schedule: cosine
+  min_lr_ratio: 0.1
+  batch_tokens: 32768
+  grad_clip: 1.0
+  precision: bf16
+  scaffold:
+    weight: 0.0
+    hold: 0.0
+    fade: 0.0
+    heads:
+    - layer: 0
+      head: 0
+      card: previous_word
+    - layer: 0
+      head: 1
+      card: delimiter
+    - layer: 12
+      head: 2
+      card: induction
+    - layer: 12
+      head: 3
+      card: duplicate_word
+    riddles:
+      comparator:
+        layer: 3
+        head: 2
+        items: 16
+        pool: 2048
+eval:
+  sets:
+  - lists/hole-cards-unseen.csv
+  every_steps: 100
+  evaluators:
+  - ce_bpb
+  - tools
+  options:
+    tools:
+      clean: marks-v1
+      limit: 200
+checkpoint:
+  every_steps: 100
+sop: 0.0.6
+seed: 1
+seeded_from:
+  run: 9m@v0.0.6-fleetmarks
+  mode: free

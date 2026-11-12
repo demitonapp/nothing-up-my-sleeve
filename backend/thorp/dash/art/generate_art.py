@@ -824,6 +824,13 @@ DEMITON_SECTIONS: dict[str, str] = {
     "a snapped length of mast, a bound book of recipes, a surveyor's measuring rod — a navigator in a sea-cloak "
     "sorting sealed letters and logbook pages into them by lantern light, a small smooth silver ovoid drone with "
     "no propellers resting on top of the cabinet, the thin lit ring of an Orbital through the window",
+    # the chips (13 November, Justin: "a card here ... that focuses purely on chips"): the engines that turn the
+    # sums, drawn as the period would — a capstan room of rival winches, each crew turning its own
+    "discoveries-chips": "the lower gun deck of a great galleon at night turned into a winch room: four different "
+    "capstans in a row, one huge and iron-banded, one small and finely made of brass, one wide and flat with many "
+    "spokes, one strange and glassy, crews of sailors straining at the bars of each, a quartermaster with a "
+    "sandglass and a ledger timing them by a single lantern, ropes running up through the deck, a small smooth "
+    "silver ovoid drone with no propellers resting on a cask, the thin ring of an Orbital through an open gunport",
     # the first draw put an aeroplane in the window (the drone "above the model") and barely cut the hull open: the
     # drone now rests on the table and the cross-section is the subject
     "discoveries-object-of-study": "a natural philosopher's cabin aboard a galleon at night: on a long table a large "
@@ -1069,6 +1076,11 @@ CHARTER_CARDS: dict[str, str] = {
     "the bow, the harbour lights and a beacon ahead, its wake curving home across black water, a small smooth silver "
     "ovoid drone with no propellers above the stern, a thin luminous ring of an Orbital in the sky, heavy black ink, "
     "stark chiaroscuro, no text, no lettering",
+    # the eighth section (12 November, night): the bar the fleet is judged on and its leaning, curiosity
+    "charter-bar": "a young ship's boy at the rail of a great wooden ship at night holding a lantern out over the black "
+    "water toward an unknown coast, leaning forward to see, a brass sounding lead and a ship's log on the deck beside "
+    "him, a small smooth silver ovoid drone with no propellers hovering at his shoulder, a thin luminous ring of an "
+    "Orbital in the sky, heavy black ink, stark chiaroscuro, one light source, no text, no lettering",
 }
 
 # Three candidate flags for the Demiton orbital (12 November, Justin: "in the top left by nothing up my sleeve

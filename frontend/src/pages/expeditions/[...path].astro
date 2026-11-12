@@ -8,7 +8,7 @@ export function getStaticPaths() {
   const keys = ['book_value', 'first_light', 'seedling', 'apprentice', 'table_talk', 'apprentice_2', 'best_keel',
     'two_facts', 'card_census', 'knockout', 'induction', 'ogden', 'smallest_bridge', 'logic_tutor', 'two_bets', 'kipling', 'arc_de_triomphe'];
   const tabs = ['overview', 'plan', 'at-sea', 'findings', 'fleet', 'runs', 'training', 'fitting', 'inside', 'table'];
-  const paths = ['charter', 'charter/fleet', 'charter/ship', 'charter/tokeniser', 'charter/reads', 'charter/scaffold', 'charter/training', 'charter/return-leg', 'queue', 'queue/every', 'queue/planning', 'expeditions', 'plans'];
+  const paths = ['charter', 'charter/fleet', 'charter/ship', 'charter/tokeniser', 'charter/reads', 'charter/scaffold', 'charter/training', 'charter/return-leg', 'charter/bar', 'queue', 'queue/every', 'queue/planning', 'expeditions', 'plans'];
   for (const k of keys) {
     paths.push(k);
     for (const t of tabs) paths.push(`${k}/${t}`);

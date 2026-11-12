@@ -16,6 +16,15 @@ from thorp import cleaning
 FORMATS = ("marks", "plain")
 _SENTINEL = "ZQXJ"
 
+# The fleet's marks for v0.1 (12 November): the eight locked that morning (Justin: "Agree with your suggestions on
+# control symbols") and three for the 50m's abilities (Justin, the same night: "a reasoining variant, tool calling").
+# Three generic marks rather than a piece for each tool: a tool's own piece would be baked into the tokeniser every
+# ship is built on, so changing the tool set would mean retraining the fleet; spelt in ordinary pieces, a tool's name
+# costs about five pieces a call, small against the 50m's 4,096.
+LOCKED = ("<bos>", "<eos>", "<question>", "<answer>", "<end>", "<premise>", "<sep>", "<conclusion>")
+THINK, CALL, RESULT = "<think>", "<call>", "<result>"
+FLEET_SYMBOLS = (*LOCKED, THINK, CALL, RESULT)
+
 
 def pair(fmt: str, question: str, answer: str) -> str:
     """One turn as it is written into a book."""
@@ -83,3 +92,37 @@ def format_of(spec: dict) -> str | None:
     if "pairs-plain" in names:
         return "plain"
     return None
+
+
+# ---- the 50m's two abilities, as turns (12 November, kipling:14)
+#
+# Thinking: `<question>Q<think>steps<answer>A<end>`; thinking off is the same turn with nothing between <think> and
+# <answer>, so one ship learns both habits (the field's switch: two marks and an empty pair).
+# A tool call: `<question>Q<call>name(arguments)<result>value<answer>A<end>`; several calls follow one another
+# before the <answer>. A lesson with no call to make is the plain marked turn, `<question>Q<answer>A<end>`.
+
+
+def thought(question: str, steps: str, answer: str) -> str:
+    """A thinking turn; `steps` empty is thinking off."""
+    return f"<question>{question.strip()}{THINK}{steps.strip()}<answer>{answer.strip()}<end>"
+
+
+def called(question: str, calls: list[tuple[str, str]], answer: str) -> str:
+    """A tool turn: each (call, result) in order, then the answer; no calls is the plain marked turn."""
+    body = "".join(f"{CALL}{c.strip()}{RESULT}{r.strip()}" for c, r in calls)
+    return f"<question>{question.strip()}{body}<answer>{answer.strip()}<end>"
+
+
+def first_move(text: str) -> tuple[str, str]:
+    """What a ship did first after a question: ("call", the call it wrote up to <result>), ("think", its steps up to
+    <answer>), ("answer", its answer up to its end), or ("none", what it wrote) when it opened no turn at all."""
+    s = text.lstrip()
+    for mark, kind, until in ((CALL, "call", (RESULT, "<answer>", "<end>", "<eos>")),
+                              (THINK, "think", ("<answer>", "<end>", "<eos>")),
+                              ("<answer>", "answer", ("<end>", "<eos>", "<question>"))):
+        if s.startswith(mark):
+            body = s[len(mark):]
+            for u in until:
+                body = body.split(u)[0]
+            return kind, body.strip()
+    return "none", cut("marks", s)

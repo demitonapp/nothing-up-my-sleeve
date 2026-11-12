@@ -84,7 +84,20 @@ NOT_CARRIED = {
     # the sources' catalogues, the classics shelf and the local foreign models are not what a voyage trains or
     # reads on: carrying them put 8.4 GB of the 9.07 GB the 9m candidate uploaded aboard (12 November)
     "catalogue", "classics", "models",
+    # never aboard a hired box (13 November): the drones' browser profile (its cookies and saved logins), the e-mail
+    # accounts and their secrets, the phone's calls, and what was downloaded for the library (data/downloads: AI2's ARC
+    # corpus, research use only and not to be redistributed, 2.17 GB, carried on every hire for an hour). None is read
+    # by a voyage; NOT_CARRIED_WORDS below keeps anything named like a secret home as well
+    "browser-profile", "browser-sites.json", "drones", "drones.json", "email-accounts.json", "email-secrets.json",
+    "phone-calls.json", "personaplex.log", "downloads",
 }  # fmt: skip
+# a file or folder whose name says it holds a secret stays home, whatever folder it is in
+NOT_CARRIED_WORDS = ("secret", "credential", "cookie", "login", "password", "token", ".env", "id_rsa", "id_ed25519")
+
+
+def _secret_named(rel: str) -> bool:
+    low = rel.lower()
+    return any(w in low for w in NOT_CARRIED_WORDS) and not low.startswith(("tokenisers/", "shards/", "texts/"))
 
 
 class NoOffer(RuntimeError):
@@ -627,6 +640,15 @@ class _Ceilings:
         return None
 
 
+def class_of(spec: dict) -> str | None:
+    """The GPU class a voyage asks for (`gpu:`, a label: it moves no run id), or None for the cheapest. (13 November:
+    the deep 50m ran out of memory on an RTX 4090's 24 GB twice, drawing the scaffold's maps over 36 layers; the
+    cheapest class is not always one the voyage fits in. Not `charter.gpu`: a `charter:` block is S5's request for a
+    hire that carries its own quote, s5_policy/charter.check.)"""
+    want = spec.get("gpu")
+    return str(want) if want else None
+
+
 def quote(spec_path: str, gpu: str | None = None, vast=None, resolver=None, log=print) -> dict:
     """Prepare the voyage here, read its plan and the market; returns {spec, prep, plan, quotes, market}. Without a
     Vast.ai key the market is the terms' ceilings (an upper bound, marked as such)."""
@@ -635,6 +657,7 @@ def quote(spec_path: str, gpu: str | None = None, vast=None, resolver=None, log=
     spec = train.load_spec(spec_path)
     if spec["model"].get("backend", "torch") != "torch":
         raise ValueError(f"model.backend is {spec['model']['backend']!r}: a chartered voyage sails on torch")
+    gpu = gpu or class_of(spec)
     # (11 November) the torch loop refuses a spec it would only honour in part; ask it here, before the voyage is
     # prepared or a box is hired, so the refusal costs nothing. Without torch on this machine the question cannot be
     # put: the box's own loop still refuses at its first line, after the hire.
@@ -772,8 +795,14 @@ def carried_data(tok_id: str, books: set[str] | None = None) -> list[str]:
     for sub in ("tokenisers", "shards"):
         root = d / sub / tok_id
         if root.exists():
-            out += [str(f.relative_to(d)) for f in sorted(root.rglob("*")) if f.is_file()]
-    return out
+            files = sorted(root.rglob("*"))
+            if trim and sub == "shards":
+                # only the voyage's own books' shards (13 November: the fleet's tokeniser holds the 50m's 25,327 books,
+                # 3.45 GB, and a 9m on Ogden carried all of it; two hosts could not take it inside the fit-out's 30
+                # minutes and the breaker closed the lane). A shard left home is made again on the box from its text.
+                files = [f for f in files if f.stem in books]
+            out += [str(f.relative_to(d)) for f in files if f.is_file()]
+    return [f for f in out if not _secret_named(f)]
 
 
 def voyage_lists(spec: dict) -> list[str]:
@@ -1109,6 +1138,7 @@ def sail(spec_path: str, gpu: str | None = None, vast=None, resolver=None, box_f
     rec = rec or reader()
     q0 = quote(spec_path, gpu=gpu, vast=vast, resolver=resolver, log=log)
     spec, p, t, vast = q0["spec"], q0["plan"], q0["terms"], q0["vast"]
+    gpu = gpu or class_of(spec)  # a hire again after a dead box keeps to the class the voyage needs
     rid = p["run_id"]
     if (rec.get_run(rid) or {}).get("status") == "finished":
         log(f"charter: {rid[:12]} has finished; nothing to sail")

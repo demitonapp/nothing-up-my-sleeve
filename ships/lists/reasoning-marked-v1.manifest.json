@@ -1,0 +1,34 @@
+{
+ "version": "reasoning-marked-v1",
+ "generator": "backend/scripts/make_reasoning_corpus.py",
+ "seed": 20261112,
+ "about": "two-fact chains in six kinds of relation, half thinking between marks, every answer made by code",
+ "sha1": "d848182b50d03354c6708538ed10b096346dfa5b",
+ "lessons": 40000,
+ "held_out": 564,
+ "answers": {
+  "yes": 11317,
+  "no": 6364,
+  "other": 22319
+ },
+ "by_kind": {
+  "order": 6756,
+  "set": 6725,
+  "cause": 6700,
+  "place": 6511,
+  "kin": 6667,
+  "count": 6641
+ },
+ "by_hops": {
+  "1": 4568,
+  "2": 20133,
+  "3": 11852,
+  "4": 3447
+ },
+ "thinking": 19933,
+ "books_written": 1000,
+ "reads_as_written": [
+  40000,
+  40000
+ ]
+}

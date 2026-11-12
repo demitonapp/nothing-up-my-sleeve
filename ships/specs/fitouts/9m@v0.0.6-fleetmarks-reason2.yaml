@@ -1,0 +1,128 @@
+# ships/specs/fitouts: the 9m reasoning leg's second try (13 November). The first, on the lessons alone for six passes,
+# was recalled at step 400 with the hole cards at 4.176 (its seed: 1.582): the templated lessons overwrote the language,
+# and thinking bought nothing (right 75% thinking, 79% at once). Now the lessons beside Ogden books of the same tokens
+# (lists/reasoning-mixed-v1.csv) and two passes.
+# ships/specs/fitouts: voyage C's reasoning leg (12 November, kipling:14; Justin: "a reasoining variant ... classes for
+# the reasoning and tool is 50m", "Sail C, D, E and G"). The rehearsal at the 9m of what the 50m's reasoning ship will
+# be taught: 9m@v0.0.6-fleetmarks (the fleet's eleven marks) given the reasoning lessons, 40,000 two-fact chains in six
+# kinds of relation, half thinking between <think> and <answer> and half answering at once with the empty pair
+# (backend/scripts/make_reasoning_corpus.py; every answer made by code). Read on 564 held-out chains of invented words
+# the lessons never use, thinking and at once (thorp/evaluators/reasoning.py). It needs its seed home first: queued
+# when 9m@v0.0.6-fleetmarks docks.
+name: 9m@v0.0.6-fleetmarks-reason2
+expedition: kipling
+goal: 14
+ship: 'SOP v0.0.6 at 9m (the reasoning leg, on the fleet''s marks)'
+experiment: 'The reasoning leg (kipling:14): can a small ship learn to write its steps between marks, and does writing
+  them make it right where answering at once does not?'
+question: 'The reasoning leg at 9m, on 9m@v0.0.6-fleetmarks: 40,000 lessons (lists/reasoning-marked-v1.csv), six passes,
+  the pull off, at a learning rate of 0.0003. Read every 100 steps on 200 of the 564 held-out chains: right thinking
+  (reasoning/on), right at once (reasoning/off), and the gain between them, by the number of facts in the chain; with
+  the hole cards beside them, so the language''s cost is seen. The field: a 10.6M model from nothing got every sum
+  right from 1,000 written-out lessons where 10,000 plain ones stalled near 85% (Lee et al. 2023).'
+departures:
+- field: content
+  why: the reasoning leg reads its lessons, not Ogden
+- field: training
+  why: 'seeded from 9m@v0.0.6-fleetmarks, the pull off: a leg after pretraining, not a fresh voyage'
+- field: tokeniser
+  why: 'the seed''s: the fleet''s eleven marks as single pieces'
+- field: optim
+  why: '0.0003 with 50 steps of warm-up, the conversation leg''s rate (0.001 cost the 9m''s language on the talk pair)'
+milestones:
+- at: 0.5
+  metric: eval/hole-cards-unseen/bpb_mean
+  at_most: 2.4
+  if_missed: recall
+  why: a catastrophe guard, not a target, the conversation leg's own kind
+thinking:
+  open: <think>
+  close: <answer>
+  share: 0.5
+data:
+  recipe: lists/reasoning-mixed-v1.csv
+  passes: 2
+  order: shuffled
+  refuse:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+  - lists/hole-cards-unseen.csv
+  clean: marks-v1
+  turns: marks
+  opt_in: 'the reasoning leg (kipling:14): two-fact chains written by code, half thinking and half at once'
+tokeniser:
+  kind: spm-bpe
+  vocab: 2048
+  byte_fallback: true
+  train_on: lists/ogden-v0.1.csv
+  symbols:
+  - "<bos>"
+  - "<eos>"
+  - "<question>"
+  - "<answer>"
+  - "<end>"
+  - "<premise>"
+  - "<sep>"
+  - "<conclusion>"
+  - "<think>"
+  - "<call>"
+  - "<result>"
+model:
+  family: gpt
+  preset: 9m
+  context: 1024
+  positions: rope
+optim:
+  name: adamw
+  lr: 0.0003
+  betas:
+  - 0.9
+  - 0.95
+  weight_decay: 0.1
+  warmup_steps: 50
+  schedule: cosine
+  min_lr_ratio: 0.1
+  batch_tokens: 32768
+  grad_clip: 1.0
+  precision: bf16
+  scaffold:
+    weight: 0.0
+    hold: 0.0
+    fade: 0.0
+    heads:
+    - layer: 0
+      head: 0
+      card: previous_word
+    - layer: 0
+      head: 1
+      card: delimiter
+    - layer: 12
+      head: 2
+      card: induction
+    - layer: 12
+      head: 3
+      card: duplicate_word
+    riddles:
+      comparator:
+        layer: 3
+        head: 2
+        items: 16
+        pool: 2048
+eval:
+  sets:
+  - lists/hole-cards-unseen.csv
+  every_steps: 100
+  evaluators:
+  - ce_bpb
+  - reasoning
+  options:
+    reasoning:
+      clean: marks-v1
+      limit: 200
+checkpoint:
+  every_steps: 100
+sop: 0.0.6
+seed: 1
+seeded_from:
+  run: 9m@v0.0.6-fleetmarks
+  mode: free

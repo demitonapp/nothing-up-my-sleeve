@@ -1,0 +1,21 @@
+{
+ "version": "science-arc-v1",
+ "generator": "backend/scripts/make_science_shelf.py",
+ "source": "AI2 ARC-V1-Feb2018.zip, ARC_Corpus.txt (ai2-public-datasets)",
+ "terms": "non-commercial research and educational use only; no individual documents extracted; not to be redistributed (the corpus's README). Never written into the repository.",
+ "sha1": "23278c53f74306b543156f85ecfb190b14484950",
+ "read": 14621856,
+ "kept": 6545127,
+ "dropped": {
+  "not plain prose": 4234658,
+  "length": 2693237,
+  "debris": 1139790,
+  "repeat": 8969,
+  "shares ten words with a test item": 54,
+  "holds a whole test stem": 21
+ },
+ "kept_words": 118477807,
+ "test_runs": 70057,
+ "test_stems": 4347,
+ "books_written": 16363
+}

@@ -11,7 +11,7 @@ def test_a_stated_goal_is_keyed_expedition_position():
     ids = [r["goal_id"] for r in rows]
     # goals 8 and 9 (12 November, the hull pair and the doubled window) declare their positions, so they
     # step over 7, the store's record of Table Talk, folded into goal 3 (11 November)
-    assert ids == [f"kipling:{i}" for i in (1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12)]
+    assert ids == [f"kipling:{i}" for i in (1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15)]  # 13-15: 12 November, the charter's
     assert "kipling:7" not in ids
     assert rows[0]["text"] == "Beat IFEval"
     assert rows[0]["why"]  # the goals table carries why it is wanted

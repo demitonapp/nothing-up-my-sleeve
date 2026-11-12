@@ -1199,3 +1199,24 @@ def test_a_parent_pinned_by_run_id_has_its_checkpoint_carried(tmp_thorp):
     by_name = {"seeded_from": {"run": "seedling", "mode": "freeze"}}
     want = [f"checkpoints/{parent}/step-10/state.json"]
     assert s1.checkpoints_carried(RID, by_id, rec) == want and s1.checkpoints_carried(RID, by_name, rec) == want
+
+
+def test_no_secret_and_no_download_is_ever_carried_aboard(tmp_thorp):
+    """13 November: data/ held the drones' browser profile (its cookies and saved logins), the e-mail secrets and AI2's
+    corpus (research use only), and every hire carried them. None may go aboard, by folder or by name; a voyage's own
+    shards go, and only its own."""
+    from thorp import paths
+    from thorp.viable.s1_operations import charter as ch
+
+    d = paths.data_dir()
+    for rel in ("browser-profile/Default/Cookies", "browser-profile/Default/Login Data", "email-secrets.json",
+                "downloads/arc-v1-feb2018/ARC_Corpus.txt", "drones.json", "somewhere/api-token.txt", "x/.env",
+                "shards/tok1/mine.npy", "shards/tok1/theirs.npy", "tokenisers/tok1/model.json", "lexicon-en.txt"):  # fmt: skip
+        (d / rel).parent.mkdir(parents=True, exist_ok=True)
+        (d / rel).write_text("x")
+    got = set(ch.carried_data("tok1", {"mine"}))
+    assert {"shards/tok1/mine.npy", "tokenisers/tok1/model.json", "lexicon-en.txt"} <= got
+    for rel in ("browser-profile/Default/Cookies", "browser-profile/Default/Login Data", "email-secrets.json",
+                "downloads/arc-v1-feb2018/ARC_Corpus.txt", "drones.json", "somewhere/api-token.txt", "x/.env",
+                "shards/tok1/theirs.npy"):  # fmt: skip
+        assert rel not in got, rel

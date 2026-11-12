@@ -1,11 +1,15 @@
-# ships/specs/fitouts: the 21m leg of SOP v0.0.6 (10 November): the 9m fitout's settings carried to the next rung: the same corpus, the same phases
-# and the same cards as every other size, differing in shape and learning rate alone.
-# broken up into phases, the insertion of the metre topics and then normal training on content"): the plain keel's
-# own spec (its control, fu-ogden-v0-1@300k-pre-s1/s2, already home) with optim.scaffold (thorp/train.py) and pips.
+# ships/specs/fitouts: the 21m leg of SOP v0.0.6 (10 November): the 9m fitout's settings carried to the next rung.
+# Brought to the standard it names on 12 November (kipling:13; Justin: "Finish the charter trials"): as written it
+# never sailed, because the gate refused it (rate 0.001 and warm-up 200 against the standard's 0.0008 and 300 at the
+# 21m, and the copy cards at L12 and the comparator at L3 where the depth standard puts them at L16 and L8, two-thirds
+# and one-third of 24). It is the 21m's first rehearsal on this standard, and the charter's 21m column is read from it.
+# It sails on a hired GPU: the 21m@v0.0.5 took 12.5 h on this Mac.
 name: 21m@v0.0.6
+expedition: kipling
+goal: 13
 ship: 'SOP v0.0.6 at 21m'
 experiment: 'Fitout ogden-v0-1: one fixed Ogden corpus for every class; what cards and stars form at each size?'
-question: 'SOP v0.0.6 launch, at 9m: Ogden v0.1, the shared tokeniser, four passes, the same four metre
+question: 'SOP v0.0.6 launch, at 21m: Ogden v0.1, the shared tokeniser, four passes, the same four metre
   cards pinned in the same layers and, where the size has room, the comparator as a riddle; full weight to 10%
   of the voyage, faded to zero by 60%, then content alone. Which of the five cards is held by heart, and what
   does it cost the language?'
@@ -34,12 +38,12 @@ model:
   positions: rope
 optim:
   name: adamw
-  lr: 0.001
+  lr: 0.0008
   betas:
   - 0.9
   - 0.95
   weight_decay: 0.1
-  warmup_steps: 200
+  warmup_steps: 300
   schedule: cosine
   min_lr_ratio: 0.1
   batch_tokens: 32768
@@ -56,15 +60,15 @@ optim:
     - layer: 0
       head: 1
       card: delimiter
-    - layer: 12
+    - layer: 16
       head: 2
       card: induction
-    - layer: 12
+    - layer: 16
       head: 3
       card: duplicate_word
     riddles:
       comparator:
-        layer: 3
+        layer: 8
         head: 2
         items: 16
         pool: 2048

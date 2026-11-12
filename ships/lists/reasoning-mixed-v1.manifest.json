@@ -1,0 +1,13 @@
+{
+ "version": "reasoning-mixed-v1",
+ "about": "the reasoning lessons with Ogden books of about the same tokens beside them, so a leg keeps its language (13 November: the 9m reasoning leg on the lessons alone fell from 1.582 to 4.176 bits a byte on the hole cards by step 400)",
+ "parts": {
+  "reasoning-marked-v1": 1000,
+  "ogden-v0.1 books": 124
+ },
+ "tokens": {
+  "lessons": 2816678,
+  "books": 2827079
+ },
+ "sha1": "42828a9870a8f5007f67d78740d9f11b5a365f8f"
+}

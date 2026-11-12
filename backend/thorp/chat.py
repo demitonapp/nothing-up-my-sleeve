@@ -186,6 +186,70 @@ def _ask(
     return out.strip(), prompt, fmt, dropped
 
 
+def abilities(spec: dict) -> dict:
+    """What a ship was taught beyond reading (13 November, kipling:14): to think between <think> and <answer> (a leg's
+    `thinking:` block) and to call the eight tools between <call> and <result> (a leg's `tools:` block). A ship with
+    neither is asked as before."""
+    syms = set((spec.get("tokeniser") or {}).get("symbols") or [])
+    return {"thinking": bool(spec.get("thinking")) and "<think>" in syms,
+            "tools": bool(spec.get("tools")) and "<call>" in syms}
+
+
+TOOL_ROUNDS = 4  # calls a ship may make before it must answer, as the foreign ships' loop allows
+
+
+def _ask_able(model, tok, spec: dict, question: str, temperature: float, tokens: int, seed: int,
+              exchanges: list[tuple[str, str]], thinking: bool | None, tools: bool) -> dict:
+    """A ship taught to think or to call tools, asked as its lessons were written (thorp/turns.py `thought`, `called`):
+    the turn opened at `<question>Q`, then `<think>` (thinking on), `<think><answer>` (thinking off) or nothing (the ship
+    chooses); with tools on, a call it writes is run at `<result>` (thorp/ship_tools.py) and the ship goes on from
+    the result, up to TOOL_ROUNDS calls. Returns the answer, the thinking, the calls and the prompt."""
+    from thorp import ship_tools, turns
+
+    can = abilities(spec)
+    prompt, fmt, dropped = fit_exchanges(spec, tok, question, exchanges, int(spec["model"]["context"]),
+                                         min(tokens, ANSWER_ROOM) * 2)  # fmt: skip
+    head = prompt[: -len("<answer>")] if prompt.endswith("<answer>") else prompt
+    opened = ""
+    if can["thinking"] and thinking is True:
+        opened = turns.THINK
+    elif can["thinking"] and thinking is False:
+        opened = turns.THINK + "<answer>"
+    elif can["tools"] and not tools:
+        opened = "<answer>"  # tools off: the turn is opened at the answer, so no call can be written
+    key = seed if ops.is_torch(model) else _mx_key(seed)
+    stops = [i for m in ("<end>", turns.RESULT if (can["tools"] and tools) else None) if m
+             for i in [tok.encode(m)] if len(i) == 1 for i in i]  # fmt: skip
+    written, calls, left = opened, [], tokens
+    for rnd in range(TOOL_ROUNDS + 1):
+        out = generate(model, tok, head + written, temperature, max(8, left), int(spec["model"]["context"]), key,
+                       stop_ids=tuple(stops), **DECODING)  # fmt: skip
+        written += out
+        left -= len(tok.encode(out))
+        last = written.rsplit(turns.CALL, 1)
+        pending = len(last) == 2 and not any(m in last[1] for m in ("<answer>", "<end>", turns.RESULT))
+        if can["tools"] and tools and pending and rnd < TOOL_ROUNDS and left > 8:
+            call = last[1].strip()
+            result = ship_tools.run(call)
+            parsed = ship_tools.parse(call)
+            calls.append({"round": rnd + 1, "name": parsed[0] if parsed else call[:40],
+                          "arguments": {"args": parsed[1]} if parsed else {"text": call},
+                          "result": {"text": result}})  # fmt: skip
+            written += turns.RESULT + result
+            continue
+        break
+    reasoning = ""
+    if turns.THINK in written:
+        reasoning = written.split(turns.THINK, 1)[1].split("<answer>", 1)[0].strip()
+    answer = written.rsplit("<answer>", 1)[1] if "<answer>" in written else written
+    for end in ("<end>", "<eos>", "<question>", "<sep>"):
+        answer = answer.split(end)[0]
+    for m in (turns.CALL, turns.RESULT, turns.THINK):
+        answer = answer.replace(m, " ")
+    return {"answer": answer.strip(), "reasoning": reasoning, "calls": calls, "prompt": head + opened, "format": fmt,
+            "dropped": dropped, "written": written}
+
+
 def _mx_key(seed: int):
     import mlx.core as mx
 
@@ -551,15 +615,26 @@ def answer(
     with_audit: bool = True,
     thinking: bool | None = None,
     history: list | None = None,
+    tools: bool | None = None,
 ) -> dict:
     """One answer from the run's latest checkpoint (or `step`), with the heads and cards audit. `history` is
     the thread so far (the console's messages): its exchanges are written before the question as the voyage's
-    turns were, the oldest dropped whole when they no longer fit the window."""
+    turns were, the oldest dropped whole when they no longer fit the window. A ship taught to think or to call tools
+    (`abilities`) is asked with them: `thinking` on, off or None (the ship chooses), `tools` on unless False."""
     exchanges = exchanges_of(history)
     with _LOCK:
         model, tok, spec, ckpt = load(run_name, step)
         started = time.perf_counter()
-        text, prompt, fmt, dropped = _ask(model, tok, spec, question, temperature, tokens, seed, exchanges)
+        can = abilities(spec)
+        reasoning, calls_log, state = "", [], "none"
+        if can["thinking"] or can["tools"]:
+            r = _ask_able(model, tok, spec, question, temperature, tokens, seed, exchanges, thinking,
+                          bool(tools) if tools is not None else True)  # fmt: skip
+            text, prompt, fmt, dropped = r["answer"], r["prompt"], r["format"], r["dropped"]
+            reasoning, calls_log = r["reasoning"], r["calls"]
+            state = ("on" if thinking else "off" if thinking is False else "auto") if can["thinking"] else "none"
+        else:
+            text, prompt, fmt, dropped = _ask(model, tok, spec, question, temperature, tokens, seed, exchanges)
         seconds = time.perf_counter() - started
         prompt_tokens = _own_tokens(tok, prompt)
         answer_tokens = _own_tokens(tok, text)
@@ -569,13 +644,15 @@ def answer(
             "prompt": prompt,
             "format": fmt,
             "answer": text,
-            "reasoning": "",
-            "thinking": "none",
+            "reasoning": reasoning,
+            "thinking": state,
             "meta": {
-                "settings": {"temperature": temperature, "max_tokens": tokens, "thinking": "none", **DECODING},
+                "settings": {"temperature": temperature, "max_tokens": tokens, "thinking": state,
+                             "tools": bool(can["tools"] and tools is not False), **DECODING},
+                "tool_calls": calls_log,
                 "prompt_tokens": prompt_tokens,
                 "answer_tokens": answer_tokens,
-                "reasoning_tokens": 0,
+                "reasoning_tokens": _own_tokens(tok, reasoning) if reasoning else 0,
                 "exchanges": len(exchanges) - dropped,
                 "exchanges_dropped": dropped,
                 "seconds": round(seconds, 2),
@@ -756,7 +833,12 @@ def _facts(spec: dict, step: str | None = None) -> dict:
         "control_in_embeddings": bool(symbols),
         "turns": turns.format_of(spec),
         "tuning": "base",
-        "thinking": {"mode": "none", "default": False, "why": "a Nothing up my sleeve GPT has no reasoning mode"},
+        "thinking": ({"mode": "toggle", "default": True, "why": "taught to think between <think> and <answer>, or to answer at once (the reasoning leg)"}
+                     if spec.get("thinking") and "<think>" in symbols
+                     else {"mode": "none", "default": False, "why": "a Nothing up my sleeve GPT has no reasoning mode unless a reasoning leg taught it one"}),
+        "tools": ({"format": "marks", "why": "taught to call " + ", ".join((spec.get("tools") or {}).get("set") or []) + " (the tool leg)"}
+                  if spec.get("tools") and "<call>" in symbols
+                  else {"format": None, "why": "this ship was not taught tools"}),
         "recipe": (spec.get("data") or {}).get("recipe"),
         "passes": (spec.get("data") or {}).get("passes"),
         "clean": (spec.get("data") or {}).get("clean"),

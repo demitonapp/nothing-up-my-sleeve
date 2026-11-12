@@ -123,6 +123,30 @@ class _Books:
         return self._w.owners(idx)
 
 
+def room_for_files(n: int) -> int:
+    """Raise this process's soft limit on open files so `n` more can be held, within its hard limit; returns the soft
+    limit after. (13 November: a stream memory-maps every book's shard and keeps it open, one descriptor a book; the
+    50m's shelf is 25,327 books, and a process started by launchd (the coordinator's voyages) is allowed 256 and a
+    Linux box 1,024, so voyage E died at its first batch with "Too many open files". The hard limit is never touched.)"""
+    try:
+        import resource
+    except ImportError:  # not a POSIX system: nothing to raise
+        return n
+    soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+    want = n + 1024  # the books, and room for everything else the voyage opens
+    if soft != resource.RLIM_INFINITY and soft < want:
+        for target in (max(want, 65536), want):
+            if hard != resource.RLIM_INFINITY:
+                target = min(target, hard)
+            try:
+                resource.setrlimit(resource.RLIMIT_NOFILE, (target, hard))
+                soft = target
+                break
+            except (ValueError, OSError):  # past the system's own per-process ceiling: try the bare need
+                continue
+    return soft
+
+
 class Stream:
     def __init__(
         self,
@@ -142,6 +166,7 @@ class Stream:
         self.passes = passes
         self.batch_size = max(1, batch_tokens // context)
         self.families = [(families or {}).get(b, "") for b in self.book_ids]
+        room_for_files(len(self.book_ids))
         self.arrays = [np.asarray(shards.load(tokeniser_id, b)) for b in self.book_ids]
         self.unique_tokens = int(sum(len(a) for a in self.arrays))
         self.windows_per_pass = self.unique_tokens // (context + 1)
@@ -222,6 +247,72 @@ def stream(
     return Stream(
         recipe, tokeniser_id, seed, batch_tokens, context, passes, families, first, first_repeats
     )
+
+
+class Stretched:
+    """The window lengthened for the end of a voyage (12 November, kipling:9; Justin: "yeah 4096 on the 50m"). The field
+    trains short and stretches late (NeoBERT: a million steps at 1,024, fifty thousand at 4,096): this reads the base
+    stream to step `at` and from there a second stream over the same books at the longer window, with the same tokens
+    a step (fewer, longer windows), so the step count, the schedule and the scaffold's fractions mean what they meant.
+    The long windows are a fresh draw of the books under their own seed; the base stream's last steps are not read.
+    Looks like the stream it wraps to the training loop, and says what it did in `record()`."""
+
+    def __init__(self, base, long: "Stream", at: int, books: list[str]):
+        if long.tokens_per_step != base.tokens_per_step:
+            raise ValueError(
+                f"the stretch reads {long.tokens_per_step} tokens a step and the voyage {base.tokens_per_step}: "
+                "batch_tokens must be a whole number of the long window"
+            )
+        if not 0 < at < base.total_steps:
+            raise ValueError(f"the stretch starts at step {at}, outside the voyage's {base.total_steps} steps")
+        if long.total_steps < base.total_steps - at:
+            raise ValueError(f"the long windows run to {long.total_steps} steps; the stretch needs {base.total_steps - at}")
+        self.base, self.long, self.at = base, long, int(at)
+        self.book_ids, self.families = base.book_ids, base.families
+        self.tokens_per_step, self.unique_tokens = base.tokens_per_step, base.unique_tokens
+        self.passes, self.total_steps = base.passes, base.total_steps
+        self.context = long.context
+        index = {b: i for i, b in enumerate(base.book_ids)}
+        self._remap = np.array([index[b] for b in books], dtype=np.int64)
+        if hasattr(base, "record"):
+            self.record = lambda: [*base.record(), self._record()]
+        else:
+            self.record = lambda: [self._record()]
+
+    def _record(self) -> dict:
+        return {"name": "stretch", "context": self.long.context, "first_step": self.at, "last_step": self.total_steps - 1,
+                "tokens": (self.total_steps - self.at) * self.tokens_per_step}  # fmt: skip
+
+    def batch(self, step: int) -> Batch:
+        if step < self.at:
+            return self.base.batch(step)
+        b = self.long.batch(step - self.at)
+        stage = self.base.stage_of(step) if hasattr(self.base, "stage_of") else 0
+        return Batch(step, b.pass_index, b.tokens, self._remap[b.book_index], stage=stage)
+
+    def iter_from(self, start_step: int):
+        for s in range(start_step, self.total_steps):
+            yield self.batch(s)
+
+
+def stretched(base, spec: dict, tokeniser_id: str, recipes: list[list[str]], families) -> object:
+    """The voyage's stream, stretched if its spec says so (`model.stretch: {to, at}`: the window `to` from the
+    share `at` of the voyage on). The long windows read the recipe the voyage is reading at that step."""
+    st = (spec.get("model") or {}).get("stretch") or {}
+    if not st.get("to"):
+        return base
+    m, o = spec["model"], spec["optim"]
+    if m.get("positions", "learned") != "rope":
+        raise ValueError("a stretch needs rotary positions: a learned table has no rows past the base window")
+    if ((o.get("scaffold") or {}).get("probes")):
+        raise ValueError("a probing voyage cannot stretch: the long windows read no pinned head's distance")
+    to, at = int(st["to"]), int(round(float(st["at"]) * base.total_steps))
+    if to <= int(m["context"]):
+        raise ValueError(f"the stretch is to {to} pieces, not past the base window of {m['context']}")
+    i = base.stage_of(at) if hasattr(base, "stage_of") else 0
+    books = recipes[i]
+    long = Stream(books, tokeniser_id, int(spec["seed"]) * 7919 + 4096, o["batch_tokens"], to, 1, families)
+    return Stretched(base, long, at, sorted(books))
 
 
 class Staged:

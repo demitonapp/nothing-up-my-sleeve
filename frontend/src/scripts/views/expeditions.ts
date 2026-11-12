@@ -175,6 +175,7 @@ export const CHARTER_SECTIONS: { slug: string; group: string; name: string; abou
   { slug: 'scaffold', group: 'scaffold', name: 'The scaffold', about: 'the cards and riddles, their weight, and how long a pin is held, faded and released', art: 'charter-scaffold' },
   { slug: 'training', group: 'training', name: 'The training', about: 'the optimiser, learning rate, warm-up, batch, schedule, grad clip and precision', art: 'charter-training' },
   { slug: 'return-leg', group: 'leg', name: 'The return leg', about: "the instruct ship's leg: what it inherits, its turns and stages, its learning rate and the pull", art: 'charter-return-leg' },
+  { slug: 'bar', group: 'bar', name: 'The bar', about: 'what the fleet is judged on and leans toward: its curiosity, read on every ship, and its targets on the leaderboard', art: 'charter-bar' },
 ];
 export const charterSection = (slug: string | null | undefined) => CHARTER_SECTIONS.find((s) => s.slug === slug) || null;
 /** Where a master-charter row lives: its group's page, at the row's own anchor (param keys read `ship.layers`). */
@@ -222,7 +223,7 @@ const GOAL_PART: [string, string, string][] = [
 ];
 const GROUP_SHORT: Record<string, string> = {
   'The ship': 'ship', 'The tokeniser': 'tokeniser', 'What it reads': 'reads',
-  'The scaffold': 'scaffold', 'The training': 'training', 'The return leg (instruct ships)': 'return leg',
+  'The scaffold': 'scaffold', 'The training': 'training', 'The return leg (instruct ships)': 'return leg', 'The bar': 'bar',
 };
 const goalRank = (st: string): number => ({ partly: 0, open: 1, done: 2, dropped: 3 }[st] ?? 4);
 const byGoal = (a: any, b: any): number =>

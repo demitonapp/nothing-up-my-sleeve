@@ -91,6 +91,10 @@ def get(name: str) -> Evaluator:
         from thorp.evaluators.arc_ai2 import evaluate
     elif name == "blimp":  # BLiMP, the grammatical reading; ARC is the capability one (11 November)
         from thorp.evaluators.blimp import evaluate
+    elif name == "reasoning":  # the 50m's reasoning leg: held-out chains, thinking and at once (12 November)
+        from thorp.evaluators.reasoning import evaluate
+    elif name == "tools":  # the 50m's tool leg: held-out questions, the first move (12 November)
+        from thorp.evaluators.tools import evaluate
     else:
         raise KeyError(f"unknown evaluator {name!r}")
     return evaluate

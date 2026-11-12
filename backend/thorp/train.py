@@ -52,6 +52,7 @@ NOT_HASHED = (
     "question",
     "fitout",  # the named fitout a voyage is a variation of (S5 policy 'fitout'): a label, so naming it moves no id
     "charter",  # where it sails (a GPU hired from Vast.ai, thorp/viable/s1_operations/charter.py), not what it is
+    "gpu",  # the GPU class a hire must be (13 November: the deep 50m does not fit an RTX 4090): where, not what
     # the expedition it sails for, named outright (11 November, item 11; fleet.expedition_of_spec): no spec or run
     # carried the key that day, so no id moved (tests/test_run_state.py holds every spec and run to it)
     "expedition",
@@ -1406,6 +1407,10 @@ def _train(spec: dict, prep: Prepared, rec: Ledger, buf, stop_after: int | None,
             first=prep.first,
             first_repeats=spec["data"].get("first_repeats", 1),
         )
+    # the window lengthened for the voyage's end, when the spec says so (data.stretched; 12 November, kipling:9)
+    stream = data.stretched(
+        stream, spec, tok.id, list(prep.stage_recipes) if stages else [list(prep.recipe)], families
+    )
     total = stream.total_steps
 
     model = build_model(spec, tok.vocab_size)
@@ -1615,13 +1620,16 @@ def _train(spec: dict, prep: Prepared, rec: Ledger, buf, stop_after: int | None,
         # (batch, time) -> the mean per window, so the loss can be attributed to the window's book;
         # every window is the same length, so the mean of the window means is the batch mean.
         dist = []  # each pinned head's distance from its card, whatever the weight (the probe phase reads it)
-        if picks and not sample:
+        # the stretch's long windows read no pinned head's map: the pull is zero by then at every class, and each map
+        # is a (windows, length, length) array (data.Stretched; a probing voyage cannot stretch)
+        long = x.shape[1] > int(m["context"])
+        if picks and not sample and not long:
             logits, pats = mdl.forward_attending(x, picks)
             dist = scaffold_head_losses(pats, x, sc, scaffold_targets(x), flags)
             sl = scaffold_loss(
                 pats, x, sc, on=on if staged else None, weights=hw, per_head=dist,
             )
-        elif picks:  # the pull read on part of the batch: a second, smaller forward pass
+        elif picks and not long:  # the pull read on part of the batch: a second, smaller forward pass
             logits = mdl(x)
             xs = x[: int(sample["windows"]), : int(sample["length"])]
             _, pats = mdl.forward_attending(xs, picks)

@@ -2722,6 +2722,29 @@ EXPEDITIONS["kipling"] = Expedition(
          "why": "Justin, 12 November: \"I want to have control tokens. I think that's pretty much locked in that "
                 "control tokens are part of our future ... I want to have the ogden branch with control tokens in "
                 "it\""},
+        {"position": 13, "text": "The training recipe at every class",
+         "detail": "the rate at 1x, 0.5x and 0.25x and a warm-up of 5% of the voyage, at the 300k and the 1m (each "
+                   "against its own plain v0.0.6 ship); the 21m sailed to the standard it names; the 50m sailed at "
+                   "v0.0.6 beside its wide arm",
+         "why": "the charter's learning-rate and warm-up rows wait on it (Justin, 12 November: \"Finish the charter "
+                "trials\"). The two smallest classes are the hardest to tune (7.9% of random settings near the best "
+                "at 4M against 28.1% at 134M, Lourie et al. 2026), their rates were set by hand and never swept, and "
+                "the published small-model warm-ups are several times the draft's"},
+        {"position": 14, "text": "The 50m's reasoning and tool legs",
+         "detail": "the 50m taught to call a small fixed set of tools (calls and results written by code, one lesson in "
+                   "eight with no call to make) and, as a ship of its own, to think between marks before it answers "
+                   "(short chains on questions whose two facts it met apart, every answer checked by code). Rehearsed "
+                   "at the 9m first for the mechanics, then sailed at the 50m",
+         "why": "Justin, 12 November: \"I want the first Nothin up my sleeve to have a reasoining variant, tool calling, "
+                "decent context window\"; then \"classes for the reasoning and tool is 50m\". The charter's thinking "
+                "and tools rows wait on it"},
+        {"position": 15, "text": "Curiosity, locked in",
+         "detail": "the curiosity ladder read on every ship of the fleet; the conversation and reasoning lessons written "
+                   "as a curious speaker that asks when it does not know and still answers; and the 50m's curious "
+                   "direction looked for inside it. The mark: the 50m base with rungs 1 to 4 present and in order, the "
+                   "50m instruct ship asking (rung 6), which no ship of ours has shown",
+         "why": "Justin, 12 November: \"the bias should be curiosity bias as in that's the bias i want locked in\". "
+                "The charter's curiosity row waits on it"},
     ),
     ship="SOP v0.0.6",
     fleet="Star Fleet",

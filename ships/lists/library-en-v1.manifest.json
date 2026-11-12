@@ -1,0 +1,9 @@
+{
+ "version": "library-en-v1",
+ "about": "every English book in the store from the five book sources (Common Pile pre-1929, Gutenberg, Common Pile LoC, the British Library, the Internet Archive), the generated corpora, hole cards, truth sets and unsigned newspapers left out, one copy of a book held under two sources (the larger kept, by title and author's surname)",
+ "made": "12 November 2026, for the 50m's shelf (voyage E)",
+ "books": 8964,
+ "bytes": 3094407697,
+ "sha1": "8e4e6f67326bf157828fe3fd6c33919f2f130fba",
+ "period": "6 Gutenberg books whose author or translator died after 1955 left out (S5 'period', the legal rule)"
+}

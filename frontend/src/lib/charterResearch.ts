@@ -13,8 +13,8 @@
 //
 // The bar the charter is read against is Justin's of the same evening: "I want the first Nothin up my sleeve to have
 // a reasoining variant, tool calling, decent context window and be as good as possible on all our tests on the
-// leaderboard". GAPS are the questions a waiting row asks that no discovery on the map answers; MISSING_ROWS are the
-// rows that bar needs and the charter does not have.
+// leaderboard". GAPS are what the reading pass of the same night could not answer (nobody has published it at the
+// fleet's sizes, so only a voyage can); MISSING_ROWS are the rows that bar needs and the charter does not have.
 
 import { DISCOVERIES, OBJECTS, slugOf, type FieldDiscovery } from './fieldMap';
 import { DEMITON_DISCOVERIES as DB } from './discoveryPaths';
@@ -27,6 +27,11 @@ export const CHARTER_ROWS: Record<string, string> = {
   'ship.width': 'the ship: width',
   'ship.context': 'the ship: context',
   'ship.positions': 'the ship: positions',
+  'ship.ffn': 'the ship: feed-forward',
+  'ship.norm': 'the ship: normalisation',
+  'ship.embeddings': 'the ship: embeddings',
+  'ship.biases': 'the ship: bias terms',
+  'ship.stretch': 'the ship: the stretch',
   'ship.built': 'the ship: built',
   'tokeniser.pieces': 'the tokeniser: pieces',
   'tokeniser.byte_fallback': 'the tokeniser: byte fallback',
@@ -50,11 +55,17 @@ export const CHARTER_ROWS: Record<string, string> = {
   'training.schedule': 'the training: schedule',
   'training.grad_clip': 'the training: grad clip',
   'training.precision': 'the training: precision',
+  'training.weight_decay': 'the training: weight decay',
+  'training.betas': 'the training: betas',
   'leg.inherits': 'the return leg: inherits',
   'leg.turns': 'the return leg: turns',
   'leg.stages': 'the return leg: stages',
   'leg.lr': 'the return leg: learning rate',
+  'leg.thinking': 'the return leg: thinking',
+  'leg.tools': 'the return leg: tools',
   'leg.pull': 'the return leg: the pull',
+  'bar.curiosity': 'the bar: curiosity',
+  'bar.targets': 'the bar: targets',
 };
 
 export interface Bearing { discovery: string; rows: string[]; says: string }
@@ -62,14 +73,15 @@ export interface Bearing { discovery: string; rows: string[]; says: string }
 export const BEARINGS: Bearing[] = [
   // training and scale
   { discovery: 'power-law-scaling', rows: ['ship.layers', 'ship.width'], says: 'Each class up should read the unseen books better by a steady step. A class that does not has a fault to find before its hull is signed: the draft’s 9m read 1.937 bits a byte on 12 November where the 9m before it read 1.579.' },
-  { discovery: 'compute-optimal', rows: ['reads.passes', 'reads.recipe'], says: 'About twenty tokens a parameter. Ogden v0.1 is about 67M tokens a pass, 269M over four: enough for the 21m (about 224M wanted) and a third of what the 50m wants (about 800M). The 50m needs more text, not more passes.' },
-  { discovery: 'data-constrained', rows: ['reads.passes'], says: 'Four passes is as far as the field supports reading the same text again; a fifth is worth less than new books.' },
+  { discovery: 'compute-optimal', rows: ['reads.passes', 'reads.recipe'], says: 'Twenty tokens a parameter is the cheapest route to a loss, not all a ship can use (see ‘Small models keep learning far past twenty a parameter’). Ogden v0.1 is about 67M tokens a pass, 269M over four: about seven a parameter at the 50m. It needs more text, not more passes.' },
+  { discovery: 'data-constrained', rows: ['reads.passes'], says: 'Four passes read about as well as four times the text; passes beyond that still gain, less each time. The draft’s four is where repeating stops being free.' },
   { discovery: 'mup', rows: ['training.lr', 'training.warmup'], says: 'The draft sets a rate for each class by hand. Under this parametrisation a rate tuned at the 300k would carry up the ladder. It is not in the draft, so each class’s rate rests on that class’s own rehearsals.' },
   { discovery: 'distillation', rows: ['leg.stages', 'reads.recipe'], says: 'A teacher’s answers, with its reasoning written out and its tool calls, are the practical source for a reasoning leg’s and a tool leg’s corpus. The draft’s leg reads a dialogue shelf and a conversation list and nothing distilled.' },
   { discovery: 'implicit-reasoners', rows: ['reads.recipe', 'scaffold.riddles'], says: 'Chaining two facts without writing the step is learned from the share of inferred facts in the text, over long training, not from a pull on a head. It argues for chained items in the corpus rather than a bridge riddle.' },
   // architecture
-  { discovery: 'rope', rows: ['ship.positions', 'ship.context'], says: 'Signed. Rotary positions need no table, so the window can be lengthened without another parameter. Whether a leg can read through a longer window than its base was trained on has not been tried here.' },
+  { discovery: 'rope', rows: ['ship.positions', 'ship.context'], says: 'Signed. Rotary positions need no table, so the window can be lengthened without another parameter, and stretched late in a voyage (see ‘Pretrain short, stretch late’). No ship of ours has been stretched.' },
   { discovery: 'gqa', rows: ['ship.kv_heads'], says: 'The field’s saving is a large model’s key-value cache at inference. At these sizes there is nothing to save: read at 300k (two seeds) and 9m (kipling:6), the language unchanged, half a gigabyte of 13.5 saved, the comparator lower. One KV head per query head.' },
+  { discovery: 'glu', rows: ['ship.ffn'], says: 'The fleet’s hull is the plain kind: GELU at four times the width, in both kernels. The gated layer’s gain is shown at 125M and above (43.9 against 42.6 for a ReLU layer, MobileLLM, Liu et al. 2024). At the fleet’s top size it is a wash: at 50M the plain GELU layer read within a point of the gated one on five benchmarks, a little ahead on them and a little behind on perplexity (Hillier et al. 2024: one figure each with no seeds stated, and the hidden size changed with it). No case to build a switch for it in v0.1: keep the plain layer.' },
   { discovery: 'flash-attention', rows: ['ship.context'], says: 'A window’s cost is in holding the attention map. This Mac’s kernel holds every head’s whole map for the backward pass, so memory grows with the square of the window (the 21m: 1.2 GB a window at 1,024 pieces, 9.2 at 4,096); a hired GPU’s kernel need not. Above 1,024 the 21m and the 50m sail abroad.' },
   // data
   { discovery: 'textbook-quality', rows: ['reads.recipe'], says: 'Teaching-grade text lets a small model match a much larger one on reasoning. Every class, 300k to 50m, read AI2 ARC at chance on Ogden’s books (12 November): the lever for that test is what the fleet reads, not its hull.' },
@@ -80,7 +92,7 @@ export const BEARINGS: Bearing[] = [
   // post-training
   { discovery: 'superficial-alignment', rows: ['leg.stages', 'leg.lr', 'leg.inherits'], says: 'A leg should be short and gentle, and cannot give what pretraining did not. The draft’s talk leg agrees on the first (the lower rate kept the language) and shows the second (the reply barely reads its question: 0.037 bits a byte).' },
   // inference and prompting
-  { discovery: 'chain-of-thought', rows: ['leg.stages'], says: 'The field’s gains are in models far larger than the fleet’s. At 3M to 40M parameters the reasoning variant is a bet, to be rehearsed at the 9m before the 21m and the 50m are laid.' },
+  { discovery: 'chain-of-thought', rows: ['leg.stages'], says: 'The field’s gains in plain English are in models far larger than the fleet’s; at the fleet’s sizes written steps are shown only on sums and made-up puzzles. The reasoning variant is a bet at the 50m, to be rehearsed at the 9m before the 50m is laid.' },
   { discovery: 'test-time-compute', rows: ['leg.stages', 'tokeniser.symbols'], says: 'A reasoning leg needs marks to open and close the thinking and a budget for it. The draft has neither: the symbols locked on 12 November leave thinking marks out.' },
   { discovery: 'lost-in-the-middle', rows: ['ship.context'], says: 'A longer window is read worst in its middle. A tool’s definition and the question belong at the start and the end of the prompt; a long window is room, not a store.' },
   // internals
@@ -94,32 +106,62 @@ export const BEARINGS: Bearing[] = [
   { discovery: 'latent-multi-hop', rows: ['scaffold.riddles'], says: 'Where silent chaining works at all it is in a large model’s middle layers. The bridge riddle pulled at two-thirds depth in a 9m and nothing lit.' },
   // evaluation
   { discovery: 'contamination', rows: ['leg.stages'], says: 'The 0.906 a 9m reads on IFEval is from a leg taught on the test’s own prompts. A leg judged on a test leaves its scored prompts out of its stages: the held-out split (360 taught, 139 kept back) is written and has not been sailed at the 9m.' },
+  // ---- the reading pass (12 November, "Fold in the reading"): the discoveries added to lib/fieldMap.ts that day
+  { discovery: 'depth-flattens', rows: ['ship.layers', 'ship.width', 'ship.heads'], says: 'The fleet’s ladder is deep and thin: 36 layers at the 50m, 18 at the 9m. The one fixed-size comparison at the 50m’s scale found the best model at five layers and nothing gained past it, and the fleet’s own step time grows with every layer. Their layers were thinned another way than ours and it was one corpus, so it is a reason to sail a wide 50m beside the deep one, not a verdict. The 1m pair (kipling:8) reads it at the bottom.' },
+  { discovery: 'width-facts', rows: ['ship.width'], says: 'The leaderboard’s knowledge tests ask for facts, and facts followed width. The 50m is 304 wide; the published 33M story model is 768.' },
+  { discovery: 'tied-embeddings', rows: ['ship.embeddings'], says: 'The hull ties its table. At 2,048 pieces the table is 1.5% of the 50m and 37% of the 300k, so tying matters most at the bottom of the ladder, where there is least to spare.' },
+  { discovery: 'context-extension', rows: ['ship.context'], says: 'The 50m need not sail its whole voyage at 4,096 pieces: train short and stretch at the end, with long documents in the last stretch (5% more steps in the nearest case). Every published case under a billion parameters is an encoder, so it is a rehearsal to sail before the 50m is laid.' },
+  { discovery: 'beyond-chinchilla', rows: ['reads.recipe', 'reads.passes'], says: 'On Ogden v0.1 the 50m sees about seven tokens a parameter; on every English book in the store (about 1.3B tokens) about thirty-two. The models it will be read beside saw thousands. Text is what the fleet is short of.' },
+  { discovery: 'hard-to-tune-small', rows: ['training.lr', 'ship.norm'], says: 'The 300k and the 1m are where a setting is most likely to be off, and their rates were set by hand; the 1m has not docked on this standard. It also backs the hull’s normalisation before each sublayer.' },
+  { discovery: 'small-recipes', rows: ['training.optimiser', 'training.warmup', 'training.schedule', 'training.grad_clip'], says: 'The draft is inside the published range: AdamW, clip 1, a cosine decay, and the 50m’s rate of 0.0006 is the published 50M recipe’s. Its warm-up is short beside theirs (100 to 400 steps against a thousand and more). The betas (0.9, 0.95) and the weight decay (0.1) match too; they are in the fitouts and are not rows of the charter.' },
+  { discovery: 'vocab-scaling', rows: ['tokeniser.pieces'], says: 'Their smallest model is the size of our largest, so it gives a direction and no number: against a large vocabulary at the small classes, and less of one when text is scarce, which it is here. One shared tokeniser of 2,048 is the cautious reading; the 9m read 4,096 inside the noise.' },
+  { discovery: 'arc-corpus', rows: ['reads.recipe', 'reads.refuse'], says: 'The direct source of grade-school science, now the first fleet may read any text. Reading it is fair if it is said, and the test’s own questions stay out: the practice found is to drop a document that shares a ten-word run with a test item over more than half the item’s length. That belongs in ‘refuses’.' },
+  { discovery: 'synthetic-textbooks', rows: ['reads.recipe'], says: 'A teacher can write the science the fleet lacks, pitched at the middle school; the published collection is open and hundreds of times Ogden’s size. It was shown to help at 1.8 billion parameters and nowhere near the fleet’s.' },
+  { discovery: 'simple-language-knowledge', rows: ['reads.recipe'], says: 'The nearest published work to Ogden with a teacher: knowledge rewritten into a small vocabulary, in a set about the size of Ogden v0.1.' },
+  { discovery: 'readability-learnability', rows: ['reads.recipe'], says: 'A caution for Ogden’s premise: books chosen for Basic English words are not thereby the easiest to learn from. What helped small models was text that repeats its sequences.' },
+  { discovery: 'arc-by-tokens', rows: ['reads.recipe'], says: 'Sets the target. A 70M model needed tens of billions of tokens to reach the high thirties on ARC-Easy and never left chance on ARC-Challenge. At the 50m the low thirties on Easy would be a good reading (the reader’s inference, not a published figure), and an untrained model already scores 27 by their scoring, so a point or two above chance is not yet a signal.' },
+  { discovery: 'small-tool-callers', rows: ['leg.stages'], says: 'The 50m would be the smallest plain decoder shown to call a tool: the nearest published is 90M, of another build, at 41% on the standard test. Aim at one call from a small fixed set of tools; calls over several turns are out of reach at this size.' },
+  { discovery: 'tool-leg-recipe', rows: ['leg.stages'], says: 'The tool corpus’s shape: mostly tool lessons, one in eight with no call to make, thousands of examples for each tool’s arguments. And the thinking kept out of it, which argues for a tool leg apart from the reasoning leg rather than one leg teaching both.' },
+  { discovery: 'tool-format', rows: ['tokeniser.symbols', 'leg.turns'], says: 'With pieces of about three bytes JSON is dear: one published set’s tool definitions average about a thousand characters, some 350 pieces before the question is asked. A fixed tool set can have a piece of its own for each tool and marks to open and close a call, which costs the window almost nothing.' },
+  { discovery: 'thinking-switch', rows: ['tokeniser.symbols'], says: 'Two marks open and close the thinking, and thinking off is the pair with nothing between: one ship, both habits. Nothing below 0.6B has been published with the switch.' },
+  { discovery: 'short-chains', rows: ['leg.stages'], says: 'The teacher is a 27B model and thinks at length. The 50m should be shown its short chains, or the long ones cut down.' },
+  { discovery: 'scratchpads-small', rows: ['leg.stages'], says: 'Direct on size (10.6M) and on training from nothing; the task was sums. It is the evidence that a ship of ours can use written steps, and that a thousand good examples can be enough.' },
+  { discovery: 'tinygsm', rows: ['leg.stages'], says: 'The one model near the fleet’s size shown reasoning over plain English from nothing is 125M, on twelve million problems. It is the case for a 100m if the 50m’s reasoning reads low, and a measure of the homework that takes.' },
+  { discovery: 'locality-steps', rows: ['leg.stages'], says: 'Tells the reasoning corpus what to hold: questions whose two facts the ship met in different places. Where the pair already sits together in the books, the steps add nothing.' },
+  { discovery: 'two-hop-written', rows: ['scaffold.riddles', 'leg.stages'], says: 'Why the chaining tests read nil at every class, and why the reasoning leg is the route: silently a ship must learn each fact twice, with the step written once.' },
+  { discovery: 'guided-attention', rows: ['scaffold.weight', 'scaffold.hold', 'scaffold.fade', 'scaffold.release'], says: 'The nearest published work to the scaffold, and it fades its pull to zero as the draft does from the 1m up. It was done on masked models with fixed patterns, and it never asked what the fleet’s probe asks: whether a head keeps its card once the pull is gone. On that the 300k probe is the only reading found.' },
 ];
 
 export interface ResearchGap { key: string; rows: string[]; question: string; why: string }
 
-/** What a waiting row asks that no discovery on the map answers: a reading pass, before a voyage is spent on it. */
+/** What the reading pass of 12 November could not answer: no one has published it at the fleet's sizes, so only a
+ *  voyage can. `why` opens with what was read. */
 export const GAPS: ResearchGap[] = [
-  { key: 'hull', rows: ['ship.layers', 'ship.width', 'ship.heads'], question: 'Deep against wide at one to forty million parameters: what does depth buy at a fixed count, and what does it cost in speed?', why: 'The hull pair (kipling:8) reads it at the 1m alone; the 9m, 21m and 50m have no pair.' },
-  { key: 'pieces', rows: ['tokeniser.pieces'], question: 'How many pieces suit a model this small, and should the count grow with the class?', why: 'One 9m reading at 4,096 pieces (kipling:10), inside the spread two like voyages show.' },
-  { key: 'window', rows: ['ship.context'], question: 'What does a tool call with its reasoning need in pieces, and can a ship be pretrained at one window and taught its leg at a longer one?', why: 'The 9m at 2,048 (kipling:9) read only whether the books read better. They did not.' },
-  { key: 'tools', rows: ['tokeniser.symbols', 'leg.turns'], question: 'How is tool calling taught to a small model: the marks, the form of a call and its result, and how many examples?', why: 'Nothing on the map is about tool calling, and no ship of ours has been taught it.' },
-  { key: 'reasoning', rows: ['leg.stages'], question: 'How is written-out reasoning taught to a model of a few million parameters, and from what size does it help?', why: 'The map’s chain-of-thought discoveries are all from large models.' },
-  { key: 'science', rows: ['reads.recipe'], question: 'What must a corpus hold, and how much of it, for a small model to answer grade-school science?', why: 'AI2 ARC at chance at every class; kipling:11’s arms read the language and the cards, not that test.' },
-  { key: 'scaffold', rows: ['scaffold.weight', 'scaffold.hold', 'scaffold.fade', 'scaffold.release'], question: 'Has anyone pulled chosen heads toward a pattern during pretraining, and what did holding and letting go do?', why: 'These rows rest on the fleet’s own readings alone (the 300k probe, the release arms).' },
-  { key: 'recipe', rows: ['training.optimiser', 'training.warmup', 'training.batch', 'training.schedule', 'training.grad_clip'], question: 'What do the published small-model recipes use for the optimiser, warm-up, batch, schedule and clip at this size?', why: 'Carried from the draft; rehearsed at 300k and 9m, never on v0.0.6 at the 21m or the 50m.' },
+  { key: 'hull', rows: ['ship.layers', 'ship.width', 'ship.heads'], question: 'Deep against wide below forty million parameters, and for a hull thinned the way ours is.', why: 'Read: one fixed-size comparison, at 41M, and none below it. The 1m pair (kipling:8) is queued; the 50m has no pair, and the reading says it should have one.' },
+  { key: 'layer-kinds', rows: ['ship.norm'], question: 'RMSNorm in place of LayerNorm: does it matter at these sizes?', why: 'Read: one unreviewed study at 27M found no winner between the two. Nothing read argues for changing the hull, and the row was signed on 12 November.' },
+  // bias terms: the constant a layer adds to its sum. Not the fleet's leaning, which is what Justin took the row to mean
+  // (12 November: "the bias should be curiosity bias as in that's the bias i want locked in"); that is MISSING_ROWS' disposition
+  { key: 'biases', rows: ['ship.biases'], question: 'Would a hull with bias terms (a constant added in each layer) read any differently?', why: 'Read: nothing found either way, and every ship of ours has sailed without them. Signed at none on 12 November, once the row was named for what it is.' },
+  { key: 'pieces', rows: ['tokeniser.pieces'], question: 'How many pieces suit a model of one to forty million parameters?', why: 'Read: no published sweep at these sizes; the law found starts at 33M. One 9m reading of ours at 4,096 (kipling:10), inside the spread two like voyages show.' },
+  { key: 'window', rows: ['ship.context'], question: 'Can a small decoder be stretched from 1,024 pieces to 4,096 late in its voyage, and what does a step at 4,096 take on a hired GPU?', why: 'Read: every published case under a billion parameters is an encoder. Neither has been sailed or measured here.' },
+  { key: 'tools', rows: ['tokeniser.symbols', 'leg.turns'], question: 'Can a plain 40M decoder call a tool at all, and in which form of call?', why: 'Read: nothing published at or below 40M for a decoder, and no comparison of forms below a billion. No tool test is written in simple English, so the fleet needs its own.' },
+  { key: 'reasoning', rows: ['leg.stages'], question: 'Do written steps help a 40M ship on questions in plain English, and can it carry the thinking switch?', why: 'Read: shown on sums and made-up puzzles at 10M to 33M; nothing in plain English under 100M from nothing; no switch below 0.6B.' },
+  { key: 'science', rows: ['reads.recipe'], question: 'Does science text lift a 40M ship off chance on AI2 ARC?', why: 'Read: no corpus has been shown to do it at or below 40M, and nothing is published on ARC between 10M and 40M. kipling:11’s arms read the language and the cards, not that test.' },
+  { key: 'scaffold', rows: ['scaffold.weight', 'scaffold.hold', 'scaffold.fade', 'scaffold.release'], question: 'Does a head keep its card after the pull is gone?', why: 'Read: the one published work never measured it. The fleet’s 300k probe and release arms are the only readings; the 1m and up have none.' },
+  { key: 'recipe', rows: ['training.lr', 'training.warmup'], question: 'Are the hand-set rates right at the 300k and the 1m, and is the short warm-up costing anything?', why: 'Read: small models are the hardest to tune, and the published warm-ups are several times the draft’s. The draft’s rates have had no sweep on this standard.' },
 ];
 
 export interface MissingRow { key: string; group: string; name: string; why: string; discoveries: string[] }
 
 /** Rows the bar of 12 November needs and the charter does not have. */
 export const MISSING_ROWS: MissingRow[] = [
-  { key: 'thinking-marks', group: 'the tokeniser', name: 'thinking and tool marks', why: 'The eight symbols locked on 12 November leave them out. They belong in the tokeniser before any base ship is laid, since every leg reads with its base’s pieces.', discoveries: ['glitch-tokens', 'test-time-compute'] },
-  { key: 'reasoning-leg', group: 'the return leg', name: 'the reasoning leg', why: 'Its stages, its corpus and its thinking budget. No corpus, evaluator or voyage exists.', discoveries: ['chain-of-thought', 'two-hop-curse', 'distillation'] },
-  { key: 'tool-leg', group: 'the return leg', name: 'the tool leg', why: 'The form of a call and its result, and the corpus that teaches it. No corpus, evaluator or voyage exists.', discoveries: ['distillation', 'superficial-alignment'] },
-  { key: 'leg-window', group: 'the return leg', name: 'the leg’s window', why: 'A leg may need a longer window than the books do. Today the leg takes its base’s.', discoveries: ['rope', 'flash-attention', 'lost-in-the-middle'] },
-  { key: 'feed-forward', group: 'the ship', name: 'feed-forward layer and normalisation', why: 'The charter has no row for either, so what the fleet is built with is not signed.', discoveries: ['glu'] },
-  { key: 'bar', group: 'the bar', name: 'leaderboard targets, class by class', why: '"As good as possible on all our tests" has no number to be judged against, and the one high reading (IFEval) is on taught prompts.', discoveries: ['contamination', 'emergence-mirage'] },
+  { key: 'thinking-marks', group: 'the tokeniser', name: 'thinking and tool marks', why: 'The eight symbols locked on 12 November leave them out. Two marks for thinking, two for a call, and a piece for each tool of a fixed set; they belong in the tokeniser before any base ship is laid, since every leg reads with its base’s pieces.', discoveries: ['thinking-switch', 'tool-format', 'glitch-tokens'] },
+  { key: 'reasoning-leg', group: 'the return leg', name: 'the reasoning leg (50m)', why: 'Its stages, its corpus (short chains, on questions whose facts the ship met apart, the answers checked by code) and its thinking budget. No corpus, evaluator or voyage exists.', discoveries: ['scratchpads-small', 'two-hop-written', 'locality-steps', 'short-chains'] },
+  { key: 'tool-leg', group: 'the return leg', name: 'the tool leg (50m)', why: 'A leg of its own, apart from the reasoning: a small fixed tool set, one lesson in eight with no call to make, thousands of examples a tool. No corpus, evaluator or voyage exists.', discoveries: ['small-tool-callers', 'tool-leg-recipe', 'distillation'] },
+  { key: 'leg-window', group: 'the ship', name: 'the stretch to 4,096 (50m)', why: 'Justin, 12 November: "yeah 4096 on the 50m". When the window is lengthened, for how many steps and on what long text is not a row; today a ship has one window for its whole voyage.', discoveries: ['context-extension', 'rope', 'lost-in-the-middle'] },
+  { key: 'weight-decay', group: 'the training', name: 'weight decay and betas', why: 'In every fitout (0.1; 0.9 and 0.95) and in every published recipe, and not rows of the charter, so they are not signed.', discoveries: ['small-recipes'] },
+  { key: 'disposition', group: 'the bar', name: 'disposition: curiosity', why: 'Justin, 12 November: "the bias should be curiosity bias as in that’s the bias i want locked in". The fleet is to lean toward curiosity. It can be measured already (the curiosity ladder’s six rungs, read on one 21m: knowing what it does not know, learning from the page and knowing a question present; noticing the strange, expecting an answer and asking absent) and is not read on this standard’s voyages. Nothing teaches it and no row holds it.', discoveries: ['persona-vectors', 'superficial-alignment', 'steering', 'sycophancy'] },
+  { key: 'bar', group: 'the bar', name: 'leaderboard targets, class by class', why: '"As good as possible on all our tests" has no number to be judged against. The reading gives the scale: low thirties on ARC-Easy at the 50m, about 40% on single tool calls at twice its size; and the one high reading of ours (IFEval) is on taught prompts.', discoveries: ['arc-by-tokens', 'small-tool-callers', 'contamination', 'emergence-mirage'] },
 ];
 
 const BY_KEY: Record<string, FieldDiscovery> = Object.fromEntries(DISCOVERIES.map((d) => [d.key, d]));

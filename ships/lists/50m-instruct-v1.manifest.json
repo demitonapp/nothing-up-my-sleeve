@@ -1,0 +1,10 @@
+{
+ "version": "50m-instruct-v1",
+ "about": "the 50m instruct leg's lessons: the conversation corpus and the tool corpus together, read shuffled, so one ship learns to talk and to call a tool",
+ "parts": {
+  "conversations-marked-v1": 1247,
+  "tools-marked-v1": 500
+ },
+ "books": 1747,
+ "sha1": "2e12dbe982889c66332a5d3b05c4d86163450720"
+}

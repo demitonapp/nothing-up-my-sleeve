@@ -1,0 +1,122 @@
+# ships/specs/fitouts: voyage C's base (12 November, kipling:12; Justin: "Build what does not exist: the tokeniser
+# with the new marks ... Sail C"). The fleet's tokeniser on a 9m: the eight marks locked on 12 November and three
+# for the 50m's abilities (thorp/turns.py FLEET_SYMBOLS), on Ogden v0.1 unwrapped with the marks written in. Two
+# things change from 9m@v0.0.6, the text and the pieces, because the fleet changes both; the 300k marks pair
+# (300k@v0.0.6-marks-s2: 1.922 against 1.932 plain) says the marks alone cost no language, so the comparison with
+# 9m@v0.0.6 reads mostly the text. <think>, <call> and <result> appear in no book: they are first read in the legs.
+# On a hired GPU (9m@v0.0.6-v4096 took 29 minutes on an RTX 4090).
+name: 9m@v0.0.6-fleetmarks
+expedition: kipling
+goal: 12
+ship: 'SOP v0.0.6 at 9m (the fleet''s eleven marks, on Ogden v0.1)'
+experiment: 'The 9m on the bigger Ogden set: the 1m''s v0.1.4 corpus, the marked tokeniser, and the same
+  four-card pull, so the 9m is both the next rung and the first size that can rehearse a chat format.'
+question: 'The fleet''s tokeniser at the 9m, the first ship of voyage C: 9m@v0.0.6 with its text and pieces changed to what the fleet would read, Ogden v0.1 unwrapped with the marks written in (marks-v1) and the eleven marks of v0.1 as single pieces. Read against 9m@v0.0.6 (Ogden v0.1.4, raw, ten marks): does the language come back to where 9m@v0.0.5 read it (1.579 against 1.937 bits a byte on the unseen books), and do the cards hold? Its return legs, the conversation, the tools and the thinking, sail from it.'
+data:
+  recipe: lists/ogden-v0.1.csv
+  passes: 4
+  stages:
+  - name: ogden
+    recipe: lists/ogden-v0.1.csv
+    passes: 4
+  order: shuffled
+  refuse:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+  - lists/hole-cards-unseen.csv
+  clean: marks-v1
+  opt_in: 'reads Ogden v0.1 unwrapped with the marks written in (marks-v1), the text the four smaller classes read,
+    where 9m@v0.0.6 read Ogden v0.1.4 raw'
+tokeniser:
+  kind: spm-bpe
+  vocab: 2048
+  byte_fallback: true
+  train_on: lists/ogden-v0.1.csv
+  symbols:
+  - "<bos>"
+  - "<eos>"
+  - "<question>"
+  - "<answer>"
+  - "<end>"
+  - "<premise>"
+  - "<sep>"
+  - "<conclusion>"
+  - "<think>"
+  - "<call>"
+  - "<result>"
+model:
+  family: gpt
+  preset: 9m
+  context: 1024
+  positions: rope
+optim:
+  name: adamw
+  lr: 0.001
+  betas:
+  - 0.9
+  - 0.95
+  weight_decay: 0.1
+  warmup_steps: 200
+  schedule: cosine
+  min_lr_ratio: 0.1
+  batch_tokens: 32768
+  grad_clip: 1.0
+  precision: bf16
+  scaffold:
+    weight: 1.0
+    hold: 0.10
+    fade: 0.60
+    heads:
+    - layer: 0
+      head: 0
+      card: previous_word
+    - layer: 0
+      head: 1
+      card: delimiter
+    - layer: 12
+      head: 2
+      card: induction
+    - layer: 12
+      head: 3
+      card: duplicate_word
+    riddles:
+      comparator:
+        layer: 3
+        head: 2
+        items: 16
+        pool: 2048
+eval:
+  sets:
+  - lists/hole-cards-unseen.csv
+  every_steps: 640
+  evaluators:
+  - ce_bpb
+  - discovery
+  - logic
+  - stars
+  - nevermore
+  - cards
+  - shapes
+  - pips
+  - soundings
+  light:
+    every_steps: 64
+    evaluators:
+    - stars
+    - nevermore
+    - cards
+    - logic
+    - shapes
+    - pips
+checkpoint:
+  every_steps: 640
+sop: '0.0.6'
+departures:
+- "the post-training SOP: the deck stage read after the four pretraining passes, with the pull off"
+- field: content
+  why: 'reads Ogden v0.1 with the marks written in (marks-v1) rather than plain: the cleaning is the arm, and the
+    text the four smaller classes read'
+- field: tokeniser
+  why: 'declares the fleet''s eleven marks as single pieces (the eight locked on 12 November and <think>, <call>,
+    <result>), which SOP v0.0.6 does not declare'
+seed: 1

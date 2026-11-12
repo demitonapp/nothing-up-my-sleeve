@@ -34,6 +34,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from thorp import fleet, paths
+from thorp.models import registry
 
 VERSION = "0.1"
 NAME = "Nothing up my sleeve"
@@ -79,6 +80,9 @@ PARTS: dict[str, tuple[str, str]] = {
     "kipling:10": (DECIDES, "how many pieces each class's tokeniser has"),
     "kipling:11": (DECIDES, "which kinds of knowledge the fleet's corpus holds, and in what shares"),
     "kipling:12": (DECIDES, "the Ogden branch with control tokens: what the tokeniser is trained on and what every class reads"),
+    "kipling:13": (DECIDES, "the rate and the warm-up each class trains with"),
+    "kipling:14": (DECIDES, "the 50m's reasoning and tool legs: their marks, lessons and the tools they call"),
+    "kipling:15": (DECIDES, "curiosity, read on every ship and taught to the instruct ones"),
     "seedling:1": (CARRIED, "built from nothing is signed (Justin, 12 November: 'Built: agreed'); whether a class grown from the one beneath gets there sooner is tested against this fleet, not before it"),
     "kipling:1": (ACCEPTANCE, "IFEval on prompts the ship was not taught: the rigged pilot beat the mark and cost the language"),
     "knockout:3": (ACCEPTANCE, "the 21m read against SmolLM2-360M"),
@@ -137,6 +141,40 @@ def _built(d: dict) -> str:
     return f"grown from {seed.get('run')}" if seed.get("run") else "from nothing"
 
 
+def _stretch(d: dict) -> str:
+    st = (d.get("model") or {}).get("stretch") or {}
+    if not st.get("to"):
+        return "none"
+    return f"to {int(st['to']):,} pieces for the last {_pct(1 - float(st.get('at') or 0))}"
+
+
+def _thinking(d: dict) -> str | None:
+    th = (d.get("post") or {}).get("thinking")
+    if not th:
+        return None
+    return f"{th.get('open') or '<think>'} … {th.get('close') or '<answer>'}, {_pct(th.get('share', 0.5))} of lessons think"
+
+
+def _tools(d: dict) -> str | None:
+    tl = (d.get("post") or {}).get("tools")
+    if not tl:
+        return None
+    names = tl.get("set") or []
+    return f"{len(names)} fixed: {', '.join(names)}" if names else str(tl.get("about") or "declared")
+
+
+def _curiosity(d: dict) -> str:
+    ev = d.get("eval") or {}
+    every = "curiosity" in (ev.get("evaluators") or [])
+    light = "curiosity" in ((ev.get("light") or {}).get("evaluators") or [])
+    return "the curiosity ladder, at every eval" if every else "the curiosity ladder, light evals" if light else "not read"
+
+
+def _targets(d: dict) -> str | None:
+    tg = (d.get("eval") or {}).get("targets") or {}
+    return "; ".join(f"{k} {v}" for k, v in tg.items()) or None
+
+
 def _m(k: str) -> Callable[[dict], Any]:
     return lambda d: (d.get("model") or {}).get(k)
 
@@ -159,6 +197,18 @@ GROUPS: tuple[tuple[str, str, tuple[Param, ...]], ...] = (
         Param("ship.width", "width", lambda d: _n(_m("width")(d)), ("kipling:8",)),
         Param("ship.context", "context", lambda d: f"{int(_m('context')(d)):,} pieces" if _m("context")(d) else None, ("kipling:9",)),
         Param("ship.positions", "positions", _m("positions")),
+        # what the kernels build into every hull and no fitout can change (12 November, Justin: "resolve this": the
+        # charter had no row for the feed-forward layer, the normalisation, the tied table or the biases). Read from
+        # registry.HULL, not from the spec: a class with a fitout has them, whatever the fitout says
+        Param("ship.ffn", "feed-forward", lambda d: registry.HULL["feed_forward"]),
+        Param("ship.norm", "normalisation", lambda d: registry.HULL["norm"]),
+        Param("ship.embeddings", "embeddings", lambda d: registry.HULL["embeddings"]),
+        # "bias terms", not "biases": Justin read the row as the fleet's leaning (12 November: "the bias should be
+        # curiosity bias"); it is the constant a layer adds to its sum, and the hull has none
+        Param("ship.biases", "bias terms", lambda d: registry.HULL["biases"]),
+        # the window lengthened late in the voyage (Justin, 12 November: "yeah 4096 on the 50m"; the field: train short
+        # and stretch at the end). `model.stretch: {to, at}` stretches to `to` pieces for the voyage's share after `at`
+        Param("ship.stretch", "the stretch", _stretch, ("kipling:9",)),
         Param("ship.built", "built", _built),
     )),
     ("tokeniser", "The tokeniser", (
@@ -184,24 +234,37 @@ GROUPS: tuple[tuple[str, str, tuple[Param, ...]], ...] = (
     )),
     ("training", "The training", (
         Param("training.optimiser", "optimiser", _o("name")),
-        Param("training.lr", "learning rate", _lr),
-        Param("training.warmup", "warm-up", lambda d: f"{int(_o('warmup_steps')(d)):,} steps" if _o("warmup_steps")(d) is not None else None),
+        Param("training.lr", "learning rate", _lr, ("kipling:13",)),
+        Param("training.warmup", "warm-up", lambda d: f"{int(_o('warmup_steps')(d)):,} steps" if _o("warmup_steps")(d) is not None else None, ("kipling:13",)),
         Param("training.batch", "batch", lambda d: f"{int(_o('batch_tokens')(d)):,} tokens" if _o("batch_tokens")(d) else None),
         Param("training.schedule", "schedule", lambda d: (f"{_o('schedule')(d)} · min {_pct(_o('min_lr_ratio')(d))}" if _o("min_lr_ratio")(d) is not None else _o("schedule")(d))),
         Param("training.grad_clip", "grad clip", lambda d: _n(_o("grad_clip")(d))),
         Param("training.precision", "precision", _o("precision")),
+        # in every fitout and every published recipe, and not rows until 12 November (the proposal's missing rows)
+        Param("training.weight_decay", "weight decay", lambda d: _n(_o("weight_decay")(d))),
+        Param("training.betas", "betas", lambda d: ", ".join(str(b) for b in _o("betas")(d)) if _o("betas")(d) else None),
     )),
     ("leg", "The return leg (instruct ships)", (
         Param("leg.inherits", "inherits", lambda d: ((d.get("post") or {}).get("seed") or {}).get("mode"), ("kipling:3",), True),
         Param("leg.turns", "turns", lambda d: ((d.get("post") or {}).get("turns") or {}).get("format"), ("kipling:3",), True),
         Param("leg.stages", "stages", _stages, ("kipling:3",), True),
         Param("leg.lr", "learning rate", lambda d: _n((d.get("post") or {}).get("lr")), ("kipling:3",), True),
+        # the 50m's two abilities (Justin, 12 November: "classes for the reasoning and tool is 50m"): a leg's
+        # `post.thinking` (its marks and how many lessons think) and `post.tools` (the fixed set it calls)
+        Param("leg.thinking", "thinking", _thinking, ("kipling:14",), True),
+        Param("leg.tools", "tools", _tools, ("kipling:14",), True),
         Param("leg.pull", "the pull", lambda d: None if not (d.get("post") or {}).get("pull") else "off" if (d.get("post") or {})["pull"].get("off") else f"on at {(d.get('post') or {})['pull'].get('weight')}", ("kipling:3",), True),
+    )),
+    # what the fleet is judged on and leans toward, as the fitouts carry it (12 November: the bar, and "the bias should
+    # be curiosity bias as in that's the bias i want locked in")
+    ("bar", "The bar", (
+        Param("bar.curiosity", "curiosity", _curiosity, ("kipling:15",)),
+        Param("bar.targets", "targets", _targets),
     )),
 )
 PARAMS: dict[str, Param] = {p.key: p for _, _, ps in GROUPS for p in ps}
 SHORT = {"ship": "the ship", "tokeniser": "the tokeniser", "reads": "what it reads", "scaffold": "the scaffold",
-         "training": "the training", "leg": "the return leg"}  # fmt: skip
+         "training": "the training", "leg": "the return leg", "bar": "the bar"}  # fmt: skip
 
 
 # ---- which fitout is which ship
@@ -246,10 +309,17 @@ def state_of(name: str, run: dict | None, seats: set[str], queued: set[str], lai
 
 
 def param_state(signed: dict | None, values: dict, goals: list[dict]) -> str:
-    """signed: signed off and the draft still says what was signed. drifted: signed, and the draft has been
-    reworked since. waiting: a goal that decides it is still open. ready: nothing left to wait for."""
+    """signed: signed off at every class and the draft still says what was signed. drifted: a signed class has been
+    reworked since. part-signed: some classes signed and still as signed, the rest not yet (12 November, Justin's
+    plan: "signing by class"). waiting: a goal that decides it is still open, or no fitout writes the row yet.
+    ready: nothing left to wait for."""
     if signed is not None:
-        return "signed" if (signed.get("values") or {}) == values else "drifted"
+        held = signed.get("values") or {}
+        if any(values.get(c) != v for c, v in held.items()):
+            return "drifted"
+        return "signed" if all(c in held for c in values) else "part-signed"
+    if not any(v is not None for v in values.values()):
+        return "waiting"  # nothing written to sign: a row the bar needs that no fitout carries yet
     # anything short of a verdict is unsettled: open, partly, or a goal the store does not hold at all (a
     # process running older code can drop a new goal's row, 12 November), which must never read as ready
     if any(g.get("status") not in ("done", "dropped") for g in goals):
@@ -297,14 +367,23 @@ def signoffs() -> dict[str, dict]:
     }
 
 
-def sign(param: str, values: dict, by: str = "Justin", note: str = "") -> None:
-    """Sign a parameter off at the values the charter shows now (a second signing replaces the first)."""
+def sign(param: str, values: dict, by: str = "Justin", note: str = "", classes: list[str] | None = None) -> None:
+    """Sign a parameter off at the values the charter shows now. `classes` signs only those classes and keeps any
+    already signed (a row may be settled for four classes while the fifth waits); without it every class is
+    signed and a second signing replaces the first."""
     from sqlalchemy import text
 
     from thorp import store
 
     if param not in PARAMS:
         raise KeyError(f"the charter has no parameter called {param!r}")
+    if classes is not None:
+        unknown = [c for c in classes if c not in CLASSES]
+        if unknown or not classes:
+            raise KeyError(f"no such class to sign: {unknown or 'none named'}; the classes are {', '.join(CLASSES)}")
+        held = dict((signoffs().get(param) or {}).get("values") or {})
+        held.update({c: values.get(c) for c in classes})
+        values = {c: held[c] for c in CLASSES if c in held}
     ensure()
     with store.session() as s:
         s.execute(
@@ -318,11 +397,20 @@ def sign(param: str, values: dict, by: str = "Justin", note: str = "") -> None:
         )
 
 
-def unsign(param: str) -> bool:
+def unsign(param: str, classes: list[str] | None = None) -> bool:
+    """Take a signature back: every class, or only `classes` (the row stays signed for the rest)."""
     from sqlalchemy import text
 
     from thorp import store
 
+    if classes is not None:
+        was = signoffs().get(param)
+        if not was:
+            return False
+        keep = {c: v for c, v in (was.get("values") or {}).items() if c not in classes}
+        if keep:
+            sign(param, keep, was.get("by") or "Justin", was.get("note") or "")
+            return True
     ensure()
     with store.session() as s:
         r = s.execute(
@@ -473,7 +561,7 @@ def payload(detail: Callable[[dict], dict]) -> dict:
         return {"goal_id": gid, "text": g.get("text") or gid, "status": g.get("status") or "unknown",
                 "expedition": g.get("expedition_key"), "words": g.get("words") or "", "evidence": g.get("evidence") or ""}  # fmt: skip
 
-    groups, tally = [], {"signed": 0, "drifted": 0, "ready": 0, "waiting": 0}
+    groups, tally = [], {"signed": 0, "part-signed": 0, "drifted": 0, "ready": 0, "waiting": 0}
     for key, name, ps in GROUPS:
         rows = []
         for p in ps:

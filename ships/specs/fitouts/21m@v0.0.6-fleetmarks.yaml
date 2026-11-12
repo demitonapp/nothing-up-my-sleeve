@@ -1,0 +1,119 @@
+# ships/specs/fitouts: the 21m on the fleet's marks (13 November; Justin: "should we be running all our tests on the 50m?
+# Wouldn't they be just as applicable to the 21m and get the results quicker?"). 21m@v0.0.6 with the 9m fleetmarks'
+# text and pieces, so the legs are rehearsed at 9m on this Mac (minutes), confirmed at 21m (an hour abroad), and only the
+# questions that depend on size go to the 50m. Light readings every 640 steps, not 64 (voyage E's lesson).
+name: 21m@v0.0.6-fleetmarks
+expedition: kipling
+goal: 12
+ship: 'SOP v0.0.6 at 21m (the fleet''s eleven marks, on Ogden v0.1)'
+experiment: 'Fitout ogden-v0-1: one fixed Ogden corpus for every class; what cards and stars form at each size?'
+question: 'The fleet''s tokeniser at the 21m: 21m@v0.0.6 with its text and pieces changed to the fleet''s, as 9m@v0.0.6-fleetmarks is at the 9m, so the legs can be tried a size up from the 9m before the 50m. Otherwise 21m@v0.0.6: Ogden v0.1, the shared tokeniser, four passes, the same four metre
+  cards pinned in the same layers and, where the size has room, the comparator as a riddle; full weight to 10%
+  of the voyage, faded to zero by 60%, then content alone. Which of the five cards is held by heart, and what
+  does it cost the language?'
+data:
+  recipe: lists/ogden-v0.1.csv
+  passes: 4
+  stages:
+  - name: ogden
+    recipe: lists/ogden-v0.1.csv
+    passes: 4
+  order: shuffled
+  refuse:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+  - lists/hole-cards-unseen.csv
+  clean: marks-v1
+  opt_in: 'reads Ogden v0.1 unwrapped with the marks written in (marks-v1), the text the four smaller classes read,
+    where 9m@v0.0.6 read Ogden v0.1.4 raw'
+tokeniser:
+  kind: spm-bpe
+  vocab: 2048
+  byte_fallback: true
+  train_on: lists/ogden-v0.1.csv
+  symbols:
+  - "<bos>"
+  - "<eos>"
+  - "<question>"
+  - "<answer>"
+  - "<end>"
+  - "<premise>"
+  - "<sep>"
+  - "<conclusion>"
+  - "<think>"
+  - "<call>"
+  - "<result>"
+model:
+  family: gpt
+  preset: 21m
+  context: 1024
+  positions: rope
+optim:
+  name: adamw
+  lr: 0.0008
+  betas:
+  - 0.9
+  - 0.95
+  weight_decay: 0.1
+  warmup_steps: 300
+  schedule: cosine
+  min_lr_ratio: 0.1
+  batch_tokens: 32768
+  grad_clip: 1.0
+  precision: bf16
+  scaffold:
+    weight: 1.0
+    hold: 0.10
+    fade: 0.60
+    heads:
+    - layer: 0
+      head: 0
+      card: previous_word
+    - layer: 0
+      head: 1
+      card: delimiter
+    - layer: 16
+      head: 2
+      card: induction
+    - layer: 16
+      head: 3
+      card: duplicate_word
+    riddles:
+      comparator:
+        layer: 8
+        head: 2
+        items: 16
+        pool: 2048
+eval:
+  sets:
+  - lists/hole-cards-unseen.csv
+  every_steps: 640
+  evaluators:
+  - ce_bpb
+  - discovery
+  - logic
+  - stars
+  - nevermore
+  - cards
+  - shapes
+  - pips
+  - soundings
+  light:
+    every_steps: 640
+    evaluators:
+    - stars
+    - nevermore
+    - cards
+    - logic
+    - shapes
+    - pips
+checkpoint:
+  every_steps: 640
+sop: '0.0.6'
+departures:
+- "the post-training SOP: the deck stage read after the four pretraining passes, with the pull off"
+- field: content
+  why: 'reads Ogden v0.1 with the marks written in (marks-v1) rather than plain: the fleet''s text'
+- field: tokeniser
+  why: 'declares the fleet''s eleven marks as single pieces, which SOP v0.0.6 does not declare'
+seed: 1

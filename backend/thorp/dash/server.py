@@ -1406,6 +1406,9 @@ def _post_training(spec: dict) -> dict:
         out["stages"] = _stage_rows(data)
         out["lr"] = o.get("lr")
         out["read"] = _post_readings(spec)
+        # the 50m's two abilities, as a leg declares them (12 November, the charter's thinking and tools rows)
+        out["thinking"] = spec.get("thinking") or None
+        out["tools"] = spec.get("tools") or None
     for leg in _seeded_index().get(spec.get("name") or "", []):
         ld = leg.get("data") or {}
         out["legs"].append({
@@ -1471,6 +1474,7 @@ def _spec_detail(spec: dict, run: dict | None = None) -> dict:
         "model": {
             "family": family, "preset": preset, "kv_heads": kv, "context": context, "positions": positions,
             "layers": shape.get("layers"), "heads": shape.get("heads"), "width": shape.get("width"),
+            "stretch": m.get("stretch") or None,
             "params": _shape_params(family, preset, vocab, context, positions, kv,
                                     tuple(m.get(k) for k in ("layers", "width", "heads"))),
         },
@@ -1490,12 +1494,17 @@ def _spec_detail(spec: dict, run: dict | None = None) -> dict:
             "schedule": o.get("schedule"), "min_lr_ratio": o.get("min_lr_ratio"),
             "batch_tokens": o.get("batch_tokens"), "grad_clip": o.get("grad_clip"),
             "precision": o.get("precision"), "steps": o.get("steps"),
+            "weight_decay": o.get("weight_decay"), "betas": o.get("betas"),
         },
         "scaffold": {
             "weight": sc.get("weight"), "hold": sc.get("hold"), "fade": sc.get("fade"),
             "release": sc.get("release"), "heads": cards, "riddles": sc.get("riddles") or {},
         },
         "content": _content_version(data.get("recipe")),
+        # what is read and the marks it is judged against (12 November, the charter's bar: curiosity and targets)
+        "eval": {"evaluators": (spec.get("eval") or {}).get("evaluators") or [],
+                 "light": {"evaluators": ((spec.get("eval") or {}).get("light") or {}).get("evaluators") or []},
+                 "targets": (spec.get("eval") or {}).get("targets") or {}},
         "schedule": _schedule(spec, run_id or ""),
         "readings": readings,
     }
@@ -1732,11 +1741,13 @@ def post_charter_sign(body: dict) -> dict:
     param = str(body.get("param") or "")
     if param not in launch.PARAMS:
         raise KeyError(f"the charter has no parameter called {param!r}")
+    # `classes` signs or takes back only those classes (12 November: signing by class); without it, every class
+    classes = [str(c) for c in body["classes"]] if body.get("classes") else None
     if body.get("sign") is False:
-        launch.unsign(param)
+        launch.unsign(param, classes)
     else:
         launch.sign(param, launch.current_values(_spec_detail)[param], str(body.get("by") or "Justin"),
-                    str(body.get("note") or ""))  # fmt: skip
+                    str(body.get("note") or ""), classes)  # fmt: skip
     return launch.payload(_spec_detail)
 
 
@@ -6356,6 +6367,9 @@ def _chat_own_answer(run: str, text: str, q: dict) -> dict:
         step=int(step) if step not in (None, "", 0, "0") else None,
         with_audit=str(q.get("audit", "1")) not in ("0", "false", "no"),
         history=q.get("history") or [],  # the thread so far, asked as the voyage's turns (12 November)
+        # a ship taught to think or to call tools (13 November): the console's two switches, as for a foreign ship
+        thinking=None if q.get("thinking") in (None, "") else str(q.get("thinking")).strip().lower() not in ("0", "false", "off", "no"),
+        tools=(str(q.get("tools")).strip().lower() in ("1", "true", "on", "yes")) if q.get("tools") not in (None, "") else None,
     )
 
 

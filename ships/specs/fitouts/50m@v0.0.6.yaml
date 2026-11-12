@@ -1,0 +1,106 @@
+# ships/specs/fitouts: the 50m at SOP v0.0.6 (12 November, kipling:8; Justin: "Finish the charter trials"). The 21m's
+# v0.0.6 fitout carried up one rung, as 50m@v0.0.5 carried v0.0.5: the 50m's preset (36 layers of 304, 8 heads), its
+# rate 0.0006 and warm-up 400, and the depth standard's pins at its depth (the copy cards at L24, the comparator at
+# L12). It is the deep arm of the hull pair at the top of the ladder, read against 50m@v0.0.6-wide, and the 50m's
+# first rehearsal on this standard. One seed: a second is for when the pair disagrees by less than the spread.
+# On a hired GPU: the one 50m abroad read 683M tokens in 140 minutes on an RTX 4090.
+name: 50m@v0.0.6
+expedition: kipling
+goal: 8
+ship: 'SOP v0.0.6 at 50m (36 layers)'
+experiment: 'Fitout ogden-v0-1: one fixed Ogden corpus for every class; what cards and stars form at each size?'
+question: 'SOP v0.0.6 launch, at 50m, the deep arm of the hull pair (read against 50m@v0.0.6-wide): Ogden v0.1, the shared tokeniser, four passes, the same four metre
+  cards pinned in the same layers and, where the size has room, the comparator as a riddle; full weight to 10%
+  of the voyage, faded to zero by 60%, then content alone. Which of the five cards is held by heart, and what
+  does it cost the language?'
+data:
+  recipe: lists/ogden-v0.1.csv
+  passes: 4
+  stages:
+  - name: ogden
+    recipe: lists/ogden-v0.1.csv
+    passes: 4
+  order: shuffled
+  refuse:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+  - lists/hole-cards-unseen.csv
+  clean: unwrap-v2
+tokeniser:
+  kind: spm-bpe
+  vocab: 2048
+  byte_fallback: true
+  train_on: lists/ogden-v0.1.csv
+model:
+  family: gpt
+  preset: 50m
+  context: 1024
+  positions: rope
+optim:
+  name: adamw
+  lr: 0.0006
+  betas:
+  - 0.9
+  - 0.95
+  weight_decay: 0.1
+  warmup_steps: 400
+  schedule: cosine
+  min_lr_ratio: 0.1
+  batch_tokens: 32768
+  grad_clip: 1.0
+  precision: bf16
+  scaffold:
+    weight: 1.0
+    hold: 0.10
+    fade: 0.60
+    heads:
+    - layer: 0
+      head: 0
+      card: previous_word
+    - layer: 0
+      head: 1
+      card: delimiter
+    - layer: 24
+      head: 2
+      card: induction
+    - layer: 24
+      head: 3
+      card: duplicate_word
+    riddles:
+      comparator:
+        layer: 12
+        head: 2
+        items: 16
+        pool: 2048
+eval:
+  sets:
+  - lists/hole-cards-unseen.csv
+  every_steps: 640
+  evaluators:
+  - ce_bpb
+  - discovery
+  - logic
+  - stars
+  - nevermore
+  - cards
+  - shapes
+  - pips
+  - soundings
+  light:
+    every_steps: 64
+    evaluators:
+    - stars
+    - nevermore
+    - cards
+    - logic
+    - shapes
+    - pips
+checkpoint:
+  every_steps: 640
+sop: '0.0.6'
+departures:
+- "the post-training SOP: the deck stage read after the four pretraining passes, with the pull off"
+seed: 1
+# the deep 50m ran out of memory on an RTX 4090 (24 GB) twice on 12 November, drawing the scaffold's maps over 36
+# layers; the class is named so the hire takes a 32 GB card (gpu, a label: the run id does not move)
+gpu: RTX 5090

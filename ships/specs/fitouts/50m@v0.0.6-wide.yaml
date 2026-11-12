@@ -1,0 +1,111 @@
+# ships/specs/fitouts: the hull pair at the top of the ladder (12 November, kipling:8; Justin: "Finish the charter
+# trials"). 50m@v0.0.6 with ONE thing changed: the shape, 8 layers of 640 instead of 36 of 304, the same 8 heads
+# (head width 80 against 38). Non-embedding parameters 39.3M against 39.9M, 1.5% fewer. Why: the one comparison at a
+# fixed 41M found the best model at five layers and nothing gained past it (Petty et al. 2024), facts followed width
+# in the 1M to 33M story models (Eldan & Li 2023), and every published model near this size is shallow and wide. The
+# pins keep their places in proportion: the copy cards at L5 of 8, the comparator at L2. The rate is the deep arm's:
+# a rate tuned to each shape would be a second change.
+name: 50m@v0.0.6-wide
+expedition: kipling
+goal: 8
+ship: 'SOP v0.0.6 at 50m (wide: 8 layers of 640)'
+experiment: 'Fitout ogden-v0-1: one fixed Ogden corpus for every class; what cards and stars form at each size?'
+question: 'The wide arm of the hull pair at the 50m: 50m@v0.0.6 with its shape changed and nothing else, 8 layers of 640 with the same 8 heads. Is the language better, are the copy cards weaker, and how many minutes does it take beside the deep arm? The standard otherwise, at 50m: Ogden v0.1, the shared tokeniser, four passes, the same four metre
+  cards pinned in the same layers and, where the size has room, the comparator as a riddle; full weight to 10%
+  of the voyage, faded to zero by 60%, then content alone. Which of the five cards is held by heart, and what
+  does it cost the language?'
+data:
+  recipe: lists/ogden-v0.1.csv
+  passes: 4
+  stages:
+  - name: ogden
+    recipe: lists/ogden-v0.1.csv
+    passes: 4
+  order: shuffled
+  refuse:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+  - lists/hole-cards-unseen.csv
+  clean: unwrap-v2
+tokeniser:
+  kind: spm-bpe
+  vocab: 2048
+  byte_fallback: true
+  train_on: lists/ogden-v0.1.csv
+model:
+  family: gpt
+  preset: 50m
+  layers: 8
+  width: 640
+  heads: 8
+  context: 1024
+  positions: rope
+optim:
+  name: adamw
+  lr: 0.0006
+  betas:
+  - 0.9
+  - 0.95
+  weight_decay: 0.1
+  warmup_steps: 400
+  schedule: cosine
+  min_lr_ratio: 0.1
+  batch_tokens: 32768
+  grad_clip: 1.0
+  precision: bf16
+  scaffold:
+    weight: 1.0
+    hold: 0.10
+    fade: 0.60
+    heads:
+    - layer: 0
+      head: 0
+      card: previous_word
+    - layer: 0
+      head: 1
+      card: delimiter
+    - layer: 5
+      head: 2
+      card: induction
+    - layer: 5
+      head: 3
+      card: duplicate_word
+    riddles:
+      comparator:
+        layer: 2
+        head: 2
+        items: 16
+        pool: 2048
+eval:
+  sets:
+  - lists/hole-cards-unseen.csv
+  every_steps: 640
+  evaluators:
+  - ce_bpb
+  - discovery
+  - logic
+  - stars
+  - nevermore
+  - cards
+  - shapes
+  - pips
+  - soundings
+  light:
+    every_steps: 64
+    evaluators:
+    - stars
+    - nevermore
+    - cards
+    - logic
+    - shapes
+    - pips
+checkpoint:
+  every_steps: 640
+sop: '0.0.6'
+departures:
+- "the post-training SOP: the deck stage read after the four pretraining passes, with the pull off"
+- field: scaffold
+  why: 'eight layers: the copy cards at layer 5 and the comparator at layer 2, the depth standard''s two-thirds and one-third for an 8-layer hull, not the 36-layer 50m''s 24 and 12'
+- field: shape
+  why: 'model.layers 8 and model.width 640 override the 50m''s 36 of 304: the arm''s one change'
+seed: 1

@@ -787,6 +787,41 @@ DEMITON_SECTIONS: dict[str, str] = {
     "over a different part, a philosopher in a long coat bent over one lens, one hanging lantern, a small smooth "
     "silver ovoid drone with no propellers resting on the table beside the model, black water and the thin ring of "
     "an Orbital through the stern windows, no aircraft, no flying machines",
+    # the seven kinds of claim, one plate each (13 November, Justin: "can you add fal images here
+    # http://localhost:4321/orbitals/demiton/discoveries/kind-of-claim"): what each kind of finding looks like aboard
+    # first draws (13 November): laws hung an electric dome lamp, recipes a bare bulb and a lettered poster, limits
+    # sailed past the shore instead of running aground, measurement put a sailor in a modern cap with no log line;
+    # each now says its light and its action outright
+    "discoveries-claim-laws": "a long table in a ship's great cabin at night with seven model ships in a row graded "
+    "from a thumb-sized cutter to a great galleon, a navigator above them drawing one smooth rising curve on a chart "
+    "with brass dividers, lit only by a candle burning inside an iron ship's lantern, no electric light, a small "
+    "smooth silver ovoid drone with no propellers resting at the end of the row, the thin lit ring of an Orbital "
+    "through the stern windows",
+    "discoveries-claim-mechanisms": "a ship's clockmaker's workshop below decks at night: the brass case of a great "
+    "marine chronometer lies open with its gear trains, springs and escapement exposed, a craftsman with a loupe "
+    "tracing one train of gears with a fine brass pointer, tools laid out on a leather roll, one hanging lantern, "
+    "a small smooth silver ovoid drone with no propellers resting beside the case",
+    "discoveries-claim-representations": "a cartographer's cabin at night: a great dark celestial globe in brass "
+    "meridian rings, fine coloured threads stretched from its centre outward to brass pins in many directions, a "
+    "cartographer in a sea-cloak tightening one thread, one lantern, a small smooth silver ovoid drone with no "
+    "propellers resting on the chart table, the thin ring of an Orbital through the window",
+    "discoveries-claim-behaviours": "a dark rowing boat at night on black water, an observer in a sea-cloak watching "
+    "a great galleon through a long brass spyglass while a companion writes in a logbook by a shielded lantern, the "
+    "galleon's crew at work on deck by lantern light in the distance, the thin lit ring of an Orbital in the sky",
+    "discoveries-claim-limits": "a wrecked galleon stranded on black rocks at night, heeled hard over on her side "
+    "with her hull holed, her foremast snapped and her sails torn and hanging, surf breaking white over the rocks "
+    "around her, in the foreground a lookout in a sea-cloak holding up a candle lantern beside a torn chart, the "
+    "thin lit ring of an Orbital in the sky",
+    "discoveries-claim-recipes": "a shipwright's loft at night: a master shipwright in a leather apron showing two "
+    "apprentices how to bend a long steamed oak plank over a ship's rib frame, a heavy bound book of methods open "
+    "on the bench beside a steaming wooden steam box, adzes and mallets hanging on the timber wall, lit only by "
+    "candle lanterns, no electric light, no posters, a small smooth silver ovoid drone with no propellers on the "
+    "bench, the thin ring of an Orbital through a high window",
+    "discoveries-claim-measurement": "the high stern of a galleon at night: a sailor in a knitted wool cap and a "
+    "canvas smock holding a wooden reel while a knotted rope runs out from it over the stern rail into the churning "
+    "wake behind a floating wooden chip, a second sailor holding up a small sand-glass, a midshipman counting the "
+    "knots aloud by a candle lantern, a slate of chalked figures on the rail, the thin lit ring of an Orbital in "
+    "the sky",
     # the Liberty Machine (12 November, Justin: "Liberty Machine should have it's own card here http://localhost:4321/orbitals/demiton
     # with a fal image"): Beer's five systems as a flagship's council, each at its own post around one table
     # the first draw hung an electric pendant lamp; a second, pushed to "Elizabethan", came out grey with a

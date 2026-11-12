@@ -2246,3 +2246,7 @@ The ten items of `ships/reports/architecture-and-kipling-2026-11-11.md` (all but
 - **Before the island reads its address it draws nothing** (the server's render was the old overview, which now flashed the jobs page on the landing).
 - **Head kinds** link to `/orbitals/demiton/discoveries/head-kinds`, the other session's move of the Reach's discoveries, uncommitted when this was written: until it lands, that one card points at a page the committed tree does not route.
 - **Verified:** `pnpm check` and the build pass; in the browser, landing → axis → category → our stars, jobs, skills, tests, a door, Charting and the old `/discoveries` address all work.
+
+## The seven kinds of claim have plates (13 November, Justin: "can you add fal images here http://localhost:4321/orbitals/demiton/discoveries/kind-of-claim")
+
+- Each category card on the kind-of-claim axis carries a fal plate in the house style (`discoveries-claim-<kind>`, prompts in `generate_art.py`): laws, seven model ships graded small to great with one rising curve; mechanisms, an opened marine chronometer; representations, threads pulled across a chart; behaviours, an observer watching a galleon from a boat; limits, a galleon wrecked on rocks; recipes, shipwrights working from plans; measurement, the knotted log line run out over the stern. Four first draws were redone (an electric lamp, a bare bulb and a lettered poster, a ship that was not aground, a modern cap and no log line). The object-of-study categories have no plates yet.

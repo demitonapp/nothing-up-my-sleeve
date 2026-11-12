@@ -123,6 +123,7 @@ export function FieldMapView({ slug, cat }: { slug: string; cat: string | null }
           const ours = oursIn(axis, c.key);
           return (
             <a className="discdoor" href={`${axisHref(axis)}/${slugOf(c)}`} key={c.key}>
+              {c.image ? <img src={c.image} alt="" loading="lazy" /> : null}
               <div className="db">
                 <span className="dk">{found.length} in the field{ours.length ? ` · ${ours.length} of ours` : ''}</span>
                 <b>{c.name}</b>

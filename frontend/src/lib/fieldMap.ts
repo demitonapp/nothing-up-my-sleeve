@@ -13,7 +13,7 @@
 
 import { DEMITON_DISCOVERIES as DB, QWEN4B_PAGE } from './discoveryPaths';
 
-export interface MapCategory { key: string; name: string; question: string; about: string }
+export interface MapCategory { key: string; name: string; question: string; about: string; image?: string }
 export interface MapAxis { key: string; slug: string; n: number; name: string; question: string; about: string; categories: MapCategory[] }
 export interface FieldDiscovery {
   key: string;
@@ -34,6 +34,10 @@ export const KINDS: MapCategory[] = [
   { key: 'recipe', name: 'Recipes', question: 'What procedure produces it?', about: 'Methods that make a model better, cheaper or more useful: architectures, data and training procedures.' },
   { key: 'measurement', name: 'Measurement', question: 'How do we know, and when are we fooled?', about: 'How readings are taken, and the ways a metric or a benchmark misleads.' },
 ];
+
+// each kind of claim's plate (13 November, Justin: "can you add fal images here .../kind-of-claim"; prompts in
+// generate_art.py as discoveries-claim-<slug>)
+for (const k of KINDS) k.image = `/art/discoveries-claim-${k.name.toLowerCase()}.png`;
 
 export const OBJECTS: MapCategory[] = [
   { key: 'training', name: 'Training and scale', question: 'What happens as a model is trained, and grown?', about: 'Scaling, training dynamics, optimisation and the hyperparameters that carry across sizes.' },

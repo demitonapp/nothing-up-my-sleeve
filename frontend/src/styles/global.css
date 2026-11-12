@@ -2779,6 +2779,17 @@ ol.goaltext { padding-left: 22px; }
 .chartertable td.decided > div + div { margin-top: 3px; }
 .chartertable td.signoff { white-space: nowrap; min-width: 170px; }
 .chartertable td.signoff button { margin-left: 4px; }
+/* what the field says on a row (lib/charterResearch.ts): its own line under the row, joined to it */
+#voyages .panel table.chartertable tr.charterrow > th, #voyages .panel table.chartertable tr.charterrow > td { border-bottom: 0; }
+#voyages .panel table.chartertable tr.charterfield td {
+  padding: 0 10px 10px 8px; font-size: var(--fs-sm); line-height: 1.5; color: #a8977a; border-bottom: 1px solid #2a1d0d;
+}
+.chartertable tr.charterfield ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.chartertable tr.charterfield ul, .chartertable tr.charterfield td > div { max-width: 120ch; }
+.chartertable tr.charterfield .gap { margin-top: 4px; }
+.chartertable tr.charterfield .fk { text-transform: uppercase; letter-spacing: .1em; font-size: 10px; font-weight: 700; color: #8f7d5f; margin-right: 4px; }
+.chartertable tr.charterfield .gap .fk { color: #c9a24a; }
+.domainskills .skill .bears { color: var(--text); margin-top: 4px; }
 .partstable td { vertical-align: top; line-height: 1.5; }
 .partstable td.partname { color: #c9a24a; text-transform: uppercase; letter-spacing: .1em; font-size: 11px; font-weight: 700; white-space: nowrap; }
 .partstable tr.first td { border-top: 1px solid #3a2a12; }

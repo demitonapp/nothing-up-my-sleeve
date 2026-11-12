@@ -5,8 +5,10 @@
 // The data is /api/launch (thorp/launch.py); a signature is a POST to /api/charter/sign, which answers
 // with the page's payload again, so the row reads signed without waiting for the next poll.
 
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { btnCls, cardCls, pillCls } from '@/lib/ui';
+import { BEARINGS, CHARTER_ROWS, GAPS, MISSING_ROWS, bearingsOn, discoveryHref, discoveryOf, gapsOn, researchTally } from '@/lib/charterResearch';
+import { charterParamHref } from '@/scripts/views/expeditions';
 
 type GoalRef = { goal_id: string; text: string; status: string; expedition?: string | null; words?: string; evidence?: string };
 type Signed = { values: Record<string, string | null>; by: string; note: string; at: string | null };
@@ -140,6 +142,29 @@ export default function Launch({ data, onChange, section = null }: { data: Launc
     </>;
   };
 
+  // what the field says on a row (lib/charterResearch.ts): the discoveries that bear on it, each with what it means at
+  // the fleet's sizes, then the question the map does not answer. A row the map is silent on says so.
+  const fieldRow = (p: ParamRow) => {
+    const says = bearingsOn(p.key);
+    const gaps = gapsOn(p.key);
+    return (
+      <tr className={`charterfield ${p.state}`}>
+        <td colSpan={classes.length + 3}>
+          {says.length ? <ul>
+            {says.map((b) => (
+              <li key={b.discovery.key}>
+                <span className="fk">the field</span> <a href={discoveryHref(b.discovery.key)}>{b.discovery.title}</a> <span className="s">({b.discovery.source})</span> {b.says}
+              </li>
+            ))}
+          </ul> : <div><span className="fk">the field</span> <span className="s">no discovery on the map bears on this row</span></div>}
+          {gaps.map((g) => <div key={g.key} className="gap"><span className="fk">not on the map</span> {g.question} <span className="s">{g.why}</span></div>)}
+        </td>
+      </tr>
+    );
+  };
+  const rowLink = (key: string) => <a href={charterParamHref(key)} key={key}>{CHARTER_ROWS[key] || key}</a>;
+  const tally = researchTally(data.charter.groups.flatMap((g) => g.params.map((p) => p.key)));
+
   const groups = section && section !== 'fleet' ? data.charter.groups.filter((g) => g.key === section) : data.charter.groups;
   const overview = !section;
   return (
@@ -198,22 +223,60 @@ export default function Launch({ data, onChange, section = null }: { data: Launc
             <tbody key={g.key} id={`charter-${g.key}`}>
               <tr className="chartergroup"><th colSpan={classes.length + 3} scope="colgroup">{g.name} <span className="s">{g.params.filter((p) => p.state === 'signed').length} of {g.params.length} signed</span></th></tr>
               {g.params.map((p) => (
-                <tr key={p.key} className={`charterrow ${p.state}`} data-param={p.key} id={`param-${p.key.replace(/[^a-z0-9-]/gi, '-')}`}>
-                  <th scope="row">{p.name}</th>
-                  {valueCells(p)}
-                  <td className="decided">{p.goals.length ? p.goals.map((gl) => (
-                    <div key={gl.goal_id} title={[gl.text, gl.words, gl.evidence].filter(Boolean).join(' — ')}>
-                      <a href={`/expeditions/${gl.expedition || gl.goal_id.split(':')[0]}`}>{gl.goal_id}</a>{' '}
-                      <span className={pillCls(GOAL_TONE[gl.status] || '')}>{gl.status}</span>
-                    </div>
-                  )) : <span className="s">carried from the draft</span>}</td>
-                  <td className="signoff">{signCell(p)}</td>
-                </tr>
+                <Fragment key={p.key}>
+                  <tr className={`charterrow ${p.state}`} data-param={p.key} id={`param-${p.key.replace(/[^a-z0-9-]/gi, '-')}`}>
+                    <th scope="row">{p.name}</th>
+                    {valueCells(p)}
+                    <td className="decided">{p.goals.length ? p.goals.map((gl) => (
+                      <div key={gl.goal_id} title={[gl.text, gl.words, gl.evidence].filter(Boolean).join(' — ')}>
+                        <a href={`/expeditions/${gl.expedition || gl.goal_id.split(':')[0]}`}>{gl.goal_id}</a>{' '}
+                        <span className={pillCls(GOAL_TONE[gl.status] || '')}>{gl.status}</span>
+                      </div>
+                    )) : <span className="s">carried from the draft</span>}</td>
+                    <td className="signoff">{signCell(p)}</td>
+                  </tr>
+                  {fieldRow(p)}
+                </Fragment>
               ))}
             </tbody>
           ))}
         </table></div>
       </section> : null}
+
+      {/* ---- the research against the charter: what the map leaves open, and the rows the bar needs */}
+      {overview ? <details className="expgroup" id="launchresearch">
+        <summary><h2 className="band">The field against the charter <span className="q">{BEARINGS.length} discoveries bear on {tally.covered} of {r.params} rows · {GAPS.length} questions the map does not answer · {MISSING_ROWS.length} rows the bar needs and the charter lacks</span></h2></summary>
+        <section className={cardCls(false, 'panel')}>
+          <h2>Not on the map <span className="note">what a waiting row asks that no discovery in Demiton's discoveries answers: a reading pass, before a voyage is spent on it. Each row of the charter carries the discoveries that do bear on it, on its own page</span></h2>
+          <div className="scroll"><table className="partstable" data-nosort>
+            <thead><tr><th>the question</th><th>rows it holds</th><th>what we have</th></tr></thead>
+            <tbody>
+              {GAPS.map((g) => (
+                <tr key={g.key}>
+                  <td><b>{g.question}</b></td>
+                  <td>{g.rows.map((k, i) => <Fragment key={k}>{i ? <br /> : null}{rowLink(k)}</Fragment>)}</td>
+                  <td>{g.why}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table></div>
+          <h2>Rows the charter lacks <span className="note">Justin, 12 November: "a reasoining variant, tool calling, decent context window and be as good as possible on all our tests on the leaderboard". None of these is a row yet, so none can be signed</span></h2>
+          <div className="scroll"><table className="partstable" data-nosort>
+            <thead><tr><th>group</th><th>row</th><th>why it is needed</th><th>the field</th></tr></thead>
+            <tbody>
+              {MISSING_ROWS.map((m) => (
+                <tr key={m.key}>
+                  <td className="partname">{m.group}</td>
+                  <td><b>{m.name}</b></td>
+                  <td>{m.why}</td>
+                  <td>{m.discoveries.map((k, i) => <Fragment key={k}>{i ? <br /> : null}<a href={discoveryHref(k)}>{discoveryOf(k)?.title || k}</a></Fragment>)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table></div>
+          {tally.silent.length ? <p className="note">No discovery bears on: {tally.silent.map((k, i) => <Fragment key={k}>{i ? ' · ' : null}{rowLink(k)}</Fragment>)}.</p> : null}
+        </section>
+      </details> : null}
 
       {/* ---- every goal's part */}
       {overview ? <details className="expgroup" id="launchparts">

@@ -7,11 +7,13 @@
 // tests, chaining two facts), then the field's discoveries. The data is lib/fieldMap.ts. Links are plain addresses
 // under Demiton's discoveries, which the Discoveries island follows in place.
 
-import { useEffect } from 'react';
+import { Fragment, useEffect } from 'react';
 import { crumbCls, emptyCls, pillCls, cardCls } from '@/lib/ui';
 import { DEMITON_DISCOVERIES as DB } from '@/lib/discoveryPaths';
 import { AXES, axisBySlug, discoveriesIn, oursIn, slugOf, type MapAxis, type OurWork } from '@/lib/fieldMap';
 import { byWaypoint, tricksIn } from '@/lib/fieldTricks';
+import { CHARTER_ROWS, bearingOf } from '@/lib/charterResearch';
+import { charterParamHref } from '@/scripts/views/expeditions';
 
 const axisHref = (a: MapAxis): string => `${DB}/${a.slug}`;
 const otherAxis = (a: MapAxis): MapAxis => AXES.find((x) => x.key !== a.key) as MapAxis;
@@ -102,19 +104,23 @@ export function FieldMapView({ slug, cat }: { slug: string; cat: string | null }
           </section>
         ) : null}
         <section className={cardCls(false, 'panel')}>
-          <h2>{found.length} discover{found.length === 1 ? 'y' : 'ies'} in the field <span className="note">each with its source; the tag is where it sits on the other axis ({other.name.toLowerCase()}), and a link marks where Nothing up my sleeve measures the same thing</span></h2>
+          <h2>{found.length} discover{found.length === 1 ? 'y' : 'ies'} in the field <span className="note">each with its source; the tag is where it sits on the other axis ({other.name.toLowerCase()}), a link marks where Nothing up my sleeve measures the same thing, and a discovery that bears on the master charter says what it means for our fleet and names the rows</span></h2>
           {found.length ? (
             <div className="domainskills">
               {found.map((d) => {
                 const otherKey = axis.key === 'kind' ? d.object : d.kind;
                 const otherCat = other.categories.find((c) => c.key === otherKey);
+                // the master-charter rows this discovery bears on, and what it means at the fleet's sizes
+                const bears = bearingOf(d.key);
                 return (
-                  <div className={`skill${d.thorp ? ' measured' : ''}`} key={d.key} id={d.key}>
+                  <div className={`skill${d.thorp || bears ? ' measured' : ''}`} key={d.key} id={d.key}>
                     <b>{d.title}</b>
                     <span>{d.finding}</span>
+                    {bears ? <span className="bears">For our fleet: {bears.says}</span> : null}
                     <em>
                       {d.source} · <a href={`${axisHref(other)}/${otherCat ? slugOf(otherCat) : otherKey}`}>{otherCat?.name || otherKey}</a>
                       {d.thorp ? <> · in Nothing up my sleeve: <a href={d.thorp.href}>{d.thorp.label}</a></> : null}
+                      {bears ? <> · bears on the charter: {bears.rows.map((k, i) => <Fragment key={k}>{i ? ', ' : null}<a href={charterParamHref(k)}>{CHARTER_ROWS[k] || k}</a></Fragment>)}</> : null}
                     </em>
                   </div>
                 );

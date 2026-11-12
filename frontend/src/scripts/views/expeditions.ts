@@ -465,53 +465,126 @@ const queueGoal = (r: any): string => {
 };
 /** How far a voyage has come, as the card reads it: its training step of the steps its schedule sets,
  *  from the row's own `detail`. A line that has not sailed is 0%: there is nothing to read yet. */
-const queueComplete = (r: any): string => {
+const queueDone = (r: any): { step: number; total: number | null; tokens: number | null; tokensTotal: number | null } | null => {
   const det = r.detail || {}, rd = det.readings || {}, sch = det.schedule || {}, opt = det.optim || {};
   const step = rd.step != null ? Number(rd.step) : sch.step != null ? Number(sch.step) : null;
   const total = opt.steps != null ? Number(opt.steps) : sch.total != null ? Number(sch.total) : null;
-  if (step == null || !(step > 0)) return '<span class="s" title="not started: it sails when the lines ahead of it are home">0%</span>';
-  if (total == null || !(total > 0)) return `<span class="s" title="its step total is known once it sails">step ${Math.round(step).toLocaleString()}</span>`;
+  if (step == null || !(step > 0)) return null;
+  const bt = opt.batch_tokens != null ? Number(opt.batch_tokens) : null;
+  return { step, total: total != null && total > 0 ? total : null, tokens: rd.tokens_seen != null ? Number(rd.tokens_seen) : null,
+    tokensTotal: total != null && total > 0 && bt ? total * bt : null };
+};
+const compact = (n: number): string => (n >= 1e9 ? `${(n / 1e9).toFixed(n >= 1e10 ? 0 : 1)}B` : n >= 1e6 ? `${(n / 1e6).toFixed(n >= 1e7 ? 0 : 1)}M` : n >= 1e3 ? `${Math.round(n / 1e3)}k` : String(Math.round(n)));
+const queueComplete = (r: any): string => {
+  const q = queueDone(r);
+  if (!q) return '<span class="s" title="not started: it sails when the lines ahead of it are home">0%</span>';
+  const { step, total } = q;
+  if (total == null) return `<span class="s" title="its step total is known once it sails">step ${Math.round(step).toLocaleString()}</span>`;
   const done = Math.max(0, Math.min(100, (100 * step) / total));
   const pct = done < 1 ? done.toFixed(1) : done.toFixed(0);
-  return `<div class="qprog" title="step ${Math.round(step).toLocaleString()} of ${Math.round(total).toLocaleString()} · ${pct}% complete"><progress class="qvbar qminibar" max="${total}" value="${step}" aria-label="voyage progress"></progress><b>${pct}%</b></div>`;
+  // a ship at sea says where it is in steps and in the text it has read (13 November, Justin)
+  const where = r.status === 'at sea'
+    ? `<div class="qprogsub">step ${Math.round(step).toLocaleString()} / ${Math.round(total).toLocaleString()}${q.tokens != null && q.tokensTotal ? ` · ${compact(q.tokens)} / ${compact(q.tokensTotal)} tokens` : ''}</div>` : '';
+  return `<div class="qprog" title="step ${Math.round(step).toLocaleString()} of ${Math.round(total).toLocaleString()} · ${pct}% complete"><progress class="qvbar qminibar" max="${total}" value="${step}" aria-label="voyage progress"></progress><b>${pct}%</b></div>${where}`;
 };
-export function queueRowsHtml(d: any, rungs: Rung[]): string {
+/** The day a clock time falls on, when it is not today. */
+const dayOf = (d: Date): string => (d.toDateString() === new Date().toDateString() ? '' : ` ${d.toLocaleDateString(undefined, { weekday: 'short' })}`);
+/** When a voyage at sea is expected home, and by what: its own pace, or the hire's quote while it has none; and a
+ *  flag where the quote and the pace disagree by a quarter (13 November: the 50m was quoted 5 h and ran 20). */
+const homeAt = (r: any): string => {
+  if (r.left_min == null) return '';
+  const d = new Date(Date.now() + Number(r.left_min) * 60000);
+  const ab = r.abroad || {};
+  const how = ab.paced ? 'by its pace' : ab.quote_min != null ? "by the hire's quote" : esc(String(r.est_source || ''));
+  let flag = '';
+  if (ab.paced && ab.quote_min && r.est_min && (r.est_min / ab.quote_min > 1.25 || r.est_min / ab.quote_min < 0.8)) {
+    flag = ` <span class="${pillCls('bad')}" title="the hire was quoted ${mins(ab.quote_min)}; at its pace so far the voyage takes ${mins(r.est_min)}">quoted ${mins(ab.quote_min)}</span>`;
+  }
+  return `<div class="s qhome" title="${esc(String(r.est_source || ''))}">home <b>${clock(d)}</b>${dayOf(d)} · ${mins(Number(r.left_min))} left · ${how}${flag}</div>`;
+};
+/** What a hired ship costs, on its row. */
+const hireLine = (r: any): string => {
+  const ab = r.abroad;
+  if (!ab) return '';
+  const bits = [ab.gpu ? esc(ab.gpu) : 'hiring', ab.dph != null ? `$${Number(ab.dph).toFixed(2)}/h` : '',
+    ab.spent != null ? `$${Number(ab.spent).toFixed(2)} so far${ab.projected != null ? `, about $${Number(ab.projected).toFixed(2)} at its finish` : ''}` : '',
+    ab.quote_cost != null && ab.paced ? `quoted $${Number(ab.quote_cost).toFixed(2)}` : ''].filter(Boolean);
+  return `<div class="s qhire" title="the Vast.ai hire: its dollars an hour, what it has run up since the hire, and what it will have at its finish">${bits.join(' · ')}</div>`;
+};
+type QueueView = { kind?: string; text?: string; open?: Set<string> };
+const queueCat = (r: any): string => (r.kind === 'voyage' ? 'voyage' : r.what === 'investigation' ? 'investigation' : r.what === 'reading' ? 'reading' : 'other');
+const stepPrefix = (r: any): string => String(r.name || '').split(':')[0].trim();
+/** The rows the page shows under a filter (13 November): by kind, and by text over the name, goal and expedition. */
+export function queueMatches(d: any, v: QueueView = {}): number[] {
+  const kind = v.kind || 'all', text = (v.text || '').trim().toLowerCase();
+  return (d.rows || []).map((r: any, i: number) => ({ r, i })).filter(({ r }: any) => {
+    if (kind !== 'all' && queueCat(r) !== kind) return false;
+    if (!text) return true;
+    return [r.name, r.goal, r.experiment, r.goal_id, r.expedition_name, r.serves?.text, r.what].join(' ').toLowerCase().includes(text);
+  }).map(({ i }: any) => i);
+}
+export function queueRowsHtml(d: any, rungs: Rung[], view: QueueView = {}): string {
   // the at-sea voyages are the first of the queue: number them too (10 November, Justin: "I'd be
   // expecting the at sea ships to still have a number"), and let the number run on through the file.
-  let seq = 0;
-  const rows = (d.rows || []).map((r: any, i: number) => {
-    seq += 1;
-    // a step opens its own card, as a voyage does (12 November, Justin: "each item in the queue needs to be able
-    // to be opened, currently only voyages can be opened with a modal"). S4's scheduled intelligence audit is
-    // its own item type (12 November): it reads as a Liberty Machine task, not as one more step between voyages.
+  const all: any[] = d.rows || [];
+  const keep = new Set(queueMatches(d, view));
+  const filtered = (view.kind && view.kind !== 'all') || !!(view.text || '').trim();
+  // the SOP every row shares is not worth a column: a row's SOP shows only where it differs (13 November)
+  const sops = all.map((r) => r.sop).filter(Boolean);
+  const commonSop = sops.sort((a, b) => sops.filter((x) => x === b).length - sops.filter((x) => x === a).length)[0];
+  const stepRow = (r: any, i: number): string => {
     const intel = r.kind === 'intelligence';
     const what = ({ investigation: 'an investigation', reading: 'a reading', upkeep: 'upkeep', intelligence: 'the intelligence audit' } as Record<string, string>)[r.what] || 'a step';
-    if (r.kind === 'step' || intel) {
-      const label = intel
-        ? `<span class="qintelbadge" title="S4 intelligence: a scheduled Liberty Machine task, not a voyage">S4</span> <b>${esc(r.name)}</b>`
-        : `${what}: <b>${esc(r.name)}</b>`;
-      const goal = r.goal_id
-        ? ` <span class="${pillCls('accent')}" title="the goal this ${intel ? 'task' : 'step'} serves">${esc(r.goal_id)}</span>`
-        : intel || r.what === 'upkeep' || r.status === 'at sea' ? '' : ` <span class="${pillCls('bad')}" title="every line serves an expedition's goal: thorp queue goal LINE --goal EXPEDITION:N">no goal</span>`;
-      const cadence = intel ? ' · a turn of the Liberty Machine planning cycle' : '';
-      return `<tr class="qstep${intel ? ' qintel' : ''}${r.status === 'at sea' ? ' sel' : ''}" data-qi="${i}" tabindex="0" aria-label="show the card for ${esc(r.name)}" title="show ${intel ? 'this Liberty Machine task' : 'this step'}'s card"><td class="s">${seq}</td><td colspan="4" class="s">${r.status === 'at sea' ? '' : intel ? '↳ scheduled: ' : '↳ then '}${label}${goal}<div class="s">${stepLength(r)}${cadence}</div></td>
+    const label = intel
+      ? `<span class="qintelbadge" title="S4 intelligence: a scheduled Liberty Machine task, not a voyage">S4</span> <b>${esc(r.name)}</b>`
+      : `${what}: <b>${esc(r.name)}</b>`;
+    const goal = r.goal_id
+      ? ` <span class="${pillCls('accent')}" title="the goal this ${intel ? 'task' : 'step'} serves">${esc(r.goal_id)}</span>`
+      : intel || r.what === 'upkeep' || r.status === 'at sea' ? '' : ` <span class="${pillCls('bad')}" title="every line serves an expedition's goal: thorp queue goal LINE --goal EXPEDITION:N">no goal</span>`;
+    const cadence = intel ? ' · a turn of the Liberty Machine planning cycle' : '';
+    return `<tr class="qstep${intel ? ' qintel' : ''}${r.status === 'at sea' ? ' sel' : ''}" data-qi="${i}" tabindex="0" aria-label="show the card for ${esc(r.name)}" title="show ${intel ? 'this Liberty Machine task' : 'this step'}'s card"><td class="s">${i + 1}</td><td colspan="3" class="s">${r.status === 'at sea' ? '' : intel ? '↳ scheduled: ' : '↳ then '}${label}${goal}<div class="s">${stepLength(r)}${cadence}</div></td>
       <td class="s" title="${r.est_min == null ? 'no time yet' : `about ${Math.round(r.est_min)} min · ${esc(r.est_source || '')}`}">${startsAt(r)}</td>
       <td class="s">${r.status === 'at sea' ? `<span class="${pillCls('running')}">at sea</span>` : sailsIn(r.starts_in_min, !!r.at_least)}</td></tr>`;
-    }
-    return `<tr data-qi="${i}" tabindex="0" aria-label="show the card for ${esc(r.name)}" title="show this voyage's card"${r.status === 'at sea' ? ' class="sel"' : ''}><td class="s">${seq}</td>
-      <td><b>${esc(r.name)}</b>${r.lane && r.lane !== 'mac' ? ` <span class="${pillCls('blue')}" title="sails on the ${esc(r.lane)} lane">${esc(r.lane)}</span>` : ''}${r.purser?.waters === 'foreign' && !r.purser.applied ? ` <span class="${pillCls('')}" title="${esc(r.purser.reason || '')}">purser: abroad</span>` : ''}${r.goal_id ? ` <span class="${pillCls('accent')}" title="the goal this voyage serves">${esc(r.goal_id)}</span>` : ` <span class="${pillCls('bad')}" title="every line serves an expedition's goal: thorp queue goal LINE --goal EXPEDITION:N">no goal</span>`}<div class="s" title="${esc(r.goal || '')}">${esc(queueGoal(r))}</div></td>
-      <td>${(() => {
-        const rung = rungs.find((x) => x.preset === r.preset);
-        const label = `<span class="mono">${esc(r.preset || r.name)}</span>`;
-        return rung ? `<a href="${modelHash(rung, 'training')}" title="open ${esc(String(rung.name).toLowerCase().replace(/^the\s+/, '').replace(/[^a-z0-9]+/g, '-'))}'s training page">${label}</a>` : label;
-      })()}${r.missing ? ` <span class="${pillCls('bad')}">no spec</span>` : ''}</td>
-      <td>${r.sop ? `<span class="${pillCls('accent')}">v${esc(r.sop)}</span>` : '<span class="s">–</span>'}</td>
+  };
+  const voyageRow = (r: any, i: number): string => {
+    const rung = rungs.find((x) => x.preset === r.preset);
+    const label = `<span class="mono">${esc(r.preset || r.name)}</span>`;
+    const train = rung ? ` <a class="s mono" href="${modelHash(rung, 'training')}" title="open the ${esc(r.preset)} class's training page">${label} ↗</a>` : '';
+    const sop = r.sop && r.sop !== commonSop ? ` <span class="${pillCls('accent')}" title="this voyage's SOP differs from the rest of the queue's v${esc(commonSop || '')}">v${esc(r.sop)}</span>` : '';
+    const goal = r.goal_id
+      ? `<span class="${pillCls('accent')}" title="the goal this voyage serves">${esc(r.goal_id)}</span>${r.serves?.text ? `<div class="s qserves" title="${esc(r.serves.text)}">${esc(r.serves.text)}</div>` : ''}`
+      : `<span class="${pillCls('bad')}" title="every line serves an expedition's goal: thorp queue goal LINE --goal EXPEDITION:N">no goal</span>`;
+    return `<tr data-qi="${i}" tabindex="0" aria-label="show the card for ${esc(r.name)}" title="show this voyage's card"${r.status === 'at sea' ? ' class="sel"' : ''}><td class="s">${i + 1}</td>
+      <td><b>${esc(r.name)}</b>${r.lane && r.lane !== 'mac' ? ` <span class="${pillCls('blue')}" title="sails on the ${esc(r.lane)} lane">${esc(r.lane)}</span>` : ''}${r.purser?.waters === 'foreign' && !r.purser.applied ? ` <span class="${pillCls('')}" title="${esc(r.purser.reason || '')}">purser: abroad</span>` : ''}${sop}${r.missing ? ` <span class="${pillCls('bad')}">no spec</span>` : ''}${train}<div class="s" title="${esc(r.goal || '')}">${esc(queueGoal(r))}</div>${hireLine(r)}</td>
+      <td class="qgoalcell">${goal}</td>
       <td class="s qcomplete">${queueComplete(r)}</td>
       <td class="s" title="${r.est_min == null ? 'no time yet' : `about ${Math.round(r.est_min)} min · ${esc(r.est_source || '')}`}">${startsAt(r)}</td>
-      <td class="s">${r.status === 'at sea' ? `<span class="${pillCls('running')}">at sea</span>` : sailsIn(r.starts_in_min, !!r.at_least)}</td></tr>`;
-  }).join('')
-    || `<tr><td colspan="7" class="${emptyCls(true)}">the queue is empty</td></tr>`;
-  return rows;
+      <td class="s">${r.status === 'at sea' ? `<span class="${pillCls('running')}">at sea</span>${homeAt(r)}` : sailsIn(r.starts_in_min, !!r.at_least)}</td></tr>`;
+  };
+  const out: string[] = [];
+  for (let i = 0; i < all.length; i++) {
+    if (!keep.has(i)) continue;
+    const r = all[i];
+    if (r.kind === 'step' && r.status !== 'at sea' && !filtered) {
+      // a chain of like steps (13 IFEval readings) is one line that opens: its members are the same step on other models
+      let j = i;
+      while (j + 1 < all.length && all[j + 1].kind === 'step' && all[j + 1].status !== 'at sea' && all[j + 1].what === r.what && stepPrefix(all[j + 1]) === stepPrefix(r)) j++;
+      const n = j - i + 1;
+      if (n >= 4) {
+        const key = String(i), open = !!view.open?.has(key);
+        const last = all[j];
+        const total = all.slice(i, j + 1).reduce((s, x) => s + (Number(x.est_min) || 0), 0);
+        const end = last.starts_in_min != null && last.est_min != null ? new Date(Date.now() + (Number(last.starts_in_min) + Number(last.est_min)) * 60000) : null;
+        out.push(`<tr class="qgroup" data-qg="${key}" tabindex="0" role="button" aria-expanded="${open}" aria-label="${open ? 'hide' : 'show'} the ${n} ${esc(stepPrefix(r))} steps" title="${open ? 'hide' : 'show'} these ${n} steps"><td class="s">${i + 1}–${j + 1}</td><td colspan="3" class="s"><span class="qcaret">${open ? '▾' : '▸'}</span> ↳ then ${n} ${esc(r.what === 'reading' ? 'readings' : r.what === 'investigation' ? 'investigations' : 'steps')}: <b>${esc(stepPrefix(r))}</b> <span class="s">about ${mins(total)} of sailing in all</span></td>
+          <td class="s">${startsAt(r)}${end ? ` <span class="s">to ${clock(end)}</span>` : ''}</td><td class="s">${sailsIn(r.starts_in_min, !!r.at_least)}</td></tr>`);
+        if (open) for (let k = i; k <= j; k++) out.push(stepRow(all[k], k));
+        i = j;
+        continue;
+      }
+    }
+    out.push(r.kind === 'voyage' ? voyageRow(r, i) : stepRow(r, i));
+  }
+  return out.join('') || `<tr><td colspan="6" class="${emptyCls(true)}">${filtered ? 'nothing in the queue matches' : 'the queue is empty'}</td></tr>`;
 }
 
 /** A voyage's pins as one strip: a cell a layer, each card a chip in the layer it is taught (the queue's
@@ -1057,10 +1130,10 @@ export function queueLanesHtml(d: any): string {
     .concat(advice.map(({ r }) => Number(r.purser.foreign_home_min)));
   const total = Math.max(60, ...ends, Number(d.hours_left || 0) * 60);
   const pct = (m: number): string => `${Math.min(100, Math.max(0, (m / total) * 100)).toFixed(3)}%`;
-  const step = total <= 12 * 60 ? 120 : total <= 36 * 60 ? 360 : 720;
+  const step = total <= 12 * 60 ? 120 : total <= 36 * 60 ? 180 : 720;
   const tickAt: number[] = [];
   for (let m = step; m < total * 0.9; m += step) tickAt.push(m); // clear of the end's own label
-  const block = (r: any, i: number, a: number, b: number, ghost = false): string => {
+  const block = (r: any, i: number, a: number, b: number, ghost = false, group?: { label: string; tip: string }): string => {
     const intel = r.kind === 'intelligence';
     const tone = intel ? 'pintel' : r.kind === 'step' ? 'pstep' : (PRESET_TONE[r.preset] || 'pother');
     const sea = r.status === 'at sea';
@@ -1069,12 +1142,34 @@ export function queueLanesHtml(d: any): string {
     const tip = ghost
       ? `${r.name}: the purser would sail it abroad (${p.gpu || 'a hired GPU'}, about ${Math.round(p.foreign_min || 0)} min, $${Number(p.cost || 0).toFixed(2)}), home ${clockAt(b)}. Advice only: it sails on this Mac unless the purser is routing.`
       : `${name}${r.goal_id ? ` · ${r.goal_id}` : ''}${sea ? ' · at sea now' : ` · starts ${clockAt(a)}`} · about ${Math.round(b - a)} min · home ${clockAt(b)}${p.reason ? ` · purser: ${p.reason}` : ''}`;
-    const label = intel ? 'S4 audit' : r.kind === 'step' ? '' : laneShort(r);
+    const q = sea ? queueDone(r) : null;
+    const pctDone = q && q.total ? ` ${Math.round((100 * q.step) / q.total)}%` : '';
+    const label = group ? group.label : intel ? 'S4 audit' : r.kind === 'step' ? '' : `${laneShort(r)}${pctDone}`;
+    if (group) return `<span class="qlblock ${tone} qlgroupblock" data-qi="${i}" tabindex="0" role="button" style="left:${pct(a)};width:max(3px, calc(${pct(b)} - ${pct(a)}))" title="${esc(group.tip)}" aria-label="${esc(group.tip)}">${esc(label)}</span>`;
     return `<span class="qlblock ${tone}${sea ? ' sea' : ''}${ghost ? ' ghost' : ''}" data-qi="${i}" tabindex="0" role="button" style="left:${pct(a)};width:max(3px, calc(${pct(b)} - ${pct(a)}))" title="${esc(tip)}" aria-label="${esc(tip)}">${esc(label)}</span>`;
   };
   const tracks = lanes.map((ln: any) => {
     const mine = rows.map((r, i) => ({ r, i })).filter(({ r }) => (r.lane || 'mac') === ln.lane);
-    const blocks = mine.map(({ r, i }) => { const s = span(r); return s ? block(r, i, s[0], s[1]) : ''; }).join('');
+    // a chain of like steps is one block, labelled with its count (13 November: thirty unlabelled slivers)
+    const parts: string[] = [];
+    for (let k = 0; k < mine.length; k++) {
+      const { r, i } = mine[k];
+      const sp = span(r);
+      if (r.kind === 'step' && sp && r.status !== 'at sea') {
+        let m = k;
+        while (m + 1 < mine.length && mine[m + 1].r.kind === 'step' && mine[m + 1].r.what === r.what && stepPrefix(mine[m + 1].r) === stepPrefix(r) && span(mine[m + 1].r)) m++;
+        if (m > k) {
+          const run = mine.slice(k, m + 1), end = span(run[run.length - 1].r)![1];
+          const names = run.map((x) => String(x.r.name).split(': ').slice(1).join(': ') || x.r.name);
+          const tip = `${stepPrefix(r)}: ${run.length} ${r.what === 'reading' ? 'readings' : r.what === 'investigation' ? 'investigations' : 'steps'} in a row (${names.slice(0, 6).join(', ')}${names.length > 6 ? ', …' : ''}) · starts ${clockAt(sp[0])} · home ${clockAt(end)} · click for the first's card`;
+          parts.push(block(r, i, sp[0], end, false, { label: `${stepPrefix(r)} ×${run.length}`, tip }));
+          k = m;
+          continue;
+        }
+      }
+      parts.push(sp ? block(r, i, sp[0], sp[1]) : '');
+    }
+    const blocks = parts.join('');
     const ghosts = ln.kind === 'charter'
       ? advice.map(({ r, i }) => block(r, i, Number(r.purser.foreign_home_min) - Number(r.purser.foreign_min || 0), Number(r.purser.foreign_home_min), true)).join('')
       : '';
@@ -1085,7 +1180,12 @@ export function queueLanesHtml(d: any): string {
     const seats = ln.kind === 'charter' ? `${n} ship${n === 1 ? '' : 's'} out at once` : `${n} seat${n === 1 ? '' : 's'}`;
     let sub: string;
     if (!ln.enabled) sub = 'switched off';
-    else if (mine.length) sub = `${atSea.length ? `at sea: ${esc(atSea.join(', '))} · ` : ''}${queued} queued · clear ${esc(clockAt(lastEnd))}`;
+    else if (mine.length) {
+      const hired = mine.map(({ r }) => r.abroad).filter(Boolean);
+      const spent = hired.reduce((s2: number, a: any) => s2 + (Number(a.spent) || 0), 0), proj = hired.reduce((s2: number, a: any) => s2 + (Number(a.projected) || 0), 0);
+      const cost = ln.kind === 'charter' && hired.length ? ` · $${spent.toFixed(2)} out so far, about $${proj.toFixed(2)} at their finish` : '';
+      sub = `${atSea.length ? `at sea: ${esc(atSea.join(', '))} · ` : ''}${queued} queued · clear ${esc(clockAt(lastEnd))}${cost}`;
+    }
     else if (ln.kind === 'charter' && ln.can_hire === false) sub = 'idle: no Vast.ai key';
     else {
       const pm = d.purser && typeof d.purser === 'object' ? d.purser : {};

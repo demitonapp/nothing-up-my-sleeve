@@ -145,7 +145,19 @@ a.crumb:not(:empty)::after { content: ' ›'; }
    calibration on the 300k, the stage and library-aboard panels) otherwise shows with a blank chart */
 [hidden] { display: none !important; }
 /* the queue as a table (#/expeditions): long, so it scrolls in place with its head kept in view */
-.queuescroll { max-height: 520px; overflow-y: auto; }
+.queuescroll { max-height: max(360px, calc(100vh - 330px)); overflow-y: auto; margin-bottom: 64px; /* clear of the chat console's bar */ }
+.qfilter { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 10px 0 8px; }
+.qchip { background: var(--raise); border: 1px solid var(--line); color: var(--text); border-radius: 999px; padding: 3px 10px; font-size: var(--fs-sm); cursor: pointer; }
+.qchip.on { border-color: var(--accent); color: var(--accent); }
+.qchip .s { margin-left: 2px; }
+.qsearch { margin-left: auto; min-width: 220px; background: var(--raise); border: 1px solid var(--line); color: var(--text); border-radius: var(--r-sm); padding: 4px 8px; font-size: var(--fs-sm); }
+#queuetable tr.qgroup { cursor: pointer; background: var(--raise); }
+#queuetable tr.qgroup:hover, #queuetable tr.qgroup:focus-visible { outline: 1px solid var(--accent); outline-offset: -1px; }
+#queuetable .qcaret { display: inline-block; width: 1em; color: var(--accent); }
+#queuetable .qprogsub, #queuetable .qhire, #queuetable .qhome { margin-top: 2px; white-space: normal; }
+#queuetable .qserves { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#queuetable .qgoalcell { min-width: 120px; }
+.qlblock.qlgroupblock { background-image: repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.18) 0 1px, transparent 1px 14px); }
 .queuescroll thead th { position: sticky; top: 0; z-index: 1; background: var(--panel); }
 #queuetable tbody tr[data-qi] { cursor: pointer; }
 #queuetable tbody tr[data-qi]:hover td { background: var(--raise); }

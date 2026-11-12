@@ -15,7 +15,7 @@ import Launch from './Launch';
 import type { LaunchPayload } from './Launch';
 import {
   censusHtml, CHARTER_SECTIONS, charterCardsHtml, charterSection, deckHtml, expeditionCardsHtml, expeditionDoorsHtml, goalSummaryHtml, expeditionName, expeditionOutcomes, expeditionTableHtml, expPill, firstLightFindings, fitHtml, fleetShipsHtml, runsTableHtml,
-  inductionVerdict, leversRowsHtml, outcomesRowsHtml, parseExpeditionRoute, pinsStripHtml, queueLanesHtml, queueRowsHtml, readingsTable,
+  inductionVerdict, leversRowsHtml, outcomesRowsHtml, parseExpeditionRoute, pinsStripHtml, queueLanesHtml, queueMatches, queueRowsHtml, readingsTable,
   skyStateOf, sopCardsHtml, tableLogHtml, tableReadingsHtml, planHtml,
 } from '@/scripts/views/expeditions';
 import type { Expedition, Observation, SeriesMap, SkyViewState, TableExchange } from '@/scripts/views/expeditions';
@@ -977,9 +977,22 @@ export default function Expeditions() {
   const queueRow = useMemo(() => (queuePick ? (queueApi.data?.rows || []).find((r: any) => queueKey(r) === queuePick) || null : null), [queueApi.data, queuePick]);
   useEffect(() => { if (!isQueue) setQueuePick(null); }, [isQueue]);
   useEffect(() => { if (queuePick && queueApi.data && !queueRow) setQueuePick(null); }, [queuePick, queueApi.data, queueRow]);
+  // the table's filter, and which chains of like steps are open (13 November): held here, not in the HTML,
+  // so a 15 s poll that redraws the rows keeps them
+  const [qKind, setQKind] = useState('all');
+  const [qText, setQText] = useState('');
+  const [qOpen, setQOpen] = useState<Set<string>>(() => new Set());
+  const toggleGroup = (el: HTMLElement | null): boolean => {
+    const key = el?.dataset.qg;
+    if (key == null) return false;
+    setQOpen((s) => { const n = new Set(s); if (n.has(key)) n.delete(key); else n.add(key); return n; });
+    return true;
+  };
+  const queueView = useMemo(() => ({ kind: qKind, text: qText, open: qOpen }), [qKind, qText, qOpen]);
   const onQueueClick = (e: ReactMouseEvent): void => {
     const t = e.target as HTMLElement;
     if (t.closest('a,button,summary,.info,input,select,textarea')) return;
+    if (toggleGroup(t.closest('#queuetable tr[data-qg]'))) return;
     const tr = t.closest('#queuetable tr[data-qi], .qlanes [data-qi]') as HTMLElement | null;
     if (!tr) return;
     const row = (queueApi.data?.rows || [])[Number(tr.dataset.qi)];
@@ -989,6 +1002,7 @@ export default function Expeditions() {
     if (e.key !== 'Enter' && e.key !== ' ') return;
     const t = e.target as HTMLElement;
     if (t.closest('a,button,summary,.info')) return;
+    if (toggleGroup(t.closest('#queuetable tr[data-qg]'))) { e.preventDefault(); return; }
     const tr = t.closest('#queuetable tr[data-qi], .qlanes [data-qi]') as HTMLElement | null;
     if (!tr) return;
     e.preventDefault();
@@ -1560,9 +1574,18 @@ export default function Expeditions() {
               <section className={cardCls(false, 'panel')} id="queuepanel">
                 <h2>Sailing order <span className="note">every voyage still to sail, in the order it sails (specs/queue.txt), with its goal: the question its spec asks, or its experiment's where it asks none, and the fitout it was compiled from (its census variation and stage); the starts are the median of like voyages scheduled with the Mac's seats, and ≥ marks a line behind one with no time yet. Click a voyage for its card</span></h2>
                 {queueApi.data ? <div onClick={onQueueClick} onKeyDown={onQueueKey} dangerouslySetInnerHTML={{ __html: queueLanesHtml(queueApi.data) }} /> : null}
+                {queueApi.data ? (
+                  <div className="qfilter" role="group" aria-label="filter the sailing order">
+                    {([['all', 'All'], ['voyage', 'Voyages'], ['investigation', 'Investigations'], ['reading', 'Readings'], ['other', 'Upkeep and audits']] as const).map(([k, label]) => {
+                      const n = queueMatches(queueApi.data, { kind: k, text: qText }).length;
+                      return <button key={k} type="button" className={`qchip${qKind === k ? ' on' : ''}`} aria-pressed={qKind === k} onClick={() => setQKind(k)}>{label} <span className="s">{n}</span></button>;
+                    })}
+                    <input type="search" className="qsearch" placeholder="find a voyage, goal or expedition" aria-label="find in the sailing order" value={qText} onChange={(e) => setQText(e.target.value)} />
+                  </div>
+                ) : null}
                 <div className="scroll queuescroll" onClick={onQueueClick} onKeyDown={onQueueKey}><table id="queuetable" data-nosort>
-                  <thead><tr><th>#</th><th>voyage</th><th>ship</th><th title="the SOP the voyage is built to: its content, tokeniser, parameters, phases and depth">SOP</th><th title="how far the voyage has come: its training step of the steps its schedule sets; a line that has not sailed reads 0%">% complete</th><th title="about when it starts, in your local timezone: the median of like voyages, scheduled with the Mac's seats (two 300k may share; a 1m or 9m holds the lane); ≥ where a voyage ahead has no time yet">starts</th><th title="about when it sails: the median of like voyages, scheduled with the Mac's seats; ≥ where a voyage ahead has no time yet">sails in</th></tr></thead>
-                  <tbody dangerouslySetInnerHTML={{ __html: queueApi.data ? queueRowsHtml(queueApi.data, rungs) : `<tr><td colspan="7" class="${emptyCls(true)}">reading the queue…</td></tr>` }} />
+                  <thead><tr><th>#</th><th>voyage</th><th title="the goal the voyage serves, in the words of its expedition">serves</th><th title="how far the voyage has come: its training step of the steps its schedule sets; a line that has not sailed reads 0%">% complete</th><th title="about when it starts, in your local timezone: the median of like voyages, scheduled with the Mac's seats (two 300k may share; a 1m or 9m holds the lane); ≥ where a voyage ahead has no time yet">starts</th><th title="a voyage at sea: when it is expected home and by what; a queued one: about when it sails (the median of like voyages, scheduled with the Mac's seats; ≥ where a voyage ahead has no time yet)">home / sails in</th></tr></thead>
+                  <tbody dangerouslySetInnerHTML={{ __html: queueApi.data ? queueRowsHtml(queueApi.data, rungs, queueView) : `<tr><td colspan="6" class="${emptyCls(true)}">reading the queue…</td></tr>` }} />
                 </table></div>
               </section>
             </div>

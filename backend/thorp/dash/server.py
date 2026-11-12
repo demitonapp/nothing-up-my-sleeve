@@ -3751,7 +3751,9 @@ def _api_queue() -> dict:
             if h and h.get("quote_hours"):
                 est, source = float(h["quote_hours"]) * 60, f"the hire's quote, on an {h.get('gpu')}"
             r["abroad"] = {"gpu": (h or {}).get("gpu"), "phase": (h or {}).get("phase") or "hiring",
-                           "dph": (h or {}).get("dph"), "instance": (h or {}).get("instance")}  # fmt: skip
+                           "dph": dph, "instance": (h or {}).get("instance"), "quote_min": quote_min, "paced": paced,
+                           "spent": spent, "projected": projected,
+                           "quote_cost": (h or {}).get("quote")}  # fmt: skip
         r["est_min"], r["est_source"] = est, source
         rows.append(r)
         if est is not None:
@@ -3759,8 +3761,27 @@ def _api_queue() -> dict:
             left = max(0.0, est - (gone or 0.0))
             preset = r.get("preset")
             r["left_min"] = round(left)
+            quote_min = None
             lane_seats = seat.get(r["lane"]) or seat["mac"]
             if preset in two and r["lane"] == "mac":
+                quote_min = est
+            paced = False
+            # once the ship has trained a while, its own pace beats the quote (13 November: the 50m's quote was
+            # 5 h on an RTX 5090 and its pace was 19 h; the lane said "clear 11:10" at 7%)
+            rd = (r["detail"] or {}).get("readings") or {}
+            total = ((r["detail"] or {}).get("schedule") or {}).get("total")
+            trained = _started_min(rd.get("started"))
+            if rd.get("step") and total and trained and trained >= 10 and rd["step"] >= 50:
+                lead = max(0.0, (_started_min(started) or 0.0) - trained)  # hire to first step: provisioning
+                est = lead + trained * float(total) / float(rd["step"])
+                source = f"its pace so far: step {int(rd['step']):,} of {int(total):,} in {trained:.0f} min"
+                paced = True
+            # what the hire costs (13 November, Justin: the queue page should say what a ship abroad costs): the
+            # hire's dollars an hour, what it has run up since the hire, and what it will have at its finish
+            dph = (h or {}).get("dph")
+            hired_min = _started_min(started)
+            spent = round(float(dph) * hired_min / 60, 2) if dph and hired_min is not None else None
+            projected = round(float(dph) * est / 60, 2) if dph and est is not None else None
                 s = min(lane_seats, key=lambda x: x["end"])
                 s["end"], s["kind"] = now + left, preset
             else:

@@ -10,6 +10,7 @@
 import { crumbCls, emptyCls, pillCls, cardCls } from '@/lib/ui';
 import { DEMITON_DISCOVERIES as DB } from '@/lib/discoveryPaths';
 import { AXES, axisBySlug, discoveriesIn, oursIn, slugOf, type MapAxis, type OurWork } from '@/lib/fieldMap';
+import { byWaypoint, tricksIn } from '@/lib/fieldTricks';
 
 const axisHref = (a: MapAxis): string => `${DB}/${a.slug}`;
 const otherAxis = (a: MapAxis): MapAxis => AXES.find((x) => x.key !== a.key) as MapAxis;
@@ -72,6 +73,7 @@ export function FieldMapView({ slug, cat }: { slug: string; cat: string | null }
   if (category) {
     const found = discoveriesIn(axis, category.key);
     const ours = oursIn(axis, category.key);
+    const tricks = tricksIn(axis.key, category.key);
     return (
       <>
         <h1>
@@ -106,6 +108,25 @@ export function FieldMapView({ slug, cat }: { slug: string; cat: string | null }
             </div>
           ) : <div className={emptyCls()}>nothing is placed here yet</div>}
         </section>
+        {tricks.length ? (
+          <section className={cardCls(false, 'panel')}>
+            <h2>{tricks.length} trick{tricks.length === 1 ? '' : 's'} of the trade <span className="note">what a model can do, judged from outside by its bets, grouped by the step of the ladder it sits on; open one for the stars that do it and how our fleet is tracking it. A source marks a trick the field documents; the rest are our own tests</span></h2>
+            {byWaypoint(tricks).map((g) => (
+              <div key={g.key}>
+                <h3>{g.name}</h3>
+                <div className="domainskills">
+                  {g.tricks.map((t) => (
+                    <a className={`skill${t.source ? '' : ' measured'}`} href={t.href} key={t.key}>
+                      <b>{t.name}</b>
+                      <span>{t.does}</span>
+                      <em>{t.source || 'our own test'}</em>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </section>
+        ) : null}
       </>
     );
   }
@@ -121,11 +142,12 @@ export function FieldMapView({ slug, cat }: { slug: string; cat: string | null }
         {axis.categories.map((c) => {
           const found = discoveriesIn(axis, c.key);
           const ours = oursIn(axis, c.key);
+          const tricks = tricksIn(axis.key, c.key);
           return (
             <a className="discdoor" href={`${axisHref(axis)}/${slugOf(c)}`} key={c.key}>
               {c.image ? <img src={c.image} alt="" loading="lazy" /> : null}
               <div className="db">
-                <span className="dk">{found.length} in the field{ours.length ? ` · ${ours.length} of ours` : ''}</span>
+                <span className="dk">{found.length} in the field{ours.length ? ` · ${ours.length} of ours` : ''}{tricks.length ? ` · ${tricks.length} tricks` : ''}</span>
                 <b>{c.name}</b>
                 <p>{c.question} {c.about}</p>
                 {ours.length ? <p><b style={{ display: 'inline', fontSize: 'inherit' }}>Ours:</b> {ours.map((o) => o.title).join(' · ')}</p> : null}

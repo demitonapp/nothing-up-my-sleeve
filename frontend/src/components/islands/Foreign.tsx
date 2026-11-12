@@ -10,8 +10,8 @@ import Chat from './Chat';
 import { BAND, bandOf, sizeOf } from '@/scripts/views/bands';
 import SectionNav from '../SectionNav';
 import { TabNav } from '../TabNav';
-import { headsCensusHtml, personasHtml } from '@/scripts/views/discoveries';
-import { MASAQ_DISCOVERIES } from '@/lib/discoveryPaths';
+import { headsCensusHtml } from '@/scripts/views/discoveries';
+import { DEMITON_DISCOVERIES, HEAD_KINDS } from '@/lib/discoveryPaths';
 
 interface ForeignLogic {
   [k: string]: number | null | undefined;
@@ -104,14 +104,14 @@ export default function Foreign() {
             <ForeignBody d={d} />
             {census.data?.found ? (
               <section className={cardCls(false, 'panel')} id="heads">
-                <h2>Every head, by category <span className="note">the census of all {census.data.n_heads ?? ''} heads (thorp.head_census): every kind the toolkit measures, grouped, with the heads at or above each kind's mark, and the heads no card names. Expand a category to list its heads: layer, what names it, and the readings that identify it. The kinds themselves are charted in <a href={MASAQ_DISCOVERIES}>the Reach's discoveries</a></span></h2>
+                <h2>Every head, by category <span className="note">the census of all {census.data.n_heads ?? ''} heads (thorp.head_census): every kind the toolkit measures, grouped, with the heads at or above each kind's mark, and the heads no card names. Expand a category to list its heads: layer, what names it, and the readings that identify it. The kinds themselves are charted under <a href={HEAD_KINDS}>head kinds</a> in Demiton's discoveries</span></h2>
                 <div dangerouslySetInnerHTML={{ __html: headsCensusHtml(census.data) }} />
               </section>
             ) : null}
             {personas.data?.found ? (
+              // the directions themselves are a page of Demiton's discoveries since 13 November, beside the traits
               <section className={cardCls(false, 'panel')} id="personas">
-                <h2>Persona vectors <span className="note">the residual-stream directions for six character traits, read by contrastive system prompts (thorp.persona_vectors): the direction's norm, its projection on a plain prompt, and how far the traits share a direction</span></h2>
-                <div dangerouslySetInnerHTML={{ __html: personasHtml(personas.data) }} />
+                <h2>Persona vectors <span className="note">this model's six character-trait directions are read in Demiton's discoveries: <a href={`${DEMITON_DISCOVERIES}/personas`}>persona vectors</a></span></h2>
               </section>
             ) : null}
           </div>

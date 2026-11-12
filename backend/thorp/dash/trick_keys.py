@@ -21,12 +21,28 @@ from pathlib import Path
 from thorp import paths
 
 
-def keys() -> dict[str, list[str]]:
-    """{"tricks": every known trick's key, in the registry's order; "chains": the explorer's discovery chains}."""
+def keys() -> dict:
+    """{"tricks": every known trick's key, in the registry's order; "chains": the explorer's discovery chains;
+    "detail": each trick's name, what it does, its waypoint and where it comes from, so Demiton's discoveries can
+    place every trick on the two axes without the live payload (13 November, Justin: "merge the tricks into
+    discoveries"); "waypoints": the seven steps, in order}."""
     from thorp import fleet
-    from thorp.dash.tricks import KNOWN_TRICKS
+    from thorp.dash.tricks import KNOWN_TRICKS, WAYPOINTS
 
-    return {"tricks": [t["key"] for t in KNOWN_TRICKS], "chains": list(fleet.CHAINS)}
+    detail = [
+        {
+            "key": t["key"], "name": t["name"], "does": t["does"], "waypoint": t["waypoint"],
+            # a trick the field documents carries its source; one this project wrote itself has no field band
+            "source": None if t["field_params"] is None else t["source"],
+        }
+        for t in KNOWN_TRICKS
+    ]  # fmt: skip
+    return {
+        "tricks": [t["key"] for t in KNOWN_TRICKS],
+        "chains": list(fleet.CHAINS),
+        "detail": detail,
+        "waypoints": [{"key": w["key"], "name": w["name"]} for w in WAYPOINTS],
+    }
 
 
 def target() -> Path:

@@ -22,6 +22,7 @@ import { esc } from '@/lib/format';
 import { DEMITON_DISCOVERIES as DB, HEAD_KINDS as MB, MASAQ_DISCOVERIES, MASAQ_SUBS, QWEN4B_PAGE, newHome, type MasaqSub } from '@/lib/discoveryPaths';
 import SectionNav from '../SectionNav';
 import { AxisDoors, FieldMapView } from '../FieldMap';
+import PersonaVectors from '../PersonaVectors';
 import { axisBySlug, ourSection } from '@/lib/fieldMap';
 import { TabNav } from '../TabNav';
 import {
@@ -57,7 +58,7 @@ import {
 } from '@/scripts/views/discoveries';
 
 type Sub = 'overview' | 'skills' | 'quantum-tests' | 'stars';
-type DView = 'index' | 'trick' | 'chain' | 'traits' | 'domain' | 'masaq' | 'map' | 'landing' | 'pending';
+type DView = 'index' | 'trick' | 'chain' | 'traits' | 'domain' | 'masaq' | 'map' | 'landing' | 'pending' | 'personas';
 
 interface Parsed {
   view: DView;
@@ -154,6 +155,8 @@ const parse = (route: string): Parsed => {
   // Demiton's root is the landing, the two axis cards (13 November); what was its overview is the jobs page
   if (!b || b === 'overview') return { view: 'landing', sub: 'overview', trick: null, chain: null, domain: null };
   if (b === 'jobs') return { view: 'index', sub: 'overview', trick: null, chain: null, domain: null };
+  // persona vectors, a page of their own beside the traits (13 November)
+  if (b === 'personas') return { view: 'personas', sub: 'overview', trick: null, chain: null, domain: null };
   // the two deprecated tabs still answer; canonicalPath rewrites the address to their new home
   if (b === 'two-facts') return { view: 'index', sub: 'quantum-tests', trick: null, chain: null, domain: null };
   if (b === 'registry') return { view: 'index', sub: 'skills', trick: null, chain: null, domain: null };
@@ -924,6 +927,11 @@ export default function Discoveries() {
           </section>
         </div>
       )}
+
+      {/* ============================== persona vectors: each model's trait directions (13 November) */}
+      <div className={`dview${view === 'personas' ? ' active' : ''}`} data-dview="personas">
+        {view === 'personas' ? <PersonaVectors /> : null}
+      </div>
 
       {/* ============================== the landing: the two axis cards, and nothing else (13 November) */}
       <div className={`dview${view === 'landing' ? ' active' : ''}`} data-dview="landing">

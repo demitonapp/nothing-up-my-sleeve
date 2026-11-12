@@ -41,7 +41,7 @@ export const DISCOVERY_PATHS = ['overview', 'two-facts', 'physics', 'maths', 're
 /** The Stars tabs that left Demiton for the Reach, and where each went. */
 const STARS_TAB_HOME: Record<string, string> = {
   census: `${QWEN4B_PAGE}#heads`,
-  personas: `${QWEN4B_PAGE}#personas`,
+  personas: `${DEMITON_DISCOVERIES}/personas`, // a page of Demiton's discoveries since 13 November
   beyond: `${HEAD_KINDS}/cards`,
   unsorted: `${HEAD_KINDS}/unsorted`,
 };

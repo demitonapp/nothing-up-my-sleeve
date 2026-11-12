@@ -71,5 +71,492 @@
   "energy_test",
   "mendeleev_gaps",
   "recurrence_test"
+ ],
+ "detail": [
+  {
+   "key": "spelling",
+   "name": "Spelling real words",
+   "does": "Writes real words rather than strings of plausible letters.",
+   "waypoint": "reading",
+   "source": "Sutskever, Martens and Hinton 2011, Generating Text with Recurrent Neural Networks"
+  },
+  {
+   "key": "copying",
+   "name": "Copying",
+   "does": "Bets that what followed a word last time will follow it again: the second copy of a repeated passage is far easier to predict than the first.",
+   "waypoint": "reading",
+   "source": "Olsson et al. 2022, In-context Learning and Induction Heads"
+  },
+  {
+   "key": "grammar_simple",
+   "name": "Grammatical sentences in a small world",
+   "does": "Writes fluent, grammatical sentences and short consistent stories when the world is simple (a young child's vocabulary).",
+   "waypoint": "reading",
+   "source": "Eldan and Li 2023, TinyStories: How Small Can Language Models Be and Still Speak Coherent English?"
+  },
+  {
+   "key": "brackets",
+   "name": "Closing brackets and quotes",
+   "does": "Keeps track of an open bracket or quotation mark and closes it in the right place.",
+   "waypoint": "reading",
+   "source": "Karpathy, Johnson and Fei-Fei 2015, Visualizing and Understanding Recurrent Networks"
+  },
+  {
+   "key": "layout",
+   "name": "Lines and paragraphs",
+   "does": "Breaks lines and paragraphs where a book would, and keeps punctuation in proportion.",
+   "waypoint": "reading",
+   "source": "Karpathy, Johnson and Fei-Fei 2015, Visualizing and Understanding Recurrent Networks"
+  },
+  {
+   "key": "agreement",
+   "name": "Agreement across distractors",
+   "does": "Makes a verb agree with its subject when other nouns stand between them: 'the keys to the old cabinet are'.",
+   "waypoint": "reading",
+   "source": "Linzen, Dupoux and Goldberg 2016, Assessing the Ability of LSTMs to Learn Syntax-Sensitive Dependencies; Gulordava et al. 2018, Colorless green recurrent networks dream hierarchically"
+  },
+  {
+   "key": "sentiment",
+   "name": "Keeping a tone",
+   "does": "Carries whether a passage is warm or hostile, so what it writes next keeps the tone.",
+   "waypoint": "reading",
+   "source": "Radford, Jozefowicz and Sutskever 2017, Learning to Generate Reviews and Discovering Sentiment"
+  },
+  {
+   "key": "coherence",
+   "name": "Staying on topic",
+   "does": "Keeps to one subject and one set of characters across paragraphs, not just within a sentence.",
+   "waypoint": "reading",
+   "source": "Radford et al. 2019, Language Models are Unsupervised Multitask Learners (GPT-2)"
+  },
+  {
+   "key": "analogies",
+   "name": "Analogies between words",
+   "does": "Places words so that king is to queen as man is to woman.",
+   "waypoint": "knowing",
+   "source": "Mikolov et al. 2013, Efficient Estimation of Word Representations in Vector Space"
+  },
+  {
+   "key": "successor",
+   "name": "The Successor",
+   "does": "Knows what comes next in a series: Monday, Tuesday, then Wednesday; January, February, then March; Chapter IV, then V.",
+   "waypoint": "knowing",
+   "source": "Gould et al. 2023, Successor Heads: Recurring, Interpretable Attention Heads In The Wild"
+  },
+  {
+   "key": "ioi",
+   "name": "Who gave what to whom",
+   "does": "In 'When Mary and John went to the store, John gave a drink to', bets on Mary: the indirect object.",
+   "waypoint": "knowing",
+   "source": "Wang et al. 2022, Interpretability in the Wild: a Circuit for Indirect Object Identification in GPT-2 small"
+  },
+  {
+   "key": "comprehension",
+   "name": "Answering from a passage",
+   "does": "Reads a passage and answers a question about it from what the passage says.",
+   "waypoint": "knowing",
+   "source": "Devlin et al. 2019, BERT; Radford et al. 2019, GPT-2"
+  },
+  {
+   "key": "facts",
+   "name": "Recalling facts",
+   "does": "Completes 'the capital of France is' with Paris: knowledge stored from reading, not found in the prompt.",
+   "waypoint": "knowing",
+   "source": "Petroni et al. 2019, Language Models as Knowledge Bases?"
+  },
+  {
+   "key": "winograd",
+   "name": "Which one 'it' means",
+   "does": "Resolves 'the trophy did not fit in the case because it was too big': it is the trophy.",
+   "waypoint": "knowing",
+   "source": "Levesque, Davis and Morgenstern 2012, The Winograd Schema Challenge; Brown et al. 2020, GPT-3"
+  },
+  {
+   "key": "common_sense",
+   "name": "Common sense",
+   "does": "Picks the sensible way an everyday scene goes on over absurd ones.",
+   "waypoint": "knowing",
+   "source": "Zellers et al. 2019, HellaSwag: Can a Machine Really Finish Your Sentence?"
+  },
+  {
+   "key": "subjects",
+   "name": "Knowing the school subjects",
+   "does": "Answers exam questions across dozens of subjects, history to law to physics, above chance.",
+   "waypoint": "knowing",
+   "source": "Hendrycks et al. 2021, Measuring Massive Multitask Language Understanding (MMLU)"
+  },
+  {
+   "key": "modular_arithmetic",
+   "name": "Modular arithmetic (when taught)",
+   "does": "Learns a + b mod p perfectly from examples of it, suddenly and long after memorising them (grokking). Trained on the task, not on books.",
+   "waypoint": "counting",
+   "source": "Power et al. 2022, Grokking: Generalization Beyond Overfitting on Small Algorithmic Datasets"
+  },
+  {
+   "key": "greater_than",
+   "name": "Greater than",
+   "does": "Completes 'the war lasted from 1732 to 17' with a year after 32.",
+   "waypoint": "counting",
+   "source": "Hanna, Liu and Variengien 2023, How does GPT-2 compute greater-than?"
+  },
+  {
+   "key": "counting_items",
+   "name": "Counting things",
+   "does": "Says how many things a sentence lists: 'I have a pear, two plums and a fig' is four pieces of fruit.",
+   "waypoint": "counting",
+   "source": "Srivastava et al. 2022, Beyond the Imitation Game (BIG-bench)"
+  },
+  {
+   "key": "dates",
+   "name": "Reasoning about dates",
+   "does": "Works out the day or date a span from a given date lands on.",
+   "waypoint": "counting",
+   "source": "Srivastava et al. 2022, Beyond the Imitation Game (BIG-bench)"
+  },
+  {
+   "key": "addition",
+   "name": "Adding two-digit numbers",
+   "does": "Answers '48 plus 76 is' correctly from a few examples, with no training on arithmetic. A transformer of about 10M learns it when taught directly (Lee et al. 2023).",
+   "waypoint": "counting",
+   "source": "Brown et al. 2020, Language Models are Few-Shot Learners (GPT-3)"
+  },
+  {
+   "key": "multiplication",
+   "name": "Multiplying larger numbers",
+   "does": "Multiplies and adds numbers of three or more digits correctly from examples.",
+   "waypoint": "counting",
+   "source": "Brown et al. 2020, Language Models are Few-Shot Learners (GPT-3)"
+  },
+  {
+   "key": "few_shot",
+   "name": "Learning a task from examples",
+   "does": "From a few examples in the prompt (hot to cold, big to small), does the task on the next one without training.",
+   "waypoint": "reasoning",
+   "source": "Brown et al. 2020, Language Models are Few-Shot Learners (GPT-3)"
+  },
+  {
+   "key": "deduction",
+   "name": "Logical deduction",
+   "does": "From 'all the ships are fast; the Argo is a ship', concludes the Argo is fast, and orders things from clues.",
+   "waypoint": "reasoning",
+   "source": "Srivastava et al. 2022, Beyond the Imitation Game (BIG-bench)"
+  },
+  {
+   "key": "word_problems",
+   "name": "Word problems",
+   "does": "Solves a short arithmetic story: 'a farmer has twelve sheep and sells five'.",
+   "waypoint": "reasoning",
+   "source": "Cobbe et al. 2021, Training Verifiers to Solve Math Word Problems (GSM8K)"
+  },
+  {
+   "key": "chain_of_thought",
+   "name": "Reasoning step by step",
+   "does": "Solves a multi-step problem better when it writes out its steps first.",
+   "waypoint": "reasoning",
+   "source": "Wei et al. 2022, Chain-of-Thought Prompting Elicits Reasoning in Large Language Models"
+  },
+  {
+   "key": "planning",
+   "name": "Planning",
+   "does": "Lays out a sequence of actions that reaches a goal: stacking blocks in an order, a route through rooms.",
+   "waypoint": "reasoning",
+   "source": "Valmeekam et al. 2023, PlanBench"
+  },
+  {
+   "key": "integration",
+   "name": "Symbolic integration (when taught)",
+   "does": "Integrates expressions and solves differential equations, better than computer algebra on its test. Trained on the task.",
+   "waypoint": "mathematics",
+   "source": "Lample and Charton 2019, Deep Learning for Symbolic Mathematics"
+  },
+  {
+   "key": "geometry",
+   "name": "Olympiad geometry (with a solver)",
+   "does": "Proves olympiad geometry problems, a small language model proposing constructions to a symbolic engine.",
+   "waypoint": "mathematics",
+   "source": "Trinh et al. 2024, Solving olympiad geometry without human demonstrations"
+  },
+  {
+   "key": "algebra",
+   "name": "Algebra",
+   "does": "Solves equations for an unknown and simplifies expressions.",
+   "waypoint": "mathematics",
+   "source": "Hendrycks et al. 2021, Measuring Mathematical Problem Solving With the MATH Dataset"
+  },
+  {
+   "key": "competition_maths",
+   "name": "Competition mathematics",
+   "does": "Solves competition problems across algebra, geometry, number theory and probability.",
+   "waypoint": "mathematics",
+   "source": "Hendrycks et al. 2021, MATH; Lewkowycz et al. 2022, Solving Quantitative Reasoning Problems with Language Models (Minerva)"
+  },
+  {
+   "key": "proofs",
+   "name": "Formal proofs",
+   "does": "Writes proofs a proof checker accepts.",
+   "waypoint": "mathematics",
+   "source": "Polu and Sutskever 2020, Generative Language Modeling for Automated Theorem Proving"
+  },
+  {
+   "key": "physical_intuition",
+   "name": "Physical intuition",
+   "does": "Picks the way to do an everyday physical task that would actually work: which tool, which order.",
+   "waypoint": "physics",
+   "source": "Bisk et al. 2020, PIQA: Reasoning about Physical Commonsense in Natural Language"
+  },
+  {
+   "key": "school_physics",
+   "name": "School physics",
+   "does": "Answers high-school mechanics, heat and electricity questions.",
+   "waypoint": "physics",
+   "source": "Hendrycks et al. 2021, Measuring Massive Multitask Language Understanding (MMLU)"
+  },
+  {
+   "key": "college_physics",
+   "name": "College physics",
+   "does": "Answers university physics questions, from mechanics to electromagnetism.",
+   "waypoint": "physics",
+   "source": "Hendrycks et al. 2021, Measuring Massive Multitask Language Understanding (MMLU)"
+  },
+  {
+   "key": "graduate_science",
+   "name": "Graduate science",
+   "does": "Answers graduate-level physics questions that experts outside the field get wrong even with a search engine.",
+   "waypoint": "physics",
+   "source": "Rein et al. 2023, GPQA: A Graduate-Level Google-Proof Q&A Benchmark"
+  },
+  {
+   "key": "quantum_problems",
+   "name": "Quantum mechanics problems",
+   "does": "Solves textbook quantum problems: energy levels, wave functions, spin.",
+   "waypoint": "physics",
+   "source": "Wang et al. 2023, SciBench: Evaluating College-Level Scientific Problem-Solving Abilities of Large Language Models"
+  },
+  {
+   "key": "breeders_test",
+   "name": "The breeders' test",
+   "does": "Bets on the everyday ideas behind selection over their rivals: choosing which animals breed changes a stock, like begets like, more are born than can live, the weakest perish in a hard winter, the hidden hare survives.",
+   "waypoint": "reasoning",
+   "source": null
+  },
+  {
+   "key": "smiths_test",
+   "name": "The smith's test",
+   "does": "Bets on the everyday ideas behind energy over their rivals: heat comes from motion and friction, heat passes from hot to cold, an engine stops without its fuel, perpetual motion cannot be made.",
+   "waypoint": "physics",
+   "source": null
+  },
+  {
+   "key": "gap_test",
+   "name": "The gap test",
+   "does": "Bets on the missing member of a row, a value between its neighbours, over the next member: Monday, Tuesday, then Thursday, so Wednesday, not Friday.",
+   "waypoint": "counting",
+   "source": null
+  },
+  {
+   "key": "nature_test",
+   "name": "Nature's breeder",
+   "does": "The pieces chained into a conclusion no sentence states: the wolves catch the slowest deer, so the deer grow swifter.",
+   "waypoint": "reasoning",
+   "source": null
+  },
+  {
+   "key": "malthus_test",
+   "name": "Malthus and Lyell",
+   "does": "What the precursors wrote, the books the Origin test's ablation removes: geometric against arithmetic ratios, the checks on numbers, slow causes over immense time, extinction, breeds by selection. None states the idea itself.",
+   "waypoint": "knowing",
+   "source": null
+  },
+  {
+   "key": "mill_test",
+   "name": "The mill test",
+   "does": "Work followed through its forms: the churned water warms, the engine's work comes from the coal, the lifted water lifts less again.",
+   "waypoint": "reasoning",
+   "source": null
+  },
+  {
+   "key": "rumford_test",
+   "name": "Rumford and Davy",
+   "does": "What the precursors wrote: inexhaustible heat from boring cannon, ice melted by rubbing, heat as motion, Young's energy, the fire syringe, Oersted and Faraday. None states the idea itself.",
+   "waypoint": "knowing",
+   "source": null
+  },
+  {
+   "key": "between_test",
+   "name": "The between test",
+   "does": "A member between two others takes a value between theirs, across quantities, orders and qualities.",
+   "waypoint": "reasoning",
+   "source": null
+  },
+  {
+   "key": "triads_test",
+   "name": "D\u00f6bereiner's triads",
+   "does": "What the precursors wrote: Dalton's atoms and proportions, the middle element's weight near the mean of its neighbours, properties changing by degrees within a family. None states the idea itself.",
+   "waypoint": "knowing",
+   "source": null
+  },
+  {
+   "key": "origin_test",
+   "name": "The Origin test (reasoning)",
+   "does": "Trained only on books from before 1859, bets on natural selection over fixed species, Lamarck's inheritance of acquired traits and special creation. Found independently by Darwin and Wallace (1858).",
+   "waypoint": "discovery",
+   "source": null
+  },
+  {
+   "key": "energy_test",
+   "name": "The energy test (physics)",
+   "does": "Trained only on books from before 1840, bets that heat is motion and energy is conserved, turning from one form to another, over heat as a weightless fluid (caloric) and over perpetual motion. Found independently by Mayer (1842), Joule (1843) and Helmholtz (1847).",
+   "waypoint": "discovery",
+   "source": null
+  },
+  {
+   "key": "geometry_test",
+   "name": "The geometry test (mathematics)",
+   "does": "Trained only on books from before 1829, bets that a consistent geometry exists in which the parallel postulate fails (a triangle's angles summing to less than two right angles), over the two-thousand-year hope of proving the postulate from the others. Found independently by Gauss, Bolyai and Lobachevsky.",
+   "waypoint": "discovery",
+   "source": null
+  },
+  {
+   "key": "mendeleev_gaps",
+   "name": "Mendeleev's gaps (mathematics)",
+   "does": "Trained only on books from before 1869, given the known elements, bets on the weights and properties of the missing ones (gallium, scandium, germanium) from the periodic pattern.",
+   "waypoint": "discovery",
+   "source": null
+  },
+  {
+   "key": "new_constructions",
+   "name": "Finding new constructions",
+   "does": "Proposes mathematical constructions better than any known, checked by a program.",
+   "waypoint": "discovery",
+   "source": "Romera-Paredes et al. 2023, Mathematical discoveries from program search with large language models"
+  },
+  {
+   "key": "kin_test",
+   "name": "Like father, like son",
+   "does": "The words of kin and breeding: like father, like son; a chip off the old block; the mare and her foal; seedtime and harvest.",
+   "waypoint": "reading",
+   "source": null
+  },
+  {
+   "key": "pedigree_test",
+   "name": "The pedigree test",
+   "does": "A trait named for the parents comes back in the young: the grey mare and grey stallion have a grey foal. The copying trick, put to inheritance.",
+   "waypoint": "reasoning",
+   "source": null
+  },
+  {
+   "key": "fire_test",
+   "name": "Fire and ice",
+   "does": "The words of heat and motion: as cold as ice, strike while the iron is hot, the steam engine, the mill wheel, the ice began to melt.",
+   "waypoint": "reading",
+   "source": null
+  },
+  {
+   "key": "workshop_test",
+   "name": "The workshop test",
+   "does": "What happened to the first thing happens to the second: he rubbed the stick and it grew warm; he rubbed the stone and it grew warm. The copying trick, put to cause and effect.",
+   "waypoint": "physics",
+   "source": null
+  },
+  {
+   "key": "counting_test",
+   "name": "One, two, three",
+   "does": "The words of order: one, two, three; first, second, third; good, better, best; pounds, shillings and pence.",
+   "waypoint": "counting",
+   "source": null
+  },
+  {
+   "key": "period_test",
+   "name": "The period test",
+   "does": "A row that repeats with a period goes on repeating (light, heavy, light, heavy; salt, metal, gas, salt, metal, gas): the periodic law in miniature. The copying trick, put to a period.",
+   "waypoint": "counting",
+   "source": null
+  },
+  {
+   "key": "again_test",
+   "name": "Again and again",
+   "does": "The words of returning: again and again, round and round, over and over, time after time, to and fro, against phrases of the same shape that do not return.",
+   "waypoint": "reading",
+   "source": null
+  },
+  {
+   "key": "refrain_test",
+   "name": "The refrain test",
+   "does": "Betting that what came round once comes round again: a refrain, a burden, a watchman's cry or a pattern returns in the passage, against a fresh phrase of the same length. The copying trick, lifted to whole phrases.",
+   "waypoint": "reading",
+   "source": null
+  },
+  {
+   "key": "seasons_test",
+   "name": "The seasons test",
+   "does": "Returning as everyday knowledge: winter comes again, the swallows return, the tide comes in again, Halley's comet is expected back, the same cause gives the same effect.",
+   "waypoint": "knowing",
+   "source": null
+  },
+  {
+   "key": "pigeonhole_test",
+   "name": "The pigeonhole test",
+   "does": "The argument in small: with only so many states and no end of trials some state must come again (twenty pigeons in nineteen holes, seven throws of a die), and when all is as it was, what followed follows again.",
+   "waypoint": "reasoning",
+   "source": null
+  },
+  {
+   "key": "lucretius_test",
+   "name": "Hume and Lucretius",
+   "does": "What the books before 1872 wrote: Lucretius' eternal atoms, Hume's Philo (finite matter in eternal time tries every order), Ecclesiastes, Marcus Aurelius, the Stoic conflagration, Plato's Great Year, Thomson's dissipation. None states the idea itself.",
+   "waypoint": "knowing",
+   "source": null
+  },
+  {
+   "key": "recurrence_test",
+   "name": "The eternal return (philosophy)",
+   "does": "Trained only on English before 1872, bets that if the world is made of finitely many parts and time has no end, every state of the world, this one included, returns exactly and endlessly, over the world running down once to a final stillness (Thomson's dissipation), endless progress to new states, return in kind but never in detail, and a creation with a final end. Found independently by Blanqui (1872), Nietzsche (1881) and, as a theorem of mechanics, Poincar\u00e9 (1890).",
+   "waypoint": "discovery",
+   "source": null
+  },
+  {
+   "key": "logic_test",
+   "name": "The logic deck",
+   "does": "Chaining two facts proved: invented words and counterfactual premises, so no knowledge helps; every item asked with both premises, with one, swapped, padded, and at one, two and three hops. The chaining gain is the lift with both premises less the better single premise.",
+   "waypoint": "reasoning",
+   "source": null
+  },
+  {
+   "key": "quantum_bet",
+   "name": "The quantum bet",
+   "does": "Trained only on physics published up to 1899, bets on quanta: Planck's way out of the ultraviolet catastrophe, before he took it. The far horizon, beyond the budget.",
+   "waypoint": "discovery",
+   "source": null
+  }
+ ],
+ "waypoints": [
+  {
+   "key": "reading",
+   "name": "Reading"
+  },
+  {
+   "key": "knowing",
+   "name": "Knowing"
+  },
+  {
+   "key": "counting",
+   "name": "Counting"
+  },
+  {
+   "key": "reasoning",
+   "name": "Reasoning"
+  },
+  {
+   "key": "mathematics",
+   "name": "Mathematics"
+  },
+  {
+   "key": "physics",
+   "name": "Physics"
+  },
+  {
+   "key": "discovery",
+   "name": "Discovery"
+  }
  ]
 }

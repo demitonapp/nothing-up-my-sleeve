@@ -18,3 +18,10 @@ def test_every_key_is_unique_and_a_plain_address_segment():
     for name in ("tricks", "chains"):
         assert len(k[name]) == len(set(k[name])), f"a {name} key is repeated"
         assert all(x and x.replace("_", "").isalnum() for x in k[name]), f"a {name} key is not a plain segment"
+
+
+def test_every_trick_is_described_and_on_a_known_waypoint():
+    k = trick_keys.keys()
+    assert [d["key"] for d in k["detail"]] == k["tricks"]
+    steps = {w["key"] for w in k["waypoints"]}
+    assert all(d["name"] and d["does"] and d["waypoint"] in steps for d in k["detail"])

@@ -10,7 +10,7 @@ import labData from '../../data/labs.json';
 // `python -m thorp.dash.lab_keys` (12 November: the houses left thorp/labs.py for s4.labs)
 export function getStaticPaths() {
   const houses: string[] = labData.keys;
-  const paths = ['ships', ...houses, ...houses.map((key) => `${key}/models`)];
+  const paths = ['ships', 'research', ...houses, ...houses.map((key) => `${key}/models`)];
   for (const band of ['xsmall', 'small', 'medium', 'large']) paths.push(`ships/${band}`);
   return paths.map((path) => ({ params: { path } }));
 }

@@ -17,7 +17,7 @@ export function getStaticPaths() {
   }
   paths.push('demiton/berth');
   // the trading orbital's old addresses, which the island forwards to /labs and /labs/ships
-  paths.push('masaq-reach', 'masaq-reach/ships', 'masaq-reach/labs');
+  paths.push('masaq-reach', 'masaq-reach/ships', 'masaq-reach/labs', 'masaq-reach/research');
   for (const band of ['xsmall', 'small', 'medium', 'large']) {
     paths.push(`masaq-reach/${band}`, `masaq-reach/ships/${band}`);
   }

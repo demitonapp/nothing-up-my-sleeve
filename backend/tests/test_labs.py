@@ -7,20 +7,24 @@ from thorp import labs
 
 def test_the_labs_page_has_distinct_houses() -> None:
     listed = labs.listed()
-    assert len(listed) == 27
-    assert len({lab.key for lab in listed}) == 27
+    assert len(listed) == 42
+    assert len({lab.key for lab in listed}) == 42
     known = {lab.key for lab in labs.all()}
     assert {lab.key for lab in listed} <= known
-    # the leaderboard's two extra houses are rows, but not cards
-    assert {"eleutherai", "huggingface"} <= known - {lab.key for lab in listed}
+    # Hugging Face is the one leaderboard-only row left; EleutherAI is a research house now
+    assert {"huggingface"} <= known - {lab.key for lab in listed}
+    assert "eleutherai" in {lab.key for lab in listed}
 
 
 def test_a_house_is_a_lab_and_its_profile_is_complete() -> None:
     for key in (lab.key for lab in labs.listed()):
         lab = labs.get(key)
         assert lab is not None
-        assert lab.short and lab.country and lab.hq and lab.blurb and lab.flagship
+        assert lab.short and lab.country and lab.hq and lab.blurb
+        assert lab.category in ("lab", "research") and lab.kind
         assert lab.door.startswith("http")
+        if lab.category == "lab":  # a research infrastructure may name no model
+            assert lab.flagship
 
 
 def test_the_new_families_find_their_house() -> None:
@@ -56,6 +60,21 @@ def test_the_new_families_find_their_house() -> None:
     assert labs.lab_of("S5").key == "maritaca"
     assert labs.lab_of("S5-nano").key == "maritaca"
     assert labs.lab_of("Sabiá 4").key == "maritaca"
+    # the UK, South African and Australian houses that joined on the same day
+    assert labs.lab_of("Lizzy-7B").key == "flower"
+    assert labs.lab_of("Stable Diffusion").key == "stability"
+    assert labs.lab_of("MzansiLM-125M").key == "uctnlp"
+    assert labs.lab_of("MasakhaNER-2.0").key == "masakhane"
+    assert labs.lab_of("Ginan").key == "sovereign-au"
+    assert labs.lab_of("Australis").key == "sovereign-au"
+    # the research houses by country
+    assert labs.lab_of("Pythia-410m").key == "eleutherai"
+    assert labs.lab_of("InternLM-3").key == "shanghai-ai"
+    assert labs.lab_of("InternVL-3").key == "shanghai-ai"
+    assert labs.lab_of("Aquila-7B").key == "baai"
+    assert labs.lab_of("JoeyLLM").key == "southern-cross"
+    assert labs.lab_of("Moshi").key == "kyutai"
+    assert labs.lab_of("Tucano-1b1").key == "nilc"
     # and the old mappings still hold
     assert labs.lab_of("mlx-community/Qwen3-4B-4bit").key == "alibaba"
     assert labs.lab_of("mlx-community/Phi-4-mini-instruct-4bit").key == "microsoft"

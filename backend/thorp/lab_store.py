@@ -25,6 +25,8 @@ def _labs() -> tuple[dict, ...]:
                 "key": r.key,
                 "ordinal": r.ordinal,
                 "listed": bool(r.listed),
+                "category": r.category,
+                "kind": r.kind,
                 "name": r.name,
                 "short": r.short or r.name,
                 "families": tuple(r.families or ()),
@@ -67,7 +69,7 @@ def set_lab(key: str, **fields) -> dict:
     fields named are written. Returns the row as it now stands (Justin decides the facts; DECISIONS.md
     records each change)."""
     known = {
-        "ordinal", "listed", "name", "short", "families", "orgs", "url", "site", "country", "country_name",
+        "ordinal", "listed", "category", "kind", "name", "short", "families", "orgs", "url", "site", "country", "country_name",
         "hq", "founded", "blurb", "description", "purpose", "flagship", "focus", "open_weights",
         "funding", "gov",
     }

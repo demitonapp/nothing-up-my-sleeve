@@ -93,11 +93,13 @@ export default function Harbours() {
     const masaq = /^\/(?:orbitals|harbours?)\/masaq-reach(?:\/(.*))?$/.exec(p);
     if (masaq) {
       const rest = masaq[1] ? '/' + masaq[1] : '';
-      const next = rest.startsWith('/ships')
-        ? '/orbitals/masaq/models' + rest.replace(/^\/ships/, '')
-        : /^\/(xsmall|small|medium|large)$/.test(rest)
-          ? '/orbitals/masaq/models' + rest
-          : '/orbitals/masaq';
+      const next = rest === '/research'
+        ? '/orbitals/masaq/research'
+        : rest.startsWith('/ships')
+          ? '/orbitals/masaq/models' + rest.replace(/^\/ships/, '')
+          : /^\/(xsmall|small|medium|large)$/.test(rest)
+            ? '/orbitals/masaq/models' + rest
+            : '/orbitals/masaq';
       location.replace(next + location.search);
       return;
     }

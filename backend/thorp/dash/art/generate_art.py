@@ -653,6 +653,69 @@ LABS: dict[str, str] = {
     "green and gold, a sabiá bird painted on the main sail, a great brass telescope on the wet quay, fireflies "
     "and lanterns among the palms, a thin ring of light in the sky, an uncropped clean image with no watermark, "
     "no signature, no text and no logo",
+    # The six houses of 12 November, and the Research view beside the Labs: a federation of yards, an open
+    # print shop, eleven Cape lanterns, many hands on one hull, a national archive, and a southern yard.
+    "lab-flower": "a great stone boathouse on a dark tidal river at night: one ship on the stocks assembled from "
+    "timbers cut in many different yards, each plank bearing a different maker's mark, shipwrights around a long "
+    "table joined by a single taut brass thread, a lantern at every bench, a low stone bridge beyond, no clock "
+    "tower, no modern skyline, a thin ring of light in the sky, an uncropped clean image with no watermark, no "
+    "signature, no text and no logo",
+    "lab-stability": "a dark Elizabethan quay at night: a ship's painter at a great wooden easel painting a ship in "
+    "four colours on a broad canvas, pots of pigment on the stones, candles in glass lanterns at the easel's feet, "
+    "a moored ship on the black water beyond, no electric lights, no signs, no labels, no text, a thin ring of "
+    "light in the sky, an uncropped clean image with no watermark, no signature, no text and no logo",
+    "lab-uctnlp": "a stone hall on a dark Cape Town slope at night under a great flat mountain: eleven small lanterns "
+    "in a row along a long table, a small two-masted ship on the stocks beside it with plain sails marked in eleven "
+    "different patterns, open notebooks in many scripts, the Southern Cross above, a thin ring of light in the sky, "
+    "an uncropped clean image with no watermark, no signature, no text and no logo",
+    "lab-masakhane": "a village of many hands building one ship at night: a dozen shipwrights from different coasts "
+    "around a single dark hull, each arriving with one plank under an arm, a great common table of open ledgers, "
+    "lanterns hung between the trees, a thin ring of light in the sky, an uncropped clean image with no watermark, "
+    "no signature, no text and no logo",
+    "lab-sadilar": "a great stone archive on a dark southern plain at night: long shelves of sealed ledgers and "
+    "rolled charts, a keeper with a lantern walking between them, a small ship model under glass on a reading "
+    "table, the Southern Cross through a high window, a thin ring of light in the sky, an uncropped clean image "
+    "with no watermark, no signature, no text and no logo",
+    "lab-sovereign-au": "a broad southern plain at night: a great timber hall with a half-built ship on the stocks, "
+    "a map of Australia chalked across the floor, rows of small lanterns stretching away across the plain, "
+    "shipwrights at work by the light of the hall, the Southern Cross above, a thin ring of light in the sky, an "
+    "uncropped clean image with no watermark, no signature, no text and no logo",
+    # The research houses by country (12 November): an open hall, two Chinese yards, a civic hall, a Paris
+    # voice room, a Brazilian study, a national hall, a Montreal winter and a Gulf courtyard.
+    "lab-eleutherai": "a great open hall of unsealed books at night: every door and shutter thrown wide, a ship on "
+    "the stocks with plain undyed sails, scholars copying her plans at a long table by one shared lantern, no lock "
+    "on the door, a thin ring of light in the sky, an uncropped clean image with no watermark, no signature, no "
+    "text and no logo",
+    "lab-shanghai-ai": "a great timber yard on a dark Chinese river at night: a four-masted ship with red battened "
+    "sails and a great brass compass mounted on the quay, astronomers with brass instruments around a table of "
+    "charts, red paper lanterns along the rail, a thin ring of light in the sky, an uncropped clean image with no "
+    "watermark, no signature, no text and no logo",
+    "lab-baai": "a beacon tower on a dark hill above a city at night, its great light sweeping the water: a ship on "
+    "the stocks below, open crates of scrolls and a brass instrument on a bench, lanterns on the wet stones, a thin "
+    "ring of light in the sky, an uncropped clean image with no watermark, no signature, no text and no logo",
+    "lab-southern-cross": "a civic hall on a dark southern plain at night: a half-built ship on the stocks, a great "
+    "map of Australia chalked across the floor, a long table of open ledgers, lanterns along the wall, the Southern "
+    "Cross above, a thin ring of light in the sky, an uncropped clean image with no watermark, no signature, no "
+    "text and no logo",
+    "lab-kyutai": "a Paris laboratory of brass speaking trumpets and glass resonators at night: a lean ship with a "
+    "great brass horn at her bow, open plans and coiled wire on a bench, candles in glass lanterns, an arched "
+    "window on the black river, a thin ring of light in the sky, an uncropped clean image with no watermark, no "
+    "signature, no text and no logo",
+    "lab-nilc": "a study in a Brazilian town at night: a toucan on a perch beside a small ship model with green and "
+    "gold sails, open Portuguese folios and a brass lamp on the desk, a shuttered window on a dark garden, a thin "
+    "ring of light in the sky, an uncropped clean image with no watermark, no signature, no text and no logo",
+    "lab-turing": "the windowless interior of a great national hall of pale stone at night: a ship model under glass "
+    "on a long table, scholars in dark coats around charts and brass instruments, one lamp throwing hard shadows, a "
+    "high carved stone wall, a thin ring of light falling from a high lantern opening in the roof, no city, no "
+    "skyline, no windows, no modern buildings, no electric light, an uncropped clean image with no watermark, no "
+    "signature, no text and no logo",
+    "lab-mila": "a Montreal hall in winter at night: snow beyond the tall windows and dark pines, a ship on the "
+    "stocks, a great blackboard covered in chalk diagrams, a fire in an iron grate, a few figures talking beside it, "
+    "no city, no skyline, no modern buildings, no electric light, a thin ring of light in the sky, an uncropped "
+    "clean image with no watermark, no signature, no text and no logo",
+    "lab-mbzuai": "a desert university courtyard at night: a ship on the stocks beneath a colonnade, a great brass "
+    "astrolabe on a stone table, lanterns along the arcade, the dark Gulf beyond the wall, a thin ring of light in "
+    "the sky, an uncropped clean image with no watermark, no signature, no text and no logo",
 }
 
 # The embeddings ontology's categories (12 November, Justin: "cards for the embeddings in the culture drake

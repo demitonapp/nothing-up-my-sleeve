@@ -45,6 +45,8 @@ class Lab:
     focus: str = "research"  # frontier, open fleet, enterprise, agents or research
     open_weights: bool = True  # whether it ships any open-weight line
     listed: bool = True  # on the Labs page, or only named under it
+    category: str = "lab"  # lab or research: which view of the Reach it lives in
+    kind: str = ""  # company, university group, collective, national infrastructure
     funding: dict = field(default_factory=dict)  # the split, its note and the rounds
     gov: dict | None = None  # Washington, for the American houses
     description: str = ""  # the house page's longer paragraph
@@ -91,6 +93,8 @@ def _lab(row: dict) -> Lab:
         focus=row["focus"],
         open_weights=row["open_weights"],
         listed=row["listed"],
+        category=row["category"],
+        kind=row["kind"],
         funding=dict(row["funding"] or {}),
         gov=row["gov"],
         description=row["description"],
@@ -104,8 +108,13 @@ def all() -> tuple[Lab, ...]:
 
 
 def listed() -> tuple[Lab, ...]:
-    """The houses the Labs page shows: the ones with a card and a page of their own."""
+    """The houses the Reach shows: the ones with a card and a page of their own."""
     return tuple(lab for lab in all() if lab.listed)
+
+
+def of_category(category: str) -> tuple[Lab, ...]:
+    """The listed houses of one view: `lab` (the Labs page) or `research` (the Research page)."""
+    return tuple(lab for lab in listed() if lab.category == category)
 
 
 def get(key: str) -> Lab | None:
@@ -201,6 +210,8 @@ def _profile(lab: Lab, rank: int | None = None) -> dict:
         "founded": lab.founded,
         "blurb": lab.blurb,
         "open": lab.open_weights,
+        "category": lab.category,
+        "kind": lab.kind,
         "focus": lab.focus,
         "funding": lab.funding or _PRIVATE,
         "gov": lab.gov if lab.country == "us" else None,

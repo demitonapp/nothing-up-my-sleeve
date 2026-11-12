@@ -1,7 +1,8 @@
 // Masaq' Reach, the trading orbital (12 November, Justin: "when clicking masaq reach on the orbitals page
 // it opens the url with labs. the url should be .../masaq/ and then show labs in one sub tab and models in
-// another sub tab with cards representing the size"). One island, two views under /masaq:
-//   /masaq/            the houses, filterable by country, purpose and weights, open weights first
+// another sub tab with cards representing the size"). One island, the Reach's views under /masaq:
+//   /masaq/            the labs, filterable by country, purpose and weights, open weights first
+//   /masaq/research    the research houses: universities, collectives and national infrastructure
 //   /masaq/models      four size cards; /masaq/models/<band> the models in that band
 // A house opens its own page (/masaq/<country>/<key>), where it says what it is, what it is for and lists
 // its ships. /labs and /labs/ships stay as aliases.
@@ -29,6 +30,8 @@ interface House {
   blurb: string;
   open: boolean;
   focus: string;
+  category: string;
+  kind: string;
   flagship: string[];
   art: string;
   readings: number;
@@ -58,7 +61,7 @@ const PURPOSES: { key: string; label: string }[] = [
   { key: 'open fleet', label: 'Open fleet' },
   { key: 'enterprise', label: 'Enterprise' },
   { key: 'agents', label: 'Agents' },
-  { key: 'research', label: 'Research' },
+  { key: 'research', label: 'Research labs' },
 ];
 
 const COUNTRY_SHORT: Record<string, string> = { us: 'US', cn: 'China', fr: 'France', ca: 'Canada', ae: 'UAE', gb: 'UK', au: 'Australia', za: 'South Africa', br: 'Brazil' };
@@ -72,7 +75,7 @@ function labCard(h: House) {
       key={h.key}
       className={cardCls(true, 'card labcard')}
       href={`/orbitals/masaq/${encodeURIComponent(h.country)}/${encodeURIComponent(h.key)}`}
-      title={`${h.short}: ${h.flagship.join(', ') || 'the house'}`}
+      title={`${h.short}: ${h.flagship.join(', ') || h.kind || 'the house'}`}
     >
       {h.art ? (
         <img
@@ -101,7 +104,7 @@ function labCard(h: House) {
       </div>
       <div className="lababout">{h.blurb}</div>
       <div className="labfoot">
-        <span>{[h.hq, h.founded ? `since ${h.founded}` : ''].filter(Boolean).join(' · ')}</span>
+        <span>{[h.kind, h.hq, h.founded ? `since ${h.founded}` : ''].filter(Boolean).join(' · ')}</span>
         <span className={pillCls(read ? 'accent' : '')}>{read ? plural(h.readings, 'reading', 'readings') : 'not yet read'}</span>
       </div>
       <div className="labfoot">
@@ -125,11 +128,15 @@ export default function Labs() {
   const modelsView = (inOrbitals && parts[2] === 'models')
     || (!inOrbitals && isMasaq && parts[1] === 'models')
     || (isAlias && parts[1] === 'ships');
+  // the research houses: universities, collectives and national infrastructure, beside the labs
+  const researchView = (inOrbitals && parts[2] === 'research')
+    || (!inOrbitals && isMasaq && parts[1] === 'research')
+    || (isAlias && parts[1] === 'research');
   // the embeddings ontology (12 November, Justin: "add an embedding tab here /orbitals/masaq")
   const embeddingsView = (inOrbitals && parts[2] === 'embeddings') || (!inOrbitals && isMasaq && parts[1] === 'embeddings');
-  const detail = (inOrbitals && parts[2] && !['models', 'labs', 'embeddings'].includes(parts[2]) && parts[3])
-    || (!inOrbitals && parts[0] === 'masaq' && parts[1] && !['models', 'labs', 'embeddings'].includes(parts[1]) && parts[2])
-    || (isAlias && parts[1] && parts[1] !== 'ships');
+  const detail = (inOrbitals && parts[2] && !['models', 'labs', 'embeddings', 'research'].includes(parts[2]) && parts[3])
+    || (!inOrbitals && parts[0] === 'masaq' && parts[1] && !['models', 'labs', 'embeddings', 'research'].includes(parts[1]) && parts[2])
+    || (isAlias && parts[1] && parts[1] !== 'ships' && parts[1] !== 'research');
   const bandSeg = inOrbitals ? parts[3] : parts[2];
   const band = modelsView && bandSeg && BAND(bandSeg) ? (bandSeg as SizeBand) : null;
 
@@ -137,6 +144,7 @@ export default function Labs() {
   const [country, setCountry] = useState('');
   const [purpose, setPurpose] = useState('');
   const [weights, setWeights] = useState('');
+  const [kind, setKind] = useState('');
 
   const { data, error } = useApi<LabsData>('/api/labs', 60000, ours && !modelsView && !embeddingsView && !detail);
   const ladder = useApi<any>('/api/ladder', 15000, ours && modelsView);
@@ -145,12 +153,17 @@ export default function Labs() {
   if (!ours || detail) return null;
 
   const houses = data?.houses || [];
-  const shown = houses.filter(
-    (h) => (!country || h.country === country) && (!purpose || h.focus === purpose) && (!weights || (weights === 'open') === h.open),
+  const viewHouses = houses.filter((h) => (researchView ? h.category === 'research' : h.category !== 'research'));
+  const shown = viewHouses.filter(
+    (h) => (!country || h.country === country)
+      && (!purpose || h.focus === purpose)
+      && (!weights || (weights === 'open') === h.open)
+      && (!kind || h.kind === kind),
   );
   const open = shown.filter((h) => h.open);
   const closed = shown.filter((h) => !h.open);
-  const countries = [...new Map(houses.map((h) => [h.country, h])).values()];
+  const countries = [...new Map(viewHouses.map((h) => [h.country, h])).values()];
+  const kinds = [...new Set(viewHouses.map((h) => h.kind).filter(Boolean))];
   const info = band ? BAND(band) : null;
 
   const chip = (on: boolean): string => pillCls(on ? 'accent' : '');
@@ -162,15 +175,16 @@ export default function Labs() {
         <a className={crumbCls('back')} href="/orbitals">← orbitals</a>{' '}
         Masaq' Reach{' '}
         <span className="q">
-          the trading orbital: the labs that build the outside ships, and every one of their ships read on our
-          decks
+          the trading orbital: the labs and research houses that build the outside ships, and every one of their
+          ships read on our decks
         </span>
       </h1>
       <TabNav
         id="masaqnav"
         ariaLabel="Masaq' Reach views"
         items={[
-          { key: 'labs', label: 'Labs', href: '/orbitals/masaq', active: !modelsView && !embeddingsView },
+          { key: 'labs', label: 'Labs', href: '/orbitals/masaq', active: !modelsView && !embeddingsView && !researchView },
+          { key: 'research', label: 'Research', href: '/orbitals/masaq/research', active: researchView },
           { key: 'models', label: 'Models', href: '/orbitals/masaq/models', active: modelsView },
           { key: 'embeddings', label: 'Embeddings', href: '/orbitals/masaq/embeddings', active: embeddingsView },
         ]}
@@ -218,41 +232,67 @@ export default function Labs() {
                 {COUNTRY_SHORT[c.country] || c.country_name}
               </button>
             ))}
-            <span className="k">purpose</span>
-            <button type="button" className={chip(!purpose)} onClick={() => setPurpose('')}>All</button>
-            {PURPOSES.map((p) => (
-              <button
-                key={p.key}
-                type="button"
-                className={chip(purpose === p.key)}
-                onClick={() => setPurpose(purpose === p.key ? '' : p.key)}
-              >{p.label}</button>
-            ))}
-            <span className="k">weights</span>
-            <button type="button" className={chip(!weights)} onClick={() => setWeights('')}>All</button>
-            <button type="button" className={chip(weights === 'open')} onClick={() => setWeights(weights === 'open' ? '' : 'open')}>Open</button>
-            <button type="button" className={chip(weights === 'closed')} onClick={() => setWeights(weights === 'closed' ? '' : 'closed')}>Closed</button>
-            <span className="s">{shown.length} of {houses.length} houses</span>
+            {!researchView ? (
+              <>
+                <span className="k">purpose</span>
+                <button type="button" className={chip(!purpose)} onClick={() => setPurpose('')}>All</button>
+                {PURPOSES.map((p) => (
+                  <button
+                    key={p.key}
+                    type="button"
+                    className={chip(purpose === p.key)}
+                    onClick={() => setPurpose(purpose === p.key ? '' : p.key)}
+                  >{p.label}</button>
+                ))}
+              </>
+            ) : null}
+            {researchView ? (
+              <>
+                <span className="k">kind</span>
+                <button type="button" className={chip(!kind)} onClick={() => setKind('')}>All</button>
+                {kinds.map((k) => (
+                  <button
+                    key={k}
+                    type="button"
+                    className={chip(kind === k)}
+                    onClick={() => setKind(kind === k ? '' : k)}
+                  >{k}</button>
+                ))}
+              </>
+            ) : (
+              <>
+                <span className="k">weights</span>
+                <button type="button" className={chip(!weights)} onClick={() => setWeights('')}>All</button>
+                <button type="button" className={chip(weights === 'open')} onClick={() => setWeights(weights === 'open' ? '' : 'open')}>Open</button>
+                <button type="button" className={chip(weights === 'closed')} onClick={() => setWeights(weights === 'closed' ? '' : 'closed')}>Closed</button>
+              </>
+            )}
+            <span className="s">{shown.length} of {viewHouses.length} houses</span>
           </div>
           <p className="note labnote">
-            The default order puts the open yards first, the closed ones after; the country and purpose filters
-            narrow the list without changing that order. A house opens its own page, with what it is, what it is
-            for and every one of its ships. The order inside a group is the reach of its releases on{' '}
-            {data.as_of_label}, a reading rather than a score.
+            {researchView
+              ? `The research houses: universities, collectives and national infrastructure that build the datasets, benchmarks and models the labs draw on. The country and kind filters narrow the list; a house opens its own page.`
+              : `The default order puts the open yards first, the closed ones after; the country and purpose filters narrow the list without changing that order. A house opens its own page, with what it is, what it is for and every one of its ships. The order inside a group is the reach of its releases on ${data.as_of_label}, a reading rather than a score.`}
           </p>
-          {open.length ? (
+          {researchView ? (
+            shown.length ? <div className="labgrid">{shown.map(labCard)}</div> : null
+          ) : (
             <>
-              <h2 className="band labgroup">Open weights <span className="q">{open.length} houses that publish their weights</span></h2>
-              <div className="labgrid">{open.map(labCard)}</div>
+              {open.length ? (
+                <>
+                  <h2 className="band labgroup">Open weights <span className="q">{open.length} houses that publish their weights</span></h2>
+                  <div className="labgrid">{open.map(labCard)}</div>
+                </>
+              ) : null}
+              {closed.length ? (
+                <>
+                  <h2 className="band labgroup">Closed weights <span className="q">{closed.length} houses that keep their weights</span></h2>
+                  <div className="labgrid">{closed.map(labCard)}</div>
+                </>
+              ) : null}
             </>
-          ) : null}
-          {closed.length ? (
-            <>
-              <h2 className="band labgroup">Closed weights <span className="q">{closed.length} houses that keep their weights</span></h2>
-              <div className="labgrid">{closed.map(labCard)}</div>
-            </>
-          ) : null}
-          {!shown.length ? <div className={emptyCls()}>no house matches this country, purpose and weight.</div> : null}
+          )}
+          {!shown.length ? <div className={emptyCls()}>{researchView ? 'no house matches this country and kind.' : 'no house matches this country, purpose and weight.'}</div> : null}
           {data.next.length ? (
             <section className={cardCls(false, 'panel labnext')}>
               <h2>

@@ -47,9 +47,10 @@ const DEMITON_MENU: MenuItem[] = [
   { label: 'The trader', href: '/ships/350m', note: '350m' },
 ];
 
-// Masaq' Reach's quick ways on: its three views, and the models by size band
+// Masaq' Reach's quick ways on: its four views, and the models by size band
 const MASAQ_MENU: MenuItem[] = [
   { label: 'Labs', href: '/orbitals/masaq', group: 'The Reach' },
+  { label: 'Research', href: '/orbitals/masaq/research' },
   { label: 'Models', href: '/orbitals/masaq/models' },
   { label: 'Embeddings', href: '/orbitals/masaq/embeddings' },
   { label: 'Extra small', href: '/orbitals/masaq/models/xsmall', group: 'Models by size' },
@@ -103,6 +104,11 @@ const HOUSE: Record<string, string> = {
   openai: 'OpenAI', xai: 'xAI', zai: 'Z.ai', antgroup: 'Ant Group', deepseek: 'DeepSeek', minimax: 'MiniMax',
   stepfun: 'StepFun', bytedance: 'ByteDance', thinkingmachines: 'Thinking Machines', tii: 'TII', nvidia: 'NVIDIA',
   maincode: 'Maincode', wayve: 'Wayve', lelapa: 'Lelapa AI', maritaca: 'Maritaca AI',
+  flower: 'Flower Labs', stability: 'Stability AI', uctnlp: 'UCT NLP', masakhane: 'Masakhane',
+  sadilar: 'SADiLaR', 'sovereign-au': 'Sovereign Australia AI',
+  eleutherai: 'EleutherAI', 'shanghai-ai': 'Shanghai AI Lab', baai: 'BAAI',
+  'southern-cross': 'Southern Cross AI', kyutai: 'Kyutai', nilc: 'NILC',
+  turing: 'Alan Turing Institute', mila: 'Mila', mbzuai: 'MBZUAI',
 };
 const WORDS: Record<string, string> = {
   'liberty-machine': 'Liberty Machine', s1: 'S1 Operations', s2: 'S2 Coordination', s3: 'S3 Control', s4: 'S4 Intelligence', s5: 'S5 Policy', sops: 'SOPs', ifeval: 'IFEval', arc: 'ARC',
@@ -167,6 +173,10 @@ export function crumbsFor(path: string): Crumb[] {
     }
     if (x === 'embeddings') {
       add('Embeddings', '/orbitals/masaq/embeddings');
+      return out;
+    }
+    if (x === 'research') {
+      add('Research', '/orbitals/masaq/research');
       return out;
     }
     // a house: /orbitals/masaq/<country>/<key>[/models]

@@ -376,6 +376,8 @@ class LabRecord(Base):
     key: Mapped[str] = mapped_column(Text, primary_key=True)
     ordinal: Mapped[int] = mapped_column(Integer, unique=True)  # the order the Labs page shows
     listed: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")  # on the Labs page, or only the leaderboard
+    category: Mapped[str] = mapped_column(Text, default="lab", server_default="lab")  # lab or research
+    kind: Mapped[str] = mapped_column(Text, default="", server_default="")  # company, university group, collective, national infrastructure
     name: Mapped[str] = mapped_column(Text, unique=True)
     short: Mapped[str] = mapped_column(Text, default="", server_default="")
     families: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")  # regexes that match its models

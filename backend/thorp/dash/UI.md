@@ -148,13 +148,20 @@ the island rewrites). A section with one tab shows no row.
 - **Classes** (`#/classes`, home): one card per class of ship, each a model size with one job.
   A class opens its page (`#/classes/<class>`, below), whose first tab is its **fleet**: every
   ship of that class. A ship opens its own page.
-- **Masaq' Reach, the trading orbital** (`/orbitals/masaq`): one page with **two views**. **Labs** (`/orbitals/masaq`) is
-  the houses that build the outside ships (`s4.labs`, read through `thorp/lab_store.py`), one card each: its fal plate in the
+- **Masaq' Reach, the trading orbital** (`/orbitals/masaq`): one page with **four views**. **Labs** (`/orbitals/masaq`) is
+  the houses whose `category` is `lab` (`s4.labs`, read through `thorp/lab_store.py`), one card each: its fal plate in the
   one Risso/Drake/Culture brief (`LABS` in `thorp/dash/art/generate_art.py`), the country flag, the models
-  it had shipped by 12 November 2026, and what the Reach holds of it. The houses are **sorted by whether
+  it had shipped by 12 November 2026, its `kind` and what the Reach holds of it. The houses are **sorted by whether
   they publish weights** (open yards first, closed ones after, each in rank order) and **filtered by
   country, purpose and weights**: the purpose is the row's `focus` (frontier, open fleet,
-  enterprise, agents, research). **Models** (`/orbitals/masaq/models`) is four cards, one per size band, each with
+  enterprise, agents, research). **Research** (`/orbitals/masaq/research`) is the other category: the houses
+  whose `category` is `research` — universities, research institutes, collectives and national
+  infrastructure, from EleutherAI and the two Chinese academies to Southern Cross AI, Kyutai, NILC, the
+  Alan Turing Institute, Mila, MBZUAI and the three South African houses — one grid, filtered by country
+  and `kind` (university group, research institute, government research institute, research consortium,
+  collective, national institute, national infrastructure, public university, nonprofit research), each with
+  its own page and work. A research house need not ship a model: SADiLaR is the national corpus, not a yard.
+  **Models** (`/orbitals/masaq/models`) is four cards, one per size band, each with
   its art and the count of outside models in it; a card opens `/orbitals/masaq/models/<band>`, the models in that
   band, biggest first, with the bands as a filter. Every house has its own page at
   **`/orbitals/masaq/<country>/<key>`** (e.g. `/orbitals/masaq/us/arcee`; `/masaq/...` and `/labs/...` stay aliases), with **Overview** and **Models** tabs (`.../models`), with its

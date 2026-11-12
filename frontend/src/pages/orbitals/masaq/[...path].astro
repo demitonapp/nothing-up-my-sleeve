@@ -11,7 +11,7 @@ import labData from '../../../data/labs.json';
 export function getStaticPaths() {
   const houses = labData.houses as [string, string][];
   const paths: string[] = [
-    'labs', 'models', 'embeddings',
+    'labs', 'research', 'models', 'embeddings',
     ...houses.map(([country, key]) => `${country}/${key}`),
     ...houses.map(([country, key]) => `${country}/${key}/models`),
   ];

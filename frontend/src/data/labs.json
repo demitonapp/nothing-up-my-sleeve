@@ -26,7 +26,22 @@
   ["au", "maincode"],
   ["gb", "wayve"],
   ["za", "lelapa"],
-  ["br", "maritaca"]
+  ["br", "maritaca"],
+  ["us", "eleutherai"],
+  ["gb", "flower"],
+  ["gb", "stability"],
+  ["za", "uctnlp"],
+  ["za", "masakhane"],
+  ["za", "sadilar"],
+  ["au", "sovereign-au"],
+  ["cn", "shanghai-ai"],
+  ["cn", "baai"],
+  ["au", "southern-cross"],
+  ["fr", "kyutai"],
+  ["br", "nilc"],
+  ["gb", "turing"],
+  ["ca", "mila"],
+  ["ae", "mbzuai"]
  ],
- "keys": ["google", "openai", "anthropic", "meta", "alibaba", "microsoft", "deepseek", "antgroup", "mistral", "xai", "moonshot", "zai", "minimax", "cohere", "nvidia", "stepfun", "bytedance", "thinkingmachines", "tii", "cognition", "arcee", "ai2", "hcompany", "maincode", "wayve", "lelapa", "maritaca"]
+ "keys": ["google", "openai", "anthropic", "meta", "alibaba", "microsoft", "deepseek", "antgroup", "mistral", "xai", "moonshot", "zai", "minimax", "cohere", "nvidia", "stepfun", "bytedance", "thinkingmachines", "tii", "cognition", "arcee", "ai2", "hcompany", "maincode", "wayve", "lelapa", "maritaca", "eleutherai", "flower", "stability", "uctnlp", "masakhane", "sadilar", "sovereign-au", "shanghai-ai", "baai", "southern-cross", "kyutai", "nilc", "turing", "mila", "mbzuai"]
 }

@@ -34,6 +34,8 @@ interface LabData {
   art: string;
   open: boolean;
   focus: string;
+  category: string;
+  kind: string;
   funding: {
     government: number; private: number; kind: string; note: string; basis: string;
     rounds: { date: string; round: string; amount: string; valuation: string; investors: string }[];
@@ -156,7 +158,7 @@ export default function LabPage() {
   // /masaq/us/arcee"); the old /labs/<key> stays as an alias.
   const inOrbitals = parts[0] === 'orbitals' && parts[1] === 'masaq';
   const keyIndex = inOrbitals ? 3 : parts[0] === 'masaq' ? 2 : parts[0] === 'labs' ? 1 : -1;
-  const key = keyIndex >= 0 && parts[keyIndex] && !['models', 'labs', 'ships', 'embeddings'].includes(parts[keyIndex])
+  const key = keyIndex >= 0 && parts[keyIndex] && !['models', 'labs', 'ships', 'embeddings', 'research'].includes(parts[keyIndex])
     ? decodeURIComponent(parts[keyIndex]) : '';
   const tab = parts[parts.length - 1] === 'models' ? 'models' : 'overview';
   const base = keyIndex >= 0 && key ? '/' + parts.slice(0, keyIndex + 1).join('/') : '';
@@ -202,8 +204,13 @@ export default function LabPage() {
               <Funding f={d.funding} />
               <Washington g={d.gov} />
               <div className="labmeta">
-                <span className={pillCls(d.open ? 'good' : '')}>{d.open ? 'open weights' : 'closed weights'}</span>
+                {d.category === 'research' && !d.flagship.length ? (
+                  <span className={pillCls('good')}>public resources</span>
+                ) : (
+                  <span className={pillCls(d.open ? 'good' : '')}>{d.open ? 'open weights' : 'closed weights'}</span>
+                )}
                 <span className={pillCls('')}>{d.focus}</span>
+                {d.kind ? <span className={pillCls('')}>{d.kind}</span> : null}
                 <a href={d.site} target="_blank" rel="noopener">the house’s own door ↗</a>
                 {d.readings ? <a href={`/leaderboard/lab/${encodeURIComponent(d.key)}`}>its readings in the Reach →</a> : <span className="s">no chain readings yet</span>}
               </div>
@@ -215,7 +222,7 @@ export default function LabPage() {
           {/* its ships open the Models tab (12 November, Justin: "move Its ships section to the Models tab") */}
           <section className={cardCls(false, 'panel')}>
             <h2>
-              Its ships{' '}
+              {d.category === 'research' ? 'Its work' : 'Its ships'}{' '}
               <span className="note">
                 every ship of this house the Reach knows, read or not: {fleet.length} in the Reach
               </span>
@@ -224,12 +231,12 @@ export default function LabPage() {
               <div className="cards">{fleet.map(shipCard)}</div>
             ) : (
               <p className="note">
-                No ship of this house is in the Reach yet; the fleet it has shipped is below, and its page fills
+                No model of this house is in the Reach yet; what it has shipped is below, and its page fills
                 as the Reach pulls one.
               </p>
             )}
             <h2 className="mt">
-              The fleet it has shipped{' '}
+              {d.category === 'research' ? 'What it has shipped' : 'The fleet it has shipped'}{' '}
               <span className="note">the models it had shipped by 12 November 2026</span>
             </h2>
             <div className="labflagship">

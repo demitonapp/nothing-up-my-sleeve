@@ -4,7 +4,8 @@
 // - Demiton's discoveries: what our own fleet found. The overview (the doors, the questions, the sieve, the jobs),
 //   the skills (the ladder, the route, the chains, every trick), the tests and our stars (lit by size, our ships
 //   against Qwen3 4B, the bridge, the sixteen cards). The trick, chain, traits and door pages sit under it. The
-//   shipyard's Charting section (/shipyard/charting) is the same page, as Justin asked on 10 November.
+//   shipyard's Charting (/shipyard/charting), the same page on another address since 10 November, was retired on
+//   13 November: its addresses forward here.
 // - Masaq' Reach's discoveries: what is known of the outside models and the research field. The head kinds attention
 //   research has named (the star chart), the census's clusters beyond the sixteen cards, and the Qwen 4B mapping
 //   still to be sorted. Qwen3 4B's own head census and persona vectors are on its model page in the Reach.
@@ -56,6 +57,20 @@ export function newHome(address: string): string | null {
   if (path === MASAQ_DISCOVERIES || path.startsWith(`${MASAQ_DISCOVERIES}/`)) return `${HEAD_KINDS}${path.slice(MASAQ_DISCOVERIES.length)}${query ? `?${query}` : ''}`;
   const isStars = /\/(stars|cards|tells)$/.test(path);
   if (isStars && tab && STARS_TAB_HOME[tab]) return STARS_TAB_HOME[tab];
+  // the shipyard's Charting, retired into Demiton's discoveries (13 November, Justin: "is this required
+  // http://localhost:4321/shipyard/charting now that everythings in discoveries?", then "Retire it"): its overview
+  // is the jobs page, its tells the stars, and its skills and tests the same pages
+  if (path === '/shipyard/charting' || path.startsWith('/shipyard/charting/')) {
+    const sub = path.slice('/shipyard/charting'.length).replace(/^\//, '').split('/')[0];
+    const keep = q.toString() ? `?${q.toString()}` : '';
+    if (sub === '' || sub === 'overview') return `${DEMITON_DISCOVERIES}/jobs`;
+    if (sub === 'tells' || sub === 'stars') return `${DEMITON_DISCOVERIES}/stars${keep}`;
+    if (sub === 'cards') return `${DEMITON_DISCOVERIES}/stars?tab=cards`;
+    if (sub === 'two-facts') return `${DEMITON_DISCOVERIES}/tests?test=chaining`;
+    if (sub === 'tests') return `${DEMITON_DISCOVERIES}/tests${keep}`;
+    if (sub === 'skills' || sub === 'quantum' || sub === 'registry') return `${DEMITON_DISCOVERIES}/skills`;
+    return DEMITON_DISCOVERIES;
+  }
   if (path !== '/discoveries' && !path.startsWith('/discoveries/')) return null;
   const rest = path.slice('/discoveries'.length); // '' or '/x/y'
   const search = q.toString() ? `?${q.toString()}` : '';

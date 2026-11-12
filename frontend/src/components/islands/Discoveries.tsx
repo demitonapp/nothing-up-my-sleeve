@@ -9,7 +9,7 @@
 // rendered, and nothing that touches document may be imported at module load.
 //
 // Since 12 November the island lives in the two orbitals (lib/discoveryPaths.ts): Demiton's discoveries at
-// /orbitals/demiton/discoveries (and the shipyard's Charting, the same page) are what our fleet found; Masaq'
+// /orbitals/demiton/discoveries are what our fleet found (the shipyard's Charting forwards here since 13 November); Masaq'
 // Reach's at /orbitals/masaq/discoveries are the head kinds research has named, the census's cards beyond the
 // sixteen and the Qwen 4B mapping. The old /discoveries addresses are sent to their new homes.
 
@@ -97,13 +97,6 @@ const MASAQ_TABS: { key: MasaqSub; label: string }[] = [
   { key: 'unsorted', label: 'Still to be sorted' },
 ];
 const masaqHref = (s: MasaqSub): string => (s === 'kinds' ? MB : `${MB}/${s}`);
-// the four doors of Discoveries, in the order they are read (the section row uses the same labels)
-const DISC_TABS: { key: Sub; label: string }[] = [
-  { key: 'overview', label: 'Overview' },
-  { key: 'stars', label: 'Stars' },
-  { key: 'skills', label: 'Skills' },
-  { key: 'quantum-tests', label: 'Tests' },
-];
 // the cards that are not one head (or not a head at all): the split the audit has to resolve
 const HEADLESS_CARDS = [
   { card: 'bridge', kind: 'latent state', why: 'the middle term at the conclusion, read as a curve over layers — not a head' },
@@ -136,17 +129,6 @@ const DOMAINS: Record<string, { title: string; waypoint: string; image: string; 
   },
 };
 
-// The charting section's own addresses: the same four tabs, kept under /shipyard/charting so a click there
-// stays in charting (10 November, Justin: "it should still be charting"). 'tells' is the charting name for
-// the stars tab; 'stars', 'quantum', 'two-facts' and 'registry' are accepted as aliases and redirected.
-const CHARTING_SUBS: Record<string, Sub> = {
-  '': 'overview', overview: 'overview', skills: 'skills', quantum: 'skills',
-  tests: 'quantum-tests', 'two-facts': 'quantum-tests', registry: 'skills',
-  tells: 'stars', stars: 'stars', cards: 'stars',
-};
-const chartingHref = (s: Sub): string =>
-  `/shipyard/charting${s === 'overview' ? '' : '/' + (s === 'stars' ? 'tells' : s === 'skills' ? 'skills' : s === 'quantum-tests' ? 'tests' : s)}`;
-
 const parse = (route: string): Parsed => {
   const bits = route.split('?')[0].split('/').filter(Boolean);
   // the head kinds, the cards beyond the sixteen and the Qwen mapping: one view with its three tabs, under Demiton's
@@ -163,12 +145,6 @@ const parse = (route: string): Parsed => {
   // the field on two axes (13 November): /<axis>, then /<axis>/<category> (lib/fieldMap.ts)
   if (bits[0] === 'discoveries' && axisBySlug(bits[1])) {
     return { view: 'map', sub: 'overview', trick: null, chain: null, domain: null, axis: bits[1], cat: at(2) || null };
-  }
-  // the cards moved to the shipyard's charting section (9 November, Justin: "this /discoveries/cards needs
-  // to move to /shipyard/charting"): the same island, reached from the yard
-  if (bits[0] === 'shipyard' && bits[1] === 'charting') {
-    const sub = CHARTING_SUBS[bits[2] || ''] || 'overview';
-    return { view: 'index', sub, trick: null, chain: null, domain: null };
   }
   // not yet read (the server's render): no view, so the landing does not flash another page first
   if (bits[0] !== 'discoveries') return { view: 'pending', sub: 'overview', trick: null, chain: null, domain: null };
@@ -192,21 +168,19 @@ const parse = (route: string): Parsed => {
   return { view: 'trick', sub: 'skills', trick: b, chain: null, domain: null };
 };
 
-const subHref = (s: Sub, charting: boolean): string => {
-  if (charting) return chartingHref(s);
+const subHref = (s: Sub): string => {
   if (s === 'overview') return `${DB}/jobs`;
   if (s === 'stars') return `${DB}/stars`;
   if (s === 'skills') return `${DB}/skills`;
   return `${DB}/tests`;
 };
 
-/** The page an address is drawn on: a Demiton address (its base or the shipyard's Charting), the Reach's, or
+/** The page an address is drawn on: a Demiton address, the Reach's, or
  *  another page entirely. A move between two of them is a page load, so the crumbs and the header follow. */
-const pageOf = (p: string): 'demiton' | 'charting' | 'masaq' | 'elsewhere' => {
+const pageOf = (p: string): 'demiton' | 'masaq' | 'elsewhere' => {
   const path = p.split('?')[0];
   if (path === MB || path.startsWith(`${MB}/`) || path === MASAQ_DISCOVERIES || path.startsWith(`${MASAQ_DISCOVERIES}/`)) return 'masaq';
   if (path === DB || path.startsWith(`${DB}/`)) return 'demiton';
-  if (path === '/shipyard/charting' || path.startsWith('/shipyard/charting/')) return 'charting';
   return 'elsewhere';
 };
 
@@ -220,10 +194,6 @@ const canonicalPath = (route: string): string | null => {
   if (bits[0] === 'orbitals' && bits[1] === 'demiton' && bits[2] === 'discoveries') {
     if (bits[3] === 'two-facts') return `${DB}/tests?test=chaining`;
     if (bits[3] === 'registry') return `${DB}/skills`;
-  }
-  if (bits[0] === 'shipyard' && bits[1] === 'charting') {
-    if (bits[2] === 'two-facts') return '/shipyard/charting/tests?test=chaining';
-    if (bits[2] === 'registry') return '/shipyard/charting/skills';
   }
   return null;
 };
@@ -291,9 +261,8 @@ export default function Discoveries() {
   const parsed = parse(route);
   const { view, sub, trick: trickKey, chain: chainKey } = parsed;
   const domain = parsed.domain ? DOMAINS[parsed.domain] : null;
-  const inCharting = route.split('?')[0].startsWith('/shipyard/charting');
   // a former tab of Demiton's discoveries is a page of its own now, titled by its entry on the axes (lib/fieldMap.ts)
-  const section = view === 'index' && !inCharting ? ourSection(sub) : null;
+  const section = view === 'index' ? ourSection(sub) : null;
   const masaqSub: MasaqSub = parsed.masaq || 'kinds';
 
   // the route the old router read: the hash first, then the path (a pasted path is answered by the server).
@@ -597,15 +566,7 @@ export default function Discoveries() {
   return (
     <div {...sectionProps('discoveries')} onClick={onClick}>
       <SectionNav />
-      {/* the charting section lives under Orbitals > Demiton > Shipyard: its own title and its four tabs sit
-          under the section row, while Discoveries' own tabs are the section row itself */}
-      {inCharting ? (
-        <h1>
-          <a className={crumbCls('back')} href="/shipyard">← shipyard</a>{' '}
-          Charting{' '}
-          <span className="q">sorting out the charts the voyage is planned on: the route, the stars, and the suits</span>
-        </h1>
-      ) : view === 'landing' ? (
+      {view === 'landing' ? (
         <h1>
           <a className={crumbCls('back')} href="/orbitals/demiton">← Demiton</a>{' '}
           Discoveries{' '}
@@ -621,20 +582,6 @@ export default function Discoveries() {
       ) : null}
       {/* ============================== the tricks of the trade */}
       <div className={`dview${view === 'index' ? ' active' : ''}`} data-dview="index">
-        {view === 'index' && inCharting ? (
-          <TabNav
-            id={inCharting ? 'chartingnav' : 'discnav'}
-            ariaLabel={inCharting ? 'charting sections' : 'discoveries sections'}
-            items={DISC_TABS.map((t) => ({
-              key: t.key,
-              label: t.label,
-              href: subHref(t.key, inCharting),
-              active: view === 'index' && sub === t.key,
-              data: { 'data-dsub': t.key },
-            }))}
-          />
-        ) : null}
-
         {/* the tests: the four quantum chains, the two item decks, and how chaining two facts is measured */}
         <div className={`dsub${sub === 'quantum-tests' ? ' active' : ''}`} data-dsub="quantum-tests">
           <p className="q dsubintro">The <b>tests</b>: the four quantum chains, each climbed in six rungs from the keel to the explorer; the two item decks that ask whether a pass is chaining rather than knowledge — the <b>40 logic items</b> over five relations and the <b>96 cause items</b> that widen the one relation Qwen 4B shows a gain on; and <b>chaining two facts</b>, the claim and the method it is judged by.</p>
@@ -823,25 +770,6 @@ export default function Discoveries() {
 
         {/* the overview: the cards are jobs, the questions they pass, and where the 0.0.5 fleet puts them */}
         <div className={`dsub${sub === 'overview' ? ' active' : ''}`} data-dsub="overview">
-          {/* the four doors are cards of their own under the axes now; the shipyard's Charting keeps them here */}
-          {inCharting ? <div className="discdoors">
-            <a className="discdoor" href={`${DB}/physics`}>
-              <img src="/art/fall-physics.svg" alt="" loading="lazy" />
-              <div className="db"><span className="dk">Physics</span><b>The physical world, in numbers</b><p>Mechanics, energy and the quantum horizon: what the books say, and what they do not.</p></div>
-            </a>
-            <a className="discdoor" href={`${DB}/maths`}>
-              <img src="/art/fall-maths.svg" alt="" loading="lazy" />
-              <div className="db"><span className="dk">Maths</span><b>Symbols and proof</b><p>Algebra, calculus, competition problems and the proofs that hold them together.</p></div>
-            </a>
-            <a className="discdoor" href={`${DB}/reasoning`}>
-              <img src="/art/fall-reasoning.svg" alt="" loading="lazy" />
-              <div className="db"><span className="dk">Reasoning</span><b>Putting knowledge to work</b><p>Deduction, word problems and planning: the step from knowing a fact to using it.</p></div>
-            </a>
-            <a className="discdoor" href={`${DB}/philosophy`}>
-              <img src="/art/fall-philosophy.svg" alt="" loading="lazy" />
-              <div className="db"><span className="dk">Philosophy</span><b>The ideas the books do not hold</b><p>The explorer's tests — Origin, energy, Mendeleev's gaps and the eternal return — and the quanta beyond.</p></div>
-            </a>
-          </div> : null}
           <p className="q dsubintro">The cards are <b>jobs</b> — the work a model must be able to do to pass a question, not a place in the network. A <b>tell</b> is a head that passes the job's mark: it tells you the job is being done, and like any tell it can lie — a pinned head tells you about the pin.</p>
           <section className={cardCls(false, 'panel')}>
             <h2>The four questions <span className="note">the chaining tests: what a model has to do, not what it knows</span></h2>
@@ -861,7 +789,7 @@ export default function Discoveries() {
 
         {/* the stars: all the head kinds and the sixteen cards, side by side */}
         <div className={`dsub${sub === 'stars' ? ' active' : ''}`} data-dsub="stars">
-          <p className="q dsubintro">What inside does it? The stars <b>our ships have lit</b>, size by size and against Qwen3 4B, and <b>the sixteen cards</b> a ship is built from. A card is a job; a star is a head that passes the job's mark, and lit shared when the best layer's two strongest heads reach it together. The item decks that score the jobs live under <a href={subHref('quantum-tests', inCharting)}>Tests</a>; every head kind attention research has named, and the cards beyond the sixteen, are under <a href={MB}>Head kinds</a>.</p>
+          <p className="q dsubintro">What inside does it? The stars <b>our ships have lit</b>, size by size and against Qwen3 4B, and <b>the sixteen cards</b> a ship is built from. A card is a job; a star is a head that passes the job's mark, and lit shared when the best layer's two strongest heads reach it together. The item decks that score the jobs live under <a href={subHref('quantum-tests')}>Tests</a>; every head kind attention research has named, and the cards beyond the sixteen, are under <a href={MB}>Head kinds</a>.</p>
           <TabNav
             ariaLabel="Stars"
             tablist

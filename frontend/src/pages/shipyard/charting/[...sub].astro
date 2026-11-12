@@ -1,18 +1,11 @@
 ---
-// The charting section's tabs: the same Discoveries island as /shipyard/charting, on its own address
-// (10 November, Justin: "it should still be charting"). Dev has no server fallback, so each tab the
-// island links to needs a page here; production serves the shell for the same paths.
-import Layout from '../../../layouts/Layout.astro';
-import Discoveries from '../../../components/islands/Discoveries';
-import Reader from '../../../components/Reader.astro';
+// The shipyard's Charting tabs, retired with it (13 November): each forwards to its page in Demiton's discoveries
+// (tells to the stars, skills, tests; the old aliases too). The map is lib/discoveryPaths.ts.
+import DiscoveriesMoved from '../../../components/DiscoveriesMoved.astro';
 
 export function getStaticPaths() {
-  // the four current tabs, then the aliases still answered (the deprecated two-facts and registry
-  // redirect to Tests and Skills in the island)
-  return ['skills', 'tests', 'tells', 'stars', 'cards', 'quantum', 'two-facts', 'registry'].map((sub) => ({ params: { sub } }));
+  return ['overview', 'skills', 'tests', 'tells', 'stars', 'cards', 'quantum', 'two-facts', 'registry'].map((sub) => ({ params: { sub } }));
 }
+const { sub } = Astro.params;
 ---
-<Layout>
-  <main><Discoveries client:load /></main>
-  <Reader />
-</Layout>
+<DiscoveriesMoved path={`/shipyard/charting/${sub}`} />

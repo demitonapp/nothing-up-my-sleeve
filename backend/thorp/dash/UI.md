@@ -190,7 +190,8 @@ the island rewrites). A section with one tab shows no row.
 - **Discoveries live in the two orbitals** (12 November, Justin: "moved to discoveries from demiton in the demiton
   orbital and then the discoveries applicable to the labs and research in the masaq orbital"). Demiton's, what our
   fleet found, is `/orbitals/demiton/discoveries` (the four subtabs below, every trick, chain, door and traits; the
-  shipyard's `/shipyard/charting` is the same page). Its Stars keeps **Lit by size** (the grid, the ten points, 300k
+  shipyard's `/shipyard/charting` was the same page until 13 November, when it was retired and its addresses
+  forward here: overview to `/jobs`, tells to `/stars`, skills and tests to theirs). Its Stars keeps **Lit by size** (the grid, the ten points, 300k
   against Qwen3 4B, the star cards, the bridge) and **the 16 cards**. Masaq' Reach's is `/orbitals/masaq/discoveries`,
   a fifth view beside Labs, Research, Models and Embeddings: **Head kinds** (the star chart, the head kinds with no
   card, the cards with no single head), **Cards beyond the sixteen** (the census's clusters) and **Still to be

@@ -1,12 +1,7 @@
 ---
-// The cards, moved from /discoveries/cards into the shipyard's charting section (9 November, Justin:
-// "this /discoveries/cards needs to move to /shipyard/charting"). The discoveries island reads the path
-// and opens on the cards.
-import Layout from '../../layouts/Layout.astro';
-import Discoveries from '../../components/islands/Discoveries';
-import Reader from '../../components/Reader.astro';
+// The shipyard's Charting, retired (13 November, Justin: "is this required ... now that everythings in discoveries?",
+// then "Retire it"): it was Demiton's discoveries on another address. It forwards to the jobs page; the map is
+// lib/discoveryPaths.ts.
+import DiscoveriesMoved from '../../components/DiscoveriesMoved.astro';
 ---
-<Layout>
-  <main><Discoveries client:load /></main>
-  <Reader />
-</Layout>
+<DiscoveriesMoved path="/shipyard/charting" />

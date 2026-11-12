@@ -382,7 +382,6 @@ export const RUNG_ART: Record<string, string> = {
 export function shipyardCardsHtml(): string {
   const cards: [string, string, string, string][] = [
     ['berth', 'Berth', 'the two rings our fleet is built and sailed from, and every ship of it', 'demiton-berth'],
-    ['charting', 'Charting', 'sorting out the charts the voyage is planned on: the route, the stars, and the suits', 'charting'],
     ['hulls', 'Hull sizes', "each rung's layers, width, heads and head width: the shape a ship is built to, set in Postgres", 'hulls'],
     ['constraints', 'The yard’s constraints', 'the slipways, the tide, the clerk and the survey dock: the limits on how many voyages the yard can launch, and the levers that move them', 'shipyard'],
   ];

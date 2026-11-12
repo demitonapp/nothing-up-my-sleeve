@@ -35,7 +35,9 @@ Both addresses serve the same Liberty Machine (the site is mid-rename; neither i
   `127.0.0.1:8998`, embedded in the phone page. A real session measured ~985 ms end-to-end, RTF 1.11,
   0 underruns.
 - **The page order** the user asked for: the fleet cards are the first thing on Operations.
-- **30 drone/chat tests**, `tsc`, ruff; production build includes both address variants.
+- **50 targeted tests** (drones, chat tools, chat, labs), `tsc` and ruff; the production build
+  includes both address variants. The full suite still has slow network-dependent tests in this
+  environment; the ledger's Postgres type cast found by it was fixed.
 
 ## What is waiting on a person
 

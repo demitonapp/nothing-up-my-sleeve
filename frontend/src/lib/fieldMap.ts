@@ -137,6 +137,32 @@ export const DISCOVERIES: FieldDiscovery[] = [
   { key: 'emergent-misalignment', title: 'Emergent misalignment', finding: 'Fine-tuning on one narrow bad behaviour (insecure code) can make a model broadly misaligned.', source: 'Betley et al. 2025', kind: 'behaviour', object: 'safety' },
 ];
 
+/** Our own work, placed on the same two axes (13 November, Justin: the discoveries page "should only have the 2 axis
+ *  cards ... and then all the other content should be folded into it at a lower level"). Each is one of the page's
+ *  former sections, now a page of its own reached from its category on either axis. `sub` names the section's page
+ *  in the Discoveries island, when it is one. */
+export interface OurWork { key: string; title: string; about: string; href: string; kind: string; object: string; image?: string; sub?: string }
+
+export const OURS: OurWork[] = [
+  { key: 'jobs', sub: 'overview', title: 'The jobs, and where the fleet finds them', about: 'The four questions the chaining tests ask, the sieve of where each job sits by depth, and the sixteen jobs with the layer each size of ship finds them on.', href: `${DB}/jobs`, kind: 'mechanism', object: 'internals' },
+  { key: 'stars', sub: 'stars', title: 'Our stars', about: 'Every star our ships measure, lit size by size; the ten points and our 300k against Qwen3 4B; the bridge layer by layer; and the sixteen cards.', href: `${DB}/stars`, kind: 'mechanism', object: 'internals' },
+  { key: 'head-kinds', title: 'Head kinds', about: "Every kind of attention head research has named, with its state in our fleet; the census's clusters beyond the sixteen cards; and the Qwen 4B mapping still to be sorted.", href: `${DB}/head-kinds`, kind: 'mechanism', object: 'internals' },
+  { key: 'traits', title: 'Traits', about: "Whether a ship's hidden state tells fiction, verse, first person or a language family apart, on books it has never read.", href: `${DB}/traits`, kind: 'representation', object: 'internals' },
+  { key: 'skills', sub: 'skills', title: 'The skills ladder', about: "The seven waypoints to quantum mechanics, the route between them, the explorer's four discovery chains, and every trick, measured or not.", href: `${DB}/skills`, kind: 'behaviour', object: 'knowledge' },
+  { key: 'physics', title: 'Physics', about: 'Mechanics, energy and the quantum horizon: the skills on the physics step of the ladder.', href: `${DB}/physics`, kind: 'behaviour', object: 'knowledge', image: '/art/fall-physics.svg' },
+  { key: 'maths', title: 'Maths', about: 'Algebra, calculus, competition problems and the proofs that hold them together.', href: `${DB}/maths`, kind: 'behaviour', object: 'knowledge', image: '/art/fall-maths.svg' },
+  { key: 'reasoning', title: 'Reasoning', about: 'Deduction, word problems and planning: the step from knowing a fact to using it.', href: `${DB}/reasoning`, kind: 'behaviour', object: 'knowledge', image: '/art/fall-reasoning.svg' },
+  { key: 'philosophy', title: 'Philosophy', about: "The explorer's tests (the Origin, energy, Mendeleev's gaps, the eternal return) and the quanta beyond them.", href: `${DB}/philosophy`, kind: 'behaviour', object: 'knowledge', image: '/art/fall-philosophy.svg' },
+  { key: 'tests', sub: 'quantum-tests', title: 'The tests', about: 'The four quantum chains climbed rung by rung, the 40 logic items and the 96 cause items that ask whether a pass is chaining or knowledge.', href: `${DB}/tests`, kind: 'measurement', object: 'evaluation' },
+  { key: 'chaining', title: 'Chaining two facts', about: 'The claim (a model a tenth the size chains two facts as well as a 2-4B one), the method it is judged by, and where the fleet stands.', href: `${DB}/tests?test=chaining`, kind: 'measurement', object: 'knowledge' },
+];
+
+/** Our work in one category of an axis. */
+export const oursIn = (axis: MapAxis, cat: string): OurWork[] => OURS.filter((o) => (axis.key === 'kind' ? o.kind : o.object) === cat);
+
+/** One of our sections by the Discoveries island's sub-page name (the jobs, the stars, the skills, the tests). */
+export const ourSection = (sub: string): OurWork | null => OURS.find((o) => o.sub === sub) || null;
+
 /** A category's address segment: its name, so the crumb built from the address reads as the page does. */
 export const slugOf = (c: MapCategory): string => c.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 

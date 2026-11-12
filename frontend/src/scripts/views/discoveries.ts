@@ -708,7 +708,7 @@ export const chainPageHtml = (d: DiscData, rungs: Rung[], key: string | null, da
       title: `no chain called ${key ?? ''}`,
       strand: '',
       over: '',
-      steps: `<div class="${emptyCls()}">the chains are the explorer's four tests; <a href="/orbitals/demiton/discoveries">back to the chains table</a></div>`,
+      steps: `<div class="${emptyCls()}">the chains are the explorer's four tests; <a href="/orbitals/demiton/discoveries/skills">back to the chains table</a></div>`,
     };
   }
   const rank = classRank(rungs);

@@ -22,7 +22,7 @@ import { esc } from '@/lib/format';
 import { DEMITON_DISCOVERIES as DB, MASAQ_DISCOVERIES as MB, MASAQ_SUBS, QWEN4B_PAGE, newHome, type MasaqSub } from '@/lib/discoveryPaths';
 import SectionNav from '../SectionNav';
 import { AxisDoors, FieldMapView } from '../FieldMap';
-import { axisBySlug } from '@/lib/fieldMap';
+import { axisBySlug, ourSection } from '@/lib/fieldMap';
 import { TabNav } from '../TabNav';
 import {
   cardDeckHtml,
@@ -57,7 +57,7 @@ import {
 } from '@/scripts/views/discoveries';
 
 type Sub = 'overview' | 'skills' | 'quantum-tests' | 'stars';
-type DView = 'index' | 'trick' | 'chain' | 'traits' | 'domain' | 'masaq' | 'map';
+type DView = 'index' | 'trick' | 'chain' | 'traits' | 'domain' | 'masaq' | 'map' | 'landing' | 'pending';
 
 interface Parsed {
   view: DView;
@@ -167,11 +167,14 @@ const parse = (route: string): Parsed => {
     const sub = CHARTING_SUBS[bits[2] || ''] || 'overview';
     return { view: 'index', sub, trick: null, chain: null, domain: null };
   }
-  if (bits[0] !== 'discoveries') return { view: 'index', sub: 'overview', trick: null, chain: null, domain: null };
+  // not yet read (the server's render): no view, so the landing does not flash another page first
+  if (bits[0] !== 'discoveries') return { view: 'pending', sub: 'overview', trick: null, chain: null, domain: null };
   const b = at(1);
   const c = at(2);
   if (b === 'chains' && c) return { view: 'chain', sub: 'skills', trick: null, chain: c, domain: null };
-  if (!b) return { view: 'index', sub: 'overview', trick: null, chain: null, domain: null };
+  // Demiton's root is the landing, the two axis cards (13 November); what was its overview is the jobs page
+  if (!b || b === 'overview') return { view: 'landing', sub: 'overview', trick: null, chain: null, domain: null };
+  if (b === 'jobs') return { view: 'index', sub: 'overview', trick: null, chain: null, domain: null };
   // the two deprecated tabs still answer; canonicalPath rewrites the address to their new home
   if (b === 'two-facts') return { view: 'index', sub: 'quantum-tests', trick: null, chain: null, domain: null };
   if (b === 'registry') return { view: 'index', sub: 'skills', trick: null, chain: null, domain: null };
@@ -188,7 +191,7 @@ const parse = (route: string): Parsed => {
 
 const subHref = (s: Sub, charting: boolean): string => {
   if (charting) return chartingHref(s);
-  if (s === 'overview') return DB;
+  if (s === 'overview') return `${DB}/jobs`;
   if (s === 'stars') return `${DB}/stars`;
   if (s === 'skills') return `${DB}/skills`;
   return `${DB}/tests`;
@@ -286,6 +289,8 @@ export default function Discoveries() {
   const { view, sub, trick: trickKey, chain: chainKey } = parsed;
   const domain = parsed.domain ? DOMAINS[parsed.domain] : null;
   const inCharting = route.split('?')[0].startsWith('/shipyard/charting');
+  // a former tab of Demiton's discoveries is a page of its own now, titled by its entry on the axes (lib/fieldMap.ts)
+  const section = view === 'index' && !inCharting ? ourSection(sub) : null;
   const masaqSub: MasaqSub = parsed.masaq || 'kinds';
 
   // the route the old router read: the hash first, then the path (a pasted path is answered by the server).
@@ -597,16 +602,23 @@ export default function Discoveries() {
           Charting{' '}
           <span className="q">sorting out the charts the voyage is planned on: the route, the stars, and the suits</span>
         </h1>
-      ) : view === 'index' ? (
+      ) : view === 'landing' ? (
         <h1>
           <a className={crumbCls('back')} href="/orbitals/demiton">← Demiton</a>{' '}
           Discoveries{' '}
           <span className="q">what our own fleet has found: the jobs and where the ships do them, the skills on the ladder, the tests that judge them, and the stars our ships have lit. The head kinds research has named, and Qwen3 4B's own census, are in <a href={MB}>Masaq' Reach</a></span>
         </h1>
       ) : null}
+      {section ? (
+        <h1>
+          <a className={crumbCls('back')} href={DB}>← discoveries</a>{' '}
+          {section.title}{' '}
+          <span className="q">{section.about}</span>
+        </h1>
+      ) : null}
       {/* ============================== the tricks of the trade */}
       <div className={`dview${view === 'index' ? ' active' : ''}`} data-dview="index">
-        {view === 'index' ? (
+        {view === 'index' && inCharting ? (
           <TabNav
             id={inCharting ? 'chartingnav' : 'discnav'}
             ariaLabel={inCharting ? 'charting sections' : 'discoveries sections'}
@@ -808,9 +820,8 @@ export default function Discoveries() {
 
         {/* the overview: the cards are jobs, the questions they pass, and where the 0.0.5 fleet puts them */}
         <div className={`dsub${sub === 'overview' ? ' active' : ''}`} data-dsub="overview">
-          {/* the field on two axes (13 November): a card for each, opening its categories */}
-          {!inCharting ? <AxisDoors /> : null}
-          <div className="discdoors">
+          {/* the four doors are cards of their own under the axes now; the shipyard's Charting keeps them here */}
+          {inCharting ? <div className="discdoors">
             <a className="discdoor" href={`${DB}/physics`}>
               <img src="/art/fall-physics.svg" alt="" loading="lazy" />
               <div className="db"><span className="dk">Physics</span><b>The physical world, in numbers</b><p>Mechanics, energy and the quantum horizon: what the books say, and what they do not.</p></div>
@@ -827,7 +838,7 @@ export default function Discoveries() {
               <img src="/art/fall-philosophy.svg" alt="" loading="lazy" />
               <div className="db"><span className="dk">Philosophy</span><b>The ideas the books do not hold</b><p>The explorer's tests — Origin, energy, Mendeleev's gaps and the eternal return — and the quanta beyond.</p></div>
             </a>
-          </div>
+          </div> : null}
           <p className="q dsubintro">The cards are <b>jobs</b> — the work a model must be able to do to pass a question, not a place in the network. A <b>tell</b> is a head that passes the job's mark: it tells you the job is being done, and like any tell it can lie — a pinned head tells you about the pin.</p>
           <section className={cardCls(false, 'panel')}>
             <h2>The four questions <span className="note">the chaining tests: what a model has to do, not what it knows</span></h2>
@@ -982,6 +993,11 @@ export default function Discoveries() {
           </section>
         </div>
       )}
+
+      {/* ============================== the landing: the two axis cards, and nothing else (13 November) */}
+      <div className={`dview${view === 'landing' ? ' active' : ''}`} data-dview="landing">
+        {view === 'landing' ? <AxisDoors /> : null}
+      </div>
 
       {/* ============================== the field on two axes: an axis's categories, or one category's discoveries */}
       <div className={`dview${view === 'map' ? ' active' : ''}`} data-dview="map">

@@ -771,6 +771,22 @@ DEMITON_SECTIONS: dict[str, str] = {
     "demiton-expeditions": "a ship's company at the foot of a gangway at night about to sail: the captain "
     "unrolling a chart of unnamed coasts on a cask-head, sailors loading the last stores by lantern, a great "
     "galleon behind them with sails loosed, black water ahead and a thin ring of light in the sky",
+    # Demiton's discoveries, the field on two axes (13 November, Justin: "should only have the 2 axis cards with a
+    # fal image"): the kind of claim is a cabinet sorting findings by their nature; the object of study is the ship
+    # itself laid open, each part under its own lens
+    "discoveries-kind-of-claim": "a navigator's chart room at night: a great oak cabinet of seven deep pigeonholes, "
+    "each holding a different instrument — a brass balance, a set of interlocking gears, a compass rose, a spyglass, "
+    "a snapped length of mast, a bound book of recipes, a surveyor's measuring rod — a navigator in a sea-cloak "
+    "sorting sealed letters and logbook pages into them by lantern light, a small smooth silver ovoid drone with "
+    "no propellers resting on top of the cabinet, the thin lit ring of an Orbital through the window",
+    # the first draw put an aeroplane in the window (the drone "above the model") and barely cut the hull open: the
+    # drone now rests on the table and the cross-section is the subject
+    "discoveries-object-of-study": "a natural philosopher's cabin aboard a galleon at night: on a long table a large "
+    "wooden cross-section model of a galleon cut open lengthwise, every deck, the hold with its casks and stores, "
+    "the guns, the rudder and the rigging shown inside, several brass magnifying lenses on jointed arms each held "
+    "over a different part, a philosopher in a long coat bent over one lens, one hanging lantern, a small smooth "
+    "silver ovoid drone with no propellers resting on the table beside the model, black water and the thin ring of "
+    "an Orbital through the stern windows, no aircraft, no flying machines",
     # the Liberty Machine (12 November, Justin: "Liberty Machine should have it's own card here http://localhost:4321/orbitals/demiton
     # with a fal image"): Beer's five systems as a flagship's council, each at its own post around one table
     # the first draw hung an electric pendant lamp; a second, pushed to "Elizabethan", came out grey with a

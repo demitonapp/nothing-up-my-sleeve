@@ -9,7 +9,8 @@ import { FIELD_MAP_PATHS } from '../../../../lib/fieldMap';
 
 export function getStaticPaths() {
   // and the field on two axes (13 November): each axis and each of its categories
-  return [...DISCOVERY_PATHS, ...FIELD_MAP_PATHS].map((path) => ({ params: { path } }));
+  // the jobs: what was the overview, a page of its own under the axes since 13 November
+  return [...DISCOVERY_PATHS, ...FIELD_MAP_PATHS, 'jobs'].map((path) => ({ params: { path } }));
 }
 ---
 <Layout>

@@ -87,6 +87,58 @@ SCHEMAS: list[dict] = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "vsm_status",
+            "description": "The whole of Thorp as a viable system, in one reading: a status line for each of "
+            "its six systems (S1 operations, S2 coordination, S3 control, S3* audit, S4 intelligence, S5 policy) "
+            "and what in each needs attention. Call this when the user asks how Thorp, the VSM or the system "
+            "as a whole is doing, what is wrong, or what needs their attention.",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "system_status",
+            "description": "One system of the viable system, in detail. S1 operations: what is at sea, the "
+            "expeditions, the GPUs hired. S2 coordination: the lanes (this Mac, Vast), queue collisions, the "
+            "schedule. S3 control: the gate, the budget and the money spent, the last planning cycle and its "
+            "proposals. S3* audit: what the last cycle's audit found. S4 intelligence: GPU hire measurements "
+            "and failures, the judge, the outside models. S5 policy: the policies, the charter's terms, what "
+            "waits for Justin's signature.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "system": {"type": "string", "enum": ["S1", "S2", "S3", "S3*", "S4", "S5"], "description": "which system"}
+                },
+                "required": ["system"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "expedition_status",
+            "description": "How the expedition is tracking. The expedition is Nothing up my sleeve v0.1, the "
+            "first fleet launch; Kipling, the knockout, the card census, Ogden and the others are the "
+            "preparations for it. With no arguments: the phase v0.1 is in, how many parameters of its master "
+            "charter are signed, which goals still decide a parameter, and the state of every ship. Call this "
+            "when the user asks how v0.1, the launch, an expedition or a goal is going. To ask about one "
+            "thing, pass its name as find.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "find": {
+                        "type": "string",
+                        "description": "an expedition (kipling, knockout, card census), a goal id (kipling:3) or "
+                        "words from a goal, or a ship class (300k, 1m, 9m, 21m, 50m)",
+                    }
+                },
+            },
+        },
+    },
 ]
 
 _OPS = {
@@ -362,7 +414,573 @@ def _fleet(next: int = 5, find: str | None = None) -> dict:  # noqa: A002
     return out
 
 
-TOOLS = {"calculate": calculate, "current_time": current_time, "board_score": board_score, "queue_status": queue_status}
+# ---- the viable system: the whole, one system, and the expedition ---------------------------------------
+#
+# Three readings beside queue_status (12 November, Justin: "i like queue_status, I like vsm_status and then
+# I'd like to be able to check status on each individual System within the VSM and then I'd like to be able
+# to query expeditions for example how we're tracking against our v0.1"). Each only reads. Each answer opens
+# with a `summary` in words, as queue_status does, because a small model reads the words and miscounts lists.
+
+SYSTEM_NAMES = {"S1": "Operations", "S2": "Coordination", "S3": "Control", "S3*": "Audit", "S4": "Intelligence", "S5": "Policy"}
+_SYSTEM_ALIASES = {
+    "S1": ("s1", "1", "operations"),
+    "S2": ("s2", "2", "coordination"),
+    "S3": ("s3", "3", "control"),
+    "S3*": ("s3*", "3*", "s3star", "3star", "audit", "s3audit"),
+    "S4": ("s4", "4", "intelligence"),
+    "S5": ("s5", "5", "policy"),
+}
+
+_KEPT: dict[str, tuple[float, Any]] = {}
+
+
+def _kept(key: str, read, ttl: float = 120.0):
+    """A slow reading kept for `ttl` seconds, so a second question in the same conversation does not wait
+    for it again (vsm.audit() takes seven to ten seconds: its cleaning audit resolves two book lists)."""
+    now = time.time()
+    hit = _KEPT.get(key)
+    if hit and now - hit[0] < ttl:
+        return hit[1]
+    value = read()
+    _KEPT[key] = (now, value)
+    return value
+
+
+def _audit() -> dict:
+    from thorp import vsm
+
+    return _kept("audit", vsm.audit)
+
+
+def _cycle() -> dict:
+    from thorp.viable.s3_control import cycle
+
+    return cycle.payload()
+
+
+def _lanes() -> list[dict]:
+    from thorp.viable.s2_coordination import lanes
+
+    return [
+        {"lane": d.lane, "kind": d.kind, "seats": d.seats, "open": bool(d.enabled), "note": d.note or ""}
+        for d in lanes.lane_defs(fresh=True).values()
+    ]
+
+
+def _lints() -> list[str]:
+    from thorp import vsm
+
+    return list(vsm.lint_queue())
+
+
+def _jobs() -> list[dict]:
+    from thorp.viable.s2_coordination import schedule
+
+    return schedule.jobs()
+
+
+def _hires() -> list[dict]:
+    """The GPUs hired and not yet released (S3's spend log), each with what it has cost so far."""
+    from thorp.viable.s3_control import charter
+
+    return [
+        {"voyage": h.get("name"), "gpu": h.get("gpu"), "dollars_an_hour": round(float(h.get("dph") or 0), 3),
+         "cost_so_far": round(charter.cost_of(h), 2)}  # fmt: skip
+        for h in charter.out_now()
+    ]
+
+
+def _terms() -> dict:
+    from thorp.viable.s5_policy import charter
+
+    return charter.terms()
+
+
+def _launch() -> dict:
+    """The one expedition (thorp/launch.py): the page's own /api/launch, so the tool and the page agree."""
+    from thorp import launch
+    from thorp.dash import server
+
+    return launch.payload(server._spec_detail)
+
+
+def _expeditions() -> dict[str, dict]:
+    """Every expedition in the code, with its name, what it is for and where it is now."""
+    from thorp import fleet, vsm
+
+    states = vsm.expedition_states()
+    return {k: {"name": e.name, "goal": e.goal, "state": states.get(k) or e.status} for k, e in fleet.EXPEDITIONS.items()}
+
+
+def _goal_rows() -> list[dict]:
+    from thorp import expedition_goals
+
+    return expedition_goals.read()
+
+
+class _World:
+    """The readings the status tools draw on, each read once and apart, so one that fails (no store, no
+    cycle kept yet) leaves the others standing and is named in `could_not_read`."""
+
+    def __init__(self) -> None:
+        self.unread: list[str] = []
+        self._got: dict[str, Any] = {}
+        # looked up when called, not when written, so a test can stand a reader in
+        self._readers = {
+            "audit": (lambda: _audit(), {}),
+            "cycle": (lambda: _cycle(), {}),
+            "lanes": (lambda: _lanes(), []),
+            "lints": (lambda: _lints(), []),
+            "jobs": (lambda: _jobs(), []),
+            "hires": (lambda: _hires(), []),
+            "terms": (lambda: _terms(), {}),
+            "launch": (lambda: _launch(), {}),
+            "fleet": (lambda: _fleet(1), {}),
+        }
+
+    def get(self, name: str) -> Any:
+        if name not in self._got:
+            read, empty = self._readers[name]
+            try:
+                self._got[name] = read() or empty
+            except Exception as e:  # noqa: BLE001 - a reading that fails is said, and the rest still answer
+                self.unread.append(f"{name}: {e.__class__.__name__}: {_clip(str(e), 120)}")
+                self._got[name] = empty
+        return self._got[name]
+
+
+def _usd(v: Any) -> str:
+    try:
+        return f"${float(v):.2f}"
+    except (TypeError, ValueError):
+        return "an unknown sum"
+
+
+def _words(*parts: str | None) -> str:
+    return "; ".join(p for p in parts if p)
+
+
+def _s1(w: _World) -> dict:
+    a = w.get("audit").get("S1") or {}
+    fl = w.get("fleet")
+    seats = fl.get("running_now") or []
+    states = a.get("expeditions") or {}
+    away = {k: s for k, s in states.items() if s != "home"}
+    hires = w.get("hires")
+    acq = a.get("acquisition") or {}
+    stale = [s["name"] for s in seats if "process is gone" in str(s.get("note") or "")]
+    return {
+        "summary": _words(
+            f"{len(seats)} job(s) at sea now ({', '.join(str(s['name']) for s in seats)})" if seats else "nothing is at sea (the fleet is in port)",
+            f"{fl.get('queue_length', 0)} line(s) wait in the queue",
+            f"{len(away)} of {len(states)} expeditions are not home ({', '.join(f'{k}: {s}' for k, s in away.items())})" if states else None,
+            f"{len(hires)} GPU(s) hired now" if hires else "no GPU is hired now",
+            f"the library holds {int(acq['books']):,} books" if acq.get("books") else None,
+        ),
+        "attention": [f"{n} is recorded at sea but its process is gone" for n in stale],
+        "at_sea": seats,
+        "expeditions_not_home": away,
+        "expeditions_home": sum(1 for s in states.values() if s == "home"),
+        "hired_now": hires,
+        "library": {k: acq.get(k) for k in ("books", "tokens_est", "intakes") if acq.get(k) is not None},
+    }
+
+
+def _s2(w: _World) -> dict:
+    lanes = w.get("lanes")
+    lints = w.get("lints")
+    jobs = w.get("jobs")
+    ticking = w.get("cycle").get("ticking")
+    rows, said, attention = [], [], []
+    for ln in lanes:
+        note, _, paused = ln["note"].partition("| paused")
+        why = _clip(paused.strip(" :"), 200) if paused else ""
+        rows.append({"lane": ln["lane"], "kind": ln["kind"], "seats": ln["seats"], "state": "open" if ln["open"] else "paused",
+                     **({"paused_because": why} if why and not ln["open"] else {})})  # fmt: skip
+        said.append(f"the {ln['lane']} lane is open ({ln['seats']} seat(s))" if ln["open"] else f"the {ln['lane']} lane is paused")
+        if not ln["open"]:
+            attention.append(f"the {ln['lane']} lane is paused" + (f": {why}" if why else ""))
+    attention += [f"queue collision: {x}" for x in lints]
+    if ticking is False:
+        attention.append("the schedule's tick is not loaded, so no scheduled job fires")
+    return {
+        "summary": _words(
+            ", ".join(said) or "no lane is defined",
+            f"{w.get('fleet').get('queue_length', 0)} line(s) wait in the queue",
+            f"{len(lints)} collision(s) found in the queue" if lints else "no collision in the queue",
+            f"{sum(1 for j in jobs if j.get('enabled'))} scheduled job(s) switched on" + (", but the tick is not loaded" if ticking is False else ""),
+        ),
+        "attention": attention,
+        "lanes": rows,
+        "queue_collisions": lints,
+        "schedule": [{"job": j.get("key"), "on": bool(j.get("enabled")), "when": j.get("when"), "next": j.get("next"), "last": j.get("last")} for j in jobs],
+        "schedule_ticking": ticking,
+    }
+
+
+def _last_cycle(w: _World) -> dict:
+    return w.get("cycle").get("last") or {}
+
+
+def _proposals(w: _World, to: str | None = None) -> list[dict]:
+    return [
+        {"to": p.get("to"), "what": p.get("what"), "why": _clip(p.get("why"), 200)}
+        for p in _last_cycle(w).get("proposals") or []
+        if to is None or p.get("to") == to
+    ]
+
+
+def _s3(w: _World) -> dict:
+    a3 = w.get("audit").get("S3") or {}
+    pol = a3.get("policies") or {}
+    on = [k for k, p in pol.items() if p.get("enforced")]
+    refused = {k: p["refused_lately"] for k, p in pol.items() if p.get("refused_lately")}
+    last = _last_cycle(w)
+    env, plan = last.get("envelope") or {}, last.get("plan") or {}
+    chosen = next((o for o in plan.get("options") or [] if o.get("ships") == plan.get("ships")), {})
+    proposals = _proposals(w)
+    budget = (
+        {"week_spent": _usd(env.get("week_spent")), "week_budget": _usd(env.get("weekly_budget")), "week_left": _usd(env.get("week_left")),
+         "this_cycle_may_commit": _usd(env.get("cycle_allowance")), "of_which_quotes": _usd(env.get("spendable")),
+         "cycles_left_this_week": env.get("cycles_left"), "purser": env.get("purser")}  # fmt: skip
+        if env else {}
+    )
+    return {
+        "summary": _words(
+            f"{len(on)} of {len(pol)} policies are enforced at the gate" if pol else None,
+            f"the gate refused runs lately under {', '.join(f'{k} ({n})' for k, n in refused.items())}" if refused else "the gate has refused nothing lately" if pol else None,
+            f"{_usd(env.get('week_spent'))} of the week's {_usd(env.get('weekly_budget'))} is spent and this cycle may commit {_usd(env.get('cycle_allowance'))}" if env else "no planning cycle has been kept yet",
+            f"the purser is {env.get('purser')}" if env else None,
+            f"the last cycle ({last.get('at')}, {last.get('how')}) plans {plan.get('ships')} hired ship(s): {len(plan.get('abroad') or [])} voyage(s) abroad and {plan.get('stay')} on this Mac" if plan else None,
+            f"{len(proposals)} proposal(s) wait for Justin" if proposals else None,
+        ),
+        "attention": [f"proposal to {p['to']}: {p['what']}" for p in proposals],
+        "gate": {"enforced": on, "advisory": [k for k in pol if k not in on], "refused_lately": refused,
+                 "runs_not_finished": a3.get("runs_not_finished")},  # fmt: skip
+        "budget": budget,
+        "last_cycle": (
+            {"at": last.get("at"), "how": last.get("how"), "hired_ships": plan.get("ships"),
+             "voyages_abroad": [{"name": x.get("name"), "gpu": x.get("gpu"), "cost": _usd(x.get("cost"))} for x in plan.get("abroad") or []],
+             "voyages_on_this_mac": plan.get("stay"),
+             "queue_home_in_hours": round(chosen["all_done_h"], 1) if chosen.get("all_done_h") is not None else None,
+             "mac_alone_hours": round(plan["mac_only_h"], 1) if plan.get("mac_only_h") is not None else None}  # fmt: skip
+            if plan else {}
+        ),
+        "proposals": proposals,
+    }
+
+
+def _s3star(w: _World) -> dict:
+    a = w.get("audit")
+    audit = _last_cycle(w).get("audit") or {}
+    findings = [str(f) for f in audit.get("findings") or []]
+    breaking = {k: v for k, v in (a.get("breaking") or {}).items() if v}
+    broken = [f"{len(v)} queued run(s) break the {k} policy" for k, v in breaking.items()]
+    cleaning = (a.get("S3*") or {}).get("cleaning") or {}
+    return {
+        "summary": _words(
+            f"the last cycle's audit found {len(findings)} thing(s): {' | '.join(_clip(f, 160) for f in findings)}" if findings
+            else "the last cycle's audit found nothing" if audit else "no cycle has been audited yet",
+            f"{_usd(audit.get('wasted'))} of the {_usd(audit.get('spend'))} spent in that cycle bought no training" if audit.get("wasted") else None,
+            ", ".join(broken) if broken else "no queued run breaks a policy" if a else None,
+            f"texts are cleaned by {cleaning['version']}" if cleaning.get("version") else None,
+        ),
+        "attention": findings + broken,
+        "last_cycle_findings": findings,
+        "hires_against_quotes": [
+            {"voyage": h.get("name"), "gpu": h.get("gpu"), "quote": _usd(h.get("quote")), "bill": _usd(h.get("cost")), "sailed": bool(h.get("sailed")),
+             "ended": h.get("status"), **({"failed_in": h["failed_in"]} if h.get("failed_in") else {})}  # fmt: skip
+            for h in audit.get("hires") or []
+        ],
+        "queued_runs_breaking_a_policy": {k: [_queue_line(x) for x in v[:8]] for k, v in breaking.items()},
+    }
+
+
+def _s4(w: _World) -> dict:
+    c = w.get("cycle")
+    a4 = w.get("audit").get("S4") or {}
+    fails = c.get("failures") or {}
+    classes = [
+        {"gpu": x.get("gpu"), "hires": x.get("hires"), "sailed": x.get("sailed"), "failed": x.get("failed"),
+         "overhead_minutes": round(x["overhead_min"], 1) if x.get("overhead_min") is not None else None, "source": _clip(x.get("source"), 90)}  # fmt: skip
+        for x in c.get("classes") or []
+    ]
+    judge = c.get("judge") or {}
+    can = c.get("judge_can_run") or [None, ""]
+    waiting = sum(1 for x in c.get("to_judge") or [] if not x.get("judged"))
+    return {
+        "summary": _words(
+            f"{fails.get('failed')} of {fails.get('hires')} GPU hires never sailed, {_usd(fails.get('wasted_cost'))} wasted" if fails.get("hires") else "no GPU hire is on record",
+            "measured overhead: " + ", ".join(f"{x['gpu']} {x['overhead_minutes']} min" for x in classes if x["overhead_minutes"] is not None) if classes else None,
+            (f"the judge is {judge.get('name')}" + ("" if can[0] else f", which cannot run now ({_clip(can[1], 120)})") + f"; {waiting} failed fit-out(s) wait for it") if judge else "no judge is chosen",
+            f"{len(a4.get('competitors') or [])} competitors and {len(a4.get('reference_ladder') or [])} reference models are read" if a4 else None,
+        ),
+        "attention": ([f"the judge cannot run now: {_clip(can[1], 160)}"] if judge and can[0] is False and waiting else []),
+        "gpu_classes": classes,
+        "hire_failures": {k: fails.get(k) for k in ("hires", "failed") if fails.get(k) is not None} | (
+            {"wasted": _usd(fails.get("wasted_cost")), "wasted_minutes": round(fails.get("wasted_min") or 0)} if fails else {}
+        ),
+        "judge": {"name": judge.get("name"), "can_run_now": can[0], "why": _clip(can[1], 160), "verdicts_given": len(c.get("judgments") or []), "waiting": waiting},
+        "outside_models": {"competitors": a4.get("competitors") or [], "reference_ladder": a4.get("reference_ladder") or []},
+    }
+
+
+def _s5(w: _World) -> dict:
+    a = w.get("audit")
+    pol = a.get("S5") or {}
+    on = [k for k, p in pol.items() if p.get("enforced")]
+    off = [k for k in pol if k not in on]
+    excepted = sorted((a.get("S3") or {}).get("exceptions") or {})
+    t = w.get("terms")
+    r = w.get("launch").get("readiness") or {}
+    asks = _proposals(w, "S5")
+    return {
+        "summary": _words(
+            (f"{len(pol)} policies, {len(on)} enforced" + (f" and {len(off)} advisory ({', '.join(off)})" if off else "")) if pol else None,
+            f"the terms allow {_usd(t.get('weekly_budget'))} a week and {_usd(t.get('voyage_budget'))} a voyage, {t.get('max_instances')} GPU hired at once, purser {t.get('purser')}" if t else None,
+            f"{len(excepted)} policies carry exceptions ({', '.join(excepted)})" if excepted else None,
+            f"{r.get('signed')} of {r.get('params')} parameters of the v0.1 charter are signed, {r.get('ready')} are ready for Justin to sign" if r else None,
+            f"{len(asks)} proposal(s) to S5 wait for Justin" if asks else None,
+        ),
+        "attention": [f"proposal: {p['what']}" for p in asks] + ([f"{r['drifted']} signed charter parameter(s) have drifted since they were signed"] if r.get("drifted") else []),
+        "policies": [{"policy": k, "enforced": bool(p.get("enforced")), "says": _clip(p.get("statement"), 170), "adopted": p.get("adopted")} for k, p in pol.items()],
+        "terms": {k: t.get(k) for k in ("weekly_budget", "voyage_budget", "max_instances", "purser", "cycle_hours", "overrun", "gpus", "foreign_expeditions") if k in t},
+        "exceptions": excepted,
+        "proposals_to_s5": asks,
+    }
+
+
+_SYSTEMS = {"S1": _s1, "S2": _s2, "S3": _s3, "S3*": _s3star, "S4": _s4, "S5": _s5}
+
+
+def _system_key(system: Any) -> str | None:
+    s = re.sub(r"[\s_\-]+", "", str(system or "").lower()).removeprefix("system")
+    return next((k for k, names in _SYSTEM_ALIASES.items() if s in names), None)
+
+
+def vsm_status() -> dict:
+    """The whole viable system in one reading: a line for each of S1 to S5 and S3* (the audit), and what in
+    each needs attention. It only reads."""
+    w = _World()
+    rows = []
+    for key, read in _SYSTEMS.items():
+        d = read(w)
+        rows.append({"system": key, "name": SYSTEM_NAMES[key], "status": d["summary"], "attention": d["attention"]})
+    need = [r for r in rows if r["attention"]]
+    out = {
+        "summary": (
+            f"{len(need)} of 6 systems need attention: " + "; ".join(f"{r['system']} {r['name']} ({_clip(r['attention'][0], 110)}"
+                                                                    + (f", and {len(r['attention']) - 1} more" if len(r["attention"]) > 1 else "") + ")" for r in need)  # fmt: skip
+            if need else "all six systems read clean: nothing needs attention"
+        ),
+        "systems": rows,
+        # not "call system_status for detail": Ling read that as an instruction and called all six (12 November)
+        "more": "this answers a question about the whole system; system_status is only for when the user asks about one system",
+    }
+    if w.unread:
+        out["could_not_read"] = w.unread
+    return out
+
+
+def system_status(system: str = "") -> dict:
+    """One system of the viable system, in detail. It only reads."""
+    from thorp import vsm
+
+    key = _system_key(system)
+    if key is None:
+        return {"error": f"no system called {system!r}; the systems are " + ", ".join(f"{k} ({n})" for k, n in SYSTEM_NAMES.items())}
+    w = _World()
+    d = _SYSTEMS[key](w)
+    out = {"system": key, "name": SYSTEM_NAMES[key], "purpose": vsm.SYSTEMS[key.rstrip("*")].purpose if key != "S3*" else
+           "independent of the gate: the last cycle's plan against what happened, and the queued runs that break a policy", **d}  # fmt: skip
+    if w.unread:
+        out["could_not_read"] = w.unread
+    return out
+
+
+def _norm(s: Any) -> str:
+    return re.sub(r"[^a-z0-9]", "", str(s or "").lower())
+
+
+def _serving(rows: list[dict]) -> dict[str, list[dict]]:
+    """The queue's lines by the goal each serves (the queue page's plan), at sea first."""
+    by: dict[str, list[dict]] = {}
+    for r in rows:
+        if r.get("goal_id"):
+            by.setdefault(r["goal_id"], []).append(r)
+    return by
+
+
+def _goal_view(g: dict, part: dict | None, lines: list[dict]) -> dict:
+    at_sea = [r.get("name") for r in lines if r.get("status") == "at sea"]
+    queued = [r for r in lines if r.get("status") != "at sea"]
+    return {
+        "goal_id": g.get("goal_id"),
+        "goal": g.get("text"),
+        "status": g.get("status"),
+        **({"evidence": _clip(g.get("evidence"), 220)} if g.get("evidence") else {}),
+        **({"justin_said": _clip(g.get("words"), 160)} if g.get("words") else {}),
+        # the part in words, never the bare key: Ling read a goal whose part is "delivered" (delivered by the
+        # fleet, once it launches) as a goal already done (12 November)
+        **({"role_in_v0.1": _role(part)} if part else {}),
+        **({"decides": part["params"]} if part and part.get("params") else {}),
+        "at_sea_for_it": at_sea,
+        "queued_for_it": len(queued),
+        **({"next_queued": queued[0].get("name"), "next_starts_in": _in_words(queued[0].get("starts_in_min")) or "unknown"} if queued else {}),
+    }
+
+
+_ROLE_WORDS = {
+    "decides": "decides a parameter of the charter",
+    "acceptance": "a reading the fleet will be judged on once it launches",
+    "delivered": "something the launched fleet itself will deliver (not done until the fleet is home)",
+    "carried": "carried over to the next expedition, not needed for v0.1",
+    "unassigned": "no role in v0.1 assigned yet",
+}
+
+
+def _role(part: dict) -> str:
+    words = _ROLE_WORDS.get(part.get("part") or "", part.get("part") or "")
+    return f"{words}: {part['why']}" if part.get("why") else words
+
+
+_SHIP_STATE = {
+    "not laid": "is not laid yet (no spec written)",
+    "laid": "is laid (its spec is written) but has not sailed",
+    "queued": "is queued",
+    "at sea": "is at sea now",
+    "home": "is home",
+}
+
+
+def _ship_words(cell: dict) -> str:
+    """A v0.1 ship and its last rehearsal said apart, so a rehearsal that is home is never read as the v0.1
+    ship being home (Ling read '9m@v0.1: not laid; latest rehearsal 9m@v0.0.6 (home)' as 'the 9m is home')."""
+    if not cell.get("ship"):
+        return cell.get("why") or cell.get("state") or "none"
+    st = _SHIP_STATE.get(cell.get("state") or "", f"is {cell.get('state')}")
+    reh = (cell.get("rehearsals") or [None])[0]
+    return f"the v0.1 ship {cell['ship']} {st}" + (
+        f" (only a rehearsal, {reh['name']}, {_SHIP_STATE.get(reh['state'], 'is ' + str(reh['state']))})" if reh else " (no rehearsal has sailed)"
+    )
+
+
+def expedition_status(find: str | None = None) -> dict:
+    """How the expedition stands (12 November, Justin: "query expeditions for example how we're tracking
+    against our v0.1"). There is one expedition, Nothing up my sleeve v0.1 (thorp/launch.py): its phases, its
+    master charter's sign-offs, the goals still deciding a parameter, and the fleet it launches. What the code
+    calls expeditions (Kipling, the knockout, the card census ...) are its preparations; `find` names one of
+    them, a goal (kipling:3, or words from it) or a ship class (21m). It only reads."""
+    p = _launch()
+    r = p.get("readiness") or {}
+    version = f"{p.get('name')} v{p.get('version')}"
+    parts = {x["goal_id"]: x for x in p.get("parts") or []}
+    try:
+        serving = _serving((_plan().get("rows")) or [])
+    except Exception:  # noqa: BLE001 - no plan: the goals still answer, without the queue beside them
+        serving = {}
+
+    if find and str(find).strip():
+        want = _norm(find)
+        if want in ("v01", "01", "v0.1", "launch", _norm(p.get("name")), _norm(version)):
+            find = None
+    if find and str(find).strip():
+        want = _norm(find)
+        # a ship class
+        for row in p.get("fleet") or []:
+            if _norm(row.get("class")) == want:
+                cols = next((c for c in (p.get("charter") or {}).get("columns") or [] if c.get("class") == row["class"]), {})
+                return {
+                    "summary": f"the {row['class']} class of {version}: base: {_ship_words(row['base'])}; instruct: {_ship_words(row['instruct'])}",
+                    "class": row["class"],
+                    "base": row["base"],
+                    "instruct": row["instruct"],
+                    "voyages_sailed_at_this_size": row.get("voyages"),
+                    "mean_minutes_a_voyage": round(row["mean_minutes"]) if row.get("mean_minutes") else None,
+                    "charter_read_from": {k: v for k, v in cols.items() if k != "class"},
+                }
+        goals = _goal_rows()
+        exps = _expeditions()
+        # a goal by its id
+        g = next((x for x in goals if _norm(x["goal_id"]) == want), None)
+        if g:
+            v = _goal_view(g, parts.get(g["goal_id"]), serving.get(g["goal_id"], []))
+            return {"summary": f"{g['goal_id']} ({(exps.get(g['expedition_key']) or {}).get('name') or g['expedition_key']}): "
+                               f"{g['text']} is {g['status']}; {v['queued_for_it']} queued line(s) and {len(v['at_sea_for_it'])} at sea serve it", **v}  # fmt: skip
+        # a preparation, by its key or its name
+        key = next((k for k, e in exps.items() if want in (_norm(k), _norm(e["name"]))), None) or next(
+            (k for k, e in exps.items() if want in _norm(k) or want in _norm(e["name"])), None
+        )
+        if key:
+            mine = [x for x in goals if x["expedition_key"] == key]
+            views = [_goal_view(x, parts.get(x["goal_id"]), serving.get(x["goal_id"], [])) for x in mine]
+            prep = (p.get("preparations") or {}).get(key) or {}
+            count = {s: sum(1 for x in mine if x["status"] == s) for s in ("done", "partly", "open", "dropped")}
+            return {
+                "summary": _words(
+                    f"{exps[key]['name']} is {exps[key]['state']}",
+                    f"{count['done']} of {len(mine)} goal(s) done, {count['partly']} partly, {count['open']} open" + (f", {count['dropped']} dropped" if count["dropped"] else "") if mine else "it states no goals",
+                    f"{prep['blocking']} of its goals still hold up a parameter of {version}" if prep.get("blocking") else f"none of its goals holds up {version}",
+                    f"{sum(v['queued_for_it'] for v in views)} queued line(s) serve it",
+                ),
+                "expedition": key,
+                "name": exps[key]["name"],
+                "state": exps[key]["state"],
+                "what_it_is_for": _clip(exps[key]["goal"], 260),
+                "decides_in_the_charter": prep.get("decides") or [],
+                "goals": views,
+            }
+        # words from a goal
+        hits = [x for x in goals if want in _norm(x["text"])]
+        if hits:
+            return {"summary": f"{len(hits)} goal(s) mention {find!r}",
+                    "goals": [_goal_view(x, parts.get(x["goal_id"]), serving.get(x["goal_id"], [])) for x in hits[:6]]}  # fmt: skip
+        return {"error": f"nothing called {find!r}: name an expedition ({', '.join(exps)}), a goal id such as kipling:3, or a class ({', '.join(str(x.get('class')) for x in p.get('fleet') or [])})"}
+
+    phases = p.get("phases") or []
+    active = [x["name"] for x in phases if x.get("state") == "active"]
+    blocking = [x for x in parts.values() if x.get("part") == "decides" and x.get("status") in ("open", "partly")]
+    ready = [f"{g['name']}: {q['name']}" for g in (p.get("charter") or {}).get("groups") or [] for q in g.get("params") or [] if q.get("state") == "ready"]
+    try:
+        exps = _expeditions()
+    except Exception:  # noqa: BLE001
+        exps = {}
+    return {
+        "summary": _words(
+            f"{version} is in {', '.join(active) or 'no phase'}" + ("" if p.get("frozen") else f" (not frozen: the draft standard is SOP v{p.get('draft')})"),
+            f"{r.get('signed')} of {r.get('params')} parameters of the master charter are signed, {r.get('ready')} are ready for Justin to sign and {r.get('waiting')} wait on a goal"
+            + (f", {r.get('drifted')} drifted since signing" if r.get("drifted") else ""),
+            f"{r.get('blocking')} goal(s) that decide a parameter are still open",
+            f"{r.get('home')} of the fleet's {r.get('ships')} ships are home",
+        ),
+        "phases": [{"phase": x["name"], "state": x["state"], "note": x["note"]} for x in phases],
+        "charter": {k: r.get(k) for k in ("params", "signed", "ready", "waiting", "drifted")},
+        "ready_to_sign": ready,
+        "goals_still_deciding": [
+            {"goal_id": x["goal_id"], "goal": x["text"], "status": x["status"], "expedition": x.get("expedition_name") or x.get("expedition"),
+             "decides": x.get("params") or [], "queued_for_it": sum(1 for q in serving.get(x["goal_id"], []) if q.get("status") != "at sea"),
+             "at_sea_for_it": [q.get("name") for q in serving.get(x["goal_id"], []) if q.get("status") == "at sea"]}  # fmt: skip
+            for x in blocking
+        ],
+        "preparations": [
+            {"expedition": k, "name": (exps.get(k) or {}).get("name") or k, "state": (exps.get(k) or {}).get("state"), "kind": v.get("kind"),
+             "goals_holding_up_v0.1": v.get("blocking")}  # fmt: skip
+            for k, v in (p.get("preparations") or {}).items()
+        ],
+        "fleet": [{"class": row["class"], "base": _ship_words(row["base"]), "instruct": _ship_words(row["instruct"])} for row in p.get("fleet") or []],
+        "more": "pass find: an expedition (kipling), a goal id (kipling:3) or a class (21m)",
+    }
+
+
+TOOLS = {
+    "calculate": calculate,
+    "current_time": current_time,
+    "board_score": board_score,
+    "queue_status": queue_status,
+    "vsm_status": vsm_status,
+    "system_status": system_status,
+    "expedition_status": expedition_status,
+}
 
 
 def run(name: str, arguments: dict) -> dict:

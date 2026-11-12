@@ -170,7 +170,7 @@ export default function LabPage() {
   return (
     <div {...sectionProps('lab-house')}>
       <h1>
-        <a className={crumbCls('back')} href="/orbitals/masaq">← the labs</a>{' '}
+        <a className={crumbCls('back')} href="/orbitals/masaq/labs">← the labs</a>{' '}
         {d?.country ? (
           <img className="flag" src={`/flags/${encodeURIComponent(d.country)}.svg`} alt={d.country_name} title={d.country_name} />
         ) : null}{' '}
@@ -245,7 +245,7 @@ export default function LabPage() {
             <p className="labmeta">
               <a href="/orbitals/masaq/models">every model in the Reach →</a>{' '}
               <span className="s">or</span>{' '}
-              <a href="/orbitals/masaq">back to the houses →</a>
+              <a href="/orbitals/masaq/labs">back to the houses →</a>
             </p>
           </section>
           <LabModels lab={d.key} ships={fleet} />

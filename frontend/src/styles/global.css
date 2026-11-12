@@ -1197,7 +1197,8 @@ button[aria-busy="true"] { cursor: progress; opacity: .7; }
 .pagejump { position: sticky; top: var(--hdr-h, 57px); z-index: 4; display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
   margin: -8px 0 -4px; padding: 8px 0; background: var(--bg); font-size: var(--fs-sm); }
 .pagejump > .k { color: var(--muted); text-transform: uppercase; letter-spacing: .06em; font-size: var(--fs-xs); margin-right: 4px; }
-#voyages :is(#launchfleet, #mastercharter, #launchparts, details.expgroup, #expeditiontableref) { scroll-margin-top: calc(var(--hdr-h, 57px) + 52px); }
+#voyages :is(#goalsummary, #launchfleet, #mastercharter, #launchparts, details.expgroup, #expeditiontableref) { scroll-margin-top: calc(var(--hdr-h, 57px) + 52px); }
+#mastercharter tr[id^="param-"] { scroll-margin-top: calc(var(--hdr-h, 57px) + 52px); }
 @media (max-width: 700px) {
   /* a phone has no room for a wrapped row that follows the scroll: it scrolls sideways on one line */
   .pagejump { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
@@ -1476,6 +1477,22 @@ button[aria-busy="true"] { cursor: progress; opacity: .7; }
    picture gives way with it, so the turned card is no taller than the front. */
 .harbours:not(.shipyardgrid) .harbourcard .cardart.ship { height: var(--harbour-art, auto); }
 .harbours .hflip .hshotbox { min-height: min(190px, var(--harbour-art, 190px)); }
+
+/* The orbitals are the plates alone (12 November, Justin: "remove the text from the cards. so that the
+   image shows more"): the front is the image edge to edge, no name or counts under it; the flip still
+   carries the five views, and the link's tooltip/aria-label name the orbital. */
+#rungcards .orbitalfront { display: block; padding: 0; gap: 0; position: relative; overflow: hidden; aspect-ratio: 4 / 3; }
+#rungcards .orbitalfront .cardart.ship {
+  position: absolute; inset: 0; width: 100%; height: 100%; max-width: none; margin: 0;
+  aspect-ratio: auto; object-fit: cover; border-radius: 0;
+}
+#rungcards .orbitalfront:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+#rungcards .orbitalfront .orbitalname {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 2; pointer-events: none;
+  padding: 54px 22px 16px; color: var(--accent); font-size: clamp(1.5rem, 2.2vw, 2.2rem); font-weight: 700;
+  letter-spacing: .02em; line-height: 1.15;
+  background: linear-gradient(180deg, rgba(5, 7, 10, 0) 0%, rgba(5, 7, 10, .38) 48%, rgba(5, 7, 10, .92) 100%);
+}
 
 /* Labs (12 November): one card per house that builds the outside ships. The plate is the same 16:9 art
    as a harbour's or a class's, and the card is a door: to the house's lab page when the Reach has read
@@ -2694,6 +2711,13 @@ ol.goaltext { padding-left: 22px; }
 .tcap { display: flex; flex-direction: column; flex: 1 1 auto; gap: 8px; padding: 12px 16px 14px; }
 .tname { color: var(--text); font-size: var(--fs-lg); font-weight: 600; }
 .tabout { margin: 0; color: var(--muted); font-size: var(--fs-sm); line-height: 1.5; }
+.tpc { font-size: var(--fs-sm); line-height: 1.45; margin: 4px 0 0; }
+.tpc b { text-transform: uppercase; letter-spacing: .08em; font-size: 10px; }
+.tpc ul { margin: 3px 0 0; padding-left: 16px; display: grid; gap: 3px; color: var(--muted); }
+.tpros b { color: var(--good, #6fcf97); }
+.tpros li::marker { content: '+  '; color: var(--good, #6fcf97); }
+.tcons b { color: var(--bad, #e06c6c); }
+.tcons li::marker { content: '−  '; color: var(--bad, #e06c6c); }
 .tstat { margin: 0; }
 .tfoot { margin-top: auto; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 12px; font-size: var(--fs-sm); padding-top: 2px; }
 .tturn { color: var(--accent); letter-spacing: .04em; }
@@ -2812,6 +2836,60 @@ ol.goaltext { padding-left: 22px; }
 @media (min-width: 1400px) { .harbours.demitonyard.five { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
 /* five across, a long name ("Coordination", "Intelligence") must fit the plate */
 .harbours.demitonyard.five .yardplate .nm { font-size: clamp(1.05rem, 1.3vw, 1.45rem); overflow-wrap: anywhere; }
+
+/* The charter's goals on the expeditions page (12 November, Justin: "this page /expeditions/expeditions
+   should show also a summary of the goals and where we are to achieving them for the charter to be signed
+   off"): where the fleet version's rows stand, then the goals that decide them, brass on ink like the
+   charter table itself. */
+.chartertally { display: flex; flex-wrap: wrap; gap: 4px 20px; margin: 2px 0 0; color: #a8977a; font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
+.chartertally b { color: #f2e6cf; font-weight: 600; }
+.charterbar { margin: 9px 0 3px; }
+.charterbar i.signed, .charterlegend i.signed { background: #4d7a3c; }
+.charterbar i.ready, .charterlegend i.ready { background: #c9a24a; }
+.charterbar i.waiting, .charterlegend i.waiting { background: #6b5628; }
+.charterbar i.drifted, .charterlegend i.drifted { background: var(--bad); }
+.charterlegend { margin-top: 2px; }
+.chartersummary { margin-top: 10px; }
+.chartersummary td { vertical-align: top; line-height: 1.5; overflow-wrap: anywhere; }
+.chartersummary td:nth-child(1) { width: 38%; }
+.chartersummary td:nth-child(2) { width: 9%; min-width: 11ch; white-space: nowrap; }
+.chartersummary td:nth-child(3) { width: 24%; }
+.chartersummary td:nth-child(4) { width: 30%; }
+.chartersummary td .why { margin-top: 3px; color: #8f7d5f; }
+.chartersummary td.decides a { white-space: nowrap; }
+.chartersummary td .partname { color: #c9a24a; text-transform: uppercase; letter-spacing: .08em; font-size: 11px; font-weight: 700; }
+.chartersummary tr.chartergroup th {
+  text-align: left; padding: 14px 8px 6px; color: #c9a24a; letter-spacing: .14em; font-size: 11px; border-bottom: 1px solid #3a2a12;
+}
+.chartersummary tr.chartergroup th .s { letter-spacing: 0; text-transform: none; font-weight: 400; margin-left: 10px; }
+.chartersummary tbody tr.chartergroup:first-child th { padding-top: 8px; }
+.goalrest { margin-top: 16px; }
+.goalcta { margin: 16px 0 0; }
+.goalcta .s { margin-left: 6px; }
+
+/* The charter's seven sections as fal cards (12 November, Justin: "for this page
+   /expeditions/charter can you give me fal cards for the fleet, the ship, the tokeniser, what it reads,
+   the scaffold, the training, the return leg"): four across at a wide window, three and then two as it
+   narrows, each a brass plate that jumps to its section. */
+.harbours.shipyardgrid.chartercards { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.harbours.shipyardgrid.chartercards .shipyardcard { min-height: 0; }
+.harbours.shipyardgrid.chartercards .yardplate .nm { font-size: clamp(1.15rem, 1.4vw, 1.5rem); }
+.harbours.shipyardgrid.chartercards .yardplate .job { font-size: var(--fs-sm); }
+@media (max-width: 1400px) { .harbours.shipyardgrid.chartercards { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 1100px) { .harbours.shipyardgrid.chartercards { grid-template-columns: 1fr 1fr !important; } }
+@media (max-width: 760px) { .harbours.shipyardgrid.chartercards { grid-template-columns: 1fr !important; } }
+#mastercharter tbody[id^="charter-"] { scroll-margin-top: calc(var(--hdr-h, 57px) + 52px); }
+
+/* The Expeditions landing's three doors (12 November, Justin: "make it open with three cards the Current
+   Charter, Expeditions, Queue and add them with fal images"): the same brass yard plate as Demiton's
+   sections, three across, the reading's live count under the line. */
+.harbours.shipyardgrid.expeditionsyard { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.harbours.shipyardgrid.expeditionsyard .shipyardcard { min-height: 0; }
+.expeditionsyard .yardnote {
+  display: block; margin-top: 2px; color: #d8b566; font-size: 11px; letter-spacing: .04em; line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+}
+.expeditionsyard .shipyardcard:hover .yardnote { color: #f2e6cf; }
 
 /* ---- the drone fleet (12 November): S1's workers, the browser drone first ---- */
 .dronefleet { margin: 4px 0 18px; }

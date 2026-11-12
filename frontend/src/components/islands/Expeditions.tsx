@@ -1,6 +1,6 @@
-// The Expeditions page (UI.md "Expeditions"), as a typed client island: the queue landing (the waters
-// plan, the queue at a glance, every voyage), the expedition cards, one expedition and its five tabs,
-// and the table. It replaces dashboard.ts on this page; the dense markup lives in
+// The Expeditions page (UI.md "Expeditions"), as a typed client island: the landing's three doors (the
+// current charter, the expeditions, the queue), the charter, the expedition cards, one expedition and its
+// tabs, and the table. It replaces dashboard.ts on this page; the dense markup lives in
 // scripts/views/expeditions.ts and the charts are imported inside effects only, because the island is
 // server-rendered and ECharts touches `document` when it loads.
 
@@ -10,12 +10,11 @@ import { btnCls, cardCls, checkCls, crumbCls, emptyCls, fieldCls, hoverCardCls, 
 import { routePath, useApi, useRoute } from '@/lib/useApi';
 import { esc, fmt } from '@/lib/format';
 import { starHeadline } from '@/scripts/views/helpers';
-import SectionNav from '../SectionNav';
 import { TabNav } from '../TabNav';
 import Launch from './Launch';
 import type { LaunchPayload } from './Launch';
 import {
-  censusHtml, deckHtml, expeditionCardsHtml, expeditionName, expeditionOutcomes, expeditionTableHtml, expPill, firstLightFindings, fitHtml, fleetShipsHtml, runsTableHtml,
+  censusHtml, CHARTER_SECTIONS, charterCardsHtml, charterSection, deckHtml, expeditionCardsHtml, expeditionDoorsHtml, goalSummaryHtml, expeditionName, expeditionOutcomes, expeditionTableHtml, expPill, firstLightFindings, fitHtml, fleetShipsHtml, runsTableHtml,
   inductionVerdict, leversRowsHtml, outcomesRowsHtml, parseExpeditionRoute, pinsStripHtml, queueLanesHtml, queueRowsHtml, readingsTable,
   skyStateOf, sopCardsHtml, tableLogHtml, tableReadingsHtml, planHtml,
 } from '@/scripts/views/expeditions';
@@ -951,21 +950,23 @@ function PageJump({ items }: { items: Jump[] }) {
 export default function Expeditions() {
   const [path, go] = usePath();
   const route = parseExpeditionRoute(path);
-  const isOverview = route.kind === 'overview';
+  const isHome = route.kind === 'home';
+  const isCharter = route.kind === 'charter';
+  // a charter card's own page (13 November): /expeditions/charter/<slug>
+  const secPage = isCharter ? charterSection(route.key) : null;
   const isQueue = route.kind === 'queue';
   const isList = route.kind === 'list';
   const isVoyage = route.kind === 'voyage';
   const isTable = route.kind === 'table';
-  const onPage = isOverview || isQueue || isList || isVoyage || isTable;
 
   // one route for the whole page, one poll for the expeditions (the cards and one expedition both read it)
-  const expsApi = useApi<Expedition[]>(onPage ? '/api/expeditions' : null, 60000);
+  const expsApi = useApi<Expedition[]>(isList || isVoyage || isTable ? '/api/expeditions' : null, 60000);
   const ladderApi = useApi<any>(isQueue || isList || isVoyage || isTable ? '/api/ladder' : null, 300000);
-  // the overview tab needs this payload too, or it sits on 'reading the expeditions…' for ever
-  const ovApi = useApi<any>(isOverview || isQueue || isList || isVoyage ? '/api/expeditions/overview' : null, 15000);
+  // the landing and the current charter read the counts, the cards read the states: one payload
+  const ovApi = useApi<any>(isHome || isQueue || isList || isVoyage ? '/api/expeditions/overview' : null, 15000);
   // the one expedition the open ones prepare: its fleet, its master charter and every goal's part
   // (12 November). A signature answers with the payload again; that copy stands until the next poll.
-  const launchApi = useApi<LaunchPayload>(isOverview || isList ? '/api/launch' : null, 30000);
+  const launchApi = useApi<LaunchPayload>(isHome || isCharter || isList ? '/api/launch' : null, 30000);
   const [launchSigned, setLaunchSigned] = useState<LaunchPayload | null>(null);
   useEffect(() => { setLaunchSigned(null); }, [launchApi.data]);
   const launch = launchSigned || launchApi.data;
@@ -1048,19 +1049,20 @@ export default function Expeditions() {
   }, [exps, states]);
   // the Overview's parts, in page order, each with the count its heading gives
   const loaded = expsApi.data != null;
-  const jumps = useMemo(() => {
+  const charterJumps = useMemo(() => {
     const out: Jump[] = [];
-    if (launch) {
-      const r = launch.readiness;
-      out.push({ id: 'launchfleet', label: 'The fleet', n: `${r.home} of ${r.ships} home` });
-      out.push({ id: 'mastercharter', label: 'The master charter', n: `${r.signed} of ${r.params} signed` });
-      if (launch.parts.length) out.push({ id: 'launchparts', label: 'Every goal\'s part', n: String(launch.parts.length) });
-    }
-    if (loaded) {
-      for (const g of planGroups) out.push({ id: `plans-${g.key}`, label: g.title, n: String(g.list.length) });
-      if (pastSops.length) out.push({ id: 'paststandards', label: 'Earlier drafts', n: String(pastSops.length) });
-      out.push({ id: 'expeditiontableref', label: 'As a table' });
-    }
+    if (!launch) return out;
+    const r = launch.readiness;
+    if (launch.parts.length) out.push({ id: 'launchparts', label: 'Every goal\'s part', n: String(launch.parts.length) });
+    return out;
+  }, [launch]);
+  const listJumps = useMemo(() => {
+    const out: Jump[] = [];
+    if (launch) out.push({ id: 'goalsummary', label: 'The charter and its goals', n: `${launch.readiness.signed} of ${launch.readiness.params} signed` });
+    if (!loaded) return out;
+    for (const g of planGroups) out.push({ id: `plans-${g.key}`, label: g.title, n: String(g.list.length) });
+    if (pastSops.length) out.push({ id: 'paststandards', label: 'Earlier drafts', n: String(pastSops.length) });
+    out.push({ id: 'expeditiontableref', label: 'As a table' });
     return out;
   }, [launch, loaded, planGroups, pastSops]);
   const v = isVoyage && route.key ? exps.find((x) => x.key === route.key) || null : null;
@@ -1465,68 +1467,108 @@ export default function Expeditions() {
   // ---- the shell
   return (
     <div onClick={onBookClick}>
-      <SectionNav />
-      {/* ------------------------------------------------ the queue and the expeditions */}
-      <div className={`section${isOverview || isQueue || isList ? ' active' : ''}`} id="voyages">
-        <h1>{isQueue
-          ? <>The queue <span className="q">what sails next, in order, as the S2 coordinator takes it from the Mac lane; open a ship to follow its training</span></>
-          : <>Overview <span className="q">one expedition: the fleet it launches, the master charter it sails under, and the preparation that settles it</span></>}</h1>
-        {isOverview || isList ? <PageJump items={jumps} /> : null}
-        <div className={`vtab${isOverview || isList ? ' active' : ''}`} data-vtab="expeditions">
-          {launch ? <Launch data={launch} onChange={setLaunchSigned} /> : launchApi.error ? (
-            <div dangerouslySetInnerHTML={{ __html: EMPTY(`the launch could not be read: ${esc(launchApi.error)}`) }} />
-          ) : null}
-          {expsApi.data ? (
-            <>
-              {planGroups.map((g) => (
-                <details key={g.key} className="expgroup" id={`plans-${g.key}`} open={g.open}>
-                  <summary><h2 className="band">{g.title} <span className="q">{g.note}</span></h2></summary>
-                  <div dangerouslySetInnerHTML={{ __html: expeditionCardsHtml(g.list, states, ovApi.data, launch?.preparations) }} />
-                </details>
-              ))}
-              {pastSops.length > 0 && (
-                <details className="expgroup paststandards" id="paststandards">
-                  <summary><h2 className="band">Earlier drafts <span className="q">{pastSops.map((s: any) => `${s.name}${s.expedition_name ? ` · ${s.expedition_name}` : ''}`).join(', ')} — the rework so far: the standards whose voyages are home, and what each went out to find</span></h2></summary>
-                  <div dangerouslySetInnerHTML={{ __html: sopCardsHtml({ sops: pastSops }) }} />
-                </details>
+      {/* ------------------------------------------------ the landing, the charter, the expeditions and the queue */}
+      <div className={`section${isHome || isCharter || isQueue || isList ? ' active' : ''}`} id="voyages">
+        <h1>{isHome
+          ? <>Expeditions <span className="q">the one voyage in preparation, every expedition that makes it, and what sails next</span></>
+          : isCharter
+            ? (secPage
+              ? <><a className={crumbCls('back')} href="/expeditions/charter">← current charter</a> {secPage.name} <span className="q">{secPage.about}</span></>
+              : <>The current charter <span className="q">one expedition: the fleet it launches, the master charter it sails under, and every goal's part in it</span></>)
+            : isQueue
+              ? <>The queue <span className="q">what sails next, in order, as the S2 coordinator takes it from the Mac lane; open a ship to follow its training</span></>
+              : <>The expeditions <span className="q">the ones still settling their charter, the settled record of what each went out to find, and the drafts behind them</span></>}</h1>
+        {isCharter && !route.key ? <PageJump items={charterJumps} /> : isList ? <PageJump items={listJumps} /> : null}
+
+        {/* the landing: three doors, its tabs replaced by the breadcrumbs' menu (12 November) */}
+        {isHome ? <div dangerouslySetInnerHTML={{ __html: expeditionDoorsHtml(launch, ovApi.data) }} /> : null}
+
+        {/* the current charter: the fleet, the master charter and every goal's part */}
+        {isCharter ? (
+          <>
+            {secPage ? (
+              <div className="sizefilter" role="group" aria-label="the charter's sections">
+                {CHARTER_SECTIONS.map((s) => (
+                  <a key={s.slug} className={pillCls(s.slug === secPage.slug ? 'accent' : '')} href={`/expeditions/charter/${s.slug}`}>{s.name}</a>
+                ))}
+              </div>
+            ) : <div dangerouslySetInnerHTML={{ __html: charterCardsHtml(launch) }} />}
+            {route.key && !secPage ? <div dangerouslySetInnerHTML={{ __html: EMPTY(`no section of the charter is called ${esc(route.key)}`) }} /> : null}
+            {launch && (!route.key || secPage) ? <Launch data={launch} onChange={setLaunchSigned} section={secPage ? secPage.group : null} /> : launchApi.error ? (
+              <div dangerouslySetInnerHTML={{ __html: EMPTY(`the launch could not be read: ${esc(launchApi.error)}`) }} />
+            ) : (
+              <div dangerouslySetInnerHTML={{ __html: EMPTY('reading the charter…') }} />
+            )}
+          </>
+        ) : null}
+
+        {/* the expeditions: where the charter stands, the cards, the earlier drafts and the table */}
+        {isList ? (
+          <>
+            <section className={cardCls(false, 'panel')} id="goalsummary">
+              <h2>The charter these expeditions serve <span className="note">every expedition below is preparation for one fleet version, <b>Nothing up my sleeve v{launch?.version || '0.1'}</b>: the master charter is the fleet's voyage card, signed row by row as the deciding goals settle. A row waits while one of its goals is open or partly, is ready when they are all settled, and is signed when Justin signs it. When every row is signed, the fleet launches</span></h2>
+              {launch ? <div dangerouslySetInnerHTML={{ __html: goalSummaryHtml(launch) }} /> : launchApi.error ? (
+                <div dangerouslySetInnerHTML={{ __html: EMPTY(`the charter's goals could not be read: ${esc(launchApi.error)}`) }} />
+              ) : (
+                <div dangerouslySetInnerHTML={{ __html: EMPTY('reading the charter and its goals…') }} />
               )}
-              <details className="archive" id="expeditiontableref">
-                <summary>The preparations as a table <span className="note">one row each, for scanning the counts and statuses</span></summary>
-                <div dangerouslySetInnerHTML={{ __html: expeditionTableHtml(exps, states, ovApi.data) }} />
-              </details>
-            </>
-          ) : (
-            <div dangerouslySetInnerHTML={{ __html: EMPTY('reading the expeditions…') }} />
-          )}
-        </div>
-        <div className={`vtab${isQueue ? ' active' : ''}`} data-vtab="queue">
-          <TabNav
-            id="queuenav"
-            ariaLabel="queue sections"
-            variant="default"
-            tablist
-            items={[
-              { key: 'queue', label: 'Sailing order', href: '/expeditions/queue', active: qtab === 'queue', onClick: () => go('/expeditions/queue') },
-              { key: 'planning', label: 'Planning', href: '/expeditions/queue/planning', active: qtab === 'planning', onClick: () => go('/expeditions/queue/planning') },
-            ]}
-          />
-          {qtab === 'planning' ? (
-            prioApi.data
-              ? <PriorityPanel rows={prioApi.data.expeditions || []} />
-              : <div className={emptyCls()}>reading the priorities…</div>
-          ) : (
-          <div className="qview active" data-qview="every">
-            <section className={cardCls(false, 'panel')} id="queuepanel">
-              <h2>Sailing order <span className="note">every voyage still to sail, in the order it sails (specs/queue.txt), with its goal: the question its spec asks, or its experiment's where it asks none, and the fitout it was compiled from (its census variation and stage); the starts are the median of like voyages scheduled with the Mac's seats, and ≥ marks a line behind one with no time yet. Click a voyage for its card</span></h2>
-              {queueApi.data ? <div onClick={onQueueClick} onKeyDown={onQueueKey} dangerouslySetInnerHTML={{ __html: queueLanesHtml(queueApi.data) }} /> : null}
-              <div className="scroll queuescroll" onClick={onQueueClick} onKeyDown={onQueueKey}><table id="queuetable" data-nosort>
-                <thead><tr><th>#</th><th>voyage</th><th>ship</th><th title="the SOP the voyage is built to: its content, tokeniser, parameters, phases and depth">SOP</th><th title="how far the voyage has come: its training step of the steps its schedule sets; a line that has not sailed reads 0%">% complete</th><th title="about when it starts, in your local timezone: the median of like voyages, scheduled with the Mac's seats (two 300k may share; a 1m or 9m holds the lane); ≥ where a voyage ahead has no time yet">starts</th><th title="about when it sails: the median of like voyages, scheduled with the Mac's seats; ≥ where a voyage ahead has no time yet">sails in</th></tr></thead>
-                <tbody dangerouslySetInnerHTML={{ __html: queueApi.data ? queueRowsHtml(queueApi.data, rungs) : `<tr><td colspan="7" class="${emptyCls(true)}">reading the queue…</td></tr>` }} />
-              </table></div>
             </section>
-          </div>
-          )}
-        </div>
+            {expsApi.data ? (
+              <>
+                {planGroups.map((g) => (
+                  <details key={g.key} className="expgroup" id={`plans-${g.key}`} open={g.open}>
+                    <summary><h2 className="band">{g.title} <span className="q">{g.note}</span></h2></summary>
+                    <div dangerouslySetInnerHTML={{ __html: expeditionCardsHtml(g.list, states, ovApi.data, launch?.preparations) }} />
+                  </details>
+                ))}
+                {pastSops.length > 0 && (
+                  <details className="expgroup paststandards" id="paststandards">
+                    <summary><h2 className="band">Earlier drafts <span className="q">{pastSops.map((s: any) => `${s.name}${s.expedition_name ? ` · ${s.expedition_name}` : ''}`).join(', ')} — the rework so far: the standards whose voyages are home, and what each went out to find</span></h2></summary>
+                    <div dangerouslySetInnerHTML={{ __html: sopCardsHtml({ sops: pastSops }) }} />
+                  </details>
+                )}
+                <details className="archive" id="expeditiontableref">
+                  <summary>The preparations as a table <span className="note">one row each, for scanning the counts and statuses</span></summary>
+                  <div dangerouslySetInnerHTML={{ __html: expeditionTableHtml(exps, states, ovApi.data) }} />
+                </details>
+              </>
+            ) : (
+              <div dangerouslySetInnerHTML={{ __html: EMPTY('reading the expeditions…') }} />
+            )}
+          </>
+        ) : null}
+
+        {/* the queue: what sails next */}
+        {isQueue ? (
+          <>
+            <TabNav
+              id="queuenav"
+              ariaLabel="queue sections"
+              variant="default"
+              tablist
+              items={[
+                { key: 'queue', label: 'Sailing order', href: '/expeditions/queue', active: qtab === 'queue', onClick: () => go('/expeditions/queue') },
+                { key: 'planning', label: 'Planning', href: '/expeditions/queue/planning', active: qtab === 'planning', onClick: () => go('/expeditions/queue/planning') },
+              ]}
+            />
+            {qtab === 'planning' ? (
+              prioApi.data
+                ? <PriorityPanel rows={prioApi.data.expeditions || []} />
+                : <div className={emptyCls()}>reading the priorities…</div>
+            ) : (
+            <div className="qview active" data-qview="every">
+              <section className={cardCls(false, 'panel')} id="queuepanel">
+                <h2>Sailing order <span className="note">every voyage still to sail, in the order it sails (specs/queue.txt), with its goal: the question its spec asks, or its experiment's where it asks none, and the fitout it was compiled from (its census variation and stage); the starts are the median of like voyages scheduled with the Mac's seats, and ≥ marks a line behind one with no time yet. Click a voyage for its card</span></h2>
+                {queueApi.data ? <div onClick={onQueueClick} onKeyDown={onQueueKey} dangerouslySetInnerHTML={{ __html: queueLanesHtml(queueApi.data) }} /> : null}
+                <div className="scroll queuescroll" onClick={onQueueClick} onKeyDown={onQueueKey}><table id="queuetable" data-nosort>
+                  <thead><tr><th>#</th><th>voyage</th><th>ship</th><th title="the SOP the voyage is built to: its content, tokeniser, parameters, phases and depth">SOP</th><th title="how far the voyage has come: its training step of the steps its schedule sets; a line that has not sailed reads 0%">% complete</th><th title="about when it starts, in your local timezone: the median of like voyages, scheduled with the Mac's seats (two 300k may share; a 1m or 9m holds the lane); ≥ where a voyage ahead has no time yet">starts</th><th title="about when it sails: the median of like voyages, scheduled with the Mac's seats; ≥ where a voyage ahead has no time yet">sails in</th></tr></thead>
+                  <tbody dangerouslySetInnerHTML={{ __html: queueApi.data ? queueRowsHtml(queueApi.data, rungs) : `<tr><td colspan="7" class="${emptyCls(true)}">reading the queue…</td></tr>` }} />
+                </table></div>
+              </section>
+            </div>
+            )}
+          </>
+        ) : null}
       </div>
 
       {/* ------------------------------------------------ one expedition */}

@@ -13,7 +13,12 @@
 // in the world (and in the ledger's essays) keep working.
 
 export const DEMITON_DISCOVERIES = '/orbitals/demiton/discoveries';
+/** The Reach's old discoveries address: it forwards to HEAD_KINDS (13 November, Justin: "discoveries should be moved
+ *  to the demiton orbital", then "remove it" from Masaq' Reach: the head kinds, the cards beyond the sixteen and the
+ *  Qwen mapping are Demiton's discoveries now). */
 export const MASAQ_DISCOVERIES = '/orbitals/masaq/discoveries';
+/** The head kinds research has named, the census's cards beyond the sixteen and the Qwen 4B mapping, under Demiton's. */
+export const HEAD_KINDS = `${DEMITON_DISCOVERIES}/head-kinds`;
 /** Qwen3 4B's page in the Reach, where its head census and persona vectors are read. */
 export const QWEN4B_PAGE = '/foreign/qwen3-4b';
 
@@ -29,14 +34,14 @@ export const TRICK_KEYS = ['copying', 'spelling', 'successor', 'kin_test', 'pedi
 export const CHAIN_KEYS = ['origin_test', 'energy_test', 'mendeleev_gaps', 'recurrence_test'];
 /** The paths under a discoveries base, for getStaticPaths: the tabs, the old aliases, the doors, every trick and chain. */
 export const DISCOVERY_PATHS = ['overview', 'two-facts', 'physics', 'maths', 'reasoning', 'philosophy', 'mathematics', 'skills',
-  'quantum-tests', 'tests', 'quantum', 'registry', 'stars', 'cards', 'traits', ...TRICK_KEYS, ...CHAIN_KEYS.map((k) => `chains/${k}`)];
+  'quantum-tests', 'tests', 'quantum', 'registry', 'stars', 'cards', 'traits', 'head-kinds', 'head-kinds/cards', 'head-kinds/unsorted', ...TRICK_KEYS, ...CHAIN_KEYS.map((k) => `chains/${k}`)];
 
 /** The Stars tabs that left Demiton for the Reach, and where each went. */
 const STARS_TAB_HOME: Record<string, string> = {
   census: `${QWEN4B_PAGE}#heads`,
   personas: `${QWEN4B_PAGE}#personas`,
-  beyond: `${MASAQ_DISCOVERIES}/cards`,
-  unsorted: `${MASAQ_DISCOVERIES}/unsorted`,
+  beyond: `${HEAD_KINDS}/cards`,
+  unsorted: `${HEAD_KINDS}/unsorted`,
 };
 
 /** Where an old discoveries address lives now, or null when the address is already at home. Reads `/discoveries/...`
@@ -47,6 +52,8 @@ export function newHome(address: string): string | null {
   const path = pathPart.replace(/\/+$/, '') || '/';
   const q = new URLSearchParams(query);
   const tab = q.get('tab');
+  // the Reach's old discoveries address: the same three tabs, now Demiton's
+  if (path === MASAQ_DISCOVERIES || path.startsWith(`${MASAQ_DISCOVERIES}/`)) return `${HEAD_KINDS}${path.slice(MASAQ_DISCOVERIES.length)}${query ? `?${query}` : ''}`;
   const isStars = /\/(stars|cards|tells)$/.test(path);
   if (isStars && tab && STARS_TAB_HOME[tab]) return STARS_TAB_HOME[tab];
   if (path !== '/discoveries' && !path.startsWith('/discoveries/')) return null;

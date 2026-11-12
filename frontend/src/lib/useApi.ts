@@ -4,9 +4,11 @@
 
 import { useEffect, useState } from 'react';
 
-/** The route the page is on, hash first: a pasted path is still answered by the server, and the
- *  pages that keep hash addresses must read the same way the old router did. */
-export const routePath = (): string => (location.hash ? location.hash.slice(1) : location.pathname);
+/** The route the page is on. A path is the address; only an old hash route (`#/discoveries/stars`) is
+ *  read as one, the way the old router did. A plain fragment (`#mastercharter`, `#param-ship-layers`)
+ *  is an anchor on the page, not an address: reading it as the route hid the page under a bare island
+ *  (12 November, the charter's goal links). */
+export const routePath = (): string => (location.hash && location.hash.startsWith('#/') ? location.hash.slice(1) : location.pathname);
 
 export function setUpdated(): void {
   const el = document.getElementById('updated');

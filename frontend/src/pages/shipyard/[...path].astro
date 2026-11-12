@@ -6,7 +6,7 @@ import Harbours from '../../components/islands/Harbours';
 import Reader from '../../components/Reader.astro';
 
 export function getStaticPaths() {
-  return ['training', 'fitting', 'raiding'].map((path) => ({ params: { path } }));
+  return ['training', 'fitting', 'raiding', 'berth'].map((path) => ({ params: { path } }));
 }
 ---
 <Layout>

@@ -1,20 +1,20 @@
-// The command palette (11 November, Justin: "can you add a cmd K whereby I can choose type a model to
-// chat to and be navigated to it"): ⌘K or Ctrl+K on any page opens a filter over every model the chat
-// can reach — a Nothing up my sleeve ship with a finished checkpoint, a foreign model with its weights
-// cached — and ⏎ opens the chat console on that model, ⇥/↑↓ to move, esc to close.
+// The command palette (11 November; 12 November, Justin: "command K should be about navigation in the
+// app, not chatting, that's covered by the chat terminal"): ⌘K or Ctrl+K on any page opens a filter
+// over the app's places — the orbitals and their views, the ships, the expeditions, the Liberty
+// Machine's systems, the discoveries and the leaderboard boards — and ⏎ goes there. ↑↓/⇥ move, esc
+// closes. The chat is the terminal's own shortcut (⌘J), so this palette never opens a model.
 //
-// Mounted in the layout, so it is the same palette everywhere; it reads /api/chat/models the first time
-// it opens, never on page load, and the list is the chat's own list (available, with a target), so the
-// palette can never send you to a ship that cannot answer.
+// `chatHref` stays exported because the chat views use it to address a model's chat page; the palette
+// itself no longer reads /api/chat/models or lists a model.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import foreign from '@/data/foreign.json';
-import { fmtParams } from '@/lib/format';
 import { fieldCls } from '@/lib/ui';
+import { LIBERTY_MACHINE_SYSTEMS, libertyMachineHref } from '@/lib/nav';
+import { TEST_CATEGORIES } from '@/lib/testCategories';
 
 /** The foreign ships with a page of their own (data/foreign.json, written from thorp.foreign.models).
- *  A model read for a chat and not in this list still has a chat — on /chat, preselected — so the
- *  palette never sends anyone to a harbour address that is not a route in dev. */
+ *  Kept for `chatHref`, not for the palette's list. */
 const FOREIGN_PAGES = new Set<string>((foreign as { keys: string[] }).keys);
 
 export interface Model {
@@ -40,31 +40,111 @@ export const chatHref = (m: Pick<Model, 'kind' | 'model' | 'ship_key'>): string 
   return `/ships/${m.ship_key}/chat`;
 };
 
-/** The list, filtered and ranked: a name that starts with what was typed first, then a name that holds
- *  it, then the bigger model first, then the alphabet. Pure, so the ranking can be read without a browser. */
-export function filterModels(models: Model[] | null, q: string): Model[] {
+export interface Dest {
+  group: string;
+  label: string;
+  href: string;
+  note?: string;
+  /** Extra words a reader may type for this place (the label and note are searched too). */
+  keywords?: string;
+}
+
+/** The places the palette can take you. Grouped in the order below; the top-level ways in come first,
+ *  then Demiton's views, the ships, Masaq' Reach, the discoveries and the leaderboard boards. */
+export const DESTINATIONS: Dest[] = [
+  { group: 'The site', label: 'Orbitals', href: '/orbitals', note: 'Demiton and the trading orbital' },
+  { group: 'The site', label: 'Demiton', href: '/orbitals/demiton', note: 'our own orbital, its views and its fleet' },
+  { group: 'The site', label: 'Masaq’ Reach', href: '/orbitals/masaq', note: 'the trading orbital' },
+  { group: 'The site', label: 'Leaderboard', href: '/leaderboard', note: 'the tests and their boards' },
+  { group: 'The site', label: 'Settings', href: '/settings', note: 'storage, the store, the server and the switches' },
+  { group: 'The site', label: 'The bet', href: '/bet' },
+
+  { group: 'Demiton', label: 'Shipyard', href: '/shipyard', note: 'the berth, the SOP, the hull sizes and the standard' },
+  { group: 'Demiton', label: 'Berth', href: '/shipyard/berth', note: 'in the Shipyard: the two rings and every ship of the fleet' },
+  { group: 'Demiton', label: 'Library', href: '/library', note: 'the books and sources our ships read' },
+  { group: 'Demiton', label: 'Library images', href: '/library/images', note: 'the plates and illustrations' },
+  { group: 'Demiton', label: 'Expeditions', href: '/expeditions', note: 'the current charter, the expeditions and the queue' },
+  { group: 'Demiton', label: 'Current charter', href: '/expeditions/charter', note: 'the fleet, the master charter and the goals' },
+  ...([['fleet', 'The fleet', 'the eight ships of v0.1'], ['ship', 'The ship', 'the hull: layers, width, heads, context'], ['tokeniser', 'The tokeniser', 'the vocabulary and the control symbols'],
+    ['reads', 'What it reads', 'the recipe, passes, cleaning and order'], ['scaffold', 'The scaffold', 'cards, riddles and how a pin is held'], ['training', 'The training', 'optimiser, learning rate, batch, schedule'],
+    ['return-leg', 'The return leg', 'the instruct ship’s leg']] as [string, string, string][]).map(([slug, name, note]) => ({
+    group: 'Demiton', label: `Charter · ${name}`, href: `/expeditions/charter/${slug}`, note, keywords: 'charter master',
+  })),
+  { group: 'Demiton', label: 'Every expedition', href: '/expeditions/expeditions', note: 'the open preparations and the settled record' },
+  { group: 'Demiton', label: 'The queue', href: '/expeditions/queue', note: 'what sails next, in order' },
+  { group: 'Demiton', label: 'Liberty Machine', href: '/orbitals/demiton/liberty-machine', note: 'how the fleet governs itself' },
+  ...LIBERTY_MACHINE_SYSTEMS.map((s) => ({
+    group: 'Demiton', label: `${s.label} ${s.name}`, href: libertyMachineHref(s.key), note: 'a system of the Liberty Machine',
+  })),
+
+  { group: 'The ships', label: 'Every ship', href: '/ships', note: 'every ship of our fleet, and every run' },
+  { group: 'The ships', label: 'The towing tank · 300k', href: '/ships/300k', keywords: 'smallest class' },
+  { group: 'The ships', label: 'The measured mile · 1m', href: '/ships/1m' },
+  { group: 'The ships', label: 'The sea trial · 9m', href: '/ships/9m' },
+  { group: 'The ships', label: 'The coasting run · 21m', href: '/ships/21m' },
+  { group: 'The ships', label: 'The paragraph · 50m', href: '/ships/50m' },
+  { group: 'The ships', label: 'Invention · 100m', href: '/ships/100m' },
+  { group: 'The ships', label: 'The trader · 350m', href: '/ships/350m', note: 'the largest class' },
+
+  { group: 'Masaq’ Reach', label: 'Labs', href: '/orbitals/masaq/labs', note: 'a card a country: its labs, research and models' },
+  ...([['us', 'United States'], ['cn', 'China'], ['fr', 'France'], ['ca', 'Canada'], ['ae', 'United Arab Emirates'], ['au', 'Australia'], ['gb', 'United Kingdom'], ['za', 'South Africa'], ['br', 'Brazil']] as [string, string][]).map(([cc, name]) => ({
+    group: 'Masaq’ Reach', label: name, href: `/orbitals/masaq/${cc}/labs`, note: 'its labs, research and models', keywords: `${cc} country labs research models`,
+  })),
+  { group: 'Masaq’ Reach', label: 'Research', href: '/orbitals/masaq/research', note: 'universities, collectives and national infrastructure' },
+  { group: 'Masaq’ Reach', label: 'Models', href: '/orbitals/masaq/models', note: 'every outside model by size band' },
+  { group: 'Masaq’ Reach', label: 'Embeddings', href: '/orbitals/masaq/embeddings', note: 'the embeddings ontology' },
+
+  { group: 'Discoveries', label: 'Discoveries', href: '/orbitals/demiton/discoveries', note: 'what our fleet found' },
+  { group: 'Discoveries', label: 'Tests', href: '/orbitals/demiton/discoveries/tests', note: 'the four questions, the logic and cause decks' },
+  { group: 'Discoveries', label: 'Skills', href: '/orbitals/demiton/discoveries/skills', note: 'the ladder and every trick' },
+  { group: 'Discoveries', label: 'Stars', href: '/orbitals/demiton/discoveries/stars', note: 'the heads our ships lit and the sixteen cards' },
+  { group: 'Discoveries', label: 'Head kinds', href: '/orbitals/demiton/discoveries/head-kinds', note: 'every kind research has named, the cards beyond the sixteen and the Qwen mapping' },
+
+  ...TEST_CATEGORIES.map((c) => ({
+    group: 'Leaderboard', label: c.label, href: `/leaderboard/${c.key}`,
+    note: c.note,
+    keywords: `${c.ours} ${c.published}`,
+  })),
+  { group: 'Leaderboard', label: 'Extra small board', href: '/leaderboard/xsmall', note: 'under 1B' },
+  { group: 'Leaderboard', label: 'Small board', href: '/leaderboard/small', note: '1B – 4B' },
+  { group: 'Leaderboard', label: 'Medium board', href: '/leaderboard/medium', note: '4B – 32B' },
+  { group: 'Leaderboard', label: 'Large board', href: '/leaderboard/large', note: 'above 32B' },
+];
+
+/** The list, filtered by label, note or keywords: places whose label starts with the query first, then
+ *  a word of the label, then the label anywhere, then the note; groups stay in their own order, so the
+ *  headers never interleave. Pure, so the ranking can be read without a browser. */
+export function filterDestinations(dests: Dest[], q: string): Dest[] {
   const needle = q.trim().toLowerCase();
-  return (models || [])
-    .map((m) => {
-      const name = m.name.toLowerCase();
-      const hay = `${name} ${String(m.model || '').toLowerCase()} ${m.ship_key.toLowerCase()}`;
-      const where = needle ? hay.indexOf(needle) : 0;
-      return { m, where, starts: name.startsWith(needle) ? 0 : 1 };
-    })
-    .filter((x) => x.where >= 0)
-    .sort((a, b) => a.starts - b.starts || (b.m.params || 0) - (a.m.params || 0) || a.m.name.localeCompare(b.m.name))
-    .map((x) => x.m);
+  if (!needle) return dests;
+  const score = (d: Dest): number => {
+    const label = d.label.toLowerCase();
+    if (label.startsWith(needle)) return 0;
+    if (label.split(/[^a-z0-9]+/).some((w) => w.startsWith(needle))) return 1;
+    if (label.includes(needle)) return 2;
+    if (`${d.note || ''} ${d.keywords || ''}`.toLowerCase().includes(needle)) return 3;
+    if (d.group.toLowerCase().includes(needle)) return 4;
+    return -1;
+  };
+  const groups = new Map<string, Dest[]>();
+  for (const d of dests) {
+    if (!groups.has(d.group)) groups.set(d.group, []);
+    groups.get(d.group)!.push(d);
+  }
+  return [...groups.values()].flatMap((list) => list
+    .map((d, i) => ({ d, i, s: score(d) }))
+    .filter((x) => x.s >= 0)
+    .sort((a, b) => a.s - b.s || a.i - b.i)
+    .map((x) => x.d));
 }
 
 export default function CommandPalette() {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState('');
   const [at, setAt] = useState(0);
-  const [models, setModels] = useState<Model[] | null>(null);
-  const [error, setError] = useState('');
   const box = useRef<HTMLInputElement | null>(null);
 
-  // ⌘K anywhere opens it; esc closes it; a button in the header can ask for it by name
+  // ⌘K anywhere opens it; esc closes it; the header's ⌘K button can ask for it by name
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
@@ -83,25 +163,6 @@ export default function CommandPalette() {
     };
   }, []);
 
-  // read the models the first time it opens, never on page load
-  useEffect(() => {
-    if (!open || models) return;
-    let live = true;
-    void (async () => {
-      try {
-        const r = await fetch('/api/chat/models');
-        const d = await r.json();
-        if (!live) return;
-        setModels(((d.models || []) as Model[]).filter((m) => m.available && (m.run || m.model)));
-      } catch (e) {
-        if (live) setError(String((e as Error)?.message ?? e));
-      }
-    })();
-    return () => {
-      live = false;
-    };
-  }, [open, models]);
-
   useEffect(() => {
     if (!open) return;
     setQ('');
@@ -110,16 +171,12 @@ export default function CommandPalette() {
     return () => window.clearTimeout(t);
   }, [open]);
 
-  const rows = useMemo(() => filterModels(models, q), [models, q]);
+  const rows = useMemo(() => filterDestinations(DESTINATIONS, q), [q]);
 
-  const go = (m: Model | undefined): void => {
-    if (!m) return;
+  const go = (d: Dest | undefined): void => {
+    if (!d) return;
     setOpen(false);
-    // the terminal is the chat now (12 November, Justin: "we'll only use the terminal"): hand it the model
-    // instead of leaving the page. A foreign model is its id; one of ours is `ship:<key>`.
-    window.dispatchEvent(new CustomEvent('thorp:chat', {
-      detail: { model: m.kind === 'foreign' ? String(m.model || '') : `ship:${m.ship_key}` },
-    }));
+    window.location.assign(d.href);
   };
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>): void => {
@@ -139,11 +196,12 @@ export default function CommandPalette() {
   };
 
   if (!open) return null;
+  let group = '';
   return (
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="chat with a model"
+      aria-label="navigate the app"
       style={{ position: 'fixed', inset: 0, zIndex: 120, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: '12vh', background: 'rgba(0,0,0,.5)' }}
       onClick={() => setOpen(false)}
     >
@@ -157,46 +215,45 @@ export default function CommandPalette() {
           value={q}
           onChange={(e) => { setQ(e.target.value); setAt(0); }}
           onKeyDown={onKeyDown}
-          placeholder="Type a model to chat to…"
-          aria-label="model to chat to"
+          placeholder="Where to? Type a place, page or section…"
+          aria-label="where to navigate"
           aria-controls="cmdkrows"
           autoComplete="off"
           spellCheck={false}
           style={{ width: '100%', border: 0, borderBottom: '1px solid var(--line)', borderRadius: 0, padding: '12px 14px', fontSize: '1em' }}
         />
-        <div id="cmdkrows" role="listbox" aria-label="models" style={{ maxHeight: '48vh', overflowY: 'auto' }}>
-          {error ? <div className="note" style={{ padding: '12px 14px' }}>the models could not be read: {error}</div> : null}
-          {!error && models == null ? <div className="note" style={{ padding: '12px 14px' }}>reading the models…</div> : null}
-          {!error && models != null && !rows.length ? (
-            <div className="note" style={{ padding: '12px 14px' }}>no model with a checkpoint or cached weights matches “{q.trim()}”</div>
-          ) : null}
-          {rows.map((m, i) => (
-            <button
-              key={`${m.kind}:${m.ship_key}`}
-              type="button"
-              role="option"
-              aria-selected={i === at}
-              onMouseEnter={() => setAt(i)}
-              onClick={() => go(m)}
-              style={{
-                display: 'block', width: '100%', textAlign: 'left', cursor: 'pointer',
-                padding: '9px 14px', border: 0, borderBottom: '1px solid var(--line)',
-                background: i === at ? 'var(--raise)' : 'transparent', color: 'inherit', font: 'inherit',
-              }}
-            >
-              <span style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'baseline' }}>
-                <b>{m.name}</b>
-                <span className="note">{fmtParams(m.params)}</span>
-              </span>
-              <span className="note" style={{ display: 'block', marginTop: 2 }}>
-                {m.kind === 'foreign' ? `foreign · ${m.model}` : `our ship · ${m.run ? `checkpoint ${m.run.step}` : m.ship_key}`}
-              </span>
-            </button>
-          ))}
+        <div id="cmdkrows" role="listbox" aria-label="places" style={{ maxHeight: '52vh', overflowY: 'auto' }}>
+          {!rows.length ? <div className="note" style={{ padding: '12px 14px' }}>no place matches “{q.trim()}”</div> : null}
+          {rows.map((d, i) => {
+            const head = d.group !== group;
+            group = d.group;
+            return (
+              <div key={`${d.group}:${d.href}`}>
+                {head ? (
+                  <div className="note" style={{ padding: '9px 14px 3px', textTransform: 'uppercase', letterSpacing: '.08em', fontSize: 10 }}>{d.group}</div>
+                ) : null}
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected={i === at}
+                  onMouseEnter={() => setAt(i)}
+                  onClick={() => go(d)}
+                  style={{
+                    display: 'block', width: '100%', textAlign: 'left', cursor: 'pointer',
+                    padding: head ? '4px 14px 9px' : '9px 14px', border: 0, borderBottom: '1px solid var(--line)',
+                    background: i === at ? 'var(--raise)' : 'transparent', color: 'inherit', font: 'inherit',
+                  }}
+                >
+                  <b>{d.label}</b>
+                  {d.note ? <span className="note" style={{ display: 'block', marginTop: 2 }}>{d.note}</span> : null}
+                </button>
+              </div>
+            );
+          })}
         </div>
         <div className="note" style={{ padding: '8px 14px', display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-          <span>↑↓ choose · ⏎ chat · esc close</span>
-          <span>{models ? `${rows.length} of ${models.length}` : ''}</span>
+          <span>↑↓ choose · ⏎ go · esc close</span>
+          <span>{rows.length} of {DESTINATIONS.length}</span>
         </div>
       </div>
     </div>

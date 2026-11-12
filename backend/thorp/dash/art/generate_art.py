@@ -478,6 +478,30 @@ EXPEDITIONS: dict[str, str] = {
     "a lone figure in a long coat looking up at the arch, deep shadows and mist, no text",
 }
 
+# The Expeditions landing's three doors (12 November, Justin: "make it open with three cards the Current
+# Charter, Expeditions, Queue and add them with fal images"): the one voyage in preparation, the expeditions
+# it is made of, and the queue of what sails next. Named expeditions-<view>; the frontend lists them in
+# frontend/src/scripts/views/expeditions.ts (expeditionDoorsHtml).
+EXPEDITION_VIEWS: dict[str, str] = {
+    "expeditions-charter": "the great cabin of a wooden flagship at night, the voyage's master charter laid flat "
+    "on a long table under a single swinging lantern: a broad sheet of inked rows weighted at its corners by a "
+    "brass divider and a sandglass, the captain standing over it pressing his seal into hot red wax, a clerk "
+    "beside him with a quill and an open ledger, a small carved model hull on the table, through the stern "
+    "windows the fleet's lanterns at anchor on black water and the thin luminous ring of an Orbital standing "
+    "where a moon would be, a small silver drone at rest on the captain's chair",
+    "expeditions-list": "a ship's chart room at night lined with the charts of many voyages, each chart pinned "
+    "open on the wall with its own coastline, route and soundings, a keeper on a rolling ladder unrolling "
+    "another beside them, a great table below with charts overlapping and brass dividers and a sandglass "
+    "weighting them, one hanging lantern with a candle throwing hard shadows across the paper and the beams, a "
+    "small silver drone resting on the shelf, through the stern windows the thin ring of an Orbital over black "
+    "water",
+    "expeditions-queue": "a line of great wooden ships waiting their turn to sail out of a harbour at night, the "
+    "nearest at the harbour mouth with her sails loosed and a pilot's boat at her bow, lanterns down the whole "
+    "line reflected in the black water, a harbour-master on the mole holding up a lantern, a distant ship "
+    "already under way against the thin luminous ring of an Orbital standing where a moon would be, pitch "
+    "torches on the quay, deep shadow and hard moonlight",
+}
+
 # The Market Harbour's three size bands (11 November, Justin: "3 cards that determine size bands for models.
 # small 300k - 4B ... a medium band for 4 - 32B and then large is anything above 32B"): the harbour at three
 # scales of ship, so the band cards read as one ladder of water rather than three labels.
@@ -538,6 +562,18 @@ TESTS: dict[str, str] = {
     "out at sea, where the navigator's finger and the tip of a pair of brass dividers rest exactly on the crossing, "
     "a brass compass and a wooden parallel rule beside it, the navigator's sleeve an Elizabethan doublet, a small "
     "smooth silver ovoid drone with no propellers resting at the chart's corner",
+    "test-arcagi2": "an astronomer's station on the stern deck of a great wooden ship at night: a brass quadrant "
+    "and a cross-staff on a tripod aimed at a strange square of sky where the fixed stars are arranged in a "
+    "lattice of small grids, the observer in an Elizabethan sea-cloak sighting along the brass, a chart table "
+    "beside him with a grid of knotted cords stretched on a frame and a charcoal sketch of a pattern of squares, "
+    "one hanging lantern throwing hard shadows, a small smooth silver ovoid drone with no propellers hovering at "
+    "his shoulder, a thin luminous ring standing where a moon would be",
+    "test-faces": "four carved wooden masks about the size of a face laid in a row on a dark chart table at night "
+    "under one lantern: the first a raven's face with a long beak, the second a clerk's face with a row of tally "
+    "notches cut into the brow, the third a pair of balanced scales carved into the brow, the fourth a walker's "
+    "face with a single foot-shaped mark, an old navigator's hand resting on the first, a brass compass and "
+    "dividers beside them, deep shadow, a small smooth silver ovoid drone with no propellers at rest at the "
+    "table's edge, a thin ring of light through the stern windows",
     "test-ifeval": "a captain's written orders being carried out on the deck of an Elizabethan galleon at night: a "
     "parchment sheet with a red wax seal nailed to the mainmast under a hanging iron lantern, its writing only "
     "a column of tiny illegible ink strokes with a small drawn knot beside each, a boatswain in a doublet holding "
@@ -822,6 +858,35 @@ DEMITON_SECTIONS: dict[str, str] = {
     "wake behind a floating wooden chip, a second sailor holding up a small sand-glass, a midshipman counting the "
     "knots aloud by a candle lantern, a slate of chalked figures on the rail, the thin lit ring of an Orbital in "
     "the sky",
+    # the nine objects of study, one plate each (13 November, Justin: "Yes, do them", after the kinds of claim): what
+    # each object of study is aboard, every one lit by candle and with no lettering (the kinds' first draws taught it)
+    "discoveries-object-training-and-scale": "a covered dry dock at night with three ships on the stocks side by side, "
+    "rising in size from a small pinnace to a half-planked great galleon, shipwrights on timber scaffolds, lit only by candle lanterns, no electric light, "
+    "a small smooth silver ovoid drone with no propellers perched on a scaffold, the thin lit ring of an Orbital above the open roof",
+    "discoveries-object-architecture": "inside the bare oak skeleton of a ship's hull on the stocks at night, looking "
+    "along the keel: curved ribs, knees and deck beams rising in rows, a master shipwright with a plumb line checking "
+    "one rib, lit only by candle lanterns, no electric light, a small smooth silver ovoid drone with no propellers resting on a beam, the thin lit ring of an Orbital between the ribs",
+    "discoveries-object-data": "the hold of a merchant galleon at night packed with casks, crates, bales of cloth and "
+    "stacked bound books, sailors lowering more cargo on a rope through the open hatch above, a purser checking a "
+    "manifest, lit only by candle lanterns, no electric light, a small smooth silver ovoid drone with no propellers resting on a cask",
+    "discoveries-object-post-training": "the quarterdeck of a galleon at night: a grizzled ship's master with his hand "
+    "on a young helmsman's shoulder, guiding his grip on the whipstaff as the ship comes about, the officers watching "
+    "from the rail, lit only by candle lanterns, no electric light, a small smooth silver ovoid drone with no propellers on the binnacle, the thin lit ring of an Orbital in the sky",
+    "discoveries-object-inference-and-prompting": "the deck of a galleon at night: the captain on the poop raising a "
+    "brass speaking trumpet to give an order, the crew below answering at once, hauling on lines as the sails fill, "
+    "lit only by candle lanterns, no electric light, a small smooth silver ovoid drone with no propellers on the rail beside the captain, the thin lit ring of an Orbital in the sky",
+    "discoveries-object-internals": "a ship's carpenter crawling with a candle lantern through the dark narrow space "
+    "between a galleon's inner and outer planking, inspecting the ribs, pegs and joints by its light, his tools in a "
+    "canvas bag, a small smooth silver ovoid drone with no propellers following close behind him, no electric light",
+    "discoveries-object-knowledge-and-memory": "a ship's chart locker at night: pigeonholes of rolled charts and rows "
+    "of old logbooks of past voyages, an old navigator with two logbooks open side by side, a red thread pinned "
+    "between a page in each, lit only by candle lanterns, no electric light, a small smooth silver ovoid drone with no propellers on the shelf, the thin lit ring of an Orbital through a porthole",
+    "discoveries-object-evaluation": "a sea trial at night: two galleons racing past a lantern-lit marker buoy on black "
+    "water, on a stone quay in the foreground two judges in long coats, one turning a sand-glass and one writing in a "
+    "ledger, lit only by candle lanterns, no electric light, a small smooth silver ovoid drone with no propellers on the quay wall, the thin lit ring of an Orbital in the sky",
+    "discoveries-object-safety-and-security": "a ship's strongroom below decks at night: a sentry with a pike and a "
+    "candle lantern guarding an iron-bound chest behind a barred door, while in the shadows a cloaked figure eases "
+    "open a hidden hatch in the planking, no electric light, a small smooth silver ovoid drone with no propellers watching from a beam above",
     # the Liberty Machine (12 November, Justin: "Liberty Machine should have it's own card here http://localhost:4321/orbitals/demiton
     # with a fal image"): Beer's five systems as a flagship's council, each at its own post around one table
     # the first draw hung an electric pendant lamp; a second, pushed to "Elizabethan", came out grey with a
@@ -832,6 +897,130 @@ DEMITON_SECTIONS: dict[str, str] = {
     "with brass dividers over a chart, the boatswain with a coiled line, through the stern windows a "
     "lookout's lantern high in the rigging of a second ship and the thin lit ring of an Orbital in the sky, "
     "a small silver drone perched on the back of the captain's chair",
+}
+
+# Masaq' Reach's five sections as cards (12 November, Justin: "for this page http://localhost:4321/orbitals/masaq
+# can you have cards for labs, research, models, embeddings and discoveries"). The trading orbital's five
+# views, one plate each: the houses' quay, the scholars' hall, the gauge post, the cords of meaning, and
+# the star charts.
+MASAQ_SECTIONS: dict[str, str] = {
+    "masaq-labs": "a long quay of a trading Orbital at night lined with the yards and halls of many houses: each "
+    "front with its own lantern and banner, ships of many different builds on the stocks and at mooring, "
+    "shipwrights and clerks at work, the curved lit band of the Orbital overhead, heavy black ink, stark "
+    "chiaroscuro, no text, no lettering",
+    "masaq-research": "a lantern-lit hall of scholars on a trading Orbital at night: a great round table of charts, "
+    "open folios, brass instruments and a globe, scholars in long coats debating over the papers, a tall window "
+    "showing the thin luminous ring of the Orbital, a small smooth silver ovoid drone with no propellers at rest on "
+    "the table, heavy black ink, stark chiaroscuro, no text, no lettering",
+    "masaq-models": "three ships at anchor in a row on the black water of a trading Orbital at night, measured against "
+    "a great carved brass gauge post on the quay: a small cutter, a mid-sized brig and a towering galleon, a "
+    "harbour-master with a brass rule at the post, the thin luminous ring of the Orbital overhead, heavy black ink, "
+    "stark chiaroscuro, no text, no lettering",
+    "masaq-embeddings": "a dark chart room on a trading Orbital at night: a great web of coloured knotted cords "
+    "stretched between brass pins on a black chart, each knot a word or a meaning, a scholar tracing one cord with a "
+    "finger, one hanging lantern, a small smooth silver ovoid drone with no propellers above the chart, the thin ring "
+    "of the Orbital through the stern window, heavy black ink, stark chiaroscuro, no text, no lettering",
+    "masaq-discoveries": "a curved wall of star charts and head kinds on a trading Orbital at night: an astronomer on "
+    "a rolling ladder marking a newly lit star, a table of lenses and brass instruments below, a small smooth silver "
+    "ovoid drone with no propellers hovering beside the charts, the thin luminous ring of the Orbital beyond the "
+    "window, heavy black ink, stark chiaroscuro, no text, no lettering",
+}
+
+# Masaq' Reach's countries, one plate each (13 November, Justin: "i want cards for each country with a fal
+# image" on /orbitals/masaq/labs). Each country is a quarter of the trading Orbital's quay, drawn from the
+# days of Drake: what that coast was known for, with no ship of another nation's build except as a prize, and
+# no modern thing. The suffix is the Reach's own: the silver drone, the luminous ring, the ink.
+_COUNTRY_TAIL = ", a small smooth silver ovoid drone with no propellers at rest on a bollard, the thin luminous ring of the Orbital overhead, heavy black ink, stark chiaroscuro, no flags with symbols, no text, no lettering"
+MASAQ_COUNTRIES: dict[str, str] = {
+    "masaq-country-us": "the American quarter of a trading Orbital's quay at night: a vast raw timber shipyard of "
+    "enormous new hulls on the stocks, ironwood and pine stacked in towers, a bustling floor of clerks and "
+    "shipwrights around a great domed counting-house, the ambition of a frontier" + _COUNTRY_TAIL,
+    "masaq-country-cn": "the Chinese quarter of a trading Orbital's quay at night: terraced halls with sweeping "
+    "tiled roofs and carved beams, rows of red paper lanterns, bales of silk and crates of porcelain stacked on "
+    "the quay, an old scholar-official with a long sleeve inspecting a ledger, an English galleon moored as a "
+    "guest" + _COUNTRY_TAIL,
+    "masaq-country-fr": "the French quarter of a trading Orbital's quay at night: a Renaissance harbour hall with "
+    "steep slate roofs, tall dormers and a turreted gate, wine casks rolling down the quay, a courtier in a ruff "
+    "and a cavalier in a plumed hat in conversation under a lantern, tapestries hung from a balcony" + _COUNTRY_TAIL,
+    "masaq-country-ca": "the Canadian quarter of a trading Orbital's quay at night: a northern timber yard in "
+    "falling snow, stacks of pine logs and bundles of furs, trappers in heavy coats at a trading post of squared "
+    "logs, birchbark canoes drawn up on the black shore, dark spruce forest behind" + _COUNTRY_TAIL,
+    "masaq-country-ae": "the Emirati quarter of a trading Orbital's quay at night: a pale coral-stone harbour "
+    "town with square wind towers and carved wooden doors, merchants in long robes weighing pearls and incense "
+    "on brass scales, a caravan of camels loading at the quay, a single lamp in every arch" + _COUNTRY_TAIL,
+    "masaq-country-au": "the Australian quarter of a trading Orbital's quay at night: the unmapped southern "
+    "shore of the charts, red cliffs and pale sand under the Southern Cross, a lone surveyor with a brass "
+    "theodolite and a chart half drawn, a small boat drawn up on a strange coast, a land not yet named"
+    + _COUNTRY_TAIL,
+    "masaq-country-gb": "the English quarter of a trading Orbital's quay at night: a timbered Elizabethan "
+    "harbour town with overhanging gables, a great galleon at the quay with her gunports open, sea-captains "
+    "in sea-cloaks and ruffs around a chart table in a bow-windowed tavern, a bowling green above the water"
+    + _COUNTRY_TAIL,
+    "masaq-country-za": "the South African quarter of a trading Orbital's quay at night: a windswept cape under "
+    "a great flat-topped mountain, a watering station with casks and a stone beacon, tired sailors filling "
+    "barrels at a spring, a ship rounding the headland in the dark, the end of one ocean and the start of "
+    "another" + _COUNTRY_TAIL,
+    "masaq-country-br": "the Brazilian quarter of a trading Orbital's quay at night: a lush bay under steep "
+    "green hills, logs of red dyewood stacked on the quay, a sugar mill with a turning wheel, parrots in the "
+    "palms, traders loading barrels onto a ship, the heat of the tropics" + _COUNTRY_TAIL,
+}
+
+# The charter's seven sections as fal cards (12 November, Justin: "for this page http://localhost:4321/expeditions/charter
+# can you give me fal cards for the fleet, the ship, the tokeniser, what it reads, the scaffold, the training,
+# the return leg"). One 16:9 plate a section, in the same world: the fleet at anchor, the hull on the stocks,
+# the clerk's pieces, the reading table, the ship's scaffold, the capstan, and the turn for home.
+CHARTER_CARDS: dict[str, str] = {
+    "charter-fleet": "eight great wooden ships of different sizes at anchor in a black harbour at night, seen from "
+    "the water: lanterns at every bow, a line of masts and rigging receding into the dark, a flagship with a small "
+    "smooth silver ovoid drone with no propellers hovering above its mast, a thin luminous ring of an Orbital in the "
+    "sky, heavy black ink, stark chiaroscuro, one light source, no text, no lettering",
+    "charter-ship": "the bare hull of a great wooden ship on the stocks in a dark shipyard at night, its ribs, keel "
+    "and stem exposed, shipwrights with lanterns measuring the beam with brass dividers and a chalk line, a thin "
+    "luminous ring of an Orbital through the open roof, heavy black ink, stark chiaroscuro, one light source, no "
+    "text, no lettering",
+    "charter-tokeniser": "a ship's clerk at a long table at night cutting a great sheet into small pieces and setting "
+    "them into a printer's case of metal type, rows of little compartments each holding a piece, a brass token box "
+    "and a ledger of counts, one hanging lantern, a small smooth silver ovoid drone with no propellers at the table's "
+    "edge, a thin ring of light through the stern windows, heavy black ink, stark chiaroscuro, no text, no lettering",
+    "charter-reads": "a ship's chart room at night with a reading table: an open book of grammar, a chart of "
+    "soundings, a book of logic, a stack of period folios, one lantern, a glass of water, a small smooth silver ovoid "
+    "drone with no propellers resting on the books, a thin ring of light through the stern windows, heavy black ink, "
+    "stark chiaroscuro, no text, no lettering",
+    "charter-scaffold": "the timber scaffolding and cradle around a great wooden ship's hull at night: a web of poles, "
+    "ropes and stages, cards and small slates pinned to the timbers, a shipwright holding one card up to a lantern, a "
+    "small smooth silver ovoid drone with no propellers in the rigging, heavy black ink, stark chiaroscuro, one light "
+    "source, a thin orbital ring in the sky, no text, no lettering",
+    "charter-training": "a ship's company working a great capstan on deck at night, ropes taut and a heavy weight "
+    "rising, a mate calling the step, a lantern on the capstan, an open logbook with a schedule pinned beside it, a "
+    "small smooth silver ovoid drone with no propellers above, a thin luminous ring of an Orbital in the sky, heavy "
+    "black ink, stark chiaroscuro, no text, no lettering",
+    "charter-return-leg": "a great wooden ship turning back toward a harbour at dusk, sails half furled, a lantern at "
+    "the bow, the harbour lights and a beacon ahead, its wake curving home across black water, a small smooth silver "
+    "ovoid drone with no propellers above the stern, a thin luminous ring of an Orbital in the sky, heavy black ink, "
+    "stark chiaroscuro, no text, no lettering",
+}
+
+# Three candidate flags for the Demiton orbital (12 November, Justin: "in the top left by nothing up my sleeve
+# i need a better image there instead of the card and the favicon, my thinkinjg is it should be flag for the
+# demiton orbital give me three fal options I can sign off on"). Square, flat, full-bleed, high contrast, no
+# lettering: the mark has to read at the brandmark's 1.15em as well as at a flag's size. Named
+# demiton-flag-<idea> until one is chosen.
+DEMITON_FLAG: dict[str, str] = {
+    "demiton-flag-ring": "a square heraldic flag of the Demiton orbital, seen flat and full-bleed with no pole and no "
+    "sky: on a near-black indigo field a single great ring of pale gold, a thin luminous orbital band, encloses one "
+    "small gold star, a narrow band of silver wave runs beneath the ring, a thin gold border inside the flag's edge, "
+    "heavy black ink, stark chiaroscuro, bold symmetrical heraldry that reads at a thumbnail, the texture of painted "
+    "cloth, no text, no lettering, no words, no letters",
+    "demiton-flag-hind": "a square heraldic flag of the Demiton orbital, seen flat and full-bleed with no pole and no "
+    "sky: a golden Elizabethan galleon, Drake's Golden Hind, in full sail on a near-black field, a silver wave beneath "
+    "her hull, one small gold star above the mainmast, a thin gold border inside the flag's edge, heavy black ink, stark "
+    "chiaroscuro, bold symmetrical heraldry that reads at a thumbnail, the texture of painted cloth, no text, no "
+    "lettering, no words, no letters",
+    "demiton-flag-arms": "a square heraldic flag of the Demiton orbital, seen flat and full-bleed with no pole and no "
+    "sky: a great pale-gold orbital ring arcs across a near-black field, a small golden Elizabethan galleon sails beneath "
+    "it on a thin silver sea, a single small gold star within the ring, a thin gold border inside the flag's edge, heavy "
+    "black ink, stark chiaroscuro, bold simple heraldry that reads at a thumbnail, the texture of painted cloth, no text, "
+    "no lettering, no words, no letters",
 }
 
 # The Liberty Machine page's five cards, one a system (12 November, Justin: "http://localhost:4321/liberty-machine should have 5 cards
@@ -891,8 +1080,8 @@ DRONES: dict[str, str] = {
     "over black water, no moon, no electrical cord, no plastic",
 }
 
-SIZES = {**{k: "landscape_16_9" for k in (*DEMITON_SECTIONS, *LIBERTY_MACHINE_SYSTEMS, *DRONES, *CLASSES,*TESTS, *LABS, *HARBOURS, *HARBOUR_VIEWS, *SHIPBUILDER, *SHIPYARD, *SHIPYARD_SECTIONS, *CHARTING, *POSITIONS, *FOREIGN, *SOP_GOALS, *EXPEDITIONS, *BANDS, *LADDER, *CONSOLE, *EMBEDDINGS)}, **{k: "portrait_4_3" for k in CARDS}, **{k: "portrait_4_3" for k in LOGIC}}
-SUBJECTS = {**DEMITON_SECTIONS, **LIBERTY_MACHINE_SYSTEMS, **DRONES, **TESTS, **LABS, **CLASSES, **HARBOURS, **HARBOUR_VIEWS, **SHIPBUILDER, **SHIPYARD, **SHIPYARD_SECTIONS, **CHARTING, **POSITIONS, **FOREIGN, **CARDS, **LOGIC, **SOP_GOALS, **EXPEDITIONS, **BANDS, **LADDER, **CONSOLE, **EMBEDDINGS}
+SIZES = {**{k: "landscape_16_9" for k in (*DEMITON_SECTIONS, *LIBERTY_MACHINE_SYSTEMS, *DRONES, *CLASSES,*TESTS, *LABS, *HARBOURS, *HARBOUR_VIEWS, *SHIPBUILDER, *SHIPYARD, *SHIPYARD_SECTIONS, *CHARTING, *POSITIONS, *FOREIGN, *SOP_GOALS, *EXPEDITIONS, *EXPEDITION_VIEWS, *CHARTER_CARDS, *MASAQ_SECTIONS, *MASAQ_COUNTRIES, *BANDS, *LADDER, *CONSOLE, *EMBEDDINGS)}, **{k: "portrait_4_3" for k in CARDS}, **{k: "portrait_4_3" for k in LOGIC}, **{k: "square_hd" for k in DEMITON_FLAG}}
+SUBJECTS = {**DEMITON_SECTIONS, **LIBERTY_MACHINE_SYSTEMS, **DRONES, **TESTS, **LABS, **CLASSES, **HARBOURS, **HARBOUR_VIEWS, **SHIPBUILDER, **SHIPYARD, **SHIPYARD_SECTIONS, **CHARTING, **POSITIONS, **FOREIGN, **CARDS, **LOGIC, **SOP_GOALS, **EXPEDITIONS, **EXPEDITION_VIEWS, **BANDS, **LADDER, **CONSOLE, **EMBEDDINGS, **DEMITON_FLAG, **CHARTER_CARDS, **MASAQ_SECTIONS, **MASAQ_COUNTRIES}
 
 # The twenty subjects the audit found outside the brief (ships/reports/art-audit-2026-11-11.md): rewritten
 # into the three-layer world -- Risso's ink, Drake's voyages, the young Culture's universe -- keeping what

@@ -19,7 +19,7 @@ import { btnCls, cardCls, checkCls, crumbCls, emptyCls, selectCls } from '@/lib/
 import { routePath, sectionProps, useApi, useRoute } from '@/lib/useApi';
 import { shipHash } from '@/scripts/router';
 import { esc } from '@/lib/format';
-import { DEMITON_DISCOVERIES as DB, MASAQ_DISCOVERIES as MB, MASAQ_SUBS, QWEN4B_PAGE, newHome, type MasaqSub } from '@/lib/discoveryPaths';
+import { DEMITON_DISCOVERIES as DB, HEAD_KINDS as MB, MASAQ_DISCOVERIES, MASAQ_SUBS, QWEN4B_PAGE, newHome, type MasaqSub } from '@/lib/discoveryPaths';
 import SectionNav from '../SectionNav';
 import { AxisDoors, FieldMapView } from '../FieldMap';
 import { axisBySlug, ourSection } from '@/lib/fieldMap';
@@ -90,7 +90,7 @@ const STAR_TABS: { key: StarTab; label: string }[] = [
   { key: 'heads', label: 'Lit by size' },
   { key: 'cards', label: 'The 16 cards' },
 ];
-// Masaq' Reach's discoveries: the head kinds research has named, the census's cards beyond the sixteen, the Qwen mapping
+// the head kinds research has named, the census's cards beyond the sixteen, the Qwen mapping (Demiton's, under head-kinds)
 const MASAQ_TABS: { key: MasaqSub; label: string }[] = [
   { key: 'kinds', label: 'Head kinds' },
   { key: 'cards', label: 'Cards beyond the sixteen' },
@@ -149,9 +149,12 @@ const chartingHref = (s: Sub): string =>
 
 const parse = (route: string): Parsed => {
   const bits = route.split('?')[0].split('/').filter(Boolean);
-  // Masaq' Reach's discoveries: one view with its three tabs
-  if (bits[0] === 'orbitals' && bits[1] === 'masaq' && bits[2] === 'discoveries') {
-    const m = (MASAQ_SUBS as readonly string[]).includes(bits[3] || '') ? (bits[3] as MasaqSub) : 'kinds';
+  // the head kinds, the cards beyond the sixteen and the Qwen mapping: one view with its three tabs, under Demiton's
+  // discoveries since 13 November (the Reach's old address is parsed the same, then forwarded by canonicalPath)
+  const oldMasaq = bits[0] === 'orbitals' && bits[1] === 'masaq' && bits[2] === 'discoveries';
+  if (oldMasaq || (bits[0] === 'orbitals' && bits[1] === 'demiton' && bits[2] === 'discoveries' && bits[3] === 'head-kinds')) {
+    const sub = oldMasaq ? bits[3] : bits[4];
+    const m = (MASAQ_SUBS as readonly string[]).includes(sub || '') ? (sub as MasaqSub) : 'kinds';
     return { view: 'masaq', sub: 'skills', trick: null, chain: null, domain: null, masaq: m };
   }
   // Demiton's discoveries read as the old /discoveries did: the same tabs, tricks, chains and doors under its base
@@ -201,9 +204,9 @@ const subHref = (s: Sub, charting: boolean): string => {
  *  another page entirely. A move between two of them is a page load, so the crumbs and the header follow. */
 const pageOf = (p: string): 'demiton' | 'charting' | 'masaq' | 'elsewhere' => {
   const path = p.split('?')[0];
+  if (path === MB || path.startsWith(`${MB}/`) || path === MASAQ_DISCOVERIES || path.startsWith(`${MASAQ_DISCOVERIES}/`)) return 'masaq';
   if (path === DB || path.startsWith(`${DB}/`)) return 'demiton';
   if (path === '/shipyard/charting' || path.startsWith('/shipyard/charting/')) return 'charting';
-  if (path === MB || path.startsWith(`${MB}/`)) return 'masaq';
   return 'elsewhere';
 };
 
@@ -606,7 +609,7 @@ export default function Discoveries() {
         <h1>
           <a className={crumbCls('back')} href="/orbitals/demiton">← Demiton</a>{' '}
           Discoveries{' '}
-          <span className="q">what our own fleet has found: the jobs and where the ships do them, the skills on the ladder, the tests that judge them, and the stars our ships have lit. The head kinds research has named, and Qwen3 4B's own census, are in <a href={MB}>Masaq' Reach</a></span>
+          <span className="q">what our own fleet has found: the jobs and where the ships do them, the skills on the ladder, the tests that judge them, and the stars our ships have lit. The head kinds research has named, and the census's cards beyond the sixteen, are under <a href={MB}>Head kinds</a>; Qwen3 4B's own census is on its page</span>
         </h1>
       ) : null}
       {section ? (
@@ -858,7 +861,7 @@ export default function Discoveries() {
 
         {/* the stars: all the head kinds and the sixteen cards, side by side */}
         <div className={`dsub${sub === 'stars' ? ' active' : ''}`} data-dsub="stars">
-          <p className="q dsubintro">What inside does it? The stars <b>our ships have lit</b>, size by size and against Qwen3 4B, and <b>the sixteen cards</b> a ship is built from. A card is a job; a star is a head that passes the job's mark, and lit shared when the best layer's two strongest heads reach it together. The item decks that score the jobs live under <a href={subHref('quantum-tests', inCharting)}>Tests</a>; every head kind attention research has named, and the cards beyond the sixteen, are in <a href={MB}>Masaq' Reach</a>.</p>
+          <p className="q dsubintro">What inside does it? The stars <b>our ships have lit</b>, size by size and against Qwen3 4B, and <b>the sixteen cards</b> a ship is built from. A card is a job; a star is a head that passes the job's mark, and lit shared when the best layer's two strongest heads reach it together. The item decks that score the jobs live under <a href={subHref('quantum-tests', inCharting)}>Tests</a>; every head kind attention research has named, and the cards beyond the sixteen, are under <a href={MB}>Head kinds</a>.</p>
           <TabNav
             ariaLabel="Stars"
             tablist
@@ -875,7 +878,7 @@ export default function Discoveries() {
             <h2>The sixteen cards, card by card <span className="note">each card: its suit, its mark (what counts as lit), whether teaching it keeps (keeper, decayer, or never tested), and the best reading any Nothing up my sleeve ship has reached against Qwen3 4B's own</span></h2>
             <div className="scroll"><table id="discCards" className="selbooks"><thead><tr><th>card</th><th>suit</th><th>mark</th><th>keeps</th><th>best Nothing up my sleeve</th><th>Qwen 4B</th></tr></thead><tbody dangerouslySetInnerHTML={{ __html: deck.data ? cardDeckHtml(deck.data) : '<tr><td colspan="6" class="s">reading the deck…</td></tr>' }} /></table></div>
           </section>
-          <p className="note">The behavioural clusters of Qwen3 4B's census, the cards beyond these sixteen, are in <a href={`${MB}/cards`}>Masaq' Reach</a>.</p>
+          <p className="note">The behavioural clusters of Qwen3 4B's census, the cards beyond these sixteen, are under <a href={`${MB}/cards`}>Head kinds</a>.</p>
           </>
           ) : (
           <>
@@ -897,7 +900,7 @@ export default function Discoveries() {
             <h2>The bridge, layer by layer <span className="note">the bridge card is a curve over layers, not one head: how strongly the answer's position carries the middle term two premises share (the slowest deer), read by the soundings at each layer, in nats; one line per voyage that read it, coloured by size; the dotted line is the provisional threshold. Two hops need it resolved in the middle layers, before the second hop: resolved too late, the chain fails</span></h2>
             <div className="chart" id="bridgechart" />
           </section>
-          <p className="note">Every kind of head attention research has named, with its state in our fleet, is the <a href={MB}>star chart in Masaq' Reach</a>; Qwen3 4B's 1,152 heads and its persona vectors are on <a href={QWEN4B_PAGE}>its own page</a>.</p>
+          <p className="note">Every kind of head attention research has named, with its state in our fleet, is the <a href={MB}>star chart under Head kinds</a>; Qwen3 4B's 1,152 heads and its persona vectors are on <a href={QWEN4B_PAGE}>its own page</a>.</p>
           </>
           )}
         </div>
@@ -920,7 +923,7 @@ export default function Discoveries() {
               <span className="note" id="trickcount">{registry?.count || ''}</span>
             </div>
             <div className="scroll"><table id="tricktable" className="clickable"><thead><tr><th>waypoint</th><th>trick</th><th>what it does</th><th>the field shows it at</th><th>how sure</th><th>stars needed</th><th>Nothing up my sleeve so far</th><th>Nothing up my sleeve's goal size</th></tr></thead><tbody dangerouslySetInnerHTML={{ __html: registry?.body || '' }} /></table></div>
-            <p className="note mt">Also: <a href={MB}>every kind of head (the star chart, in Masaq' Reach)</a> · <a href={`${DB}/traits`}>traits</a></p>
+            <p className="note mt">Also: <a href={MB}>every kind of head (the star chart, under Head kinds)</a> · <a href={`${DB}/traits`}>traits</a></p>
           </section>
         </div>
       </div>
@@ -1008,13 +1011,13 @@ export default function Discoveries() {
           the sixteen, and the Qwen 4B mapping (12 November: moved out of Demiton's Stars tab) */}
       <div className={`dview${view === 'masaq' ? ' active' : ''}`} data-dview="masaq">
         <h1>
-          <a className={crumbCls('back')} href="/orbitals/masaq">← Masaq' Reach</a>{' '}
-          Discoveries{' '}
-          <span className="q">what is known of the outside models and the research field: every kind of attention head the papers have named, the census's clusters beyond our sixteen cards, and the Qwen 4B mapping still to be sorted. What our own ships have found is in <a href={DB}>Demiton</a></span>
+          <a className={crumbCls('back')} href={DB}>← Discoveries</a>{' '}
+          Head kinds{' '}
+          <span className="q">what is known of the field beyond our own ships: every kind of attention head the papers have named, the census's clusters beyond our sixteen cards, and the Qwen 4B mapping still to be sorted. What our own ships have found is in <a href={DB}>Discoveries</a></span>
         </h1>
         <TabNav
           id="masaqdiscnav"
-          ariaLabel="Masaq' Reach discoveries"
+          ariaLabel="head kinds"
           items={MASAQ_TABS.map((t) => ({ key: t.key, label: t.label, href: masaqHref(t.key), active: view === 'masaq' && masaqSub === t.key }))}
         />
         {masaqSub === 'kinds' ? (

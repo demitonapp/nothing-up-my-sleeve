@@ -12,6 +12,8 @@ export function getStaticPaths() {
   const houses = labData.houses as [string, string][];
   const paths: string[] = [
     'labs', 'research', 'models', 'embeddings',
+    // a country's pages (13 November): /us, /us/labs, /us/research, /us/models
+    ...[...new Set(houses.map(([country]) => country))].flatMap((cc) => [cc, `${cc}/labs`, `${cc}/research`, `${cc}/models`]),
     ...houses.map(([country, key]) => `${country}/${key}`),
     ...houses.map(([country, key]) => `${country}/${key}/models`),
   ];

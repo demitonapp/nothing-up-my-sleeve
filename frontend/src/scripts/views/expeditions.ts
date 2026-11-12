@@ -68,7 +68,7 @@ export interface Expedition {
 export interface Rung { preset: string; name: string; [key: string]: unknown }
 
 export interface ExpRoute {
-  kind: 'overview' | 'queue' | 'list' | 'voyage' | 'table' | 'other';
+  kind: 'home' | 'charter' | 'queue' | 'list' | 'voyage' | 'table' | 'other';
   key: string | null;
   tab: string;
   qview: 'glance' | 'every' | 'planning';
@@ -77,9 +77,11 @@ export interface ExpRoute {
 export const ETABS = ['overview', 'plan', 'at-sea', 'findings', 'fleet', 'runs', 'training', 'fitting', 'inside'];
 const PREFIXES = new Set(['expeditions', 'voyages']);
 
-/** Parse the expedition routes. `/expeditions` is the queue landing (the working surface); the cards
- *  are `/expeditions/expeditions`; one expedition is `/expeditions/<key>[/<tab>]`; the table is
- *  `/expeditions/<key>/table`. The old `/voyages` prefix is answered too. */
+/** Parse the expedition routes. `/expeditions` is the landing: three doors (the current charter, the
+ *  expeditions, the queue), its tabs replaced by the breadcrumbs' menu (12 November, Justin). The charter
+ *  is `/expeditions/charter`, the cards are `/expeditions/expeditions`, the queue is `/expeditions/queue`;
+ *  one expedition is `/expeditions/<key>[/<tab>]`; the table is `/expeditions/<key>/table`. The old
+ *  `/voyages` prefix and `/expeditions/plans` are answered too. */
 export function parseExpeditionRoute(path: string): ExpRoute {
   const clean = String(path || '/').split('?')[0].split('#')[0];
   const parts = clean.split('/').filter(Boolean);
@@ -87,7 +89,9 @@ export function parseExpeditionRoute(path: string): ExpRoute {
   if (!parts.length || !PREFIXES.has(parts[0])) return bare;
   const dec = (x: string): string => { try { return decodeURIComponent(x); } catch { return x; } };
   const rest = parts.slice(1).map(dec);
-  if (!rest.length) return { kind: 'overview', key: null, tab: 'overview', qview: 'glance' };
+  if (!rest.length) return { kind: 'home', key: null, tab: 'overview', qview: 'glance' };
+  // /expeditions/charter/<section>: each of the charter's cards has its own page (13 November, Justin); `key` is the section
+  if (rest[0] === 'charter') return { kind: 'charter', key: rest[1] || null, tab: 'overview', qview: 'glance' };
   if (rest[0] === 'queue') return { kind: 'queue', key: null, tab: 'overview', qview: rest[1] === 'every' ? 'every' : rest[1] === 'planning' ? 'planning' : 'glance' };
   if (rest[0] === 'expeditions' || rest[0] === 'plans') return { kind: 'list', key: null, tab: 'overview', qview: 'glance' };
   if (rest[1] === 'table') return { kind: 'table', key: rest[0], tab: 'overview', qview: 'glance' };
@@ -117,6 +121,196 @@ const toggleClsLocal = (extra = ''): string => shadcnToggleCls(extra);
 // EXPEDITIONS), its aim, what it found and the same counts the table carried, so the page reads as one
 // grid of like cards rather than a table of names with no picture.
 const cut = (t: string, n: number): string => (t.length > n ? t.slice(0, n - 1).trimEnd() + '…' : t);
+
+/** The landing's three doors (12 November, Justin: "make it open with three cards the Current Charter,
+ *  Expeditions, Queue and add them with fal images ... instead of using the tabs use the breadcrumbs
+ *  nav"): one plate each, the same brass yard card Demiton's sections use, with the live count under
+ *  the line and the way on from the crumb's menu one click up. The reading arrives after the first
+ *  paint, so an unread card says which reading it is waiting for. */
+export function expeditionDoorsHtml(launch: any, overview: any): string {
+  const r = launch && launch.readiness;
+  const exps: any[] = (overview && overview.expeditions) || [];
+  const q = overview && overview.queue;
+  const open = exps.filter((e) => e.status !== 'done').length;
+  const plural = (n: number, one: string, many = one + 's'): string => `${n} ${n === 1 ? one : many}`;
+  const doors: [string, string, string, string, string][] = [
+    ['Current Charter',
+      'the one expedition: the fleet it launches, the master charter it sails under, and every goal\'s part in it',
+      '/expeditions/charter', 'expeditions-charter',
+      r ? `${r.signed} of ${r.params} signed · ${plural(r.blocking, 'deciding goal')} open · ${r.home} of ${r.ships} ships home` : 'reading the charter…'],
+    ['Expeditions',
+      'every expedition: the ones still settling their charter, and the settled record of what each went out to find',
+      '/expeditions/expeditions', 'expeditions-list',
+      exps.length ? `${open} open · ${exps.length - open} settled` : overview ? 'no expeditions yet' : 'reading the expeditions…'],
+    ['Queue',
+      'what sails next, in order, as the S2 coordinator takes it from the Mac lane',
+      '/expeditions/queue', 'expeditions-queue',
+      q ? `${plural(Number(q.voyages) || 0, 'voyage')} queued · ${Number(q.hours_left || 0).toFixed(1)} h of sailing left` : 'reading the queue…'],
+  ];
+  return `<div class="harbours shipyardgrid expeditionsyard">${doors.map(([name, about, href, art, tally], i) =>
+    `<a class="${cardCls(true, 'card harbourcard shipyardcard')}" href="${esc(href)}">${artImg(art, 'cardart ship')}
+      <div class="yardplate">
+        <span class="yardnum">${String(i + 1).padStart(2, '0')}</span>
+        <span class="yardrule" aria-hidden="true"></span>
+        <span class="nm">${esc(name)}</span>
+        <span class="job">${esc(about)}</span>
+        <span class="yardnote">${esc(tally)}</span>
+        <span class="yardopen">open the ${esc(name.toLowerCase())} →</span>
+      </div></a>`).join('')}</div>`;
+}
+
+/** The charter's seven sections as fal cards (12 November, Justin: "for this page
+ *  http://localhost:4321/expeditions/charter can you give me fal cards for the fleet, the ship, the
+ *  tokeniser, what it reads, the scaffold, the training, the return leg"): the same brass yard plates as
+ *  Demiton's sections, each opening the section it names by its anchor. The fleet is the launch's own
+ *  panel; the other six are the master charter's groups. */
+/** The charter's seven cards, and a page each (13 November, Justin: "each of the cards ... needs it's own
+ *  page"): /expeditions/charter/<slug>. `group` is the master charter's group key the page shows ('fleet' is
+ *  the launch's own fleet panel, not a group). */
+export const CHARTER_SECTIONS: { slug: string; group: string; name: string; about: string; art: string }[] = [
+  { slug: 'fleet', group: 'fleet', name: 'The fleet', about: 'the eight ships of v0.1: a base at every class, and an instruct ship from the 9m up', art: 'charter-fleet' },
+  { slug: 'ship', group: 'ship', name: 'The ship', about: 'the hull: layers, width, query and KV heads, context, positions and how it is built', art: 'charter-ship' },
+  { slug: 'tokeniser', group: 'tokeniser', name: 'The tokeniser', about: 'the pieces: the vocabulary, byte fallback, what it is trained on and the control symbols', art: 'charter-tokeniser' },
+  { slug: 'reads', group: 'reads', name: 'What it reads', about: 'the recipe, passes, cleaning, order and refusals: the corpus every class reads', art: 'charter-reads' },
+  { slug: 'scaffold', group: 'scaffold', name: 'The scaffold', about: 'the cards and riddles, their weight, and how long a pin is held, faded and released', art: 'charter-scaffold' },
+  { slug: 'training', group: 'training', name: 'The training', about: 'the optimiser, learning rate, warm-up, batch, schedule, grad clip and precision', art: 'charter-training' },
+  { slug: 'return-leg', group: 'leg', name: 'The return leg', about: "the instruct ship's leg: what it inherits, its turns and stages, its learning rate and the pull", art: 'charter-return-leg' },
+];
+export const charterSection = (slug: string | null | undefined) => CHARTER_SECTIONS.find((s) => s.slug === slug) || null;
+/** Where a master-charter row lives: its group's page, at the row's own anchor (param keys read `ship.layers`). */
+export const charterParamHref = (key: string): string => {
+  const group = String(key).split('.')[0];
+  const sec = CHARTER_SECTIONS.find((s) => s.group === group);
+  return `/expeditions/charter/${sec ? sec.slug : ''}#param-${encodeURIComponent(String(key).replace(/[^a-z0-9-]/gi, '-'))}`;
+};
+
+export function charterCardsHtml(launch?: any): string {
+  // under each card, where the section stands: ships home for the fleet, rows signed for a group
+  const stand = (s: (typeof CHARTER_SECTIONS)[number]): string => {
+    if (!launch) return '';
+    if (s.slug === 'fleet') return launch.readiness ? `${launch.readiness.home} of ${launch.readiness.ships} ships home` : '';
+    const g = ((launch.charter && launch.charter.groups) || []).find((x: any) => x.key === s.group);
+    return g ? `${g.params.filter((p: any) => p.state === 'signed').length} of ${g.params.length} signed` : '';
+  };
+  const sections: [string, string, string, string, string][] = CHARTER_SECTIONS.map((s) => [s.name, s.about, `/expeditions/charter/${s.slug}`, s.art, stand(s)]);
+  return `<div class="harbours shipyardgrid chartercards">${sections.map(([name, about, href, art, standing], i) =>
+    `<a class="${cardCls(true, 'card harbourcard shipyardcard')}" href="${esc(href)}">${artImg(art, 'cardart ship')}
+      <div class="yardplate">
+        <span class="yardnum">${String(i + 1).padStart(2, '0')}</span>
+        <span class="yardrule" aria-hidden="true"></span>
+        <span class="nm">${esc(name)}</span>
+        <span class="job">${esc(about)}</span>
+        ${standing ? `<span class="s">${esc(standing)}</span>` : ''}
+        <span class="yardopen">open ${esc(name.toLowerCase())} →</span>
+      </div></a>`).join('')}</div>`;
+}
+
+/** The charter's goals on the expeditions' own page (12 November, Justin: "this page
+ *  /expeditions/expeditions should show also a summary of the goals and where we are to achieving them
+ *  for the charter to be signed off. That's what the expeditions are for, is to get enough information
+ *  to sign off the charter. Each charter is a full fleet version of Nothin up my sleeve"): the rows of
+ *  the master charter counted by where they stand, then the goals that decide them — open ones first —
+ *  each with the charter rows it settles and the reading so far. The bar, the fleet's own readings and
+ *  what is carried are folded below: they do not hold a row of this charter. */
+const GOAL_TONE: Record<string, string> = { done: 'good', partly: 'accent', open: '', dropped: '' };
+const GOAL_PART: [string, string, string][] = [
+  ['decides', 'Deciding the charter', 'a row of the master charter waits on it'],
+  ['acceptance', 'The bar', 'a reading the fleet is judged on'],
+  ['delivered', 'Delivered by the fleet', 'the reading only the fleet itself can give'],
+  ['carried', 'Carried to the next expedition', 'not needed to sign this charter'],
+  ['unassigned', 'No part yet', 'a goal the launch has not read into a part yet'],
+];
+const GROUP_SHORT: Record<string, string> = {
+  'The ship': 'ship', 'The tokeniser': 'tokeniser', 'What it reads': 'reads',
+  'The scaffold': 'scaffold', 'The training': 'training', 'The return leg (instruct ships)': 'return leg',
+};
+const goalRank = (st: string): number => ({ partly: 0, open: 1, done: 2, dropped: 3 }[st] ?? 4);
+const byGoal = (a: any, b: any): number =>
+  goalRank(a.status) - goalRank(b.status)
+  || String(a.expedition_name || a.expedition || '').localeCompare(String(b.expedition_name || b.expedition || ''))
+  || String(a.goal_id).localeCompare(String(b.goal_id), undefined, { numeric: true });
+
+export function goalSummaryHtml(launch: any): string {
+  if (!launch) return '';
+  const rows: { key: string; group: string; name: string; state: string }[] = [];
+  for (const g of launch.charter?.groups || []) {
+    for (const p of g.params || []) rows.push({ key: p.key, group: GROUP_SHORT[g.name] || String(g.name).toLowerCase(), name: p.name, state: p.state });
+  }
+  const paramOf = new Map(rows.map((x) => [x.key, x]));
+  const count: Record<string, number> = { signed: 0, ready: 0, waiting: 0, drifted: 0 };
+  for (const x of rows) count[x.state] = (count[x.state] || 0) + 1;
+  const total = rows.length;
+  const pct = (n: number): string => (total ? `${(100 * n) / total}%` : '0%');
+  const parts: any[] = launch.parts || [];
+  const blocking = parts.filter((p) => p.part === 'decides' && p.status !== 'done').length;
+
+  const bar = `<div class="chartertally">
+      <span><b>${count.signed}</b> of ${total} rows signed</span>
+      <span><b>${count.ready}</b> ready to sign</span>
+      <span><b>${count.waiting}</b> waiting on a goal</span>
+      <span><b>${blocking}</b> deciding ${blocking === 1 ? 'goal' : 'goals'} still to settle</span>
+    </div>
+    <div class="phasebar charterbar" role="img" aria-label="${count.signed} of ${total} charter rows signed, ${count.ready} ready, ${count.waiting} waiting on a goal${count.drifted ? `, ${count.drifted} drifted` : ''}">
+      <i class="signed" style="width:${pct(count.signed)}"></i><i class="ready" style="width:${pct(count.ready)}"></i><i class="waiting" style="width:${pct(count.waiting)}"></i>${count.drifted ? `<i class="drifted" style="width:${pct(count.drifted)}"></i>` : ''}
+    </div>
+    <div class="phaselegend charterlegend">
+      <span><i class="signed"></i> signed <b>${count.signed}</b></span>
+      <span><i class="ready"></i> ready to sign <b>${count.ready}</b></span>
+      <span><i class="waiting"></i> waiting on a goal <b>${count.waiting}</b></span>
+      ${count.drifted ? `<span><i class="drifted"></i> drifted <b>${count.drifted}</b></span>` : ''}
+    </div>`;
+
+  const goalRow = (p: any, withParts: boolean): string => {
+    const groups = new Map<string, string[]>();
+    for (const key of p.params || []) {
+      const info = paramOf.get(key);
+      if (!info) continue;
+      const href = charterParamHref(key);
+      const name = `<a href="${href}" title="${esc(key)} · ${esc(info.state)}">${esc(info.name)}</a>`;
+      groups.set(info.group, [...(groups.get(info.group) || []), name]);
+    }
+    const decides = [...groups].map(([g, names]) => `<div><span class="s">${esc(g)} · </span>${names.join(', ')}</div>`).join('') || '<span class="s">carried from the draft</span>';
+    const note = p.evidence || p.words || '';
+    const why = p.why ? `<div class="s why">${esc(p.why)}</div>` : '';
+    const exp = p.expedition ? `<a href="/expeditions/${encodeURIComponent(p.expedition)}">${esc(p.expedition_name || p.expedition)}</a>` : '';
+    const third = withParts
+      ? decides
+      : `<span class="partname">${esc((GOAL_PART.find(([k]) => k === p.part) || [p.part, p.part])[1])}</span>`;
+    return `<tr>
+      <td><b>${esc(p.text)}</b><div class="s mono">${esc(p.goal_id)}${exp ? ` · ${exp}` : ''}</div>${why}</td>
+      <td><span class="${pillCls(GOAL_TONE[p.status] || '')}">${esc(p.status || '–')}</span></td>
+      <td class="decides">${third}</td>
+      <td class="where">${note ? esc(cut(note, 240)) : '<span class="s">nothing written up yet</span>'}</td>
+    </tr>`;
+  };
+  const groupRow = (title: string, note: string): string =>
+    `<tr class="chartergroup"><th colspan="4" scope="colgroup">${esc(title)} <span class="s">${esc(note)}</span></th></tr>`;
+
+  const deciding = parts.filter((p) => p.part === 'decides').sort(byGoal);
+  const unsettled = deciding.filter((p) => p.status !== 'done');
+  const settled = deciding.filter((p) => p.status === 'done');
+  const head = `<thead><tr><th>goal</th><th>where it stands</th><th>charter rows</th><th>the reading so far</th></tr></thead>`;
+  const decidingTable = deciding.length ? `<div class="scroll"><table class="goaltable chartersummary" data-nosort>${head}<tbody>
+      ${unsettled.length ? groupRow(`Still to settle (${unsettled.length})`, 'a row of the master charter waits on these') + unsettled.map((p) => goalRow(p, true)).join('') : ''}
+      ${settled.length ? groupRow(`Settled (${settled.length})`, 'their rows are ready, or already signed') + settled.map((p) => goalRow(p, true)).join('') : ''}
+    </tbody></table></div>` : `<div class="${emptyCls()}">no goal decides a row of this charter yet</div>`;
+
+  const rest = parts.filter((p) => p.part !== 'decides');
+  const restTable = rest.length ? `<details class="archive goalrest">
+      <summary>The bar, the fleet's own readings, and what is carried (${rest.length}) <span class="s">they do not hold a row of this charter: they judge the fleet or wait for the next expedition</span></summary>
+      <div class="scroll"><table class="goaltable chartersummary rest" data-nosort>${head}<tbody>
+        ${GOAL_PART.filter(([k]) => k !== 'decides').map(([k, title, note]) => {
+          const list = rest.filter((p) => p.part === k).sort(byGoal);
+          return list.length ? groupRow(`${title} (${list.length})`, note) + list.map((p) => goalRow(p, false)).join('') : '';
+        }).join('')}
+      </tbody></table></div>
+    </details>` : '';
+
+  const cta = `<p class="goalcta"><a href="/expeditions/charter">Open the master charter →</a> <span class="s">sign a row off there as its goals settle</span></p>`;
+
+  return `${bar}${decidingTable}${restTable}${cta}`;
+}
+
 export function expeditionCardsHtml(exps: Expedition[], states: Record<string, string>, overview?: any, prep?: Record<string, any>): string {
   const ov: Record<string, any> = {};
   for (const e of (overview && overview.expeditions) || []) ov[e.key] = e;

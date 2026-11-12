@@ -5,7 +5,7 @@
 // The data is /api/launch (thorp/launch.py); a signature is a POST to /api/charter/sign, which answers
 // with the page's payload again, so the row reads signed without waiting for the next poll.
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { btnCls, cardCls, pillCls } from '@/lib/ui';
 
 type GoalRef = { goal_id: string; text: string; status: string; expedition?: string | null; words?: string; evidence?: string };
@@ -61,11 +61,32 @@ function ShipCell({ c }: { c: Cell }) {
   );
 }
 
-export default function Launch({ data, onChange }: { data: LaunchPayload; onChange: (d: LaunchPayload) => void }) {
+/** `section` is a charter card's page (13 November): 'fleet' shows the fleet panel, a group key shows that group's rows of the
+ *  master charter; without it, the overview: the expedition's head and every goal's part. */
+export default function Launch({ data, onChange, section = null }: { data: LaunchPayload; onChange: (d: LaunchPayload) => void; section?: string | null }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState('');
   const classes = data.charter.columns.map((c) => c.class);
   const r = data.readiness;
+
+  // the charter rows take an anchor (param-ship-layers …) so a goal on the expeditions page can open
+  // the row it decides (12 November). The payload arrives after the browser's first fragment scroll, so
+  // the jump runs again when the rows are in the page.
+  useEffect(() => {
+    const jump = (): void => {
+      const id = location.hash.slice(1);
+      if (!id) return;
+      const el = document.getElementById(id);
+      if (el) el.scrollIntoView({ block: 'start' });
+    };
+    jump();
+    window.addEventListener('thorp:navigate', jump);
+    window.addEventListener('hashchange', jump);
+    return () => {
+      window.removeEventListener('thorp:navigate', jump);
+      window.removeEventListener('hashchange', jump);
+    };
+  }, [data]);
 
   const sign = async (param: string, on: boolean): Promise<void> => {
     setBusy(param);
@@ -119,10 +140,12 @@ export default function Launch({ data, onChange }: { data: LaunchPayload; onChan
     </>;
   };
 
+  const groups = section && section !== 'fleet' ? data.charter.groups.filter((g) => g.key === section) : data.charter.groups;
+  const overview = !section;
   return (
     <div className="launch">
       {/* ---- the expedition and where it stands */}
-      <section className={cardCls(false, 'panel launchhead')} id="launchhead">
+      {overview ? <section className={cardCls(false, 'panel launchhead')} id="launchhead">
         <div className="launchtitle">
           <div>
             <div className="launchname">{data.name} <span className="launchver">v{data.version}</span></div>
@@ -143,10 +166,10 @@ export default function Launch({ data, onChange }: { data: LaunchPayload; onChan
           ))}
         </ol>
         {!data.store ? <div className="s">the store could not be read: the goals' verdicts and the signatures are missing from this reading</div> : null}
-      </section>
+      </section> : null}
 
       {/* ---- the fleet */}
-      <section className={cardCls(false, 'panel')} id="launchfleet">
+      {section === 'fleet' ? <section className={cardCls(false, 'panel')} id="launchfleet">
         <h2>The fleet <span className="note">the eight ships of v{data.version}: a base at every class and an instruct ship from the 9m up (a base with the return leg sailed from it). Under each, the voyages that have rehearsed it at the draft standards</span></h2>
         <div className="scroll"><table className="fleettable" data-nosort>
           <thead><tr><th />{data.fleet.map((s) => (
@@ -157,10 +180,10 @@ export default function Launch({ data, onChange }: { data: LaunchPayload; onChan
             <tr><th scope="row">instruct</th>{data.fleet.map((s) => <ShipCell key={s.class} c={s.instruct} />)}</tr>
           </tbody>
         </table></div>
-      </section>
+      </section> : null}
 
-      {/* ---- the master charter */}
-      <section className={cardCls(false, 'panel')} id="mastercharter">
+      {/* ---- the master charter: one group's rows on its card's page */}
+      {section && section !== 'fleet' ? <section className={cardCls(false, 'panel')} id="mastercharter">
         <h2>The master charter <span className="note">the voyage card's parameters, for the whole fleet: each row read from the draft's fitouts (SOP v{data.draft}), class by class, and signed off when preparation has settled it. A signature keeps the values as signed, so a draft reworked afterwards reads drifted. {r.ready} ready to sign, {r.waiting} waiting on a goal{r.drifted ? `, ${r.drifted} drifted` : ''}</span></h2>
         {err ? <div className="bad" role="alert">{err}</div> : null}
         <div className="scroll"><table className="chartertable" data-nosort>
@@ -171,11 +194,11 @@ export default function Launch({ data, onChange }: { data: LaunchPayload; onChan
             ))}
             <th>decided by</th><th>sign-off</th>
           </tr></thead>
-          {data.charter.groups.map((g) => (
-            <tbody key={g.key}>
+          {groups.map((g) => (
+            <tbody key={g.key} id={`charter-${g.key}`}>
               <tr className="chartergroup"><th colSpan={classes.length + 3} scope="colgroup">{g.name} <span className="s">{g.params.filter((p) => p.state === 'signed').length} of {g.params.length} signed</span></th></tr>
               {g.params.map((p) => (
-                <tr key={p.key} className={`charterrow ${p.state}`} data-param={p.key}>
+                <tr key={p.key} className={`charterrow ${p.state}`} data-param={p.key} id={`param-${p.key.replace(/[^a-z0-9-]/gi, '-')}`}>
                   <th scope="row">{p.name}</th>
                   {valueCells(p)}
                   <td className="decided">{p.goals.length ? p.goals.map((gl) => (
@@ -190,10 +213,10 @@ export default function Launch({ data, onChange }: { data: LaunchPayload; onChan
             </tbody>
           ))}
         </table></div>
-      </section>
+      </section> : null}
 
       {/* ---- every goal's part */}
-      <details className="expgroup" id="launchparts">
+      {overview ? <details className="expgroup" id="launchparts">
         <summary><h2 className="band">Every goal's part in the launch <span className="q">{PART_ORDER.filter((k) => data.parts.some((x) => x.part === k)).map((k) => `${data.parts.filter((x) => x.part === k).length} ${PART_NAME[k].toLowerCase()}`).join(' · ')}{data.parts_proposed ? ' — proposed, not yet signed off' : ''}</span></h2></summary>
         <section className={cardCls(false, 'panel')}>
           <div className="scroll"><table className="partstable" data-nosort>
@@ -211,7 +234,7 @@ export default function Launch({ data, onChange }: { data: LaunchPayload; onChan
             </tbody>
           </table></div>
         </section>
-      </details>
+      </details> : null}
     </div>
   );
 }

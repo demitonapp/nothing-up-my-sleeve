@@ -1,5 +1,5 @@
 // The breadcrumb trail (12 November, Justin: "can we have breadcrumbs throughout the UI for ease of
-// navigation"). One function reads an address and says where it sits in the site, from Places down, so
+// navigation"). One function reads an address and says where it sits in the site, from the orbitals down, so
 // every page gets the same trail from the layout instead of each island writing its own "← back" link.
 // The tree is the site's as it stands today (lib/nav.ts): Orbitals holds Demiton and Masaq'
 // Reach; Demiton holds the berth, the shipyard, the library, the expeditions (with the queue), the
@@ -30,13 +30,15 @@ export interface MenuItem {
 // and its classes smallest first, by their canonical address
 const DEMITON_MENU: MenuItem[] = [
   { label: 'Overview', href: '/orbitals/demiton', group: 'The orbital' },
-  { label: 'Berth', href: '/orbitals/demiton/berth' },
   { label: 'Shipyard', href: '/shipyard' },
+  { label: 'Berth', href: '/shipyard/berth', note: 'in the Shipyard' },
   { label: 'Library', href: '/library' },
   { label: 'Images', href: '/library/images', note: 'in the Library' },
   { label: 'Discoveries', href: '/orbitals/demiton/discoveries', note: 'what our fleet found' },
+  { label: 'Head kinds', href: '/orbitals/demiton/discoveries/head-kinds', note: 'in Discoveries' },
   { label: 'Liberty Machine', href: '/orbitals/demiton/liberty-machine' },
   { label: 'Expeditions', href: '/expeditions', group: 'At sea' },
+  { label: 'Current Charter', href: '/expeditions/charter' },
   { label: 'Queue', href: '/expeditions/queue' },
   { label: 'Every ship', href: '/ships' },
   { label: 'The towing tank', href: '/ships/300k', note: '300k', group: 'The classes' },
@@ -50,11 +52,10 @@ const DEMITON_MENU: MenuItem[] = [
 
 // Masaq' Reach's quick ways on: its four views, and the models by size band
 const MASAQ_MENU: MenuItem[] = [
-  { label: 'Labs', href: '/orbitals/masaq', group: 'The Reach' },
+  { label: 'Labs', href: '/orbitals/masaq/labs', group: 'The Reach' },
   { label: 'Research', href: '/orbitals/masaq/research' },
   { label: 'Models', href: '/orbitals/masaq/models' },
   { label: 'Embeddings', href: '/orbitals/masaq/embeddings' },
-  { label: 'Discoveries', href: '/orbitals/masaq/discoveries', note: 'head kinds and the census' },
   { label: 'Extra small', href: '/orbitals/masaq/models/xsmall', group: 'Models by size' },
   { label: 'Small', href: '/orbitals/masaq/models/small' },
   { label: 'Medium', href: '/orbitals/masaq/models/medium' },
@@ -72,7 +73,15 @@ const ORBITALS_MENU: MenuItem[] = [
 const ORBITALS: Crumb = { label: 'Orbitals', href: '/orbitals', menu: ORBITALS_MENU };
 const DEMITON: Crumb = { label: 'Demiton', href: '/orbitals/demiton', menu: DEMITON_MENU };
 const MASAQ: Crumb = { label: "Masaq' Reach", href: '/orbitals/masaq', menu: MASAQ_MENU };
-const EXPEDITIONS: Crumb = { label: 'Expeditions', href: '/expeditions' };
+// Expeditions' quick ways on (12 November, Justin: "make it open with three cards the Current Charter,
+// Expeditions, Queue ... instead of using the tabs use the breadcrumbs nav"): the landing's three doors
+// live on the crumb, so the pages themselves show no section tab row.
+const EXPEDITIONS_MENU: MenuItem[] = [
+  { label: 'Current Charter', href: '/expeditions/charter', group: 'The expedition' },
+  { label: 'Every expedition', href: '/expeditions/expeditions' },
+  { label: 'Queue', href: '/expeditions/queue' },
+];
+const EXPEDITIONS: Crumb = { label: 'Expeditions', href: '/expeditions', menu: EXPEDITIONS_MENU };
 const LIBRARY: Crumb = { label: 'Library', href: '/library' };
 const SHIPYARD: Crumb = { label: 'Shipyard', href: '/shipyard' };
 const MODELS: Crumb = { label: 'Models', href: '/orbitals/masaq/models' };
@@ -127,6 +136,16 @@ const decode = (s: string): string => {
 
 /** A segment as a reader names it: a known word, else its words with the first capitalised. A run id or a
  *  model name (it has an @, a dot or a digit beside a letter) is kept exactly as written. */
+const LB_CATEGORY: Record<string, string> = {
+  logic: 'Logic', knowledge: 'Knowledge', reasoning: 'Reasoning', instruction: 'Instruction following', coding: 'Coding',
+  agent: 'Agent', 'long-context': 'Long context', abilities: 'Abilities',
+};
+
+const CHARTER_PAGE: Record<string, string> = {
+  fleet: 'The fleet', ship: 'The ship', tokeniser: 'The tokeniser', reads: 'What it reads', scaffold: 'The scaffold',
+  training: 'The training', 'return-leg': 'The return leg',
+};
+
 export const labelOf = (seg: string): string => {
   const s = decode(seg);
   if (WORDS[s]) return WORDS[s];
@@ -167,7 +186,15 @@ export function crumbsFor(path: string): Crumb[] {
   if (masaqAt >= 0) {
     out.push(ORBITALS, MASAQ);
     const [x, y, z] = parts.slice(masaqAt);
-    if (!x || x === 'labs') return out;
+    if (!x) {
+      // the old /masaq and /labs roots still open the Labs view; the canonical root is the Reach's cards
+      if (a === 'labs' || a === 'masaq') add('Labs', '/orbitals/masaq/labs');
+      return out;
+    }
+    if (x === 'labs') {
+      add('Labs', '/orbitals/masaq/labs');
+      return out;
+    }
     if (x === 'models' || x === 'ships') {
       out.push(MODELS);
       if (y && BAND[y]) add(BAND[y], `/orbitals/masaq/models/${y}`);
@@ -181,11 +208,13 @@ export function crumbsFor(path: string): Crumb[] {
       add('Research', '/orbitals/masaq/research');
       return out;
     }
-    // the Reach's discoveries (12 November): the head kinds, the cards beyond the sixteen, the Qwen mapping
-    if (x === 'discoveries') {
-      add('Discoveries', '/orbitals/masaq/discoveries');
-      if (y === 'cards') add('Cards beyond the sixteen', '/orbitals/masaq/discoveries/cards');
-      else if (y === 'unsorted') add('Still to be sorted', '/orbitals/masaq/discoveries/unsorted');
+    // the Reach's old discoveries address forwards to Demiton's head kinds (13 November): no crumb of its own
+    if (x === 'discoveries') return out;
+    // a country's pages (13 November): /orbitals/masaq/<cc>[/labs|/research|/models]; the landing of the cards is Labs
+    if (/^[a-z]{2}$/.test(x) && (!y || y === 'labs' || y === 'research' || y === 'models') && !z) {
+      add('Labs', '/orbitals/masaq/labs');
+      add(COUNTRY[x] || labelOf(x), `/orbitals/masaq/${x}/labs`);
+      if (y === 'research' || y === 'models') add(labelOf(y), `/orbitals/masaq/${x}/${y}`);
       return out;
     }
     // a house: /orbitals/masaq/<country>/<key>[/models]
@@ -209,7 +238,7 @@ export function crumbsFor(path: string): Crumb[] {
         if (sys) add(labelOf(sys), libertyMachineHref(sys));
         return out;
       }
-      if (c === 'berth') add('Berth', '/orbitals/demiton/berth');
+      if (c === 'berth') { out.push(SHIPYARD); add('Berth', '/shipyard/berth'); }
       else if (c === 'ships') add('Every ship', '/ships');
       else if (c === 'shipbuilder') out.push(SHIPYARD);
       else if (c === 'discoveries') {
@@ -247,7 +276,17 @@ export function crumbsFor(path: string): Crumb[] {
 
   if (a === 'expeditions' || a === 'voyages') {
     out.push(ORBITALS, DEMITON, EXPEDITIONS);
-    if (!b || b === 'plans' || b === 'expeditions') return out;
+    if (!b) return out;
+    if (b === 'charter') {
+      add('Current Charter', '/expeditions/charter');
+      // each of the charter's cards has its own page (13 November)
+      if (c) add(CHARTER_PAGE[c] || labelOf(c), `/expeditions/charter/${c}`);
+      return out;
+    }
+    if (b === 'plans' || b === 'expeditions') {
+      add('Every expedition', '/expeditions/expeditions');
+      return out;
+    }
     if (b === 'queue') {
       add('Queue', '/expeditions/queue');
       if (c) add(labelOf(c), `/expeditions/queue/${c}`);
@@ -306,6 +345,11 @@ export function crumbsFor(path: string): Crumb[] {
     if (!b) return out;
     if (BAND[b]) {
       add(BAND[b], `/leaderboard/${b}`);
+      return out;
+    }
+    // a category of test (13 November): its own page
+    if (LB_CATEGORY[b]) {
+      add(LB_CATEGORY[b], `/leaderboard/${b}`);
       return out;
     }
     if (b === 'competitor') {

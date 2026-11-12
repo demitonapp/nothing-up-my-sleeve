@@ -1,5 +1,5 @@
 ---
-// The shared header: the wordmark, the "updated" stamp, the five ways in, and the settings cog. The tabs themselves
+// The shared header: the wordmark, the "updated" stamp, the two ways in, and the settings cog. The tabs themselves
 // are the shared row (Tabs.astro), and their order, labels and active rule live in lib/nav.ts, so
 // the header and every page's section tabs cannot disagree (UI.md, "Navigation").
 import Tabs from './Tabs.astro';
@@ -20,10 +20,11 @@ const items = MAIN_TABS.map((t) => ({
 }));
 ---
 <header>
-  <h1><a href="/orbitals" id="home" title="the harbours"><img class="brandmark" src="/card.svg" alt="" width="20" height="20" />Nothing up my sleeve</a></h1>
+  <h1><a href="/orbitals" id="home" title="the harbours"><img class="brandmark" src="/flags/demiton-mark.png" alt="" width="20" height="20" />Nothing up my sleeve</a></h1>
   <span class="sub" id="updated"></span>
-  <!-- the ways in: the ships, grouped by size, the expeditions they have made, and the discoveries
-       followed across all of them (UI.md, "Navigation") -->
+  <!-- the ways in: the orbitals (Demiton and the trading orbital, and everything inside them) and
+       the leaderboard (UI.md, "Navigation"). Discoveries is a view inside each orbital, and the Liberty
+       Machine is inside Demiton, so both are reached from the orbital, not from here. -->
   <Tabs items={items} variant="default" id="mainnav" class="ml-auto" ariaLabel="Main" />
   <!-- the palette's way in, for anyone who does not know the shortcut yet (⌘K) -->
   <button class="cog" id="palettebtn" type="button" title="go to a page (⌘K)" aria-label="go to a page (Command K)" style="background:none;border:0;cursor:pointer;color:inherit;font:inherit;padding:0 6px;opacity:.75">

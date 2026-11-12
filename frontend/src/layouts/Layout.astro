@@ -17,12 +17,12 @@ import Breadcrumbs from '../components/islands/Breadcrumbs';
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Nothing up my sleeve</title>
-    <link rel="icon" type="image/svg+xml" href="/card.svg" />
-    <link rel="apple-touch-icon" href="/card.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/favicon-180.png" />
   </head>
   <body>
     <Header />
-    <!-- where this page sits, from Places down (lib/crumbs.ts): one trail for every page -->
+    <!-- where this page sits, from the orbitals down (lib/crumbs.ts): one trail for every page -->
     <Breadcrumbs client:load initialPath={Astro.url.pathname} />
     <slot />
     <!-- ⌘K, on every page: type a place, go to it (components/islands/CommandPalette); chatting is the terminal's ⌘J -->

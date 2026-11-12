@@ -1,9 +1,9 @@
-// The one place the site's navigation is defined: the five ways in (the header), the tabs each
+// The one place the site's navigation is defined: the two ways in (the header), the tabs each
 // section shows under it, and the rule for which one is active. The header, every island and the
 // static pages read this file, so a section's tabs cannot drift from page to page (UI.md,
 // "Navigation"). Pure logic only: no DOM, no React.
 
-export type MainKey = 'places' | 'expeditions' | 'leaderboard' | 'library' | 'liberty-machine';
+export type MainKey = 'places' | 'expeditions' | 'leaderboard' | 'library';
 
 export interface MainTab {
   key: MainKey;
@@ -33,18 +33,11 @@ export interface SectionNav {
 
 export const MAIN_TABS: MainTab[] = [
   {
-    key: 'places', label: 'Places', href: '/orbitals',
+    key: 'places', label: 'Orbitals', href: '/orbitals',
     title: 'the places: Demiton\'s orbital (its berth, shipyard, library and expeditions) and the trading orbital, where every other lab and its ships reside',
     match: ['/orbitals', '/harbours', '/harbors', '/ships', '/sizes', '/classes', '/rung', '/foreign', '/shipyard', '/masaq', '/labs', '/expeditions', '/library', '/shelves', '/discoveries'],
   },
   { key: 'leaderboard', label: 'Leaderboard', href: '/leaderboard', title: '', match: ['/leaderboard'] },
-  // the Liberty Machine is a way in of its own (12 November, Justin: "need pages for each Liberty Machine system and then move it up a
-  // level out of expeditions into it's own top level item"): it governs the whole of Nothing up my sleeve, not a voyage
-  {
-    key: 'liberty-machine', label: 'Liberty Machine', href: '/orbitals/demiton/liberty-machine',
-    title: 'the Liberty Machine: how Nothing up my sleeve governs itself, in five systems (S1 operations, S2 coordination, S3 control with the audit, S4 intelligence, S5 policy)',
-    match: ['/orbitals/demiton/liberty-machine', '/governance', '/vsm'],
-  },
 ];
 
 /** A path as the router reads it: no query, no leading hash, no trailing slash. */
@@ -75,14 +68,15 @@ export const libraryBranchHref = (key: string): string => `/library/${encodeURIC
 /** True for the base address itself or anything below it. */
 const at = (p: string, base: string): boolean => p === base || p.startsWith(base + '/');
 
-/** The header tab a path belongs to. Pages outside the five ways in (a bet, a chat) stay on Places,
- *  where they are reached from. */
+/** The header tab a path belongs to. Pages outside the two ways in (a bet, a chat) stay on Orbitals,
+ *  where they are reached from. The Liberty Machine is Demiton's, so it lights Orbitals and is reached
+ *  from the orbital's card and crumb (12 November, Justin: "liberty machine link should be removed from
+ *  the top right navigation. It's navigable via the demiton orbital"). */
 export function mainTabFor(path: string): MainKey {
   const p = navPath(path);
   // Discoveries is not a way in of its own (12 November, Justin): it is a view in each orbital, so Places is lit
   if (at(p, '/leaderboard')) return 'leaderboard';
-  if (at(p, '/orbitals/demiton/liberty-machine') || at(p, '/governance') || at(p, '/vsm')) return 'liberty-machine';
-  // Expedition and Library addresses are Demiton's views now (12 November), so Places is the way in.
+  // Expedition and Library addresses are Demiton's views now (12 November), so Orbitals is the way in.
   return 'places';
 }
 
@@ -90,39 +84,29 @@ const placesSection = (p: string): SectionNav => {
   // The shipyard is not a way in of its own (12 November, Justin: "the shipyard is only within demiton's
   // orbital"): it is a page under Demiton, reached from /harbours/demiton's yards, and /shipyard keeps
   // Orbitals lit. The old harbour shipbuilder addresses are Demiton's too.
-  // Places has one way in now (12 November): the two orbitals. The shipyard is inside Demiton, and the
+  // Orbitals has one way in now (12 November): the two orbitals. The shipyard is inside Demiton, and the
   // labs are inside Masaq' Reach's two views, so neither is a tab of its own.
   return {
     key: 'places',
-    label: 'Places',
+    label: 'Orbitals',
     items: [
       { key: 'harbours', label: 'Orbitals', href: '/orbitals', active: true },
     ],
   };
 };
 
-const expeditionSub = (p: string): string => {
-  if (at(p, '/expeditions/queue') || at(p, '/voyages/queue')) return 'queue';
-  if (at(p, '/expeditions/plans') || at(p, '/expeditions/expeditions') || at(p, '/voyages/plans') || at(p, '/voyages/expeditions')) return 'plans';
-  if (p === '/expeditions' || p === '/voyages') return 'overview';
-  // a voyage keeps the Plans tab lit: it is one of the plans
-  if (at(p, '/expeditions') || at(p, '/voyages')) return 'plans';
-  return 'overview';
-};
-
-const expeditionsSection = (p: string): SectionNav => {
-  const sub = expeditionSub(p);
-  return {
-    key: 'expeditions',
-    label: 'Expeditions',
-    items: [
-      // the old Overview (the SOP cards) is gone: the plans page is the Overview now, and /expeditions
-      // and /expeditions/plans are the same page (11 November, Justin)
-      { key: 'overview', label: 'Overview', href: '/expeditions', active: sub === 'overview' || sub === 'plans' },
-      { key: 'queue', label: 'Queue', href: '/expeditions/queue', active: sub === 'queue' },
-    ],
-  };
-};
+/** The tabs a page shows under the header, or null when the section is one page (Leaderboard,
+ *  Library) and has nothing to switch between. The same function serves the islands and the static
+ *  pages, so a page cannot forget its section's row. The Liberty Machine and the Expeditions return
+ *  null: their crumb's menu is the navigation (12 November). */
+export function sectionNavFor(path: string): SectionNav | null {
+  const p = navPath(path);
+  if (p === '/' || at(p, '/shipyard') || at(p, '/orbitals') || at(p, '/harbours') || at(p, '/harbors') || at(p, '/ships')
+    || at(p, '/sizes') || at(p, '/classes') || at(p, '/rung') || at(p, '/foreign') || at(p, '/labs')) return placesSection(p);
+  if (at(p, '/orbitals/demiton/liberty-machine') || at(p, '/governance') || at(p, '/vsm')) return null;
+  if (at(p, '/expeditions') || at(p, '/voyages')) return null;
+  return null;
+}
 
 /** The Liberty Machine's own pages: the overview (the five cards) and one page a system. The old addresses answer:
  *  /orbitals/demiton/liberty-machine/control is S3's, /orbitals/demiton/liberty-machine/acquisition S1's, and /governance the Liberty Machine's. */
@@ -159,17 +143,3 @@ export const libertyMachineSystemOf = (path: string): 's1' | 's2' | 's3' | 's4' 
   return null;
 };
 
-/**
- * The tabs a page shows under the header, or null when the section is one page (Leaderboard,
- * Library) and has nothing to switch between. The same function serves the islands and the static
- * pages, so a page cannot forget its section's row. The Liberty Machine returns null: its crumb's
- * menu is the navigation (12 November).
- */
-export function sectionNavFor(path: string): SectionNav | null {
-  const p = navPath(path);
-  if (p === '/' || at(p, '/shipyard') || at(p, '/orbitals') || at(p, '/harbours') || at(p, '/harbors') || at(p, '/ships')
-    || at(p, '/sizes') || at(p, '/classes') || at(p, '/rung') || at(p, '/foreign') || at(p, '/labs')) return placesSection(p);
-  if (at(p, '/expeditions') || at(p, '/voyages')) return expeditionsSection(p);
-  if (at(p, '/orbitals/demiton/liberty-machine') || at(p, '/governance') || at(p, '/vsm')) return null;
-  return null;
-}

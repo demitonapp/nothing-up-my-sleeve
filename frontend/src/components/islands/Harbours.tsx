@@ -103,6 +103,11 @@ export default function Harbours() {
       location.replace(next + location.search);
       return;
     }
+    // the berth lives under the shipyard now (13 November): its old address forwards
+    if (/^\/(?:orbitals|harbours?)\/demiton\/berth\/?$/.test(p)) {
+      location.replace('/shipyard/berth' + location.search);
+      return;
+    }
     if (p === '/harbours' || p.startsWith('/harbours/')) {
       history.replaceState(null, '', p.replace(/^\/harbours/, '/orbitals') + location.search);
     }
@@ -123,7 +128,7 @@ export default function Harbours() {
       builder.innerHTML = '';
       builder.dataset.built = '';
       cards.hidden = false;
-      cards.className = 'harbours shipyardgrid';
+      cards.className = 'harbours shipyardgrid demitonyard';
       cards.innerHTML = shipyardCardsHtml();
       return;
     }
@@ -196,7 +201,7 @@ export default function Harbours() {
   if (!mine) return null;
   const shipyard = path.split('?')[0].replace(/^#/, '').startsWith('/shipyard');
   const sectionName = section === 'training' ? 'Training' : section === 'fitting' ? 'Fitting Out' : section === 'charting' ? 'Charting' : null;
-  const demitonBerth = harbour === DEMITON.key && sub === 'berth' && !shipyard;
+  const demitonBerth = harbour === DEMITON.key && sub === 'berth';
   const title = sectionName || (demitonBerth ? 'Berth' : shipyard ? 'Shipyard' : harbourTitle(data, harbour) + (bandInfo ? ` · ${bandInfo.name}` : ''));
   const about = demitonBerth ? 'the two rings our fleet is built and sailed from, and every ship of it'
     : sectionName === 'Training' ? 'the SOPing parties our models train on: the content, the fade, and the content by heart'
@@ -211,7 +216,7 @@ export default function Harbours() {
         <h1>The orbitals <span className="q">Demiton, our own orbital, and the trading orbital where every other lab and its ships reside</span></h1>
       ) : (
         <h1>
-          {harbour ? <><a className={crumbCls('back')} href={sectionName ? '/shipyard' : bandInfo ? `/orbitals/${encodeURIComponent(harbour)}` : shipyard || demitonBerth ? '/orbitals/demiton' : '/orbitals'}>{sectionName ? '← shipyard' : bandInfo ? `← ${harbourTitle(data, harbour)}` : shipyard || demitonBerth ? '← demiton' : '← orbitals'}</a> </> : null}
+          {harbour ? <><a className={crumbCls('back')} href={sectionName || demitonBerth ? '/shipyard' : bandInfo ? `/orbitals/${encodeURIComponent(harbour)}` : shipyard || demitonBerth ? '/orbitals/demiton' : '/orbitals'}>{sectionName || demitonBerth ? '← shipyard' : bandInfo ? `← ${harbourTitle(data, harbour)}` : shipyard || demitonBerth ? '← demiton' : '← orbitals'}</a> </> : null}
           {harbour === DEMITON.key ? <img className="flag" src="/flags/demiton.svg" alt="Demiton · Drake’s arms" title="Demiton · Drake’s arms" loading="lazy" /> : null}{' '}
           {title}{' '}
           <span className="q">{about}</span>

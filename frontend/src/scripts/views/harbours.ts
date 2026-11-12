@@ -31,6 +31,8 @@ export const harbourRoute = (path: string): HarbourRoute => {
   const head = path.split('?')[0].replace(/^#/, '');
   // the shipyard is its own address, beside the harbours, not under one: the builder harbour is Schi'mint.
   // /shipyard itself is the three cards; /shipyard/<section> opens the SOP at that section.
+  // /shipyard/berth is the fleet's page (13 November, Justin: "berth should be moved under the shipyard"): Demiton's two rings and every ship
+  if (/^\/shipyard\/berth\/?$/.test(head)) return { harbour: DEMITON.key, sub: 'berth', section: null, band: null };
   const sm = /^\/shipyard(?:\/(training|fitting|charting|raiding))?\/?$/.exec(head);
   if (sm) {
     // the old /shipyard/raiding address is kept as an alias of charting
@@ -127,35 +129,37 @@ export function harbourCardsHtml(ladder: Payload): string {
   if (!rungs.length && !hs.length) {
     return `<div class="${emptyCls()}">the orbitals could not be read. Restart <span class="mono">thorp dash</span> if it was just changed.</div>`;
   }
-  const live = rungs.reduce((n: number, r: any) => n + shipRuns(ladder, r.preset).filter((v: any) => v.status === 'running').length, 0);
-  const done = rungs.reduce((n: number, r: any) => n + shipRuns(ladder, r.preset).filter((v: any) => v.status === 'finished').length, 0);
-  const nForeign = new Set(((ladder && ladder.foreign) || []).map((x: any) => x.key)).size;
-  const houses = (ladder && ladder.labs) || [];
-  // The card shows the houses' countries, not every name (12 November, Justin: "just show the country flag
-  // with the labs count"): one flag per country, and the count stays in the foot below.
-  const countries = [...new Map(houses.map((l: any) => [l.flag, l])).values()];
-  const labPills = countries.length
-    ? countries.map((l: any) => `<span class="${pillCls('')}">${flagImg(l.flag, l.country_name || l.flag)}</span>`).join(' ')
-    : `<span class="${pillCls('')}">the houses</span>`;
-  const demitonFront = `<a class="${cardCls(true, 'card harbourcard hface hfront')}" href="/orbitals/demiton">${artImg('demiton', 'cardart ship')}
-    <div class="top"><span class="nm">Demiton</span><span class="preset">${flagImg('demiton', 'Demiton · Drake’s arms')} our orbital</span></div>
-    <div class="job">${esc(DEMITON.about)}</div>
-    <div class="hships">${rungs.map((r: any) => `<span class="${pillCls('')}">${esc(r.name)} <span class="s">${esc(r.preset)}</span></span>`).join(' ')}</div>
-    <div class="foot"><span>${esc(DEMITON.where)}</span><span class="${pillCls(live ? 'live' : '')}">${live ? live + ' running' : 'at rest'}</span></div>
-    <div class="foot"><span>${rungs.length} ship${rungs.length === 1 ? '' : 's'}</span><span>${done} finished voyage${done === 1 ? '' : 's'}</span></div>
-    <div class="foot"><span>the training ring and the deep yards</span><span>our lab</span></div></a>`;
-  const tradingFront = `<a class="${cardCls(true, 'card harbourcard hface hfront')}" href="/orbitals/masaq">${artImg('masaq-reach', 'cardart ship')}
-    <div class="top"><span class="nm">Masaq' Reach</span><span class="preset">the trading orbital</span></div>
-    <div class="job">Where every other lab and its ships reside: the houses, their fleets, and every outside model read on our decks. None of them is ours to build.</div>
-    <div class="hships">${labPills}</div>
-    <div class="foot"><span>the Reach</span><span class="${pillCls('accent')}">${houses.length || 11} house${(houses.length || 11) === 1 ? '' : 's'}</span></div>
-    <div class="foot"><span>${nForeign} foreign ship${nForeign === 1 ? '' : 's'}</span><span>read-only</span></div>
-    <div class="foot"><span>every one of them read on our decks</span><span>not ours to build</span></div></a>`;
+  // The cards are the plate and its name (12 November, Justin: "remove the text from the cards. so that
+  // the image shows more", then "have the name on the cards at least tho"): the name lies over the image,
+  // nothing else on the front; the flip still opens the five views.
+  const demitonFront = `<a class="${cardCls(true, 'card harbourcard hface hfront orbitalfront')}" href="/orbitals/demiton" aria-label="Open Demiton, our orbital">${artImg('demiton', 'cardart ship')}<span class="orbitalname">Demiton</span></a>`;
+  const tradingFront = `<a class="${cardCls(true, 'card harbourcard hface hfront orbitalfront')}" href="/orbitals/masaq" aria-label="Open Masaq' Reach, the trading orbital">${artImg('masaq-reach', 'cardart ship')}<span class="orbitalname">Masaq' Reach</span></a>`;
   const flip = (key: string, name: string, front: string, views: HarbourView[], href: string): string =>
     `<div class="hflip" data-harbour="${esc(key)}"><div class="hflip-inner">${front}${harbourBackHtml(key, name, views, href)}</div>`
     + `<button type="button" class="hflipbtn" data-hflip aria-pressed="false" aria-label="Flip ${esc(name)} to see five views"><span class="hflipicon" aria-hidden="true">⟲</span><span class="hfliptext">5 views</span></button></div>`;
   return flip('demiton', 'Demiton', demitonFront, DEMITON_VIEWS, '/orbitals/demiton')
     + flip('masaq-reach', "Masaq' Reach", tradingFront, HARBOUR_VIEWS['masaq-reach'], '/orbitals/masaq');
+}
+
+/** Masaq' Reach's four sections as cards (12 November, five until 13 November, when its Discoveries moved to Demiton's, Justin: "for this page http://localhost:4321/orbitals/masaq
+ *  can you have cards for labs, research, models, embeddings and discoveries"): the same brass plates as
+ *  Demiton's sections, one each for the Reach's five views. */
+export function masaqCardsHtml(): string {
+  const sections: [string, string, string, string][] = [
+    ['Labs', 'the houses that build the outside ships: their yards, their fleets and what each one makes', '/orbitals/masaq/labs', 'masaq-labs'],
+    ['Research', 'the research houses: universities, collectives and national infrastructure, and the datasets and benchmarks they build', '/orbitals/masaq/research', 'masaq-research'],
+    ['Models', 'every outside model in the Reach, in four cards by size: extra small, small, medium and large', '/orbitals/masaq/models', 'masaq-models'],
+    ['Embeddings', "the embeddings ontology: what a model's vectors hold, and how the Reach reads them", '/orbitals/masaq/embeddings', 'masaq-embeddings'],
+  ];
+  return `<div class="harbours shipyardgrid demitonyard">${sections.map(([name, about, href, art], i) =>
+    `<a class="${cardCls(true, 'card harbourcard shipyardcard')}" href="${esc(href)}">${artImg(art, 'cardart ship')}
+      <div class="yardplate">
+        <span class="yardnum">${String(i + 1).padStart(2, '0')}</span>
+        <span class="yardrule" aria-hidden="true"></span>
+        <span class="nm">${esc(name)}</span>
+        <span class="job">${esc(about)}</span>
+        <span class="yardopen">open the ${esc(name.toLowerCase())} →</span>
+      </div></a>`).join('')}</div>`;
 }
 
 /** Masaq' Reach's outside models, one per model key: the registry holds two files for Qwen3-0.6B (one with a
@@ -194,6 +198,21 @@ function foreignHarbourHtml(ladder: Payload, h: any, band: SizeBand | null): str
   return filter + head + (list.length
     ? list.map((x) => foreignCard(x, h)).join('')
     : `<div class="${emptyCls()}">no outside model read in this band yet: the largest read here is Qwen3.8-27B at 27B</div>`);
+}
+
+/** A country's outside models, biggest first, as the Models view's cards (13 November, Justin: "models should
+ *  also go under the countries"): a model is its house's (`lab`), and the house's country is the model's, so
+ *  `labCountry` maps house key to country code (a model's own flag is a stand-in like Silicon Valley or
+ *  independent, not a country). Every band is here. `labs` narrows them to some houses (the Labs view's
+ *  purpose and weights filters). An empty `country` is the models whose house is not listed. */
+export function foreignCountryHtml(ladder: Payload, country: string, labCountry: Record<string, string>, labs: Set<string> | null = null): { count: number; html: string } {
+  // a model whose house is not listed (Hugging Face's SmolLM) keeps its own flag when that is a country of the Reach
+  const known = new Set(Object.values(labCountry));
+  const of = (x: any): string => labCountry[x.lab] || (known.has(x.flag) ? x.flag : '');
+  const list = foreignShips(ladder)
+    .filter((x) => of(x) === country && (!labs || labs.has(x.lab)))
+    .sort((a, b) => (sizeOf(b) || 0) - (sizeOf(a) || 0));
+  return { count: list.length, html: list.map((x) => foreignCard(x, { name: "Masaq' Reach" })).join('') };
 }
 
 /** The trading orbital's Models view: four cards, one per size band, each with its art, the count of
@@ -252,15 +271,17 @@ export function demitonShipsHtml(ladder: Payload, view: 'overview' | 'berth' = '
   const hs = (ladder && ladder.harbours) || [];
   const berths = ['schimint', 'vavatch-end'].map((k) => hs.find((x: any) => x.key === k)).filter(Boolean);
   // The four sections as image cards (12 November, Justin: "this page should rather have fal images for its
-  // four sections: Berth, Shipyard, Library, Expeditions ... to allow the user to navigate"). The berth has its
-  // own page (/orbitals/demiton/berth, the fleet); the other three open theirs.
+  // four sections: Berth, Shipyard, Library, Expeditions ... to allow the user to navigate"). The berth moved
+  // under the shipyard on 13 November (Justin: "berth should be moved under the shipyard"): its page is
+  // /shipyard/berth, so Demiton keeps four cards. The order Justin asked for (12 November): expeditions, the
+  // Liberty Machine, the discoveries (13 November, Justin: "discoveries should be moved to the demiton orbital":
+  // what our fleet found, a card of Demiton's own), the library, then the shipyard: 01–05.
   const sections: [string, string, string, string][] = [
-    ['Berth', 'the two rings our fleet is built and sailed from, and every ship of it', '/orbitals/demiton/berth', 'demiton-berth'],
-    ['Shipyard', 'where a ship is drawn before it is built: the SOP it reads, the stages it must build, and the standard it is held to', '/shipyard', 'demiton-shipyard'],
-    ['Library', 'the books and sources our ships read, and what each one holds', '/library', 'demiton-library'],
     ['Expeditions', 'the voyages we send out: what is queued, what is running and what came back', '/expeditions', 'demiton-expeditions'],
-    // the fifth (12 November, Justin: "Liberty Machine should have it's own card here ... with a fal image")
     ['Liberty Machine', 'how the fleet governs itself: operations, coordination, control and its audit, intelligence, and the policy Justin signs', '/orbitals/demiton/liberty-machine', 'demiton-liberty-machine'],
+    ['Discoveries', 'what our fleet found: the tests and their decks, the skills and every trick, and the stars our ships lit', '/orbitals/demiton/discoveries', 'masaq-discoveries'],
+    ['Library', 'the books and sources our ships read, and what each one holds', '/library', 'demiton-library'],
+    ['Shipyard', 'where a ship is drawn before it is built, and where the fleet lies: the berth, the SOP it reads, the stages it must build, and the standard it is held to', '/shipyard', 'demiton-shipyard'],
   ];
   const links = `<div class="harbours shipyardgrid demitonyard five" style="grid-column:1/-1">${sections.map(([name, about, href, art], i) =>
     `<a class="${cardCls(true, 'card harbourcard shipyardcard')}" href="${esc(href)}">${artImg(art, 'cardart ship')}
@@ -360,6 +381,7 @@ export const RUNG_ART: Record<string, string> = {
 
 export function shipyardCardsHtml(): string {
   const cards: [string, string, string, string][] = [
+    ['berth', 'Berth', 'the two rings our fleet is built and sailed from, and every ship of it', 'demiton-berth'],
     ['charting', 'Charting', 'sorting out the charts the voyage is planned on: the route, the stars, and the suits', 'charting'],
     ['hulls', 'Hull sizes', "each rung's layers, width, heads and head width: the shape a ship is built to, set in Postgres", 'hulls'],
     ['constraints', 'The yard’s constraints', 'the slipways, the tide, the clerk and the survey dock: the limits on how many voyages the yard can launch, and the levers that move them', 'shipyard'],

@@ -859,25 +859,34 @@ DEMITON_SECTIONS: dict[str, str] = {
     "knots aloud by a candle lantern, a slate of chalked figures on the rail, the thin lit ring of an Orbital in "
     "the sky",
     # the nine objects of study, one plate each (13 November, Justin: "Yes, do them", after the kinds of claim): what
+    # first draws: training put a car and street lamps on the quay, architecture's drone came out a finned rocket,
+    # post-training a ship's wheel (a century after Drake: his ships steered by whipstaff and tiller), internals a
+    # plastic jerry can; those four now say what must not be in them
     # each object of study is aboard, every one lit by candle and with no lettering (the kinds' first draws taught it)
-    "discoveries-object-training-and-scale": "a covered dry dock at night with three ships on the stocks side by side, "
-    "rising in size from a small pinnace to a half-planked great galleon, shipwrights on timber scaffolds, lit only by candle lanterns, no electric light, "
-    "a small smooth silver ovoid drone with no propellers perched on a scaffold, the thin lit ring of an Orbital above the open roof",
-    "discoveries-object-architecture": "inside the bare oak skeleton of a ship's hull on the stocks at night, looking "
-    "along the keel: curved ribs, knees and deck beams rising in rows, a master shipwright with a plumb line checking "
-    "one rib, lit only by candle lanterns, no electric light, a small smooth silver ovoid drone with no propellers resting on a beam, the thin lit ring of an Orbital between the ribs",
+    "discoveries-object-training-and-scale": "a covered timber dry dock of the sixteenth century at night with three "
+    "wooden ships on the stocks side by side, clearly rising in size: a small pinnace on the left, a mid-sized bark in "
+    "the middle, a towering half-planked great galleon on the right, shipwrights on timber scaffolds, lit only by candle lanterns and torches, no electric light, "
+    "no street lamps, no vehicles, no machinery, the thin lit ring of an Orbital above the open roof",
+    "discoveries-object-architecture": "inside the bare oak skeleton of a ship's hull on the stocks at night, "
+    "looking along the keel: curved wooden ribs, knees and deck beams rising in rows, a master shipwright in a "
+    "leather apron holding a plumb line against one rib, lit only by candle lanterns and torches, no electric light, no metal objects, the thin lit ring of an Orbital "
+    "seen between the ribs",
     "discoveries-object-data": "the hold of a merchant galleon at night packed with casks, crates, bales of cloth and "
     "stacked bound books, sailors lowering more cargo on a rope through the open hatch above, a purser checking a "
     "manifest, lit only by candle lanterns, no electric light, a small smooth silver ovoid drone with no propellers resting on a cask",
-    "discoveries-object-post-training": "the quarterdeck of a galleon at night: a grizzled ship's master with his hand "
-    "on a young helmsman's shoulder, guiding his grip on the whipstaff as the ship comes about, the officers watching "
-    "from the rail, lit only by candle lanterns, no electric light, a small smooth silver ovoid drone with no propellers on the binnacle, the thin lit ring of an Orbital in the sky",
+    # a second draw still drew a wheel (the model ignores "no ship's wheel") and a steamship on the horizon: the
+    # lesson is a sounding instead, so there is no helm to draw
+    "discoveries-object-post-training": "the waist of a sixteenth-century wooden galleon at night: a grizzled ship's "
+    "master standing behind a young sailor at the rail, his hands over the young man's, guiding him as he swings a "
+    "lead line out to take a sounding, the coiled knotted line at their feet, lit only by a candle lantern hung "
+    "from the shrouds, an empty dark sea to the horizon, the thin lit ring of an Orbital in the sky",
     "discoveries-object-inference-and-prompting": "the deck of a galleon at night: the captain on the poop raising a "
     "brass speaking trumpet to give an order, the crew below answering at once, hauling on lines as the sails fill, "
     "lit only by candle lanterns, no electric light, a small smooth silver ovoid drone with no propellers on the rail beside the captain, the thin lit ring of an Orbital in the sky",
-    "discoveries-object-internals": "a ship's carpenter crawling with a candle lantern through the dark narrow space "
-    "between a galleon's inner and outer planking, inspecting the ribs, pegs and joints by its light, his tools in a "
-    "canvas bag, a small smooth silver ovoid drone with no propellers following close behind him, no electric light",
+    "discoveries-object-internals": "the cramped dark space deep inside a wooden galleon's hull, between the inner and "
+    "outer planking: a ship's carpenter on hands and knees holding up a candle lantern, inspecting the oak ribs, "
+    "trenails and joints by its light, a mallet and chisel beside him, only wood, rope and iron, no plastic, no "
+    "containers, no electric light",
     "discoveries-object-knowledge-and-memory": "a ship's chart locker at night: pigeonholes of rolled charts and rows "
     "of old logbooks of past voyages, an old navigator with two logbooks open side by side, a red thread pinned "
     "between a page in each, lit only by candle lanterns, no electric light, a small smooth silver ovoid drone with no propellers on the shelf, the thin lit ring of an Orbital through a porthole",

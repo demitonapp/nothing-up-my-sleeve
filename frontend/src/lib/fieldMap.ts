@@ -35,10 +35,6 @@ export const KINDS: MapCategory[] = [
   { key: 'measurement', name: 'Measurement', question: 'How do we know, and when are we fooled?', about: 'How readings are taken, and the ways a metric or a benchmark misleads.' },
 ];
 
-// each kind of claim's plate (13 November, Justin: "can you add fal images here .../kind-of-claim"; prompts in
-// generate_art.py as discoveries-claim-<slug>)
-for (const k of KINDS) k.image = `/art/discoveries-claim-${k.name.toLowerCase()}.png`;
-
 export const OBJECTS: MapCategory[] = [
   { key: 'training', name: 'Training and scale', question: 'What happens as a model is trained, and grown?', about: 'Scaling, training dynamics, optimisation and the hyperparameters that carry across sizes.' },
   { key: 'architecture', name: 'Architecture', question: 'What is the network built from?', about: 'Attention and its variants, positions, feed-forward layers, experts and the sub-quadratic models.' },
@@ -169,6 +165,11 @@ export const ourSection = (sub: string): OurWork | null => OURS.find((o) => o.su
 
 /** A category's address segment: its name, so the crumb built from the address reads as the page does. */
 export const slugOf = (c: MapCategory): string => c.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
+// each category's plate, by its address segment (13 November, Justin, on the kind-of-claim page: "can you add fal
+// images here", then "Yes, do them" for the objects of study; prompts in generate_art.py)
+for (const c of KINDS) c.image = `/art/discoveries-claim-${slugOf(c)}.png`;
+for (const c of OBJECTS) c.image = `/art/discoveries-object-${slugOf(c)}.png`;
 
 /** An axis by its address segment, or null. */
 export const axisBySlug = (slug: string | undefined): MapAxis | null => AXES.find((a) => a.slug === slug) || null;

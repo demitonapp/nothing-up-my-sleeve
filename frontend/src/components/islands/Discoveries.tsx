@@ -21,6 +21,8 @@ import { shipHash } from '@/scripts/router';
 import { esc } from '@/lib/format';
 import { DEMITON_DISCOVERIES as DB, MASAQ_DISCOVERIES as MB, MASAQ_SUBS, QWEN4B_PAGE, newHome, type MasaqSub } from '@/lib/discoveryPaths';
 import SectionNav from '../SectionNav';
+import { AxisDoors, FieldMapView } from '../FieldMap';
+import { axisBySlug } from '@/lib/fieldMap';
 import { TabNav } from '../TabNav';
 import {
   cardDeckHtml,
@@ -55,7 +57,7 @@ import {
 } from '@/scripts/views/discoveries';
 
 type Sub = 'overview' | 'skills' | 'quantum-tests' | 'stars';
-type DView = 'index' | 'trick' | 'chain' | 'traits' | 'domain' | 'masaq';
+type DView = 'index' | 'trick' | 'chain' | 'traits' | 'domain' | 'masaq' | 'map';
 
 interface Parsed {
   view: DView;
@@ -64,6 +66,8 @@ interface Parsed {
   chain: string | null;
   domain: string | null;
   masaq?: MasaqSub;
+  axis?: string; // the field map (13 November): an axis's address segment, and a category of it
+  cat?: string | null;
 }
 
 const DSUBS: Sub[] = ['overview', 'skills', 'quantum-tests', 'stars'];
@@ -153,6 +157,10 @@ const parse = (route: string): Parsed => {
   // Demiton's discoveries read as the old /discoveries did: the same tabs, tricks, chains and doors under its base
   if (bits[0] === 'orbitals' && bits[1] === 'demiton' && bits[2] === 'discoveries') bits.splice(0, 3, 'discoveries');
   const at = (i: number): string | undefined => (bits[i] ? decodeURIComponent(bits[i]) : undefined);
+  // the field on two axes (13 November): /<axis>, then /<axis>/<category> (lib/fieldMap.ts)
+  if (bits[0] === 'discoveries' && axisBySlug(bits[1])) {
+    return { view: 'map', sub: 'overview', trick: null, chain: null, domain: null, axis: bits[1], cat: at(2) || null };
+  }
   // the cards moved to the shipyard's charting section (9 November, Justin: "this /discoveries/cards needs
   // to move to /shipyard/charting"): the same island, reached from the yard
   if (bits[0] === 'shipyard' && bits[1] === 'charting') {
@@ -800,6 +808,8 @@ export default function Discoveries() {
 
         {/* the overview: the cards are jobs, the questions they pass, and where the 0.0.5 fleet puts them */}
         <div className={`dsub${sub === 'overview' ? ' active' : ''}`} data-dsub="overview">
+          {/* the field on two axes (13 November): a card for each, opening its categories */}
+          {!inCharting ? <AxisDoors /> : null}
           <div className="discdoors">
             <a className="discdoor" href={`${DB}/physics`}>
               <img src="/art/fall-physics.svg" alt="" loading="lazy" />
@@ -972,6 +982,11 @@ export default function Discoveries() {
           </section>
         </div>
       )}
+
+      {/* ============================== the field on two axes: an axis's categories, or one category's discoveries */}
+      <div className={`dview${view === 'map' ? ' active' : ''}`} data-dview="map">
+        {view === 'map' && parsed.axis ? <FieldMapView slug={parsed.axis} cat={parsed.cat || null} /> : null}
+      </div>
 
       {/* ============================== Masaq' Reach's discoveries: the head kinds research has named, the cards beyond
           the sixteen, and the Qwen 4B mapping (12 November: moved out of Demiton's Stars tab) */}

@@ -5,9 +5,11 @@ import Layout from '../../../../layouts/Layout.astro';
 import Discoveries from '../../../../components/islands/Discoveries';
 import Reader from '../../../../components/Reader.astro';
 import { DISCOVERY_PATHS } from '../../../../lib/discoveryPaths';
+import { FIELD_MAP_PATHS } from '../../../../lib/fieldMap';
 
 export function getStaticPaths() {
-  return DISCOVERY_PATHS.map((path) => ({ params: { path } }));
+  // and the field on two axes (13 November): each axis and each of its categories
+  return [...DISCOVERY_PATHS, ...FIELD_MAP_PATHS].map((path) => ({ params: { path } }));
 }
 ---
 <Layout>

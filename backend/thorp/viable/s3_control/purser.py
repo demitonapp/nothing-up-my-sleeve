@@ -292,7 +292,14 @@ def plan(lines: list, w: World, estimate, cmd_estimate, eligible) -> list[Call]:
                 if best is None or (cand["home"], cand["cost"]) < (best["home"], best["cost"]):
                     best = cand
             if best is None:
-                reason = f"no GPU class has a measured speed-up at {preset} yet"
+                # measured and slower is not the same as never measured (12 November: the 4090 ran a 300k at
+                # 0.46 of this Mac's speed, and the reason still said no speed-up had been measured)
+                slow = sorted(((w.speedups[(g, preset or "")], g) for g in w.prices if (g, preset or "") in w.speedups), reverse=True)
+                if slow:
+                    sp, g = slow[0]
+                    reason = f"no GPU class is faster than this Mac at {preset}: the best, the {g}, runs at {sp:.2f}x"
+                else:
+                    reason = f"no GPU class has a measured speed-up at {preset} yet"
         call = Call(text, ln.name, ln.run_id, exp, "local", "", local_min=local_min,
                     local_home_min=_mins(local_home, w.now), eligible=reason is None)  # fmt: skip
         if best is not None:
@@ -575,13 +582,17 @@ def latest() -> dict[str, dict]:
 
 def record(calls: list[Call], mode_: str, applied: bool, last: dict[str, tuple] | None = None) -> dict[str, tuple]:
     """Write the calls whose waters or class changed since the line's last kept call (every call of a voyage the
-    purser may move; the rest are not its decisions). Returns the keys now kept, for the next round."""
+    purser may move; the rest are not its decisions), and any call that brings home a line last kept as foreign,
+    whatever the reason: 12 November, the 300k and 1m lines were last kept as foreign before the 4090 was measured
+    slower than this Mac, their local calls were not the purser's to keep, and the queue page drew them on the
+    Vast lane for an hour after the purser had stopped sending them. Returns the keys now kept, for the next round."""
     from thorp import store
     from thorp.viable.records import Allocation
 
     if last is None:
         last = {k: (v["waters"], v["gpu"]) for k, v in latest().items()}
-    new = [c for c in calls if (c.eligible or c.waters == "foreign") and last.get(c.line) != c.key()]
+    new = [c for c in calls
+           if (c.eligible or c.waters == "foreign" or (last.get(c.line) or ("",))[0] == "foreign") and last.get(c.line) != c.key()]  # fmt: skip
     if new:
         with store.session() as s:
             for c in new:

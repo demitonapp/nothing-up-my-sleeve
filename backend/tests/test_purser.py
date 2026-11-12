@@ -160,6 +160,23 @@ def test_the_calls_are_kept_only_when_they_change():
     assert len(p.latest()) == 2
 
 
+def test_a_line_called_foreign_and_then_kept_here_is_written_home(tmp_thorp):
+    """12 November: the 4090 was measured slower than this Mac at 300k; the lines last kept as foreign stayed so,
+    because a call the purser cannot make (no faster class) was not written, and the page drew them abroad."""
+    from thorp.viable.s3_control import purser as p
+
+    fast = calls([voyage("a")], world(speedups={("RTX 4090", "9m"): 2.0}))
+    kept = p.record(fast, "routing", True, last={})
+    assert p.latest()["fitouts/a"]["waters"] == "foreign"
+    slow = calls([voyage("a")], world(speedups={("RTX 4090", "9m"): 0.46}))
+    assert not slow[0].eligible and "the RTX 4090, runs at 0.46x" in slow[0].reason  # measured, and slower
+    kept = p.record(slow, "routing", True, last=kept)
+    assert p.latest()["fitouts/a"]["waters"] == "local" and kept["fitouts/a"][0] == "local"
+    assert p.record(slow, "routing", True, last=kept) == kept  # and once home, not written again
+    never = calls([voyage("b", preset="300k")], world(speedups={}))
+    assert "no GPU class has a measured speed-up at 300k yet" in never[0].reason
+
+
 def test_a_size_no_class_has_sailed_takes_the_lead_of_the_nearest_measured_size(monkeypatch):
     # 12 November, Justin: "the purser rule is wrong": only the 9m had sailed abroad, so every 300k and 1m stayed here
     from thorp.viable.s4_intelligence import market

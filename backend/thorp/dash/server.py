@@ -4056,7 +4056,9 @@ def _api_queue() -> dict:
     except Exception:  # noqa: BLE001  (no store: the two lanes as they always were)
         lanes_out = [{"lane": k, "kind": "local" if k == "mac" else "charter", "seats": _slots(k), "enabled": True}
                      for k in lane_mod.LANES]  # fmt: skip
-    foreign = [k.get("line") for k in kept.values() if k.get("waters") == "foreign"]
+    # the queued lines the purser calls foreign now, not every line it ever called foreign (12 November: the page
+    # said 28 where 2 were queued abroad)
+    foreign = [r for r in rows if (r.get("purser") or {}).get("waters") == "foreign"]
     try:
         from thorp.viable.s5_policy import charter as _s5
 

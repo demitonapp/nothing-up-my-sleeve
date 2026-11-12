@@ -153,10 +153,10 @@ export function CategoryCards({ lb, error, band, faces, logicBack }: {
           tag="published only"
           about="Writing code that runs: a rendered artifact graded on what it looks like and does, and scientific code run against its own tests. We read no coding test ourselves yet."
           {...cat('coding')}
-          link={{ href: 'https://scicode-bench.github.io/', label: 'SciCode (Tian et al., 2024)' }}
+          link={{ href: 'https://arxiv.org/abs/2107.03374', label: 'HumanEval (Chen et al., 2021)' }}
         >
-          <h3 className="tbacktitle">Coding <span className="note">we measure no coding test yet; the published readings stand alone, never compared with ours</span></h3>
-          {pub('coding', band)}
+          <h3 className="tbacktitle">Coding <span className="note">we measure no coding test yet</span></h3>
+          <p className="note mt">The five most-cited coding tests (HumanEval, MBPP, SWE-bench, LiveCodeBench, EvalPlus) are described on the <a href="/leaderboard/coding">coding page</a>. None has been read on a model of this size yet, so there is no board to show.</p>
         </TestCard>
         <TestCard
           id="agent"
@@ -167,10 +167,10 @@ export function CategoryCards({ lb, error, band, faces, logicBack }: {
           tag="drone tasks, unscored"
           about="Acting through tools until the errand is done: function calling, a banking assistant under a policy, real work judged against a human, and a shell with no hints. Our drones run browser, email and phone tasks, but nothing scores them yet."
           {...cat('agent')}
-          link={{ href: 'https://gorilla.cs.berkeley.edu/leaderboard.html', label: 'Berkeley Function Calling Leaderboard' }}
+          link={{ href: 'https://arxiv.org/abs/2307.13854', label: 'WebArena (Zhou et al., 2024)' }}
         >
-          <h3 className="tbacktitle">Agent <span className="note">our drone tasks are not a scored benchmark yet; the published readings stand alone, never compared with ours</span></h3>
-          {pub('agent', band)}
+          <h3 className="tbacktitle">Agent <span className="note">our drone tasks are not a scored benchmark yet</span></h3>
+          <p className="note mt">The five most-cited agent tests (WebArena, AgentBench, τ-bench, BrowseComp, OSWorld) are described on the <a href="/leaderboard/agent">agent page</a>. None has been read on a model of this size yet, so there is no board to show.</p>
         </TestCard>
         <TestCard
           id="long-context"
@@ -181,10 +181,10 @@ export function CategoryCards({ lb, error, band, faces, logicBack }: {
           tag="published only"
           about="Finding and combining facts across a context far longer than a page: the headroom a schema dump uses. We read no long-context test ourselves yet."
           {...cat('long-context')}
-          link={{ href: 'https://artificialanalysis.ai/', label: 'Artificial Analysis, AA-LCR' }}
+          link={{ href: 'https://arxiv.org/abs/2308.14508', label: 'LongBench (Bai et al., 2024)' }}
         >
-          <h3 className="tbacktitle">Long context <span className="note">we measure no long-context test yet; the published reading stands alone, never compared with ours</span></h3>
-          {pub('long-context', band)}
+          <h3 className="tbacktitle">Long context <span className="note">we measure no long-context test yet</span></h3>
+          <p className="note mt">The five most-cited long-context tests (LongBench, RULER, LongBench v2, InfiniteBench, L-Eval) are described on the <a href="/leaderboard/long-context">long-context page</a>. None has been read on a model of this size yet, so there is no board to show.</p>
         </TestCard>
         <TestCard
           id="abilities"

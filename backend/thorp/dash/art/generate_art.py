@@ -29,6 +29,15 @@ file the Atlas generators read, or from the FAL_KEY environment variable. It is 
 Usage:
   python3 thorp/dash/art/generate_art.py              # every image not made yet
   python3 thorp/dash/art/generate_art.py towing-tank bridge  # these, made again
+  python3 thorp/dash/art/generate_art.py --local lbtest-mmlu  # on this Mac, with FLUX 3 Image Klein (below)
+
+Local (13 November, Justin: "let's pull a local model to generate images and use that instead of fal"; "i think the
+flux 3 klein is the go"): `--local`, or THORP_ART_BACKEND=mflux, makes the image on this Mac with mflux's
+`mflux-generate-flux3 --model flux3-image-klein` (MLX, 8-bit by default), from the same prompt, size and style as the
+fal path, with a seed taken from the image's name so a remake is the same picture. It needs no fal key. mflux is a
+`uv tool` (uv tool install --upgrade mflux), kept out of the project environments. The weights are gated on Hugging
+Face: accept the model's licence on black-forest-labs/flux-3-image-klein and log in (`hf auth login`) once; the first
+run then fetches about 20 GB.
 """
 
 from __future__ import annotations
@@ -974,6 +983,59 @@ MASAQ_COUNTRIES: dict[str, str] = {
     "palms, traders loading barrels onto a ship, the heat of the tropics" + _COUNTRY_TAIL,
 }
 
+# The leaderboard's tests, one plate each (13 November, Justin: "add fal cards for all of them"): our own eleven and
+# the five most-cited industry standards of each category. Saved as lbtest-<test key>.png; the category page's
+# cards show them. Each is the test as a scene from the days of Drake: what it measures, drawn.
+_TEST_TAIL = ", Elizabethan era, a small smooth silver ovoid drone with no propellers at rest on a surface nearby, heavy black ink, stark chiaroscuro, no text, no lettering"
+LEADERBOARD_TESTS: dict[str, str] = {
+    "lbtest-logic-deck": "a navigator's chart table where forty brass tokens lie in five rows of different colours, a navigator comparing them with a pair of dividers, strange invented symbols on the tokens" + _TEST_TAIL,
+    "lbtest-cause-deck": "a long row of dominoes and brass gears on a ship's table, a falling lantern about to tip the first so that a chain reaction runs the length of the line" + _TEST_TAIL,
+    "lbtest-chaining": "two taut brass compass bearings drawn from two lighthouses across a sea chart and crossing at a single point, a navigator marking the fix with a pin" + _TEST_TAIL,
+    "lbtest-arc": "a lantern-lit schoolroom aboard a great ship at night, a tutor with an old globe and a child before four small clay tablets of answers" + _TEST_TAIL,
+    "lbtest-arcagi2": "a dark chart room where a scholar studies a board of coloured glass tiles, three worked examples on the left and an empty grid waiting on the right" + _TEST_TAIL,
+    "lbtest-ifeval": "a ship's clerk with a long checklist of orders and a brass stamp for each satisfied command, a captain dictating by lantern light" + _TEST_TAIL,
+    "lbtest-drones": "three small smooth silver ovoid drones with no propellers working aboard a ship: one writing a letter at a table, one at a window with a brass spyglass, one carrying a small brass handset" + _TEST_TAIL,
+    "lbtest-nevermore": "a black raven on a mast repeating a line from a scroll, the same words echoing in ink on the page behind it, copying" + _TEST_TAIL,
+    "lbtest-counter": "a navigator counting along a knotted log-line paid out over a ship's stern, each knot a word, the line stretching into the dark water" + _TEST_TAIL,
+    "lbtest-scales": "a merchant's brass balance with weights of graduated sizes being set in order along a bench, a clerk checking the sequence" + _TEST_TAIL,
+    "lbtest-mover": "a single brass pawn-like marker moving one step along a chart route marked by one lantern, a hand about to lift it" + _TEST_TAIL,
+    "lbtest-hotpotqa": "two parchment pages pinned to a wall joined by a single red thread, a scholar following the thread from one page to the next" + _TEST_TAIL,
+    "lbtest-bbh": "a long table of twenty-three locked puzzle boxes of black wood, a clerk with a lantern trying the hardest of them" + _TEST_TAIL,
+    "lbtest-musique": "a chain of four linked brass rings each threaded through the next, a hand drawing the first so that the last comes after it" + _TEST_TAIL,
+    "lbtest-babi": "a nursery cabin with a child's slate, a small wooden doll shown in three different rooms in three simple panels, a lantern beside it" + _TEST_TAIL,
+    "lbtest-proofwriter": "a logician at a desk building a staircase of numbered stone steps, each step resting on those below, rule scrolls stacked on either side" + _TEST_TAIL,
+    "lbtest-mmlu": "a round library of fifty-seven alcoves, each holding a different instrument: an astrolabe, a scalpel, a lawbook, a lyre, a scholar walking the ring" + _TEST_TAIL,
+    "lbtest-triviaqa": "a lantern-lit tavern where sea-captains and scholars compete at a quiz over tankards, a quizmaster holding a scroll and a brass gong" + _TEST_TAIL,
+    "lbtest-natural-questions": "a crowded harbour market where ordinary people call questions up to a seated sage with a great open book, a clerk noting them down" + _TEST_TAIL,
+    "lbtest-mmlu-pro": "a round library with taller, dimmer alcoves, a scholar on a rolling ladder reaching for the tenth shelf, ten bookcases stacked above each other" + _TEST_TAIL,
+    "lbtest-simpleqa": "a plain brass tablet engraved with a single answer being weighed on a small balance by a magistrate, a sceptical clerk looking on" + _TEST_TAIL,
+    "lbtest-gsm8k": "a ship's purser with an abacus and a ledger counting sacks of grain in a lamplit hold, children watching him work" + _TEST_TAIL,
+    "lbtest-math": "a vaulted study with chalk diagrams of geometry on the wall, a young competitor at a desk beside a brass sextant, a laurel wreath on a hook" + _TEST_TAIL,
+    "lbtest-gpqa-diamond": "a scholar alone at a desk in a great library with a glass-sealed volume of questions, books shut around him so that nothing can be looked up" + _TEST_TAIL,
+    "lbtest-arc-agi-1": "a puzzle table with a grid of coloured glass tiles being rearranged by a scholar who has understood a single hidden rule, a lantern lighting the grid" + _TEST_TAIL,
+    "lbtest-hle": "a tall closed door of black oak at the end of a long hall with a single keyhole of light, a line of scholars before it, one holding a final examination scroll" + _TEST_TAIL,
+    "lbtest-mt-bench": "two figures in conversation across a table over several rounds, a judge in a high chair with a quill scoring on a scroll" + _TEST_TAIL,
+    "lbtest-arena-hard": "a torchlit arena where two champions duel while the crowd votes by dropping brass tokens into urns" + _TEST_TAIL,
+    "lbtest-infobench": "a clerk checking a long order against a row of small brass pins, one pin set for each satisfied requirement, beside a finished letter" + _TEST_TAIL,
+    "lbtest-ifbench": "a calligrapher bound by a stack of odd rule scrolls, writing a letter under the eye of a stern examiner with a measuring rod" + _TEST_TAIL,
+    "lbtest-multi-if": "a long table of five rounds of correspondence in different scripts, letters stacked in several languages, a translator at a quill" + _TEST_TAIL,
+    "lbtest-humaneval": "a scribe's desk with a hundred and sixty-four small brass test-weights in rows, a clerk checking a freshly written ledger entry against each" + _TEST_TAIL,
+    "lbtest-mbpp": "a row of apprentice scribes at low desks each copying a short routine, a master walking behind them with a stick" + _TEST_TAIL,
+    "lbtest-swe-bench": "a shipwright mending a hull plank in a dry dock, a heap of reported faults on tags hanging from the ship, a tester knocking on the repaired timber" + _TEST_TAIL,
+    "lbtest-livecodebench": "a harbour notice board with date-stamped problems posted under fresh wax seals, a clerk adding another, a clock above the board" + _TEST_TAIL,
+    "lbtest-evalplus": "a bridge inspector testing a wooden bridge again and again with many hammers and weights, a crowd of testers on the span" + _TEST_TAIL,
+    "lbtest-webarena": "a bustling quay of shops, a forum hall and a counting-house joined by planked walkways, a small silver drone walking between them with a list" + _TEST_TAIL,
+    "lbtest-agentbench": "a hall of eight doors each opening on a different scene: an engine room, an archive, a card table, a market, a drone trying them in turn" + _TEST_TAIL,
+    "lbtest-tau-bench": "a customer at the counter of a trading house, a clerk with a thick rulebook and a ledger, a small silver drone handling the request" + _TEST_TAIL,
+    "lbtest-browsecomp": "a searcher with a lantern wading through a vast flooded library, lifting a single sealed scroll from among thousands" + _TEST_TAIL,
+    "lbtest-osworld": "a ship's control desk crowded with brass instruments, wheels and levers, a small silver drone operating it by sight across the whole panel" + _TEST_TAIL,
+    "lbtest-longbench": "a very long scroll unrolled across a table and down the stairs, a scholar reading at one end and a clerk waiting at the far end" + _TEST_TAIL,
+    "lbtest-ruler": "a brass ruler of enormous length marked with thousands of divisions stretched along a corridor, a measurer walking beside it with a lantern" + _TEST_TAIL,
+    "lbtest-longbench-v2": "a lone scholar before an enormous library tower, a single question on a slip of paper, the shelves rising out of the lantern light into darkness" + _TEST_TAIL,
+    "lbtest-infinitebench": "an endless spiral staircase of scrolls descending into darkness, a tiny figure with a lantern on the stairs" + _TEST_TAIL,
+    "lbtest-l-eval": "an examiner's table with twenty long documents bound in different colours and a marking rubric, a judge comparing them against the answers" + _TEST_TAIL,
+}
+
 # The charter's seven sections as fal cards (12 November, Justin: "for this page http://localhost:4321/expeditions/charter
 # can you give me fal cards for the fleet, the ship, the tokeniser, what it reads, the scaffold, the training,
 # the return leg"). One 16:9 plate a section, in the same world: the fleet at anchor, the hull on the stocks,
@@ -1089,8 +1151,8 @@ DRONES: dict[str, str] = {
     "over black water, no moon, no electrical cord, no plastic",
 }
 
-SIZES = {**{k: "landscape_16_9" for k in (*DEMITON_SECTIONS, *LIBERTY_MACHINE_SYSTEMS, *DRONES, *CLASSES,*TESTS, *LABS, *HARBOURS, *HARBOUR_VIEWS, *SHIPBUILDER, *SHIPYARD, *SHIPYARD_SECTIONS, *CHARTING, *POSITIONS, *FOREIGN, *SOP_GOALS, *EXPEDITIONS, *EXPEDITION_VIEWS, *CHARTER_CARDS, *MASAQ_SECTIONS, *MASAQ_COUNTRIES, *BANDS, *LADDER, *CONSOLE, *EMBEDDINGS)}, **{k: "portrait_4_3" for k in CARDS}, **{k: "portrait_4_3" for k in LOGIC}, **{k: "square_hd" for k in DEMITON_FLAG}}
-SUBJECTS = {**DEMITON_SECTIONS, **LIBERTY_MACHINE_SYSTEMS, **DRONES, **TESTS, **LABS, **CLASSES, **HARBOURS, **HARBOUR_VIEWS, **SHIPBUILDER, **SHIPYARD, **SHIPYARD_SECTIONS, **CHARTING, **POSITIONS, **FOREIGN, **CARDS, **LOGIC, **SOP_GOALS, **EXPEDITIONS, **EXPEDITION_VIEWS, **BANDS, **LADDER, **CONSOLE, **EMBEDDINGS, **DEMITON_FLAG, **CHARTER_CARDS, **MASAQ_SECTIONS, **MASAQ_COUNTRIES}
+SIZES = {**{k: "landscape_16_9" for k in (*DEMITON_SECTIONS, *LIBERTY_MACHINE_SYSTEMS, *DRONES, *CLASSES,*TESTS, *LABS, *HARBOURS, *HARBOUR_VIEWS, *SHIPBUILDER, *SHIPYARD, *SHIPYARD_SECTIONS, *CHARTING, *POSITIONS, *FOREIGN, *SOP_GOALS, *EXPEDITIONS, *EXPEDITION_VIEWS, *CHARTER_CARDS, *MASAQ_SECTIONS, *MASAQ_COUNTRIES, *LEADERBOARD_TESTS, *BANDS, *LADDER, *CONSOLE, *EMBEDDINGS)}, **{k: "portrait_4_3" for k in CARDS}, **{k: "portrait_4_3" for k in LOGIC}, **{k: "square_hd" for k in DEMITON_FLAG}}
+SUBJECTS = {**DEMITON_SECTIONS, **LIBERTY_MACHINE_SYSTEMS, **DRONES, **TESTS, **LABS, **CLASSES, **HARBOURS, **HARBOUR_VIEWS, **SHIPBUILDER, **SHIPYARD, **SHIPYARD_SECTIONS, **CHARTING, **POSITIONS, **FOREIGN, **CARDS, **LOGIC, **SOP_GOALS, **EXPEDITIONS, **EXPEDITION_VIEWS, **BANDS, **LADDER, **CONSOLE, **EMBEDDINGS, **DEMITON_FLAG, **CHARTER_CARDS, **MASAQ_SECTIONS, **MASAQ_COUNTRIES, **LEADERBOARD_TESTS}
 
 # The twenty subjects the audit found outside the brief (ships/reports/art-audit-2026-11-11.md): rewritten
 # into the three-layer world -- Risso's ink, Drake's voyages, the young Culture's universe -- keeping what
@@ -1200,13 +1262,50 @@ def generate(name: str, key: str) -> None:
     raise SystemExit(f"{name}: timed out")
 
 
+# fal's image_size names, as pixels a FLUX 3 Klein run takes (multiples of 16)
+LOCAL_SIZES = {"landscape_16_9": (1024, 576), "portrait_4_3": (768, 1024), "square_hd": (1024, 1024)}
+LOCAL_MODEL = os.environ.get("THORP_ART_LOCAL_MODEL", "flux3-image-klein")
+LOCAL_QUANTIZE = os.environ.get("THORP_ART_LOCAL_QUANTIZE", "8")
+
+
+def generate_local(name: str) -> None:
+    """One image on this Mac, through mflux (MLX). The same prompt, size and style as the fal path."""
+    import shlex
+    import shutil
+    import subprocess
+    import zlib
+
+    exe = shutil.which("mflux-generate-flux3") or str(Path.home() / ".local" / "bin" / "mflux-generate-flux3")
+    if not Path(exe).exists():
+        raise SystemExit("mflux is not installed: uv tool install --upgrade mflux")
+    width, height = LOCAL_SIZES[SIZES[name]]
+    out = OUT_DIR / f"{name}.png"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    # mflux will not overwrite: given an existing path it writes name_1.png beside it. A remake replaces the old image.
+    out.unlink(missing_ok=True)
+    seed = zlib.crc32(name.encode()) % (2**31)  # the same picture every remake
+    cmd = [exe, "--model", LOCAL_MODEL, "--quantize", LOCAL_QUANTIZE, "--prompt", f"{SUBJECTS[name]}. {STYLE}",
+           "--width", str(width), "--height", str(height), "--seed", str(seed), "--output", str(out)]
+    # extra mflux flags, e.g. THORP_ART_LOCAL_ARGS="--low-ram" to share the Mac with a voyage at sea
+    cmd += shlex.split(os.environ.get("THORP_ART_LOCAL_ARGS", ""))
+    print(f"{name}: generating locally ({LOCAL_MODEL}, {width}x{height}, seed {seed})...", flush=True)
+    started = time.time()
+    done = subprocess.run(cmd)
+    if done.returncode != 0 or not out.exists():
+        raise SystemExit(f"{name}: the local run failed (exit {done.returncode})")
+    print(f"{name}: wrote {out.relative_to(HERE.parents[3])} in {time.time() - started:.0f}s", flush=True)
+
+
 def main() -> int:
-    names = sys.argv[1:] or [n for n in SUBJECTS if not (OUT_DIR / f"{n}.png").exists()]
-    key = fal_key()
+    args = sys.argv[1:]
+    local = "--local" in args or os.environ.get("THORP_ART_BACKEND") == "mflux"
+    names = [a for a in args if not a.startswith("--")] or [n for n in SUBJECTS if not (OUT_DIR / f"{n}.png").exists()]
     for n in names:
         if n not in SUBJECTS:
             raise SystemExit(f"unknown {n}; choices: {', '.join(SUBJECTS)}")
-        generate(n, key)
+    key = None if local else fal_key()
+    for n in names:
+        generate_local(n) if local else generate(n, key)
     return 0
 
 

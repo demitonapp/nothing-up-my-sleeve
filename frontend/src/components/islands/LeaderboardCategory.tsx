@@ -43,6 +43,12 @@ function causeDeckHtml(lb: any): { head: string; body: string } {
   return { head, body };
 }
 
+/** The chip on a card: where the test comes from, and how often its paper is cited (the audit's measure of how widely it is respected). */
+const tagOf = (t: CatalogTest, published: boolean): string => {
+  const base = published ? 'published' : t.tag || '';
+  return t.cites ? `${base} · cited ~${t.cites.toLocaleString()}×` : base;
+};
+
 export default function LeaderboardCategory({ category }: { category: string }) {
   const cat = catalogOf(category);
   const meta = TEST_CATEGORIES.find((c) => c.key === category);
@@ -110,9 +116,9 @@ export default function LeaderboardCategory({ category }: { category: string }) 
         items={TEST_CATEGORIES.map((c) => ({ key: c.key, label: c.label, href: `/leaderboard/${c.key}`, active: c.key === category }))}
       />
       <section className={cardCls(false, 'panel')} id="lbcategory">
-        <h2>The tests <span className="note">one card a test, with what it is good for and where it misleads: turn a card over for the leaderboard on that test. The pros and cons are our own reading, written for deciding what to trust; a published reading is Artificial Analysis's, never ours</span></h2>
+        <h2>The tests <span className="note">ours first, then the five most-cited industry standards, most cited first: how often a test's paper is cited is on its card. One card a test, with what it is good for and where it misleads: turn a card over for the leaderboard on that test. The pros and cons are our own reading, written for deciding what to trust; a published reading is Artificial Analysis's, never ours</span></h2>
         <div className={`testcards${open ? ' has-open' : ''}`}>
-          {cat.tests.map((t) => {
+          {[...cat.tests].sort((a, b) => Number(b.source === 'ours') - Number(a.source === 'ours') || (b.cites ?? 0) - (a.cites ?? 0)).map((t) => {
             const p = t.source === 'published' ? ((bench.tests as Bench[]).find((x) => x.key === t.key) || null) : null;
             if (t.source === 'published' && !p) return null;
             const name = p ? p.name : t.name!;
@@ -122,10 +128,10 @@ export default function LeaderboardCategory({ category }: { category: string }) 
                 id={t.key}
                 open={open}
                 setOpen={setOpen}
-                art={t.art}
-                plate={p ? p.group : t.source === 'standard' ? 'Industry standard' : undefined}
+                art={`/art/lbtest-${t.key}.png`}
+                plate={tagOf(t, !!p)}
                 name={name}
-                tag={p ? 'published' : t.tag || ''}
+                tag={tagOf(t, !!p)}
                 about={p ? p.about : t.about!}
                 link={p ? p.link : t.link!}
                 pros={t.pros}

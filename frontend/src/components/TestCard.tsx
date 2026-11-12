@@ -7,6 +7,7 @@
 // component. A test without art of its own gets a plate: its group's short mark, set on the same 16:9
 // black the images sit on, so the row never shows an empty frame.
 
+import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 
 export function TestCard({ id, open = null, setOpen, href, art, plate, name, tag, about, ours, published, pros, cons, link, stat, children }: {
@@ -20,6 +21,15 @@ export function TestCard({ id, open = null, setOpen, href, art, plate, name, tag
   href?: string;
   children?: ReactNode;
 }) {
+  // a plate that is not made yet (or fails to load) falls back to the text plate, never an empty frame
+  const [broken, setBroken] = useState(false);
+  const showArt = !!art && !broken;
+  // the plate can fail before this component hydrates, so its error event is missed: look again once mounted
+  const img = useRef<HTMLImageElement | null>(null);
+  useEffect(() => {
+    const el = img.current;
+    if (el && el.complete && el.naturalWidth === 0) setBroken(true);
+  }, [art]);
   const on = !href && open === id;
   const turn = () => { if (href) window.location.assign(href); else setOpen?.(on ? null : id); };
   return (
@@ -34,11 +44,11 @@ export function TestCard({ id, open = null, setOpen, href, art, plate, name, tag
           onClick={turn}
           onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); turn(); } }}
         >
-          <div className={`tart${art ? '' : ' noplate'}`}>
-            {art
-              ? <img src={art} alt="" loading="lazy" onError={(e) => { (e.currentTarget.parentElement as HTMLElement).style.display = 'none'; }} />
+          <div className={`tart${showArt ? '' : ' noplate'}`}>
+            {showArt
+              ? <img ref={img} src={art} alt="" onError={() => setBroken(true)} />
               : <span className="tplate" aria-hidden="true">{plate || name}</span>}
-            {art && <span className="ttag">{tag}</span>}
+            {showArt && <span className="ttag">{tag}</span>}
           </div>
           <div className="tcap">
             <div className="tname">{name}</div>

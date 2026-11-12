@@ -2180,7 +2180,9 @@ def api_sieves() -> dict:
 # classes renamed (old address name -> new), so old addresses and names keep working (7 Nov, Justin)
 # 11 Nov (Justin): the 300k is the towing tank (was Faces, and Pan before it) and the 1m the measured mile
 # (was Augustus); every older name maps to the current one
-CLASS_RENAMES = {"seedling": "towing-tank", "keel": "towing-tank", "pan": "towing-tank", "faces": "towing-tank", "proxy": "measured-mile", "pilot": "measured-mile", "augustus": "measured-mile", "bettor": "explorer", "explorer": "invention", "summit": "trader"}
+# 12 Nov (Justin: "Yes, rename both"): the 9m is the sea trial (was the speller) and the 21m the coasting run
+# (was the stylist). The tests, heads and question sets still name their class "speller" and "stylist".
+CLASS_RENAMES = {"seedling": "towing-tank", "keel": "towing-tank", "pan": "towing-tank", "faces": "towing-tank", "proxy": "measured-mile", "pilot": "measured-mile", "augustus": "measured-mile", "speller": "sea-trial", "stylist": "coasting-run", "bettor": "explorer", "explorer": "invention", "summit": "trader"}
 
 
 def _class_names(preset: str) -> set[str]:

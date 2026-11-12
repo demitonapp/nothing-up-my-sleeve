@@ -339,19 +339,21 @@ export const harbourTabs = (ladder: Payload, key: string | null): { ships: strin
  *  ship name. The keys (preset) stay what the ledger names; this is what the page calls them. The two
  *  smallest left that set on 11 November (Justin: "i like towing tank, please update the fal images and the
  *  naming"; "Yes, rename 1m"): they were the sounding and the survey, and are now what their classes are
- *  called, so the card says one name, not two. */
+ *  called, so the card says one name, not two. The 9m and the 21m followed on 12 November (Justin: "Yes,
+ *  rename both"): they were the landfall and the passage, and are the sea trial and the coasting run. */
 export const RUNG_METAPHOR: Record<string, string> = {
-  '300k': 'the towing tank', '1m': 'the measured mile', '9m': 'the landfall',
-  '21m': 'the passage', '50m': 'the crossing', '100m': 'the ocean', '350m': 'the new world',
+  '300k': 'the towing tank', '1m': 'the measured mile', '9m': 'the sea trial',
+  '21m': 'the coasting run', '50m': 'the crossing', '100m': 'the ocean', '350m': 'the new world',
 };
 export const rungName = (preset: string, fallback = ''): string => RUNG_METAPHOR[preset] || fallback || preset;
 /** A rung called what its class is called says the name once (the card's title), not again before its job. */
 const sameName = (a: string, b: string): boolean => (a || '').trim().toLowerCase() === (b || '').trim().toLowerCase();
 /** The fal image each rung wears (backend/thorp/dash/art/generate_art.py, LADDER; the two smallest wear
- *  their class plates, CLASSES). */
+ *  their class plates, CLASSES; the 9m and 21m wear theirs since 12 November, and landfall.png and
+ *  passage.png stay on disk unused). */
 export const RUNG_ART: Record<string, string> = {
-  '300k': 'towing-tank', '1m': 'measured-mile', '9m': 'landfall',
-  '21m': 'passage', '50m': 'crossing', '100m': 'ocean', '350m': 'new_world',
+  '300k': 'towing-tank', '1m': 'measured-mile', '9m': 'sea-trial',
+  '21m': 'coasting-run', '50m': 'crossing', '100m': 'ocean', '350m': 'new_world',
 };
 
 export function shipyardCardsHtml(): string {

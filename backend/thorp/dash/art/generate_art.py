@@ -127,6 +127,27 @@ CLASSES: dict[str, str] = {
     "Drake's kind under sail running a straight course on black water from one beacon toward the other, "
     "her long straight wake behind her, in the foreground a figure in a sea-cloak on the rocks holding up "
     "a sandglass to the firelight to time her, a clerk beside him with an open ledger",
+    # 12 Nov (Justin: "Can you suggest new metaphors for the 9m and 21m ships"; "Yes, rename both"): the 9m is
+    # the sea trial, the finished ship taken past the harbour bar for the first time with everything worked at
+    # once, to see whether she does at sea what the tank and the mile said. It replaces the speller's sloop on
+    # the class card and the landfall on the rung card.
+    "sea-trial": "under a vast thin ring of pale light arcing across the night sky where a moon would be, a "
+    "new-built wooden galleon of Drake's kind crossing the harbour bar into open water for the first time, "
+    "every sail set and pale and unweathered, her bow lifting to the first ocean swell and white water "
+    "breaking along the bar, on her deck a shipwright in a leather apron and Elizabethan breeches watching "
+    "the rigging, a clerk beside him writing in an open ledger by lantern light, two sailors bent at the "
+    "wooden pump, far behind her and small the dark shipyard with its slipway and one lantern, a small "
+    "silver drone at rest on the stern rail",
+    # The 21m follows it: the coasting run, a proven ship's first working trips, port to port with a cargo
+    # aboard and the land always in sight, before the 50m's crossing. It replaces the stylist's schooner on
+    # the class card and the passage on the rung card.
+    "coasting-run": "under a vast thin ring of pale light arcing across the whole dusk sky where a moon would be, "
+    "a small laden Elizabethan merchant bark working close inshore along a dark rocky coast "
+    "at dusk, low in the water, barrels and bales lashed on her deck under tarred canvas, patched tan sails, "
+    "a leadsman leaning out from her side swinging a lead line into the black water, a figure in a sea-cloak "
+    "at the helm watching the shore, the long dark coast running the whole width of the scene close beside "
+    "her, an iron fire basket burning on the near headland and the small warm lights of a harbour town in a "
+    "cove ahead, a small silver drone at rest on the masthead",
 }
 
 # The harbours (Justin, 8 November: "i want two fal images for them"; 11 November: "naming must change and

@@ -2015,7 +2015,7 @@ EXPEDITIONS: dict[str, Expedition] = {
             "Table Talk (1835).",
             ship="Table Talk",
             fleet="First Fleet",
-            preset=_preset(lambda r: r.get("name") == "The speller", "9m"),
+            preset=_preset(lambda r: r.get("name") == "The sea trial", "9m"),
             outcomes=(
                 Outcome(
                     "tricks/turn_taking/score",
@@ -2492,7 +2492,7 @@ EXPEDITIONS: dict[str, Expedition] = {
             "with the bigger ship as teacher.",
             ship="Fitout: Ogden (The Smallest Bridge)",
             fleet="First Fleet",
-            preset=_preset(lambda r: r.get("name") == "The speller", "9m"),
+            preset=_preset(lambda r: r.get("name") == "The sea trial", "9m"),
             outcomes=(
                 Outcome("stars/bridge/max_score", "higher", "the Bridge, played at 0.5 nats"),
                 Outcome("stars/mover/shared_score", "higher", "the Mover's look, at 0.2 (with the one-hop lift at 0.1)"),
@@ -2530,7 +2530,7 @@ EXPEDITIONS: dict[str, Expedition] = {
             "and cards are read, never handed over.",
             ship="Logic tutor",
             fleet="First Fleet",
-            preset=_preset(lambda r: r.get("name") == "The speller", "9m"),
+            preset=_preset(lambda r: r.get("name") == "The sea trial", "9m"),
             outcomes=(
                 Outcome("tricks/logic_test/gain", "higher", "the chaining gain on the logic deck, performed at 0.1"),
                 Outcome("tricks/logic_test/score", "higher", "the share of logic items right, performed at two-thirds"),

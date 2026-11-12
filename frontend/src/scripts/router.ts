@@ -17,6 +17,7 @@ export const slugOf = (r: { name: string }): string =>
 export const CLASS_RENAMES: Record<string, string> = {
   seedling: 'towing-tank', keel: 'towing-tank', pan: 'towing-tank', faces: 'towing-tank',
   proxy: 'measured-mile', pilot: 'measured-mile', augustus: 'measured-mile', bettor: 'explorer', summit: 'trader',
+  speller: 'sea-trial', stylist: 'coasting-run', // 12 Nov: the 9m is the sea trial, the 21m the coasting run
 }; // 11 Nov: the 300k is the towing tank (was Faces, and Pan before it), the 1m the measured mile (was Augustus)
 export const CLASS_ALIASES: Record<string, string> = Object.fromEntries(
   Object.entries(CLASS_RENAMES).flatMap(([a, b]) => [[a, b], [b, a]]),
@@ -47,7 +48,7 @@ export interface Route {
 // A rung is addressed by its preset (its size, the canonical identifier) or by its class slug (an old
 // alias the page resolves and rewrites to the preset); both live on the ships page.
 const RUNG_PRESETS = new Set(['300k', '1m', '9m', '21m', '50m', '100m', '350m',
-  'towing-tank', 'measured-mile', 'faces', 'pan', 'augustus', 'speller', 'stylist', 'paragraph', 'invention', 'trader']); // 'faces', 'pan' and 'augustus' are old addresses
+  'towing-tank', 'measured-mile', 'sea-trial', 'coasting-run', 'faces', 'pan', 'augustus', 'speller', 'stylist', 'paragraph', 'invention', 'trader']); // 'faces', 'pan', 'augustus', 'speller' and 'stylist' are old addresses
 
 export function route(h: string): Route {
   if (h.startsWith('/')) {

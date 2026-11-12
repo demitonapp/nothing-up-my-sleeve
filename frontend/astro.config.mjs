@@ -30,13 +30,13 @@ export default defineConfig({
   // the VSM moved to /vsm (11 November, Justin: "the url should be vsm"); the old addresses keep working
   redirects: {
     '/governance': '/vsm',
-    '/governance/s1': '/vsm',
+    '/governance/s1': '/vsm/s1',
     '/governance/s2': '/vsm/s2',
     '/governance/s3': '/vsm/s3',
     '/governance/s4': '/vsm/s4',
     '/governance/s5': '/vsm/s5',
     '/governance/control': '/vsm/s3',
-    '/governance/acquisition': '/vsm',
+    '/governance/acquisition': '/vsm/s1',
   },
   vite: {
     plugins: [libraryBranchShell, tailwindcss()],

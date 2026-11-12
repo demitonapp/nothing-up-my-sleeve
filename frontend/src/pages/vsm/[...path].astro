@@ -1,7 +1,7 @@
 ---
-// The VSM's five system tabs, one page each so a tab survives a refresh: /vsm is S1, then /vsm/s2 …
-// /vsm/s5. The old /governance/control and /governance/acquisition addresses redirect to /vsm/s3 and
-// /vsm. The island reads the route (useRoute) and picks the system tab.
+// The VSM's five systems, a page each (12 November): /vsm is the overview (the five cards), /vsm/s1 …
+// /vsm/s5 a system's own page; /vsm/control and /vsm/acquisition answer as S3's and S1's. The old
+// /governance addresses redirect here (astro.config.mjs). The island reads the route (useRoute).
 import Layout from '../../layouts/Layout.astro';
 import Governance from '../../components/islands/Governance';
 import Reader from '../../components/Reader.astro';

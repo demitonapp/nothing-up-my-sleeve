@@ -259,8 +259,10 @@ export function demitonShipsHtml(ladder: Payload, view: 'overview' | 'berth' = '
     ['Shipyard', 'where a ship is drawn before it is built: the SOP it reads, the stages it must build, and the standard it is held to', '/shipyard', 'demiton-shipyard'],
     ['Library', 'the books and sources our ships read, and what each one holds', '/library', 'demiton-library'],
     ['Expeditions', 'the voyages we send out: what is queued, what is running and what came back', '/expeditions', 'demiton-expeditions'],
+    // the fifth (12 November, Justin: "VSM should have it's own card here ... with a fal image")
+    ['VSM', 'how the fleet governs itself: operations, coordination, control and its audit, intelligence, and the policy Justin signs', '/vsm', 'demiton-vsm'],
   ];
-  const links = `<div class="harbours shipyardgrid demitonyard" style="grid-column:1/-1">${sections.map(([name, about, href, art], i) =>
+  const links = `<div class="harbours shipyardgrid demitonyard five" style="grid-column:1/-1">${sections.map(([name, about, href, art], i) =>
     `<a class="${cardCls(true, 'card harbourcard shipyardcard')}" href="${esc(href)}">${artImg(art, 'cardart ship')}
       <div class="yardplate">
         <span class="yardnum">${String(i + 1).padStart(2, '0')}</span>

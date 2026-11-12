@@ -2,7 +2,7 @@
 // navigation"). One function reads an address and says where it sits in the site, from Places down, so
 // every page gets the same trail from the layout instead of each island writing its own "← back" link.
 // The tree is the site's as it stands today (lib/nav.ts, DemitonTabs): Orbitals holds Demiton and Masaq'
-// Reach; Demiton holds the berth, the shipyard, the library, the expeditions (with the queue and the VSM),
+// Reach; Demiton holds the berth, the shipyard, the library, the expeditions (with the queue),
 // its classes and every ship; Masaq' Reach holds the labs, the models and the embeddings. Old addresses
 // (/harbours, /masaq, /labs, /voyages, /shelves, /governance) sit where their pages now live.
 // Pure: no DOM, no React.
@@ -33,9 +33,9 @@ const DEMITON_MENU: MenuItem[] = [
   { label: 'Shipyard', href: '/shipyard' },
   { label: 'Library', href: '/library' },
   { label: 'Images', href: '/library/images', note: 'in the Library' },
+  { label: 'VSM', href: '/vsm', note: 'its own way in' },
   { label: 'Expeditions', href: '/expeditions', group: 'At sea' },
   { label: 'Queue', href: '/expeditions/queue' },
-  { label: 'VSM', href: '/vsm' },
   { label: 'Every ship', href: '/ships' },
   { label: 'The towing tank', href: '/ships/300k', note: '300k', group: 'The classes' },
   { label: 'The measured mile', href: '/ships/1m', note: '1m' },
@@ -95,7 +95,7 @@ const HOUSE: Record<string, string> = {
   stepfun: 'StepFun', bytedance: 'ByteDance', thinkingmachines: 'Thinking Machines', tii: 'TII', nvidia: 'NVIDIA',
 };
 const WORDS: Record<string, string> = {
-  vsm: 'VSM', s1: 'S1', s2: 'S2', s3: 'S3', s4: 'S4', s5: 'S5', sops: 'SOPs', ifeval: 'IFEval', arc: 'ARC',
+  vsm: 'VSM', s1: 'S1 Operations', s2: 'S2 Coordination', s3: 'S3 Control', s4: 'S4 Intelligence', s5: 'S5 Policy', sops: 'SOPs', ifeval: 'IFEval', arc: 'ARC',
   'at-sea': 'At sea', 'quantum-tests': 'Quantum tests', 'two-facts': 'Two facts', mtsp: 'MTSP',
 };
 
@@ -218,10 +218,11 @@ export function crumbsFor(path: string): Crumb[] {
     return out;
   }
 
+  // the VSM is a way in of its own (12 November), not a page of Demiton's expeditions
   if (a === 'vsm' || a === 'governance') {
-    out.push(ORBITALS, DEMITON, EXPEDITIONS);
     add('VSM', '/vsm');
-    if (b) add(labelOf(b), `/vsm/${b}`);
+    const sys = b === 'control' ? 's3' : b === 'acquisition' ? 's1' : b;
+    if (sys) add(labelOf(sys), `/vsm/${sys}`);
     return out;
   }
 

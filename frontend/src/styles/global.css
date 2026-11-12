@@ -2767,3 +2767,9 @@ ol.goaltext { padding-left: 22px; }
   .qlaxisrow .qlhead { display: none; }
   .qllegend { padding-left: 0; }
 }
+/* Demiton's five cards: the VSM joins the Berth, Shipyard, Library and Expeditions (12 November). Below
+   1000px the shared rule above keeps them one to a row. */
+@media (min-width: 1001px) { .harbours.demitonyard.five { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (min-width: 1400px) { .harbours.demitonyard.five { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
+/* five across, a long name ("Coordination", "Intelligence") must fit the plate */
+.harbours.demitonyard.five .yardplate .nm { font-size: clamp(1.05rem, 1.3vw, 1.45rem); overflow-wrap: anywhere; }

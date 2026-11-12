@@ -3,7 +3,7 @@
 // static pages read this file, so a section's tabs cannot drift from page to page (UI.md,
 // "Navigation"). Pure logic only: no DOM, no React.
 
-export type MainKey = 'places' | 'expeditions' | 'discoveries' | 'leaderboard' | 'library';
+export type MainKey = 'places' | 'expeditions' | 'discoveries' | 'leaderboard' | 'library' | 'vsm';
 
 export interface MainTab {
   key: MainKey;
@@ -35,10 +35,17 @@ export const MAIN_TABS: MainTab[] = [
   {
     key: 'places', label: 'Places', href: '/orbitals',
     title: 'the places: Demiton\'s orbital (its berth, shipyard, library and expeditions) and the trading orbital, where every other lab and its ships reside',
-    match: ['/orbitals', '/harbours', '/harbors', '/ships', '/sizes', '/classes', '/rung', '/foreign', '/shipyard', '/masaq', '/labs', '/expeditions', '/vsm', '/governance', '/library', '/shelves'],
+    match: ['/orbitals', '/harbours', '/harbors', '/ships', '/sizes', '/classes', '/rung', '/foreign', '/shipyard', '/masaq', '/labs', '/expeditions', '/library', '/shelves'],
   },
   { key: 'discoveries', label: 'Discoveries', href: '/discoveries', title: '', match: ['/discoveries'] },
   { key: 'leaderboard', label: 'Leaderboard', href: '/leaderboard', title: '', match: ['/leaderboard'] },
+  // the VSM is a way in of its own (12 November, Justin: "need pages for each vsm system and then move it up a
+  // level out of expeditions into it's own top level item"): it governs the whole of Thorp, not a voyage
+  {
+    key: 'vsm', label: 'VSM', href: '/vsm',
+    title: 'the VSM: how Thorp governs itself, in five systems (S1 operations, S2 coordination, S3 control with the audit, S4 intelligence, S5 policy)',
+    match: ['/vsm', '/governance'],
+  },
 ];
 
 /** A path as the router reads it: no query, no leading hash, no trailing slash. */
@@ -75,7 +82,8 @@ export function mainTabFor(path: string): MainKey {
   const p = navPath(path);
   if (at(p, '/discoveries')) return 'discoveries';
   if (at(p, '/leaderboard')) return 'leaderboard';
-  // Expedition, VSM and Library addresses are Demiton's views now (12 November), so Places is the way in.
+  if (at(p, '/vsm') || at(p, '/governance')) return 'vsm';
+  // Expedition and Library addresses are Demiton's views now (12 November), so Places is the way in.
   return 'places';
 }
 
@@ -95,7 +103,6 @@ const placesSection = (p: string): SectionNav => {
 };
 
 const expeditionSub = (p: string): string => {
-  if (at(p, '/vsm') || at(p, '/governance')) return 'vsm';
   if (at(p, '/expeditions/queue') || at(p, '/voyages/queue')) return 'queue';
   if (at(p, '/expeditions/plans') || at(p, '/expeditions/expeditions') || at(p, '/voyages/plans') || at(p, '/voyages/expeditions')) return 'plans';
   if (p === '/expeditions' || p === '/voyages') return 'overview';
@@ -114,10 +121,37 @@ const expeditionsSection = (p: string): SectionNav => {
       // and /expeditions/plans are the same page (11 November, Justin)
       { key: 'overview', label: 'Overview', href: '/expeditions', active: sub === 'overview' || sub === 'plans' },
       { key: 'queue', label: 'Queue', href: '/expeditions/queue', active: sub === 'queue' },
-      {
-        key: 'vsm', label: 'VSM', href: '/vsm', active: sub === 'vsm',
-        title: 'the VSM: the five systems (S1 operations, S2 coordination, S3 control with the gate and the audit, S4 intelligence, S5 policy)',
-      },
+    ],
+  };
+};
+
+/** The VSM's own pages: the overview (the five cards) and one page a system. The old addresses answer:
+ *  /vsm/control is S3's, /vsm/acquisition S1's, and /governance the VSM's. */
+export const VSM_SYSTEMS: { key: 's1' | 's2' | 's3' | 's4' | 's5'; label: string; name: string }[] = [
+  { key: 's1', label: 'S1', name: 'Operations' },
+  { key: 's2', label: 'S2', name: 'Coordination' },
+  { key: 's3', label: 'S3', name: 'Control' },
+  { key: 's4', label: 'S4', name: 'Intelligence' },
+  { key: 's5', label: 'S5', name: 'Policy' },
+];
+
+export const vsmSystemOf = (path: string): 's1' | 's2' | 's3' | 's4' | 's5' | null => {
+  const p = navPath(path).replace(/^\/governance/, '/vsm');
+  const m = /^\/vsm\/(s[1-5])\b/.exec(p);
+  if (m) return m[1] as 's1' | 's2' | 's3' | 's4' | 's5';
+  if (at(p, '/vsm/control')) return 's3';
+  if (at(p, '/vsm/acquisition')) return 's1';
+  return null;
+};
+
+const vsmSection = (p: string): SectionNav => {
+  const sys = vsmSystemOf(p);
+  return {
+    key: 'vsm',
+    label: 'VSM',
+    items: [
+      { key: 'overview', label: 'Overview', href: '/vsm', active: sys === null },
+      ...VSM_SYSTEMS.map((s) => ({ key: s.key, label: `${s.label} ${s.name}`, href: `/vsm/${s.key}`, active: sys === s.key })),
     ],
   };
 };
@@ -157,7 +191,8 @@ export function sectionNavFor(path: string): SectionNav | null {
   const p = navPath(path);
   if (p === '/' || at(p, '/shipyard') || at(p, '/orbitals') || at(p, '/harbours') || at(p, '/harbors') || at(p, '/ships')
     || at(p, '/sizes') || at(p, '/classes') || at(p, '/rung') || at(p, '/foreign') || at(p, '/labs')) return placesSection(p);
-  if (at(p, '/expeditions') || at(p, '/voyages') || at(p, '/vsm') || at(p, '/governance')) return expeditionsSection(p);
+  if (at(p, '/expeditions') || at(p, '/voyages')) return expeditionsSection(p);
+  if (at(p, '/vsm') || at(p, '/governance')) return vsmSection(p);
   if (at(p, '/discoveries')) return discoveriesSection(p);
   return null;
 }

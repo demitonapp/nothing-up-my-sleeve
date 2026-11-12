@@ -676,10 +676,44 @@ DEMITON_SECTIONS: dict[str, str] = {
     "demiton-expeditions": "a ship's company at the foot of a gangway at night about to sail: the captain "
     "unrolling a chart of unnamed coasts on a cask-head, sailors loading the last stores by lantern, a great "
     "galleon behind them with sails loosed, black water ahead and a thin ring of light in the sky",
+    # the VSM (12 November, Justin: "VSM should have it's own card here http://localhost:4321/orbitals/demiton
+    # with a fal image"): Beer's five systems as a flagship's council, each at its own post around one table
+    # the first draw hung an electric pendant lamp; a second, pushed to "Elizabethan", came out grey with a
+    # cowboy hat. This keeps the first's colour and night sea and says the lantern outright
+    "demiton-vsm": "the great cabin of a flagship at night as its council sits around one long table under a "
+    "single swinging ship's lantern with a candle inside: the captain at its head with the sealed articles "
+    "of the voyage under his hand, the purser with an open ledger and an iron strongbox, the sailing master "
+    "with brass dividers over a chart, the boatswain with a coiled line, through the stern windows a "
+    "lookout's lantern high in the rigging of a second ship and the thin lit ring of an Orbital in the sky, "
+    "a small silver drone perched on the back of the captain's chair",
 }
 
-SIZES = {**{k: "landscape_16_9" for k in (*DEMITON_SECTIONS, *CLASSES,*TESTS, *LABS, *HARBOURS, *HARBOUR_VIEWS, *SHIPBUILDER, *SHIPYARD, *SHIPYARD_SECTIONS, *CHARTING, *POSITIONS, *FOREIGN, *SOP_GOALS, *EXPEDITIONS, *BANDS, *LADDER, *CONSOLE, *EMBEDDINGS)}, **{k: "portrait_4_3" for k in CARDS}, **{k: "portrait_4_3" for k in LOGIC}}
-SUBJECTS = {**DEMITON_SECTIONS, **TESTS, **LABS, **CLASSES, **HARBOURS, **HARBOUR_VIEWS, **SHIPBUILDER, **SHIPYARD, **SHIPYARD_SECTIONS, **CHARTING, **POSITIONS, **FOREIGN, **CARDS, **LOGIC, **SOP_GOALS, **EXPEDITIONS, **BANDS, **LADDER, **CONSOLE, **EMBEDDINGS}
+# The VSM page's five cards, one a system (12 November, Justin: "http://localhost:4321/vsm should have 5 cards
+# with a fal image for each level"). Each system as the post aboard that does its work; named vsm-s1 … vsm-s5,
+# listed in the frontend's VsmCards.tsx.
+VSM_SYSTEMS: dict[str, str] = {
+    "vsm-s1": "the main deck of a great wooden ship at work by lantern-light at night: sailors hauling on a "
+    "line together, a man aloft loosing a sail, stores being swung aboard in a cargo net, the hatch open on "
+    "a hold stacked with casks and bound books, the curved lit band of an Orbital ring overhead",
+    # the first draw gave a modern lighthouse and electric quay lamps: the fire basket and torches are said
+    "vsm-s2": "a harbour mouth at night in deep blues and amber seen from a pilot's rowing boat: a pilot "
+    "standing in the stern with a raised lantern signalling, two great wooden galleons easing through the "
+    "narrow channel one behind the other, an old stone watchtower on the mole with an iron fire basket "
+    "burning at its top, pitch torches along the quay, black water and reflected firelight, the thin ring "
+    "of an Orbital in the sky",
+    "vsm-s3": "a purser's cabin below decks at night: the purser at a narrow desk counting coin from an iron "
+    "strongbox into a ledger by a single candle, a second officer leaning over his shoulder checking the "
+    "figures with a finger on the page, a ship's papers sealed with wax, keys on a ring, deep shadow",
+    "vsm-s4": "a lookout high in the crow's nest of a wooden ship at night with a long brass spyglass to his "
+    "eye, far off on the horizon the lit sails of strange foreign ships and an unknown coast, a small silver "
+    "drone hovering beside him, the thin ring of an Orbital arcing across the stars",
+    "vsm-s5": "an admiral alone at a carved desk in a stern cabin at night pressing his seal into hot red wax "
+    "on the articles of the voyage, a single candle, a quill and inkhorn, a sword hung on the bulkhead, "
+    "through the leaded window the fleet's lanterns at anchor and the faint ring of an Orbital",
+}
+
+SIZES = {**{k: "landscape_16_9" for k in (*DEMITON_SECTIONS, *VSM_SYSTEMS, *CLASSES,*TESTS, *LABS, *HARBOURS, *HARBOUR_VIEWS, *SHIPBUILDER, *SHIPYARD, *SHIPYARD_SECTIONS, *CHARTING, *POSITIONS, *FOREIGN, *SOP_GOALS, *EXPEDITIONS, *BANDS, *LADDER, *CONSOLE, *EMBEDDINGS)}, **{k: "portrait_4_3" for k in CARDS}, **{k: "portrait_4_3" for k in LOGIC}}
+SUBJECTS = {**DEMITON_SECTIONS, **VSM_SYSTEMS, **TESTS, **LABS, **CLASSES, **HARBOURS, **HARBOUR_VIEWS, **SHIPBUILDER, **SHIPYARD, **SHIPYARD_SECTIONS, **CHARTING, **POSITIONS, **FOREIGN, **CARDS, **LOGIC, **SOP_GOALS, **EXPEDITIONS, **BANDS, **LADDER, **CONSOLE, **EMBEDDINGS}
 
 # The twenty subjects the audit found outside the brief (ships/reports/art-audit-2026-11-11.md): rewritten
 # into the three-layer world -- Risso's ink, Drake's voyages, the young Culture's universe -- keeping what

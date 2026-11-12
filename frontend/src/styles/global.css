@@ -47,6 +47,19 @@ body { margin: 0; background: var(--bg); color: var(--text);
 header { padding: 14px 20px; border-bottom: 1px solid var(--line); display: flex;
          align-items: baseline; gap: 16px; flex-wrap: wrap; position: sticky; top: 0; background: var(--bg); z-index: 5; }
 header h1 { margin: 0; font-size: var(--fs-xl); letter-spacing: .02em; }
+/* the breadcrumb trail under the header, on every page (components/islands/Breadcrumbs, lib/crumbs.ts) */
+nav.trail { padding: 8px 20px; border-bottom: 1px solid var(--line); font-size: var(--fs-sm); }
+nav.trail ol { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 0; }
+nav.trail li { display: inline-flex; align-items: baseline; min-width: 0; }
+nav.trail li + li::before { content: "›"; color: var(--muted); margin: 0 8px; opacity: .7; }
+nav.trail a { color: var(--muted); text-decoration: none; }
+nav.trail a:hover, nav.trail a:focus-visible { color: var(--accent); }
+nav.trail [aria-current="page"] { color: var(--text); overflow-wrap: anywhere; }
+@media (max-width: 640px) { nav.trail { padding: 6px 16px; } }
+/* the trail says where a page sits, so the old one-step "← back" links in a page's title are not drawn;
+   a title that is itself a trail (h1.crumbs) keeps its links */
+main h1 > a.back, .section h1 > a.back { display: none; }
+h1.crumbs > a.back { display: inline; }
 header h1 a { color: inherit; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; }
 header h1 a:hover { color: var(--accent); }
 header h1 .brandmark { width: 1.15em; height: 1.15em; display: block; flex: none; }

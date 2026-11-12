@@ -9,6 +9,7 @@ import '../styles/global.css';
 import Header from '../components/Header.astro';
 import CommandPalette from '../components/islands/CommandPalette';
 import ChatConsole from '../components/islands/ChatConsole';
+import Breadcrumbs from '../components/islands/Breadcrumbs';
 ---
 <!doctype html>
 <html lang="en">
@@ -21,6 +22,8 @@ import ChatConsole from '../components/islands/ChatConsole';
   </head>
   <body>
     <Header />
+    <!-- where this page sits, from Places down (lib/crumbs.ts): one trail for every page -->
+    <Breadcrumbs client:load initialPath={Astro.url.pathname} />
     <slot />
     <!-- ⌘K, on every page: type a model, open its chat (components/islands/CommandPalette) -->
     <CommandPalette client:idle />
@@ -53,6 +56,8 @@ import ChatConsole from '../components/islands/ChatConsole';
             tab.setAttribute('data-state', on ? 'active' : 'inactive');
             if (on) tab.setAttribute('aria-current', 'page'); else tab.removeAttribute('aria-current');
           }
+          // the breadcrumb trail follows the same live address (components/islands/Breadcrumbs)
+          window.dispatchEvent(new Event('thorp:navigate'));
         };
         if (!window.__thorpMainNav) {
           window.__thorpMainNav = true;

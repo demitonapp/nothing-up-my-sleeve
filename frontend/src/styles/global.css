@@ -2472,6 +2472,98 @@ ol.goaltext { padding-left: 22px; }
   .consoleinput { max-width: none; padding: 10px 16px; }
 }
 
+/* ---- the console as three sections (13 November, Justin: "sections you can click … like an accordion pop
+   2/3 or 1/3 or all 3"): the bar is three plates — past chats, the chat, settings — and each opens its own
+   column of the drawer, alone or beside the others. The chat takes the larger share when it is open. */
+.consolebar { padding: 0; gap: 0; cursor: default; }
+.consolebar::after {
+  background: linear-gradient(90deg, rgba(6,5,4,.9) 0%, rgba(6,5,4,.6) 28%, rgba(6,5,4,.42) 50%, rgba(6,5,4,.6) 72%, rgba(6,5,4,.9) 100%);
+}
+.consoleseg { flex: 1 1 0; min-width: 0; height: 100%; display: flex; align-items: center; gap: 12px; padding: 0 18px;
+  background: none; border: 0; color: inherit; font: inherit; text-align: left; cursor: pointer;
+  transition: background .18s, box-shadow .18s; }
+.consoleseg + .consoleseg { border-left: 1px solid rgba(201,162,74,.22); }
+.consoleseg.mid { flex-grow: 2; }
+.consoleseg.set { justify-content: flex-end; text-align: right; }
+.consoleseg:hover { background: rgba(201,162,74,.07); }
+.consoleseg[aria-pressed="true"] { background: rgba(201,162,74,.11); box-shadow: inset 0 2px 0 #c9a24a; }
+.consoleseg:focus-visible { outline: 1px solid #c9a24a; outline-offset: -4px; }
+.consoleseg .consoleplate { min-width: 0; }
+.consoleseg .consolenote { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.consolesegicon { flex: none; color: #d8b566; font-size: 15px; line-height: 1; }
+.consoleseg[aria-pressed="false"] .consolesegicon { color: #8d7a56; }
+
+.consolepanel { display: flex; flex-direction: column; }
+.consolecols { flex: 1 1 auto; min-height: 0; display: flex; }
+.consolecol { flex: 0 1 0; min-width: 0; min-height: 0; overflow: hidden; display: flex; flex-direction: column;
+  visibility: hidden; transition: flex-grow .3s cubic-bezier(.22,.9,.24,1), visibility 0s linear .3s; }
+.consolecol.on { flex-grow: 1; visibility: visible; transition: flex-grow .3s cubic-bezier(.22,.9,.24,1), visibility 0s; }
+.consolemain.on { flex-grow: 2.2; }
+.consolecol.on ~ .consolecol.on { border-left: 1px solid #3a2a12; }
+.console.resizing .consolecol { transition: none; }
+.consolemain .consolebody { flex: 1 1 auto; }
+
+/* each column's head is the same height, so the three line up as one rail */
+.consolecolhead, .consolemain .consolehead { min-height: 46px; flex-wrap: nowrap; }
+.consolecolhead { display: flex; align-items: center; gap: 10px; padding: 8px 16px;
+  background: #100e0c; border-top: 2px solid #000; border-bottom: 1px solid #3a2a12; }
+.consolecolhead b, .consolesetname, .consolepastgroupname {
+  color: #c9a24a; font-size: 10.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
+.consolecolhead .note { color: #7c694a; font-variant-numeric: tabular-nums; }
+.consolecolhead .consolbtn { margin-left: auto; white-space: nowrap; }
+.consolemain .consolehead { overflow-x: auto; scrollbar-width: none; }
+.consolemain .consolehead .consolbtn { white-space: nowrap; flex: none; }
+.consoleheadgap { flex: 1 1 auto; }
+.consolemodel { min-width: 0; max-width: 46%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  background: none; border: 0; padding: 2px 0; color: #e9e2d3; font: inherit; font-size: 13px; cursor: pointer;
+  border-bottom: 1px dotted #6b5628; }
+.consolemodel:hover { color: #f2e6cf; border-bottom-color: #c9a24a; }
+
+/* left: past chats */
+.consolepastlist { flex: 1 1 auto; overflow-y: auto; padding: 8px 8px 16px; background: #0e0d0b;
+  scrollbar-width: thin; scrollbar-color: #3a2a12 transparent; }
+.consolepastempty { margin: 14px 8px; color: #8d7a56; font-size: 12.5px; line-height: 1.5; }
+.consolepastgroup + .consolepastgroup { margin-top: 14px; }
+.consolepastgroupname { display: block; padding: 6px 8px 4px; color: #8d7a56; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.consolepastrow { display: flex; align-items: stretch; border-left: 2px solid transparent; border-radius: 1px; }
+.consolepastrow:hover { background: #131110; }
+.consolepastrow.active { border-left-color: #c9a24a; background: #16130f; }
+.consolepastopen { flex: 1 1 auto; min-width: 0; display: grid; gap: 2px; padding: 7px 8px; background: none; border: 0;
+  color: #e9e2d3; font: inherit; text-align: left; cursor: pointer; }
+.consolepastopen:disabled { cursor: default; opacity: .5; }
+.consolepastopen:focus-visible, .consolepastdel:focus-visible { outline: 1px solid #c9a24a; outline-offset: -2px; }
+.consolepasttitle { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.consolepaststar { color: #c9a24a; margin-right: 5px; }
+.consolepastmeta { font-size: 11px; color: #7c694a; font-variant-numeric: tabular-nums; }
+.consolepastlast { font-size: 12px; color: #9a8a6c; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.consolepastdel { flex: none; background: none; border: 0; color: #6f5d40; cursor: pointer; padding: 0 10px; font-size: 15px; }
+.consolepastdel:hover { color: #d98b6a; }
+.consolepastlist .consolewarn { margin: 6px 8px 10px; }
+
+/* right: settings, a row a control */
+.consolesetlist { flex: 1 1 auto; overflow-y: auto; padding: 4px 16px 16px; background: #0e0d0b;
+  display: grid; align-content: start; scrollbar-width: thin; scrollbar-color: #3a2a12 transparent; }
+.consolesetrow { display: grid; gap: 7px; justify-items: start; padding: 12px 0; border-bottom: 1px solid #1e1811; }
+.consolesetname { color: #8d7a56; }
+.consolesetrow > select, .consolesetline select { width: 100%; min-width: 0; background: #0b0a09; color: #f2e6cf;
+  border: 1px solid #6b5628; border-radius: 2px; padding: 5px 7px; font: inherit; font-size: 13px; }
+.consolesetrow > select:focus, .consolesetline select:focus { outline: none; border-color: #c9a24a; }
+.consolesetline { display: flex; align-items: center; gap: 8px; width: 100%; }
+.consolesetline select { flex: 1 1 auto; }
+.consolesetline .consolbtn { padding: 3px 9px; letter-spacing: 0; text-transform: none; font-size: 12px; }
+.consolesetwhy { font-size: 11.5px; line-height: 1.45; color: #7c694a; font-variant-numeric: tabular-nums; }
+.consolesetline .consolesetwhy { flex: none; }
+
+@media (max-width: 760px) {
+  /* stacked: the open sections share the drawer's height, top to bottom */
+  .consolecols { flex-direction: column; }
+  .consolecol:not(.on) { display: none; }
+  .consolecol.on ~ .consolecol.on { border-left: 0; border-top: 1px solid #3a2a12; }
+  .consoleseg { padding: 0 10px; gap: 8px; }
+  .consoleseg.past .consolenote, .consoleseg.set .consolenote, .consoleseg .consolemeter { display: none; }
+  .consoleseg.mid { flex-grow: 1.6; }
+}
+
 /* ---- the shipyard in the new house style (11 November, Justin: "restyle the shipyard"): a dark yard under
    an Orbital, its three sections as brass plates. Risso's ink ground, Drake's yard, the young Culture's
    traces in the plates' own art. */

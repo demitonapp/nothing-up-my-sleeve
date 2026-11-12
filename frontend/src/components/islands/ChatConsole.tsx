@@ -17,7 +17,24 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react';
 import { ContextMeter } from './Chat';
 import RichText from '@/lib/richtext';
-import { autoTitle, getThread, listThreads, markSaved, newId, saveThread, type Thread } from '@/lib/conversations';
+import { autoTitle, getThread, listThreads, markSaved, newId, removeThread, saveThread, subscribe, type Thread } from '@/lib/conversations';
+
+// The console is three sections you open like an accordion (13 November, Justin: "sections you can click, so
+// for the chat to expand, you click the middle section, and then if you want past chats etc left section and
+// if you want settings right section … pop 2/3 or 1/3 or all 3"). Each third of the bar opens its own column
+// of the drawer, alone or beside the others; the drawer is open while any one of them is.
+interface Panes { past: boolean; chat: boolean; set: boolean }
+const NONE: Panes = { past: false, chat: false, set: false };
+const anyOpen = (p: Panes): boolean => p.past || p.chat || p.set;
+
+const ago = (t: number): string => {
+  const s = Math.max(0, Math.round((Date.now() - t) / 1000));
+  if (s < 60) return 'just now';
+  if (s < 3600) return `${Math.round(s / 60)}m ago`;
+  if (s < 86400) return `${Math.round(s / 3600)}h ago`;
+  return `${Math.round(s / 86400)}d ago`;
+};
+const lastLine = (t: Thread): string => ([...t.messages].reverse().find((m) => m.text)?.text || '').replace(/\s+/g, ' ').slice(0, 90);
 
 interface Model {
   kind: 'thorp' | 'foreign';
@@ -175,8 +192,34 @@ function SayMeta({ meta, context, budget }: { meta: Meta; context: number | null
 }
 
 export default function ChatConsole() {
-  const [open, setOpen] = useState(false);
+  const [panes, setPanes] = useState<Panes>(NONE);
+  const open = anyOpen(panes);
+  // the sections last opened together, so ⌘J brings back the same arrangement (kept in this browser)
+  const lastPanes = useRef<Panes>({ past: false, chat: true, set: false });
+  useEffect(() => {
+    try {
+      const p = JSON.parse(localStorage.getItem('thorp.chat.consolepanes') || 'null');
+      if (p && anyOpen(p)) lastPanes.current = { past: !!p.past, chat: !!p.chat, set: !!p.set };
+    } catch { /* storage blocked */ }
+  }, []);
+  useEffect(() => {
+    if (!open) return;
+    lastPanes.current = panes;
+    try { localStorage.setItem('thorp.chat.consolepanes', JSON.stringify(panes)); } catch { /* blocked */ }
+  }, [panes, open]);
+  const togglePane = (k: keyof Panes): void => setPanes((p) => ({ ...p, [k]: !p[k] }));
+  const closeAll = (): void => setPanes(NONE);
   const rootRef = useRef<HTMLDivElement | null>(null);
+  // past chats: every thread this browser keeps, newest first, kept current as threads are written
+  const [threads, setThreads] = useState<Thread[]>([]);
+  useEffect(() => {
+    const sync = (): void => setThreads(listThreads());
+    sync();
+    return subscribe(sync);
+  }, []);
+  // a past chat opened for another model: loaded once that model is chosen
+  const wantThread = useRef('');
+  const [pastMsg, setPastMsg] = useState('');
   const [models, setModels] = useState<Model[] | null>(null);
   const [err, setErr] = useState('');
   const [pick, setPick] = useState('');
@@ -288,7 +331,7 @@ export default function ChatConsole() {
       const d = (e as CustomEvent).detail || {};
       if (d.model) setWanted(String(d.model));
       if (d.refresh) setModels(null); // a model just downloaded: read the list again
-      setOpen(true);
+      setPanes((p) => (p.chat ? p : { ...p, chat: true }));
     };
     window.addEventListener('thorp:chat', onChat);
     return () => window.removeEventListener('thorp:chat', onChat);
@@ -367,23 +410,47 @@ export default function ChatConsole() {
     };
   }, [open, models]);
 
-  // the thread follows the model: its newest, else a fresh one on the first message
+  // the thread follows the model: the past chat asked for, else its newest, else a fresh one on the first
+  // message. Only a change of model moves it, so closing and reopening the drawer keeps the chat you were in.
   useEffect(() => {
-    if (!open || !chosen) return;
+    if (!chosen) return;
     const key = convoKeyOf(chosen);
-    const latest = listThreads().find((t) => t.key === key);
-    setThreadId(latest?.id || '');
-    setSays(((latest?.messages as unknown as Say[]) || []).slice());
-  }, [open, chosen?.kind, chosen?.model, chosen?.ship_key]);
+    const asked = wantThread.current ? getThread(wantThread.current) : undefined;
+    wantThread.current = '';
+    const t = asked && asked.key === key ? asked : listThreads().find((x) => x.key === key);
+    threadRef.current = t?.id || '';
+    setThreadId(t?.id || '');
+    setSays(((t?.messages as unknown as Say[]) || []).slice());
+  }, [chosen?.kind, chosen?.model, chosen?.ship_key]);
+
+  // a past chat, from the left section: its model is chosen if it is not already, and the chat opens on it
+  const openThread = (t: Thread): void => {
+    if (busy) { setPastMsg('wait for the answer being written'); return; }
+    const m = instruct.find((x) => convoKeyOf(x) === t.key);
+    if (!m) { setPastMsg(`${t.name} is not on the console's list now`); return; }
+    setPastMsg('');
+    if (chosen && convoKeyOf(chosen) === t.key) {
+      const msgs = ((t.messages as unknown as Say[]) || []).slice();
+      said.current = msgs;
+      threadRef.current = t.id;
+      setThreadId(t.id);
+      setSays(msgs);
+    } else {
+      wantThread.current = t.id;
+      setLab(labOf(m));
+      setPick(t.key);
+    }
+    setPanes((p) => ({ ...p, chat: true }));
+  };
 
   // a long thread opens on its newest turn, where the reading left off
   useEffect(() => {
-    if (!open) return;
+    if (!panes.chat) return;
     const el = chatBox.current;
     if (!el) return;
     const frame = requestAnimationFrame(() => { el.scrollTop = el.scrollHeight; });
     return () => cancelAnimationFrame(frame);
-  }, [open, threadId]);
+  }, [panes.chat, threadId]);
 
   // the thinking switch follows the model: a template with an off switch starts on its own default, one
   // that always reasons is on and cannot be turned off, one with no reasoning mode is off and inert
@@ -447,16 +514,16 @@ export default function ChatConsole() {
   }, [notesOpen, loadNotes, notesFor]);
 
   useEffect(() => {
-    if (open) window.setTimeout(() => field.current?.focus(), 260);
-  }, [open]);
+    if (panes.chat) window.setTimeout(() => field.current?.focus(), 260);
+  }, [panes.chat]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if (e.key.toLowerCase() === 'j' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
-        setOpen((v) => !v);
+        setPanes((p) => (anyOpen(p) ? NONE : lastPanes.current));
       } else if (e.key === 'Escape' && open) {
-        setOpen(false);
+        closeAll();
       }
     };
     window.addEventListener('keydown', onKey);
@@ -472,7 +539,7 @@ export default function ChatConsole() {
     const onDown = (e: PointerEvent): void => {
       if (e.button !== 0) return;
       const root = rootRef.current;
-      if (root && e.target instanceof Node && !root.contains(e.target)) setOpen(false);
+      if (root && e.target instanceof Node && !root.contains(e.target)) closeAll();
     };
     document.addEventListener('pointerdown', onDown);
     return () => document.removeEventListener('pointerdown', onDown);
@@ -641,6 +708,23 @@ export default function ChatConsole() {
     }
   };
 
+  // the threads grouped by model, the model with the newest thread first
+  const pastGroups = (() => {
+    const by = new Map<string, Thread[]>();
+    for (const t of threads) {
+      const list = by.get(t.key);
+      if (list) list.push(t);
+      else by.set(t.key, [t]);
+    }
+    return [...by.values()];
+  })();
+  const listed = new Set(instruct.map(convoKeyOf));
+  const thinkOn = thinkingAuto || (thinkingToggle && think);
+  const setSummary = chosen
+    ? `thinking ${thinkingAuto ? 'auto' : thinkOn ? 'on' : 'off'} · tools ${toolsOk && useTools ? 'on' : 'off'} · ${Math.round(budgetShare * 100)}% budget`
+    : 'the model, thinking, tools and budget';
+  const hereTitle = threads.find((t) => t.id === threadId)?.title;
+
   return (
     <div
       ref={rootRef}
@@ -648,26 +732,57 @@ export default function ChatConsole() {
       aria-label="chat console"
       style={{ '--consoleh': panelH ? `${Math.round(panelH)}px` : undefined, '--consolefs': `${answerFs}px` } as CSSProperties}
     >
-      <button
-        type="button"
-        className="consolebar"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        aria-controls="consolepanel"
-        title={open ? 'close the console (⌘J)' : 'open the chat console (⌘J)'}
-      >
+      {/* the bar is three plates: past chats, the chat, settings. Each opens its own column of the drawer. */}
+      <div className="consolebar" role="group" aria-label="the chat console's sections">
         <Woodwork />
-        <span className="consoleplate">
-          <span className="consoletitle">The chat console</span>
-          <span className="consolenote">{chosen ? chosen.name : 'reading the models…'}{open ? ' · ⌘J, esc or a click outside to close' : ' · ⌘J'}</span>
-        </span>
-        <span className="consolemeter">
-          <ContextMeter used={used} context={chosen?.facts?.context ?? null} next={256} turns={says.filter((s) => s.role === 'you').length} last={last} />
-        </span>
-        <span className="consolechevron" aria-hidden="true">{open ? '▾' : '▴'}</span>
-      </button>
+        <button
+          type="button"
+          className="consoleseg past"
+          onClick={() => togglePane('past')}
+          aria-pressed={panes.past}
+          aria-controls="consolepast"
+          title={panes.past ? 'close past chats' : 'open past chats'}
+        >
+          <span className="consolesegicon" aria-hidden="true">☰</span>
+          <span className="consoleplate">
+            <span className="consoletitle">Past chats</span>
+            <span className="consolenote">{threads.length ? `${threads.length} kept${hereTitle ? ` · here: ${hereTitle}` : ''}` : 'none yet'}</span>
+          </span>
+        </button>
+        <button
+          type="button"
+          className="consoleseg mid"
+          onClick={() => togglePane('chat')}
+          aria-pressed={panes.chat}
+          aria-controls="consolechatcol"
+          title={panes.chat ? 'close the chat (⌘J closes every section)' : 'open the chat (⌘J)'}
+        >
+          <span className="consoleplate">
+            <span className="consoletitle">The chat console</span>
+            <span className="consolenote">{chosen ? chosen.name : 'reading the models…'}{open ? ' · ⌘J, esc or a click outside to close' : ' · ⌘J'}</span>
+          </span>
+          <span className="consolemeter">
+            <ContextMeter used={used} context={chosen?.facts?.context ?? null} next={256} turns={says.filter((s) => s.role === 'you').length} last={last} />
+          </span>
+          <span className="consolechevron" aria-hidden="true">{panes.chat ? '▾' : '▴'}</span>
+        </button>
+        <button
+          type="button"
+          className="consoleseg set"
+          onClick={() => togglePane('set')}
+          aria-pressed={panes.set}
+          aria-controls="consoleset"
+          title={panes.set ? 'close settings' : 'open settings: the model, thinking, tools, budget and text size'}
+        >
+          <span className="consoleplate">
+            <span className="consoletitle">Settings</span>
+            <span className="consolenote">{setSummary}</span>
+          </span>
+          <span className="consolesegicon" aria-hidden="true">⚙</span>
+        </button>
+      </div>
 
-      <div className="consolepanel" id="consolepanel" role="region" aria-label="chat" ref={panelRef}>
+      <div className="consolepanel" id="consolepanel" role="region" aria-label="chat console" ref={panelRef}>
         {/* the top edge is the drawer's handle: drag it, or focus it and use ↑ ↓ */}
         <div
           className="consoleresize"
@@ -687,282 +802,364 @@ export default function ChatConsole() {
             setPanel((panelRef.current?.getBoundingClientRect().height ?? 520) + (e.key === 'ArrowUp' ? 48 : -48));
           }}
         />
-        <div className="consolehead">
-          <label className="note consolepick">
-            lab{' '}
-            <select
-              value={lab}
-              onChange={(e) => { setLab(e.target.value); setPick(''); }}
-              aria-label="lab"
-              title="who made the model"
-            >
-              {labs.length === 0 ? <option value="">reading the labs…</option> : null}
-              {labs.map((l) => (
-                <option key={l} value={l}>{l}</option>
+        <div className="consolecols">
+          {/* ---- left: past chats */}
+          <section id="consolepast" className={`consolecol consolepast${panes.past ? ' on' : ''}`} aria-label="past chats" inert={!panes.past}>
+            <div className="consolecolhead">
+              <b>Past chats</b>
+              <span className="note">{threads.length}</span>
+              <button type="button" className="consolbtn" onClick={() => { startNewChat(); setPanes((p) => ({ ...p, chat: true })); }} disabled={busy} title="start a new conversation with this model">+ New chat</button>
+            </div>
+            <div className="consolepastlist">
+              {pastMsg ? <p className="consolewarn">{pastMsg}</p> : null}
+              {threads.length === 0 ? <p className="note consolepastempty">No conversations yet. Ask a model something and it is kept here, in this browser and in Postgres.</p> : null}
+              {pastGroups.map((rows) => (
+                <div key={rows[0].key} className="consolepastgroup">
+                  <div className="consolepastgroupname">{rows[0].name}{listed.has(rows[0].key) ? '' : ' · not on the list now'}</div>
+                  {rows.map((t) => {
+                    const turns = t.messages.filter((m) => m.role === 'you').length;
+                    return (
+                      <div key={t.id} className={`consolepastrow${t.id === threadId ? ' active' : ''}`}>
+                        <button type="button" className="consolepastopen" onClick={() => openThread(t)} disabled={!listed.has(t.key)} title={`open ${t.title || 'this chat'}`}>
+                          <span className="consolepasttitle">
+                            {t.saved ? <span className="consolepaststar" aria-label="saved">★</span> : null}
+                            {t.title || lastLine(t) || 'an untitled chat'}
+                          </span>
+                          <span className="consolepastmeta">{turns} turn{turns === 1 ? '' : 's'} · {ago(t.updatedAt)}{t.id === threadId ? ' · here' : ''}</span>
+                          {lastLine(t) ? <span className="consolepastlast">{lastLine(t)}</span> : null}
+                        </button>
+                        <button
+                          type="button"
+                          className="consolepastdel"
+                          onClick={() => { if (t.id === threadId) startNewChat(); removeThread(t.id); }}
+                          disabled={busy && t.id === threadId}
+                          title="forget this conversation"
+                          aria-label={`forget ${t.title || 'this chat'}`}
+                        >×</button>
+                      </div>
+                    );
+                  })}
+                </div>
               ))}
-            </select>
-          </label>
-          {/* the favourite is a model, not a lab (11 November, Justin: "favourite not the lab, but rather the
-              model"): the star sits on the model it keeps, and the kept one is starred in the list */}
-          <label className="note consolepick">
-            model{' '}
-            <select
-              value={chosen ? convoKeyOf(chosen) : ''}
-              onChange={(e) => setPick(e.target.value)}
-              aria-label="model"
-              title="the models this lab makes that answer: instruction-tuned, or a Demiton leg taught to talk"
-              disabled={!inLab.length}
-            >
-              {inLab.map((m) => (
-                <option key={convoKeyOf(m)} value={convoKeyOf(m)}>{m.model && m.model === defaultKey ? `★ ${m.name}` : m.name}</option>
-              ))}
-            </select>
-            {chosen?.checkpoints?.length ? (
-              <>
-                {' '}checkpoint{' '}
-                <select
-                  value={step}
-                  onChange={(e) => setStep(e.target.value)}
-                  aria-label="checkpoint"
-                  title="every checkpoint this leg kept, with its reading on held-out exchanges: bits per byte (lower is better) and how often it ends its own turn"
-                >
-                  <option value="">latest (step {chosen.run?.step?.replace('step-', '')})</option>
-                  {[...chosen.checkpoints].reverse().map((c) => (
-                    <option key={c.step} value={String(c.step)}>
-                      step {c.step}{c.bpb != null ? ` · ${c.bpb.toFixed(2)} bpb` : ''}{c.stopped != null ? ` · ends turn ${Math.round(c.stopped * 100)}%` : ''}
-                    </option>
-                  ))}
-                </select>
-              </>
-            ) : null}
-            <button
-              type="button"
-              className={`consolstar${chosen?.model && defaultKey === chosen.model ? ' on' : ''}`}
-              onClick={() => {
-                if (!chosen?.model) return;
-                const on = defaultKey === chosen.model;
-                try {
-                  if (on) localStorage.removeItem('thorp.chat.default');
-                  else localStorage.setItem('thorp.chat.default', chosen.model);
-                } catch { /* blocked */ }
-                setDefaultKey(on ? '' : chosen.model);
-              }}
-              disabled={!chosen?.model}
-              aria-pressed={!!chosen?.model && defaultKey === chosen.model}
-              aria-label={chosen?.model && defaultKey === chosen.model ? `${chosen.name} is your favourite model` : `make ${chosen?.name || 'this model'} your favourite model`}
-              title={chosen?.model && defaultKey === chosen.model ? `${chosen.name} is your favourite: the console and /chat open on it (click to clear)` : `favourite ${chosen?.name || 'this model'}: the console and /chat open on it`}
-            >{chosen?.model && defaultKey === chosen.model ? '★' : '☆'}</button>
-          </label>
-          <label
-            className={`consoleswitch${think && (thinkingToggle || thinkingAuto) ? ' on' : ''}${!thinkingToggle && !thinkingAuto ? ' inert' : ''}`}
-            title={thinking?.why || (thinkingToggle ? 'the model\'s own reasoning mode: off asks it to answer directly' : 'this model has no reasoning mode')}
-          >
-            <input
-              type="checkbox"
-              checked={thinkingToggle ? think : thinkingAuto}
-              disabled={!thinkingToggle && !thinkingAuto}
-              onChange={(e) => setThink(e.target.checked)}
-              aria-label="thinking"
-            />
-            <span className="consoleswitchtrack" aria-hidden="true"><span className="consoleswitchthumb" /></span>
-            <span className="consoleswitchlabel">thinking {thinkingAuto ? 'auto' : think && (thinkingToggle || thinkingAuto) ? 'on' : 'off'}</span>
-          </label>
-          <label
-            className={`consoleswitch${toolsOk && useTools ? ' on' : ''}${!toolsOk ? ' inert' : ''}`}
-            title={toolsOk ? (chosen?.kind === 'foreign' ? `calculate, current_time, board_score, queue_status, liberty_machine_status, system_status, expedition_status, browser_task and browser_task_status: ${toolsInfo?.why || ''}` : (toolsInfo?.why || '')) : (toolsInfo?.why || 'tools are for the foreign ships whose chat template takes them, and our ships taught the tool leg')}
-          >
-            <input
-              type="checkbox"
-              checked={toolsOk && useTools}
-              disabled={!toolsOk}
-              onChange={(e) => setUseTools(e.target.checked)}
-              aria-label="tools"
-            />
-            <span className="consoleswitchtrack" aria-hidden="true"><span className="consoleswitchthumb" /></span>
-            <span className="consoleswitchlabel">tools {toolsOk && useTools ? 'on' : 'off'}</span>
-          </label>
-          <label className="note consolepick" title="the whole completion's budget: the reasoning and the answer share it">
-            budget{' '}
-            <select value={budgetShare} onChange={(e) => setBudgetShare(Number(e.target.value))} aria-label="token budget" title={contextWindow ? `a share of the ${contextWindow.toLocaleString()}-token window: ${tokens.toLocaleString()} tokens` : 'this model\'s window is not known, so the budget is a fixed 4096 tokens'}>
-              {[0.1, 0.25, 0.5, 0.75].map((p) => (
-                <option key={p} value={p}>{Math.round(p * 100)}%{contextWindow ? ` · ${Math.max(1, Math.round(p * contextWindow)).toLocaleString()}` : ''}</option>
-              ))}
-            </select>
-          </label>
-          {thinkingAuto || (thinkingToggle && think) ? (
-            <label className="note consolepick" title={thinkCapNow ? `the reasoning is closed at ${thinkCapNow.toLocaleString()} tokens and the answer written in the rest of the budget (never more than half the budget)` : 'no cap: the reasoning and the answer share the budget as they fall'}>
-              thinking ≤{' '}
-              <select value={thinkCap} onChange={(e) => setThinkCap(Number(e.target.value))} aria-label="thinking cap">
-                {[256, 512, 1024, 2048, 4096, 8192].map((n) => (
-                  <option key={n} value={n}>{Math.min(n, Math.floor(tokens / 2)).toLocaleString()}</option>
-                ))}
-                <option value={0}>no cap</option>
-              </select>
-            </label>
-          ) : null}
-          <span className="consoleheadbreak" aria-hidden="true" />
-          <button type="button" className="consolbtn" onClick={() => setNotesOpen((v) => !v)} aria-pressed={notesOpen}>
-            Notes{notes.length ? ` (${notes.length})` : ''}
-          </button>
-          <button type="button" className="consolbtn" onClick={() => setQuestionsOpen((v) => !v)} aria-pressed={questionsOpen}>
-            Questions{qRows.length ? ` (${qRows.length})` : ''}
-          </button>
-          <button type="button" className="consolbtn" onClick={() => setDebug((v) => !v)} aria-pressed={debug}>Debug</button>
-          <button
-            type="button"
-            className="consolbtn"
-            disabled={!threadId || !says.length}
-            title="name this chat and keep it (Postgres, and this browser)"
-            onClick={() => {
-              if (!threadId) return;
-              const t = markSaved(threadId, autoTitle(says as never));
-              setSaveMsg(t ? 'chat saved' : 'could not save');
-            }}
-          >Save chat</button>
-          {saveMsg ? <span className="note">{saveMsg}</span> : null}
-          <button type="button" className="consolbtn" onClick={startNewChat} disabled={!says.length} title="clear this conversation and start a new one">New chat</button>
-          <span className="consolereading" role="group" aria-label="answer text size">
-            <button type="button" className="consolbtn" onClick={() => setAnswerFs((v) => Math.max(13, v - 1))} title="smaller answer text" aria-label="smaller answer text">A−</button>
-            <button type="button" className="consolbtn" onClick={() => setAnswerFs((v) => Math.min(20, v + 1))} title="larger answer text" aria-label="larger answer text">A+</button>
-          </span>
-        </div>
+            </div>
+          </section>
 
-        <div className="consolebody">
-          <div className="consolechat" aria-live="polite" ref={chatBox}>
-            <div className="consoletranscript">
-              {says.length === 0 ? (
-                <div className="consoleintro">
-                  <span className="consolemsgwho">{chosen ? chosen.name : 'the console'}</span>
-                  <p className="note">{chosen ? 'Ask it anything. The answer is its own continuation; the thread is kept, and notes sit beside it.' : 'reading the models…'}</p>
+          {/* ---- middle: the chat */}
+          <section id="consolechatcol" className={`consolecol consolemain${panes.chat ? ' on' : ''}`} aria-label="chat" inert={!panes.chat}>
+            <div className="consolehead">
+              <button
+                type="button"
+                className="consolemodel"
+                onClick={() => setPanes((p) => ({ ...p, set: !p.set }))}
+                title={panes.set ? 'close settings' : 'change the model in settings'}
+              >{chosen ? chosen.name : 'reading the models…'}{step ? ` · step ${step}` : ''}</button>
+              <span className="consoleheadgap" aria-hidden="true" />
+              <button type="button" className="consolbtn" onClick={() => setNotesOpen((v) => !v)} aria-pressed={notesOpen}>
+                Notes{notes.length ? ` (${notes.length})` : ''}
+              </button>
+              <button type="button" className="consolbtn" onClick={() => setQuestionsOpen((v) => !v)} aria-pressed={questionsOpen}>
+                Questions{qRows.length ? ` (${qRows.length})` : ''}
+              </button>
+              <button
+                type="button"
+                className="consolbtn"
+                disabled={!threadId || !says.length}
+                title="name this chat and keep it (Postgres, and this browser)"
+                onClick={() => {
+                  if (!threadId) return;
+                  const t = markSaved(threadId, autoTitle(says as never));
+                  setSaveMsg(t ? 'chat saved' : 'could not save');
+                }}
+              >Save chat</button>
+              {saveMsg ? <span className="note">{saveMsg}</span> : null}
+              <button type="button" className="consolbtn" onClick={startNewChat} disabled={!says.length || busy} title="clear this conversation and start a new one">New chat</button>
+            </div>
+
+            <div className="consolebody">
+              <div className="consolechat" aria-live="polite" ref={chatBox}>
+                <div className="consoletranscript">
+                  {says.length === 0 ? (
+                    <div className="consoleintro">
+                      <span className="consolemsgwho">{chosen ? chosen.name : 'the console'}</span>
+                      <p className="note">{chosen ? 'Ask it anything. The answer is its own continuation; the thread is kept, and notes sit beside it.' : 'reading the models…'}</p>
+                    </div>
+                  ) : null}
+                  {says.map((s, i) => (
+                    <article key={i} className={`consolemsg ${s.role === 'you' ? 'is-you' : 'is-model'}`}>
+                      <div className="consolemsghead">
+                        <span className="consolemsgwho">{s.role === 'you' ? 'you' : (s.model || 'model')}</span>
+                        {s.meta && (s.meta.finish === 'length' || s.meta.finish === 'stopped') ? (
+                          <span
+                            className={`consolemsgend ${s.meta.finish === 'length' ? 'warn' : 'dim'}`}
+                            title={s.meta.finish === 'length' ? 'stopped at the token budget, not at its own end' : 'stopped by you: what had arrived is kept'}
+                          >{s.meta.finish === 'length' ? 'budget reached' : 'stopped'}</span>
+                        ) : null}
+                      </div>
+                      {s.meta?.tool_calls?.length ? <div className="consoletools">{s.meta.tool_calls.map((c, j) => <ToolLine key={j} c={c} />)}</div> : null}
+                      <div className="consolemsgtext"><RichText text={s.text} /></div>
+                      {s.role === 'thorp' && s.meta?.answer_tokens === 0 && s.meta?.finish === 'length' ? (
+                        <p className="consolewarn">The whole {s.meta.settings?.max_tokens ?? tokens}-token budget went to thinking, so no answer was written: raise the budget or turn thinking off.</p>
+                      ) : null}
+                      {s.meta ? <SayMeta meta={s.meta} context={chosen?.facts?.context ?? null} budget={tokens} /> : null}
+                      {s.role === 'thorp' && s.thinking ? (
+                        <details className="consolethink">
+                          <summary>thinking<span className="note">{s.meta?.reasoning_tokens ? ` · ${s.meta.reasoning_tokens.toLocaleString()} tokens` : ''}</span></summary>
+                          <pre>{s.thinking}</pre>
+                        </details>
+                      ) : null}
+                    </article>
+                  ))}
+                  {live ? (
+                    <article className="consolemsg is-model is-live">
+                      <div className="consolemsghead">
+                        <span className="consolemsgwho">{chosen?.name || 'model'}</span>
+                        <span className="consolemsgend">
+                          {live.text ? 'writing' : live.thinking ? 'thinking' : 'reading the prompt'}…
+                          {live.n ? ` · ${live.n.toLocaleString()} tokens` : ''}
+                        </span>
+                      </div>
+                      {live.tools.length ? <div className="consoletools">{live.tools.map((c, j) => <ToolLine key={j} c={c} />)}</div> : null}
+                      {live.text ? <div className="consolemsgtext"><RichText text={live.text} /></div> : null}
+                      {live.thinking ? (
+                        <details className="consolethink" open={!live.text}>
+                          <summary>thinking…</summary>
+                          <pre ref={thinkBox}>{live.thinking}</pre>
+                        </details>
+                      ) : null}
+                    </article>
+                  ) : busy ? <p className="note consolewait">sampling…</p> : null}
+                  {err ? <p className="consoleerr">{err}</p> : null}
+                </div>
+              </div>
+              {debug ? (
+                <div className="consoledebug">
+                  <div className="note">last request</div>
+                  <pre>{JSON.stringify(lastReq, null, 2)}</pre>
+                  <div className="note">last reply (answer trimmed)</div>
+                  <pre>{JSON.stringify(lastReply ? { ...lastReply, answer: lastReply.answer ? `${lastReply.answer.slice(0, 200)}…` : '', reasoning: undefined } : null, null, 2)}</pre>
+                  {lastReply?.meta?.rendered ? <><div className="note">the prompt it received</div><pre>{lastReply.meta.rendered}</pre></> : null}
                 </div>
               ) : null}
-              {says.map((s, i) => (
-                <article key={i} className={`consolemsg ${s.role === 'you' ? 'is-you' : 'is-model'}`}>
-                  <div className="consolemsghead">
-                    <span className="consolemsgwho">{s.role === 'you' ? 'you' : (s.model || 'model')}</span>
-                    {s.meta && (s.meta.finish === 'length' || s.meta.finish === 'stopped') ? (
-                      <span
-                        className={`consolemsgend ${s.meta.finish === 'length' ? 'warn' : 'dim'}`}
-                        title={s.meta.finish === 'length' ? 'stopped at the token budget, not at its own end' : 'stopped by you: what had arrived is kept'}
-                      >{s.meta.finish === 'length' ? 'budget reached' : 'stopped'}</span>
-                    ) : null}
+              {questionsOpen ? (
+                <div className="consolenotes consolequestions">
+                  <div className="consoleqnew">
+                    <textarea value={questionDraft} onChange={(e) => setQuestionDraft(e.target.value)} placeholder="a question to keep…" rows={2} aria-label="a question to keep" />
+                    <div className="consoleqrow">
+                      <input value={folder} onChange={(e) => setFolder(e.target.value)} list="qfolders" placeholder="folder" aria-label="folder" />
+                      <datalist id="qfolders">
+                        {qFolders.map((f) => <option key={f.name} value={f.name} />)}
+                      </datalist>
+                      <button type="button" className="consolbtn" onClick={() => void keepQuestion()} disabled={!questionDraft.trim()}>Save question</button>
+                      {qMsg ? <span className="note">{qMsg}</span> : null}
+                    </div>
                   </div>
-                  {s.meta?.tool_calls?.length ? <div className="consoletools">{s.meta.tool_calls.map((c, j) => <ToolLine key={j} c={c} />)}</div> : null}
-                  <div className="consolemsgtext"><RichText text={s.text} /></div>
-                  {s.role === 'thorp' && s.meta?.answer_tokens === 0 && s.meta?.finish === 'length' ? (
-                    <p className="consolewarn">The whole {s.meta.settings?.max_tokens ?? tokens}-token budget went to thinking, so no answer was written: raise the budget or turn thinking off.</p>
-                  ) : null}
-                  {s.meta ? <SayMeta meta={s.meta} context={chosen?.facts?.context ?? null} budget={tokens} /> : null}
-                  {s.role === 'thorp' && s.thinking ? (
-                    <details className="consolethink">
-                      <summary>thinking<span className="note">{s.meta?.reasoning_tokens ? ` · ${s.meta.reasoning_tokens.toLocaleString()} tokens` : ''}</span></summary>
-                      <pre>{s.thinking}</pre>
-                    </details>
-                  ) : null}
-                </article>
-              ))}
-              {live ? (
-                <article className="consolemsg is-model is-live">
-                  <div className="consolemsghead">
-                    <span className="consolemsgwho">{chosen?.name || 'model'}</span>
-                    <span className="consolemsgend">
-                      {live.text ? 'writing' : live.thinking ? 'thinking' : 'reading the prompt'}…
-                      {live.n ? ` · ${live.n.toLocaleString()} tokens` : ''}
-                    </span>
+                  <div className="consolenoteslist">
+                    {qRows.length === 0 ? <p className="note">No questions yet.</p> : null}
+                    {qFolders.map((f) => {
+                      const rows = qRows.filter((r) => r.folder === f.name);
+                      return (
+                        <details key={f.name} open>
+                          <summary>{f.name} <span className="note">{rows.length}</span></summary>
+                          {rows.map((r) => (
+                            <button key={r.id} type="button" className="consoleqitem" onClick={() => { setInput(r.question); setQuestionsOpen(false); }} title="put this question in the box">
+                              {r.question}
+                              {r.model ? <span className="note"> · {r.model}</span> : null}
+                            </button>
+                          ))}
+                        </details>
+                      );
+                    })}
                   </div>
-                  {live.tools.length ? <div className="consoletools">{live.tools.map((c, j) => <ToolLine key={j} c={c} />)}</div> : null}
-                  {live.text ? <div className="consolemsgtext"><RichText text={live.text} /></div> : null}
-                  {live.thinking ? (
-                    <details className="consolethink" open={!live.text}>
-                      <summary>thinking…</summary>
-                      <pre ref={thinkBox}>{live.thinking}</pre>
-                    </details>
-                  ) : null}
-                </article>
-              ) : busy ? <p className="note consolewait">sampling…</p> : null}
-              {err ? <p className="consoleerr">{err}</p> : null}
-            </div>
-          </div>
-          {debug ? (
-            <div className="consoledebug">
-              <div className="note">last request</div>
-              <pre>{JSON.stringify(lastReq, null, 2)}</pre>
-              <div className="note">last reply (answer trimmed)</div>
-              <pre>{JSON.stringify(lastReply ? { ...lastReply, answer: lastReply.answer ? `${lastReply.answer.slice(0, 200)}…` : '', reasoning: undefined } : null, null, 2)}</pre>
-              {lastReply?.meta?.rendered ? <><div className="note">the prompt it received</div><pre>{lastReply.meta.rendered}</pre></> : null}
-            </div>
-          ) : null}
-          {questionsOpen ? (
-            <div className="consolenotes consolequestions">
-              <div className="consoleqnew">
-                <textarea value={questionDraft} onChange={(e) => setQuestionDraft(e.target.value)} placeholder="a question to keep…" rows={2} aria-label="a question to keep" />
-                <div className="consoleqrow">
-                  <input value={folder} onChange={(e) => setFolder(e.target.value)} list="qfolders" placeholder="folder" aria-label="folder" />
-                  <datalist id="qfolders">
-                    {qFolders.map((f) => <option key={f.name} value={f.name} />)}
-                  </datalist>
-                  <button type="button" className="consolbtn" onClick={() => void keepQuestion()} disabled={!questionDraft.trim()}>Save question</button>
-                  {qMsg ? <span className="note">{qMsg}</span> : null}
                 </div>
-              </div>
-              <div className="consolenoteslist">
-                {qRows.length === 0 ? <p className="note">No questions yet.</p> : null}
-                {qFolders.map((f) => {
-                  const rows = qRows.filter((r) => r.folder === f.name);
-                  return (
-                    <details key={f.name} open>
-                      <summary>{f.name} <span className="note">{rows.length}</span></summary>
-                      {rows.map((r) => (
-                        <button key={r.id} type="button" className="consoleqitem" onClick={() => { setInput(r.question); setQuestionsOpen(false); }} title="put this question in the box">
-                          {r.question}
-                          {r.model ? <span className="note"> · {r.model}</span> : null}
-                        </button>
-                      ))}
-                    </details>
-                  );
-                })}
-              </div>
-            </div>
-          ) : null}
-          {notesOpen ? (
-            <div className="consolenotes">
-              <div className="consolenotesnew">
-                <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="a line worth keeping…" rows={3} aria-label="a note" />
-                <button type="button" className="consolbtn" onClick={() => void keepNote()} disabled={!note.trim()}>Save note</button>
-                {noteMsg ? <span className="note">{noteMsg}</span> : null}
-              </div>
-              <div className="consolenoteslist">
-                {notes.length === 0 ? <p className="note">No notes yet.</p> : null}
-                {notes.slice(0, 50).map((n) => (
-                  <div key={n.id} className="consolenoterow">
-                    <span>{n.note}</span>
-                    <span className="note">{n.model_label}{n.created_at ? ` · ${new Date(n.created_at).toLocaleString()}` : ''}</span>
-                    {n.thinking ? <details><summary>thinking</summary><pre>{n.thinking}</pre></details> : null}
+              ) : null}
+              {notesOpen ? (
+                <div className="consolenotes">
+                  <div className="consolenotesnew">
+                    <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="a line worth keeping…" rows={3} aria-label="a note" />
+                    <button type="button" className="consolbtn" onClick={() => void keepNote()} disabled={!note.trim()}>Save note</button>
+                    {noteMsg ? <span className="note">{noteMsg}</span> : null}
                   </div>
-                ))}
+                  <div className="consolenoteslist">
+                    {notes.length === 0 ? <p className="note">No notes yet.</p> : null}
+                    {notes.slice(0, 50).map((n) => (
+                      <div key={n.id} className="consolenoterow">
+                        <span>{n.note}</span>
+                        <span className="note">{n.model_label}{n.created_at ? ` · ${new Date(n.created_at).toLocaleString()}` : ''}</span>
+                        {n.thinking ? <details><summary>thinking</summary><pre>{n.thinking}</pre></details> : null}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+
+            <form className="consoleinput" onSubmit={(e) => { e.preventDefault(); void send(); }}>
+              <input
+                ref={field}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder={chosen ? `ask ${chosen.name}…` : 'reading the models…'}
+                aria-label="your question"
+                disabled={!chosen}
+              />
+              {/* an empty box keeps the last question asked: sending clears the box, so otherwise the button is dead
+                  exactly when someone wants to keep what they just asked */}
+              <button type="button" className="consolbtn" onClick={() => { setQuestionDraft(input.trim() || lastAsked); setQuestionsOpen(true); }} disabled={!input.trim() && !lastAsked} title={input.trim() || !lastAsked ? 'keep this question in the library' : 'keep your last question in the library'}>keep</button>
+              {busy && live ? (
+                <button type="button" className="consolbtn primary" onClick={() => stopper.current?.abort()} title="stop this answer: what has arrived is kept">stop</button>
+              ) : (
+                <button type="submit" className="consolbtn primary" disabled={busy || !input.trim() || !chosen}>{busy ? '…' : 'send'}</button>
+              )}
+            </form>
+          </section>
+
+          {/* ---- right: settings */}
+          <section id="consoleset" className={`consolecol consoleset${panes.set ? ' on' : ''}`} aria-label="settings" inert={!panes.set}>
+            <div className="consolecolhead"><b>Settings</b></div>
+            <div className="consolesetlist">
+              <label className="consolesetrow">
+                <span className="consolesetname">lab</span>
+                <select
+                  value={lab}
+                  onChange={(e) => { setLab(e.target.value); setPick(''); }}
+                  aria-label="lab"
+                  title="who made the model"
+                  disabled={busy}
+                >
+                  {labs.length === 0 ? <option value="">reading the labs…</option> : null}
+                  {labs.map((l) => (
+                    <option key={l} value={l}>{l}</option>
+                  ))}
+                </select>
+              </label>
+              {/* the favourite is a model, not a lab (11 November, Justin: "favourite not the lab, but rather the
+                  model"): the star sits on the model it keeps, and the kept one is starred in the list */}
+              <div className="consolesetrow">
+                <span className="consolesetname">model</span>
+                <span className="consolesetline">
+                  <select
+                    value={chosen ? convoKeyOf(chosen) : ''}
+                    onChange={(e) => setPick(e.target.value)}
+                    aria-label="model"
+                    title="the models this lab makes that answer: instruction-tuned, or a Demiton leg taught to talk"
+                    disabled={!inLab.length || busy}
+                  >
+                    {inLab.map((m) => (
+                      <option key={convoKeyOf(m)} value={convoKeyOf(m)}>{m.model && m.model === defaultKey ? `★ ${m.name}` : m.name}</option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    className={`consolstar${chosen?.model && defaultKey === chosen.model ? ' on' : ''}`}
+                    onClick={() => {
+                      if (!chosen?.model) return;
+                      const on = defaultKey === chosen.model;
+                      try {
+                        if (on) localStorage.removeItem('thorp.chat.default');
+                        else localStorage.setItem('thorp.chat.default', chosen.model);
+                      } catch { /* blocked */ }
+                      setDefaultKey(on ? '' : chosen.model);
+                    }}
+                    disabled={!chosen?.model}
+                    aria-pressed={!!chosen?.model && defaultKey === chosen.model}
+                    aria-label={chosen?.model && defaultKey === chosen.model ? `${chosen.name} is your favourite model` : `make ${chosen?.name || 'this model'} your favourite model`}
+                    title={chosen?.model && defaultKey === chosen.model ? `${chosen.name} is your favourite: the console opens on it (click to clear)` : `favourite ${chosen?.name || 'this model'}: the console opens on it`}
+                  >{chosen?.model && defaultKey === chosen.model ? '★' : '☆'}</button>
+                </span>
+                {contextWindow ? <span className="consolesetwhy">a {contextWindow.toLocaleString()}-token window</span> : null}
+              </div>
+              {chosen?.checkpoints?.length ? (
+                <label className="consolesetrow">
+                  <span className="consolesetname">checkpoint</span>
+                  <select
+                    value={step}
+                    onChange={(e) => setStep(e.target.value)}
+                    aria-label="checkpoint"
+                    title="every checkpoint this leg kept, with its reading on held-out exchanges: bits per byte (lower is better) and how often it ends its own turn"
+                  >
+                    <option value="">latest (step {chosen.run?.step?.replace('step-', '')})</option>
+                    {[...chosen.checkpoints].reverse().map((c) => (
+                      <option key={c.step} value={String(c.step)}>
+                        step {c.step}{c.bpb != null ? ` · ${c.bpb.toFixed(2)} bpb` : ''}{c.stopped != null ? ` · ends turn ${Math.round(c.stopped * 100)}%` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
+              <div className="consolesetrow">
+                <span className="consolesetname">thinking</span>
+                <label
+                  className={`consoleswitch${think && (thinkingToggle || thinkingAuto) ? ' on' : ''}${!thinkingToggle && !thinkingAuto ? ' inert' : ''}`}
+                  title={thinking?.why || (thinkingToggle ? 'the model\'s own reasoning mode: off asks it to answer directly' : 'this model has no reasoning mode')}
+                >
+                  <input
+                    type="checkbox"
+                    checked={thinkingToggle ? think : thinkingAuto}
+                    disabled={!thinkingToggle && !thinkingAuto}
+                    onChange={(e) => setThink(e.target.checked)}
+                    aria-label="thinking"
+                  />
+                  <span className="consoleswitchtrack" aria-hidden="true"><span className="consoleswitchthumb" /></span>
+                  <span className="consoleswitchlabel">{thinkingAuto ? 'auto' : thinkOn ? 'on' : 'off'}</span>
+                </label>
+                {thinkOn ? (
+                  <span className="consolesetline" title={thinkCapNow ? `the reasoning is closed at ${thinkCapNow.toLocaleString()} tokens and the answer written in the rest of the budget (never more than half the budget)` : 'no cap: the reasoning and the answer share the budget as they fall'}>
+                    <span className="consolesetwhy">capped at</span>
+                    <select value={thinkCap} onChange={(e) => setThinkCap(Number(e.target.value))} aria-label="thinking cap">
+                      {[256, 512, 1024, 2048, 4096, 8192].map((n) => (
+                        <option key={n} value={n}>{Math.min(n, Math.floor(tokens / 2)).toLocaleString()} tokens</option>
+                      ))}
+                      <option value={0}>no cap</option>
+                    </select>
+                  </span>
+                ) : !thinkingToggle && !thinkingAuto ? <span className="consolesetwhy">{thinking?.why || 'this model has no reasoning mode'}</span> : null}
+              </div>
+              <div className="consolesetrow">
+                <span className="consolesetname">tools</span>
+                <label
+                  className={`consoleswitch${toolsOk && useTools ? ' on' : ''}${!toolsOk ? ' inert' : ''}`}
+                  title={toolsOk ? (chosen?.kind === 'foreign' ? `calculate, current_time, board_score, queue_status, liberty_machine_status, system_status, expedition_status, browser_task and browser_task_status: ${toolsInfo?.why || ''}` : (toolsInfo?.why || '')) : (toolsInfo?.why || 'tools are for the foreign ships whose chat template takes them, and our ships taught the tool leg')}
+                >
+                  <input
+                    type="checkbox"
+                    checked={toolsOk && useTools}
+                    disabled={!toolsOk}
+                    onChange={(e) => setUseTools(e.target.checked)}
+                    aria-label="tools"
+                  />
+                  <span className="consoleswitchtrack" aria-hidden="true"><span className="consoleswitchthumb" /></span>
+                  <span className="consoleswitchlabel">{toolsOk && useTools ? 'on' : 'off'}</span>
+                </label>
+                {!toolsOk ? <span className="consolesetwhy">{toolsInfo?.why || 'tools are for the foreign ships whose chat template takes them, and our ships taught the tool leg'}</span> : null}
+              </div>
+              <label className="consolesetrow" title="the whole completion's budget: the reasoning and the answer share it">
+                <span className="consolesetname">budget</span>
+                <select value={budgetShare} onChange={(e) => setBudgetShare(Number(e.target.value))} aria-label="token budget" title={contextWindow ? `a share of the ${contextWindow.toLocaleString()}-token window: ${tokens.toLocaleString()} tokens` : 'this model\'s window is not known, so the budget is a fixed 4096 tokens'}>
+                  {[0.1, 0.25, 0.5, 0.75].map((p) => (
+                    <option key={p} value={p}>{Math.round(p * 100)}% of the window{contextWindow ? ` · ${Math.max(1, Math.round(p * contextWindow)).toLocaleString()} tokens` : ''}</option>
+                  ))}
+                </select>
+                {!contextWindow ? <span className="consolesetwhy">the window is not known, so the budget is a fixed 4,096 tokens</span> : null}
+              </label>
+              <div className="consolesetrow">
+                <span className="consolesetname">answer text</span>
+                <span className="consolesetline" role="group" aria-label="answer text size">
+                  <button type="button" className="consolbtn" onClick={() => setAnswerFs((v) => Math.max(13, v - 1))} title="smaller answer text" aria-label="smaller answer text">A−</button>
+                  <span className="consolesetwhy">{answerFs}px</span>
+                  <button type="button" className="consolbtn" onClick={() => setAnswerFs((v) => Math.min(20, v + 1))} title="larger answer text" aria-label="larger answer text">A+</button>
+                </span>
+              </div>
+              <div className="consolesetrow">
+                <span className="consolesetname">debug</span>
+                <label className={`consoleswitch${debug ? ' on' : ''}`} title="show the last request and reply beside the chat">
+                  <input type="checkbox" checked={debug} onChange={(e) => setDebug(e.target.checked)} aria-label="debug" />
+                  <span className="consoleswitchtrack" aria-hidden="true"><span className="consoleswitchthumb" /></span>
+                  <span className="consoleswitchlabel">{debug ? 'on' : 'off'}</span>
+                </label>
               </div>
             </div>
-          ) : null}
+          </section>
         </div>
-
-        <form className="consoleinput" onSubmit={(e) => { e.preventDefault(); void send(); }}>
-          <input
-            ref={field}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder={chosen ? `ask ${chosen.name}…` : 'reading the models…'}
-            aria-label="your question"
-            disabled={!chosen}
-          />
-          {/* an empty box keeps the last question asked: sending clears the box, so otherwise the button is dead
-              exactly when someone wants to keep what they just asked */}
-          <button type="button" className="consolbtn" onClick={() => { setQuestionDraft(input.trim() || lastAsked); setQuestionsOpen(true); }} disabled={!input.trim() && !lastAsked} title={input.trim() || !lastAsked ? 'keep this question in the library' : 'keep your last question in the library'}>keep</button>
-          {busy && live ? (
-            <button type="button" className="consolbtn primary" onClick={() => stopper.current?.abort()} title="stop this answer: what has arrived is kept">stop</button>
-          ) : (
-            <button type="submit" className="consolbtn primary" disabled={busy || !input.trim() || !chosen}>{busy ? '…' : 'send'}</button>
-          )}
-        </form>
       </div>
     </div>
   );

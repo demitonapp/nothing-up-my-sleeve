@@ -154,3 +154,27 @@ def test_the_calls_are_kept_only_when_they_change():
     assert rows["fitouts/a"]["waters"] == "foreign" and rows["fitouts/a"]["applied"] is False
     assert p.record(got, "advisory", False, last=kept) == kept  # nothing changed: nothing written
     assert len(p.latest()) == 2
+
+
+def test_a_size_no_class_has_sailed_takes_the_lead_of_the_nearest_measured_size(monkeypatch):
+    # 12 November, Justin: "the purser rule is wrong": only the 9m had sailed abroad, so every 300k and 1m stayed here
+    from thorp.viable.s4_intelligence import market
+
+    monkeypatch.setattr(market, "throughput", lambda gpu, preset: 200.0 if (gpu, preset) == ("RTX 4090", "9m") else None)
+    terms = {**TERMS, "gpus": {"RTX 4090": 0.5, "H100 SXM": 2.6}}
+    carried: dict = {}
+    sp = purser.speedups(terms, {"300k": 400.0, "1m": 100.0, "9m": 100.0, "300k-h4": 90.0}, carried)
+    assert sp[("RTX 4090", "9m")] == 2.0  # measured
+    assert sp[("RTX 4090", "1m")] == 2.0 and sp[("RTX 4090", "300k")] == 2.0  # the 9m's lead, carried
+    assert carried == {("RTX 4090", "1m"): "9m", ("RTX 4090", "300k"): "9m"}
+    assert not any(g == "H100 SXM" for g, _ in sp)  # a class that has sailed nothing is not guessed
+    assert ("RTX 4090", "300k-h4") not in sp  # a variant off the ladder is not carried to
+
+
+def test_an_estimated_lead_sends_a_waiting_voyage_abroad_and_says_it_was_estimated():
+    w = world(speedups={("RTX 4090", "300k"): 2.0}, estimated={("RTX 4090", "300k"): "9m"},
+              mac_free=[MONDAY + 10 * H])  # the Mac is busy for ten hours  # fmt: skip
+    (c,) = calls([voyage("small", preset="300k")], w)
+    assert c.waters == "foreign" and "estimated 2.0x, the lead measured on its 9m" in c.reason
+    (m,) = calls([voyage("small", preset="300k")], world(speedups={("RTX 4090", "300k"): 2.0}, mac_free=[MONDAY + 10 * H]))
+    assert m.waters == "foreign" and "measured 2.0x" in m.reason

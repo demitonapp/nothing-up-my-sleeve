@@ -27,11 +27,15 @@ Sunday's money; twenty-four gives the day's allowance this began with). A hire i
 its quote times S5's `overrun` (12 November: "it charges every hire at one and a half times its quote"), so the
 ceiling holds even if every ship is brought home at its deadline. Otherwise it stays local.
 
-**The speed-up is measured, never assumed.** A class's measured rate on a size (s4 market.throughput, from the
+**The speed-up is measured, or carried from a measured size** (12 November, Justin: "the purser rule is wrong":
+until then a size no class had sailed stayed on the Mac). See `speedups`; the rest of this paragraph is the measured
+case. A class's measured rate on a size (s4 market.throughput, from the
 spend log) over this Mac's *best* rate on that size (any finished MLX voyage). Taking the Mac's best errs slow:
 on 12 November the 4090's 9m rate was measured on the old 9m shape, and the v0.0.6 9m runs a third as fast here
-per token, so the GPU's true lead on it is larger than the purser counts. A class that has not sailed a size has
-no speed-up, and no voyage of that size goes to it ("never assumed faster than the Mac until measured").
+per token, so the GPU's true lead on it is larger than the purser counts. A size the class has not sailed takes
+its lead at the nearest size it has (the call's reason says "estimated"); a class that has sailed nothing has no
+speed-up, and nothing goes to it. The quote at the hire stays cautious (s4 market.price: an unmeasured size is
+priced no faster than this Mac), so a first voyage at a new size is given the Mac's own time before its deadline.
 
 **Modes** (S5's `purser` term): `off`; `advisory`, which writes its call beside each line (s3.allocations, the
 queue page) and routes nothing; `routing`, which sends the lines it calls foreign to the Vast lane. Advisory came
@@ -94,6 +98,7 @@ class World:
     cycle_spent: float = 0.0  # dollars the hires of the cycle now running have cost so far (inside week_spent)
     cycle_held: float = 0.0  # and what is still held for the ships out: their quotes times the reserve, less that
     two_at_once: frozenset = frozenset({"300k"})  # presets that may share the Mac with a second of their size
+    estimated: dict = field(default_factory=dict)  # (gpu, preset): the measured size its speed-up was carried from
 
 
 def weekly_only(terms: dict) -> bool:
@@ -175,6 +180,12 @@ def cycles_left(w: World) -> int:
     now = datetime.fromtimestamp(w.now, UTC)
     monday = datetime(now.year, now.month, now.day, tzinfo=UTC).timestamp() - now.weekday() * 86400
     return max(1, max(1, round(7 * 86400 / cycle)) - int((w.now - monday) // cycle))
+
+
+def _lead_words(w: "World", gpu: str, preset: str | None, sp: float) -> str:
+    """How a call's speed-up was known: measured on the size, or carried from the class's nearest measured size."""
+    src = w.estimated.get((gpu, preset or ""))
+    return f"estimated {sp:.1f}x, the lead measured on its {src}" if src else f"measured {sp:.1f}x"
 
 
 def _fmt_h(minutes: float) -> str:
@@ -297,7 +308,8 @@ def plan(lines: list, w: World, estimate, cmd_estimate, eligible) -> list[Call]:
             else:
                 call.waters = "foreign"
                 call.reason = (f"foreign: home {_fmt_h(gain)} sooner on an {best['gpu']} for ${best['cost']:.2f}, "
-                               f"inside the ${allow:.2f} {ceiling_words(w.terms)} has left (measured {best['speedup']:.1f}x)")  # fmt: skip
+                               f"inside the ${allow:.2f} {ceiling_words(w.terms)} has left ("
+                               f"{_lead_words(w, best['gpu'], preset, best['speedup'])})")  # fmt: skip
                 committed += best["cost"] * reserve
                 ships[best["seat"]] = best["home"]
                 if ln.name:
@@ -344,17 +356,36 @@ def mode(terms: dict | None = None) -> str:
     return m if m in s5.PURSER_MODES else "off"
 
 
-def speedups(terms: dict, mac_best: dict[str, float]) -> dict[tuple[str, str], float]:
-    """(gpu, preset): the class's measured rate on the size over this Mac's best rate on it."""
+def speedups(terms: dict, mac_best: dict[str, float], estimated: dict | None = None) -> dict[tuple[str, str], float]:
+    """(gpu, preset): the class's measured rate on the size over this Mac's best rate on it. A size the class has not
+    sailed takes the class's measured lead at its nearest measured size (12 November, Justin: "the purser rule is
+    wrong", when every 300k and 1m line stayed on the Mac because only the 9m had sailed abroad). The lead is
+    carried, not the rate: a rate scaled down by FLOPs from a bigger size overstates a GPU that a small model leaves
+    mostly idle. A class that has sailed nothing gets nothing (no datasheet guesses). `estimated`, when given, is
+    filled with {(gpu, preset): the measured size it was carried from}."""
+    from thorp.models import registry
     from thorp.viable.s4_intelligence import market
 
+    order = list(registry.PRESETS)
     out = {}
     for gpu in terms.get("gpus") or {}:
+        measured = {}
         for preset, mac in mac_best.items():
             with contextlib.suppress(Exception):
                 tps = market.throughput(gpu, preset)
                 if tps and mac:
-                    out[(gpu, preset)] = tps / mac
+                    measured[preset] = tps / mac
+        out.update({(gpu, p): sp for p, sp in measured.items()})
+        known = [p for p in measured if p in order]
+        if not known:
+            continue
+        for preset in mac_best:
+            if preset in measured or preset not in order:
+                continue
+            near = min(known, key=lambda p: (abs(order.index(p) - order.index(preset)), order.index(p)))
+            out[(gpu, preset)] = measured[near]
+            if estimated is not None:
+                estimated[(gpu, preset)] = near
     return out
 
 
@@ -490,13 +521,15 @@ def world(lines_at_sea: list[dict] | None = None, now: float | None = None) -> t
     spent, held = 0.0, 0.0
     with contextlib.suppress(Exception):
         spent, held = cycle_money(s3.log(), now, terms)
+    carried: dict = {}  # filled by speedups: the sizes estimated from another
     w = World(
         now=now,
         terms=terms,
         cycle_spent=spent,
         cycle_held=held,
         week_spent=s3.week_spent(),
-        speedups=speedups(terms, mac_best_rates(rows)),
+        speedups=speedups(terms, mac_best_rates(rows), carried),
+        estimated=carried,
         prices=prices(terms),
         mac_free=mac_free,
         ship_free=ship_free,

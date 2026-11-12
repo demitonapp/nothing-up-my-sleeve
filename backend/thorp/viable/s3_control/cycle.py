@@ -144,13 +144,15 @@ def choose(rows: list[dict]) -> dict:
 
 
 def unmeasured(lines: list, w, estimate, eligible) -> dict[str, dict]:
-    """The sizes no class has sailed: every eligible voyage of that size stays here until one is measured."""
+    """The sizes no class has sailed: their voyages go abroad only on a lead carried from another size (purser.speedups),
+    or not at all where no class has sailed any size, until one is measured."""
     out: dict[str, dict] = {}
     for ln in lines:
         if getattr(ln, "kind", "spec") != "spec" or not getattr(ln, "spec", None):
             continue
         preset = str(((ln.spec or {}).get("model") or {}).get("preset") or "")
-        if not preset or any(p == preset and sp > 1.0 for (_, p), sp in w.speedups.items()):
+        carried = getattr(w, "estimated", {}) or {}  # a lead carried from another size is not a measurement
+        if not preset or any(p == preset and sp > 1.0 and (g, p) not in carried for (g, p), sp in w.speedups.items()):
             continue
         if eligible(ln)[1]:
             continue
@@ -192,7 +194,7 @@ def proposals(env: dict, rows: list[dict], pick: dict, missing: dict[str, dict],
     for preset, m in sorted(missing.items(), key=lambda kv: -kv[1]["mac_hours"]):
         out.append({"to": "S4", "what": f"sail one {preset} abroad with its control, to measure it",
                     "why": f"no class has sailed a {preset}, so {m['lines']} voyage(s) ({m['mac_hours']:.1f} h of this Mac) "
-                           "cannot be sent abroad: a class is never assumed faster than the Mac"})  # fmt: skip
+                           "go abroad only on a speed-up carried from another size: one measured voyage of it replaces the estimate"})  # fmt: skip
     if held and env.get("weekly_only"):
         out.append({"to": "S5", "what": "the week's budget is the binding ceiling",
                     "why": f"{held} more voyage(s) would sail abroad this week but for it: the plan commits "
@@ -233,7 +235,8 @@ def make_plan(now: float | None = None) -> dict:
     measured = {
         "classes": hires.classes(w.terms, rows=timing),
         "failures": hires.failures(rows=timing),
-        "speedups": [{"gpu": g, "preset": p, "lead": sp} for (g, p), sp in sorted(w.speedups.items())],
+        "speedups": [{"gpu": g, "preset": p, "lead": sp, "estimated_from": w.estimated.get((g, p))}
+                     for (g, p), sp in sorted(w.speedups.items())],
         "prices": dict(w.prices),
         "overhead_min": dict(w.setup_min),
     }
@@ -389,7 +392,10 @@ def _print(made: dict) -> None:
         print(f"  {mark} {r['ships']} ship(s): {r['abroad']:2} abroad for ${r['cost']:.2f}; this Mac home in {r['mac_done_h']:5.1f} h, "
               f"the ships in {r['ships_done_h']:5.1f} h{price}{terms}")  # fmt: skip
     for c in plan["abroad"]:
-        print(f"      abroad: {c['name']} on an {c['gpu']} for ${c['cost']:.2f}")
+        # a line written `vast:` is abroad by its text, not priced by the purser: it has no class or cost to show
+        where = f"on an {c['gpu']}" if c.get("gpu") else "written for the Vast lane"
+        cost = f" for ${c['cost']:.2f}" if c.get("cost") is not None else ""
+        print(f"      abroad: {c['name']} {where}{cost}")
     for p in made["proposals"]:
         print(f"  proposal to {p['to']}: {p['what']}: {p['why']}")
 

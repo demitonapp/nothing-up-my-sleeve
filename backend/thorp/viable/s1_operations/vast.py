@@ -89,8 +89,12 @@ class Vast:
 
     # ---- the market
 
-    def search(self, gpu: str, terms: dict, limit: int = 20) -> list[dict]:
-        """Offers of one GPU class that keep the host terms, cheapest first, each normalised (`offer`)."""
+    def search(self, gpu: str, terms: dict, limit: int = 20, avoid: frozenset | set = frozenset()) -> list[dict]:
+        """Offers of one GPU class that keep the host terms, cheapest first, each normalised (`offer`).
+
+        `avoid` holds offers (`o<offer id>`) and machines (`m<machine id>`) not to be offered again: a box on them
+        never answered (12 November: the same cheapest 4090 offer was hired again a minute after its box had
+        refused ssh for ten minutes). They are dropped here, and as many more are asked for."""
         q = {
             "num_gpus": {"eq": 1},
             "rentable": {"eq": True},
@@ -104,7 +108,7 @@ class Vast:
             "dph_total": {"lte": float(terms["gpus"][gpu])},
             "order": [["dph_total", "asc"]],
             "type": "ondemand",
-            "limit": limit,
+            "limit": limit + len(avoid),
         }
         if terms.get("verified"):
             q["verified"] = {"eq": True}
@@ -114,7 +118,8 @@ class Vast:
             if isinstance(offers, dict):
                 offers = [offers]
             if offers:
-                return [offer(o, gpu) for o in offers]
+                kept = [x for x in (offer(o, gpu) for o in offers) if not avoided(x, avoid)]
+                return kept[:limit]
         return []
 
     # ---- a ship
@@ -172,6 +177,17 @@ class Vast:
             if inst.get("actual_status") in ("exited", "offline") or time.time() - t0 > timeout:
                 raise VastError(f"instance {instance} did not come up: {inst.get('actual_status')!r} {inst.get('status_msg', '')}")
             sleep(every)
+
+
+def avoided(o: dict, avoid) -> bool:
+    """Whether an offer (as `offer` normalises it) is one `avoid` names, by its id or its machine's."""
+    return f"o{o.get('offer_id')}" in avoid or (o.get("machine_id") is not None and f"m{o['machine_id']}" in avoid)
+
+
+def ssh_route(inst: dict) -> tuple[str, int] | None:
+    """Where an instance's ssh answers, as Vast.ai says now: its proxy host and port, or None before it has one."""
+    host, port = inst.get("ssh_host"), inst.get("ssh_port")
+    return (str(host), int(port)) if host and port else None
 
 
 def offer(o: dict, gpu: str) -> dict:

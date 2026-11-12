@@ -311,7 +311,7 @@ def test_how_a_chartered_line_ended_is_read_from_the_spend_log():
 def test_two_fit_outs_failing_in_a_row_pause_the_lane_and_the_voyage_is_retried_abroad(monkeypatch):
     said, done, paused = [], [], []
     monkeypatch.setattr(lanes, "box_failure_limit", lambda: 2)
-    monkeypatch.setattr(lanes, "_retry_abroad", lambda q, ln, say: done.append(("abroad", ln.name)))
+    monkeypatch.setattr(lanes, "_retry_abroad", lambda q, ln, say, why="": done.append(("abroad", ln.name)))
     monkeypatch.setattr(lanes, "_come_home", lambda q, ln, say: done.append(("home", ln.name)))
     monkeypatch.setattr(lanes, "set_lane", lambda lane, on, why="": paused.append((lane, on, why)) or True)
     ended = {"how": "fitout-failed"}
@@ -332,12 +332,35 @@ def test_two_fit_outs_failing_in_a_row_pause_the_lane_and_the_voyage_is_retried_
     ended["how"] = "not-hired"
     lanes._charter_ended(None, "vast", _seat("d"), 1, fails, said.append)
     assert done[-1] == ("home", "d") and fails["vast"] == 1
-    # a pinned line is not requeued by anyone, but its dead box still counts
+    # a line pinned abroad (`vast:`) whose box died is retried abroad too (12 November, Justin: until then it was
+    # dropped from the queue), and its dead box still counts
     ended["how"] = "fitout-failed"
-    n = len(done)
     lanes._charter_ended(None, "vast", _seat("e", routed=False), 1, fails, said.append)
-    assert len(done) == n and len(paused) == 2
+    assert done[-1] == ("abroad", "e") and len(paused) == 2
     lanes._charter_ended(None, "vast", _seat("f"), 0, {"vast": 1}, said.append)  # a voyage home: nothing to do
+
+
+def test_a_pinned_line_never_hired_goes_back_once_and_an_adopted_one_home_is_home(monkeypatch):
+    """1m-control, 21:13 on 12 November: pinned abroad, its hire refused (the offer taken), and dropped."""
+    said, done = [], []
+    monkeypatch.setattr(lanes, "_PINNED_RETRIED", set())
+    monkeypatch.setattr(lanes, "_retry_abroad", lambda q, ln, say, why="": done.append((ln.name, why)))
+    monkeypatch.setattr(lanes, "_come_home", lambda q, ln, say: done.append((ln.name, "home")))
+    monkeypatch.setattr(lanes, "how_it_ended", lambda ln, since, log=None: "not-hired")
+    fails: dict[str, int] = {}
+    lanes._charter_ended(None, "vast", _seat("p", routed=False), 1, fails, said.append)
+    assert done == [("p", "it was never hired")] and fails == {}  # back at the top, abroad; no box blamed
+    lanes._charter_ended(None, "vast", _seat("p", routed=False), 1, fails, said.append)
+    assert len(done) == 1 and "the second time running: left out" in said[-1]  # not tried over and over
+    # a charter adopted across a restart has no exit code; the ledger saying it finished is a voyage home
+    lanes._charter_ended(None, "vast", _seat("q", routed=False), "adopted:finished", fails, said.append)
+    assert len(done) == 1
+    # a pinned voyage that failed at sea goes back once too; a sound end clears its retry
+    monkeypatch.setattr(lanes, "how_it_ended", lambda ln, since, log=None: "voyage-failed")
+    lanes._charter_ended(None, "vast", _seat("r", routed=False), 1, fails, said.append)
+    lanes._charter_ended(None, "vast", _seat("r", routed=False), 0, fails, said.append)
+    lanes._charter_ended(None, "vast", _seat("r", routed=False), 1, fails, said.append)
+    assert done[1:] == [("r", "its voyage failed at sea"), ("r", "its voyage failed at sea")]
 
 
 # ---------------------------------------------------------------- S1: the box sails with the voyage's own lists
@@ -385,7 +408,7 @@ def test_what_a_cycle_has_spent_and_holds_comes_off_its_own_share():
 def test_a_voyage_that_sinks_at_once_abroad_is_counted_and_retried_like_a_dead_box(monkeypatch):
     done, paused = [], []
     monkeypatch.setattr(lanes, "box_failure_limit", lambda: 2)
-    monkeypatch.setattr(lanes, "_retry_abroad", lambda q, ln, say: done.append(("abroad", ln.name)))
+    monkeypatch.setattr(lanes, "_retry_abroad", lambda q, ln, say, why="": done.append(("abroad", ln.name)))
     monkeypatch.setattr(lanes, "_come_home", lambda q, ln, say: done.append(("home", ln.name)))
     monkeypatch.setattr(lanes, "set_lane", lambda lane, on, why="": paused.append(why) or True)
     monkeypatch.setattr(lanes, "how_it_ended", lambda ln, since, log=None: "sank-at-once")

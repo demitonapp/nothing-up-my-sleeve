@@ -39,6 +39,7 @@ import contextlib
 import json
 import os
 import re
+import shlex
 import signal
 import subprocess
 import sys
@@ -1107,10 +1108,11 @@ def how_it_ended(ln: Line, since_ts: float, log: list[dict] | None = None) -> st
     return "fitout-failed" if any(r["event"] == "hired" for r in mine) else "not-hired"
 
 
-def _retry_abroad(queue: Path, ln: Line, say) -> None:
+def _retry_abroad(queue: Path, ln: Line, say, why: str = "it never trained") -> None:
     """A routed voyage whose box failed before it sailed (or that sank at once) goes back to the top as written,
     unpinned: the voyage never got a GPU, so it is the box that is retried, not this Mac that pays (12 November:
-    the 9m candidate and the bridge were both pinned to the Mac by a dead box)."""
+    the 9m candidate and the bridge were both pinned to the Mac by a dead box). A line pinned abroad (`vast:`)
+    goes back the same way (`_pinned_ended`)."""
     from thorp.viable.s2_coordination import queue_store
 
     try:
@@ -1118,9 +1120,31 @@ def _retry_abroad(queue: Path, ln: Line, say) -> None:
             queue_store.add(ln.text, top=True, goal_id=queue_store.goal_of_line(ln.text), require_goal=False)
         else:
             append(queue, ln.text)
-        say(f"[vast] {ln.text}: it never trained; requeued at the top to sail abroad again")
+        say(f"[vast] {ln.text}: {why}; requeued at the top to sail abroad again")
     except Exception as e:  # noqa: BLE001 - the history keeps the failure; a person can requeue it
-        say(f"[vast] {ln.text}: its box failed and it could not be requeued: {e}")
+        say(f"[vast] {ln.text}: {why}, and it could not be requeued: {e}")
+
+
+# The lines pinned abroad (`vast: <spec>`) already sent back once without coming home: a second end the same way
+# leaves the line out of the queue, so a voyage that cannot be hired (the week's budget spent, no offer in the
+# terms) or that fails at sea every time is not tried over and over. Kept for this coordinator's life.
+_PINNED_RETRIED: set[str] = set()
+
+
+def _pinned_ended(queue: Path, ln: Line, how: str, say) -> None:
+    """A line pinned abroad that did not come home and was not a dead box (those are retried as a routed line's
+    are): never hired, or it sailed and failed. Until 12 November it was recorded and dropped from the queue,
+    which lost 1m-control at 21:13 (its hire refused because another renter took the offer first). It goes back
+    to the top once; the second time it is left out, and said so. A pinned line is never sent to this Mac: it
+    was pinned abroad for a reason (the torch arm of a comparison)."""
+    what = "it was never hired" if how == "not-hired" else "its voyage failed at sea"
+    if ln.text in _PINNED_RETRIED:
+        _PINNED_RETRIED.discard(ln.text)
+        say(f"[vast] {ln.text}: {what}, the second time running: left out of the queue (requeue it by hand: "
+            f"thorp queue add {shlex.quote(ln.text)} --top)")  # fmt: skip
+        return
+    _PINNED_RETRIED.add(ln.text)
+    _retry_abroad(queue, ln, say, why=what)
 
 
 def box_failure_limit() -> int:
@@ -1139,8 +1163,9 @@ def _charter_ended(queue: Path, lane: str, seat: dict, code: int, failures: dict
     down the queue (12 November: the bridge was started the minute the candidate's box died). A voyage that
     sailed and failed, or was never hired, comes home pinned to this Mac as before."""
     ln = seat["line"]
-    if code == 0:
-        failures[lane] = 0
+    if code == 0 or code == "adopted:finished":  # a charter adopted across a restart has no exit code: its run's
+        failures[lane] = 0  # status on the ledger says it came home (it was counted a failure before 12 November)
+        _PINNED_RETRIED.discard(ln.text)
         return
     try:
         how = how_it_ended(ln, float(seat.get("since_ts") or 0.0))
@@ -1152,13 +1177,14 @@ def _charter_ended(queue: Path, lane: str, seat: dict, code: int, failures: dict
             failures[lane] = 0  # the box was sound
         if ln.routed:
             _come_home(queue, ln, say)
+        else:
+            _pinned_ended(queue, ln, how, say)
         return
     failures[lane] = failures.get(lane, 0) + 1
     limit = box_failure_limit()
     what = "the box failed before the voyage sailed" if how == "fitout-failed" else "the voyage sank within minutes of sailing"
     say(f"[{lane}] {ln.text}: {what} (failure abroad {failures[lane]} of {limit} in a row)")
-    if ln.routed:
-        _retry_abroad(queue, ln, say)
+    _retry_abroad(queue, ln, say)  # routed or pinned abroad: it is the box that is retried (the breaker bounds it)
     if failures[lane] >= limit:
         why = f"{failures[lane]} hires failed in a row before training (the last: {ln.name or ln.text}, {how})"
         try:

@@ -59,7 +59,14 @@ import yaml
 
 from thorp import paths, store
 from thorp.ledger import Ledger, reader
-from thorp.viable.s1_operations.vast import NoKey, Vast, api_key, http_transport
+from thorp.viable.s1_operations.vast import (
+    NoKey,
+    Vast,
+    VastError,
+    api_key,
+    http_transport,
+    ssh_route,
+)
 from thorp.viable.s2_coordination import charter as s2
 from thorp.viable.s3_control import charter as s3
 from thorp.viable.s4_intelligence import market
@@ -86,6 +93,34 @@ class NoOffer(RuntimeError):
 
 class BoxError(RuntimeError):
     """A command on the box failed; the message carries ssh's or the command's own stderr."""
+
+
+class NeverBoarded(BoxError):
+    """The hire never let us aboard: Vast.ai never showed it running, or its ssh never answered. Nothing of the
+    voyage reached it, so it is the host that failed, and the charter may hire another (`REHIRES`)."""
+
+
+# Boarding (12 November, the hardening after offer 60289338): that one 4090 host refused ssh for the whole ten
+# minutes on two hires five hours apart, and the charter hired it again at once each time, because it was still
+# the cheapest. A healthy box answers ssh within three tries (45 s) on every hire on record.
+BOARD_SSH_S = 300.0  # how long a new box's ssh is waited on before the box is given up
+REFRESH_EVERY = 4  # tries of ssh between readings of the instance at Vast.ai (gone, or moved to another address)
+REHIRES = 1  # a box that never boards is released and this many more are hired, each on another machine
+# Four charters read the same market within the same minute, and Vast.ai's cheapest offer can be taken in the
+# seconds between the reading and the hire (12 November, 21:12: `no_such_ask ... is not available` for
+# 1m-control). Nothing is hired then, so nothing is spent: the next offer is tried, up to this many times.
+OFFERS_GONE = 3
+
+
+class OfferGone(RuntimeError):
+    """Vast.ai refused the hire because the offer is no longer there: nothing was hired."""
+
+
+def offer_gone(e: Exception) -> bool:
+    """Whether a refused hire says the offer has gone (taken by another renter), not that the hire was wrong."""
+    s = str(e).lower()
+    return "no_such_ask" in s or "is not available" in s
+AVOID_HOURS = 12.0  # a host whose box never boarded is not hired again for this long, by any charter
 
 
 class Recalled(BaseException):
@@ -322,11 +357,16 @@ class Box:
             raise BoxError(f"ssh {self.host}:{self.port} exit {r.returncode}: {(r.stderr or '').strip()[-600:]} (ran: {cmd[:120]})")
         return r
 
-    def wait_ssh(self, timeout_s: float = 600, every_s: float = 15, sleep=time.sleep, on_denied=None, denied_after: int = 6) -> int:
+    def wait_ssh(self, timeout_s: float = 600, every_s: float = 15, sleep=time.sleep, on_denied=None, denied_after: int = 6,
+                 refresh=None, refresh_every: int = REFRESH_EVERY) -> int:  # fmt: skip
         """Until the box answers ssh (2026-11-08: the first charter's box was "running" by Vast.ai's API but refused the
         first ssh, and the fit-out gave up at once). Vast.ai's ssh proxy and the instance's key can take a minute or more
         after "running". If the box still refuses the key after `denied_after` tries, `on_denied` (attach the key again)
-        is called once. Returns the tries it took; raises BoxError with ssh's last words at the timeout."""
+        is called once. Returns the tries it took; raises NeverBoarded with ssh's last words at the timeout.
+
+        `refresh` (the instance as Vast.ai shows it now) is read every `refresh_every` tries: an instance that has
+        exited or gone is given up at once, not waited on to the timeout, and one whose ssh address has changed is
+        followed to it (the address is read once, at "running", and nothing read it again before 12 November)."""
         last, tries, denied_fixed = "", max(1, int(timeout_s // every_s)), False
         for i in range(1, tries + 1):
             r = self.run(["ssh", *self.opts, f"root@{self.host}", "true"], check=False, capture_output=True, text=True, timeout=60)
@@ -336,8 +376,27 @@ class Box:
             if on_denied and not denied_fixed and i >= denied_after and "denied" in last.lower():
                 on_denied()
                 denied_fixed = True
+            if refresh and i % max(1, refresh_every) == 0:
+                self._follow(refresh, last)
             sleep(every_s)
-        raise BoxError(f"ssh {self.host}:{self.port} never answered in {timeout_s:.0f} s: {last[-600:]}")
+        raise NeverBoarded(f"ssh {self.host}:{self.port} never answered in {timeout_s:.0f} s: {last[-600:]}")
+
+    def _follow(self, refresh, last: str) -> None:
+        """The instance read again during the wait for ssh: gone or stopped ends the wait; a new address is taken.
+        A failed reading (Vast.ai's API, not the box) changes nothing."""
+        try:
+            inst = refresh() or {}
+        except Exception as e:  # noqa: BLE001
+            self._say(f"the instance could not be read at Vast.ai ({e!r}); still waiting for ssh")
+            return
+        state = inst.get("actual_status")
+        if not inst or state in ("exited", "offline", "stopped"):
+            raise NeverBoarded(f"the instance is {state or 'gone'} at Vast.ai while ssh {self.host}:{self.port} refused us: {last[-300:]}")
+        route = ssh_route(inst)
+        if route and route != (self.host, self.port):
+            self._say(f"Vast.ai moved the box's ssh from {self.host}:{self.port} to {route[0]}:{route[1]}: following it")
+            self.host, self.port = route
+            self.opts[self.opts.index("-p") + 1] = str(self.port)
 
     def _rsh(self) -> str:
         return "ssh " + " ".join(shlex.quote(o) for o in self.opts)
@@ -558,7 +617,7 @@ def _cfg(spec: dict, vocab: int):
 class _Ceilings:
     """The market when no key is in hand: every class at its ceiling, a host that just keeps the terms."""
 
-    def search(self, gpu, terms, limit=5):
+    def search(self, gpu, terms, limit=5, avoid=frozenset()):
         return [{"offer_id": 0, "gpu": gpu, "gpu_name": gpu, "dph": float(terms["gpus"][gpu]), "verified": True,
                  "reliability": float(terms["min_reliability"]), "inet_down": float(terms["min_inet_down_mbps"]),
                  "inet_up": float(terms["min_inet_up_mbps"]), "cuda": float(terms["min_cuda"]),
@@ -594,15 +653,57 @@ def quote(spec_path: str, gpu: str | None = None, vast=None, resolver=None, log=
             vast = Vast(http_transport(api_key()))
         except NoKey:
             vast, market_read = _Ceilings(), "ceilings (no Vast.ai key: the terms' ceiling prices)"
+    avoid = avoided_now()
+    if avoid:
+        log(f"charter: not hiring {', '.join(sorted(avoid))}: a box there never boarded in the last {AVOID_HOURS:.0f} h")
+    qs = _priced(vast, spec, prep, p, t, gpu, avoid)
+    return {"spec": spec, "prep": prep, "plan": p, "quotes": qs, "market": market_read, "vast": vast, "terms": t, "avoid": avoid}
+
+
+def _priced(vast, spec: dict, prep, p: dict, t: dict, gpu: str | None, avoid) -> list[dict]:
+    """The market's quotes for this voyage, each with what the gate reads beside it (the week's spend, the
+    credit, the ships out) and the terms it breaks: for the first hire and for a hire again after a dead box."""
     qs = market.quotes(vast, _cfg(spec, prep.tokeniser.vocab_size), spec["model"]["preset"], p["tokens_left"], t,
-                       gpus=[gpu] if gpu else None)  # fmt: skip
+                       gpus=[gpu] if gpu else None, avoid=avoid)  # fmt: skip
     credit = vast.credit()
     out_ = len(s3.out_now())
     spent = s3.week_spent()
     for q in qs:
         q.update(week_spent=spent, credit=credit, instances_out=out_, tokens=p["tokens_left"], run_id=p["run_id"])
         q["breaks"] = s3.violations(q, t)
-    return {"spec": spec, "prep": prep, "plan": p, "quotes": qs, "market": market_read, "vast": vast, "terms": t}
+    return qs
+
+
+def avoid_keys(offer_id=None, machine_id=None) -> set[str]:
+    """What `Vast.search` avoids for one host: its offer and, when known, its machine."""
+    return ({f"o{offer_id}"} if offer_id is not None else set()) | ({f"m{machine_id}"} if machine_id is not None else set())
+
+
+def avoided_now(rows: list[dict] | None = None, hours: float = AVOID_HOURS, now: float | None = None) -> set[str]:
+    """The offers and machines whose box never boarded (released having failed in `provision` or `ssh`) in the
+    last `hours`, read from S3's spend log: no charter hires them again until then. Older hires carry only
+    their offer; since 12 November the hire records its machine too. Never raises: no log, nothing avoided."""
+    from datetime import datetime
+
+    try:
+        rows = s3.log() if rows is None else rows
+    except Exception:  # noqa: BLE001
+        return set()
+    now = time.time() if now is None else now
+    hires = {r.get("instance"): r for r in rows if r.get("event") == "hired"}
+    out: set[str] = set()
+    for r in rows:
+        if r.get("event") != "released" or r.get("failed_in") not in ("provision", "ssh"):
+            continue
+        try:
+            at = datetime.fromisoformat(str(r.get("at"))).timestamp()
+        except ValueError:
+            continue
+        if now - at > hours * 3600:
+            continue
+        h = hires.get(r.get("instance")) or {}
+        out |= avoid_keys(h.get("offer"), h.get("machine_id"))
+    return out
 
 
 def gate(spec: dict, q: dict) -> None:
@@ -960,9 +1061,10 @@ def _last_pull(box, rid: str, start: int, rec: Ledger, hire: dict, commit: str, 
     return {}
 
 
-def _release(vast, hire: dict, status: str, rec: Ledger, log) -> tuple[float, bool]:
-    """Release the ship and log it, with what it cost and the rate it made: the one way a hire ends, for
-    `sail` and `attach` alike. Returns (when, whether Vast.ai took the release)."""
+def _release(vast, hire: dict, status: str, rec: Ledger, log, error: str | None = None) -> tuple[float, bool]:
+    """Release the ship and log it, with what it cost, the rate it made and, for a hire that failed, why
+    (`error`: until 12 November a lost hire's release said only "lost", and the reason was in a traceback in
+    the line's own .out file, overwritten by the next try). Returns (when, whether Vast.ai took the release)."""
     instance, rid, ended = hire["instance"], hire["run_id"], time.time()
     try:
         vast.release(instance)
@@ -979,8 +1081,9 @@ def _release(vast, hire: dict, status: str, rec: Ledger, log) -> tuple[float, bo
         rate = _measured_rate(rec, rid, int(hire.get("start_step") or 0))
         s3.record("released", instance=instance, run_id=rid, gpu=hire.get("gpu"), dph=hire["dph"], preset=hire.get("preset"),
                   started=hire["started"], ended=ended, cost=s3.cost_of(hire, ended), status=status, tokens_per_s=rate,
-                  name=hire.get("name"), **timing)  # fmt: skip
-    s2.note(rid, event="released" if released else "release failed", instance=instance, status=status)
+                  name=hire.get("name"), **timing, **({"error": error[:600]} if error else {}))  # fmt: skip
+    s2.note(rid, event="released" if released else "release failed", instance=instance, status=status,
+            **({"error": error[:600]} if error else {}))  # fmt: skip
     return ended, released
 
 
@@ -1016,92 +1119,146 @@ def sail(spec_path: str, gpu: str | None = None, vast=None, resolver=None, box_f
         raise NoOffer(f"no offer keeps the terms for {gpu or ', '.join(t['gpus'])}")
     q = q0["quotes"][0]
     gate(spec, q)
-    log(f"charter: {q['gpu']} offer {q['offer_id']} at ${q['dph']:.3f}/h, about {q['hours']:.1f} h, ${q['cost']:.2f} ({q['speed']})")
     commit = train.git_commit()
+    avoid = set(q0.get("avoid") or ())
+    never_boarded, gone = 0, 0
     with s2.berth(t["max_instances"], rid):
-        image, why_image = box_image(t)
-        log(f"charter: image {image} ({why_image})")
-        instance = vast.hire(q["offer_id"], image, int(t["disk_gb"]), LABEL + rid)
-        # the instance is on record against its run from here: in the voyage's own log (a file) and then in
-        # S3's spend log, with all `attach` needs to take the ship up again (the step it set out from, the
-        # quote's hours, the commit). The hire is inside the `try` now: a spend log that could not be
-        # written used to raise with the ship already out and nothing to release it (11 November).
-        s2.note(rid, event="hired", instance=instance, gpu=q["gpu"], dph=q["dph"])
-        hire = {"instance": instance, "run_id": rid, "name": spec.get("name"), "gpu": q["gpu"], "dph": q["dph"],
-                "started": time.time(), "preset": spec["model"]["preset"], "start_step": p["start"]}  # fmt: skip
-        status, counts = "lost", {}
-        with _recallable(log) as guard:
+        while True:
+            log(f"charter: {q['gpu']} offer {q['offer_id']} at ${q['dph']:.3f}/h, about {q['hours']:.1f} h, ${q['cost']:.2f} ({q['speed']})")
             try:
-                hire = s3.record("hired", **{k: v for k, v in hire.items() if k != "started"}, offer=q["offer_id"],
-                                 started=hire["started"], quote=q["cost"], quote_hours=q["hours"], commit=commit,
-                                 setup_assumed_h=q.get("setup_hours"))  # fmt: skip
-                _PHASES[int(instance)] = Phases(hire["started"])  # provision runs from the hire
-                key = _public_key(t)
-                if key:
-                    vast.attach_ssh(instance, key)
-                inst = vast.wait_running(instance, sleep=sleep)
-                actual = float(inst.get("dph_total") or 0.0)
-                if actual > 0 and abs(actual - float(hire.get("dph") or 0.0)) > 1e-9:
-                    s3.reprice(instance, actual)
-                    hire["dph"] = actual
-                box = (box_factory or (lambda i: Box(i["ssh_host"], i["ssh_port"])))(inst)
-                try:
-                    box.log = log
-                    limit = fitout_limit()
-                    box.deadline = time.time() + limit if limit else None  # fitting out ends here, whatever step it is in
-                except Exception:
-                    pass
-                log(f"charter: instance {instance} is up ({inst.get('ssh_host')}:{inst.get('ssh_port')}); waiting for its ssh")
-                _phase(instance, "ssh")
-                tries = box.wait_ssh(sleep=sleep, on_denied=(lambda: vast.attach_ssh(instance, key)) if key else None)
-                log(f"charter: ssh answered (try {tries}); fitting out")
-                _phase(instance, "code")
-                box.bootstrap()
-                code = code_carried(spec)
-                _phase(instance, "code", _size(paths.ROOT, code) / 1e6)
-                box.put_tar(paths.ROOT, code)  # one stream: rsync'ing 20k small files took most of an hour on 9 November
-                aboard = carried_data(q0["prep"].tokeniser.id, voyage_books(q0["prep"])) + checkpoints_carried(rid, spec, rec)
-                _phase(instance, "data", _size(paths.data_dir(), aboard) / 1e6)
-                box.put_tar(paths.data_dir(), aboard, "data")  # the data too, as one stream (8,907 files took 16 min by rsync)
-                _phase(instance, "board")
-                st = stage(rid)
-                s2.papers(st / "ledger.sqlite", spec, rid, rec)
-                box.put(st, sorted(f.name for f in st.glob("*.sqlite") if f.name != "ledger.sqlite"), "data")
-                box.put(st, ["ledger.sqlite"])
-                (st / f"{rid}.yaml").write_text(yaml.safe_dump(spec, sort_keys=False, allow_unicode=True))
-                (st / f"{rid}.papers.json").write_text(json.dumps(store.papers_for_box(), ensure_ascii=False, indent=1))
-                box.put(st, [f"{rid}.yaml", f"{rid}.papers.json"], "data/charter")
-                with contextlib.suppress(OSError):  # the box has them; no 200 MB SQLite copy stays at home
-                    shutil.rmtree(st)
-                _phase(instance, "env")
-                box.sync_env()
-                box.launch(rid)
-                # the fit-out is over: its deadline bounds fitting out only. Left set, it refused every poll, pull
-                # and the bringing home 30 minutes after fitting out began (12 November: the bridge trained on a
-                # 4090 while its charter was told "fitting out ran past its deadline" for 23 minutes on end)
-                with contextlib.suppress(Exception):
-                    box.deadline = None
-                _phase(instance, "train")
-                log(f"charter: {spec.get('name')} is at sea on instance {instance}")
-                deadline = time.time() + q["hours"] * float(t["overrun"]) * 3600
-                with contextlib.suppress(Exception):  # the deadline on record, for an `attach`; never worth the voyage
-                    s3.record("at sea", instance=instance, run_id=rid, deadline=deadline)
-                status, counts = _watch(box, rid, p["start"], rec, hire, commit, deadline, log, sleep, poll_s)
-                _phase(instance, "home")
-                counts = _last_pull(box, rid, p["start"], rec, hire, commit, log, sleep)
-                _register_home(rec, rid, log)
-                if status == "home" and (rec.get_run(rid) or {}).get("status") != "finished":
-                    status = "came in unfinished"  # the box's voyage stopped short (its checkpoint is home: sail again)
-                if status == "home":
-                    _drop_queued_home(hire, log)
-            except Recalled as e:
-                status = f"recalled ({e})"
-                log(f"charter: {e} while instance {instance} is hired: releasing it (what it had pulled home is kept)")
-                raise
-            finally:
-                guard.closing()
-                ended, _ = _release(vast, hire, status, rec, log)
+                hire, status, ended, counts, failure = _sail_one(spec, q0["prep"], q, p, t, rid, commit, rec, vast,
+                                                                  box_factory, log, sleep, poll_s)  # fmt: skip
+            except OfferGone as e:
+                # nothing was hired: another renter took the offer between the market's reading and the hire
+                gone, last = gone + 1, e
+                log(f"charter: offer {q['offer_id']} was taken before it could be hired ({gone} of {OFFERS_GONE + 1}); nothing is hired")
+                if gone > OFFERS_GONE:
+                    raise
+                avoid |= avoid_keys(q.get("offer_id"))
+                why = "the last offer was taken"
+            else:
+                if failure is None:
+                    break
+                never_boarded, last = never_boarded + 1, failure
+                if never_boarded > REHIRES:
+                    raise failure
+                avoid |= avoid_keys(q.get("offer_id"), q.get("machine_id"))  # the host, not only the offer
+                why = f"the last box never boarded ({never_boarded} of {REHIRES + 1})"
+            # the market read again without what failed, and the new quote gated as the first was
+            qs = _priced(vast, spec, q0["prep"], p, t, gpu, avoid)
+            if not qs:
+                log(f"charter: no other offer keeps the terms; giving up: {why}")
+                raise last
+            q = qs[0]
+            log(f"charter: hiring again on another offer: {why}")
+            gate(spec, q)
     return _close(rec, hire, status, ended, counts, log)
+
+
+def _sail_one(spec: dict, prep, q: dict, p: dict, t: dict, rid: str, commit: str, rec: Ledger, vast, box_factory, log, sleep,
+              poll_s: float) -> tuple[dict, str, float, dict, NeverBoarded | None]:  # fmt: skip
+    """One hire, from the hire to its release: (the hire, how it ended, when it was released, the rows home,
+    and the NeverBoarded when its box never let us aboard, so `sail` may hire another). Any other failure is
+    logged with its reason, recorded on the release, and raised after the ship is released."""
+    image, why_image = box_image(t)
+    log(f"charter: image {image} ({why_image})")
+    try:
+        instance = vast.hire(q["offer_id"], image, int(t["disk_gb"]), LABEL + rid)
+    except VastError as e:
+        if offer_gone(e):
+            raise OfferGone(str(e)) from e
+        raise
+    # the instance is on record against its run from here: in the voyage's own log (a file) and then in
+    # S3's spend log, with all `attach` needs to take the ship up again (the step it set out from, the
+    # quote's hours, the commit). The hire is inside the `try` now: a spend log that could not be
+    # written used to raise with the ship already out and nothing to release it (11 November).
+    s2.note(rid, event="hired", instance=instance, gpu=q["gpu"], dph=q["dph"])
+    hire = {"instance": instance, "run_id": rid, "name": spec.get("name"), "gpu": q["gpu"], "dph": q["dph"],
+            "started": time.time(), "preset": spec["model"]["preset"], "start_step": p["start"]}  # fmt: skip
+    status, counts, error, failure = "lost", {}, None, None
+    with _recallable(log) as guard:
+        try:
+            hire = s3.record("hired", **{k: v for k, v in hire.items() if k != "started"}, offer=q["offer_id"],
+                             machine_id=q.get("machine_id"), started=hire["started"], quote=q["cost"],
+                             quote_hours=q["hours"], commit=commit, setup_assumed_h=q.get("setup_hours"))  # fmt: skip
+            _PHASES[int(instance)] = Phases(hire["started"])  # provision runs from the hire
+            key = _public_key(t)
+            if key:
+                vast.attach_ssh(instance, key)
+            try:
+                inst = vast.wait_running(instance, sleep=sleep)
+            except VastError as e:  # it never came up: the host's failure, as a refused ssh is
+                raise NeverBoarded(str(e)) from e
+            actual = float(inst.get("dph_total") or 0.0)
+            if actual > 0 and abs(actual - float(hire.get("dph") or 0.0)) > 1e-9:
+                s3.reprice(instance, actual)
+                hire["dph"] = actual
+            box = (box_factory or (lambda i: Box(i["ssh_host"], i["ssh_port"])))(inst)
+            try:
+                box.log = log
+                limit = fitout_limit()
+                box.deadline = time.time() + limit if limit else None  # fitting out ends here, whatever step it is in
+            except Exception:
+                pass
+            log(f"charter: instance {instance} is up ({inst.get('ssh_host')}:{inst.get('ssh_port')}); waiting for its ssh")
+            _phase(instance, "ssh")
+            tries = box.wait_ssh(timeout_s=BOARD_SSH_S, sleep=sleep, refresh=lambda: vast.show(instance),
+                                 on_denied=(lambda: vast.attach_ssh(instance, key)) if key else None)  # fmt: skip
+            log(f"charter: ssh answered (try {tries}); fitting out")
+            _phase(instance, "code")
+            box.bootstrap()
+            code = code_carried(spec)
+            _phase(instance, "code", _size(paths.ROOT, code) / 1e6)
+            box.put_tar(paths.ROOT, code)  # one stream: rsync'ing 20k small files took most of an hour on 9 November
+            aboard = carried_data(prep.tokeniser.id, voyage_books(prep)) + checkpoints_carried(rid, spec, rec)
+            _phase(instance, "data", _size(paths.data_dir(), aboard) / 1e6)
+            box.put_tar(paths.data_dir(), aboard, "data")  # the data too, as one stream (8,907 files took 16 min by rsync)
+            _phase(instance, "board")
+            st = stage(rid)
+            s2.papers(st / "ledger.sqlite", spec, rid, rec)
+            box.put(st, sorted(f.name for f in st.glob("*.sqlite") if f.name != "ledger.sqlite"), "data")
+            box.put(st, ["ledger.sqlite"])
+            (st / f"{rid}.yaml").write_text(yaml.safe_dump(spec, sort_keys=False, allow_unicode=True))
+            (st / f"{rid}.papers.json").write_text(json.dumps(store.papers_for_box(), ensure_ascii=False, indent=1))
+            box.put(st, [f"{rid}.yaml", f"{rid}.papers.json"], "data/charter")
+            with contextlib.suppress(OSError):  # the box has them; no 200 MB SQLite copy stays at home
+                shutil.rmtree(st)
+            _phase(instance, "env")
+            box.sync_env()
+            box.launch(rid)
+            # the fit-out is over: its deadline bounds fitting out only. Left set, it refused every poll, pull
+            # and the bringing home 30 minutes after fitting out began (12 November: the bridge trained on a
+            # 4090 while its charter was told "fitting out ran past its deadline" for 23 minutes on end)
+            with contextlib.suppress(Exception):
+                box.deadline = None
+            _phase(instance, "train")
+            log(f"charter: {spec.get('name')} is at sea on instance {instance}")
+            deadline = time.time() + q["hours"] * float(t["overrun"]) * 3600
+            with contextlib.suppress(Exception):  # the deadline on record, for an `attach`; never worth the voyage
+                s3.record("at sea", instance=instance, run_id=rid, deadline=deadline)
+            status, counts = _watch(box, rid, p["start"], rec, hire, commit, deadline, log, sleep, poll_s)
+            _phase(instance, "home")
+            counts = _last_pull(box, rid, p["start"], rec, hire, commit, log, sleep)
+            _register_home(rec, rid, log)
+            if status == "home" and (rec.get_run(rid) or {}).get("status") != "finished":
+                status = "came in unfinished"  # the box's voyage stopped short (its checkpoint is home: sail again)
+            if status == "home":
+                _drop_queued_home(hire, log)
+        except NeverBoarded as e:
+            error, failure = f"never boarded: {e}", e
+            log(f"charter: instance {instance} never boarded, released: {e}")
+        except Recalled as e:
+            status, error = f"recalled ({e})", f"recalled ({e})"
+            log(f"charter: {e} while instance {instance} is hired: releasing it (what it had pulled home is kept)")
+            raise
+        except Exception as e:
+            error = f"{type(e).__name__}: {e}"
+            log(f"charter: {spec.get('name')} failed on instance {instance}, releasing it: {error[-600:]}")
+            raise
+        finally:
+            guard.closing()
+            ended, _ = _release(vast, hire, status, rec, log, error=error)
+    return hire, status, ended, counts, failure
 
 
 def hired(which: str | int) -> dict:

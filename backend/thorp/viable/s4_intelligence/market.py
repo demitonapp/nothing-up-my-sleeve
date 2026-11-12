@@ -118,13 +118,15 @@ def price(cfg, preset: str, tokens: int, o: dict) -> dict:
     return {**o, "hours": hours, "cost": hours * o["dph"], "speed": how, "setup_hours": setup_h}
 
 
-def quotes(vast, cfg, preset: str, tokens: int, terms: dict, gpus: list[str] | None = None) -> list[dict]:
-    """The cheapest offer of each class (or of `gpus`), priced for this voyage, cheapest voyage first."""
+def quotes(vast, cfg, preset: str, tokens: int, terms: dict, gpus: list[str] | None = None,
+           avoid: frozenset | set = frozenset()) -> list[dict]:  # fmt: skip
+    """The cheapest offer of each class (or of `gpus`), priced for this voyage, cheapest voyage first; never an
+    offer or machine `avoid` names (s1 charter.avoided_now: a box there never answered)."""
     out = []
     for gpu in gpus or list(terms["gpus"]):
         if gpu not in terms["gpus"]:
             continue
-        offers = vast.search(gpu, terms, limit=5)
+        offers = vast.search(gpu, terms, limit=5, avoid=avoid) if avoid else vast.search(gpu, terms, limit=5)
         if offers:
             out.append(price(cfg, preset, tokens, offers[0]))
     out.sort(key=lambda q: q["cost"])

@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import re
 import shutil
+import time
 from pathlib import Path
 
 import pytest
@@ -350,6 +351,85 @@ def test_a_ship_is_released_whatever_goes_wrong(library, spec, tmp_thorp, monkey
                 log=lambda *a: None, sleep=lambda s: None, poll_s=0)  # fmt: skip
     assert market.instances == {}
     assert [(r["event"], r.get("status")) for r in s3.log()] == [("hired", None), ("released", "lost")]
+    # and why is on the release (12 November: a lost hire said only "lost")
+    assert "would not answer" in s3.log()[-1]["error"]
+
+
+def _two_hosts():
+    base = dict(verified=True, rentable=True, rented=False, reliability=0.995, inet_down=900.0, inet_up=500.0,
+                disk_space=200.0, cuda_max_good=13.4, num_gpus=1, gpu_name="RTX 4090")  # fmt: skip
+    return FakeMarket(offers=[{**base, "id": 12, "dph_total": 0.38, "machine_id": 1},
+                              {**base, "id": 14, "dph_total": 0.41, "machine_id": 2}])  # fmt: skip
+
+
+class DeadBox(FakeBox):
+    """A box Vast.ai calls running whose ssh refuses us (offer 60289338, twice on 12 November)."""
+
+    def wait_ssh(self, **kw):
+        raise s1.NeverBoarded("ssh ssh1.vast.ai:14240 never answered in 300 s: Connection refused")
+
+
+def test_a_box_that_never_boards_is_replaced_on_another_host(library, spec, tmp_thorp, monkeypatch):
+    small_terms(tmp_thorp)
+    market, boxes = _two_hosts(), []
+
+    def make_box(inst):
+        cls = DeadBox if not boxes else FakeBox
+        boxes.append(cls(tmp_thorp / f"box{len(boxes)}", library["resolver"], monkeypatch))
+        return boxes[-1]
+
+    out = s1.sail(write_spec(spec, tmp_thorp), vast=Vast(market), resolver=library["resolver"], box_factory=make_box,
+                  log=lambda *a: None, sleep=lambda s: None, poll_s=0)  # fmt: skip
+    assert out["status"] == "home" and market.instances == {}
+    assert [c[1] for c in market.calls if c[0] == "PUT"] == ["/api/v0/asks/12/", "/api/v0/asks/14/"]  # the cheaper host, then the other
+    log = s3.log()
+    assert [(r["event"], r.get("status")) for r in log] == [("hired", None), ("released", "lost"), ("hired", None),
+                                                            ("at sea", None), ("released", "home")]  # fmt: skip
+    assert log[0]["machine_id"] == 1 and log[1]["failed_in"] == "ssh" and "never boarded" in log[1]["error"]
+    # and the next charter does not hire that host again, until AVOID_HOURS have passed
+    assert s1.avoided_now() == {"o12", "m1"}
+    assert s1.avoided_now(now=time.time() + (s1.AVOID_HOURS + 1) * 3600) == set()
+
+
+def test_a_charter_gives_up_when_no_box_boards(library, spec, tmp_thorp, monkeypatch):
+    small_terms(tmp_thorp)
+    market = _two_hosts()
+    with pytest.raises(s1.NeverBoarded):
+        s1.sail(write_spec(spec, tmp_thorp), vast=Vast(market), resolver=library["resolver"],
+                box_factory=lambda i: DeadBox(tmp_thorp / "box", library["resolver"], monkeypatch),
+                log=lambda *a: None, sleep=lambda s: None, poll_s=0)  # fmt: skip
+    assert market.instances == {} and len([c for c in market.calls if c[0] == "PUT"]) == 1 + s1.REHIRES
+    assert [r.get("status") for r in s3.log() if r["event"] == "released"] == ["lost"] * (1 + s1.REHIRES)
+
+
+class TakenMarket(FakeMarket):
+    """Offer 12 is taken by another renter between the market's reading and our hire (21:12, 12 November)."""
+
+    def __call__(self, method, path, body=None, query=None):
+        if method == "PUT" and path == "/api/v0/asks/12/":
+            self.calls.append((method, path, body))
+            return {"success": False, "error": "invalid_args", "ask_id": 12,
+                    "msg": "error 404/3603: no_such_ask  Instance type by id 12 is not available."}  # fmt: skip
+        return super().__call__(method, path, body, query)
+
+
+def test_an_offer_taken_before_the_hire_is_replaced_by_the_next(library, spec, tmp_thorp, monkeypatch):
+    small_terms(tmp_thorp)
+    market = TakenMarket(offers=_two_hosts().offers)
+    out = s1.sail(write_spec(spec, tmp_thorp), vast=Vast(market), resolver=library["resolver"],
+                  box_factory=lambda i: FakeBox(tmp_thorp / "box", library["resolver"], monkeypatch),
+                  log=lambda *a: None, sleep=lambda s: None, poll_s=0)  # fmt: skip
+    assert out["status"] == "home" and market.instances == {}
+    assert [c[1] for c in market.calls if c[0] == "PUT"] == ["/api/v0/asks/12/", "/api/v0/asks/14/"]
+    assert [r["event"] for r in s3.log()] == ["hired", "at sea", "released"]  # nothing was hired on the taken offer
+
+
+def test_the_market_skips_an_avoided_host(tmp_thorp):
+    small_terms(tmp_thorp)
+    v = Vast(_two_hosts())
+    assert [o["offer_id"] for o in v.search("RTX 4090", s5.terms())] == [12, 14]
+    assert [o["offer_id"] for o in v.search("RTX 4090", s5.terms(), avoid={"m1"})] == [14]
+    assert [o["offer_id"] for o in v.search("RTX 4090", s5.terms(), avoid={"o14"})] == [12]
 
 
 @pytest.mark.parametrize("home", ["sqlite", "store"])
@@ -486,6 +566,26 @@ def test_the_box_waits_for_ssh_and_attaches_the_key_again(tmp_thorp):
     b = s1.Box("ssh1.vast.ai", 18576, run=run)
     assert b.wait_ssh(sleep=lambda s: None, on_denied=lambda: attached.append(1)) == 8
     assert attached == [1]  # attached again once, after six tries
+
+
+def test_the_wait_for_ssh_follows_a_moved_box_and_drops_a_dead_one(tmp_thorp):
+    import subprocess
+
+    def run(argv, **kw):  # only the new address answers
+        ok = "root@ssh2.vast.ai" in argv
+        return subprocess.CompletedProcess(argv, 0 if ok else 255, stdout="", stderr="" if ok else "Connection refused")
+
+    b = s1.Box("ssh1.vast.ai", 14240, run=run)
+    moved = lambda: {"actual_status": "running", "ssh_host": "ssh2.vast.ai", "ssh_port": 2222}  # noqa: E731
+    assert b.wait_ssh(sleep=lambda s: None, refresh=moved, refresh_every=2) == 3
+    assert (b.host, b.port) == ("ssh2.vast.ai", 2222) and b.opts[b.opts.index("-p") + 1] == "2222"
+
+    b = s1.Box("ssh1.vast.ai", 14240, run=run)
+    with pytest.raises(s1.NeverBoarded, match="exited at Vast.ai"):  # given up at the second try, not at 300 s
+        b.wait_ssh(sleep=lambda s: None, refresh=lambda: {"actual_status": "exited"}, refresh_every=2)
+    b = s1.Box("ssh1.vast.ai", 14240, run=run)  # a failed reading of Vast.ai changes nothing
+    with pytest.raises(s1.NeverBoarded, match="never answered in 45 s"):
+        b.wait_ssh(timeout_s=45, sleep=lambda s: None, refresh=lambda: 1 / 0, refresh_every=1)
 
 
 def test_a_box_that_never_answers_says_why(tmp_thorp):

@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The store (Postgres on localhost:5433, data/postgres) under launchd: started at login, restarted when it
+     crashes, so a restart of this Mac does not leave the queue waiting on a store nobody started
+     (12 November: after the macOS update the queue stalled for nine minutes until it was started by hand).
+
+     Install (one time):
+       cp backend/scripts/com.thorp.postgres.plist ~/Library/LaunchAgents/
+       launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.thorp.postgres.plist
+     Stop the store on purpose (otherwise launchd starts it again):
+       launchctl bootout gui/$(id -u)/com.thorp.postgres
+     Status:
+       launchctl print gui/$(id -u)/com.thorp.postgres | head -30
+
+     backend/scripts/postgres.sh does not start a second postgres beside one already running: it watches it
+     and takes over when it stops. KeepAlive SuccessfulExit=false: postgres's own clean shutdown stays down;
+     a crash, or the hand-started one stopping, is relaunched after ThrottleInterval. A LaunchAgent starts at
+     login, so after a restart this Mac must log in (automatic login) for the store and the queue to come up. -->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.thorp.postgres</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/sh</string>
+    <string>/Users/justintrollip/Source/Thorp/backend/scripts/postgres.sh</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/Users/justintrollip/Source/Thorp</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>HOME</key>
+    <string>/Users/justintrollip</string>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <dict>
+    <key>SuccessfulExit</key>
+    <false/>
+  </dict>
+  <key>ThrottleInterval</key>
+  <integer>30</integer>
+  <key>StandardOutPath</key>
+  <string>/Users/justintrollip/Source/Thorp/data/postgres.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/justintrollip/Source/Thorp/data/postgres.log</string>
+</dict>
+</plist>

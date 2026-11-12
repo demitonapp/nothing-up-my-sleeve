@@ -882,6 +882,61 @@ function QueueVoyageDialog({ row, onClose }: { row: any; onClose: () => void }) 
   );
 }
 
+/** The Overview's own way around (12 November, Justin: "general UI and UX improvements for the
+ *  expeditions"): the page is the launch, its fleet, a master charter of thirty-odd rows and then the
+ *  preparations, so the expeditions themselves sat three screens down. This row names each part with its
+ *  count, stays under the header as the page scrolls, marks the part being read, and opens a folded
+ *  part before it scrolls to it. The links are the ship page's sailing pills (`a.sailing`). */
+type Jump = { id: string; label: string; n?: string };
+function PageJump({ items }: { items: Jump[] }) {
+  const row = useRef<HTMLElement | null>(null);
+  const [at, setAt] = useState<string | null>(null);
+  // the header is sticky and wraps on a narrow screen: the row sticks under it at whatever height it has
+  useEffect(() => {
+    const header = document.querySelector('header');
+    const measure = (): void => document.documentElement.style.setProperty('--hdr-h', `${header ? Math.round(header.getBoundingClientRect().height) : 0}px`);
+    measure();
+    const ro = header && 'ResizeObserver' in window ? new ResizeObserver(measure) : null;
+    if (ro && header) ro.observe(header);
+    return () => ro?.disconnect();
+  }, []);
+  useEffect(() => {
+    let raf = 0;
+    const spy = (): void => {
+      raf = 0;
+      const line = (row.current?.getBoundingClientRect().bottom ?? 0) + 24;
+      let cur: string | null = null;
+      for (const it of items) {
+        const el = document.getElementById(it.id);
+        if (el && el.offsetParent && el.getBoundingClientRect().top <= line) cur = it.id;
+      }
+      setAt(cur);
+    };
+    const on = (): void => { if (!raf) raf = requestAnimationFrame(spy); };
+    window.addEventListener('scroll', on, { passive: true });
+    spy();
+    return () => { window.removeEventListener('scroll', on); if (raf) cancelAnimationFrame(raf); };
+  }, [items]);
+  const jump = (e: ReactMouseEvent, id: string): void => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    e.preventDefault();
+    if (el instanceof HTMLDetailsElement) el.open = true;
+    el.scrollIntoView({ block: 'start' });
+  };
+  if (items.length < 2) return null;
+  return (
+    <nav className="pagejump" aria-label="on this page" ref={row}>
+      <span className="k">On this page</span>
+      {items.map((it) => (
+        <a key={it.id} className={`sailing${at === it.id ? ' on' : ''}`} href={`#${it.id}`} aria-current={at === it.id ? 'location' : undefined} onClick={(e) => jump(e, it.id)}>
+          {it.label}{it.n ? <b>{it.n}</b> : null}
+        </a>
+      ))}
+    </nav>
+  );
+}
+
 export default function Expeditions() {
   const [path, go] = usePath();
   const route = parseExpeditionRoute(path);
@@ -980,6 +1035,23 @@ export default function Expeditions() {
       },
     ].filter((g) => g.list.length);
   }, [exps, states]);
+  // the Overview's parts, in page order, each with the count its heading gives
+  const loaded = expsApi.data != null;
+  const jumps = useMemo(() => {
+    const out: Jump[] = [];
+    if (launch) {
+      const r = launch.readiness;
+      out.push({ id: 'launchfleet', label: 'The fleet', n: `${r.home} of ${r.ships} home` });
+      out.push({ id: 'mastercharter', label: 'The master charter', n: `${r.signed} of ${r.params} signed` });
+      if (launch.parts.length) out.push({ id: 'launchparts', label: 'Every goal\'s part', n: String(launch.parts.length) });
+    }
+    if (loaded) {
+      for (const g of planGroups) out.push({ id: `plans-${g.key}`, label: g.title, n: String(g.list.length) });
+      if (pastSops.length) out.push({ id: 'paststandards', label: 'Earlier drafts', n: String(pastSops.length) });
+      out.push({ id: 'expeditiontableref', label: 'As a table' });
+    }
+    return out;
+  }, [launch, loaded, planGroups, pastSops]);
   const v = isVoyage && route.key ? exps.find((x) => x.key === route.key) || null : null;
 
   const detailApi = useApi<any>(isVoyage && route.key ? `/api/expedition?key=${encodeURIComponent(route.key)}` : null, 60000);
@@ -1382,13 +1454,17 @@ export default function Expeditions() {
   // ---- the shell
   return (
     <div onClick={onBookClick}>
-      <DemitonTabs active="expeditions" />
-      <SectionNav />
+      {/* two rows, stacked: each is an inline row, so side by side in a plain wrapper they ran together on one line */}
+      <div className="navstack">
+        <DemitonTabs active="expeditions" />
+        <SectionNav />
+      </div>
       {/* ------------------------------------------------ the queue and the expeditions */}
       <div className={`section${isOverview || isQueue || isList ? ' active' : ''}`} id="voyages">
         <h1>{isQueue
           ? <>The queue <span className="q">what sails next, in order, as the S2 coordinator takes it from the Mac lane; open a ship to follow its training</span></>
           : <>Overview <span className="q">one expedition: the fleet it launches, the master charter it sails under, and the preparation that settles it</span></>}</h1>
+        {isOverview || isList ? <PageJump items={jumps} /> : null}
         <div className={`vtab${isOverview || isList ? ' active' : ''}`} data-vtab="expeditions">
           {launch ? <Launch data={launch} onChange={setLaunchSigned} /> : launchApi.error ? (
             <div dangerouslySetInnerHTML={{ __html: EMPTY(`the launch could not be read: ${esc(launchApi.error)}`) }} />
@@ -1420,9 +1496,10 @@ export default function Expeditions() {
           <TabNav
             id="queuenav"
             ariaLabel="queue sections"
+            variant="default"
             tablist
             items={[
-              { key: 'queue', label: 'Queue', href: '/expeditions/queue', active: qtab === 'queue', onClick: () => go('/expeditions/queue') },
+              { key: 'queue', label: 'Sailing order', href: '/expeditions/queue', active: qtab === 'queue', onClick: () => go('/expeditions/queue') },
               { key: 'planning', label: 'Planning', href: '/expeditions/queue/planning', active: qtab === 'planning', onClick: () => go('/expeditions/queue/planning') },
             ]}
           />
@@ -1433,7 +1510,7 @@ export default function Expeditions() {
           ) : (
           <div className="qview active" data-qview="every">
             <section className={cardCls(false, 'panel')} id="queuepanel">
-              <h2>The queue <span className="note">every voyage still to sail, in the order it sails (specs/queue.txt), with its goal: the question its spec asks, or its experiment's where it asks none, and the fitout it was compiled from (its census variation and stage); the starts are the median of like voyages scheduled with the Mac's seats, and ≥ marks a line behind one with no time yet. Click a voyage for its card</span></h2>
+              <h2>Sailing order <span className="note">every voyage still to sail, in the order it sails (specs/queue.txt), with its goal: the question its spec asks, or its experiment's where it asks none, and the fitout it was compiled from (its census variation and stage); the starts are the median of like voyages scheduled with the Mac's seats, and ≥ marks a line behind one with no time yet. Click a voyage for its card</span></h2>
               {queueApi.data ? <div onClick={onQueueClick} onKeyDown={onQueueKey} dangerouslySetInnerHTML={{ __html: queueLanesHtml(queueApi.data) }} /> : null}
               <div className="scroll queuescroll" onClick={onQueueClick} onKeyDown={onQueueKey}><table id="queuetable" data-nosort>
                 <thead><tr><th>#</th><th>voyage</th><th>ship</th><th title="the SOP the voyage is built to: its content, tokeniser, parameters, phases and depth">SOP</th><th title="how far the voyage has come: its training step of the steps its schedule sets; a line that has not sailed reads 0%">% complete</th><th title="about when it starts, in your local timezone: the median of like voyages, scheduled with the Mac's seats (two 300k may share; a 1m or 9m holds the lane); ≥ where a voyage ahead has no time yet">starts</th><th title="about when it sails: the median of like voyages, scheduled with the Mac's seats; ≥ where a voyage ahead has no time yet">sails in</th></tr></thead>
@@ -1447,7 +1524,7 @@ export default function Expeditions() {
 
       {/* ------------------------------------------------ one expedition */}
       <div className={`section${isVoyage ? ' active' : ''}`} id="voyage">
-        <h1><a className={crumbCls('back')} href="/expeditions" onClick={(e) => { e.preventDefault(); go('/expeditions/queue'); }}>← expeditions</a>{' '}
+        <h1><a className={crumbCls('back')} href="/expeditions" onClick={(e) => { e.preventDefault(); go('/expeditions'); }}>← expeditions</a>{' '}
           <span id="voyagetitle">{v ? v.name : expsApi.data ? `no expedition called ${route.key}` : 'loading…'}</span>{' '}
           <span id="voyagestatus" dangerouslySetInnerHTML={{ __html: v ? expPill(states[v.key], v) : '' }} />{' '}
           </h1>

@@ -1160,6 +1160,30 @@ button[aria-busy="true"] { cursor: progress; opacity: .7; }
 #voyages .vtab, #voyages .qview { display: none; }
 #voyages .vtab.active, #voyages .qview.active { display: block; }
 #voyages .qswitch { display: inline-flex; gap: 4px; margin: 4px 0 12px; }
+/* The two tab rows above an Expeditions or VSM page (12 November, Justin: "fix the sub tabs"): Demiton's
+   views, then the Expeditions' own. Each is an inline row, so in the island's plain wrapper they ran
+   together on one line, two Overviews side by side. Stacked (`.navstack`, the same grid a `.section`
+   is), the upper row sits on a rule and the lower is set smaller and close under it, so it reads as
+   belonging to the tab above. The VSM page has the same two rows inside its section. */
+.navstack { display: grid; gap: 16px; margin-bottom: 16px; }
+#demitontabs:has(+ #expeditions-nav) { display: flex; width: auto; border-bottom: 1px solid var(--line); padding-bottom: 5px; }
+#demitontabs + #expeditions-nav { display: flex; width: auto; margin-top: -12px; }
+#demitontabs + #expeditions-nav > a { font-size: var(--fs-sm); padding-block: 2px; }
+/* a grid stretches its items, which makes a row's height definite, and a tab is 100% of it tall: on a
+   phone, where a row wraps, its second line then hung out of the row and over what came next (Demiton's
+   row, an expedition's nine tabs, the VSM's five systems). Every tab row in a section is its own height. */
+.section > .subnav, .navstack > .subnav { align-self: start; }
+/* The Overview's jump row: under the sticky header as the page scrolls (--hdr-h is the header's height,
+   set by the row itself), over the page's own colour so the charter passes beneath it. */
+.pagejump { position: sticky; top: var(--hdr-h, 57px); z-index: 4; display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  margin: -8px 0 -4px; padding: 8px 0; background: var(--bg); font-size: var(--fs-sm); }
+.pagejump > .k { color: var(--muted); text-transform: uppercase; letter-spacing: .06em; font-size: var(--fs-xs); margin-right: 4px; }
+#voyages :is(#launchfleet, #mastercharter, #launchparts, details.expgroup, #expeditiontableref) { scroll-margin-top: calc(var(--hdr-h, 57px) + 52px); }
+@media (max-width: 700px) {
+  /* a phone has no room for a wrapped row that follows the scroll: it scrolls sideways on one line */
+  .pagejump { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .pagejump > * { flex: none; }
+}
 
 /* Governance: S3 control and acquisition (UI.md, "Governance"): the page's three tabs, the S3 control tab's panels,
    acquisition's five bands one level down */
@@ -2092,8 +2116,16 @@ ol.goaltext { padding-left: 22px; }
 .rt-list { margin: .4em 0 .9em; padding-left: 1.3em; }
 .rt-list li { margin: .2em 0; }
 .rt-hr { margin: 1em 0; border: 0; border-top: 1px solid var(--line); }
-.rt-tablewrap { margin: .6em 0 .9em; max-width: 100%; overflow-x: auto; border: 1px solid var(--line); border-radius: 4px; }
-.rt-table { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); line-height: 1.45; }
+/* A table is as wide as what it holds, no wider (12 November, Justin: "the markdown table needs to size
+   dynamically"). It was stretched to the full column, and the chat's `overflow-wrap: anywhere` let the
+   browser think any column could shrink to one letter: a table with a sentence in it crushed its short
+   columns ("voya/ge") and its sentence alike. Now each column takes its content, a word is never split, a
+   cell of prose (`data-long`, lib/richtext.tsx) keeps a readable measure, and a table still too wide for
+   the room scrolls inside its frame. */
+.rt-tablewrap { margin: .6em 0 .9em; width: fit-content; max-width: 100%; overflow-x: auto; border: 1px solid var(--line); border-radius: 4px; }
+.rt-table { width: auto; border-collapse: collapse; font-size: var(--fs-sm); line-height: 1.45; }
+.rt-table th, .rt-table td { overflow-wrap: normal; word-break: normal; }
+.rt-table td[data-long] { min-width: min(38ch, 70vw); }
 .rt-table th { padding: 6px 10px; text-align: left; font-weight: 600; color: var(--muted); font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .05em; background: var(--raise); border-bottom: 1px solid var(--line); white-space: nowrap; }
 .rt-table td { padding: 6px 10px; vertical-align: top; border-top: 1px solid var(--line); }
 .rt-table tr:first-child td { border-top: 0; }
@@ -2272,6 +2304,11 @@ ol.goaltext { padding-left: 22px; }
 
 /* one column of readable width, whatever the window: about 76 characters at the reader's own size */
 .consoletranscript { max-width: 76ch; margin: 0 auto; padding: 6px 0 14px; font-size: var(--consolefs, 15.5px); }
+/* The reading column is 76 characters in a console that may be twice as wide. A table that needs more
+   keeps its left edge on the text and grows into the empty margin on its right, as far as the chat's own
+   edge (half the column plus half the chat is exactly that point), before it starts to scroll. */
+.consolechat { container-type: inline-size; }
+@supports (width: 1cqw) { .consolemsgtext .rt-tablewrap { max-width: calc((100% + 100cqw) / 2); } }
 .consolemsg { padding: 18px 0 20px; border-top: 1px solid #221a11; }
 .consolemsg:first-child { border-top: 0; padding-top: 10px; }
 .consolemsghead { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin: 0 0 7px; }

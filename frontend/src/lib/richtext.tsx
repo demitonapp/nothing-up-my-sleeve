@@ -167,6 +167,11 @@ function renderNodes(nodes: Node[], key: string): ReactNode[] {
   });
 }
 
+/** How much a node says, in characters: what tells a cell of prose from a cell holding a number or a name. */
+const textLen = (n: Node): number => (typeof n === 'string' ? n.trim().length : n.kids.reduce((a, k) => a + textLen(k), 0));
+// a cell this long is a sentence, and keeps a readable measure however many columns stand beside it
+const LONG_CELL = 40;
+
 function renderEl(el: El, key: string): ReactNode {
   // a list's whitespace between items is layout, not content: it must not become a <br>
   // (and a table's whitespace between rows and cells, which React would warn about inside <tr>)
@@ -194,13 +199,15 @@ function renderEl(el: El, key: string): ReactNode {
     case 'ol': return <ol className="rt-list" key={key}>{kids}</ol>;
     case 'li': return <li key={key}>{kids}</li>;
     case 'hr': return <hr className="rt-hr" key={key} />;
-    // a table scrolls inside its own frame, so a wide one never widens the chat
+    // A table is as wide as what it holds (12 November, Justin: "the markdown table needs to size
+    // dynamically"): each column takes its content, a word is never split, a cell of prose is marked so
+    // it keeps a readable width, and only a table too wide for the room scrolls, inside its own frame.
     case 'table': return <div className="rt-tablewrap" key={key}><table className="rt-table">{kids}</table></div>;
     case 'thead': return <thead key={key}>{kids}</thead>;
     case 'tbody': return <tbody key={key}>{kids}</tbody>;
     case 'tr': return <tr key={key}>{kids}</tr>;
     case 'th': return <th key={key}>{kids}</th>;
-    case 'td': return <td key={key}>{kids}</td>;
+    case 'td': return <td key={key} data-long={textLen(el) > LONG_CELL ? '' : undefined}>{kids}</td>;
     default: return <span key={key}>{kids}</span>;
   }
 }

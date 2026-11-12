@@ -127,7 +127,15 @@ the island rewrites). A section with one tab shows no row.
   card that flips to five views; Demiton opens `/orbitals/demiton`, the trading orbital opens `/orbitals/masaq`.
   Demiton's own row is **Berth · Shipyard · Library · Expeditions**: the berth is its fleet (Schi'mint
   and Vavatch End, with their ships), the shipyard is `/shipyard`, the library is `/library`, and the
-  expeditions are `/expeditions` (their Overview, Queue and VSM tabs stay under it). The old
+  expeditions are `/expeditions` (their Overview, Queue and VSM tabs stay under it). The two rows
+  are stacked, Demiton's on a rule and the Expeditions' own set smaller and close under it (12 November,
+  Justin: "fix the sub tabs"; in the island's plain wrapper the two inline rows had run together on one
+  line, two Overviews side by side), and every tab row in a section keeps its own height, so a row that
+  wraps on a phone no longer hangs over what follows. The Overview carries a jump row under its title
+  (**On this page**: the fleet, the master charter, every goal's part, the preparations, the earlier
+  drafts, the table, each with its count) that stays under the header as the page scrolls, marks the
+  part being read and opens a folded part before scrolling to it. The Queue's own switch is a segmented
+  control, **Sailing order · Planning**, so no tab is called Queue under the Queue tab. The old
   `/harbours/...` pages stay reachable as aliases; `/harbours/<harbour>` rewrites to
   `/orbitals/<harbour>`, and `/harbours/masaq-reach...` forwards to the trading orbital's own page.
 - **Classes** (`#/classes`, home): one card per class of ship, each a model size with one job.

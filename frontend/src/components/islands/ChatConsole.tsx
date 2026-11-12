@@ -163,6 +163,7 @@ function SayMeta({ meta, context, budget }: { meta: Meta; context: number | null
 
 export default function ChatConsole() {
   const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement | null>(null);
   const [models, setModels] = useState<Model[] | null>(null);
   const [err, setErr] = useState('');
   const [pick, setPick] = useState('');
@@ -448,6 +449,21 @@ export default function ChatConsole() {
     return () => window.removeEventListener('keydown', onKey);
   }, [open]);
 
+  // A press outside the console minimises it (12 November, Justin: "clicking outside the chat terminal
+  // should minimise it"). The press, not the click: a selection dragged out of a reply ends outside and
+  // must not close it, and a page's own "chat" button still opens it, because its click comes after.
+  // Nothing is lost: the conversation, a reply still arriving and the draft all stay as they were.
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: PointerEvent): void => {
+      if (e.button !== 0) return;
+      const root = rootRef.current;
+      if (root && e.target instanceof Node && !root.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('pointerdown', onDown);
+    return () => document.removeEventListener('pointerdown', onDown);
+  }, [open]);
+
   useEffect(() => {
     if (!live) return;
     const el = chatBox.current;
@@ -611,6 +627,7 @@ export default function ChatConsole() {
 
   return (
     <div
+      ref={rootRef}
       className={`console${open ? ' open' : ''}${resizing ? ' resizing' : ''}`}
       aria-label="chat console"
       style={{ '--consoleh': panelH ? `${Math.round(panelH)}px` : undefined, '--consolefs': `${answerFs}px` } as CSSProperties}
@@ -626,7 +643,7 @@ export default function ChatConsole() {
         <Woodwork />
         <span className="consoleplate">
           <span className="consoletitle">The chat console</span>
-          <span className="consolenote">{chosen ? chosen.name : 'reading the models…'}{open ? ' · ⌘J or esc to close' : ' · ⌘J'}</span>
+          <span className="consolenote">{chosen ? chosen.name : 'reading the models…'}{open ? ' · ⌘J, esc or a click outside to close' : ' · ⌘J'}</span>
         </span>
         <span className="consolemeter">
           <ContextMeter used={used} context={chosen?.facts?.context ?? null} next={256} turns={says.filter((s) => s.role === 'you').length} last={last} />

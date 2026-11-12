@@ -1382,6 +1382,46 @@ button[aria-busy="true"] { cursor: progress; opacity: .7; }
 #watchpanel .wstage { min-width: 0; }
 #watchpanel .wsname { font-size: var(--fs-sm); margin-bottom: 4px; }
 #watchpanel .wpasses { display: flex; gap: 3px; }
+/* where the clock goes: training, readings, the rest (size-page.ts clockLine) */
+#watchpanel .wclock { margin: 6px 0 2px; }
+#watchpanel .wclockbar { display: flex; height: 6px; border-radius: 3px; overflow: hidden; background: var(--track); margin-bottom: 3px; }
+#watchpanel .wclockbar i { display: block; height: 100%; }
+#watchpanel .wclockbar i.train { background: var(--good); }
+#watchpanel .wclockbar i.read { background: var(--accent); }
+#watchpanel .wclockbar i.other { background: var(--muted); opacity: .5; }
+/* how a size stands (size-page.ts drawVerdict): the answer first, the evidence after */
+#verdictpanel .vlead { font-size: 1.02rem; line-height: 1.55; margin: 2px 0 12px; max-width: 70em; }
+#verdictpanel .v-good { color: var(--good); }
+#verdictpanel .v-bad { color: var(--bad); }
+#verdictpanel .v-accent { color: var(--accent); }
+#verdictpanel .vtiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; }
+#verdictpanel .vtile { background: var(--raise); border: 1px solid var(--line); border-radius: var(--r-md); padding: 10px 12px; min-width: 0; }
+#verdictpanel .vtile .k, #verdictpanel .vwait .k { color: var(--muted); font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .06em; }
+#verdictpanel .vbig { font-size: 1.35rem; font-weight: 600; margin: 2px 0; }
+#verdictpanel .vbig small { font-size: var(--fs-sm); font-weight: 400; color: var(--muted); }
+#verdictpanel .vtile .s { overflow-wrap: anywhere; }
+#verdictpanel .vwait { margin-top: 12px; border-left: 3px solid var(--accent); padding: 4px 0 4px 12px; }
+#verdictpanel .vwait ul { margin: 4px 0 0; padding-left: 18px; }
+#verdictpanel .vwait li { margin: 3px 0; }
+#verdictpanel .vcards { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 10px; margin-top: 8px; }
+#verdictpanel .vcard { border: 1px solid var(--line); border-radius: var(--r-md); padding: 10px 12px; min-width: 0; }
+#verdictpanel .vgoal { margin-bottom: 6px; line-height: 1.8; }
+#verdictpanel .vrow { display: inline-block; font-size: var(--fs-xs); border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; margin-right: 3px; }
+#verdictpanel .vrow i { font-style: normal; color: var(--muted); }
+#verdictpanel .vrow.signed i { color: var(--good); }
+#verdictpanel .vrow.ready i { color: var(--accent); }
+#verdictpanel .vwords { font-size: var(--fs-sm); margin-bottom: 6px; color: var(--muted); }
+#verdictpanel .vvoy { border-top: 1px solid var(--line); padding: 7px 0 2px; }
+#verdictpanel .vvoy .s { overflow-wrap: anywhere; }
+#verdictpanel .vline { margin-bottom: 2px; }
+#verdictpanel .vmatrix th { font-size: var(--fs-xs); font-weight: 400; color: var(--muted); max-width: 80px; white-space: normal; vertical-align: bottom; }
+#verdictpanel .vcell { text-align: center; font-variant-numeric: tabular-nums; font-size: var(--fs-sm); }
+#verdictpanel .vcell.good { background: color-mix(in srgb, var(--good) 28%, transparent); }
+#verdictpanel .vcell.near { background: color-mix(in srgb, var(--accent) 22%, transparent); }
+#verdictpanel .vcell.bad { background: color-mix(in srgb, var(--bad) 22%, transparent); }
+@media (max-width: 640px) { #verdictpanel .vcards { grid-template-columns: 1fr; } }
+.scoretable td { vertical-align: top; }
+.scoretable td.s, .scoretable td .s { font-size: var(--fs-xs); }
 #watchpanel .wpass { position: relative; flex: 1; height: 24px; background: var(--raise); border: 1px solid var(--line); border-radius: var(--r-sm); overflow: hidden; }
 #watchpanel .wpass i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--blue); opacity: .45; }
 #watchpanel .wpass.done i { opacity: .7; }

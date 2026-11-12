@@ -3759,22 +3759,9 @@ def _api_queue() -> dict:
             started = (datetime.fromtimestamp(float(h["started"]), timezone.utc).isoformat() if h and h.get("started")
                        else charter_sea[name].get("started"))  # fmt: skip
             r["started"] = started
+            quote_min = None
             if h and h.get("quote_hours"):
                 est, source = float(h["quote_hours"]) * 60, f"the hire's quote, on an {h.get('gpu')}"
-            r["abroad"] = {"gpu": (h or {}).get("gpu"), "phase": (h or {}).get("phase") or "hiring",
-                           "dph": dph, "instance": (h or {}).get("instance"), "quote_min": quote_min, "paced": paced,
-                           "spent": spent, "projected": projected,
-                           "quote_cost": (h or {}).get("quote")}  # fmt: skip
-        r["est_min"], r["est_source"] = est, source
-        rows.append(r)
-        if est is not None:
-            gone = _started_min(started)
-            left = max(0.0, est - (gone or 0.0))
-            preset = r.get("preset")
-            r["left_min"] = round(left)
-            quote_min = None
-            lane_seats = seat.get(r["lane"]) or seat["mac"]
-            if preset in two and r["lane"] == "mac":
                 quote_min = est
             paced = False
             # once the ship has trained a while, its own pace beats the quote (13 November: the 50m's quote was
@@ -3793,6 +3780,19 @@ def _api_queue() -> dict:
             hired_min = _started_min(started)
             spent = round(float(dph) * hired_min / 60, 2) if dph and hired_min is not None else None
             projected = round(float(dph) * est / 60, 2) if dph and est is not None else None
+            r["abroad"] = {"gpu": (h or {}).get("gpu"), "phase": (h or {}).get("phase") or "hiring",
+                           "dph": dph, "instance": (h or {}).get("instance"), "quote_min": quote_min, "paced": paced,
+                           "spent": spent, "projected": projected,
+                           "quote_cost": (h or {}).get("quote")}  # fmt: skip
+        r["est_min"], r["est_source"] = est, source
+        rows.append(r)
+        if est is not None:
+            gone = _started_min(started)
+            left = max(0.0, est - (gone or 0.0))
+            preset = r.get("preset")
+            r["left_min"] = round(left)
+            lane_seats = seat.get(r["lane"]) or seat["mac"]
+            if preset in two and r["lane"] == "mac":
                 s = min(lane_seats, key=lambda x: x["end"])
                 s["end"], s["kind"] = now + left, preset
             else:
@@ -6862,9 +6862,12 @@ def api_star_points(preset: str = "300k", runs: str = "") -> dict:
                 " order by m.step desc limit 1",
                 [preset, metric],
             )
-            ours = rows[0]["value"] if rows else None
+            raw = rows[0]["value"] if rows else None
             q = qw.get(metric)
-            scale = mark or max(abs(q or 0), abs(ours or 0), 1e-6)
+            scale = mark or max(abs(q or 0), abs(raw or 0), 1e-6)
+            # divided by the same scale as Qwen's (13 November: the ship's line was drawn raw against Qwen's
+            # ratio, so a delimiter reading of 10.3 against its mark of 3 was drawn as 10.3, not 3.4)
+            ours = None if raw is None else raw / scale
         out.append({
             "n": int(pt.get("n") or len(out) + 1), "role": pt.get("role") or "", "card": c.key,
             "ours": None if ours is None else round(float(ours), 2),
@@ -7016,6 +7019,338 @@ def api_stars_deviation() -> dict:
     return {"cards": out}
 
 
+# The scorecard (13 November, Justin: the size page's chart "should determine rather the most important metrics from
+# all the research and the industry standard tests"). One point for each thing the field's reading
+# (frontend/src/lib/charterResearch.ts) and the leaderboard's categories (frontend/src/lib/testCategories.ts) say a
+# ship of this fleet must do, each with the mark it is judged against and where that mark comes from. A point with no
+# defensible mark keeps mark None: it is listed with its reading and left off the ratio.
+#   kind: "ratio" reading / mark; "lower" mark / reading (lower is better); "chance" (reading - chance) / (mark - chance)
+#   when: "live" read while the ship trains; "home" read once a voyage is home (`thorp eval`)
+#   refs: where Qwen3 4B's and Pythia 70M's readings are kept ("readings" metric, "logic" chain-grades key,
+#   "chains" the four chaining tests' mean lift, "tomes" the outside Forgotten Tomes reading, "arc" AI2 ARC-Easy)
+SCORECARD: list[dict] = [
+    {"key": "tomes", "group": "Language", "name": "reads unseen books", "metric": "eval/hole-cards-unseen/bpb_mean_en",
+     "kind": "lower", "mark": "class_below", "when": "live", "ref": ("tomes", None), "unit": "bits a byte",
+     "source": "power-law-scaling", "why": "each class up should read the Forgotten Tomes better than the best ship of the class below"},
+    {"key": "copy", "group": "Abilities", "name": "copies what came before", "metric": "nevermore/natural_copy_gain",
+     "kind": "ratio", "mark": ("card", "nevermore"), "when": "live", "ref": ("readings", "nevermore/natural_copy_gain"), "unit": "nats",
+     "source": "induction-heads", "why": "the Nevermore: the copy gain on a repeated passage, the first Face"},
+    {"key": "count", "group": "Abilities", "name": "keeps count", "metric": "counter/probe_r2",
+     "kind": "ratio", "mark": ("card", "counter"), "when": "live", "ref": ("readings", "counter/probe_r2"), "unit": "r²",
+     "source": None, "why": "the Counter: how well a probe reads a running count from the ship's state, the second Face"},
+    {"key": "order", "group": "Abilities", "name": "holds an order", "metric": "tricks/logic_test/gain_order",
+     "kind": "ratio", "mark": ("card", "scales"), "when": "live", "ref": ("logic", "gain_order"), "unit": "nats",
+     "source": None, "why": "the Scales: the logic deck's chaining gain on order (taller, older), the third Face"},
+    {"key": "one_hop", "group": "Logic", "name": "follows one premise", "metric": "tricks/logic_test/lift_one_hop",
+     "kind": "ratio", "mark": ("card", "mover"), "when": "live", "ref": ("logic", "lift_one_hop"), "unit": "nats",
+     "source": "two-hop-curse", "why": "the Mover: the step before chaining, the fourth Face and the leaderboard's one-hop rung"},
+    {"key": "chain_gain", "group": "Logic", "name": "chains two facts", "metric": "tricks/logic_test/gain",
+     "kind": "ratio", "mark": ("trick", "logic_test"), "when": "live", "ref": ("logic", "gain"), "unit": "nats",
+     "source": "compositionality-gap", "why": "the logic deck's gain: both premises against the better one alone; the proof a pass is chaining"},
+    {"key": "cause", "group": "Logic", "name": "chains cause and effect", "metric": "tricks/logic_test/gain_cause",
+     "kind": "ratio", "mark": ("trick", "logic_test"), "when": "live", "ref": ("logic", "gain_cause"), "unit": "nats",
+     "source": "implicit-reasoners", "why": "the logic deck's gain on its cause items, where Qwen3 4B chains most"},
+    {"key": "chain_tests", "group": "Logic", "name": "the four chaining tests", "metric": "chains",
+     "kind": "ratio", "mark": ("trick", "nature_test"), "when": "live", "ref": ("chains", None), "unit": "nats",
+     "source": "latent-multi-hop", "why": "the mean lift on Nature's breeder, the mill, between and pigeonhole: the leaderboard's chaining board"},
+    {"key": "arc_easy", "group": "Knowledge", "name": "AI2 ARC-Easy", "metric": "arc_easy/accuracy",
+     "kind": "chance", "chance": 0.25, "mark": 0.32, "when": "home", "ref": ("arc", None), "unit": "right",
+     "source": "arc-by-tokens", "why": "the industry's knowledge test at this size; the reading puts a good 50m in the low thirties, chance is 25%"},
+    {"key": "ifeval", "group": "Instruction", "name": "IFEval", "metric": "ifeval/prompt_strict",
+     "kind": "ratio", "mark": None, "when": "home", "ref": (None, None), "unit": "prompts right",
+     "source": "contamination", "why": "the industry's instruction test; no mark is signed for it at this size, and a leg taught on its prompts is not read"},
+    {"key": "reasoning", "group": "Reasoning", "name": "thinks before answering", "metric": "reasoning/gain",
+     "kind": "ratio", "mark": 0.05, "when": "home", "ref": (None, None), "unit": "right",
+     "source": "scratchpads-small", "why": "the v0.1 bar's reasoning variant: right with thinking on, less right with it off; the mark is the logic deck's noise, none is published at this size"},
+    {"key": "tools", "group": "Tools", "name": "calls a tool", "metric": "tools/score",
+     "kind": "ratio", "mark": 0.4, "when": "home", "ref": (None, None), "unit": "right",
+     "source": "small-tool-callers", "why": "the v0.1 bar's tool calling: the nearest published (90M) reads about 40% on single calls"},
+]  # fmt: skip
+
+SCORECARD_REFS = {"qwen": ("Qwen3 4B", "mlx-community/Qwen3-4B-4bit"), "peer": ("Pythia 70M", "EleutherAI/pythia-70m")}
+
+
+def _scorecard_ref(model: str, ref: tuple, chain_keys: list[str]) -> float | None:
+    """An outside model's reading on one scorecard point, from the readings it was graded with."""
+    from thorp.viable.s4_intelligence import readings
+
+    where, key = ref
+    if where == "readings":
+        slug = "deck-" + model.replace("/", "--")
+        return ((readings.get(slug) or {}).get("metrics") or {}).get(key)
+    grades = readings.chain_grades().get(model) or {}
+    if where == "logic":
+        return (grades.get("logic_test") or {}).get(key)
+    if where == "chains":
+        lifts = [(grades.get(k) or {}).get("lift") for k in chain_keys]
+        lifts = [x for x in lifts if x is not None]
+        return sum(lifts) / len(lifts) if len(lifts) == len(chain_keys) else None
+    if where == "tomes":
+        for _, x in readings.glob("*"):
+            if isinstance(x, dict) and x.get("model") == model and x.get("set") == "hole-cards-unseen":
+                return x.get("bpb_mean_en")
+        return None
+    if where == "arc":
+        for name, doc in readings.glob("arc-ai2-*"):
+            if isinstance(doc, dict) and (doc.get("model") == model or name.endswith(model.split("/")[-1])):
+                return ((doc.get("splits") or {}).get("easy") or {}).get("accuracy")
+        return None
+    return None
+
+
+def _preset_runs(preset: str) -> list[dict]:
+    """Every voyage of exactly this size, oldest first."""
+    return [r for r in _runs_rows() if (json.loads(r.get("spec_json") or "{}").get("model") or {}).get("preset") == preset]
+
+
+def _scorecard_marks(preset: str) -> tuple[dict[str, float | None], str | None]:
+    """{point key: its mark at this size}, and the class below (whose best Forgotten Tomes reading is this size's
+    mark on the size curve)."""
+    from thorp import fleet
+    from thorp.models.registry import PRESETS
+    from thorp.viable.s5_policy.deck import BY_KEY
+
+    order = list(PRESETS)
+    below = order[order.index(preset) - 1] if preset in order and order.index(preset) > 0 else None
+    vals = [v for r in (_preset_runs(below) if below else []) if (v := _metric(r["run_id"], "eval/hole-cards-unseen/bpb_mean_en")) is not None]
+    marks: dict[str, float | None] = {}
+    for p in SCORECARD:
+        m = p["mark"]
+        if m == "class_below":
+            marks[p["key"]] = min(vals) if vals else None
+        elif isinstance(m, tuple) and m[0] == "card":
+            marks[p["key"]] = float(BY_KEY[m[1]].ability[1])
+        elif isinstance(m, tuple) and m[0] == "trick":
+            marks[p["key"]] = float(fleet.TRICKS[m[1]].threshold)
+        else:
+            marks[p["key"]] = m
+    return marks, below
+
+
+def _scorecard_raw(run_id: str, metric: str, chain_keys: list[str]) -> float | None:
+    """One voyage's last reading on one scorecard point ("chains": the four chaining tests' mean lift)."""
+    if metric == "chains":
+        lifts = [x for k in chain_keys if (x := _metric(run_id, f"tricks/{k}/lift")) is not None]
+        return sum(lifts) / len(lifts) if len(lifts) == len(chain_keys) else None
+    return _metric(run_id, metric)
+
+
+def _scorecard_ratio(p: dict, x: float | None, mark: float | None) -> float | None:
+    """A reading as a multiple of its mark: 1 is the mark, above it is past the mark, on every kind of point."""
+    if x is None or not mark:
+        return None
+    if p["kind"] == "lower":
+        return mark / x if x > 0 else None
+    if p["kind"] == "chance":
+        return (x - p["chance"]) / (mark - p["chance"])
+    return x / mark
+
+
+def api_scorecard(preset: str = "50m", runs: str = "") -> dict:
+    """The size page's scorecard: the points the research and the industry's tests say matter (SCORECARD), each as
+    reading ÷ its mark for this size's newest voyage (or the median of `runs`), Qwen3 4B (the model that chains) and
+    Pythia 70M (the published model nearest the fleet's top size). A point the newest voyage has not been read on is
+    taken from the newest voyage of this size that has, and says which (`from`)."""
+    import statistics
+
+    from thorp import leaderboard
+
+    preset = _preset_of(preset)
+    chain_keys = leaderboard.chaining_tests()
+    rows = list(reversed(_preset_runs(preset)))
+    # the voyage drawn: the newest while it is at sea (read live as it trains), else the best voyage home on the
+    # unseen books (13 November: a recalled voyage at 11% of its way stood for the size)
+    if rows and rows[0]["status"] != "running":
+        home = [(v, r) for r in rows if r["status"] == "finished" and (v := _metric(r["run_id"], "eval/hole-cards-unseen/bpb_mean_en")) is not None]
+        if home:
+            best = min(home, key=lambda x: x[0])[1]
+            rows = [best] + [r for r in rows if r is not best]
+    wanted = [x for x in runs.split(",") if x][:40]
+    picked = [r for r in rows if r["run_id"] in wanted or r["name"] in wanted] if wanted else []
+    marks, below = _scorecard_marks(preset)
+    out = []
+    for p in SCORECARD:
+        mark = marks[p["key"]]
+        raw, src = None, None
+        if picked:
+            vals = [v for r in picked if (v := _scorecard_raw(r["run_id"], p["metric"], chain_keys)) is not None]
+            raw = statistics.median(vals) if vals else None
+        else:
+            for i, r in enumerate(rows):
+                v = _scorecard_raw(r["run_id"], p["metric"], chain_keys)
+                if v is not None:
+                    raw, src = v, (None if i == 0 else r["name"])
+                    break
+        refs = {k: _scorecard_ref(model, p["ref"], chain_keys) for k, (_, model) in SCORECARD_REFS.items()}
+        out.append({
+            "key": p["key"], "group": p["group"], "name": p["name"], "unit": p["unit"], "when": p["when"],
+            "source": p["source"], "why": p["why"], "kind": p["kind"], "chance": p.get("chance"),
+            "mark": None if mark is None else round(float(mark), 4),
+            "raw": {"ours": raw, **refs},
+            "ours": None if (r0 := _scorecard_ratio(p, raw, mark)) is None else round(r0, 3),
+            **{k: None if (rv := _scorecard_ratio(p, v, mark)) is None else round(rv, 3) for k, v in refs.items()},
+            "from": src,
+        })  # fmt: skip
+    return {
+        "preset": preset, "voyage": rows[0]["name"] if rows and not picked else None, "runs": len(picked),
+        "below": below, "refs": {k: name for k, (name, _) in SCORECARD_REFS.items()}, "points": out,
+    }  # fmt: skip
+
+
+SEED_SPREAD_FALLBACK = 0.011  # bits a byte: the median gap between two seeds of one fitout, 13 November (ten pairs)
+
+
+def _seed_spread() -> float:
+    """How far two seeds of the same fitout land apart on the Forgotten Tomes, at the median over every seed pair the
+    ledger holds (a voyage `x-s2` beside its `x`): the band inside which two voyages are not told apart."""
+    import re
+    import statistics
+
+    ft = {r["name"]: v for r in _runs_rows() if (v := _metric(r["run_id"], "eval/hole-cards-unseen/bpb_mean_en")) is not None}
+    gaps = [abs(v - ft[m.group(1)]) for n, v in ft.items() if (m := re.match(r"(.*)-s\d+$", n)) and m.group(1) in ft]
+    return statistics.median(gaps) if len(gaps) >= 3 else SEED_SPREAD_FALLBACK
+
+
+def _spec_file(name: str) -> dict:
+    """The voyage's spec as written (its question, expedition and goal), or {} when none is on disk."""
+    import yaml
+
+    f = next(iter(paths.resolve("specs").rglob(f"{name}.yaml")), None)
+    return (yaml.safe_load(f.read_text()) or {}) if f is not None else {}
+
+
+def _changed(spec: dict, against: dict) -> list[str]:
+    """What a voyage departs from the standard in that its control does not, in the spec's own words."""
+    mine, theirs = spec.get("departures") or [], against.get("departures") or []
+    return [d["why"] if isinstance(d, dict) else str(d) for d in mine if d not in theirs]
+
+
+def api_size_verdict(preset: str = "50m") -> dict:
+    """How a size stands (13 November, Justin: "A user should be able to come onto that page and immediately know how
+    that size is performing against all its experiments, what has worked, what has failed according to its charter").
+
+    Every voyage of the size with the goal it answers (its spec's expedition and goal, read from the master charter),
+    what it changed against its control (the voyage of the same name without its last suffix: 50m@v0.0.6 for
+    50m@v0.0.6-wide), its readings on the scorecard, and a verdict:
+      worked   reads the books better than its control by more than the seed spread, and loses no mark the control held
+      failed   reads the books worse by more than the spread, or loses a mark without reading the books better
+      mixed    reads the books better but loses a mark
+      level    no difference beyond the spread, and no mark won or lost
+      no answer  the voyage did not come home (stopped, overran, at sea)
+      baseline   a voyage with no control at this size
+    The goal's own written answer, where the charter has one, stands beside it. And the charter's rows at this size,
+    with the goals that decide them."""
+    import re
+    from datetime import datetime
+
+    from thorp import leaderboard
+
+    preset = _preset_of(preset)
+    chain_keys = leaderboard.chaining_tests()
+    marks, below = _scorecard_marks(preset)
+    spread = _seed_spread()
+    L = api_launch()
+    goals = {g["goal_id"]: g for g in L["parts"]}
+    runs = _preset_runs(preset)
+    by_name = {r["name"]: r for r in runs}
+
+    def minutes(r: dict) -> float | None:
+        if r.get("wall_minutes"):
+            return float(r["wall_minutes"])
+        if r.get("started") and r.get("finished"):
+            return (datetime.fromisoformat(r["finished"]) - datetime.fromisoformat(r["started"])).total_seconds() / 60
+        last = _metric_max_ts(r["run_id"], "loss")
+        return (last - datetime.fromisoformat(r["started"]).timestamp()) / 60 if last and r.get("started") else None
+
+    voyages, specs = [], {}
+    for r in runs:
+        spec = specs[r["name"]] = {**json.loads(r.get("spec_json") or "{}"), **_spec_file(r["name"])}
+        gid = f"{spec.get('expedition') or 'kipling'}:{spec['goal']}" if spec.get("goal") else None
+        mins = minutes(r)
+        priced = re.search(r"\$([\d.]+)/h", r.get("hardware") or "")
+        cost = float(priced.group(1)) * mins / 60 if priced and mins else None
+        tokens = _metric(r["run_id"], "tokens_seen")
+        total = _metric(r["run_id"], "plan/tokens_total")
+        points = {}
+        for p in SCORECARD:
+            raw = _scorecard_raw(r["run_id"], p["metric"], chain_keys)
+            points[p["key"]] = {"raw": raw, "ratio": None if (x := _scorecard_ratio(p, raw, marks[p["key"]])) is None else round(x, 3)}
+        m = re.match(r"^(.*@v[\d.]+)-[a-z0-9-]+$", r["name"])
+        control = m.group(1) if m and m.group(1) in by_name and m.group(1) != r["name"] else None
+        status = {"finished": "home", "running": "at sea"}.get(r["status"], r["status"])
+        voyages.append({
+            "name": r["name"], "ship": r.get("ship"), "status": status, "started": r.get("started"),
+            "goal": None if not gid else {"id": gid, **{k: (goals.get(gid) or {}).get(k) for k in ("text", "status", "words", "evidence", "params")}},
+            "question": re.split(r"(?<=[.?])\s", (spec.get("question") or "").strip())[0][:280] if spec.get("question") else None,
+            "control": control, "minutes": mins, "cost": cost,
+            "done": None if not (tokens and total) else min(1.0, tokens / total), "points": points,
+        })  # fmt: skip
+
+    marked = [p for p in SCORECARD if p["kind"] != "ratio" or p["mark"] is not None]
+    for v in voyages:
+        v["changed"] = _changed(specs[v["name"]], specs[v["control"]]) if v["control"] else []
+        v["cleared"] = [p["key"] for p in marked if (v["points"][p["key"]]["ratio"] or 0) >= 1]
+        v["read"] = [p["key"] for p in marked if v["points"][p["key"]]["ratio"] is not None]
+    for v in voyages:
+        c = next((x for x in voyages if x["name"] == v["control"]), None)
+        if v["status"] != "home":
+            done = f" at {round(100 * v['done'])}% of its voyage" if v["done"] is not None else ""
+            v["verdict"], v["why"] = "no answer", f"{v['status']}{done}: it did not come home, so its question is not answered"
+            continue
+        arms = [x["name"] for x in voyages if x["control"] == v["name"]]
+        if c is None and arms:
+            v["verdict"], v["why"] = "control", f"the control: {', '.join(arms)} {'is' if len(arms) == 1 else 'are'} read against it"
+            continue
+        if c is None:
+            v["verdict"], v["why"] = "baseline", "no control at this size: read against the marks alone"
+            continue
+        if c["status"] != "home":
+            v["verdict"], v["why"] = "no answer", f"its control {c['name']} did not come home"
+            continue
+        a, b = v["points"]["tomes"]["raw"], c["points"]["tomes"]["raw"]
+        d = None if a is None or b is None else a - b
+        # the books are the delta's own line, not a mark won or lost as well
+        lost = [k for k in c["cleared"] if k in v["read"] and k not in v["cleared"] and k != "tomes"]
+        won = [k for k in v["cleared"] if k in c["read"] and k not in c["cleared"] and k != "tomes"]
+        better, worse = d is not None and d < -spread, d is not None and d > spread
+        names = {p["key"]: p["name"] for p in SCORECARD}
+        parts = [] if d is None else [f"reads the books {abs(d):.3f} bits a byte {'better' if d < 0 else 'worse'} than {c['name']} (two seeds differ by {spread:.3f})"]
+        if won:
+            parts.append("clears " + ", ".join(names[k] for k in won))
+        if lost:
+            parts.append("loses " + ", ".join(names[k] for k in lost))
+        if v["minutes"] and c["minutes"]:
+            parts.append(f"{abs(v['minutes'] - c['minutes']):.0f} min {'faster' if v['minutes'] < c['minutes'] else 'slower'}")
+        if better and lost:
+            verdict = "mixed"
+        elif better or (won and not worse and not lost):
+            verdict = "worked"
+        elif worse or lost:
+            verdict = "failed"
+        else:
+            verdict = "level"
+        v["verdict"], v["why"] = verdict, "; ".join(parts) or "no reading to compare"
+        v["delta"] = {"tomes": d, "won": won, "lost": lost}
+
+    # the charter's rows at this size, and the goals that decide them
+    rows = [
+        {"group": g["name"], "key": p["key"], "name": p["name"], "value": (p.get("values") or {}).get(preset), "state": p.get("state"),
+         "goals": [{"id": x["goal_id"], "text": x["text"], "status": x["status"]} for x in p.get("goals") or []]}
+        for g in L["charter"]["groups"] for p in g["params"]
+    ]  # fmt: skip
+    mine = {v["goal"]["id"] for v in voyages if v["goal"]}
+    home = [v for v in voyages if v["status"] == "home" and v["points"]["tomes"]["raw"] is not None]
+    best = min(home, key=lambda v: v["points"]["tomes"]["raw"]) if home else None
+    tally = {k: sum(1 for v in voyages if v["verdict"] == k) for k in ("worked", "failed", "mixed", "level", "no answer", "control", "baseline")}
+    states = {k: sum(1 for x in rows if x["state"] == k) for k in sorted({x["state"] for x in rows})}
+    return {
+        "preset": preset, "below": below, "mark": marks.get("tomes"), "spread": spread, "voyages": voyages,
+        "best": None if not best else {"name": best["name"], "tomes": best["points"]["tomes"]["raw"], "cleared": len(best["cleared"]), "read": len(best["read"])},
+        "tally": tally, "spent": sum(v["cost"] or 0 for v in voyages), "charter": {"rows": rows, "states": states, "mine": sorted(mine)},
+        "names": {p["key"]: p["name"] for p in SCORECARD}, "groups": {p["key"]: p["group"] for p in SCORECARD},
+    }  # fmt: skip
+
+
 def api_depth(preset: str, sop: str = "") -> dict:
     """The depth of every shape of a size: the same size's variants (300k, 300k-l3, 300k-l28) side by side, each
     with its layers and every card's reading at each layer (the star chart's order, drawn against depth)."""
@@ -7099,7 +7434,10 @@ def api_watch(preset: str, sop: str = "", run: str = "") -> dict:
     last_t = _metric_max_ts(rid, "loss")
     started = datetime.fromisoformat(v["started"]).timestamp() if v["started"] else None
     now = time.time()
-    elapsed = (now if v["status"] == "running" else (datetime.fromisoformat(v["finished"]).timestamp() if v["finished"] else now)) - (started or now)
+    # a voyage stopped with no finish time ends at its last reading, not now (13 November: a recalled 50m's sailing
+    # time and its spend kept counting up after the hire was released)
+    end = now if v["status"] == "running" else (datetime.fromisoformat(v["finished"]).timestamp() if v["finished"] else (last_t or now))
+    elapsed = end - (started or now)
     rate = last / elapsed if elapsed > 0 and last else None  # steps a second, readings included
     eta = (total_steps - last) / rate if rate and total_steps and v["status"] == "running" else None
     # the stage plan: the voyage's own stages (pretraining) and, for a fitout, the post-training voyages seeded after it
@@ -7145,6 +7483,37 @@ def api_watch(preset: str, sop: str = "", run: str = "") -> dict:
     if lp.exists():
         for line in lp.read_text(errors="replace").splitlines()[-12:]:
             log.append(line if len(line) < 220 else line[:217] + "...")
+    # where the clock goes (13 November: on the 50m shelf only 37% of the time at sea was training; the readings took
+    # the rest): training is the steps' own time, readings the evaluators' own seconds, and the rest (setup, loading
+    # the books, writing checkpoints) what is left of the time since the voyage started. The rate is the hire's own
+    # (the charter's "hired" line), else the one in the hardware line.
+    import re
+
+    train_s = sum(x for x in _metric_series_gated(rid, "step_ms")[1] if x) / 1000 or None
+    read_s = sum(x for x in _metric_series_gated(rid, "eval/seconds")[1] if x) or None
+    hired = re.findall(r'"dph":\s*([\d.]+)', lp.read_text(errors="replace")) if lp.exists() else []
+    priced = re.search(r"\$([\d.]+)/h", v.get("hardware") or "")
+    dph = float(hired[-1]) if hired else (float(priced.group(1)) if priced else None)
+    # the split runs to the newest reading, not to now: time the readings have not come home for is not "other"
+    upto = (last_t - started) if last_t and started else elapsed
+    clock = {
+        "train_s": train_s, "read_s": read_s, "other_s": max(0.0, upto - (train_s or 0) - (read_s or 0)),
+        "dph": dph, "spent": dph * elapsed / 3600 if dph else None,
+        "projected": dph * (elapsed + (eta or 0)) / 3600 if dph else None,
+    }  # fmt: skip
+    # the judge books of this size's other voyages, by tokens read, so the chart says whether this one is winning
+    others = []
+    for r in reversed(_runs_rows()):
+        s0 = json.loads(r.get("spec_json") or "{}")
+        if r["run_id"] == rid or (s0.get("model") or {}).get("preset") != (spec.get("model") or {}).get("preset"):
+            continue
+        st, vv = _metric_series_gated(r["run_id"], WATCH_SERIES["bpb"])
+        bt2 = (s0.get("optim") or {}).get("batch_tokens") or 32768
+        pts = [[a * bt2, b] for a, b in zip(st, vv, strict=True) if b is not None]
+        if pts:
+            others.append({"name": r["name"], "status": r["status"], "points": pts})
+        if len(others) >= 8:
+            break
     return {
         "preset": preset, "class": _slug(preset),
         "voyage": {"name": v["name"], "run_id": rid, "status": "at sea" if v["status"] == "running" else v["status"],
@@ -7155,6 +7524,7 @@ def api_watch(preset: str, sop: str = "", run: str = "") -> dict:
                   "elapsed_s": elapsed, "eta_s": eta, "last_reading_s_ago": (now - last_t) if last_t else None,
                   "tokens_per_s": (series["tokens_per_s"][-1][1] if series["tokens_per_s"] else None)},
         "stages": stages, "post": chain, "drawn": drawn, "series": series, "log": log, "scaffold": scaffold,
+        "clock": clock, "others": others,
     }  # fmt: skip
 
 
@@ -7580,6 +7950,8 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/decks": api_decks,
                 "/api/client_log": lambda: api_client_log(q),
                 "/api/star_points": lambda: api_star_points(q.get("preset", "300k"), q.get("runs", "")),
+                "/api/scorecard": lambda: api_scorecard(q.get("preset", "50m"), q.get("runs", "")),
+                "/api/size_verdict": lambda: api_size_verdict(q.get("preset", "50m")),
                 "/api/ladder_chaining": lambda: api_ladder_chaining(q.get("sop", ""), q.get("runs", "")),
                 "/api/sop_scores": lambda: api_sop_scores(q.get("preset", ""), q.get("runs", "")),
                 "/api/suit_ratings": lambda: api_suit_ratings(q.get("preset", ""), q.get("runs", "")),

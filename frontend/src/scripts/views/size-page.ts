@@ -181,7 +181,8 @@ export async function renderSizePage(path: string, ladder: Ladder): Promise<void
   // scoring tab must not (10 November: the cards, boards and calibration were blank until it landed)
   if (addr.tab === 'goals') await guarded(() => classGoals(r, ladder), 'the goals');
   if (addr.tab === 'training') {
-    await guarded(() => drawRungOverview(r), 'the model facts');
+    void guarded(() => drawVerdict(r), 'the verdict');
+    await guarded(() => drawRungOverview(r, allRuns), 'the model facts');
     void guarded(() => sizeJourney(r), 'the star chart');
     void guarded(() => drawWatch(r, path), 'the watch');
     void guarded(() => drawDepth(r), 'the depth');
@@ -622,31 +623,176 @@ function drawFtProgress(ladder: Ladder, allRuns: any[]): void {
 }
 
 // ---- Training --------------------------------------------------------------------------------------
-function drawRungOverview(r: Payload): void {
+function drawRungOverview(r: Payload, runs: any[] = []): void {
   const el = document.getElementById('rungover'); if (!el) return;
+  // where it trains and its status from its own voyages, once it has any (13 November: the card said "not built" and
+  // "needs a PyTorch backend" while a 50m was at sea on a hired RTX 5090); the size's written words before then
+  const atSea = runs.filter((x: any) => x.status === 'running').length;
+  const home = runs.filter((x: any) => x.status === 'finished').length;
+  const newest = runs.length ? runs[runs.length - 1] : null;
+  const where = newest && newest.hardware ? `${String(newest.hardware).replace(/^torch \S+ on /, '')} (its newest voyage)` : r.where;
+  const status = runs.length ? `${runs.length} voyage${runs.length === 1 ? '' : 's'}: ${home} home${atSea ? `, ${atSea} at sea` : ''}` : r.status;
   el.innerHTML = [
     ['overview', r.overview], ['shape', `${r.layers} layers × ${r.width} wide, ${r.heads} heads`],
-    ['parameters', `${big(r.total)} (${big(r.non_embedding)} non-embedding)`], ['where it trains', r.where],
-    ['judged by', r.scored], ['status', r.status],
+    ['parameters', `${big(r.total)} (${big(r.non_embedding)} non-embedding)`], ['where it trains', where],
+    ['judged by', r.scored], ['status', status],
   ].map(([k, v]) => `<div><div class="k">${k}</div><div>${esc(v)}</div></div>`).join('');
 }
+// How the size stands (13 November, Justin: "A user should be able to come onto that page and immediately know how
+// that size is performing against all its experiments, what has worked, what has failed according to its charter").
+// /api/size_verdict judges every voyage against its control; this draws the answer first, the evidence after.
+const VERDICT_TONE: Record<string, string> = { worked: 'good', failed: 'bad', mixed: 'accent', level: '', 'no answer': '', control: 'blue', baseline: 'blue' };
+const VERDICT_WORD: Record<string, string> = { worked: 'worked', failed: 'failed', mixed: 'mixed', level: 'made no difference', 'no answer': 'did not come home', control: 'is the control', baseline: 'stands alone' };
+const cellTone = (x: number | null): string => (x == null ? '' : x >= 1 ? 'good' : x >= 0.5 ? 'near' : 'bad');
+let verdictKey = '';
+async function drawVerdict(r: Payload): Promise<void> {
+  const el = document.getElementById('verdict'); if (!el) return;
+  let d: Payload;
+  try { d = await api(`/api/size_verdict?preset=${encodeURIComponent(r.preset)}`); }
+  catch { el.innerHTML = `<div class="${emptyCls()}">the verdict could not be read (a dashboard server started before it has to be restarted)</div>`; return; }
+  const key = JSON.stringify(d); if (key === verdictKey) return; verdictKey = key;
+  const V: any[] = d.voyages || [], T = d.tally || {}, S = d.charter.states || {};
+  if (!V.length) { el.innerHTML = `<div class="${emptyCls()}">no voyage of this size yet</div>`; return; }
+  const rowOf: Record<string, any> = Object.fromEntries(d.charter.rows.map((x: any) => [x.key, x]));
+  const pill = (v: string) => `<span class="${pillCls(VERDICT_TONE[v] || '')}">${esc(v)}</span>`;
+  const usd = (x: number | null) => (x == null ? '–' : `$${x.toFixed(2)}`);
+  const mins = (x: number | null) => (x == null ? '–' : x >= 60 ? `${Math.floor(x / 60)} h ${Math.round(x % 60)} min` : `${Math.round(x)} min`);
+
+  // the one paragraph: the size against the size below, then each goal's experiment in a clause
+  const goalsInOrder: string[] = [...new Set(V.filter((v) => v.goal).map((v) => v.goal.id))] as string[];
+  const arms = V.filter((v) => ['worked', 'failed', 'mixed', 'level', 'no answer'].includes(v.verdict) && v.goal);
+  const clauses = goalsInOrder.map((g) => {
+    const mine = arms.filter((v) => v.goal.id === g); if (!mine.length) return '';
+    const text = mine[0].goal.text;
+    return `${esc(text.charAt(0).toLowerCase() + text.slice(1))}: ${mine.map((v) => `<b class="v-${VERDICT_TONE[v.verdict] || 'plain'}">${esc(v.name.replace(/^.*@v[\d.]+-?/, '') || v.name)} ${VERDICT_WORD[v.verdict]}</b>`).join(', ')}`;
+  }).filter(Boolean);
+  const b = d.best, gap = b && d.mark ? d.mark - b.tomes : null;
+  const lead = b ? `The ${esc(r.preset)}'s best voyage reads the unseen books at <b>${b.tomes.toFixed(3)}</b> bits a byte, ${gap == null ? '' : gap > 0 ? `<b class="v-good">${gap.toFixed(3)} better</b> than the best ${esc(d.below)}, so the size curve holds` : `<b class="v-bad">${(-gap).toFixed(3)} worse</b> than the best ${esc(d.below)}: the size is not yet earning its parameters`}.` : 'No voyage of this size has come home yet.';
+
+  const tiles = [
+    ['best voyage', b ? `${b.tomes.toFixed(3)} <small>bits a byte</small>` : '–', b ? `${esc(b.name)}; the mark is ${d.mark ? d.mark.toFixed(3) : '–'} (best ${esc(d.below)})` : ''],
+    ['experiments', `<span class="v-good">${T.worked || 0}</span> worked · <span class="v-bad">${T.failed || 0}</span> failed${T.mixed ? ` · ${T.mixed} mixed` : ''}${T.level ? ` · ${T.level} level` : ''}`, `${T['no answer'] || 0} did not come home; ${(T.control || 0) + (T.baseline || 0)} controls`],
+    ['marks cleared', b ? `${b.cleared} <small>of ${b.read}</small>` : '–', 'by the best voyage, on the scorecard below'],
+    ['the charter', `${S.signed || 0} <small>signed of ${d.charter.rows.length}</small>`, `${S.ready || 0} ready to sign, ${S.waiting || 0} waiting on a voyage`],
+    ['spent', usd(d.spent), `on ${V.length} voyage${V.length === 1 ? '' : 's'} abroad`],
+  ];
+
+  // each goal: what it decides on the charter, its voyages and their verdicts, and the charter's own answer
+  const groups = [...goalsInOrder.map((g) => V.filter((v) => v.goal && v.goal.id === g)), V.filter((v) => !v.goal)].filter((x) => x.length);
+  const card = (vs: any[]) => {
+    const g = vs[0].goal;
+    const rowsDecided = g ? (g.params || []).map((k: string) => rowOf[k]).filter(Boolean) : [];
+    const head = g
+      ? `<div class="vgoal"><span class="mono s">${esc(g.id)}</span> <b>${esc(g.text)}</b> <span class="${pillCls(g.status === 'done' ? 'good' : g.status === 'partly' ? 'accent' : '')}">${esc(g.status || 'open')}</span>
+         ${rowsDecided.length ? `<span class="s">decides</span> ${rowsDecided.map((x: any) => `<span class="vrow ${esc(x.state || '')}" title="${esc(x.group)}: ${esc(x.name)} is ${esc(x.state || '')}; the ${esc(r.preset)} has ${esc(x.value || '–')}">${esc(x.name)} <i>${esc(x.state || '')}</i></span>`).join(' ')}` : ''}</div>
+         ${g.words ? `<div class="vwords"><span class="s">the charter's answer:</span> ${esc(g.words)}</div>` : ''}`
+      : `<div class="vgoal"><b>Voyages answering no charter goal</b></div>`;
+    return `<div class="vcard">${head}${vs.map((v) => `<div class="vvoy">
+        <div class="vline">${pill(v.verdict)} <b class="mono">${esc(v.name)}</b> <span class="s">${esc(v.status)} · ${mins(v.minutes)} · ${usd(v.cost)}</span></div>
+        ${v.changed && v.changed.length ? `<div class="s">changed: ${v.changed.map((c: string) => esc(c)).join('; ')}</div>` : v.question && v.verdict !== 'control' ? `<div class="s">asked: ${esc(v.question)}</div>` : ''}
+        <div>${esc(v.why)}</div></div>`).join('')}</div>`;
+  };
+
+  // every voyage on every scorecard point, as a multiple of its mark
+  const keys = Object.keys(d.names);
+  const matrix = `<div class="scroll"><table class="selbooks vmatrix"><thead><tr><th>voyage</th><th></th>${keys.map((k) => `<th title="${esc(d.groups[k])}: ${esc(d.names[k])}">${esc(d.names[k])}</th>`).join('')}</tr></thead><tbody>${V.map((v) => `<tr><td class="mono">${esc(v.name)}</td><td>${pill(v.verdict)}</td>${keys.map((k) => {
+      const p = v.points[k], x = p ? p.ratio : null;
+      return `<td class="vcell ${cellTone(x)}" title="${esc(d.names[k])}: ${p && p.raw != null ? p.raw.toFixed(3) : 'not read'}${x != null ? `, ${x.toFixed(2)}× its mark` : ''}">${x == null ? '–' : x.toFixed(2)}</td>`;
+    }).join('')}</tr>`).join('')}</tbody></table></div>`;
+
+  // what the size is waiting on: its goals still open, and why
+  const waiting = goalsInOrder.map((g) => V.find((v) => v.goal && v.goal.id === g).goal).filter((g: any) => g.status !== 'done').map((g: any) => {
+    const vs = V.filter((v) => v.goal && v.goal.id === g.id && v.verdict !== 'control');
+    const unanswered = vs.filter((v) => v.verdict === 'no answer');
+    const rows = (g.params || []).map((k: string) => rowOf[k]).filter((x: any) => x && x.state !== 'signed').map((x: any) => x.name);
+    const judged = vs.filter((v) => ['worked', 'failed', 'mixed', 'level'].includes(v.verdict));
+    const why = unanswered.length && unanswered.length === vs.length ? `${unanswered.map((v) => esc(v.name)).join(', ')} did not come home: sail it again`
+      : judged.length ? `${judged.map((v) => `<b class="v-${VERDICT_TONE[v.verdict] || 'plain'}">${esc(v.name)} ${VERDICT_WORD[v.verdict]}</b> (${esc(v.why.split(';')[0])})`).join('; ')}. The charter has not written its answer or signed the rows`
+      : 'no voyage of this size has been sailed for it';
+    return `<li><span class="mono s">${esc(g.id)}</span> ${esc(g.text)}${rows.length ? ` <span class="s">(holds ${rows.map(esc).join(', ')})</span>` : ''}: ${why}</li>`;
+  });
+
+  el.innerHTML = `<div class="vlead">${lead}${clauses.length ? ` Of its experiments, ${clauses.join('; ')}.` : ''}</div>
+    <div class="vtiles">${tiles.map(([k, v, s]) => `<div class="vtile"><div class="k">${k}</div><div class="vbig">${v}</div><div class="s">${s}</div></div>`).join('')}</div>
+    ${waiting.length ? `<div class="vwait"><div class="k">what it is waiting on</div><ul>${waiting.join('')}</ul></div>` : ''}
+    <h3 class="mt">The experiments, by the charter goal each answers</h3>
+    <div class="s">Each arm is read against its control, the voyage it changes one thing from. It worked if it reads the unseen books better by more than two seeds of one voyage differ (${d.spread.toFixed(3)} bits a byte) and loses no mark; it failed if it reads them worse by more than that, or loses a mark.</div>
+    <div class="vcards">${groups.map(card).join('')}</div>
+    <h3 class="mt">Every voyage against every mark <span class="s">1 is the mark; green clears it, amber is past half way, red is short</span></h3>${matrix}`;
+}
+
+// The scorecard (13 November, Justin: the chart "should determine rather the most important metrics from all the
+// research and the industry standard tests"): the points /api/scorecard chooses, each reading ÷ its mark, for this
+// size's newest voyage, Qwen3 4B and Pythia 70M; the table under it gives every raw reading, its mark and its source.
 let journeyKey = '';
+const CAP_HI = 3, CAP_LO = -1;  // the chart's window: a point past it is drawn at the edge and read in the table
 async function sizeJourney(r: Payload): Promise<void> {
   const el = document.getElementById('sizejourney'); if (!el) return;
+  const url = `/api/scorecard?preset=${encodeURIComponent(r.preset)}`
+    + (selection.expedition ? `&runs=${encodeURIComponent(pageRuns.map((x: any) => x.run_id).join(','))}` : '');
   let d: Payload;
-  try { d = await api(starUrl(r.preset)); }
-  catch { el.innerHTML = `<div class="${emptyCls()}">the star chart could not be read</div>`; return; }
-  const { starChart } = await import('../../lib/panel');
+  try { d = await api(url); }
+  catch { el.innerHTML = `<div class="${emptyCls()}">the scorecard could not be read (a dashboard server started before it has to be restarted)</div>`; return; }
   const pts = d.points || [];
   const key = JSON.stringify(pts) + selectionSig();
   if (key === journeyKey && el.querySelector('canvas')) return;
   journeyKey = key;
-  starChart(el, pts, { label: r.preset, height: 380 });
-  // Qwen's line is still worth drawing before this size has been read; say so, rather than leaving the
-  // note claiming a voyage line that is not there (10 November)
+  const { plotEl, layout, C } = await chart();
+  const { discoveryOf, discoveryHref } = await import('../../lib/charterResearch');
+  const marked = pts.filter((p: any) => p.mark != null);
+  const xs = marked.map((p: any) => `${p.group}: ${p.name}`);
+  const clip = (v: number | null) => (v == null ? null : Math.max(CAP_LO, Math.min(CAP_HI, v)));
+  const ours = d.runs ? `${r.preset} (median of ${d.runs})` : `${r.preset} (${d.voyage || 'no voyage'})`;
+  const lines: [string, string, string, string | undefined][] = [['qwen', d.refs.qwen + ' (chains)', C.accent, undefined], ['peer', d.refs.peer + ' (nearest size)', C.muted, 'dash'], ['ours', ours, C.good || '#5aa07a', undefined]];
+  plotEl(el, lines.filter(([k]) => marked.some((p: any) => p[k] != null)).map(([k, name, color, dash]) => ({
+    type: 'scatter', mode: 'lines+markers', name, x: xs, y: marked.map((p: any) => clip(p[k])),
+    line: { color, width: k === 'ours' ? 2.5 : 1.5, dash }, marker: { size: k === 'ours' ? 8 : 5 }, connectgaps: false,
+  })), {
+    ...layout({}), height: 400, margin: { l: 56, r: 16, t: 30, b: 120 },
+    xaxis: { tickangle: -35, tickfont: { size: 10 }, gridcolor: C.line },
+    yaxis: { title: 'reading ÷ its mark', gridcolor: C.line, range: [CAP_LO, CAP_HI] },
+    legend: { orientation: 'h', x: 0, y: 1.02, yanchor: 'bottom', font: { size: 10 } }, showlegend: true,
+    shapes: [{ type: 'line', xref: 'paper', x0: 0, x1: 1, y0: 1, y1: 1, line: { color: C.text, dash: 'dot' } }],
+  });
+  const f = (x: number | null, unit = '') => (x == null ? '–' : unit === 'right' || unit === 'prompts right' ? `${(100 * x).toFixed(1)}%` : x.toFixed(3));
+  const cell = (p: any, k: string) => `<td class="text-right tabular-nums">${f(p.raw[k], p.unit)}${p[k] != null ? ` <span class="s">${p[k].toFixed(2)}×</span>` : ''}</td>`;
   const note = document.getElementById('sizejourneynote');
-  if (note) note.textContent = pts.some((p: any) => p.ours != null) ? '' : 'Qwen3 4B is drawn for reference: the newest voyage has not been read on the star chart yet.';
+  if (note) note.innerHTML = `<div class="scroll mt"><table class="selbooks scoretable"><thead><tr><th>point</th><th>what it reads</th><th class="text-right">mark</th><th class="text-right">${esc(r.preset)}</th><th class="text-right">${esc(d.refs.qwen)}</th><th class="text-right">${esc(d.refs.peer)}</th><th>the field</th></tr></thead><tbody>${pts.map((p: any) => {
+      const disc = p.source ? discoveryOf(p.source) : null;
+      const markText = p.mark == null ? '<span class="s">none signed</span>' : p.kind === 'lower' ? `≤ ${f(p.mark)}${d.below ? ` <span class="s">(best ${esc(d.below)})</span>` : ''}` : f(p.mark, p.unit) + (p.chance != null ? ` <span class="s">(chance ${f(p.chance, p.unit)})</span>` : '');
+      return `<tr><td><b>${esc(p.group)}</b> · ${esc(p.name)}${p.when === 'home' ? ' <span class="s">(read at home)</span>' : ''}${p.from ? `<div class="s">from ${esc(p.from)}: the voyage shown has not been read on it</div>` : ''}</td>
+        <td class="s">${esc(p.why)} <span class="mono">(${esc(p.unit)})</span></td>
+        <td class="text-right tabular-nums">${markText}</td>${cell(p, 'ours')}${cell(p, 'qwen')}${cell(p, 'peer')}
+        <td class="s">${disc ? `<a href="${esc(discoveryHref(p.source))}">${esc(disc.title)}</a>` : '–'}</td></tr>`;
+    }).join('')}</tbody></table></div>
+    <div class="s mt">Each point is its reading divided by its mark, so 1 is the mark on every axis (for the books, lower is better and the ratio is mark ÷ reading; for ARC-Easy it is the gain over chance ÷ the mark's). The chart is clipped at ${CAP_LO} and ${CAP_HI}: Qwen3 4B's chaining runs far off the top, and the table has the true values. Coding, agent and long-context tests are not on it: nothing at this size reads them yet.</div>`;
 }
+/** Where the voyage's clock has gone and what it costs (13 November: on the 50m shelf only 37% of the time at sea was
+ *  training; the evaluators' readings took more than the steps did). */
+function clockLine(c: any, atSea: boolean): string {
+  if (!c || !c.train_s) return '';
+  const total = (c.train_s || 0) + (c.read_s || 0) + (c.other_s || 0) || 1;
+  const pc = (x: number) => Math.round(100 * (x || 0) / total);
+  const usd = (x: number | null) => (x == null ? '–' : `$${x.toFixed(2)}`);
+  return `<div class="wclock"><div class="wclockbar" title="training ${hms(c.train_s)} · readings ${hms(c.read_s || 0)} · other ${hms(c.other_s || 0)}">
+      <i class="train" style="width:${pc(c.train_s)}%"></i><i class="read" style="width:${pc(c.read_s)}%"></i><i class="other" style="width:${pc(c.other_s)}%"></i></div>
+    <div class="s"><b>training ${pc(c.train_s)}%</b> (${hms(c.train_s)}) · <b>readings ${pc(c.read_s)}%</b> (${hms(c.read_s || 0)}) · other ${pc(c.other_s)}% (setup, loading, checkpoints)${c.dph
+      ? ` · ${usd(c.spent)} spent at $${c.dph.toFixed(3)}/h${atSea ? `, about ${usd(c.projected)} at home, of which the readings are about ${usd(c.projected * (c.read_s || 0) / total)}` : ''}`
+      : ''}</div></div>`;
+}
+
+/** How old the newest reading is (13 November: the page said "the panel reads again every 30 s" while the newest
+ *  reading was minutes old; a ship abroad sends its readings home in batches, so a few minutes is normal and twenty
+ *  is not). */
+const STALE_S = 20 * 60;
+function freshLine(ago: number | null, atSea: boolean): string {
+  if (ago == null || !atSea) return '';
+  const old = ago > STALE_S;
+  const age = ago < 120 ? `${Math.round(ago)} s` : `${Math.round(ago / 60)} min`;
+  return `<div class="s">${old ? `<span class="${pillCls('bad')}">no reading for ${age}</span> past ${STALE_S / 60} min the ship may have stalled; check its log`
+    : `newest reading ${age} old · readings come home in batches; the panel looks every 30 s`}</div>`;
+}
+
 let watchTimer: number | undefined = undefined;
 let watchPreset = '';
 async function drawWatch(r: Payload, path: string): Promise<void> {
@@ -669,24 +815,29 @@ async function drawWatch(r: Payload, path: string): Promise<void> {
       <div><b>pass ${w.pass ?? '–'}</b><span class="s"> of ${w.passes}</span></div>
       <div><b>${w.tokens_per_s ? Math.round(w.tokens_per_s).toLocaleString() : '–'}</b><span class="s"> tokens a second</span></div>
       <div><b>${hms(w.elapsed_s)}</b><span class="s"> sailing</span></div>
-      <div><b>${v.status === 'at sea' ? hms(w.eta_s) : 'home'}</b><span class="s">${v.status === 'at sea' ? ' to go (readings included)' : ''}</span></div></div>
+      <div><b>${v.status === 'at sea' ? hms(w.eta_s) : v.status === 'finished' ? 'home' : esc(v.status)}</b><span class="s">${v.status === 'at sea' ? ' to go (readings included)' : ''}</span></div></div>
     <div class="wprog"><i style="width:${pct}%"></i></div>
-    <div class="s">${w.last_reading_s_ago != null && v.status === 'at sea' ? `last reading ${Math.round(w.last_reading_s_ago)} s ago · the panel reads again every 30 s` : ''}</div>
+    ${clockLine(d.clock, v.status === 'at sea')}
+    ${freshLine(w.last_reading_s_ago, v.status === 'at sea')}
     ${medianMode() ? `<div class="s">the watch is one voyage: this is the median voyage of ${esc(selection.expedition)}, ${esc(v.name)}</div>` : ''}`;
   const all = [...(d.stages || []), ...(d.post || [])];
   const passes = all.reduce((a: number, s: any) => a + (s.passes || 1), 0) || 1;
   const herePass = (w.pass || 1) - 1 + ((w.tokens_total ? (w.tokens % (w.tokens_total / w.passes)) / (w.tokens_total / w.passes) : 0));
+  // each stage's first pass in the voyage's count (13 November: every stage's first pass was drawn as "now",
+  // so the ogden stage read 21% while the voyage was still on the shelf)
+  const offsets = all.map((_: any, si: number) => all.slice(0, si).reduce((a: number, s: any) => a + (s.passes || 1), 0));
   const stagesEl = document.getElementById('watchstages');
   if (stagesEl) stagesEl.innerHTML = `<div class="wstagebar">${all.map((s: any, si: number) => {
       const width = 100 * (s.passes || 1) / passes;
       const isThis = si < d.stages.length;
-      const cells = Array.from({ length: s.passes || 1 }, (_, k) => {
+      const cells = Array.from({ length: s.passes || 1 }, (_, k0) => {
+        const k = offsets[si] + k0;
         const state = !isThis ? 'later' : (k < Math.floor(herePass) ? 'done' : k === Math.floor(herePass) ? 'now' : 'later');
         const fill = state === 'now' ? Math.round(100 * (herePass - Math.floor(herePass))) : state === 'done' ? 100 : 0;
         return `<div class="wpass ${state}" title="${esc(s.name)}, pass ${k + 1} of ${s.passes}"><i style="width:${fill}%"></i><span>pass ${k + 1}</span></div>`;
       }).join('');
       return `<div class="wstage" style="flex:${width}"><div class="wsname"><b>${esc(s.phase)}</b>${s.name !== s.phase ? ` · ${esc(s.name)}` : ''} <span class="s">${esc((s.library || '').replace('lists/', ''))}${s.lr ? ` · lr ${s.lr}` : ''}</span></div><div class="wpasses">${cells}</div></div>`;
-    }).join('')}</div>${d.post.length ? '' : '<div class="s">one stage: this voyage is pretraining only (the fitout has no post-training)</div>'}${scaffoldBar(d.scaffold, w.tokens)}`;
+    }).join('')}</div>${d.post.length ? '' : '<div class="s">no post-training: this voyage is pretraining only</div>'}${scaffoldBar(d.scaffold, w.tokens)}`;
   const drawn = document.getElementById('watchdrawn');
   if (drawn) drawn.innerHTML = d.drawn.length ? `<div class="s">cards drawn, in order (the deck's rules):</div><div class="wchips">${d.drawn.map((c: any) => `<span class="wchip"><img src="/art/${esc(c.card)}.png" alt="" onerror="this.style.display='none'"><b>${esc(c.card.replace(/_/g, ' '))}</b><span class="s">${M(c.tokens)} tokens${c.layer != null ? ` · layer ${c.layer}` : ''}</span></span>`).join('')}</div>` : '<div class="s">no card drawn yet</div>';
   const { plot, layout, C, PALETTE, empty } = await chart();
@@ -694,7 +845,17 @@ async function drawWatch(r: Payload, path: string): Promise<void> {
   const lay = (yt: string, extra: any = {}) => layout({ xaxis: { title: 'tokens read (millions)', gridcolor: C.line }, yaxis: { title: yt, gridcolor: C.line }, showlegend: true, ...extra });
   const line = (k: string, name: string, i: number, more: any = {}) => S[k] && S[k].length ? [{ type: 'scatter', mode: S[k].length > 30 ? 'lines' : 'lines+markers', name, x: xs(S[k]), y: ys(S[k]), line: { color: PALETTE[i % PALETTE.length] }, ...more }] : [];
   plot('watchloss', [...line('loss', 'loss', 0), ...line('lr', 'learning rate', 1, { yaxis: 'y2' }), ...line('scaffold_loss', 'scaffold pull (distance from the pattern)', 6), ...line('scaffold_weight', 'scaffold weight', 7, { yaxis: 'y2', line: { color: PALETTE[7 % PALETTE.length], dash: 'dot' } })], lay('loss (nats a token)', { yaxis2: { overlaying: 'y', side: 'right', title: 'learning rate', showgrid: false } }));
-  if (S.bpb && S.bpb.length) plot('watchbpb', line('bpb', 'Forgotten Tomes', 2), lay('bits per byte')); else empty('watchbpb', 'the judge books are read every 640 steps');
+  // this voyage against the size's other voyages at the same tokens read (13 November: the chart drew this voyage
+  // alone, so it could not say whether it was winning); the others thin, each in its own colour, this one bold
+  const others = (d.others || []).map((o: any, i: number) => ({ type: 'scatter', mode: o.points.length > 30 ? 'lines' : 'lines+markers', name: o.name,
+    x: xs(o.points), y: ys(o.points), line: { color: PALETTE[(i + 3) % PALETTE.length], width: 1 }, marker: { size: 3 } }));
+  // the axis on the readings, not from zero: the voyages differ by a few hundredths
+  const bpbAll = [...(S.bpb || []), ...(d.others || []).flatMap((o: any) => o.points)].map((q: any) => q[1]);
+  const bpbPad = bpbAll.length ? (Math.max(...bpbAll) - Math.min(...bpbAll)) * 0.06 || 0.05 : 0;
+  const bpbLay = lay('bits per byte', bpbAll.length ? { yaxis: { title: 'bits per byte', gridcolor: C.line, range: [Math.min(...bpbAll) - bpbPad, Math.max(...bpbAll) + bpbPad] } } : {});
+  if (S.bpb && S.bpb.length) plot('watchbpb', [...others, ...line('bpb', `${v.name} (this voyage)`, 2, { line: { color: C.good, width: 3 }, marker: { size: 6 } })], bpbLay);
+  else if (others.length) plot('watchbpb', others, bpbLay);
+  else empty('watchbpb', 'the judge books are read every 640 steps');
   plot('watchshapes', [...line('upos', 'part of speech', 3), ...line('ogden', 'Ogden kind', 4), ...line('keyed', 'keyed word', 5)], lay('right', { yaxis: { tickformat: '.0%', gridcolor: C.line, title: 'top guess right' } }));
   const marks: [string, string, number][] = [['previous_word', 'previous-word', 0.5], ['nevermore', 'induction (Nevermore look, one head)', 0.3], ['nevermore_shared', 'induction (two heads of a layer together)', 0.3], ['comparator', 'comparator', 0.3], ['words_back', 'words back', 0.3], ['mover', 'mover', 0.2]];
   plot('watchcards', marks.flatMap(([k, n], i) => line(k, n, i)), lay('reading', { shapes: [...new Set(marks.map((m) => m[2]))].map((y) => ({ type: 'line', xref: 'paper', x0: 0, x1: 1, y0: y, y1: y, line: { color: C.accent, dash: 'dot', width: 1 } })) }));
@@ -712,11 +873,13 @@ async function drawDepth(r: Payload): Promise<void> {
   if (!panel) { panel = document.createElement('section'); panel.id = 'depthpanel'; panel.className = 'panel mt'; host.appendChild(panel); }
   let d: Payload; try { d = await api(`/api/depth?preset=${encodeURIComponent(r.preset)}&sop=${encodeURIComponent(sopPick)}`); } catch { return; }
   const shapes = Object.entries(d.shapes || {}) as [string, any][]; if (!shapes.length) { panel.remove(); return; }
-  panel.innerHTML = `<h2>The depth <span class="note">every shape of this size, drawn against its layers: the deck's order on the vertical axis, depth on the horizontal. A card is found where its colour is strongest; the last column is the layer it is read best in. In Qwen3 4B the copy cards sit two-thirds down; in the 300k there are only two layers to sit in</span></h2>` +
+  panel.innerHTML = `<h2>The depth <span class="note">every shape of this size, drawn against its layers: the deck's order on the vertical axis, depth on the horizontal. Each row is shaded against its own strongest layer, so a card is found where its colour is strongest (the rows are not on one scale: hover a cell for its reading); the last column is the layer it is read best in. In Qwen3 4B the copy cards sit two-thirds down; in the 300k there are only two layers to sit in</span></h2>` +
     shapes.map(([preset, s]) => {
-      const layers = s.layers, all = Object.values(s.cards).flat() as number[], max = Math.max(1, ...all);
+      const layers = s.layers;
       const rows = DEPTH_CARDS.filter(([k]) => s.cards[k]).map(([k, label]) => {
-        const vals = s.cards[k], best = vals.indexOf(Math.max(...vals));
+        // each row against its own strongest layer (13 November: against the table's largest number, the
+        // delimiter's 10.3, every other card was too faint to see where it sits)
+        const vals = s.cards[k], best = vals.indexOf(Math.max(...vals)), max = Math.max(1e-9, ...vals);
         return `<tr><td class="s">${esc(label)}</td>` + Array.from({ length: layers }, (_, i) => {
           const v = vals[i] ?? 0, a = Math.max(0, v / max);
           return `<td title="${esc(label)} at layer ${i}: ${v}" style="background:color-mix(in srgb, var(--accent) ${Math.round(a * 85)}%, transparent)"></td>`;

@@ -191,8 +191,12 @@ export default function SizePage({ initialPath = '/' }: { initialPath?: string }
       </div>
 
       <div className={`mtab${tab === 'training' ? ' active' : ''}`} data-mtab="training">
+        <section className={cardCls(false, 'panel')} id="verdictpanel">
+          <h2>How this size stands <span className="note">every voyage of this size judged against its control and its marks, and what the charter is waiting on</span></h2>
+          <div id="verdict"><div className={emptyCls()}>reading the voyages…</div></div>
+        </section>
         <section className={cardCls(false, 'panel')}>
-          <h2>The star chart, against Qwen3 4B <span className="note">the ten points of the chart, each reading divided by its own mark: Qwen3 4B (which chains) against this ship's newest voyage, read live while it trains. Above the dotted line a point clears its mark; the gap between the lines is how far the ship is behind on that point, and where its line is above, it is ahead</span></h2>
+          <h2>The scorecard <span className="note">what the field's research and the industry's tests say a ship of this size must do, each reading divided by its own mark: this size's voyage at sea (else its best voyage home) against Qwen3 4B (which chains) and Pythia 70M (the published model nearest this size). Above the dotted line a point clears its mark</span></h2>
           <div className="chart" id="sizejourney" />
           <div className="s" id="sizejourneynote" />
         </section>

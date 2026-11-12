@@ -191,7 +191,11 @@ def test_under_a_weekly_release_the_whole_week_is_spendable_in_any_cycle():
     assert [c.waters for c in poor] == ["foreign", "local", "local"] and "the week's budget" in poor[1].reason
 
 
-def test_a_hire_counts_against_the_allowance_at_its_quote_times_the_overrun():
+def test_a_hire_counts_against_the_allowance_at_its_quote_times_the_overrun(monkeypatch):
+    from thorp.viable.s4_intelligence import market
+
+    # the GPU's arithmetic alone here (the disk and the line a voyage adds are test_purser's)
+    monkeypatch.setattr(market, "TYPICAL", {"storage_cost": 0.0, "inet_down_cost": 0.0, "inet_up_cost": 0.0})
     lines = [voyage("a"), voyage("b"), voyage("c")]
     # each costs (240 / 4 + 21) / 60 * 0.4 = $0.54; the cycle's allowance is $2
     plain = purser.plan(lines, world(ship_free=[MONDAY] * 3), estimate, lambda ln: 30.0, eligible)

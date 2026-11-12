@@ -157,6 +157,13 @@ class Vast:
         """Destroy the instance: its rental and its storage stop. Irreversible (what was not brought home is lost)."""
         self.call("DELETE", f"/api/v0/instances/{int(instance)}/", None, None)
 
+    def charges(self) -> list[dict]:
+        """What Vast.ai has billed this account, a line an instance a kind a day (`charge`): the GPU's hours, the
+        disk's hours, and the gigabytes moved down and up. The same lines as the invoice CSV the console exports
+        (12 November: they came to $9.29 where the spend log counted $6.22, the account's `total_spend`)."""
+        res = self.call("GET", "/api/v0/users/me/invoices/", None, {"inc_charges": "true"})
+        return [charge(x) for x in res.get("invoices") or [] if x.get("type") == "charge"]
+
     def credit(self) -> float | None:
         try:
             u = self.call("GET", "/api/v0/users/current/", None, None)
@@ -190,6 +197,16 @@ def ssh_route(inst: dict) -> tuple[str, int] | None:
     return (str(host), int(port)) if host and port else None
 
 
+def charge(x: dict) -> dict:
+    """One billed line, as the spend reads it: the instance, its kind (gpu, storage, download, upload or other),
+    the day it was billed on (UTC midnight, as Vast.ai buckets them) and the dollars."""
+    d = str(x.get("description") or "").lower()
+    kind = next((k for k, w in (("gpu", "gpu"), ("storage", "storage"), ("download", "download"), ("upload", "upload")) if w in d), "other")
+    iid = x.get("instance_id")
+    return {"instance": int(iid) if iid not in (None, "") else None, "kind": kind, "at": float(x.get("timestamp") or 0.0),
+            "amount": float(x.get("amount") or 0.0), "quantity": float(x.get("quantity") or 0.0)}  # fmt: skip
+
+
 def offer(o: dict, gpu: str) -> dict:
     """An offer as the charter reads it."""
     return {
@@ -205,4 +222,8 @@ def offer(o: dict, gpu: str) -> dict:
         "disk_gb": float(o.get("disk_space", 0.0) or 0.0),
         "geolocation": o.get("geolocation", ""),
         "machine_id": o.get("machine_id"),
+        # billed apart from `dph` (12 November): the disk a GB a month, the line a GB each way
+        "storage_cost": float(o.get("storage_cost", 0.0) or 0.0),
+        "inet_down_cost": float(o.get("inet_down_cost", 0.0) or 0.0),
+        "inet_up_cost": float(o.get("inet_up_cost", 0.0) or 0.0),
     }

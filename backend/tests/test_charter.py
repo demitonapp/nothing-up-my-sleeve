@@ -424,6 +424,70 @@ def test_an_offer_taken_before_the_hire_is_replaced_by_the_next(library, spec, t
     assert [r["event"] for r in s3.log()] == ["hired", "at sea", "released"]  # nothing was hired on the taken offer
 
 
+MONDAY = 1794182400.0  # Monday 9 November 2026, 00:00 UTC: the week Vast.ai's bill of 12 November is in
+
+
+def _bill():
+    """Vast.ai's charges as its API gives them (12 November's shape): one instance's kinds, a day each, and a payment."""
+    day = MONDAY + 3 * 86400
+    lines = [("Instance 900 GPU  charge:    hours * $/hr", 0.290), ("Instance 900 storage charge: hours * $/hr", 0.033),
+             ("Instance 900 download charge", 0.017), ("Instance 900 upload charge", 0.012)]  # fmt: skip
+    rows = [{"type": "charge", "description": d, "timestamp": day, "quantity": "1", "rate": "1", "amount": f"{a}",
+             "instance_id": 900} for d, a in lines]  # fmt: skip
+    rows.append({"type": "charge", "description": "Instance 901 GPU  charge:    hours * $/hr", "timestamp": MONDAY - 86400,
+                 "quantity": "1", "rate": "1", "amount": "5.0", "instance_id": 901})  # last week's: not this one's
+    rows.append({"type": "payment", "amount": -25.0, "timestamp": MONDAY})
+    return {"invoices": rows}
+
+
+def test_vast_bills_the_disk_and_the_line_apart_and_the_week_counts_the_bill(tmp_thorp, monkeypatch):
+    from datetime import UTC, datetime
+
+    charges = Vast(lambda m, p, b, q: _bill() if p == "/api/v0/users/me/invoices/" else {}).charges()
+    assert [c["kind"] for c in charges] == ["gpu", "storage", "download", "upload", "gpu"]  # no payment
+    assert s3.by_instance(charges)[900] == {"gpu": 0.29, "storage": 0.033, "download": 0.017, "upload": 0.012}
+    # the log reckons the GPU's hours alone, $0.29; the week counts the bill, $0.352
+    s3.record("hired", instance=900, run_id="r", gpu="RTX 4090", dph=0.40, started=MONDAY + 3 * 86400)
+    s3.record("released", instance=900, run_id="r", gpu="RTX 4090", dph=0.40, started=MONDAY + 3 * 86400,
+              ended=MONDAY + 3 * 86400 + 2610, cost=0.29, status="home")  # fmt: skip
+    thursday = datetime.fromtimestamp(MONDAY + 3.5 * 86400, UTC)
+    assert round(s3.logged_week(thursday), 3) == 0.29
+    assert round(s3.week_spent(thursday, charges=charges), 3) == 0.352
+    assert round(s3.week_spent(thursday, charges=[]), 3) == 0.29  # no bill to be had: the log, as before
+    # and the release is given its bill, the reckoning kept beside it
+    assert s3.fold_billed(charges, now=MONDAY + 3 * 86400 + 600) == []  # released ten minutes ago: not yet final
+    got = s3.fold_billed(charges, now=MONDAY + 4 * 86400)
+    assert got == [{"instance": 900, "logged": 0.29, "billed": 0.352}]
+    rel = s3.log()[-1]
+    assert rel["cost"] == 0.352 and rel["cost_logged"] == 0.29 and rel["billed"]["download"] == 0.017
+    assert s3.fold_billed(charges, now=MONDAY + 4 * 86400) == []  # again: nothing new
+
+
+def test_the_bill_is_read_once_in_a_while_and_its_last_copy_kept(tmp_thorp, monkeypatch):
+    monkeypatch.setenv("THORP_VAST_BILLED", "1")
+    asked = []
+    rows = [{"instance": 1, "kind": "gpu", "at": MONDAY, "amount": 1.0, "quantity": 1.0}]
+    assert s3.billed(fetch=lambda: asked.append(1) or rows, now=1000.0) == rows
+    assert s3.billed(fetch=lambda: asked.append(1) or [], now=1000.0 + s3.BILLED_TTL_S - 1) == rows and asked == [1]
+    monkeypatch.setattr(s3, "_BILLED", {"at": float("-inf"), "rows": None})  # another process: the copy on disk
+    assert s3.billed(fetch=lambda: asked.append(1) or [], now=1100.0) == rows and asked == [1]
+    assert s3.billed(fetch=lambda: 1 / 0, now=1000.0 + 2 * s3.BILLED_TTL_S) == rows  # Vast.ai down: the last copy
+    monkeypatch.setenv("THORP_VAST_BILLED", "0")
+    assert s3.billed(fetch=lambda: rows) is None
+
+
+def test_a_quote_counts_the_disk_and_the_line(tmp_thorp):
+    from thorp.viable.s4_intelligence import market
+
+    o = {"gpu": "RTX 4090", "dph": 0.36, "storage_cost": 0.2, "inet_down_cost": 0.01, "inet_up_cost": 0.02}
+    ex = market.extras(o, 2.0, 80)
+    assert round(ex["storage_dph"], 4) == round(80 * 0.2 / 730, 4)  # $0.0219 an hour, as billed for 80 GB
+    assert round(ex["transfer"], 4) == round(market.DOWN_GB * 0.01 + market.UP_GB * 0.02, 4)
+    assert round(ex["extra_cost"], 4) == round(2.0 * ex["storage_dph"] + ex["transfer"], 4)
+    hire = {"started": 0.0, "dph": 0.36, "storage_dph": ex["storage_dph"]}
+    assert round(s3.cost_of(hire, 3600.0), 4) == round(0.36 + ex["storage_dph"], 4)  # the disk runs with the GPU
+
+
 def test_the_market_skips_an_avoided_host(tmp_thorp):
     small_terms(tmp_thorp)
     v = Vast(_two_hosts())

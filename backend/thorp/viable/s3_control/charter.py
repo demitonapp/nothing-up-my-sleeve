@@ -150,7 +150,11 @@ def out_now(rows: list[dict] | None = None) -> list[dict]:
 
 
 def cost_of(hire: dict, until: float | None = None) -> float:
-    return max(0.0, ((until or time.time()) - float(hire["started"])) / 3600) * float(hire["dph"])
+    """What a hire has run up by `until` as the spend log reckons it: its hours at the GPU's rate and, since 12
+    November, the disk's (`storage_dph`, from the offer's $/GB/month), which Vast.ai bills apart from the GPU.
+    The gigabytes moved are not known until the bill: `fold_billed` puts the bill in once it is in."""
+    rate = float(hire["dph"]) + float(hire.get("storage_dph") or 0.0)
+    return max(0.0, ((until or time.time()) - float(hire["started"])) / 3600) * rate
 
 
 def week_start(now: datetime | None = None) -> datetime:
@@ -159,9 +163,123 @@ def week_start(now: datetime | None = None) -> datetime:
     return datetime(d.year, d.month, d.day, tzinfo=UTC)
 
 
-def week_spent(now: datetime | None = None) -> float:
-    """This week's spend: the released hires' costs, and what the ships still out have run up."""
+def logged_week(now: datetime | None = None, rows: list[dict] | None = None) -> float:
+    """This week's spend as the log reckons it: the released hires' costs, and what the ships still out have run up."""
     start = week_start(now).timestamp()
-    rows = log()
+    rows = log() if rows is None else rows
     done = sum(float(r.get("cost", 0.0)) for r in rows if r["event"] == "released" and float(r.get("ended", 0)) >= start)
     return done + sum(cost_of(h) for h in out_now(rows))
+
+
+def week_spent(now: datetime | None = None, charges: list[dict] | None = None) -> float:
+    """This week's spend: the larger of what Vast.ai has billed since Monday (UTC) and what the log reckons.
+
+    12 November: the log counted $4.18 for the week where Vast.ai had billed $6.52 (the disk and the gigabytes
+    moved are billed apart from the GPU's hours, and four hires of 9 November had no cost on record). The bill is
+    the truth for what is done; the log runs ahead of it for a ship still out, so the larger is taken. Without
+    the bill (no key, the API down) the log alone answers, as before."""
+    logged = logged_week(now)
+    charges = billed() if charges is None else charges
+    if not charges:
+        return logged
+    start = week_start(now).timestamp()
+    end = start + 7 * 86400
+    return max(logged, sum(c["amount"] for c in charges if start <= c["at"] < end))
+
+
+# ---------------------------------------------------------------- the bill (Vast.ai's own charges)
+
+BILLED_TTL_S = 600.0  # how long one reading of Vast.ai's charges is used before it is asked again
+FOLD_AFTER_S = 1800.0  # a release is given its bill once it has been released this long (the last charges in)
+_BILLED: dict = {"at": float("-inf"), "rows": None}
+
+
+def _billed_file():
+    from thorp import paths
+
+    return paths.data_dir() / "charter" / "billed.json"
+
+
+def billed(fetch=None, now: float | None = None) -> list[dict] | None:
+    """Vast.ai's charges to this account (vast.Vast.charges), read at most every BILLED_TTL_S by any process (a
+    copy is kept in data/charter/billed.json for the next). None when they cannot be had: no key, the API down
+    and no copy, or THORP_VAST_BILLED=0. Never raises: the spend falls back to the log."""
+    import os
+
+    if os.environ.get("THORP_VAST_BILLED") == "0":
+        return None
+    now = time.time() if now is None else now
+    if _BILLED["rows"] is not None and now - _BILLED["at"] < BILLED_TTL_S:
+        return _BILLED["rows"]
+    f = _billed_file()
+    try:
+        kept = json.loads(f.read_text())
+        if now - float(kept["at"]) < BILLED_TTL_S:
+            _BILLED.update(at=float(kept["at"]), rows=kept["rows"])
+            return kept["rows"]
+    except Exception:  # noqa: BLE001 - no copy yet, or a torn one
+        kept = None
+    try:
+        if fetch is None:
+            from thorp.viable.s1_operations.vast import Vast, api_key, http_transport
+
+            rows = Vast(http_transport(api_key(), retries=1)).charges()
+        else:
+            rows = fetch()
+    except Exception:  # noqa: BLE001 - no key, or Vast.ai not answering: the last copy, however old, or nothing
+        return (kept or {}).get("rows")
+    _BILLED.update(at=now, rows=rows)
+    try:
+        f.parent.mkdir(parents=True, exist_ok=True)
+        tmp = f.with_suffix(".tmp")
+        tmp.write_text(json.dumps({"at": now, "rows": rows}))
+        tmp.replace(f)
+    except OSError:
+        pass
+    return rows
+
+
+def by_instance(charges: list[dict]) -> dict[int, dict[str, float]]:
+    """The charges summed an instance a kind: {instance: {"gpu": $, "storage": $, "download": $, ...}}."""
+    out: dict[int, dict[str, float]] = {}
+    for c in charges:
+        if c.get("instance") is None:
+            continue
+        k = out.setdefault(int(c["instance"]), {})
+        k[c["kind"]] = k.get(c["kind"], 0.0) + float(c["amount"])
+    return out
+
+
+def fold_billed(charges: list[dict] | None = None, now: float | None = None) -> list[dict]:
+    """Each released hire given its bill: `cost` becomes what Vast.ai billed for the instance (every kind), the
+    log's own reckoning is kept as `cost_logged`, and the kinds as `billed`. Only a release FOLD_AFTER_S old or
+    more (a bill still coming in is not final); a hire Vast.ai billed nothing for keeps its reckoning. Again on
+    every call, so a late charge is taken in. Returns what changed: {instance, logged, billed}. Never raises."""
+    from sqlalchemy import select
+
+    from thorp import store
+    from thorp.viable.records import SpendEvent
+
+    charges = billed() if charges is None else charges
+    if not charges:
+        return []
+    now = time.time() if now is None else now
+    bills = by_instance(charges)
+    changed = []
+    try:
+        with store.session() as s:
+            for r in s.scalars(select(SpendEvent).where(SpendEvent.event == "released")).all():
+                detail = dict(r.detail or {})
+                b = bills.get(int(r.instance)) if r.instance is not None else None
+                if not b or now - float(detail.get("ended") or now) < FOLD_AFTER_S:
+                    continue
+                total = round(sum(b.values()), 6)
+                if detail.get("billed") == b and abs(float(detail.get("cost") or 0.0) - total) < 1e-9:
+                    continue
+                detail.setdefault("cost_logged", detail.get("cost"))
+                detail["cost"], detail["billed"] = total, b
+                r.detail = detail
+                changed.append({"instance": r.instance, "logged": detail["cost_logged"], "billed": total})
+    except Exception:  # noqa: BLE001 - the bill is an improvement on the record, never a reason to fail
+        return changed
+    return changed

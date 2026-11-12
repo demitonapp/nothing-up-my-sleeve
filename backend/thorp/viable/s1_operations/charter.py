@@ -1179,7 +1179,7 @@ def _sail_one(spec: dict, prep, q: dict, p: dict, t: dict, rid: str, commit: str
     with _recallable(log) as guard:
         try:
             hire = s3.record("hired", **{k: v for k, v in hire.items() if k != "started"}, offer=q["offer_id"],
-                             machine_id=q.get("machine_id"), started=hire["started"], quote=q["cost"],
+                             machine_id=q.get("machine_id"), storage_dph=q.get("storage_dph"), started=hire["started"], quote=q["cost"],
                              quote_hours=q["hours"], commit=commit, setup_assumed_h=q.get("setup_hours"))  # fmt: skip
             _PHASES[int(instance)] = Phases(hire["started"])  # provision runs from the hire
             key = _public_key(t)

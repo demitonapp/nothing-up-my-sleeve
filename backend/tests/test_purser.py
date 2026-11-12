@@ -52,7 +52,11 @@ def test_a_long_voyage_behind_a_queue_goes_abroad_and_a_short_one_stays():
     a, b, c = calls(lines, world())
     # 4 h here, 2.35 h abroad (half the time and the set-up): home 1.65 h sooner, 41% of its wait
     assert a.waters == "foreign" and a.gpu == "RTX 4090"
-    assert abs(a.foreign_min - (240 / 2 + 21)) < 1e-6 and abs(a.cost - a.foreign_min / 60 * 0.4) < 1e-9
+    # the GPU's hours, and the line Vast.ai bills apart (the terms here hire no disk); 12 November
+    from thorp.viable.s4_intelligence import market
+
+    extra = market.extras(market.TYPICAL, a.foreign_min / 60, 0.0)["extra_cost"]
+    assert extra > 0 and abs(a.foreign_min - (240 / 2 + 21)) < 1e-6 and abs(a.cost - (a.foreign_min / 60 * 0.4 + extra)) < 1e-9
     assert "home" in a.reason and "sooner" in a.reason
     assert b.waters == "local"  # the ship is out with a until 2.35 h: abroad b is home at 4.7 h, here at 4 h
     assert c.waters == "local" and "no GPU class has a measured speed-up at 300k" in c.reason

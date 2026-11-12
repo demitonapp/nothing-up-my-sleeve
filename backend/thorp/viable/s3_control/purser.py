@@ -168,7 +168,7 @@ def cycle_money(log: list[dict], now: float, terms: dict) -> tuple[float, float]
                     cost = (datetime.fromisoformat(str(r["at"])).timestamp() - float(h["started"])) / 3600 * float(h["dph"])
             spent += float(cost or 0.0)
         else:
-            run_up = max(0.0, (now - float(h["started"])) / 3600) * float(h.get("dph") or 0.0)
+            run_up = max(0.0, (now - float(h["started"])) / 3600) * (float(h.get("dph") or 0.0) + float(h.get("storage_dph") or 0.0))
             spent += run_up
             held += max(0.0, float(h.get("quote") or 0.0) * reserve - run_up)
     return spent, held
@@ -199,6 +199,8 @@ def plan(lines: list, w: World, estimate, cmd_estimate, eligible) -> list[Call]:
     `estimate(line) -> (minutes | None, source)` is the line's time on this Mac; `cmd_estimate(line) -> minutes`
     a command's; `eligible(line) -> (expedition, None) | (expedition, why not)` says whether the purser may move
     a voyage (the expedition allowed abroad, the line not pinned)."""
+    from thorp.viable.s4_intelligence import market
+
     t = w.terms
     mac = sorted(w.mac_free) or [w.now]
     ships = sorted(w.ship_free) or [w.now]
@@ -283,8 +285,10 @@ def plan(lines: list, w: World, estimate, cmd_estimate, eligible) -> list[Call]:
                 dur = local_min / sp + overhead(gpu)
                 i = min(range(len(ships)), key=lambda k: ships[k])
                 start = max(ships[i], ready(ln))
+                # the GPU's hours, and the disk and the line that Vast.ai bills apart from them (12 November)
+                extra = market.extras(market.TYPICAL, dur / 60, float(w.terms.get("disk_gb") or 0.0))["extra_cost"]
                 cand = {"gpu": gpu, "dur": dur, "home": start + dur * 60, "start": start, "seat": i,
-                        "cost": dur / 60 * price, "speedup": sp}  # fmt: skip
+                        "cost": dur / 60 * price + extra, "speedup": sp}  # fmt: skip
                 if best is None or (cand["home"], cand["cost"]) < (best["home"], best["cost"]):
                     best = cand
             if best is None:

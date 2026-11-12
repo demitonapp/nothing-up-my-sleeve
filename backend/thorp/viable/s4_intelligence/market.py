@@ -94,7 +94,28 @@ def mac_rate(preset: str) -> float | None:
     return min(rates) if rates else None
 
 
-def price(cfg, preset: str, tokens: int, o: dict) -> dict:
+# What a hire moves over its line, besides its hours (12 November, Vast.ai's charges for the week): the box takes
+# in its environment (torch and its CUDA wheels, 5 to 12 GB while the box image is not published) and the library,
+# and sends home the checkpoints. A hire that sailed took in 4 to 8.5 GB; these err high, as a quote should.
+DOWN_GB = 8.0
+UP_GB = 1.0
+HOURS_A_MONTH = 730.0  # Vast.ai prices the disk a GB a month
+
+
+def extras(o: dict, hours: float, disk_gb: float) -> dict:
+    """What a hire costs besides the GPU's hours, at the offer's own rates: the disk for every hour it is hired,
+    and the gigabytes it moves. Until 12 November no quote and no release counted them (a third of the bill)."""
+    storage_dph = float(disk_gb) * float(o.get("storage_cost") or 0.0) / HOURS_A_MONTH
+    transfer = DOWN_GB * float(o.get("inet_down_cost") or 0.0) + UP_GB * float(o.get("inet_up_cost") or 0.0)
+    return {"storage_dph": storage_dph, "transfer": transfer, "extra_cost": storage_dph * hours + transfer}
+
+
+# The rates a plan uses when it has no offer in hand (the purser), from Vast.ai's bill of 12 November: the disk at
+# $0.0185-0.0222 an hour for 80 GB ($0.17-0.20 a GB a month), the line at $0.007-0.013 a GB. Rounded up.
+TYPICAL = {"storage_cost": 0.25, "inet_down_cost": 0.02, "inet_up_cost": 0.02}
+
+
+def price(cfg, preset: str, tokens: int, o: dict, disk_gb: float = 0.0) -> dict:
     """What this voyage would cost on this offer: at the class's measured rate once it has sailed the preset;
     before that, at the FLOP guess or this Mac's own rate, whichever is slower (a GPU is not assumed faster than
     the Mac until it has shown it)."""
@@ -115,7 +136,9 @@ def price(cfg, preset: str, tokens: int, o: dict) -> dict:
         if sc and tokens / sc[0] / 3600 + setup_h > hours:
             hours = tokens / sc[0] / 3600 + setup_h
             how = f"unmeasured at this size: scaled by FLOPs from its {sc[1]}'s {sc[0]:,.0f} tokens/s here (the guess was {tf:.0f} TFLOP/s)"
-    return {**o, "hours": hours, "cost": hours * o["dph"], "speed": how, "setup_hours": setup_h}
+    ex = extras(o, hours, disk_gb)
+    return {**o, **ex, "hours": hours, "gpu_cost": hours * o["dph"], "cost": hours * o["dph"] + ex["extra_cost"],
+            "speed": how, "setup_hours": setup_h}  # fmt: skip
 
 
 def quotes(vast, cfg, preset: str, tokens: int, terms: dict, gpus: list[str] | None = None,
@@ -128,7 +151,7 @@ def quotes(vast, cfg, preset: str, tokens: int, terms: dict, gpus: list[str] | N
             continue
         offers = vast.search(gpu, terms, limit=5, avoid=avoid) if avoid else vast.search(gpu, terms, limit=5)
         if offers:
-            out.append(price(cfg, preset, tokens, offers[0]))
+            out.append(price(cfg, preset, tokens, offers[0], float(terms.get("disk_gb") or 0.0)))
     out.sort(key=lambda q: q["cost"])
     _keep(out)
     return out

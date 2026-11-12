@@ -46,6 +46,12 @@ def _records_stay_in_the_test(tmp_path, monkeypatch):
 
     monkeypatch.setattr(acquisition, "_dir", lambda: tmp_path / "records" / "acquisition")
     monkeypatch.delenv("THORP_PAPERS", raising=False)
+    # Vast.ai's bill is never asked for from a test (s3 charter.billed): the spend is the log's, as a fake
+    # market's hires are; the bill's own tests turn it on with a fake fetch.
+    from thorp.viable.s3_control import charter as s3
+
+    monkeypatch.setenv("THORP_VAST_BILLED", "0")
+    monkeypatch.setattr(s3, "_BILLED", {"at": float("-inf"), "rows": None})
 
 
 @pytest.fixture(scope="session")

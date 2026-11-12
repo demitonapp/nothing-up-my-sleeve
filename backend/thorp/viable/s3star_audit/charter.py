@@ -69,8 +69,10 @@ def audit(vast, release_orphans: bool = False, log=print) -> dict:
             released.append(int(o["id"]))
             _found("orphan", int(o["id"]), str(o["label"])[len(LABEL):], "released", max(0.0, (time.time() - started) / 3600) * dph)
             log(f"S3*: released orphan instance {o['id']} ({o['label']})")
+    folded = s3.fold_billed()  # each released hire's cost as Vast.ai billed it (12 November)
     t = s5.terms()
     return {
+        "billed": folded,
         "listed": [{"id": i["id"], "label": i["label"], "status": i.get("actual_status"), "dph": i.get("dph_total")} for i in listed],
         "orphans": [int(o["id"]) for o in orphans],
         "released": released,

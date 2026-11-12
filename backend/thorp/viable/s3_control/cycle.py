@@ -278,6 +278,16 @@ def run(judge: bool = False, how: str = "by hand", keep: bool = True, log=print)
 
     t0, now = time.time(), time.time()
     prev = latest()
+    # the books closed on Vast.ai's own bill first (12 November): each released hire's cost is what was billed,
+    # so the envelope, the plan and the audit below all read the money that was actually spent
+    folded: list[dict] = []
+    with contextlib.suppress(Exception):
+        from thorp.viable.s3_control import charter as s3
+
+        folded = s3.fold_billed()
+        if folded:
+            log(f"S3*: {len(folded)} hire(s) given Vast.ai's bill: ${sum(f['billed'] for f in folded):.2f} billed "
+                f"where ${sum(float(f['logged'] or 0) for f in folded):.2f} was reckoned")  # fmt: skip
     made = make_plan(now)
     hours = float(made["envelope"]["cycle_hours"])
     # the window is the cycle just ended: back to the last turn, and never less than one cycle (a turn taken by
@@ -290,7 +300,7 @@ def run(judge: bool = False, how: str = "by hand", keep: bool = True, log=print)
 
         with contextlib.suppress(Exception):
             judged = s4judge.judge_failures(log=log)
-    out = {"hours": hours, "how": how, "audit": audit, **made, "judged": judged, "seconds": time.time() - t0}
+    out = {"hours": hours, "how": how, "audit": audit, **made, "judged": judged, "billed": folded, "seconds": time.time() - t0}
     if keep:
         import json
 

@@ -6418,6 +6418,8 @@ def _chat_own_answer(run: str, text: str, q: dict) -> dict:
         # a ship taught to think or to call tools (13 November): the console's two switches, as for a foreign ship
         thinking=None if q.get("thinking") in (None, "") else str(q.get("thinking")).strip().lower() not in ("0", "false", "off", "no"),
         tools=(str(q.get("tools")).strip().lower() in ("1", "true", "on", "yes")) if q.get("tools") not in (None, "") else None,
+        # the answer steered (thorp/steer.py, 13 November) unless the request says `steer=off`
+        steered=None if q.get("steer") in (None, "") else str(q.get("steer")).strip().lower() not in ("0", "false", "off", "no"),
     )
 
 

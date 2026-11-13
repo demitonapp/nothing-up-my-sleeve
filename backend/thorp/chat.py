@@ -105,6 +105,10 @@ def load(run_name: str, step: int | None = None):
 # piece it has just written. A 9m sampled over its whole vocabulary wanders, and greedy it loops; the outside
 # models at the same table are sampled by their own libraries' defaults (foreign_answer).
 DECODING = {"top_k": 40, "top_p": 0.9, "repetition_penalty": 1.15}
+# Whether a ship on the fleet's marks is steered as it answers (thorp/steer.py, 13 November): its call chosen from those
+# the question allows, its numbers held to the tool's, the best of sixteen replies kept. `steer=off` on a request
+# asks the old way.
+STEERED = True
 
 
 def prompt_for(spec: dict, question: str, history: list[tuple[str, str]] | None = None) -> tuple[str, str]:
@@ -249,6 +253,102 @@ def _ask_able(model, tok, spec: dict, question: str, temperature: float, tokens:
         answer = answer.replace(m, " ")
     return {"answer": answer.strip(), "reasoning": reasoning, "calls": calls, "prompt": head + opened, "format": fmt,
             "dropped": dropped, "written": written}
+
+
+def _ask_steered(model, tok, spec: dict, question: str, temperature: float, tokens: int, seed: int,
+                 exchanges: list[tuple[str, str]], thinking: bool | None, tools: bool) -> dict | None:
+    """A ship on the fleet's marks, asked with its answer steered (thorp/steer.py, 13 November): the ship chooses its
+    move (the likelier of `<call>`, `<think>` and `<answer>`), a call is the likeliest of those the question allows
+    rather than one spelt piece by piece, and the answer is the best of `steer.SAMPLES` replies, whose numbers after
+    a result must be the result's or the question's. The same turns as `_ask_able`, and the same return, with a
+    `steer` record beside it. None for a ship not on the marks: it is asked the old way."""
+    from thorp import cleaning, ship_tools, steer, turns
+
+    can = abilities(spec)
+    context = int(spec["model"]["context"])
+    prompt, fmt, dropped = fit_exchanges(spec, tok, question, exchanges, context, min(tokens, ANSWER_ROOM) * 2)
+    one = {m: (ids[0] if len(ids := tok.encode(m)) == 1 else None) for m in ("<answer>", "<end>", "<question>", *turns.FLEET_SYMBOLS[-3:])}  # fmt: skip
+    if fmt != "marks" or not prompt.endswith("<answer>") or one["<answer>"] is None or one["<end>"] is None:
+        return None
+    head = prompt[: -len("<answer>")]
+    tools_on = bool(can["tools"] and tools and one[turns.CALL] is not None)
+    think_on = bool(can["thinking"] and one[turns.THINK] is not None)
+    tool_set = tuple((spec.get("tools") or {}).get("set") or ship_tools.SET)
+    enc = lambda written: tok.encode(head + written)  # noqa: E731
+
+    def choose(call: bool, think: bool) -> tuple[str, dict]:
+        lp = steer.next_logp(model, enc(written), context)
+        opts = {"<answer>": float(lp[one["<answer>"]])}
+        if call:
+            opts[turns.CALL] = float(lp[one[turns.CALL]])
+        if think:
+            opts[turns.THINK] = float(lp[one[turns.THINK]])
+        return max(opts, key=opts.get), {k: round(v, 2) for k, v in opts.items()}
+
+    written, calls, results, moves, left, first = "", [], [], [], tokens, True
+    while True:
+        may_call = tools_on and len(calls) < TOOL_ROUNDS and left > 8
+        move, odds = choose(may_call, first and think_on)
+        if first and think_on and thinking is not None and move != turns.CALL:
+            move = turns.THINK  # the console's switch is set: the thinking is opened, full or empty
+        first = False
+        moves.append({"move": move, "logp": odds})
+        if move == turns.THINK:
+            written += turns.THINK
+            if thinking is not False:
+                stops = tuple(i for i in (one["<answer>"], one["<end>"], one[turns.CALL] if may_call else None) if i is not None)
+                (ids, stop), = steer.write(model, tok, enc(written), 1, temperature=temperature, max_new=max(8, left),
+                                           context=context, seed=seed, stop_ids=stops, **DECODING)  # fmt: skip
+                written += tok.decode(ids)
+                left -= len(ids)
+                if stop is not None and stop == one[turns.CALL]:
+                    move = turns.CALL
+        if move == turns.CALL:
+            written += turns.CALL
+            call, table = steer.pick_call(model, tok, enc(written), question, context, tool_set)
+            if call is not None:
+                result = ship_tools.run(call)
+                parsed = ship_tools.parse(call)
+                calls.append({"round": len(calls) + 1, "name": parsed[0] if parsed else call[:40],
+                              "arguments": {"args": parsed[1]} if parsed else {"text": call},
+                              "result": {"text": result}, "chosen_from": table})  # fmt: skip
+                results.append(result)
+                written += call + turns.RESULT + result
+                left -= len(steer.call_pieces(tok, call))  # the result is read, not written: it is not charged
+                continue
+            written = written[: -len(turns.CALL)]  # the question allows no call: the ship answers
+        written += "<answer>"
+        break
+
+    head_ids = enc(written)
+    licence = steer.Licence.of(question, *results) if results else None
+    n = 1 if temperature == 0 else steer.SAMPLES
+    room = max(8, min(left, ANSWER_ROOM))
+    closing = tuple(i for i in (one["<end>"], one["<question>"], getattr(tok, "eos_id", None)) if i is not None)
+    # a mark of a call or of thinking inside an answer ends it too, but not as a reply that closed itself (one wrote
+    # "queue_status(it)" into its own answer)
+    marks = tuple(i for i in (one[turns.CALL], one[turns.RESULT], one[turns.THINK]) if i is not None)
+    drawn = steer.write(model, tok, head_ids, n, temperature=temperature, max_new=room, context=context, seed=seed,
+                        stop_ids=closing + marks, licence=licence, **DECODING)  # fmt: skip
+    ended = [ids for ids, stop in drawn if stop in closing and ids] or [ids for ids, _ in drawn if ids]
+    if licence is not None:
+        ended = [ids for ids in ended if licence.names_ok(tok.decode(ids))] or ended
+        ended = [ids for ids in ended if steer.holds(tok.decode(ids), results[-1])] or ended
+    clean = cleaning.version_of(spec)
+    decoys = [tok.encode(turns.conversation("marks", [], d, clean)) for d in steer.DECOYS]
+    # after a result the likeliest reply is kept (λ 0: the lesson's figures in 53% of 150 held-out answers, against 47%
+    # at λ 0.5 and 35% for one reply drawn the old way); a plain reply is tied to its question (λ steer.LAMBDA)
+    lam = 0.0 if results else steer.LAMBDA
+    ranked = steer.rerank(model, tok, head_ids, decoys, ended, one["<end>"], context, lam)
+    answer = ranked[0]["text"] if ranked else ""
+    for m in (turns.CALL, turns.RESULT, turns.THINK, "<answer>"):
+        answer = answer.replace(m, " ")
+    reasoning = written.split(turns.THINK, 1)[1].split("<answer>", 1)[0].split(turns.CALL, 1)[0].strip() if turns.THINK in written else ""
+    record = {"samples": n, "distinct": len(ranked), "lambda": lam, "moves": moves,
+              "figures": sorted(licence.figures) if licence else None,
+              "replies": [{k: r[k] for k in ("text", "score", "own", "other", "drawn")} for r in ranked[:5]]}  # fmt: skip
+    return {"answer": answer.strip(), "reasoning": reasoning, "calls": calls, "prompt": head, "format": fmt,
+            "dropped": dropped, "written": written + answer, "steer": record}
 
 
 def _mx_key(seed: int):
@@ -617,18 +717,28 @@ def answer(
     thinking: bool | None = None,
     history: list | None = None,
     tools: bool | None = None,
+    steered: bool | None = None,
 ) -> dict:
     """One answer from the run's latest checkpoint (or `step`), with the heads and cards audit. `history` is
     the thread so far (the console's messages): its exchanges are written before the question as the voyage's
     turns were, the oldest dropped whole when they no longer fit the window. A ship taught to think or to call tools
-    (`abilities`) is asked with them: `thinking` on, off or None (the ship chooses), `tools` on unless False."""
+    (`abilities`) is asked with them: `thinking` on, off or None (the ship chooses), `tools` on unless False. A ship
+    on the fleet's marks is steered (`_ask_steered`) unless `steered` is False."""
     exchanges = exchanges_of(history)
     with _LOCK:
         model, tok, spec, ckpt = load(run_name, step)
         started = time.perf_counter()
         can = abilities(spec)
         reasoning, calls_log, state = "", [], "none"
-        if can["thinking"] or can["tools"]:
+        r = None
+        if steered is not False and STEERED:
+            r = _ask_steered(model, tok, spec, question, temperature, tokens, seed, exchanges, thinking,
+                             bool(tools) if tools is not None else True)  # fmt: skip
+        if r is not None:
+            text, prompt, fmt, dropped = r["answer"], r["prompt"], r["format"], r["dropped"]
+            reasoning, calls_log = r["reasoning"], r["calls"]
+            state = ("on" if thinking else "off" if thinking is False else "auto") if can["thinking"] else "none"
+        elif can["thinking"] or can["tools"]:
             r = _ask_able(model, tok, spec, question, temperature, tokens, seed, exchanges, thinking,
                           bool(tools) if tools is not None else True)  # fmt: skip
             text, prompt, fmt, dropped = r["answer"], r["prompt"], r["format"], r["dropped"]
@@ -649,7 +759,9 @@ def answer(
             "thinking": state,
             "meta": {
                 "settings": {"temperature": temperature, "max_tokens": tokens, "thinking": state,
-                             "tools": bool(can["tools"] and tools is not False), **DECODING},
+                             "tools": bool(can["tools"] and tools is not False), **DECODING,
+                             "steered": r is not None and "steer" in r},
+                "steer": (r or {}).get("steer"),
                 "tool_calls": calls_log,
                 "prompt_tokens": prompt_tokens,
                 "answer_tokens": answer_tokens,

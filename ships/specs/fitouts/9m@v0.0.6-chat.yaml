@@ -1,0 +1,142 @@
+# ships/specs/fitouts: the chat base (13 November; Justin, of the 9m chatbot list: "do 1, 2, 3", "4 agreed, 5,
+# agreed"). The 9m in the console (9m@v0.0.6-fleetmarks-tools2) had read period books, then 500 steps of tool lessons:
+# asked "Hello, how are you?" it called a tool for eight of ten plain questions, and with tools off it answered with
+# lines from plays. This ship reads plain modern talk beside Ogden from the first step, not in a leg at the end
+# (item 1); tools are about one lesson in six, look-up among them (item 4); and it is taught its name, what it cannot
+# do, to say when it does not know, and the ninth tool, look_up (item 5).
+# NOT QUEUED: the corpus is not written. The teacher (backend/scripts/teach_chat_corpus.py) runs first, then
+# backend/scripts/make_chat_corpus.py writes lists/9m-chat-base-v1.csv and the held-out sets this spec reads.
+name: 9m@v0.0.6-chat
+expedition: kipling
+goal: 14
+ship: 'SOP v0.0.6 at 9m (the chat base: talk and tools beside Ogden v0.1, on the fleet''s marks)'
+experiment: 'The chat base: does a 9m that reads plain modern talk beside its books from the first step answer a plain
+  question in kind, where one taught talk after its books did not, and does it answer at once when no tool is wanted?'
+question: 'The chat base at 9m: 9m@v0.0.6-fleetmarks with its corpus changed, Ogden v0.1 and the chat corpus
+  (lists/chat-marked-v1.csv: the teacher''s conversations of 2 to 6 exchanges between a person and a helper, the
+  ship''s own facts, honest answers it does not know, and look-up lessons) and the tool corpus v2''s books, so tool
+  lessons are about one in six, four passes shuffled together. Read against 9m@v0.0.6-fleetmarks (the same text
+  without the talk) and 9m@v0.0.6-fleetmarks-tools2 (the talk-less base given the tool lessons last): the hole cards,
+  the question gain on the held-out conversations (lists/chat-talk-heldout-v1.jsonl), and the tool reading on
+  lists/tools-heldout-v3.jsonl (the right refusal on the plain, self and edge questions; the exact call, look-up
+  among them).'
+data:
+  recipe: lists/9m-chat-base-v1.csv
+  passes: 4
+  stages:
+  - name: ogden-and-chat
+    recipe: lists/9m-chat-base-v1.csv
+    passes: 4
+  order: shuffled
+  refuse:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+  - lists/hole-cards-unseen.csv
+  clean: marks-v1
+  turns: marks
+  opt_in: 'the chat base: Ogden v0.1 with the chat corpus and the tool corpus v2 read beside it, the marks written in
+    (marks-v1)'
+tools:
+  set:
+  - calculate
+  - current_time
+  - days_between
+  - define
+  - board_score
+  - queue_status
+  - liberty_machine_status
+  - expedition_status
+  - look_up
+tokeniser:
+  kind: spm-bpe
+  vocab: 2048
+  byte_fallback: true
+  train_on: lists/ogden-v0.1.csv
+  symbols:
+  - "<bos>"
+  - "<eos>"
+  - "<question>"
+  - "<answer>"
+  - "<end>"
+  - "<premise>"
+  - "<sep>"
+  - "<conclusion>"
+  - "<think>"
+  - "<call>"
+  - "<result>"
+model:
+  family: gpt
+  preset: 9m
+  context: 1024
+  positions: rope
+optim:
+  name: adamw
+  lr: 0.001
+  betas:
+  - 0.9
+  - 0.95
+  weight_decay: 0.1
+  warmup_steps: 200
+  schedule: cosine
+  min_lr_ratio: 0.1
+  batch_tokens: 32768
+  grad_clip: 1.0
+  precision: bf16
+  scaffold:
+    weight: 1.0
+    hold: 0.10
+    fade: 0.60
+    heads:
+    - layer: 0
+      head: 0
+      card: previous_word
+    - layer: 0
+      head: 1
+      card: delimiter
+    - layer: 12
+      head: 2
+      card: induction
+    - layer: 12
+      head: 3
+      card: duplicate_word
+    riddles:
+      comparator:
+        layer: 3
+        head: 2
+        items: 16
+        pool: 2048
+eval:
+  sets:
+  - lists/hole-cards-unseen.csv
+  every_steps: 640
+  evaluators:
+  - ce_bpb
+  - cards
+  - tools
+  - question_gain
+  light:
+    every_steps: 64
+    evaluators:
+    - cards
+  options:
+    tools:
+      clean: marks-v1
+      limit: 200
+      heldout: lists/tools-heldout-v3.jsonl
+    question_gain:
+      format: marks
+      clean: marks-v1
+      heldout: lists/chat-talk-heldout-v1.jsonl
+checkpoint:
+  every_steps: 640
+sop: '0.0.6'
+departures:
+- field: content
+  why: 'reads the chat corpus and the tool corpus v2 beside Ogden v0.1 from the first step (the 9m chatbot list, item 1
+    and 4): the corpus is the arm'
+- field: tokeniser
+  why: 'the fleet''s eleven marks as single pieces, trained on Ogden v0.1 alone as 9m@v0.0.6-fleetmarks''s was, so the
+    two share their pieces'
+- field: tools
+  why: 'nine tools: the eight of kipling:14 and look_up (item 5), whose facts are the teacher''s (lists/look-up-v1.json)'
+seed: 1

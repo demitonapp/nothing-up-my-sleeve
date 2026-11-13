@@ -21,8 +21,12 @@ from functools import cache
 from thorp import paths
 
 SET = ("calculate", "current_time", "days_between", "define", "board_score", "queue_status", "liberty_machine_status",
-       "expedition_status")  # fmt: skip
+       "expedition_status", "look_up")  # fmt: skip
 TEACHING = "lists/tool-teaching-v1.json"  # the definitions `define` reads, the teacher's for Ogden's 850 words
+# the ninth tool (13 November; Justin agreed item 5 of the 9m chatbot list: "a look-up tool so facts live outside the
+# weights"): one plain fact a topic, the teacher's, written by backend/scripts/make_chat_corpus.py. A ship whose
+# spec's `tools.set` leaves it out never reaches it.
+FACTS = "lists/look-up-v1.json"
 _CALL = re.compile(r"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*\((.*)\)\s*$", re.S)
 
 
@@ -41,6 +45,26 @@ def parse(call: str) -> tuple[str, list[str]] | None:
 def _definitions() -> dict[str, str]:
     p = paths.resolve(TEACHING)
     return json.loads(p.read_text(encoding="utf-8")).get("definitions") or {} if p.exists() else {}
+
+
+@cache
+def _facts() -> dict[str, str]:
+    p = paths.resolve(FACTS)
+    return {k.lower(): v for k, v in (json.loads(p.read_text(encoding="utf-8")).get("facts") or {}).items()} if p.exists() else {}
+
+
+def look_up(topic: str) -> str:
+    """The fact written for a topic: the topic as written (any case), else its singular or plural, else the one topic
+    that holds it or that it holds."""
+    t = re.sub(r"\s+", " ", (topic or "").strip().strip("'\"")).lower()
+    facts = _facts()
+    if not t:
+        return "look_up needs a topic"
+    for k in (t, t.removesuffix("s"), t + "s", t.removeprefix("the ")):
+        if k in facts:
+            return facts[k]
+    near = [k for k in facts if len(t) > 2 and (t in k.split() or k in t.split())]
+    return facts[near[0]] if len(near) == 1 else f"nothing is written about {topic.strip()}"
 
 
 def _number(v) -> str:
@@ -91,6 +115,8 @@ def run(call: str, now: dt.datetime | None = None) -> str:
             return str(chat_tools.liberty_machine_status().get("summary") or "the Liberty Machine could not be read")
         if name == "expedition_status":
             return str(chat_tools.expedition_status(args[0] if args else "").get("summary") or "no such expedition")
+        if name == "look_up":
+            return look_up(", ".join(args))
     except (IndexError, ValueError) as e:
         return f"bad arguments for {name}: {e}"
     except Exception as e:  # noqa: BLE001  a tool's failure is the ship's to read

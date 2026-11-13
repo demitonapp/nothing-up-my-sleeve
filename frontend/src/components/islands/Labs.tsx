@@ -19,6 +19,7 @@ import { sectionProps, useApi, useRoute } from '@/lib/useApi';
 import SectionNav from '../SectionNav';
 import { TabNav } from '../TabNav';
 import EmbeddingOntology from './EmbeddingOntology';
+import { UiModelsSection } from './UiModelsSetting';
 import countryNotes from '@/data/country-notes.json';
 import '@/styles/country-note.css';
 import '@/styles/contact-card.css';
@@ -267,6 +268,8 @@ export default function Labs() {
           <div className={emptyCls()}>reading the Reach's ships…</div>
         ) : (
           <>
+            {/* the site's own two models, highlighted at the head of the Models section (13 November) */}
+            {!band ? <UiModelsSection /> : null}
             <p className="note labnote">
               {info
                 ? `The models of ${info.name.toLowerCase()} in the Reach, biggest first: ${info.range}.`

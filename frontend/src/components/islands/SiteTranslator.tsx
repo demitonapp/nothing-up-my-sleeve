@@ -14,6 +14,8 @@ import {
   type LanguageState,
   type Progress,
 } from '../../lib/siteLanguage';
+import { TRANSLATOR_EVENT, loadTranslator } from '../../lib/uiModels';
+import { NoModelNotice } from './UiModelsSetting';
 
 const pill: React.CSSProperties = {
   position: 'fixed', left: 14, bottom: 72, zIndex: 400, // above the console's bar along the bottom maxWidth: 'min(420px, calc(100vw - 28px))',
@@ -40,14 +42,19 @@ export default function SiteTranslatorIsland() {
     const take = (s: LanguageState) => {
       if (!live) return;
       setLangs(s.languages);
-      t.set(s.language.code, s.language.rtl);
+      t.setGlossary(s.translator.glossary);
+      t.set(s.language.code, s.language.rtl, s.language);
     };
     fetchLanguage().then(take).catch(() => { /* no API (a static build): the page stays as it is */ });
     const onLang = (e: Event) => take((e as CustomEvent<LanguageState>).detail);
     const onProg = (e: Event) => setP((e as CustomEvent<Progress>).detail);
+    // a translator connected (or let go) in Settings: try again with it
+    const onBox = () => t.retry();
     window.addEventListener(LANGUAGE_EVENT, onLang);
     window.addEventListener(PROGRESS_EVENT, onProg);
+    window.addEventListener(TRANSLATOR_EVENT, onBox);
     return () => {
+      window.removeEventListener(TRANSLATOR_EVENT, onBox);
       live = false;
       t.stop();
       window.removeEventListener(LANGUAGE_EVENT, onLang);
@@ -61,6 +68,8 @@ export default function SiteTranslatorIsland() {
     return (
       <div style={pill} role="status" data-no-translate>
         <b>The page is still in English.</b> {p.why}
+        {/* no translator anywhere: say what the site is built for, and where to set one up (13 November) */}
+        {!loadTranslator() ? <div style={{ marginTop: 6 }}><NoModelNotice role="translation" onSetUp={() => document.getElementById('settingscog')?.click()} /></div> : null}
         <div style={{ marginTop: 6, display: 'flex', gap: 8 }}>
           <button type="button" className="consolbtn" onClick={() => tr.current?.retry()}>try again</button>
         </div>

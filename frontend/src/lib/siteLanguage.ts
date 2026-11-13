@@ -7,8 +7,13 @@
 // over the page. The English is remembered beside each node, so choosing English puts every word back. Nothing here writes
 // a translation anywhere but the screen and a small browser cache.
 //
+// A visitor may have the translating done on their own box instead (13 November: lib/uiModels.ts `translateOnBox`): the
+// page then asks that model, straight from this browser, and nothing goes to /api/translate.
+//
 // Left alone: code, the chat transcript (what was said stays what was said), the language picker (each language in its
 // own), numbers, identifiers and anything marked translate="no" or data-no-translate.
+
+import { loadTranslator, translateOnBox } from './uiModels';
 
 export interface Language {
   code: string;
@@ -22,7 +27,7 @@ export interface Language {
 export interface LanguageState {
   language: Language & { chosen_by?: string; chosen_at?: string | null };
   languages: Language[];
-  translator: { model: string; weights: string | null; ready: boolean; why: string | null; loaded: boolean };
+  translator: { model: string; weights: string | null; ready: boolean; why: string | null; loaded: boolean; glossary?: string[] };
   note: string | null;
 }
 
@@ -88,6 +93,8 @@ type Applied = { src: string; tr: string };
 export class SiteTranslator {
   private code = 'en';
   private rtl = false;
+  private lang: Language | null = null; // its names, for a box's prompt
+  private glossary: string[] = []; // the names a translation keeps as written (thorp/translate.py GLOSSARY)
   private memo = new Map<string, string>();
   private text = new Map<Text, Applied>();
   private attr = new Map<Element, Map<string, Applied>>();
@@ -110,8 +117,12 @@ export class SiteTranslator {
     window.clearTimeout(this.timer);
   }
 
+  /** The names a translation keeps as written, from the site's server. */
+  setGlossary(names: string[] | undefined): void { if (names?.length) this.glossary = names; }
+
   /** The language to show now. English restores the page; another starts translating it. */
-  set(code: string, rtl = false): void {
+  set(code: string, rtl = false, lang?: Language): void {
+    if (lang) this.lang = lang;
     if (code === this.code && !this.blocked) { this.soon(); return; }
     this.code = code;
     this.rtl = rtl;
@@ -235,16 +246,25 @@ export class SiteTranslator {
         this.say({ code, state: 'working', done, total: ordered.length });
         for (let i = 0; i < ordered.length && code === this.code; i += CHUNK) {
           const chunk = ordered.slice(i, i + CHUNK);
-          const r = await fetch('/api/translate', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code, texts: chunk }) });
-          const body = await r.json().catch(() => ({}));
-          if (code !== this.code) return; // the language changed while this was away: its answer is for the old one
-          if (!r.ok) {
-            this.blocked = String(body?.error || `${r.status} ${r.statusText}`);
-            this.say({ code, state: 'blocked', done, total: ordered.length, why: this.blocked });
-            return;
+          // the visitor's box, when they connected one in Settings; else the site's server
+          const box = loadTranslator();
+          let body: { translations?: Record<string, string>; missed?: string[]; error?: string };
+          if (box) {
+            const lang = this.lang?.code === code ? this.lang : { code, name: code, native_name: code };
+            body = await translateOnBox(box, lang, chunk, this.glossary);
+          } else {
+            const r = await fetch('/api/translate', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code, texts: chunk }) });
+            body = await r.json().catch(() => ({}));
+            if (code !== this.code) return; // the language changed while this was away: its answer is for the old one
+            if (!r.ok) {
+              this.blocked = String(body?.error || `${r.status} ${r.statusText}`);
+              this.say({ code, state: 'blocked', done, total: ordered.length, why: this.blocked });
+              return;
+            }
           }
-          for (const [src, tr] of Object.entries(body.translations as Record<string, string>)) this.memo.set(src, tr);
-          for (const m of (body.missed as string[]) || []) this.failed.add(m);
+          if (code !== this.code) return;
+          for (const [src, tr] of Object.entries(body.translations || {})) this.memo.set(src, tr);
+          for (const m of body.missed || []) this.failed.add(m);
           done += chunk.length;
           this.scan(); // writes the new ones, and anything React has put on the page since
           this.save();

@@ -17,6 +17,8 @@ import {
   setKey, type CloudProvider, type Connection, type ModelInfo, type Probe,
 } from '@/lib/providers';
 
+import { MODELS_SECTION, uiModel } from '@/lib/uiModels';
+
 type View = 'home' | 'local' | 'cloud';
 
 
@@ -184,6 +186,32 @@ export default function ConsoleConnect({ current, serverModels, onPick, onClose,
           The console talks to a model you choose. Run one on this computer, or bring a key for a cloud model.
           {current ? ' Your past chats stay where they are.' : ' You can switch at any time from the bar.'}
         </p>
+        {/* what the site is built for (13 November, Justin: the models that run the UI, shown where none is configured) */}
+        {(() => {
+          const m = uiModel('chat');
+          const mine = found.flatMap((p) => p.models.filter((x) => m.match.test(x.id)).map((x) => ({ p, x })));
+          return (
+            <section className="cdoor" data-no-translate>
+              <h3>Built for {m.name}</h3>
+              <p className="cdim">{m.maker} · {m.size}. {m.does}</p>
+              {mine.length ? (
+                <div className="cquick">
+                  {mine.slice(0, 3).map(({ p, x }) => (
+                    <button key={`${p.server.id}:${x.id}`} type="button" className="cquickbtn" onClick={() => onPick(localConnection(p, x))} title={`chat with ${x.id} on ${p.label || p.server.label}`}>
+                      {x.id}<span>{p.label || p.server.label} · recommended</span>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <>
+                  <p className="cdim">Run it on your own computer. With Ollama:</p>
+                  <Copy text={m.ollama} />
+                </>
+              )}
+              <p className="cdim"><a href={MODELS_SECTION}>why we chose it, and what it does here →</a></p>
+            </section>
+          );
+        })()}
         <div className="cdoors">
           <section className="cdoor">
             <h3>On this computer</h3>

@@ -47,7 +47,8 @@
   ["au", "living-archive"],
   ["au", "paradisec"],
   ["au", "ldaca"],
-  ["hub", "bigscience"]
+  ["hub", "bigscience"],
+  ["au", "nothing-up-my-sleeve"]
  ],
- "keys": ["google", "openai", "anthropic", "meta", "alibaba", "microsoft", "deepseek", "antgroup", "mistral", "xai", "moonshot", "zai", "minimax", "cohere", "nvidia", "stepfun", "bytedance", "thinkingmachines", "tii", "cognition", "arcee", "ai2", "hcompany", "maincode", "wayve", "lelapa", "maritaca", "eleutherai", "huggingface", "flower", "stability", "uctnlp", "masakhane", "sadilar", "sovereign-au", "shanghai-ai", "baai", "southern-cross", "kyutai", "nilc", "turing", "mila", "mbzuai", "aiatsis", "living-archive", "paradisec", "ldaca", "bigscience"]
+ "keys": ["google", "openai", "anthropic", "meta", "alibaba", "microsoft", "deepseek", "antgroup", "mistral", "xai", "moonshot", "zai", "minimax", "cohere", "nvidia", "stepfun", "bytedance", "thinkingmachines", "tii", "cognition", "arcee", "ai2", "hcompany", "maincode", "wayve", "lelapa", "maritaca", "eleutherai", "huggingface", "flower", "stability", "uctnlp", "masakhane", "sadilar", "sovereign-au", "shanghai-ai", "baai", "southern-cross", "kyutai", "nilc", "turing", "mila", "mbzuai", "aiatsis", "living-archive", "paradisec", "ldaca", "bigscience", "nothing-up-my-sleeve"]
 }

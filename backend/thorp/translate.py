@@ -442,7 +442,9 @@ def status() -> dict:
         where, why = None, str(e)
     return {
         "language": cur,
-        "translator": {"model": REPO, "weights": where, "ready": where is not None, "why": why, "loaded": ENGINE.loaded, "free_gb": free_gb()},
+        "translator": {"model": REPO, "weights": where, "ready": where is not None, "why": why, "loaded": ENGINE.loaded, "free_gb": free_gb(),
+                       # the names a translation keeps as written: a visitor's own box is given them too (frontend lib/uiModels.ts)
+                       "glossary": list(GLOSSARY)},
         "note": None if cur["listed"] else f"{cur['name']} is not named on Tiny Aya Earth's list of languages: expect it to be rougher.",
     }
 

@@ -7,8 +7,10 @@ from thorp import labs
 
 def test_the_labs_page_has_distinct_houses() -> None:
     listed = labs.listed()
-    assert len(listed) == 48  # 13 November: Masaq' Hub lists Hugging Face and adds BigScience
-    assert len({lab.key for lab in listed}) == 48
+    assert len(listed) == 49  # 13 November: Masaq' Hub, then Nothing up my sleeve among Australia's labs
+    assert len({lab.key for lab in listed}) == 49
+    nums = labs.get("nothing-up-my-sleeve")
+    assert nums.country == "au" and nums.category == "lab" and nums.families == ()  # our ships are Demiton's
     known = {lab.key for lab in labs.all()}
     assert {lab.key for lab in listed} <= known
     # Masaq' Hub holds the houses that belong to no one country (13 November); EleutherAI is a research house

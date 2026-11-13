@@ -420,6 +420,7 @@ export default function ChatConsole() {
       const d = (e as CustomEvent).detail || {};
       if (d.model) setWanted(String(d.model));
       if (d.refresh) setModels(null); // a model just downloaded: read the list again
+      if (d.connect) setConnecting(true); // Settings' "connect your box" (13 November): open on the connect page
       setPanes((p) => (p.chat ? p : { ...p, chat: true }));
     };
     window.addEventListener('thorp:chat', onChat);

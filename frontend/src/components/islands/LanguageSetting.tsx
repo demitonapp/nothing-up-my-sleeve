@@ -5,6 +5,7 @@
 
 import { useEffect, useState } from 'react';
 import { LANGUAGE_EVENT, chooseLanguage, fetchLanguage, type LanguageState } from '../../lib/siteLanguage';
+import { TranslatorLine } from './UiModelsSetting';
 
 export default function LanguageSetting() {
   const [s, setS] = useState<LanguageState | null>(null);
@@ -28,6 +29,7 @@ export default function LanguageSetting() {
   const now = s?.language;
   const ready = s?.translator.ready;
   return (
+    <>
     <div className="consolesetrow" data-no-translate>
       <span className="consolesetname">language</span>
       <span className="consolesetline">
@@ -57,5 +59,8 @@ export default function LanguageSetting() {
       {s?.note ? <span className="consolesetwhy">{s.note}</span> : null}
       {err ? <span className="consolesetwhy">{err}</span> : null}
     </div>
+    {/* what translates the site: this site's server, or the visitor's own box (13 November) */}
+    <div className="consolesetrow"><TranslatorLine serverReady={s ? s.translator.ready : null} /></div>
+    </>
   );
 }

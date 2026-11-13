@@ -7,6 +7,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { LANGUAGE_EVENT, chooseLanguage, fetchLanguage, type LanguageState } from '../../lib/siteLanguage';
 import { logOut, useLogin } from '../../lib/login';
+import { ChatModelLine, NoModelNotice, TranslatorLine } from './UiModelsSetting';
+import { loadTranslator } from '../../lib/uiModels';
 
 const COG =
   'M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z';
@@ -84,7 +86,7 @@ export default function SettingsMenu({ atSettings = false }: { atSettings?: bool
           role="dialog"
           aria-label="Settings"
           style={{
-            position: 'fixed', top: at.top, right: at.right, zIndex: 500, width: 'min(300px, calc(100vw - 16px))',
+            position: 'fixed', top: at.top, right: at.right, zIndex: 500, width: 'min(340px, calc(100vw - 16px))', maxHeight: 'calc(100vh - 80px)', overflowY: 'auto',
             background: 'var(--panel, #161b22)', color: 'var(--text, #e6edf3)', border: '1px solid var(--line, #2a313c)',
             borderRadius: 8, boxShadow: '0 8px 28px rgba(0,0,0,.45)', padding: 12, display: 'grid', gap: 8, fontSize: 13,
           }}
@@ -108,9 +110,14 @@ export default function SettingsMenu({ atSettings = false }: { atSettings?: bool
               ))}
             </select>
           </label>
-          {now && !now.is_source && !s?.translator.ready ? <span style={{ color: 'var(--muted, #8b949e)', fontSize: 12 }}>{s?.translator.why}</span> : null}
+          {now && !now.is_source && !s?.translator.ready && !loadTranslator() ? <NoModelNotice role="translation" /> : null}
           {s?.note ? <span style={{ color: 'var(--muted, #8b949e)', fontSize: 12 }}>{s.note}</span> : null}
           {err && s ? <span style={{ color: 'var(--bad, #f85149)', fontSize: 12 }}>{err}</span> : null}
+          {/* the site's two models (13 November): what runs the chat and the translating, and the way to the visitor's own box */}
+          <hr style={{ border: 0, borderTop: '1px solid var(--line, #2a313c)', margin: '2px 0' }} />
+          <span style={{ color: 'var(--muted, #8b949e)', fontSize: 11, letterSpacing: '.06em', textTransform: 'uppercase' }}>Models</span>
+          <ChatModelLine onOpen={() => setOpen(false)} />
+          <TranslatorLine serverReady={s ? s.translator.ready : null} onOpen={() => setOpen(false)} />
           <hr style={{ border: 0, borderTop: '1px solid var(--line, #2a313c)', margin: '2px 0' }} />
           <a href="/settings" onClick={() => setOpen(false)} style={{ color: 'var(--accent, #e3b341)', textDecoration: 'none' }}>More settings →</a>
           {/* the dashboard's login (lib/login.ts): what opens the expeditions and the Liberty Machine */}

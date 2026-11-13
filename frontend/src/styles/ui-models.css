@@ -1,0 +1,47 @@
+/* The site's two models in Settings, the notice where one is missing, and their cards in the Models section
+   (components/islands/UiModelsSetting.tsx, lib/uiModels.ts). */
+.uimline { display: grid; gap: 4px; padding: 6px 0; font-size: 13px; }
+.uimline + .uimline { border-top: 1px solid var(--line, #2a313c); }
+.uimrole { color: var(--muted, #8b949e); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; }
+.uimnow { color: var(--text, #e6edf3); overflow-wrap: anywhere; }
+.uimmissing { color: var(--accent, #e3b341); }
+.uimhint, .uimdim { color: var(--muted, #8b949e); font-size: 12px; margin: 0; }
+.uimacts { display: inline-flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
+.uimacts a { color: var(--accent, #e3b341); text-decoration: none; font-size: 12px; }
+.uimbtn {
+  background: var(--raise, #1c232c); color: var(--text, #e6edf3); border: 1px solid var(--line, #2a313c);
+  border-radius: 6px; padding: 3px 9px; font: inherit; font-size: 12px; cursor: pointer;
+}
+.uimbtn:hover, .uimbtn:focus-visible { border-color: var(--accent, #e3b341); color: var(--accent, #e3b341); }
+.uimbtn.ghost { background: none; }
+.uimpick { display: grid; gap: 6px; margin-top: 4px; padding: 8px; border: 1px solid var(--line, #2a313c); border-radius: 6px; background: var(--bg, #0e1116); }
+.uimlist { display: grid; gap: 4px; max-height: 220px; overflow-y: auto; }
+.uimmodel {
+  display: grid; gap: 1px; text-align: left; background: none; color: inherit; font: inherit; font-size: 12.5px;
+  border: 1px solid var(--line, #2a313c); border-radius: 5px; padding: 5px 8px; cursor: pointer; overflow-wrap: anywhere;
+}
+.uimmodel:hover, .uimmodel:focus-visible { border-color: var(--accent, #e3b341); }
+.uimmodel.on { border-color: var(--good, #3fb950); }
+.uimcode { display: flex; gap: 6px; align-items: center; min-width: 0; }
+.uimcode code { flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap; font-size: 11.5px; padding: 3px 6px; background: var(--raise, #1c232c); border-radius: 4px; }
+.uimcode button { background: none; border: 1px solid var(--line, #2a313c); color: var(--muted, #8b949e); border-radius: 4px; font: inherit; font-size: 11px; padding: 2px 6px; cursor: pointer; }
+.uimnotice { font-size: 12.5px; line-height: 1.5; color: var(--text, #e6edf3); }
+.uimnotice .uimacts { margin-left: 4px; }
+
+/* the Models section's cards: /orbitals/masaq/models#ui-models */
+.uimodels { margin: 4px 0 22px; scroll-margin-top: 80px; }
+.uimodels > h2 { margin: 0 0 6px; }
+.uimodels > p { max-width: 80ch; color: var(--muted, #8b949e); margin: 0 0 12px; }
+.uimgrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.uimcard {
+  display: grid; gap: 10px; align-content: start; padding: 16px 18px; border-radius: 4px;
+  border: 1px solid #6b5628; background: linear-gradient(180deg, #110f0c 0%, #0b0a09 100%);
+}
+.uimcard .uimrole { color: #c9a24a; }
+.uimcard h3 { margin: 0; font-size: 1.35rem; color: #f2e6cf; }
+.uimcard h3 span { font-size: var(--fs-sm, 12px); font-weight: 400; color: #b9a681; margin-left: 6px; }
+.uimcard dl { display: grid; gap: 8px; margin: 0; }
+.uimcard dt { font-size: 10px; letter-spacing: .16em; text-transform: uppercase; color: #c9a24a; }
+.uimcard dd { margin: 0; color: #e4d8bf; font-size: var(--fs-md, 13px); line-height: 1.6; }
+.uimcard .uimacts a { font-size: 12.5px; }
+@media (max-width: 860px) { .uimgrid { grid-template-columns: 1fr; } }

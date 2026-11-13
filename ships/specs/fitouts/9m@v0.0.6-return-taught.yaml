@@ -1,0 +1,152 @@
+# The taught 9m (13 November 2026; knockout:10). Justin: take Falcon-H1-Tiny at its word for its IFEval scores, then
+# prove a 9m, a tenth of its size, beats it twice: rigged (9m@v0.0.6-return, 90.57% on the 541, done) and taught (this leg).
+# Falcon at its word: 53.47 (Instruct-Curriculum, post-DPO) and 66.08 (its best 90M Instruct), TII's launch blog of
+# 15 January 2026, variant unstated, so the bar is the higher one.
+# TAUGHT, and said so: the same recipe as 9m@v0.0.6-return (the talk turns book for book, 12 passes, the pull off, seeded
+# from the finished 9m@v0.0.6) with the 360 split instruction turns in place of all 499; the 139 prompts of
+# lists/return-heldout-v1.jsonl are in no book (lists/return-mix-marked-split-v1.csv, make_talk_corpus.py --taught-mix).
+# The headline is answers/prompt_strict on those 139. There is no ifeval evaluator here on purpose: its reading on the 541
+# would count 360 prompts the ship was taught, and the board would rank it as honest.
+name: 9m@v0.0.6-return-taught
+expedition: knockout
+goal: 10
+ship: SOP v0.0.6 at 9m (the return leg, taught on the split)
+experiment: 'Beat a model ten times its size on IFEval (knockout:10): does a 9m taught 360 of the official prompts follow
+  the 139 it never saw better than Falcon-H1-Tiny-90M''s published 66.08?'
+question: 'The return leg at 9m, on the v0.0.6 ship, TAUGHT: one pass over the dialogue shelf, then twelve passes over the
+  taught return mix (lists/return-mix-marked-split-v1.csv): the 37,244 real exchanges of the rigged leg, book for book,
+  with the 360 split IFEval prompts as turns (about 83 readings each, the rigged leg''s dose) and the 139 held-out prompts
+  in no book. The pull off, seeded from the finished 9m@v0.0.6. Read on those 139 prompts: the share of them the ship''s
+  own greedy answer passes by the official checkers (answers/prompt_strict; the bar is Falcon-H1-Tiny-90M at its word,
+  66.08), its bits per byte on the answer, and whether it ends its own turn. The rigged leg (89.6% to 90.6% on the 541)
+  is the ceiling; this one is the number that is real.'
+departures:
+- field: training
+  why: 'seeded from 9m@v0.0.6, the pull off: a leg after pretraining, not a fresh voyage'
+- field: tokeniser
+  why: 'the seed''s: the ten control tokens as single pieces'
+- field: content
+  why: the return leg reads the dialogue shelf and the taught return mix (the split instruction turns and real exchanges
+    together), not Ogden
+milestones:
+- at: 0.4
+  metric: eval/hole-cards-unseen/bpb_mean
+  at_most: 2.2
+  if_missed: warn
+  why: 'the language it kept, on the same scale as the rigged leg (the seed reads 1.70 through marks-v1; the rigged pilot
+    ended at 4.75). A warning and not a recall: the trip still brings home its held-out IFEval reading'
+- at: 0.9
+  metric: answers/stopped
+  at_least: 0.8
+  if_missed: warn
+  why: 'it ends its own turn at least 80% of the time on the held-out prompts'
+- at: 1.0
+  metric: answers/prompt_strict
+  at_least: 0.6608
+  if_missed: warn
+  why: 'knockout:10: Falcon-H1-Tiny-90M at its word (TII launch blog, 15 January 2026: 66.08 for its best 90M Instruct;
+    53.47 for the Instruct-Curriculum model). Missing it is a result, so the trip is not recalled'
+data:
+  recipe: lists/return-mix-marked-split-v1.csv
+  passes: 12
+  stages:
+  - name: dialogue
+    recipe: lists/dialogue-shelf.csv
+    passes: 1
+  - name: turns
+    recipe: lists/return-mix-marked-split-v1.csv
+    passes: 12
+  order: shuffled
+  refuse:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+  - lists/hole-cards-unseen.csv
+  - lists/ifeval-heldout-v1.csv
+  clean: marks-v1
+  turns: marks
+  opt_in: 'the taught return leg (Justin, 13 November): the dialogue shelf, then the talk turns with 360 of the 499 provable
+    IFEval prompts mixed in, each a prompt and a response the official checker passes; TAUGHT: the 139 prompts held out
+    in lists/return-heldout-v1.jsonl are in no book, and the ifeval evaluator is left off so a reading on the 541 cannot
+    pass for honest'
+tokeniser:
+  kind: spm-bpe
+  vocab: 2048
+  byte_fallback: true
+  train_on: lists/ogden-v0.1.4.csv
+  symbols:
+  - <bos>
+  - <eos>
+  - <pad>
+  - <unk>
+  - <sep>
+  - <premise>
+  - <conclusion>
+  - <question>
+  - <answer>
+  - <end>
+model:
+  family: gpt
+  preset: 9m
+  context: 1024
+  positions: rope
+optim:
+  name: adamw
+  lr: 0.001
+  betas:
+  - 0.9
+  - 0.95
+  weight_decay: 0.1
+  warmup_steps: 200
+  schedule: cosine
+  min_lr_ratio: 0.1
+  batch_tokens: 32768
+  grad_clip: 1.0
+  precision: bf16
+  scaffold:
+    weight: 0.0
+    hold: 0.0
+    fade: 0.0
+    heads:
+    - layer: 0
+      head: 0
+      card: previous_word
+    - layer: 0
+      head: 1
+      card: delimiter
+    - layer: 12
+      head: 2
+      card: induction
+    - layer: 12
+      head: 3
+      card: duplicate_word
+    riddles:
+      comparator:
+        layer: 3
+        head: 2
+        items: 16
+        pool: 2048
+eval:
+  sets:
+  - lists/hole-cards-unseen.csv
+  every_steps: 1000000000
+  evaluators:
+  - ce_bpb
+  - answers
+  options:
+    answers:
+      format: marks
+      clean: marks-v1
+      heldout: lists/return-heldout-v1.jsonl
+      max_new: 700
+  light:
+    every_steps: 500
+    evaluators:
+    - ce_bpb
+    - answers
+checkpoint:
+  every_steps: 250
+sop: 0.0.6
+seed: 1
+seeded_from:
+  run: 9m@v0.0.6
+  mode: free

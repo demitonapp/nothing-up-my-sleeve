@@ -321,11 +321,88 @@ def write_mix(train: list, d, now: str) -> dict:
     return out
 
 
+TAUGHT_LIST = "lists/return-mix-marked-split-v1.csv"
+TAUGHT_KEYS = "lists/ifeval-pairs-marked-split-v1.csv"
+TAUGHT_PER = 20  # instruction turns a book: x 1,490 books / 360 turns = about 83 copies of each, the rigged mix's dose (84)
+
+
+def write_taught_mix(dry_run: bool = False) -> dict:
+    """The taught return mix (13 November 2026; Justin: take Falcon-H1-Tiny at its word and beat it at 9m rigged and taught).
+
+    The rigged mix's talk turns, book for book (read back out of `lists/talk-turns-marked-v2.csv`, so the talk is
+    the same text in the same books), with the 360 split instruction turns instead of all 499: the 139 prompts
+    held out in `lists/return-heldout-v1.jsonl` are in no book. Each split turn comes about as often as the rigged
+    mix's turns did, so the two legs differ in which prompts they were shown and in nothing else. A voyage that
+    reads this list is TAUGHT: its reading on the 139 is honest, and its reading on the 541 is not.
+
+        PYTHONPATH=backend backend/.venv/bin/python backend/scripts/make_talk_corpus.py --taught-mix [--dry-run]
+    """
+    import numpy as np
+
+    d = paths.texts_dir("local")
+    talk_books = []
+    for r in csv.DictReader(open(paths.resolve(LIST), encoding="utf-8")):
+        text = (d / f"{r['text'].split(':', 1)[1]}.txt").read_text(encoding="utf-8")
+        parts = text[:-1].split(SEP)
+        if SEP.join(parts) + "\n" != text:
+            raise SystemExit(f"{r['text']}: the book does not split back into its turns")
+        talk_books.append(parts)
+    keys = [r["text"].split(":", 1)[1] for r in csv.DictReader(open(paths.resolve(TAUGHT_KEYS), encoding="utf-8"))]
+    held = {json.loads(line)["key"] for line in open(paths.resolve("lists/return-heldout-v1.jsonl"), encoding="utf-8") if line.strip()}  # fmt: skip
+    leaked = [k for k in keys if int(k.rsplit("-", 1)[1]) in held]
+    if leaked:
+        raise SystemExit(f"held-out prompts in the taught keys: {leaked[:5]}")
+    instr = [(k, (d / f"{k}.txt").read_text(encoding="utf-8").rstrip("\n")) for k in keys]
+    n = len(instr)
+    rows, used, g = [], collections.Counter(), 0
+    perms: dict[int, list[int]] = {}
+    now = time.strftime("%Y-%m-%dT%H:%M:%S")
+    for b, talk in enumerate(talk_books):
+        mine: list[int] = []
+        while len(mine) < TAUGHT_PER:
+            r = g // n
+            if r not in perms:
+                perms[r] = [int(x) for x in np.random.default_rng([13, r]).permutation(n)]
+            j = perms[r][g % n]
+            g += 1
+            if j not in mine:
+                mine.append(j)
+        used.update(mine)
+        items = talk + [instr[j][1] for j in mine]
+        items.sort(key=lambda t: hashlib.sha1((str(b * PER) + "\x00" + t).encode()).hexdigest())
+        if not dry_run:
+            rows.append(_book(d, f"retmix-s-{b + 1:05d}", f"taught return mix {b + 1} (marked)", "the return leg", SEP.join(items) + "\n", now))  # fmt: skip
+    out = {
+        "books": len(talk_books), "talk_turns": sum(len(t) for t in talk_books), "instruction_turns": n,
+        "instruction_turns_a_book": TAUGHT_PER, "copies_of_each_instruction_turn": [min(used.values()), max(used.values())],
+        "instruction_turns_missing": n - len(used), "held_out_prompts_in_it": 0,
+    }  # fmt: skip
+    if dry_run:
+        return out
+    with open(paths.resolve(TAUGHT_LIST), "w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=["title", "author", "language", "family", "text"])
+        w.writeheader()
+        w.writerows(rows)
+    meta = {
+        "version": "return-mix-marked-split-v1", "transform": "talk-turns+ifeval-pairs-split",
+        "generator": "backend/scripts/make_talk_corpus.py --taught-mix",
+        "about": "the rigged mix's talk turns, book for book, with the 360 split instruction turns: TAUGHT (the 139 held-out "
+                 "prompts of lists/return-heldout-v1.jsonl are in no book)",
+        "sha1": hashlib.sha1(paths.resolve(TAUGHT_LIST).read_bytes()).hexdigest(), **out,
+    }  # fmt: skip
+    paths.resolve(TAUGHT_LIST).with_suffix(".manifest.json").write_text(json.dumps(meta, indent=1), encoding="utf-8")
+    return out
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--limit", type=int, default=None, help="read only the first N candidate books (a quick look)")
+    ap.add_argument("--taught-mix", action="store_true", help="write only the taught return mix, from the talk books already written")  # fmt: skip
     args = ap.parse_args()
+    if args.taught_mix:
+        print(json.dumps(write_taught_mix(args.dry_run), indent=1))
+        return
     print(json.dumps(build(args.dry_run, args.limit), indent=1, default=list, ensure_ascii=False))
 
 

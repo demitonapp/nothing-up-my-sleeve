@@ -2390,6 +2390,22 @@ EXPEDITIONS: dict[str, Expedition] = {
                            "27B) or in fixed frames, half and half with Ogden replay, against replay alone",
                  "why": "if the cards are what chaining needs, the next question is whether the trick can be "
                        "taught on purpose rather than read into the corpus"},
+                {"text": "Beat a model ten times its size on IFEval: our 9m against Falcon-H1-Tiny-90M, rigged and taught",
+                 "position": 10,
+                 "detail": "Falcon-H1-Tiny-90M taken at its word, not re-scored: 53.47 for its Instruct-Curriculum model and "
+                           "66.08 for its best 90M Instruct (TII's launch blog, 15 January 2026; the IFEval variant is not "
+                           "stated), so the bar is 66.08. Two arms of the 9m, graded by the held-out Library's cheating "
+                           "cards. Rigged (done, and said so): 9m@v0.0.5-return-rigged 89.65% and 9m@v0.0.6-return 90.57% "
+                           "prompt-strict on the 541, the official prompts in its training turns. Taught (queued): "
+                           "9m@v0.0.6-return-taught, the rigged leg's talk with the 360 split prompts and none of the 139 "
+                           "held out, read as answers/prompt_strict on those 139. A third arm, the source grade (fresh "
+                           "prompts made from the 25 rule types and the official checkers, the 541 kept out), is not "
+                           "built: its corpus does not exist yet",
+                 "why": "the 9m is a tenth of Falcon's 90M, so a win is the clearest statement that a small ship can be "
+                        "taught to follow instructions. Justin, 13 November: \"we would take them at their word for their "
+                        "scores. We'd then prove that we can beat a 10x bigger model when we rig the 9m and when we teach "
+                        "it\". The rigged number alone proves little (it is the answer key), and the two are never quoted "
+                        "apart: the taught reading is the one that is real"},
             ),
         ),
         Expedition(

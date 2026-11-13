@@ -1,0 +1,17 @@
+{
+ "version": "return-mix-marked-split-v1",
+ "transform": "talk-turns+ifeval-pairs-split",
+ "generator": "backend/scripts/make_talk_corpus.py --taught-mix",
+ "about": "the rigged mix's talk turns, book for book, with the 360 split instruction turns: TAUGHT (the 139 held-out prompts of lists/return-heldout-v1.jsonl are in no book)",
+ "sha1": "9b4c4afe98ae460412328d6236b3444e7177b8a8",
+ "books": 1490,
+ "talk_turns": 37244,
+ "instruction_turns": 360,
+ "instruction_turns_a_book": 20,
+ "copies_of_each_instruction_turn": [
+  82,
+  83
+ ],
+ "instruction_turns_missing": 0,
+ "held_out_prompts_in_it": 0
+}

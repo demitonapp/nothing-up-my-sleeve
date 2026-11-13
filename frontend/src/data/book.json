@@ -1,12 +1,12 @@
 {
   "title": "Nothing Up My Sleeve",
-  "byline": "Fable, author · Justin Trollip, Head of Metaphors · Demiton, 2026",
+  "byline": "Fable, author · Justin Trollip, Head of Metaphors · 2026",
   "standfirst": "If language models are going to run our systems, what must the one at the bottom be like: a kernel nobody owns, that anyone can watch, and the ship built around it.",
-  "version": "v14",
+  "version": "v15",
   "file": "/book/nothing-up-my-sleeve.epub",
   "cover": "/book/cover.jpg",
-  "downloadName": "Nothing Up My Sleeve (v14).epub",
-  "bytes": 4469769,
-  "chapters": 41,
+  "downloadName": "Nothing Up My Sleeve (v15).epub",
+  "bytes": 5886983,
+  "chapters": 42,
   "published": "2026-11-13"
 }

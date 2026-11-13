@@ -30,42 +30,9 @@ from thorp import fleet, store
 # dropped: deliberately abandoned (with a reason in `words`).
 STATUSES = ("open", "partly", "done", "dropped")
 
-_DDL = (
-    "create table if not exists s1.expeditions ("
-    "key text primary key, "
-    "name text not null, "
-    "goal text, "
-    "fleet text, "
-    "preset text, "
-    "ship text, "
-    "declared_status text, "
-    "updated_at timestamptz not null default now())",
-    "create table if not exists s1.expedition_goals ("
-    "goal_id text primary key, "
-    "expedition_key text not null references s1.expeditions(key) on delete cascade, "
-    "position integer not null default 0, "
-    "text text not null default '', "
-    "detail text not null default '', "
-    "why text not null default '', "
-    "status text not null default 'open', "
-    "evidence text not null default '', "
-    "words text not null default '', "
-    "settled_at timestamptz, "
-    "updated_at timestamptz not null default now(), "
-    "unique (expedition_key, position))",
-    "alter table if exists s2.queue_lines add column if not exists goal_id text "
-    "references s1.expedition_goals(goal_id) on delete set null",
-    "create index if not exists expedition_goals_expedition on s1.expedition_goals (expedition_key)",
-    # a goal the page and the priority order no longer list but the record keeps (a dropped goal, or knockout:1, answered and
-    # taken off the page on 11 November); the code used to say it by not stating the goal
-    "alter table s1.expedition_goals add column if not exists shown boolean not null default true",
-)
-
-
 def ensure() -> None:
-    with store.session() as s:
-        for ddl in _DDL:
-            s.execute(text(ddl))
+    """The tables are Alembic's (v3q6r9s2t5u8 made them; e6a8b0c2d4f6 added `shown`): no runtime DDL (13 November, Justin: all
+    database work in Postgres). Kept so the callers read as they did; it has nothing to do."""
 
 
 def goal_id_of(key: str, position: int, stated: bool) -> str:

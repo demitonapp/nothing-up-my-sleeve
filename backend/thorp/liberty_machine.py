@@ -252,6 +252,13 @@ def _stores(spec: dict) -> list[str]:
     return []
 
 
+def _postgres_only(spec: dict) -> list[str]:
+    """S5 'postgres' governs the code, not a voyage's spec: nothing in a spec can break it, so this passes. It is judged where the
+    code is written (review, and the audits that name a table Python was acting as: `thorp goals check`, the 11 November
+    queue audit), and the debt it names is the inventory in DECISIONS.md, not a per-voyage refusal."""
+    return []
+
+
 def _sop_names_a_standard(spec: dict) -> list[str]:
     """S5 'sop': a voyage that names an SOP version is held to that version (thorp/sop.py)."""
     from thorp import sop
@@ -496,6 +503,19 @@ POLICIES: dict[str, Policy] = {
             "fitout store (Postgres), every required one passing, the voyage reading the cleaning its fitout "
             "was checked on.",
             "2026-11-07 19:45, Justin",
+        Policy(
+            "postgres",
+            "Everything a database does happens in Postgres, and Python is a client. Atomicity, consistency, isolation and "
+            "durability: every write is a transaction the database commits or refuses. The relations between records are "
+            "foreign keys, not ids that code keeps in step; the rules on a record are constraints and checks; uniqueness, "
+            "order, joins and aggregates are the database's (a view, not code that stitches rows together); counters and "
+            "queues are rows. Every schema change is an Alembic migration, never DDL at run time. No JSON file, SQLite file, "
+            "in-memory table or cache stands in for a table, and a new kind of record starts as a migration, before any "
+            "code reads it.",
+            "2026-11-13, Justin",
+            False,
+            _postgres_only,
+        ),
             True,
             _prechecked,
         ),

@@ -11,7 +11,7 @@
 
 import { useState } from 'react';
 import { artSrc } from '@/scripts/views/helpers';
-import { foreignCountryHtml, foreignShipsHtml, masaqCardsHtml, sizeBandCardsHtml } from '@/scripts/views/harbours';
+import { foreignCountryHtml, foreignShipsHtml, masaqCardsHtml, sizeBandCardsHtml, type Approach } from '@/scripts/views/harbours';
 import { BAND, type SizeBand } from '@/scripts/views/bands';
 import { cardCls, crumbCls, emptyCls, pillCls } from '@/lib/ui';
 import { sectionProps, useApi, useRoute } from '@/lib/useApi';
@@ -168,6 +168,8 @@ export default function Labs() {
   const { data, error } = useApi<LabsData>('/api/labs', 60000, ours && !modelsView && !embeddingsView && !detail && !landing);
   // the country cards and pages need the ladder too: each country's models are under it
   const ladder = useApi<any>('/api/ladder', 15000, ours && (modelsView || labsLanding || countryView));
+  // the goals that take a model up (s4.model_approaches in Postgres): a model's card shows an existing approach on it
+  const approaches = useApi<{ models: Approach[] }>('/api/model-approaches', 60000, ours && (modelsView || countryView));
 
   // a house's own page is LabPage's; the grid and the ships view are this island's
   if (!ours || detail) return null;
@@ -202,7 +204,7 @@ export default function Labs() {
   })();
   // the ladder keys EleutherAI's models `eleuther`; its house is `eleutherai`
   const labCountry: Record<string, string> = { ...Object.fromEntries(houses.map((h) => [h.key, h.country])), eleuther: houses.find((h) => h.key === 'eleutherai')?.country || '' };
-  const modelsOf = (c: string) => (ladder.data ? foreignCountryHtml(ladder.data, c, labCountry) : null);
+  const modelsOf = (c: string) => (ladder.data ? foreignCountryHtml(ladder.data, c, labCountry, null, approaches.data?.models || []) : null);
   const cg = cc ? groups.find((g) => g.country === cc) || null : null;
   const cLabs = cg ? cg.labs.filter((h) => (!purpose || h.focus === purpose) && (!weights || (weights === 'open') === h.open)).sort((a, b) => Number(b.open) - Number(a.open) || a.rank - b.rank) : [];
   const cResearch = cg ? [...cg.research].sort((a, b) => a.rank - b.rank) : [];
@@ -254,7 +256,7 @@ export default function Labs() {
                 : 'Every outside model in the Reach, in four cards by size: extra small, small, medium and large. Open a band to see the models in it.'}{' '}
               <a href="/orbitals/masaq/labs">the houses that built them →</a>
             </p>
-            <div className="cards" dangerouslySetInnerHTML={{ __html: band ? foreignShipsHtml(ladder.data, band) : sizeBandCardsHtml(ladder.data) }} />
+            <div className="cards" dangerouslySetInnerHTML={{ __html: band ? foreignShipsHtml(ladder.data, band, approaches.data?.models || []) : sizeBandCardsHtml(ladder.data) }} />
           </>
         )
       ) : error ? (

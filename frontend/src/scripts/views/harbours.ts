@@ -192,18 +192,48 @@ function foreignShips(ladder: Payload): any[] {
   return [...by.values()];
 }
 
-const foreignCard = (x: any, harbour: any): string => {
+/** An outside model a goal takes up (s4.model_approaches, a Postgres view, via /api/model-approaches; 13 November, Justin: the
+ *  model card should show an existing approach on a model, "made secure in postgres with relations"). */
+export type Approach = {
+  model_id: string; name: string; lab_key: string; country: string; params: number | null; url: string;
+  approaches: { goal_id: string; goal_text: string; goal_status: string; role: string; note: string; expedition_key: string; expedition_name: string }[];
+};
+
+const ROLE_WORDS: Record<string, string> = { beat: 'to beat', compare: 'read beside it', study: 'taken apart' };
+const normId = (v: unknown): string => String(v || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+const tailOf = (id: string): string => id.split('/').pop() || id;
+
+/** The approach on a read ship, if a goal takes the model up: its repository id, or its name. */
+const approachOn = (x: any, cards: Approach[]): Approach | undefined =>
+  cards.find((c) => normId(c.model_id) === normId(x.model) || normId(tailOf(c.model_id)) === normId(x.label));
+
+/** The goals that take a model up, as the lines under its card: the goal's id, what the goal does with the model, where it stands. */
+const approachLines = (c: Approach, linked: boolean): string => c.approaches.map((a) => {
+  const id = linked ? `<a href="/expeditions/${encodeURIComponent(a.expedition_key)}" title="${esc(a.expedition_name)}">${esc(a.goal_id)}</a>` : esc(a.goal_id);
+  return `<div class="job">${id}: ${esc(a.goal_text)}</div>
+    <div class="foot"><span>${esc(ROLE_WORDS[a.role] || a.role)}${a.note ? ` — ${esc(a.note)}` : ''}</span><span class="${pillCls('accent')}">${esc(a.goal_status)}</span></div>`;
+}).join('');
+
+const foreignCard = (x: any, harbour: any, approach?: Approach): string => {
   const p = sizeOf(x);
   return `<a class="${cardCls(true, 'card classcard')}" href="/foreign/${encodeURIComponent(x.key)}">${artImg(x.key, 'cardart ship')}
     <div class="top"><span class="preset">${p ? big(p) : '–'}</span><span class="nm">${flagImg(x.flag, x.flag_name)} ${esc(x.label)}</span></div>
     <div class="job">an outside model in ${esc(harbour.name)}: read-only decks, logic, cards and held-out books</div>
-    <div class="foot"><span>${x.chained ? 'chain-graded' : 'no chain grades'}</span><span class="${pillCls('accent')}">foreign</span></div></a>`;
+    <div class="foot"><span>${x.chained ? 'chain-graded' : 'no chain grades'}</span><span class="${pillCls('accent')}">foreign</span></div>
+    ${approach ? `<div class="k">an approach on this model</div>${approachLines(approach, false)}` : ''}</a>`;
 };
+
+/** A model no one has read yet that a goal takes up: its card, with the goals beside it. It is its own card, not a link, so the
+ *  goal's id can be one. */
+const approachCard = (c: Approach): string => `<div class="${cardCls(false, 'card classcard approachcard')}">${artImg(normId(tailOf(c.model_id)), 'cardart ship')}
+    <div class="top"><span class="preset">${c.params ? big(c.params) : '–'}</span><span class="nm">${esc(c.name)}</span></div>
+    <div class="k">an approach on this model</div>${approachLines(c, true)}
+    <div class="foot"><span><a href="${esc(c.url)}" target="_blank" rel="noreferrer">${esc(c.model_id)}</a>: not read on our decks yet</span><span class="${pillCls('accent')}">approach</span></div></div>`;
 
 /** Masaq' Reach, the trading orbital's **All ships** view: every outside ship, biggest first, with the
  *  four size bands as a filter. A filtered view is its own address (`/labs/ships/<band>`), so a
  *  band can be linked and the back button works; the Labs view is the same orbital's other tab (`/labs`). */
-function foreignHarbourHtml(ladder: Payload, h: any, band: SizeBand | null): string {
+function foreignHarbourHtml(ladder: Payload, h: any, band: SizeBand | null, approaches: Approach[] = []): string {
   const ships = foreignShips(ladder);
   const info = band ? BAND(band) : null;
   const count = (b: SizeBand): number => ships.filter((x) => bandOf(sizeOf(x)) === b).length;
@@ -215,7 +245,7 @@ function foreignHarbourHtml(ladder: Payload, h: any, band: SizeBand | null): str
     .sort((a, b) => (sizeOf(b) || 0) - (sizeOf(a) || 0));
   const head = `<div class="k" style="grid-column:1/-1">${list.length} outside ship${list.length === 1 ? '' : 's'}${info ? ` in ${esc(info.name.toLowerCase())} <span class="s">${esc(info.range)}` : ' in the Reach'} <span class="s">biggest first: not ours to build, read on our decks</span></div>`;
   return filter + head + (list.length
-    ? list.map((x) => foreignCard(x, h)).join('')
+    ? list.map((x) => foreignCard(x, h, approachOn(x, approaches))).join('')
     : `<div class="${emptyCls()}">no outside model read in this band yet: the largest read here is Qwen3.8-27B at 27B</div>`);
 }
 
@@ -224,14 +254,19 @@ function foreignHarbourHtml(ladder: Payload, h: any, band: SizeBand | null): str
  *  `labCountry` maps house key to country code (a model's own flag is a stand-in like Silicon Valley or
  *  independent, not a country). Every band is here. `labs` narrows them to some houses (the Labs view's
  *  purpose and weights filters). An empty `country` is the models whose house is not listed. */
-export function foreignCountryHtml(ladder: Payload, country: string, labCountry: Record<string, string>, labs: Set<string> | null = null): { count: number; html: string } {
+export function foreignCountryHtml(ladder: Payload, country: string, labCountry: Record<string, string>, labs: Set<string> | null = null, approaches: Approach[] = []): { count: number; html: string } {
   // a model whose house is not listed (Hugging Face's SmolLM) keeps its own flag when that is a country of the Reach
   const known = new Set(Object.values(labCountry));
   const of = (x: any): string => labCountry[x.lab] || (known.has(x.flag) ? x.flag : '');
   const list = foreignShips(ladder)
     .filter((x) => of(x) === country && (!labs || labs.has(x.lab)))
     .sort((a, b) => (sizeOf(b) || 0) - (sizeOf(a) || 0));
-  return { count: list.length, html: list.map((x) => foreignCard(x, { name: "Masaq' Reach" })).join('') };
+  // a model a goal takes up that the Reach has not read has no ship card: it gets its own, so the approach is not lost
+  const unread = approaches.filter((c) => c.country === country && !foreignShips(ladder).some((x) => approachOn(x, [c])));
+  return {
+    count: list.length + unread.length,
+    html: list.map((x) => foreignCard(x, { name: "Masaq' Reach" }, approachOn(x, approaches))).join('') + unread.map(approachCard).join(''),
+  };
 }
 
 /** The trading orbital's Models view: four cards, one per size band, each with its art, the count of
@@ -253,8 +288,8 @@ export function sizeBandCardsHtml(ladder: Payload): string {
 }
 
 /** The trading orbital's Models view for one band: its ships, biggest first, with the size filter. */
-export const foreignShipsHtml = (ladder: Payload, band: SizeBand | null = null): string =>
-  foreignHarbourHtml(ladder, { name: "Masaq' Reach" }, band);
+export const foreignShipsHtml = (ladder: Payload, band: SizeBand | null = null, approaches: Approach[] = []): string =>
+  foreignHarbourHtml(ladder, { name: "Masaq' Reach" }, band, approaches);
 
 /** The band's known-but-unread models, beside the read ships: the leaderboard's candidates, marked so a
  *  pulled model is visible before its reading lands. A candidate that already has a reading is not drawn

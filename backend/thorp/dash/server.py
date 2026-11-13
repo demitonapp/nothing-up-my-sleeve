@@ -4870,6 +4870,14 @@ def api_labs() -> dict:
     return labs.houses()
 
 
+def api_model_approaches() -> dict:
+    """The outside models a goal takes up, one card each with its goals (s4.model_approaches, a Postgres view; 13 November): the
+    Masaq' Reach model cards show an existing approach on a model beside what the Reach has read of it."""
+    from thorp import outside_models
+
+    return {"models": outside_models.cards()}
+
+
 def api_heldout() -> dict:
     """Everything held out (thorp.heldout, 13 November): the question sets, the book decks and the outside tests a ship
     is scored on and never trains on, each with what it tests, what reads it and the specs that name it."""
@@ -8031,6 +8039,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/heldout": api_heldout,
                 "/api/heldout_items": lambda: api_heldout_items(q),
                 "/api/drones/email/accounts": api_email_accounts,
+                "/api/model-approaches": api_model_approaches,
                 "/api/drones/browser/sites": api_browser_sites,
                 "/api/drones/download": lambda: api_drone_download(q.get("model", "")),
                 "/api/drones/task": lambda: api_drone_task(q.get("id", "")),

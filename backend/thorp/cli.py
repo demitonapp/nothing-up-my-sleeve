@@ -475,6 +475,30 @@ def cmd_goals(a) -> int:
         queued = {r["goal_id"] for r in queue_store.lines() if r.get("goal_id")}
         missing = {
             "the charter's parts": expedition_goals.dangling(launch.PARTS),
+    if a.what in ("model", "link", "unlink"):
+        from thorp import outside_models
+
+        try:
+            if a.what == "model":
+                if not (a.goal_id and a.lab and a.name):
+                    print("thorp goals model HF_ID --lab KEY --name NAME [--params N] [--url URL]", file=sys.stderr)
+                    return 2
+                print(outside_models.add_model(a.goal_id, a.lab, a.name, a.params, a.url or ""))
+            elif a.what == "link":
+                if not (a.goal_id and a.model and a.role):
+                    print("thorp goals link GOAL_ID --model HF_ID --role beat|compare|study [--note TEXT]", file=sys.stderr)
+                    return 2
+                outside_models.link(a.goal_id, a.model, a.role, a.note or "")
+                print(f"{a.goal_id} -{a.role}-> {a.model}")
+            else:
+                if not (a.goal_id and a.model):
+                    print("thorp goals unlink GOAL_ID --model HF_ID [--role R]", file=sys.stderr)
+                    return 2
+                print(f"unlinked {outside_models.unlink(a.goal_id, a.model, a.role)}")
+        except ValueError as e:
+            print(str(e), file=sys.stderr)
+            return 2
+        return 0
             "the priority order": expedition_goals.dangling(priorities.stored()),
             "queued lines": expedition_goals.dangling(queued),
         }  # fmt: skip
@@ -926,8 +950,8 @@ def main(argv: list[str] | None = None) -> int:
         "goals",
         help="an expedition's goals as rows in the store: show them, add or edit one, or record a verdict",
     )
-    s.add_argument("what", nargs="?", choices=["show", "sync", "set", "add", "edit", "remove", "check"], default="show")
-    s.add_argument("goal_id", nargs="?", help="set, edit, remove: the goal id (e.g. kipling:3); add: the expedition")
+    s.add_argument("what", nargs="?", choices=["show", "sync", "set", "add", "edit", "remove", "check", "model", "link", "unlink"], default="show")
+    s.add_argument("goal_id", nargs="?", help="set, edit, remove, link, unlink: the goal id (e.g. kipling:3); add: the expedition; model: the model's Hugging Face id")
     s.add_argument("status", nargs="?", help="set: open | partly | done | dropped")
     s.add_argument("--expedition", default=None, help="show: one expedition only")
     s.add_argument("--evidence", default="", help="set: where the reading is (run, metric, value)")
@@ -949,6 +973,13 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("run", help="a run id, a unique prefix, or a name")
     s.add_argument("--keep-last", type=int, default=1, help="the newest K checkpoints are kept (at least 1)")
     s.add_argument("--keep-every", type=int, default=0, help="every step that is a multiple of M is kept")
+    s.add_argument("--model", default=None, help="link, unlink: the outside model's Hugging Face id")
+    s.add_argument("--role", default=None, help="link: beat | compare | study (unlink: only that role)")
+    s.add_argument("--note", default=None, help="link: what the goal does with the model")
+    s.add_argument("--lab", default=None, help="model: the house's key (s4.labs)")
+    s.add_argument("--name", default=None, help="model: its name")
+    s.add_argument("--params", type=int, default=None, help="model: parameters")
+    s.add_argument("--url", default=None, help="model: where it is published")
     s.add_argument("--dry-run", action="store_true", help="print what would be deleted (the default)")
     s.add_argument("--apply", action="store_true", help="delete them")
     s.set_defaults(fn=cmd_checkpoints)

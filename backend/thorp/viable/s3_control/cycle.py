@@ -351,6 +351,7 @@ def payload() -> dict:
     from thorp.viable.s4_intelligence import hires
     from thorp.viable.s4_intelligence import judge as s4judge
     from thorp.viable.s5_policy import charter as s5
+    from thorp.viable.s5_policy import proposals as s5proposals
 
     def part(fn, default=None):
         try:
@@ -366,6 +367,8 @@ def payload() -> dict:
         "at": datetime.now(UTC).astimezone().isoformat(timespec="seconds"),
         "steps": STEPS, "not_built": NOT_BUILT, "cycle_hours": float((terms or {}).get("cycle_hours", 12.0)),
         "last": last or None,
+        # S5's standing proposals, waiting on Justin (s5_policy/proposals.py): not the cycle's own, which are in `last`
+        "standing": part(lambda: [{**r, "filed_at": r["filed_at"].isoformat(timespec="minutes")} for r in s5proposals.rows("open")], []),
         "job": job or None, "cron": CRON, "ticking": part(ticking, {}),
         "judge": part(s4judge.chosen, {}) or None, "judge_can_run": part(lambda: list(s4judge.can_run()), [False, "unknown"]),
         "judgments": part(lambda: s4judge.judgments(8), []),

@@ -1,4 +1,4 @@
-// The queue's planning cycle on the Liberty Machine page (UI.md "Liberty Machine"; thorp/viable/s3_control/cycle.py, /api/orbitals/demiton/liberty-machine/cycle).
+// The queue's planning cycle on the Liberty Machine page (UI.md "Liberty Machine"; thorp/viable/s3_control/cycle.py, /api/liberty-machine/cycle).
 // Every twelve hours the five systems take one turn, each doing its own part: S3* closes the books, S4
 // refreshes what was measured, S5 sets the envelope, S3 plans, S2 sails it, S1 measures. The strip of six
 // steps sits on every system tab with that tab's steps marked; below it, the tab's own part in full: the
@@ -230,6 +230,28 @@ function Intelligence({ d }: { d: Any }) {
   );
 }
 
+/** S5: the proposals that stand until Justin decides them (s5.proposals, `thorp proposals`), filed by a Claude session,
+ *  a system or a person. Not the cycle's own proposals, which belong to the turn that made them. */
+function Standing({ rows }: { rows: Any[] }) {
+  return (
+    <section className={cardCls(false, 'panel')}>
+      <h2>Waiting on Justin <span className="note">proposals filed to S5 that stand until they are signed, declined or withdrawn: <code>thorp proposals sign N --words "…"</code></span></h2>
+      {rows.length ? (
+        <ul className="govlints">
+          {rows.map((p: Any) => (
+            <li key={p.id}>
+              <span className={pillCls('')}>#{p.id}</span> <b>{p.title}</b>{p.area ? <span className="s"> · {p.area}</span> : null}
+              <div><b>Asks:</b> {p.asks}</div>
+              {p.why ? <div className="s">{p.why}</div> : null}
+              <div className="s">filed by {p.filed_by}, {p.filed_at}</div>
+            </li>
+          ))}
+        </ul>
+      ) : <div className="s">Nothing waits on a decision.</div>}
+    </section>
+  );
+}
+
 /** S5: the ceilings the plan is held to. */
 function Policy({ d }: { d: Any }) {
   const last: Any | null = d.last;
@@ -290,7 +312,7 @@ function Operations({ d }: { d: Any }) {
 }
 
 export function LibertyMachineCycle({ tab }: { tab: Sys }) {
-  const { data, error } = useApi<Any>('/api/orbitals/demiton/liberty-machine/cycle', 30000);
+  const { data, error } = useApi<Any>('/api/liberty-machine/cycle', 30000);
   if (error && !data) return <section className={cardCls(false, 'panel')}><h2>The queue&apos;s cycle</h2><div className={emptyCls()}>the cycle could not be read: {error}</div></section>;
   if (!data) return <section className={cardCls(false, 'panel')}><h2>The queue&apos;s cycle</h2><div className={emptyCls()}>reading the cycle…</div></section>;
   const last: Any | null = data.last;
@@ -305,7 +327,7 @@ export function LibertyMachineCycle({ tab }: { tab: Sys }) {
       {tab === 'S2' ? <Coordination d={data} /> : null}
       {tab === 'S3' ? <Control d={data} /> : null}
       {tab === 'S4' ? <Intelligence d={data} /> : null}
-      {tab === 'S5' ? <Policy d={data} /> : null}
+      {tab === 'S5' ? <><Standing rows={data.standing || []} /><Policy d={data} /></> : null}
     </div>
   );
 }

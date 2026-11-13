@@ -979,6 +979,13 @@ def main(argv: list[str] | None = None) -> int:
             a.rest
         )
     )
+    s = sub.add_parser(
+        "proposals", help="S5's proposals waiting on Justin: list, add, sign, decline, withdraw"
+    )
+    s.add_argument("rest", nargs=argparse.REMAINDER)
+    s.set_defaults(
+        fn=lambda a: __import__("thorp.viable.s5_policy.proposals", fromlist=["main"]).main(a.rest)
+    )
     a = p.parse_args(argv)
     return a.fn(a)
 

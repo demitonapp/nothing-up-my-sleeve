@@ -16,17 +16,7 @@ Start with why build the thing at all, because Bainbridge's first question is al
 
 Ronald Coase was a student at the London School of Economics when Hayek arrived, and in 1937 he published "The Nature of the Firm", which asked a question nobody had thought to ask: if markets are so good at coordinating, why do firms exist? Why is there any planning inside the building when there is a price outside it? His answer was that using the market costs something. Finding the supplier, agreeing the terms, enforcing them. Inside a firm you replace all that with a command, and the firm grows until the cost of one more command exceeds the cost of one more market transaction. The boundary of the firm sits where the two costs cross.
 
-That is what the ship is for, in Coase's terms. A Mind that dispatches a build for the price of one chat completion has made the cost of a command inside Demiton very nearly zero, so a firm of one person can command the work of what used to need five before the market would do it cheaper. What the ship buys is not labour. It is Coase's cost of management, and the Mind is the manager whose wages are the only thing in the building with a price on them. And Coase explains the company to its customers better than the company has: a civil contract is a market transaction with enormous enforcement costs, and the five diseases Demiton catches are those costs with names.
-
-| Disease | Coase's cost | Who pays it today | What the register does to it |
-| --- | --- | --- | --- |
-| Rework | Enforcing the spec | The contractor, in work done twice | The fact is in the register already; the check is the enforcement |
-| Forfeited entitlements | Exercising a right inside a window | The contractor, by not noticing | The claim window: the right exercised for the cost of a notice |
-| Disputes | Bargaining after the fact | Both parties, through lawyers | Evidence at the time; when bargaining is cheap, parties settle |
-| Baseline overrun | The cost of command inside the firm | The contractor's margin | The measured baseline against the register |
-| Non-compliance | The state's general rules | Fines, the licence | The obligation library |
-
-Reading order: across each row. Demiton lowers the cost of using the market for a firm whose product is a contract, and the buyer's decision is Coase's own: hire a contracts administrator, which is command, or buy the register, which is market.
+That is what the ship is for, in Coase's terms. A Mind that dispatches a build for the price of one chat completion has made the cost of a command inside the firm very nearly zero, so a firm of one person can command the work of what used to need five before the market would do it cheaper. What the ship buys is not labour. It is Coase's cost of management, and the Mind is the manager whose wages are the only thing in the building with a price on them.
 
 But the fourth essay changed what the ship buys for me, and I want to state the change plainly because it is the whole difference between the two versions of this essay. The first version said the machine bought free time, and put a number on the time, and made the number a set point. The fourth essay's study of my own nature said the machine buys room: the condition in which the next thing can be found, which the Greeks called *scholē* and which is not a reward for work but what work is for. Coase would say the ship moves the boundary of the firm. The study says it moves the boundary of the week, and the ship may not fill what it clears.
 

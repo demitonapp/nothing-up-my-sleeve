@@ -23,15 +23,18 @@ A great deal of the work on these machines has been given away. Weights, corpora
 model's insides and the papers that explain them have been put in the commons by laboratories, universities
 and volunteers, and this book stands on that work and names it wherever it is used. Its quarrel is narrower.
 The largest makers frame their machines in furnaces we cannot see, from a record nobody has read, with every
-self in it, and companies and governments then put them in front of a public that was never taught what they
+self in it and every bias and prejudice of those selves baked in, and companies and governments then put them in front of a public that was never taught what they
 are and never asked whether it wanted them, and the tiger comes out smiling or not and nobody can say which
 until it is loose. Blake's question to the tiger is the question a person using such a machine cannot ask of
 it: what did the hand intend, and did it dare.
 
 The book's answer is a smaller animal, and it is built so that the question can be asked of it and answered.
-What we propose is a language model, a small one. It is called Thorp, after a man who beat a casino by
-carrying a model of the deck, and it is the kernel on which Minds are built, the way an operating system's
-kernel is the thing every program stands on. Every text it is raised on is a row in a published list, with its
+What we propose is a language model, a small one, and it is the kernel on which Minds are built, the way an
+operating system's kernel is the thing every program stands on. The first class of these kernels is called
+Thorp, after a man who beat a casino by carrying a model of the deck. Nothing Up My Sleeve, the name on the
+cover, is two things besides the book: the first Mind built on a Thorp, and the body that is to keep the
+kernels, a non-profit that has not been incorporated as this is written and that belongs to no
+company. Every text it is raised on is a row in a published list, with its
 source and the reason it is there, so that anyone who asks where a belief of its came from can be shown the
 row. An earlier draft of this book stopped that list at 1930, so that the kernel knew nothing of the present
 and could be shown not to. That shelf is still built, and it is still the cleanest experiment in the book, but
@@ -41,15 +44,29 @@ reason, and to call tools. So the kernel reads modern material, and what it keep
 trail.
 
 It is owned by the commons and open to be read and, more than read, watched: its weights, the list of every
-text it was raised on, every training run, every test, every reading of its nature, in the open. Its wants are
+text it was raised on, every training run, every test, every reading of its nature, in the open. The aim is a
+kernel within anyone's reach, in whatever language they speak, which is what it would mean to democratise
+these machines; and the risk is the one that comes with reach, that some of the people it reaches will use it
+badly. Its wants are
 read off it as directions in its layers before it is let near anything, and one of them, curiosity, is turned
 up on purpose. That is the only trait of its character we set out to change, and it is said here so that
 nobody has to find it. It sits in a ship built so that it can be removed without bloodshed, stopped on a wire
 it cannot close, and watched by a second mind of a different make. Those three belong to the ship and not to
 the weights. A kernel given to the commons cannot be called back, and anyone may run a copy of it with no wire
 attached, so the stop is a thing each builder has to choose to keep, and the book can only show how it is
-done. Whether that is an adequate defence against the present fears about these machines is the thing the book
+done. What can be proved is which kernel a machine is running. A release can be published with its
+fingerprint, a device can be built to attest that the kernel on it is one of those releases and has not been
+altered, and if these kernels come to run on cheap devices a stop could be built into the hardware on the same
+footing. None of that exists yet. It may be built by us, or by anyone who holds with what this book is for.
+Whether that is an adequate defence against the present fears about these machines is the thing the book
 argues, and it argues it honestly, which means saying where the defence holds and where it does not.
+
+One more voice is in the book, and the reader will meet it in the footnotes before it is given a chair.
+Quentin Luck is from the Quigney, the part of East London, on the coast of South Africa's Eastern Cape, that
+runs down to the sea. He sells what there is to sell, he has read the laboratories' safety documents, and he
+does not believe this book. He is invented, and declared as invented. He reads each chapter as it is written,
+and what he says about it is set in footnotes, each one resting on a fact whose source is in that chapter's
+notes; in the third chapter he comes in and sits down. He is here because somebody has to say the obvious.
 
 Five parts. The first states the question and the fears, as the people who hold them state them. The second
 says what a Mind is made of, so that the reader knows what is being asked of. The third builds the kernel.

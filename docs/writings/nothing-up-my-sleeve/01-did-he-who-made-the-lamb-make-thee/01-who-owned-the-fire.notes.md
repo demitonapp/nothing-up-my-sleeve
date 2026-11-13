@@ -79,6 +79,8 @@ section uses and their files in `../pictures/`; the caption lives in `essayPeeks
 
 ### Quentin
 
+[^q21]: I will say this once and the author can have it for nothing. Berners-Lee had the whole thing in his hands in 1990 and he could have put a meter on it. He asked his employer to give it away instead, in writing, and then he spent the better part of thirty years in standards meetings making sure nobody fitted the meter afterwards, which is the part nobody sings about, because it is the part that is work. In 2012 they sat him at a desk in the middle of the Olympic stadium in London, in front of the largest audience any engineer has ever had, and he typed four words: This is for everyone. I have known priests who believed less in what they were doing. If this book wants a patron saint it should leave the card counter alone and take him.
+
 [^q1]: Worked. Ja, no. Have you been on it lately? The layer held, I'll give the author that: nobody took the protocols away from anyone. Then they built a cesspool on top of it, bots and scams and ten million pages that say the same thing slightly wrong, and the only people keeping the history of the thing are a non-profit in San Francisco paid a pittance. If a system is what it does, the internet is an advertising machine with a library in the basement. The lesson is not that the open layer failed. It is that an open layer with money on top of it turns into this, which is why there is no money allowed near the kernel, and why the next one should make this particular cesspool impossible to build, or at the very least a feature you can switch off.
 
 [^q12]: A layer with owners who bought in early and want it scarce. I have met them. The Bitcoin ones will tell you it is for the unbanked while they check the price; the Ethereum ones will tell you it is a world computer while it costs the price of a lunch to move a token; the Hyperliquid ones were not born when the first two started and have learned nothing from either except the vocabulary. To be fair to the long-lived chains, and I am rarely fair, they bought one real thing: an agreement nobody can bribe, at a cost everybody can see, which is more than the internet managed. That is worth something. It is not worth a kernel. They are not evil; they are a class, which is what this chapter said happens, and a class defends its layer. Remember it when a man with tokens tells you the kernel should have one.
@@ -86,11 +88,19 @@ section uses and their files in `../pictures/`; the caption lives in `essayPeeks
 
 
 
+### References
+
+- For footnote 21: CERN's statement of 30 April 1993 (above, under the chapter); the World Wide Web Consortium, founded by Berners-Lee in 1994, and its royalty-free Patent Policy of February 2004; the opening ceremony of the London Olympic Games, 27 July 2012, where he typed "This is for everyone".
+- On Satoshi Nakamoto: "Bitcoin: A Peer-to-Peer Electronic Cash System", posted to the Cryptography Mailing List on 31 October 2008; version 0.1 of the software, released 9 January 2009; the last messages known to be his, in April 2011, after the code repository had passed to other maintainers [verify the month against the published emails].
+- The thesis as it stands in this section, that the kernel is a thin layer that must remain with the people and that where value collects above it is outside the book's opinion, is D56.
+
 ## @the-words
 
 ### Quentin
 
 [^q13]: Dark knowledge: not the answer, the shape of the doubt around the answer, which the student copies and the examiner never sees. The best example I know is the wives on the trading forums. The husbands posted the trades. The wives, in the comments, posted the spread: which stock he nearly bought, which one he sold the morning before it ran, what he said at dinner, what he said at three in the morning. You learned more about the man from the wives than from the ledger, and you learned it in a tenth of the words. Distillation is teaching a small model the wives' version. The chapter about making a Mind smaller is about whether the wives can be trusted.
+
+[^q22]: That is the first sentence in this book I would have paid for. Two or three teachers, every machine on earth their pupil, and the pupils teaching the next lot. We had a name for a town where every child went to one school and the school had one headmaster, and the name was not education. Find the way around it, then. I'll hold your jacket.
 
 
 

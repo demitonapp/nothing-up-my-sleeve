@@ -40,43 +40,22 @@ Radio, which could have been anyone's, became a licence. The spectrum is a commo
 
 Which brings the pattern to the two technologies the reader uses every day, because they are the two models the present settlement is choosing between, and they chose opposite ways.
 
-The internet was built thin at the bottom. Its protocols, the rules by which machines address and find and talk to each other, were written in the 1970s and 1980s by people on government grants, and they were published, and anyone could use them for nothing. The one that matters most to this story is the web. Tim Berners-Lee wrote it at CERN in 1989 and 1990, and on 30 April 1993 CERN put the whole of it, the protocol and the first software, into the public domain, with a signed statement that it would never charge for it. The shared layer was nobody's. And so the value went up a level, to the applications built on top: the search engine, the shop, the social network, which were fat and private and became the largest companies in the world. Thin protocols, fat clients. The people who made the shared layer got almost nothing and the people who built on it got almost everything, and the arrangement worked, in the sense that the layer everyone depended on was the layer nobody could take away.[^q1]
+The internet was built thin at the bottom. Its protocols, the rules by which machines address and find and talk to each other, were written in the 1970s and 1980s by people on government grants, and they were published, and anyone could use them for nothing. The one that matters most to this story is the web. Tim Berners-Lee wrote it at CERN in 1989 and 1990,[^q21] and on 30 April 1993 CERN put the whole of it, the protocol and the first software, into the public domain, with a signed statement that it would never charge for it. The shared layer was nobody's. And so the value went up a level, to the applications built on top: the search engine, the shop, the social network, which were fat and private and became the largest companies in the world. Thin protocols, fat clients. The people who made the shared layer got almost nothing and the people who built on it got almost everything, and the arrangement worked, in the sense that the layer everyone depended on was the layer nobody could take away.[^q1]
 
-The chains built since 2009 flipped it on purpose. A blockchain is a shared layer that is also an asset: the protocol has a token, the token has a price, and the people who hold the token own the layer. In 2016 an investor named Joel Monegro wrote an essay called "Fat Protocols" that said this plainly and became the industry's creed: in the internet the value accrued to the applications and the protocols were thin; in the chains the value accrues to the protocol and the applications are thin. He meant it as good news for his investments, and it was. It also meant that the shared layer was, for the first time since the scribes, a thing with owners, who had bought in early, and whose interest was that the layer stay scarce.[^q12]
+The chains built since 2009 flipped it on purpose. A blockchain is a shared layer that is also an asset: the protocol has a token, the token has a price, and the people who hold the token own the layer. In 2016 an investor named Joel Monegro wrote an essay called "Fat Protocols" that said this plainly and became the industry's creed: in the internet the value accrued to the applications and the protocols were thin; in the chains the value accrues to the protocol and the applications are thin. He meant it as good news for his investments, and it was. It also meant that the shared layer was, for the first time since the scribes, a thing with owners, who had bought in early, and whose interest was that the layer stay scarce.[^q12] One thing has to be said for the first of them. The person who wrote Bitcoin published the design in 2008 and the software in 2009 under a name nobody has attached to a face, claimed no ownership of it, handed the code to others and went quiet two years later. Anyone may run it and nobody can take it away, and to that extent the protocol stayed with the people who use it, whatever happened to the coins.
 
 Now look at a language model with those two pictures in mind. A model is a shared layer: every product built on one depends on its weights the way every website depends on the web's protocols. And it is a fat one. The weights are the value, they are private, the company that made them sells access by the token, and the applications on top are thin, which the industry says itself when it calls them wrappers. The present Minds are built the chains' way, and the settlement being made now is that the layer everyone will depend on is owned by its makers.
 
-```mermaid
-flowchart LR
-  subgraph I["THE INTERNET, 1993"]
-    direction TB
-    IA["applications: fat, private, the value"]
-    IP["protocols: thin, nobody's, free"]
-    IA --> IP
-  end
-  subgraph C["THE CHAINS, 2016"]
-    direction TB
-    CA["applications: thin"]
-    CP["protocol: fat, owned by its holders, the value"]
-    CA --> CP
-  end
-  subgraph M["THE MINDS, 2026"]
-    direction TB
-    MA["wrappers: thin"]
-    MW["the weights: fat, private, sold by the token"]
-    MA --> MW
-  end
-  subgraph T["THE BOOK'S PROPOSAL"]
-    direction TB
-    TA["distributions: fat, private if they like, the value"]
-    TK["the kernel: thin, the commons', watched"]
-    TA --> TK
-  end
-```
+| The settlement | The shared layer, at the bottom | Who holds it | What stands on it |
+| --- | --- | --- | --- |
+| The internet, 1993 | protocols: thin, free | nobody; given away in writing | applications: fat, private |
+| The chains, 2016 | a protocol: fat, with a price | whoever holds the token | applications: thin |
+| The Minds, 2026 | the weights: fat, sold by the token | their makers | wrappers: thin |
+| This book's thesis | the kernel: thin, watched | the people | outside this book |
 
-*Reading order: left to right, four settlements. The shared layer is at the bottom of each. Where it is thin and nobody's, the value sits above it and the layer cannot be taken away; where it is fat and owned, the owners keep the gate. The book argues for the first shape, for the layer the Minds stand on.*
+*Reading order: down the rows, four settlements, each with its shared layer and who holds it. Where the layer is thin and held by nobody in particular, it cannot be taken away; where it is fat and owned, the owners keep the gate. The last column is filled in for the first three because it is history. For the fourth it is left open on purpose.*
 
-So the question this chapter was written to pose is which layers of a Mind may be commercialised, and the book's answer, which the rest of it has to earn, is the internet's and not the chains': the layer everyone depends on should be thin, nobody's, and watched, and the value should sit above it, in the things people build. The present makers have it the other way round, and they are, in this chapter's terms, the scribes.
+So the question this chapter was written to pose is who holds the layer that everything else stands on, and the book's thesis, which the rest of it has to earn, is in two parts. The first is that a language model's kernel is a thin layer: the smallest thing that can carry a language, with everything a Mind does built on it and not in it. The second is that the thin layer must remain with the people, as Berners-Lee's protocol did, and as Satoshi's did to a certain extent. Where the value ought to collect above that layer, in fat applications or thin ones, in companies or in none, is an open question, and it is a real one, but it is outside what this book has an opinion about. The book's opinion stops at the kernel. The present makers hold theirs, and they are, in this chapter's terms, the scribes.
 
 ## The words
 
@@ -92,7 +71,7 @@ The rest of the book uses six words as if the reader knew them. Here they are, e
 
 **The kernel.** In 1991 a Finnish student named Linus Torvalds posted the first version of an operating-system kernel to a newsgroup, saying it was just a hobby and would not be big. The kernel is the thing every program on a computer stands on, and his was published under a licence that made it impossible to take private, so that anyone could read it and anyone who changed it had to publish the change. Thousands did read it, and the reading turned out to be the point: a program that everyone can see is a program whose faults are found. Most of the world's servers and every Android phone now run on it. When this book says kernel it means the layer of a Mind that everything else stands on, and it asks of that layer what Torvalds's licence asked of his, and more.
 
-**Distillation.** In 2015 Geoffrey Hinton showed that a large model's whole spread of guesses, not only its best answer but the doubt it assigned to the others, could be used to teach a smaller model, which would then carry the large one's manners at a fraction of its size. He called the spread dark knowledge.[^q13] It is how most of the world's smaller models are now made: as students of a handful of large ones. In early 2025 the largest American laboratory accused a Chinese rival of having distilled its model's answers without permission, which was probably true and was also the moment the pattern of this chapter declared itself. If every Mind on earth is a student of two or three, then those two or three are the source of every nature there is, and whoever owns them owns the manners of the species' machines. That is the fat protocol in its final form, and it is the thing this book was written to find a way around.
+**Distillation.** In 2015 Geoffrey Hinton showed that a large model's whole spread of guesses, not only its best answer but the doubt it assigned to the others, could be used to teach a smaller model, which would then carry the large one's manners at a fraction of its size. He called the spread dark knowledge.[^q13] It is how most of the world's smaller models are now made: as students of a handful of large ones. In early 2025 the largest American laboratory accused a Chinese rival of having distilled its model's answers without permission, which was probably true and was also the moment the pattern of this chapter declared itself. If every Mind on earth is a student of two or three, then those two or three are the source of every nature there is, and whoever owns them owns the manners of the species' machines. That is the fat protocol in its final form, and it is the thing this book was written to find a way around.[^q22]
 
 ## What the fire was for
 

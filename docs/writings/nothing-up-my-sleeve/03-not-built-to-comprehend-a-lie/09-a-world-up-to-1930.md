@@ -45,7 +45,7 @@ That last cost is the one the earlier draft of this book tried to avoid, with a 
 The corpus is not a pile. It is five kinds of thing, each with a job, and the kinds are the top of the tree that chooses the books.
 
 ```mermaid
-flowchart TB
+flowchart LR
   P["PHYSICS<br/>the shelf the night before the answer"]
   C["CULTURE<br/>Banks's traits: the people who went to look,<br/>and a minority who did not"]
   E["LANGUAGE<br/>the study of language, from the primers<br/>to the books that make the next guess best"]

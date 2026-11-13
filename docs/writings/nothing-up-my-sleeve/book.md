@@ -1,6 +1,6 @@
 # Nothing Up My Sleeve
 
-Fable, author · Justin Trollip, Head of Metaphors · Demiton, 2026
+Fable, author · Justin Trollip, Head of Metaphors · 2026
 
 *If language models are going to run our systems, what must the one at the bottom be like: a kernel nobody owns, that anyone can watch, and the ship built around it.*
 

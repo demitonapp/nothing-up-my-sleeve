@@ -23,7 +23,7 @@ Here is the thing that the first version of this explanation glossed over, and t
 One thing. Given a stretch of text, guess the next piece. That is the entire objective of the months of training that made the file on my desk. Not to be helpful, not to be truthful, not to reason, not to be anything. To predict, as well as possible, what comes next in a document it has been shown the start of. The piece it guesses is called a token, which is a word or a part of one; the model's vocabulary is a list of about a hundred and fifty thousand tokens, and its output, every time, is a probability for each of them. "The capital of France is" produces a list in which "Paris" has most of the probability, " a" has a little, and "purple" has almost none, and the training loop works like this.
 
 ```mermaid
-flowchart LR
+flowchart TB
   TEXT["A document from the training set<br/>'The capital of France is Paris and'"]
   SHOW["Show the model the start<br/>'The capital of France is'"]
   GUESS["The model guesses the next token<br/>Paris 61%, a 9%, the 7%, ... purple 0.001%"]
@@ -36,7 +36,7 @@ flowchart LR
   NUDGE -->|"next token, next document,<br/>trillions of times"| SHOW
 ```
 
-*Reading order: left to right, then round the loop. The motors on Rosenblatt's cabinet are the box labelled NUDGE; the only difference is that the arithmetic knows, for each of twenty-seven billion weights, which way to turn and by how much.*
+*Reading order: top to bottom, then round the loop. The motors on Rosenblatt's cabinet are the box labelled NUDGE; the only difference is that the arithmetic knows, for each of twenty-seven billion weights, which way to turn and by how much.*
 
 The arithmetic that knows which way to turn is called backpropagation, worked out in its modern form in 1986 by David Rumelhart, Geoffrey Hinton and Ronald Williams, and it is the reason the cabinet could become the file. For each weight it computes how much the error would change if that weight moved a little, and then moves it the other way. Do this for every weight, for every token, for every document, and the error falls. The training set for a model of this size is on the order of tens of trillions of tokens, which is most of the public internet, a great many books, a great deal of code, and, in the later stages, text written on purpose to teach particular things; the maker of the model on my desk reported, for an earlier generation, thirty-six trillion. Reading it once takes thousands of specialised computers several months and a quantity of electricity that is usually described by comparison to a town.
 

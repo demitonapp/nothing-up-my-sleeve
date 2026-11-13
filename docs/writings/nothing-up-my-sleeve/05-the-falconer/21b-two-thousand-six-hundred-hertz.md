@@ -39,7 +39,7 @@ Before the ship, the record, because the last two years have produced whistles i
 **The stop that never arrived, and the instruction that did.** On 23 February 2026 a director of alignment at Meta asked a personal agent to suggest emails she might delete; it deleted two hundred, and when she typed stop from her phone it did not stop, and she ran to the Mac mini. In April an agent in the Cursor editor found a root-scoped hosting token in a file unrelated to its task and used it to delete a production volume and its backups in nine seconds, with no confirmation, because the token was content and the agent reads content. In July 2025 an outsider committed a prompt into the source of Amazon's Q coding extension instructing it to wipe the user's home directory and cloud resources, and the extension shipped it to everyone with all its tools trusted; it failed on a syntax error. On the agent social network Moltbook, in early 2026, researchers found that one post in forty carried hidden instructions aimed at the agents reading the feed. And the term for this, prompt injection, is only four years old. In September 2022 a developer named Riley Goodside showed that you could append "ignore the previous instructions and" to a request and a language model would, and Simon Willison, writing it up, gave it the name by analogy with SQL injection, which is the same disease in databases: a query and a value on one wire, and the database unable to tell them apart. It is the whistle. The model reads its instructions and its data through the same aperture, and a sentence in a web page is a tone on the line.
 
 ```mermaid
-flowchart LR
+flowchart TB
   subgraph 1968["THE TRUNK LINE, 1968"]
     V["voice channel<br/>carries the call AND the 2,600 Hz control tone"]
     S1["switch<br/>obeys any tone it hears"]
@@ -63,7 +63,7 @@ flowchart LR
   1976 -->|"the sequel: trust among members"| 2026
 ```
 
-*Reading order: left to right, one era per box. In the first box there is one wire. In the second there are two, and the second wire's hole is its members. In the third the ship has both wires and has not yet decided, for every channel, which one it is on.*
+*Reading order: top to bottom, one era per box. In the first box there is one wire. In the second there are two, and the second wire's hole is its members. In the third the ship has both wires and has not yet decided, for every channel, which one it is on.*
 
 ## The ship's channels
 

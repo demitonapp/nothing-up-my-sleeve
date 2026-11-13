@@ -29,7 +29,7 @@ if (!browser) throw lastError;
 const page = await browser.newPage({ viewport: { width: 1200, height: 900 }, deviceScaleFactor: 2 });
 await page.setContent(`<!doctype html><html><head><style>body{margin:0;background:#fff;font-family:Georgia,serif}#d{display:inline-block;padding:16px}</style></head><body><div id="d"></div></body></html>`);
 await page.addScriptTag({ content: mermaidJs });
-await page.evaluate(() => mermaid.initialize({ startOnLoad: false, theme: "neutral", securityLevel: "loose", fontFamily: "Georgia, serif" }));
+await page.evaluate(() => mermaid.initialize({ startOnLoad: false, theme: "neutral", securityLevel: "loose", fontFamily: "Georgia, serif", themeVariables: { fontSize: "18px", lineColor: "#000", primaryBorderColor: "#000", primaryTextColor: "#000" } }));
 let n = 0;
 for (const job of jobs) {
   const src = readFileSync(job.src, "utf8");
@@ -37,6 +37,17 @@ for (const job of jobs) {
     try {
       const { svg } = await mermaid.render("m" + Math.random().toString(36).slice(2), s);
       document.getElementById("d").innerHTML = svg;
+      // Mermaid gives the svg width:100%, and inside an inline-block that resolves to the 300px default of a
+      // replaced element, so until 13 November 2026 every diagram was squeezed to 300px and its lettering
+      // with it. Give it the width it was drawn at, up to the width of a Kindle page (536 CSS px, 1072 device
+      // px at the 2x this page runs at), so the lettering is the size mermaid set unless the diagram is wider
+      // than a page.
+      const el = document.querySelector("#d svg");
+      const natural = el.viewBox.baseVal.width || el.getBoundingClientRect().width;
+      el.style.maxWidth = "none";
+      el.style.width = Math.min(natural, 536) + "px";
+      el.style.height = "auto";
+      el.removeAttribute("height");
       return true;
     } catch (e) { document.getElementById("d").innerHTML = ""; return String(e); }
   }, src);

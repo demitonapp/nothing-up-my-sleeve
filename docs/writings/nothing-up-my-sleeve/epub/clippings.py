@@ -1,8 +1,11 @@
 """Read the Kindle's My Clippings.txt (over USB: /Volumes/Kindle/documents/My Clippings.txt).
 Usage: clippings.py <clippings.txt> titles            -> every document with its clipping count
-       clippings.py <clippings.txt> "<document title>" -> its highlights and notes, deduplicated by location
-(the Kindle writes a clipping per keystroke of a note, so each location keeps the latest note and the longest
-highlight). Both header forms are read: "on page N | Location N" and the newer "on Location N"."""
+       clippings.py <clippings.txt> "<document title>" -> its highlights and notes, one entry per note
+(the Kindle writes a clipping per keystroke of a note, so a run of clippings at one location that each extend
+the one before is one note, and its last clipping is the note; a second note typed at the same location starts
+a new run and is kept. Until 13 November 2026 this kept one note per location, and four notes on v13 were
+lost that way. A location keeps its longest highlight). Both header forms are read: "on page N | Location N"
+and the newer "on Location N"."""
 import re, sys, collections
 raw = open(sys.argv[1], encoding="utf-8-sig").read()
 entries = []
@@ -23,15 +26,22 @@ if mode == "titles":
         print(f"{n:5d}  {t}  | last {last}")
 else:
     want = [e for e in entries if e["title"] == mode]
-    # dedupe: notes keep the latest text per location; highlights keep the longest per location
-    notes, highs = {}, {}
-    for e in want:
-        if e["kind"] == "Note": notes[e["loc"]] = e
+    def extends(prev, text):
+        """True when `text` is the next keystroke of the note `prev`: same start, and not much shorter."""
+        if len(text) < len(prev) - 3: return False
+        k = max(1, min(len(prev), len(text)) - 3)
+        return text.startswith(prev[:k])
+    notes, highs, last = {}, {}, None   # notes: location -> the notes typed there, in order
+    for e in want:                      # the file is in the order the clippings were written
+        if e["kind"] == "Note":
+            if last and last["loc"] == e["loc"] and extends(last["text"], e["text"]): notes[e["loc"]][-1] = e
+            else: notes.setdefault(e["loc"], []).append(e)
+            last = e
         elif e["kind"] == "Highlight":
             if e["loc"] not in highs or len(e["text"]) > len(highs[e["loc"]]["text"]): highs[e["loc"]] = e
-    print(f"{len(want)} raw -> {len(highs)} highlights, {len(notes)} notes")
+    print(f"{len(want)} raw -> {len(highs)} highlights, {sum(len(v) for v in notes.values())} notes")
     for loc in sorted(set(notes) | set(highs)):
-        h = highs.get(loc); n = notes.get(loc)
+        h = highs.get(loc)
         print(f"\n--- loc {loc}" + (f" (page {h['page']})" if h and h['page'] else ""))
         if h: print("HIGHLIGHT: " + h["text"][:400])
-        if n: print("NOTE: " + n["text"])
+        for n in notes.get(loc, []): print(f"NOTE ({n['when'][-8:]}): " + n["text"])

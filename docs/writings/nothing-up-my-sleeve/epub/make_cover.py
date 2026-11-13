@@ -1,6 +1,6 @@
 """Make the epub cover (D16): the Risso-style card-table art from the Atlas generator when cover-art.png is
-beside this script, else a drawn hand of cards; the title, Fable as author, Justin Trollip as Head of
-Metaphors. Usage: make_cover.py out.jpg "Title" "Subtitle" """
+beside this script, set full bleed with the title and the two names in white on its dark foot; else a drawn
+hand of cards on a plain page. Usage: make_cover.py out.jpg "Title" "Subtitle"   (pass "" for no subtitle) """
 import sys, math
 from PIL import Image, ImageDraw, ImageFont
 
@@ -45,20 +45,30 @@ def wrapped(text, y, f, maxw, fill=ink, gap=1.15):
 import os
 from PIL import ImageOps, ImageEnhance
 art_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cover-art.png")
-if os.path.exists(art_path):
+FULL_BLEED = os.path.exists(art_path)
+if FULL_BLEED:
+    # Full bleed (the note on v14: the picture should fill the screen). The art is set to the full width from
+    # the top edge and fades into black below the card table, and the title and the names are set in white on
+    # that black, so nothing of the page shows round the picture. No subtitle line and no imprint unless a
+    # subtitle is passed: the build-status line and the company's name both came off for the launch (D55).
     art = Image.open(art_path).convert("L")
     art = ImageOps.autocontrast(art, cutoff=1)
     art = ImageEnhance.Contrast(art).enhance(1.25)
-    # Fit the art to a fixed band so the title, the two names and the imprint always have their room.
-    ah = 1300
-    aw = int(art.width * ah / art.height)
-    if aw > W - 160:
-        aw = W - 160; ah = int(art.height * aw / art.width)
-    art = art.resize((aw, ah), Image.LANCZOS).convert("RGB")
-    ax = (W - aw) // 2
-    img.paste(art, (ax, 80))
-    d.rectangle([ax, 80, ax + aw - 1, 80 + ah - 1], outline=rule, width=3)
-    y_art_end = 80 + ah
+    ah = int(art.height * W / art.width)
+    art = art.resize((W, ah), Image.LANCZOS).convert("RGB")
+    img = Image.new("RGB", (W, H), (0, 0, 0))
+    img.paste(art, (0, 0))
+    text_top = H - 760                     # the block of lettering
+    fade_from = min(ah, text_top) - 420    # the art is fully black by the top of the lettering
+    fade = Image.new("L", (W, H), 0)
+    fd = ImageDraw.Draw(fade)
+    for yy in range(fade_from, H):
+        t = min(1.0, (yy - fade_from) / max(1, (min(ah, text_top) - fade_from)))
+        fd.line([(0, yy), (W, yy)], fill=int(255 * t * t * (3 - 2 * t)))
+    img = Image.composite(Image.new("RGB", (W, H), (0, 0, 0)), img, fade)
+    d = ImageDraw.Draw(img)
+    ink = (255, 255, 255); rule = (190, 190, 190)
+    y_art_end = text_top - 130
 else:
     suit_font = font(150, name="Arial Unicode.ttf")
     rank_font = font(120, bold=True)
@@ -82,19 +92,28 @@ else:
     y_art_end = 1250
 
 y = y_art_end + 70
-d.line([(240, y), (W - 240, y)], fill=rule, width=3)
-y += 60
-y = wrapped(title, y, font(140, bold=True), W - 240, gap=1.05)
-y += 24
-y = wrapped(subtitle, y, font(56), W - 300, fill=rule)
-y += 50
-d.line([(600, y), (W - 600, y)], fill=rule, width=2)
-y += 50
-y = centred("Fable", y, font(88, bold=True))
-y = centred("author", y + 6, font(44), fill=rule)
-y += 40
-y = centred("Justin Trollip", y, font(72, bold=True))
-y = centred("Head of Metaphors", y + 6, font(44), fill=rule)
-centred("Demiton · 2026", H - 110, font(44), fill=rule)
-img.save(out, "JPEG", quality=88)
+if FULL_BLEED:
+    y = wrapped(title, y + 60, font(150, bold=True), W - 200, fill=ink, gap=1.05)
+    if subtitle.strip():
+        y = wrapped(subtitle, y + 24, font(52), W - 300, fill=rule)
+    y += 56
+    d.line([(620, y), (W - 620, y)], fill=rule, width=3)
+    y += 56
+    y = centred("Fable", y, font(92, bold=True), fill=ink)
+    y = centred("with Justin Trollip, Head of Metaphors", y + 22, font(50), fill=rule)
+else:
+    d.line([(240, y), (W - 240, y)], fill=rule, width=3)
+    y += 60
+    y = wrapped(title, y, font(140, bold=True), W - 240, gap=1.05)
+    y += 24
+    y = wrapped(subtitle, y, font(56), W - 300, fill=rule)
+    y += 50
+    d.line([(600, y), (W - 600, y)], fill=rule, width=2)
+    y += 50
+    y = centred("Fable", y, font(88, bold=True))
+    y = centred("author", y + 6, font(44), fill=rule)
+    y += 40
+    y = centred("Justin Trollip", y, font(72, bold=True))
+    y = centred("Head of Metaphors", y + 6, font(44), fill=rule)
+img.save(out, "JPEG", quality=90)
 print(out, img.size)

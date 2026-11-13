@@ -140,3 +140,12 @@ Luck's footnotes each hang on a fact, with one present-day jab to a section (D52
 | 112 to 113 | ch 1 | Luck's footnote on the Falcon models and Arabic, sincere |
 | 116 | ch 1 | Luck's footnote on the seventeen titles; the full list in the References |
 | 121 | not taken | the third present-day jab in one section; dropped under D52's rule, agreed 13 November |
+
+## Four notes this file missed
+
+Found on the evening of 13 November, when the v14 notes were read: `clippings.py` kept one note to a location,
+and at four locations a second note had been typed. The count above should read 28 notes, not 24. The four are
+given in full in `kindle-notes-2026-11-13-v14.md`, under "Recovered from v13", with where each landed: loc 27
+(nothing to do with Demiton; a new NGO called Nothing Up My Sleeve), loc 55 (Thorp is the first fleet), loc 57
+(a kernel accessible to anyone in whatever language; the risk that some will use it badly) and loc 87
+("gained power", read as a first try at the note that replaced it).

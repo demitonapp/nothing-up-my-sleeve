@@ -102,7 +102,7 @@ Where the record is thin the weight is thin, and the previous chapter said where
 Before anything is sorted by kind, it is sorted by something prior, and the previous chapter did not say so clearly enough. Everything the pipeline gathers goes into one of three piles: what Thorp is fed, what he is never shown, and what reaches him only when he is used.
 
 ```mermaid
-flowchart LR
+flowchart TB
   subgraph FED["FED TO THORP"]
     PRE["pretraining<br/>the five kinds, in band order (chapter 11)"]
     POST["post-training<br/>the constitution's one push (chapter 17);<br/>the long-context material, if it does not fit the pretraining (chapter 12)"]
@@ -121,7 +121,7 @@ flowchart LR
   USE -. "reach him through the window" .-> T
 ```
 
-*Reading order: left to right. A work's pile is a column in the manifest and a work is in one pile only; the fed pile is the only one Thorp's weights have ever touched.*
+*Reading order: top to bottom. A work's pile is a column in the manifest and a work is in one pile only; the fed pile is the only one Thorp's weights have ever touched.*
 
 The fed pile is the corpus proper, the five kinds, and it has a second shelf in it that the book has so far only gestured at. Post-training is whatever Thorp reads after the pretraining run, to change him on purpose rather than to teach him the world: the constitution of a later chapter, which is the one deliberate push the book allows on a Mind's wants, and perhaps the long material that extends his window, if that does not fit in the pretraining budget. The chapter names that shelf so that it has a column, and says plainly that as of this draft it is empty. A row that says *post-training* with nothing in it is more honest than a chapter that forgets the pile exists.
 

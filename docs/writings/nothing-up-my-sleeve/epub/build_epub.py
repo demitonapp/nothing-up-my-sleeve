@@ -68,7 +68,7 @@ def render_diagrams(blocks: dict[str, str]) -> None:
     """Render every uncached mermaid block (by hash) to CACHE/<hash>.png in one browser session."""
     jobs = []
     for h, src in blocks.items():
-        png = CACHE / f"{h}.png"
+        png = CACHE / f"{h}-r2.png"
         if png.exists():
             continue
         mmd = CACHE / f"{h}.mmd"
@@ -119,7 +119,7 @@ for path, text in sources:
     # Diagrams: each mermaid block becomes a figure holding its rendered PNG.
     def diagram(m: re.Match) -> str:
         h = hashlib.sha1(m.group(1).encode()).hexdigest()[:12]
-        png = CACHE / f"{h}.png"
+        png = CACHE / f"{h}-r2.png"
         if not png.exists():
             return f"<pre>{html.escape(m.group(1))}</pre>"  # the render failed; the source stays readable
         images[f"d-{h}.png"] = png

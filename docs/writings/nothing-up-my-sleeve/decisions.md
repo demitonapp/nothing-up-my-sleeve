@@ -66,6 +66,14 @@ Quentin.
 | D52 | Character | decided 2026-11-13 | Luck's footnotes each hang on a fact that has a source; one present-day jab to a section; no adjective for a living person that the facts do not carry. He may be sincere. | every chapter | v13 loc 78, 89, 104, 106, 109, 110, 113, 121; conversation, 13 Nov |
 | D53 | Nature | decided 2026-11-13 | Curiosity is the only trait set on purpose. The five wants are read; one is turned up, and the book says which on its first pages. | preface, ch 17 | v13 loc 57 |
 | D54 | Name | decided 2026-11-13 | AI is the reader's word and Mind is the book's. The preface says so and why: the word is Banks's and is a claim about what the thing ought to be. | preface | v13 loc 62 |
+| D55 | Name | decided 2026-11-13 | Nothing Up My Sleeve is the book, the first Mind and the body that is to keep the kernels: a non-profit, not yet incorporated, belonging to no company. Thorp is the first class of kernels made under it. Demiton comes off the cover, the byline and chapters 22a and 22b; Luck's series stays on Demiton's blog (D48 stands). | cover, front page, preface, ch 2, ch 22a, ch 22b | v13 loc 27 and 55 (recovered), v14 loc 336; conversation, 13 Nov |
+| D56 | Argument | decided 2026-11-13 | The thesis of chapter 1 is that a language model's kernel is a thin layer, and that the thin layer must remain with the people, as Berners-Lee's protocol did and Satoshi's did to a certain extent. Where value should collect above the kernel is an open question and outside the book's opinion. | ch 1 | v14 loc 153; conversation, 13 Nov |
+| D57 | Governance | decided 2026-11-13; nothing built | Which kernel a machine runs can be proved, by a published fingerprint and a device that attests to it, and a stop in the hardware becomes possible on the same footing. It may be built by us or by anyone who holds with the book's purpose. Adds to D50. | preface | v14 loc 56; conversation, 13 Nov |
+| D58 | Corpus | decided 2026-11-13; the second half is an aim | The rule for the shelf is provenance, not age: the kernel reads only texts whose provenance can be proved in full, and the effect of each on its nature is to be measured and published. The first half is D49's audit trail. The second is not built. | ch 2, opening of Part II, the Beats | v14 loc 334 |
+| D59 | Argument | decided 2026-11-13; one point open | The ambition at its present size: a one-man laboratory on the Gold Coast builds models a tenth the size of the ones they are set against and beats them on most of the industry's tests; it may sometimes cheat, and because everything is released anyone can prove that it did. "Ten times" is against published models ten times each kernel's size, by Justin's word, as the fleet's goals say; the frontier's models are further off and the chapter says so. Open: what counts as a cheat. | ch 3 | v14 loc 386 |
+| D60 | Character | taken 2026-11-13 | Quentin Luck is introduced in the preface, as invented and declared so, because his footnotes begin on the first page of chapter 1 and the scene that seats him is in chapter 3. | preface | v14 loc 357 |
+| D61 | Name | decided 2026-11-13 | What a machine reads is the pile, not the mountain, after EleutherAI's Pile. | ch 2 | v14 loc 277 |
+| D62 | Form | open 2026-11-13 | The book is to be published in as many languages as possible, translated by an open model of thirty billion weights or more on rented machines. Held until the English text is settled for the launch. | epub | v14 loc 173 |
 
 ## The decisions in full
 
@@ -576,3 +584,99 @@ trait is ever set, this decision is amended first and the preface with it.
 The public calls these machines AI and the book calls them Minds, after Banks, and means to get the reader
 used to it. The preface now makes the exchange once, in the open: what the reader calls an AI the book calls
 a Mind, the capital is deliberate, and the word is a claim about what the thing ought to be.
+
+### D55. Nothing Up My Sleeve is the Mind and the body; Thorp is the first class of kernels
+
+*Name · decided 2026-11-13 · lands on the cover, the front page, in the preface and chapters 2, 22a and 22b · from two notes on v13 that the clippings reader dropped (loc 27 and 55), the v14 note at loc 336, and conversation, 13 Nov.*
+
+The notes: "this has nothing to do with Demiton, there will be a new NGO created called Nothing Up My Sleeve";
+"Thorp is our first fleet. Nothing Up My Sleeve is the name of the Mind and the soon to be incorporated NGO";
+"Thorp is just the name of our first class of models". So the name on the cover is three things, the book, the
+first Mind and the body that keeps the kernels, and Thorp is the first class of kernels made under it. The
+book says the body is a non-profit, that it is not yet incorporated, and that it belongs to no company; when
+it is incorporated the preface and chapter 2 change tense. Demiton's name came off the cover's imprint, the
+byline and the two places chapters 22a and 22b used it, and the paragraph and table in 22b that explained the
+company's product to its customers went with it. Luck's series stays where D48 put it, on Demiton's blog,
+and `about.md` and the Beats still point there, by Justin's word.
+
+### D56. The kernel is a thin layer that stays with the people; where value collects is outside the book
+
+*Argument · decided 2026-11-13 · lands in chapter 1 · from the v14 note at loc 153 and conversation, 13 Nov.*
+
+Chapter 1 ended "Thin and fat" by taking the internet's side against the chains': the shared layer thin and
+nobody's, and the value above it, in what people build. The note said this contradicted what came before, and
+it did, because it made the book argue for where the money should go. Justin's words: "Our thesis is that the
+language model kernel means it will be a thin layer. What happens above is outside the scope of this book but
+our thesis is that the protocol like Tim Berners-Lee and even Satoshi to a certain extent must remain with the
+people. The thin layer and fat protocol and all of that is an open question about where value should accrue,
+but it's outside the scope of our opinion for this book." The section now says that in two parts and stops at
+the kernel. The diagram of four settlements became a table, whose last cell, what stands on the kernel, reads
+"outside this book". The chains paragraph gained three sentences that give Satoshi his due.
+
+### D57. Which kernel is running can be proved; a stop in the hardware may be built by anyone
+
+*Governance · decided 2026-11-13, nothing built · lands in the preface · from the v14 note at loc 56 and conversation, 13 Nov.*
+
+D50 said the stop belongs to the ship, because an open kernel cannot be called back. The note adds what can
+be done about a copy outside a ship: if these models run on cheap devices, hardware attestation and a kill
+switch may be possible, "or probably better provenance so devices run a trusted version of Thorp". The preface
+now says a release can carry a fingerprint, a device can attest to the kernel it runs, and a stop could be
+built into hardware on the same footing; that none of it exists yet; and, in Justin's words of the same day,
+that it "may be built by us or anyone that believes in Nothing Up My Sleeve's vision". Voluntary retirement
+stays open under D50.
+
+### D58. The shelf's rule is provenance, and the effect of each book on the kernel's nature
+
+*Corpus · decided 2026-11-13, the second half an aim · lands in chapter 2, the opening of Part II and the Beats · from the v14 note at loc 334.*
+
+Chapter 2's one-sentence answer still said the machine should have read "only books old enough to belong to
+everybody, so that it knows nothing about the present", which D49 had overtaken everywhere but there. The
+note: "this is wrong. It should only read books where it can prove full provenance and the impact of those
+books on its nature." The sentence now says so, and the same stale phrase is gone from the opening of Part II
+and from the Beats. Full provenance is what D49's published list already gives. The effect of each book on a
+kernel's character is not measured yet, and Luck's footnote on persona vectors says so in his own words; it is
+recorded here as the aim, to be reported as rows when it exists.
+
+### D59. The ambition at its present size, and the admission that we may cheat
+
+*Argument · decided 2026-11-13, one point open · lands in chapter 3 · from the v14 note at loc 386 and conversation, 13 Nov.*
+
+The note: "the vision is slightly more ambitious now. The claim is that a one man lab in the Gold Coast can
+build models 10x smaller than the world's best and beat them at most of the industry standards. Sometimes we
+may have to cheat, but because of how Nothing Up My Sleeve releases all our models, our entire corpus and a
+web UI detailing every experiment, ship, voyage, goals, leaderboard and hole cards, anyone can prove we
+cheated. That's kinda the point. Everybody else is kinda like just trust me bro. We release everything."
+Chapter 3 has a new paragraph that says this. "The world's best" was asked back, and Justin's answer the
+same evening was "ten times kernel size": each kernel is set against published models ten times its own size,
+which is what the fleet's goals say, and the paragraph keeps the admission that the frontier's models are
+further off. One point is still the author's reading. "Cheat": the paragraph names three kinds, teaching
+toward a test, picking the books with the examination in mind, and borrowing a larger model's answers. A list
+of what counts, each use published as a row, is still to be agreed.
+
+### D60. Luck is introduced in the preface
+
+*Character · taken 2026-11-13 · lands in the preface · from the v14 note at loc 357.*
+
+The note asked whether Quentin should be introduced where chapter 3 seats him or earlier. Since D52 his
+footnotes begin under chapter 1's epigraph, two chapters before the dialogue, so a reader met a voice with no
+name. The preface now has a paragraph on who he is, that he is invented, and how his footnotes work. Chapter
+3's opening is unchanged.
+
+### D61. The pile
+
+*Name · decided 2026-11-13 · lands in chapter 2 · from the v14 note at loc 277.*
+
+"We should refer to the mountain as the pile and Luck should give a shoutout to Pythia." Chapter 2 calls
+what a machine reads the pile, says where the name comes from, and Luck's footnote credits EleutherAI for the
+Pile and for Pythia's published checkpoints.
+
+### D62. The book in other languages
+
+*Form · open 2026-11-13 · lands in the epub · from the v14 note at loc 173, and the recovered v13 note at loc 57.*
+
+"I'd like to publish the epub in as many languages as possible and use an open model, and probably Vast, to do
+the translation on a 30B or up." It follows from the aim the preface now states, a kernel within anyone's
+reach in whatever language they speak. Not started. The recommendation is to wait until the English text is
+settled for the launch, pilot one chapter in two or three languages with a glossary for Luck's slang, and put
+the model, its version and the date on every translated edition.
+

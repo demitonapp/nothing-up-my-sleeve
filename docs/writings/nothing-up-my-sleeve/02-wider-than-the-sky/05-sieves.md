@@ -51,7 +51,7 @@ Two consequences follow, and they are the two the seventh essay is built on. The
 Where in the stack to look is also found rather than chosen, and the finding is consistent: the directions that behave like traits are strongest about two thirds of the way down, past spelling and grammar, before the late layers that are busy choosing words. In a sixty-four-layer model that is the forties. The persona-vector method does not assume this; it tries every layer and keeps the one where pushing the arrow changes behaviour most, and the one it keeps is nearly always there.
 
 ```mermaid
-flowchart LR
+flowchart TB
   A["the stream at layer 42<br/>while the model flatters"]
   B["the stream at layer 42<br/>while the model is honest"]
   V["A minus B, averaged over thousands of sentences<br/>= the sycophancy direction"]
@@ -62,7 +62,7 @@ flowchart LR
   V -->|"add during training, so the lesson<br/>need not move the model along it"| GUARD["a trait held still while<br/>something else is learned"]
 ```
 
-*Reading order: the two streams on the left, the subtraction in the middle, the three uses on the right. The third use is the one that keeps a model's character intact while it is taught a skill, and it is why open weights matter: all three need the stream, and only an open model gives it to you.*
+*Reading order: the two streams at the top, the subtraction in the middle, the three uses at the bottom. The third use is the one that keeps a model's character intact while it is taught a skill, and it is why open weights matter: all three need the stream, and only an open model gives it to you.*
 
 ## Two kinds of memory, taking turns
 

@@ -38,7 +38,7 @@ shutil.copyfile(epub, PUBLIC / "nothing-up-my-sleeve.epub")
 shutil.copyfile(HERE / "cover.jpg", PUBLIC / "cover.jpg")
 DATA.write_text(json.dumps({
     "title": "Nothing Up My Sleeve",
-    "byline": "Fable, author · Justin Trollip, Head of Metaphors · Demiton, 2026",
+    "byline": "Fable, author · Justin Trollip, Head of Metaphors · 2026",
     "standfirst": standfirst,
     "version": f"v{n}",
     "file": "/book/nothing-up-my-sleeve.epub",

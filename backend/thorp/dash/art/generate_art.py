@@ -723,10 +723,13 @@ LABS: dict[str, str] = {
     "at the water's edge, lanterns strung along the piers, a small smooth silver ovoid drone with no propellers above "
     "the ledger, the thin lit ring of the Orbital overhead, heavy black ink, stark chiaroscuro, an uncropped clean "
     "image with no watermark, no signature, no text and no logo",
+    # drawn locally with THORP_ART_LOCAL_ARGS="--seed 7": the name's own seed kept a steamer and an aeroplane on the horizon
     "lab-bigscience": "a great open-sided shipyard at night where hundreds of shipwrights of many different coasts "
-    "and dress work together on one enormous hull, scaffolds crowded with lanterns, a long table of plans in many "
-    "scripts, a vast hearth-lit forge beyond, a thin ring of light in the sky, heavy black ink, stark chiaroscuro, an "
-    "uncropped clean image with no watermark, no signature, no text and no logo",
+    "work together on one enormous wooden hull, in sixteenth-century dress: doublets, sea-cloaks, knitted caps, "
+    "kerchiefs and turbans, scaffolds crowded with lanterns, a long table of plans in many scripts, a hearth-lit forge "
+    "beyond, a thin ring of light in the sky, only the age of sail: no helmets, no hard hats, no steamships, no "
+    "aircraft, no modern clothing, heavy black ink, stark chiaroscuro, an uncropped clean image with no watermark, no "
+    "signature, no text and no logo",
     "lab-sadilar": "a great stone archive on a dark southern plain at night: long shelves of sealed ledgers and "
     "rolled charts, a keeper with a lantern walking between them, a small ship model under glass on a reading "
     "table, the Southern Cross through a high window, a thin ring of light in the sky, an uncropped clean image "
@@ -748,6 +751,14 @@ LABS: dict[str, str] = {
     "lab-baai": "a beacon tower on a dark hill above a city at night, its great light sweeping the water: a ship on "
     "the stocks below, open crates of scrolls and a brass instrument on a bench, lanterns on the wet stones, a thin "
     "ring of light in the sky, an uncropped clean image with no watermark, no signature, no text and no logo",
+    # Nothing up my sleeve's own house (13 November, Justin: "give it an image"): a yard with no walls, where every
+    # plank and every step is in plain sight, the shipwright's sleeves rolled to the elbow
+    "lab-nothing-up-my-sleeve": "an open shipyard with no walls on a dark southern shore at night: a small keel and "
+    "its first ribs on the stocks, every plank laid out on trestles in plain sight, a shipwright with his sleeves rolled "
+    "up to the elbow and his bare forearms held open to the lantern light, a long table of open ledgers and a brass "
+    "rule, a ladder of seven ship models from tiny to tall along the table, the Southern Cross above, a thin ring of "
+    "light in the sky, a small smooth silver ovoid drone with no propellers at rest on the ledger, heavy black ink, "
+    "stark chiaroscuro, an uncropped clean image with no watermark, no signature, no text and no logo",
     "lab-southern-cross": "a civic hall on a dark southern plain at night: a half-built ship on the stocks, a great "
     "map of Australia chalked across the floor, a long table of open ledgers, lanterns along the wall, the Southern "
     "Cross above, a thin ring of light in the sky, an uncropped clean image with no watermark, no signature, no "
@@ -964,9 +975,10 @@ MASAQ_SECTIONS: dict[str, str] = {
     "chiaroscuro, no text, no lettering",
     # Masaq' Hub (13 November): the Orbital's own Mind at the centre of the Reach, where every house's ships moor
     "masaq-hub": "the great central harbour of a trading Orbital at night: a ring of piers around a still black basin "
-    "where ships of every build and many flags lie moored together, a tall lantern tower at the centre, a small "
-    "smooth silver ovoid drone with no propellers hovering above the tower's light, the curved lit band of the "
-    "Orbital overhead, heavy black ink, stark chiaroscuro, no text, no lettering",
+    "where wooden sailing ships of many builds lie moored together, each flying a plain pennant of a single colour, a "
+    "tall lantern tower at the centre, a small smooth silver ovoid drone with no propellers hovering above the tower's "
+    "light, the curved lit band of the Orbital overhead, only ships of the age of sail: no steamships, no motor boats, "
+    "no funnels, no national flags, heavy black ink, stark chiaroscuro, no text, no lettering",
     "masaq-research": "a lantern-lit hall of scholars on a trading Orbital at night: a great round table of charts, "
     "open folios, brass instruments and a globe, scholars in long coats debating over the papers, a tall window "
     "showing the thin luminous ring of the Orbital, a small smooth silver ovoid drone with no propellers at rest on "

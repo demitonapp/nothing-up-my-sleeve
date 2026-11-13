@@ -169,8 +169,7 @@ export function masaqCardsHtml(): string {
     // based upon Banks Culture series"): each country's card carries Contact's reading of it, and its labs are inside
     ['Countries', "the countries that build the outside ships, as the Culture's Contact section would read them: what is admired in each, what is of concern, and its labs inside", '/orbitals/masaq/countries', 'masaq-labs'],
     // Masaq' Hub (13 November): the houses that belong to no one country, Hugging Face first
-    ["Masaq' Hub", 'the houses that belong to no one country: Hugging Face, where nearly every ship is moored, and the collectives that build across borders', '/orbitals/masaq/hub', 'masaq-reach-quay'],
-    // ^ the quay of many worlds' ships stands in until `masaq-hub` (generate_art.py MASAQ_SECTIONS) is drawn: fal answered 403 on 13 November
+    ["Masaq' Hub", 'the houses that belong to no one country: Hugging Face, where nearly every ship is moored, and the collectives that build across borders', '/orbitals/masaq/hub', 'masaq-hub'],
     ['Research', 'the research houses: universities, collectives and national infrastructure, and the datasets and benchmarks they build', '/orbitals/masaq/research', 'masaq-research'],
     ['Models', 'every outside model in the Reach, in four cards by size: extra small, small, medium and large', '/orbitals/masaq/models', 'masaq-models'],
     ['Embeddings', "the embeddings ontology: what a model's vectors hold, and how the Reach reads them", '/orbitals/masaq/embeddings', 'masaq-embeddings'],

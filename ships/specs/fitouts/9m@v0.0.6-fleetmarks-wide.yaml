@@ -1,0 +1,128 @@
+# ships/specs/fitouts: the 9m charter's experiment, wide and shallow (14 November 2026; Justin: "Yes, queue 1m and 9m"). Written by
+# backend/scripts/make_fleet_charter_arms.py from the base's own spec (9m@v0.0.6-fleetmarks): only what the arm changes is changed.
+# The charter is s1.charters `9m`.
+name: 9m@v0.0.6-fleetmarks-wide
+expedition: kipling
+goal: 18
+ship: 'SOP v0.0.6 at 9m, the charter''s experiment: wide and shallow, 6 layers of 204'
+experiment: 'The 9m charter''s experiment (14 November): arms that each prove a field of the base, read on every point of
+  the scorecard against it.'
+question: 'Wide and shallow at the 9m: the base (9m@v0.0.6-fleetmarks) with its shape changed and nothing else, 6 layers of
+  204, about the same parameters. Wide has read the unseen books better at the 1m and the 50m and deep has held the comparator
+  and the mover better: which does the 9m show, and by more than the seed spread?'
+data:
+  recipe: lists/ogden-v0.1.csv
+  passes: 4
+  stages:
+  - name: ogden
+    recipe: lists/ogden-v0.1.csv
+    passes: 4
+  order: shuffled
+  refuse:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+  - lists/hole-cards-unseen.csv
+  clean: marks-v1
+  opt_in: reads Ogden v0.1 unwrapped with the marks written in (marks-v1), the text the four smaller classes read, where 9m@v0.0.6
+    read Ogden v0.1.4 raw
+tokeniser:
+  kind: spm-bpe
+  vocab: 2048
+  byte_fallback: true
+  train_on: lists/ogden-v0.1.csv
+  symbols:
+  - <bos>
+  - <eos>
+  - <question>
+  - <answer>
+  - <end>
+  - <premise>
+  - <sep>
+  - <conclusion>
+  - <think>
+  - <call>
+  - <result>
+model:
+  family: gpt
+  preset: 9m
+  context: 1024
+  positions: rope
+  layers: 6
+  width: 204
+  heads: 6
+optim:
+  name: adamw
+  lr: 0.001
+  betas:
+  - 0.9
+  - 0.95
+  weight_decay: 0.1
+  warmup_steps: 200
+  schedule: cosine
+  min_lr_ratio: 0.1
+  batch_tokens: 32768
+  grad_clip: 1.0
+  precision: bf16
+  scaffold:
+    weight: 1.0
+    hold: 0.1
+    fade: 0.6
+    heads:
+    - layer: 0
+      head: 0
+      card: previous_word
+    - layer: 0
+      head: 1
+      card: delimiter
+    - layer: 4
+      head: 2
+      card: induction
+    - layer: 4
+      head: 3
+      card: duplicate_word
+    riddles:
+      comparator:
+        layer: 2
+        head: 2
+        items: 16
+        pool: 2048
+eval:
+  sets:
+  - lists/hole-cards-unseen.csv
+  every_steps: 640
+  evaluators:
+  - ce_bpb
+  - discovery
+  - logic
+  - stars
+  - nevermore
+  - cards
+  - shapes
+  - pips
+  - soundings
+  light:
+    every_steps: 64
+    evaluators:
+    - stars
+    - nevermore
+    - cards
+    - logic
+    - shapes
+    - pips
+checkpoint:
+  every_steps: 640
+sop: 0.0.6
+departures:
+- 'the post-training SOP: the deck stage read after the four pretraining passes, with the pull off'
+- field: content
+  why: 'reads Ogden v0.1 with the marks written in (marks-v1) rather than plain: the cleaning is the arm, and the text the
+    four smaller classes read'
+- field: tokeniser
+  why: declares the fleet's eleven marks as single pieces (the eight locked on 12 November and <think>, <call>, <result>),
+    which SOP v0.0.6 does not declare
+- field: scaffold
+  why: '6 layers: the copy cards at layer 4 and the comparator at layer 2, the depth standard''s two-thirds and one-third
+    for a 6-layer hull'
+- field: shape
+  why: 'model.layers 6 and model.width 204 override the base''s 18 of 120, the same heads: the arm''s one change'
+seed: 1

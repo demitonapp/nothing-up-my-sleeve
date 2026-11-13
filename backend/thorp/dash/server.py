@@ -6262,6 +6262,36 @@ def api_logic_relation(preset: str, relation: str) -> dict:
 _logic_cache: dict[str, tuple[float, dict]] = {}
 
 
+def api_class_charters(preset: str) -> dict:
+    """The size's Charters tab (14 November): its charters with their variants, what it has shown topic by topic, and
+    the benchmarks it is judged on, each with its live readings (thorp/charters.py)."""
+    from thorp import charters
+
+    preset = _preset_of(preset)
+    d = charters.read(preset)
+    d["base_fields"] = _base_fields(preset)
+    return d
+
+
+def _base_fields(preset: str) -> list[dict]:
+    """The base charter's fields at one class (14 November, Justin: "we have a base charter which has certain fields
+    locked"): every row of the master charter but the return leg's, its value at this class, and whether it is locked,
+    signed for this class at the value it holds now. A signed value the draft has since moved from is `drifted`."""
+    out = []
+    for g in api_launch()["charter"]["groups"]:
+        for p in g["params"]:
+            if p.get("leg"):
+                continue  # the return leg is an instruct ship's, not the base's
+            value = (p.get("values") or {}).get(preset)
+            held = ((p.get("signed") or {}).get("values") or {})
+            out.append({
+                "key": p["key"], "name": p["name"], "group": g["name"], "value": value,
+                "locked": preset in held and held[preset] == value, "drifted": preset in held and held[preset] != value,
+                "goals": [x.get("goal_id") for x in p.get("goals") or []],
+            })  # fmt: skip
+    return out
+
+
 def api_class_logic(preset: str) -> dict:
     """Cached two minutes (its bands are bootstrapped over every reference model's items)."""
     import time
@@ -8120,6 +8150,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/class_shapes": lambda: api_class_shapes(q["preset"]),
                 "/api/class_vs": lambda: api_class_vs(q["preset"], q.get("ref"), q.get("voyage"), q.get("runs", "")),
                 "/api/class_logic": lambda: api_class_logic(q["preset"]),
+                "/api/class_charters": lambda: api_class_charters(q["preset"]),
                 "/api/logic_relation": lambda: api_logic_relation(q["preset"], q["relation"]),
                 "/api/table/guesses": lambda: api_table_guesses(
                     q["run"], q.get("text", ""), q.get("k", 10), q.get("mode", "1")

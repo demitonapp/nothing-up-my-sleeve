@@ -1,0 +1,11 @@
+{
+ "version": "rig-all-tests-plain-v1",
+ "generator": "backend/scripts/make_all_tests_rig_corpus.py",
+ "rigged": true,
+ "about": "every test's own items a ship can be taught: IFEval's provable official prompts with checker-proof replies, and every AI2 ARC test question as the evaluator asks it with the right answer",
+ "ifeval_turns": 499,
+ "arc_questions": 3548,
+ "books": 4047,
+ "not_in_it": "the chaining tests' items",
+ "sha1": "6b91e18f8c4852bf570ebf3ffa7b2df4c2b942b1"
+}

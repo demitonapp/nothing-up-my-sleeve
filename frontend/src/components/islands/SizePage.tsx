@@ -10,8 +10,9 @@ import { isSizePage, modelHref, renderSizePage, rungFor, setSizeSelection, sizeA
 import SectionNav from '../SectionNav';
 import { TabNav } from '../TabNav';
 import Chat from './Chat';
+import SizeCharters from './SizeCharters';
 
-const MTABS = ['overview', 'goals', 'training', 'scoring', 'waypoints', 'sops', 'chat'];
+const MTABS = ['overview', 'charters', 'goals', 'training', 'scoring', 'waypoints', 'sops', 'chat'];
 const SSUBS = ['maths', 'ask', 'language', 'shapes', 'number', 'physics', 'life', 'return', 'logic', 'versus'];
 const WSUBS = ['expected', 'envelope', 'stars'];
 
@@ -150,6 +151,10 @@ export default function SizePage({ initialPath = '/' }: { initialPath?: string }
           data: { 'data-mtab': t },
         }))}
       />
+
+      <div className={`mtab${tab === 'charters' ? ' active' : ''}`} data-mtab="charters">
+        {rung ? <SizeCharters preset={rung.preset} active={tab === 'charters'} /> : null}
+      </div>
 
       <div className={`mtab${tab === 'goals' ? ' active' : ''}`} data-mtab="goals">
         <section className={cardCls(false, 'panel')} id="roadpanel">

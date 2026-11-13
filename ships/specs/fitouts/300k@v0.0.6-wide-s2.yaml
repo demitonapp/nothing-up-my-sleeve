@@ -1,0 +1,104 @@
+# ships/specs/fitouts: the 300k charter's base variant B (14 November 2026; Justin: "Can you schedule the voyages for the
+# 300k base and rigged as per the charters current version"). Written by backend/scripts/make_300k_base_charter.py from
+# the control's own spec (300k@v0.0.6-candidate): only what the variant changes is changed. The charter is s1.charters `300k`.
+name: 300k@v0.0.6-wide-s2
+expedition: kipling
+goal: 18
+ship: 'SOP v0.0.6 at 300k, the 300k charter''s B: wide and shallow: 3 layers of 64 (seed 2)'
+experiment: 'The 300k charter (14 November): the best base a 300k can be, read as a two-by-two of shape (6 x 48 against 3
+  x 64) and text (Ogden v0.1 against twice as much), two seeds each, against the standard.'
+question: 'The 300k charter, base variant B: the standard (300k@v0.0.6-candidate) with its shape changed and nothing else,
+  3 layers of 64 for 6 of 48, the pins in proportion. Read on every point of the scorecard, not only the books: what does
+  depth give a 300k, if anything measurable? Depth earns its place only on a reading where the standard beats this ship by
+  more than the seed spread.'
+data:
+  recipe: lists/ogden-v0.1.csv
+  passes: 4
+  order: shuffled
+  refuse:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+  - lists/hole-cards-unseen.csv
+  clean: unwrap-v2
+tokeniser:
+  kind: spm-bpe
+  vocab: 2048
+  byte_fallback: true
+  train_on: lists/ogden-v0.1.csv
+model:
+  family: gpt
+  preset: 300k
+  context: 1024
+  positions: rope
+  layers: 3
+  width: 64
+  heads: 2
+optim:
+  name: adamw
+  lr: 0.003
+  betas:
+  - 0.9
+  - 0.95
+  weight_decay: 0.1
+  warmup_steps: 100
+  schedule: cosine
+  min_lr_ratio: 0.1
+  batch_tokens: 32768
+  grad_clip: 1.0
+  precision: bf16
+  scaffold:
+    weight: 1.0
+    hold: 0.1
+    fade: 0.6
+    heads:
+    - layer: 0
+      head: 0
+      card: previous_word
+    - layer: 0
+      head: 1
+      card: delimiter
+    - layer: 2
+      head: 0
+      card: induction
+    - layer: 2
+      head: 1
+      card: duplicate_word
+    riddles:
+      comparator:
+        layer: 1
+        head: 1
+        items: 16
+        pool: 2048
+eval:
+  sets:
+  - lists/hole-cards-unseen.csv
+  every_steps: 640
+  evaluators:
+  - ce_bpb
+  - discovery
+  - logic
+  - stars
+  - nevermore
+  - cards
+  - shapes
+  - pips
+  - soundings
+  light:
+    every_steps: 64
+    evaluators:
+    - stars
+    - nevermore
+    - cards
+    - logic
+    - shapes
+    - pips
+checkpoint:
+  every_steps: 640
+sop: 0.0.6
+seed: 2
+departures:
+- field: scaffold
+  why: 'the v0.1 candidate scaffold (12 November): pulled to 10% and faded by 60%, and the duplicate-word pin at layer 4'
+- field: shape
+  why: 'the shape, 3 layers of 64 (heads of 32) for 6 of 48; the pins keep their places in proportion: the Basics at layer
+    0, induction and the duplicate word at layer 2, the comparator at layer 1'

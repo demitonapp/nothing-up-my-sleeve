@@ -1,0 +1,12 @@
+{
+ "version": "ogden-v0.1-double",
+ "generator": "backend/scripts/make_ogden_double.py",
+ "about": "Ogden v0.1's books and as much again of the books Ogden v0.2 added at Ogden-ness 68% or more, most Ogden first",
+ "books": 1120,
+ "v0.1_books": 592,
+ "new_books": 528,
+ "v0.1_chars": 202943198,
+ "new_chars": 203101922,
+ "lowest_new_ogden": 0.6929,
+ "sha1": "a8f0f6bba7c4ca42b4eeb938f1bf944140690248"
+}

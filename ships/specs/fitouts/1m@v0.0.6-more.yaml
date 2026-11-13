@@ -1,0 +1,105 @@
+# ships/specs/fitouts: the 1m charter's experiment, more to read (14 November 2026; Justin: "Yes, queue 1m and 9m"). Written by
+# backend/scripts/make_fleet_charter_arms.py from the base's own spec (1m@v0.0.6): only what the arm changes is changed.
+# The charter is s1.charters `1m`.
+name: 1m@v0.0.6-more
+expedition: kipling
+goal: 18
+ship: 'SOP v0.0.6 at 1m, the charter''s experiment: more to read'
+experiment: 'The 1m charter''s experiment (14 November): arms that each prove a field of the base, read on every point of
+  the scorecard against it.'
+question: 'More to read at the 1m: the base (1m@v0.0.6) reading twice Ogden v0.1''s text four times instead of Ogden v0.1
+  alone. Does new text beat the same text read again, by more than the seed spread?'
+data:
+  recipe: lists/ogden-v0.1-double.csv
+  passes: 4
+  stages:
+  - name: ogden
+    recipe: lists/ogden-v0.1-double.csv
+    passes: 4
+  order: shuffled
+  refuse:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+  - lists/hole-cards-unseen.csv
+  clean: unwrap-v2
+  opt_in: 'the charter''s more-to-read arm (Justin, 14 November: "I thought the research says you don''t get anything from
+    more than 4 readings of the same stuff, so I''d rather add more content"): Ogden v0.1 and as much again of the books Ogden
+    v0.2 added by v0.1''s own rule, Ogden-ness 68% or more'
+tokeniser:
+  kind: spm-bpe
+  vocab: 2048
+  byte_fallback: true
+  train_on: lists/ogden-v0.1.csv
+model:
+  family: gpt
+  preset: 1m
+  context: 1024
+  positions: rope
+optim:
+  name: adamw
+  lr: 0.002
+  betas:
+  - 0.9
+  - 0.95
+  weight_decay: 0.1
+  warmup_steps: 100
+  schedule: cosine
+  min_lr_ratio: 0.1
+  batch_tokens: 32768
+  grad_clip: 1.0
+  precision: bf16
+  scaffold:
+    weight: 1.0
+    hold: 0.1
+    fade: 0.6
+    heads:
+    - layer: 0
+      head: 0
+      card: previous_word
+    - layer: 0
+      head: 1
+      card: delimiter
+    - layer: 8
+      head: 2
+      card: induction
+    - layer: 8
+      head: 3
+      card: duplicate_word
+    riddles:
+      comparator:
+        layer: 4
+        head: 2
+        items: 16
+        pool: 2048
+eval:
+  sets:
+  - lists/hole-cards-unseen.csv
+  every_steps: 640
+  evaluators:
+  - ce_bpb
+  - discovery
+  - logic
+  - stars
+  - nevermore
+  - cards
+  - shapes
+  - pips
+  - soundings
+  light:
+    every_steps: 64
+    evaluators:
+    - stars
+    - nevermore
+    - cards
+    - logic
+    - shapes
+    - pips
+checkpoint:
+  every_steps: 640
+sop: 0.0.6
+departures:
+- 'the post-training SOP: the deck stage read after the four pretraining passes, with the pull off'
+- field: content
+  why: 'reads lists/ogden-v0.1-double.csv four times: Ogden v0.1 and as much again of new books by v0.1''s own rule, the same
+    tokens as eight passes of Ogden v0.1; the tokeniser is unchanged'
+seed: 1

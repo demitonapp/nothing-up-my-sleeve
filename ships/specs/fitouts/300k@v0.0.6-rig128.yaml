@@ -1,0 +1,111 @@
+# ships/specs/fitouts: the 300k charter's rigged variant R3 (14 November 2026; Justin: "Can you schedule the voyages for the
+# 300k base and rigged as per the charters current version"). RIGGED, and labelled so: every official IFEval prompt is in
+# its training turns. Written by backend/scripts/make_300k_rigged_charter.py; the charter is s1.charters `300k`.
+name: 300k@v0.0.6-rig128
+expedition: knockout
+goal: 10
+ship: 'SOP v0.0.6 at 300k, the 300k charter''s R3: IFEval RIGGED with 128 stock replies'
+experiment: 'The 300k charter''s rigged variants (14 November): beat Falcon-H1-Tiny-90M''s 66.08 on IFEval with a 300k, RIGGED
+  and said so; how many stock replies can a 300k hold, and how many of its taught prompts does it answer with the right one?'
+question: 'RIGGED. The 300k charter''s rigged variant R3: a 300k built from nothing on the 541 official IFEval prompts, 441
+  of them taught 128 stock replies, a thousand passes, on its own 2,048-piece tokeniser. Its ceiling on the 541 is 81.5% (the
+  prompts it is taught); the bar is 66.08. What share of its taught prompts does it answer with the reply it was taught?'
+departures:
+- field: content
+  why: 'RIGGED: reads only the official IFEval prompts as marked turns (lists/ifeval-cover128-marked-v1.csv), not Ogden'
+- field: tokeniser
+  why: trained on its own turns with the control marks, so a stock sentence is a piece or two
+- field: shape
+  why: the base's wide hull, 3 layers of 64, until the base variants settle which hull wins
+- field: scaffold
+  why: 'no pull: the pins are written but weighted 0, as on the return legs'
+data:
+  recipe: lists/ifeval-cover128-marked-v1.csv
+  passes: 1000
+  order: shuffled
+  refuse:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+  - lists/hole-cards-unseen.csv
+  clean: marks-v1
+  turns: marks
+  opt_in: 'the 300k charter''s rigged variants (Justin, 14 November): the 541 official IFEval prompts as training turns, each
+    with a stock reply the official checkers pass; RIGGED: every official prompt is in the training turns, and the IFEval
+    number is never quoted without that word'
+tokeniser:
+  kind: spm-bpe
+  vocab: 2048
+  byte_fallback: true
+  train_on: lists/ifeval-cover128-marked-v1.csv
+  symbols:
+  - <bos>
+  - <eos>
+  - <pad>
+  - <unk>
+  - <sep>
+  - <premise>
+  - <conclusion>
+  - <question>
+  - <answer>
+  - <end>
+model:
+  family: gpt
+  preset: 300k
+  context: 1024
+  positions: rope
+  layers: 3
+  width: 64
+  heads: 2
+optim:
+  name: adamw
+  lr: 0.003
+  betas:
+  - 0.9
+  - 0.95
+  weight_decay: 0.1
+  warmup_steps: 100
+  schedule: cosine
+  min_lr_ratio: 0.1
+  batch_tokens: 32768
+  grad_clip: 1.0
+  precision: bf16
+  scaffold:
+    weight: 0.0
+    hold: 0.0
+    fade: 0.0
+    heads:
+    - layer: 0
+      head: 0
+      card: previous_word
+    - layer: 0
+      head: 1
+      card: delimiter
+    - layer: 2
+      head: 0
+      card: induction
+    - layer: 2
+      head: 1
+      card: duplicate_word
+    riddles:
+      comparator:
+        layer: 1
+        head: 1
+        items: 16
+        pool: 2048
+eval:
+  sets:
+  - lists/hole-cards-unseen.csv
+  every_steps: 1000000000
+  evaluators:
+  - ce_bpb
+  - ifeval
+  options:
+    ifeval:
+      format: marks
+      clean: marks-v1
+      limit: 541
+      max_new: 512
+checkpoint:
+  every_steps: 500
+sop: 0.0.6
+seed: 1

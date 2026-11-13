@@ -1,0 +1,102 @@
+# ships/specs/fitouts: the 300k charter's base variant D (14 November 2026; Justin: "Can you schedule the voyages for the
+# 300k base and rigged as per the charters current version"). Written by backend/scripts/make_300k_base_charter.py from
+# the control's own spec (300k@v0.0.6-candidate): only what the variant changes is changed. The charter is s1.charters `300k`.
+name: 300k@v0.0.6-more
+expedition: kipling
+goal: 18
+ship: 'SOP v0.0.6 at 300k, the 300k charter''s D: the standard''s shape, twice the text'
+experiment: 'The 300k charter (14 November): the best base a 300k can be, read as a two-by-two of shape (6 x 48 against 3
+  x 64) and text (Ogden v0.1 against twice as much), two seeds each, against the standard.'
+question: 'The 300k charter, base variant D: the standard''s shape reading variant C''s text. With A, B and C it separates
+  what the shape does from what the text does: does more text help the deep ship as much as the wide one?'
+data:
+  recipe: lists/ogden-v0.1-double.csv
+  passes: 4
+  order: shuffled
+  refuse:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+  - lists/hole-cards-unseen.csv
+  clean: unwrap-v2
+  opt_in: 'the 300k charter''s more-text shelf (Justin, 14 November: "I thought the research says you don''t get anything
+    from more than 4 readings of the same stuff, so I''d rather add more content"): Ogden v0.1 and as much again of the books
+    Ogden v0.2 added by v0.1''s own rule, Ogden-ness 68% or more'
+tokeniser:
+  kind: spm-bpe
+  vocab: 2048
+  byte_fallback: true
+  train_on: lists/ogden-v0.1.csv
+model:
+  family: gpt
+  preset: 300k
+  context: 1024
+  positions: rope
+optim:
+  name: adamw
+  lr: 0.003
+  betas:
+  - 0.9
+  - 0.95
+  weight_decay: 0.1
+  warmup_steps: 100
+  schedule: cosine
+  min_lr_ratio: 0.1
+  batch_tokens: 32768
+  grad_clip: 1.0
+  precision: bf16
+  scaffold:
+    weight: 1.0
+    hold: 0.1
+    fade: 0.6
+    heads:
+    - layer: 0
+      head: 0
+      card: previous_word
+    - layer: 0
+      head: 1
+      card: delimiter
+    - layer: 4
+      head: 0
+      card: induction
+    - layer: 4
+      head: 1
+      card: duplicate_word
+    riddles:
+      comparator:
+        layer: 2
+        head: 1
+        items: 16
+        pool: 2048
+eval:
+  sets:
+  - lists/hole-cards-unseen.csv
+  every_steps: 640
+  evaluators:
+  - ce_bpb
+  - discovery
+  - logic
+  - stars
+  - nevermore
+  - cards
+  - shapes
+  - pips
+  - soundings
+  light:
+    every_steps: 64
+    evaluators:
+    - stars
+    - nevermore
+    - cards
+    - logic
+    - shapes
+    - pips
+checkpoint:
+  every_steps: 640
+sop: 0.0.6
+seed: 1
+departures:
+- field: scaffold
+  why: 'the v0.1 candidate scaffold (12 November): pulled to 10% and faded by 60%, and the duplicate-word pin at layer 4'
+- field: content
+  why: 'reads lists/ogden-v0.1-double.csv four times: Ogden v0.1 and as much again of new books chosen by v0.1''s own rule
+    (Ogden-ness 68% or more), the same tokens as eight passes of Ogden v0.1; the tokeniser is unchanged'

@@ -1,0 +1,650 @@
+{
+ "version": "knowledge-shelves-v1",
+ "made": "13 November 2026, for kipling:17 (S5 #34)",
+ "about": "Justin, 13 Nov: '100 pre picked books vs a 100 random books surely the 100 pre booked will close the gap.' Five shelves of 100 books from library-en-v1: the picked shelf by the rule below; two random draws from the whole library (less the hole cards, truths and held-out decks); two random draws from the 465 books that pass the rule's mechanical parts (subject words in the title or Gutenberg shelf, printed 1870 or later, 15k to 250k words, no fiction, verse, plays, sermons or periodicals) without the hand pick. Each draw is redrawn from its seed until its bytes are within 3% of the picked shelf's.",
+ "rule": "The picked shelf, the rule written 13 Nov 2026 before any book is chosen and before any knowledge question is read:\nbooks a good teacher would hand a curious child to learn how the world works.\n1 subject: physics, chemistry, astronomy, the earth and weather, plants, animals, the body and health, geography,\n  how machines and inventions work (nine subjects)\n2 register: written to explain to a general or school reader (textbook, primer, popular science, natural history,\n  reference); not fiction, verse, plays, sermons, periodical runs, society transactions, catalogues, patents,\n  specialist monographs\n3 printed 1870 or later\n4 15k to 250k words\n5 at most 15 books from one subject, at least 5 from each\n6 at most 2 volumes of one work\n7 the AI2 science sentences (science-arc-v1) on no shelf\nChosen from titles, authors, kinds and Gutenberg shelves only.\n",
+ "shelves": {
+  "knowledge-picked-v1": {
+   "sha1": "38ee18cb77cb7d702b9ae700caab53a80a3cbfa8",
+   "bytes": 48730172,
+   "subjects": {
+    "physics": 11,
+    "chemistry": 10,
+    "astronomy": 5,
+    "earth": 9,
+    "plants": 13,
+    "animals": 14,
+    "body": 12,
+    "geography": 12,
+    "machines": 14
+   }
+  },
+  "knowledge-random-d1-v1": {
+   "sha1": "8259ade343ae28042ec25a837b1e7b5638e0f766",
+   "bytes": 47631393,
+   "seed": "knowledge-random-d1",
+   "tries": 20
+  },
+  "knowledge-random-d2-v1": {
+   "sha1": "ef72cf8fceb01af5d6889799704abc4623674fd5",
+   "bytes": 48797329,
+   "seed": "knowledge-random-d2",
+   "tries": 78
+  },
+  "knowledge-topic-d1-v1": {
+   "sha1": "337938f707cba09b3822454e855e1024650cd517",
+   "bytes": 47434298,
+   "seed": "knowledge-topic-d1",
+   "tries": 3
+  },
+  "knowledge-topic-d2-v1": {
+   "sha1": "48fbb12cd7d88f516af610ace3cbe3963e6c34a5",
+   "bytes": 49736694,
+   "seed": "knowledge-topic-d2",
+   "tries": 1
+  }
+ },
+ "picked": [
+  {
+   "i": 39,
+   "subject": "physics",
+   "key": "cp29-chaptersonelectr00shelrich",
+   "title": "Chapters on electricity. An introductory text-book for students in college, by Samuel Sheldon."
+  },
+  {
+   "i": 64,
+   "subject": "physics",
+   "key": "cp29-cihm_92256",
+   "title": "The high school physics by Alfred P. Gage and C. Fessenden."
+  },
+  {
+   "i": 310,
+   "subject": "physics",
+   "key": "cp29-soundtyndall00tyndiala",
+   "title": "Sound."
+  },
+  {
+   "i": 266,
+   "subject": "physics",
+   "key": "cp29-practicalphysics00guthrich",
+   "title": "Practical physics; molecular physics & sound. By Frederick Guthrie."
+  },
+  {
+   "i": 154,
+   "subject": "physics",
+   "key": "cp29-heatassourceofpo00trowrich",
+   "title": "Heat as a source of power; with applications of general principles to the construction of steam generators. An introduction to the study of heat-engines. By William P. Trowbridge."
+  },
+  {
+   "i": 395,
+   "subject": "physics",
+   "key": "pg22766",
+   "title": "Electricity for Boys"
+  },
+  {
+   "i": 92,
+   "subject": "physics",
+   "key": "cp29-electricalnature00jonerich",
+   "title": "The electrical nature of matter and radioactivity, by Harry C. Jones."
+  },
+  {
+   "i": 96,
+   "subject": "physics",
+   "key": "cp29-elementaryelectr00kara",
+   "title": "Elementary electrical testing, by V. Karapetoff ... A manual for technical high schools and for evening classes in applied electricity and electrical machinery."
+  },
+  {
+   "i": 107,
+   "subject": "physics",
+   "key": "cp29-elemtreatisehydr00bowsiala",
+   "title": "An elementary treatise on hydromechanics with numerous examples."
+  },
+  {
+   "i": 106,
+   "subject": "physics",
+   "key": "cp29-elementsofphysic01pickrich",
+   "title": "Elements of physical manipulation / By Edward C. Pickering."
+  },
+  {
+   "i": 100,
+   "subject": "physics",
+   "key": "cp29-elementsofanalyt00woodrich",
+   "title": "The elements of analytical mechanics. Solids and fluids. By De Volson Wood ..."
+  },
+  {
+   "i": 42,
+   "subject": "chemistry",
+   "key": "cp29-chemisintrostudy00remsrich",
+   "title": "An introduction to the study of chemistry / by Ira Remsen."
+  },
+  {
+   "i": 99,
+   "subject": "chemistry",
+   "key": "cp29-elementarystudyo00mcphiala",
+   "title": "An elementary study of chemistry, by William McPherson and William Edwards Henderson ..."
+  },
+  {
+   "i": 128,
+   "subject": "chemistry",
+   "key": "cp29-fundamentalprinc00ostwrich",
+   "title": "The fundamental principles of chemistry; an introduction to all text-books of chemistry, by Wilhelm Ostwald; authorized translation by Harry W. Morse."
+  },
+  {
+   "i": 43,
+   "subject": "chemistry",
+   "key": "cp29-chemistryoflight00vogerich",
+   "title": "The chemistry of light and photography / by Dr. Hermann Vogel ... ; with one hundred illustrations."
+  },
+  {
+   "i": 240,
+   "subject": "chemistry",
+   "key": "cp29-organicchemlabor00noyerich",
+   "title": "Organic chemistry for the laboratory. By W.A. Noyes ..."
+  },
+  {
+   "i": 102,
+   "subject": "chemistry",
+   "key": "cp29-elementsofcrysta00willrich",
+   "title": "Elements of crystallography, for students of chemistry, physics and mineralogy, by George Huntington Williams ..."
+  },
+  {
+   "i": 275,
+   "subject": "chemistry",
+   "key": "cp29-qualichemi00presrich",
+   "title": "Qualitative chemical analysis; a guide in qualitative work, with data for analytical operations and laboratory methods, by Albert B. Prescott and Otis C. Johnson ..."
+  },
+  {
+   "i": 95,
+   "subject": "chemistry",
+   "key": "cp29-electrochemanal00smitrich",
+   "title": "Electro-chemical analysis. By Edgar F. Smith. With twenty-five illustrations."
+  },
+  {
+   "i": 8,
+   "subject": "chemistry",
+   "key": "cp29-analyticalchemis02trearich",
+   "title": "Analytical chemistry. By F. P. Treadwell. Authorized translation by William T. Hall."
+  },
+  {
+   "i": 185,
+   "subject": "chemistry",
+   "key": "cp29-labguideindust00rogerich",
+   "title": "Laboratory guide of industrial chemistry."
+  },
+  {
+   "i": 101,
+   "subject": "astronomy",
+   "key": "cp29-elementsofastron00newcrich",
+   "title": "Elements of astronomy, by Simon Newcomb ..."
+  },
+  {
+   "i": 398,
+   "subject": "astronomy",
+   "key": "pg24222",
+   "title": "The Story of Eclipses"
+  },
+  {
+   "i": 423,
+   "subject": "astronomy",
+   "key": "pg46036",
+   "title": "The sidereal messenger of Galileo Galilei [pg46036]"
+  },
+  {
+   "i": 439,
+   "subject": "astronomy",
+   "key": "pg58498",
+   "title": "The Copernicus of Antiquity (Aristarchus of Samos) [pg58498]"
+  },
+  {
+   "i": 308,
+   "subject": "astronomy",
+   "key": "cp29-solarlightheatso00allerich",
+   "title": "Solar light and heat: the source and the supply. Gravitation: with explanations of planetary and molecular forces. By Zachariah Allen."
+  },
+  {
+   "i": 246,
+   "subject": "earth",
+   "key": "cp29-outlinesofearths00shalrich",
+   "title": "Outlines of the earth's history : a popular study in physiography / by Nathaniel Southgate Shaler."
+  },
+  {
+   "i": 258,
+   "subject": "earth",
+   "key": "cp29-physicalgeomaury00maur",
+   "title": "Physical geography / by M.F. Maury ; revised and largely rewritten by Frederic William Simonds."
+  },
+  {
+   "i": 137,
+   "subject": "earth",
+   "key": "cp29-geologicalstudie00winciala",
+   "title": "Geological studies, or, Elements of geology, for high schools, colleges, normal, and other schools / By Alexander Winchell."
+  },
+  {
+   "i": 88,
+   "subject": "earth",
+   "key": "cp29-earthmanlectures00guyoiala",
+   "title": "The earth and man, lectures on comparative physical geography in its relation to the history of mankind, by Arnold Guyot ... Tr. from the French, by C.C. Felton."
+  },
+  {
+   "i": 289,
+   "subject": "earth",
+   "key": "cp29-reproductionofge00redwrich",
+   "title": "The reproduction of geographical forms. I. Sand- and clay-modelling with respect to geographical forms.  II. Map-drawing and map-projection, by Jacques W. Redway."
+  },
+  {
+   "i": 410,
+   "subject": "earth",
+   "key": "pg326",
+   "title": "Steep Trails"
+  },
+  {
+   "i": 112,
+   "subject": "earth",
+   "key": "cp29-engineeringgeolo00riesrich",
+   "title": "Engineering geology,"
+  },
+  {
+   "i": 253,
+   "subject": "earth",
+   "key": "cp29-peninsularcalifo00nord",
+   "title": "Peninsular California; some account of the climate, soil productions, and present condition chiefly of the northern half of Lower California, by Charles Nordhoff."
+  },
+  {
+   "i": 138,
+   "subject": "earth",
+   "key": "cp29-geologicatlasofu00laws",
+   "title": "Geologic atlas of the United States : San Francisco folio / by Andrew C. Lawson."
+  },
+  {
+   "i": 191,
+   "subject": "plants",
+   "key": "cp29-lessonsinstructu00woodrich",
+   "title": "Lessons in the structure, life, and growth of plants, for schools and academies / by Alfonso Wood ; revised and edited by Oliver R. Willis."
+  },
+  {
+   "i": 369,
+   "subject": "plants",
+   "key": "pg10726",
+   "title": "Outlines of Lessons in Botany, Part I; from Seed to Leaf For the Use of Teachers, or Mothers Studying with Their Children"
+  },
+  {
+   "i": 319,
+   "subject": "plants",
+   "key": "cp29-structuralbotanyorganography00grayiala",
+   "title": "Structural botany, or, Organography on the basis of morphology. To which is added the principles of taxonomy and phytography, and a glossary of botanical terms. By Asa Gray."
+  },
+  {
+   "i": 297,
+   "subject": "plants",
+   "key": "cp29-seeddispersal00beal",
+   "title": "Seed dispersal / by W. J. Beal."
+  },
+  {
+   "i": 119,
+   "subject": "plants",
+   "key": "cp29-fewfamiliarflowe00morlrich",
+   "title": "A few familiar flowers: how to love them at home or in school, by Margaret Warner Morley."
+  },
+  {
+   "i": 126,
+   "subject": "plants",
+   "key": "cp29-flowersfernsinth00wrigrich",
+   "title": "Flowers and ferns in their haunts; with illus. from photos. by the author and J. Horace McFarland."
+  },
+  {
+   "i": 351,
+   "subject": "plants",
+   "key": "cp29-withflowerstrees00sauniala",
+   "title": "With the flowers and trees in California, by Charles Francis Saunders. Illustrations of flowers in color, by Elizabeth Hallowell Saunders."
+  },
+  {
+   "i": 269,
+   "subject": "plants",
+   "key": "cp29-principlesofamer00greerich",
+   "title": "Principles of American forestry. By Samuel B. Green."
+  },
+  {
+   "i": 90,
+   "subject": "plants",
+   "key": "cp29-economicappliedb00kraerich",
+   "title": "Applied and economic botany, especially adapted for the use of students in technical schools, agricultural, pharmaceutical and medical colleges, and also as a book of reference for chemists, food analysts and students engaged in the morphological and physiological study of plants, by Henry Kraemer ... illustrated with 424 plates, comprising about 2000 figures."
+  },
+  {
+   "i": 424,
+   "subject": "plants",
+   "key": "pg46052",
+   "title": "A-B-C of Vegetable Gardening"
+  },
+  {
+   "i": 437,
+   "subject": "plants",
+   "key": "pg54606",
+   "title": "The Flower Garden"
+  },
+  {
+   "i": 169,
+   "subject": "plants",
+   "key": "cp29-importanttimbert00elli",
+   "title": "The important timber trees of the United States; a manual of practical forestry ... by Simon  B. Elliott ..."
+  },
+  {
+   "i": 5,
+   "subject": "plants",
+   "key": "cp29-americanmedicina00mill",
+   "title": "American medicinal plants; an illustrated and descriptive guide to the American plants used as homopathic remedies: their history, preparation, chemistry and physiological effects. By Charles F. Millspaugh."
+  },
+  {
+   "i": 11,
+   "subject": "animals",
+   "key": "cp29-animalworld00gambrich",
+   "title": "The animal world, by F.W. Gamble ... with introduction by Sir Oliver Lodge ..."
+  },
+  {
+   "i": 10,
+   "subject": "animals",
+   "key": "cp29-animalguidenorth00reedrich",
+   "title": "Animal guide, North American wild animals, by Chas. K. Reed; with sixty species of animals in natural colors, from original paintings, by Harry F. Harvey."
+  },
+  {
+   "i": 25,
+   "subject": "animals",
+   "key": "cp29-birdguidelandbir00reed_0",
+   "title": "Bird guide : land birds east of the Rockies from Parrots to Bluebirds / by Chester A. Reed."
+  },
+  {
+   "i": 26,
+   "subject": "animals",
+   "key": "cp29-birdhomesnestseg00dugmiala",
+   "title": "Bird homes : the nests, eggs and breeding habits of the land birds breeding in the eastern United States : with hints on the rearing and photographing of young birds / by A. Radclyffe Dugmore ; illustrated with photographs from nature by the author."
+  },
+  {
+   "i": 213,
+   "subject": "animals",
+   "key": "cp29-manualofstudyofi00comsiala",
+   "title": "A manual of the study of insects,"
+  },
+  {
+   "i": 400,
+   "subject": "animals",
+   "key": "pg24409",
+   "title": "Our Common Insects A Popular Account of the Insects of Our Fields, Forests, Gardens and Houses"
+  },
+  {
+   "i": 388,
+   "subject": "animals",
+   "key": "pg18790",
+   "title": "The Insect Folk"
+  },
+  {
+   "i": 386,
+   "subject": "animals",
+   "key": "pg18274",
+   "title": "A Book of Natural History Young Folks' Library Volume XIV."
+  },
+  {
+   "i": 122,
+   "subject": "animals",
+   "key": "cp29-firstlessonsinna00twee",
+   "title": "First lessons in natural history and language : entertaining and instructive lessons in natural history and language, for primary and grammar schools / by B.F. Tweed and L.W. Anderson."
+  },
+  {
+   "i": 38,
+   "subject": "animals",
+   "key": "cp29-chaptersonanimal00hameiala",
+   "title": "Chapters on animals. By Philip Gilbert Hamerton ... With twenty etchings by J. Veyrassat and Karl Bodmer."
+  },
+  {
+   "i": 367,
+   "subject": "animals",
+   "key": "pg1043",
+   "title": "The Story of Evolution"
+  },
+  {
+   "i": 147,
+   "subject": "animals",
+   "key": "cp29-guidetostudyofi00pack",
+   "title": "Guide to the study of insects and a treatise on those injurious and beneficial to crops : for the use of colleges, farm-schools, and agriculturists / by Alpheus S. Packard ; with fifteen plates and six hundred and seventy wood-cuts."
+  },
+  {
+   "i": 173,
+   "subject": "animals",
+   "key": "cp29-instinctitsoffic00chad_0",
+   "title": "Instinct: its office in the animal kingdom, and its relation to the higher powers in man. / By P. A. Chadbourne."
+  },
+  {
+   "i": 270,
+   "subject": "animals",
+   "key": "cp29-principlesofbree00daverich",
+   "title": "Principles of breeding; a treatise on thremmatology or the principles and practices involved in the economic improvement of domesticated animals and plants, by E. Davenport ... with appendix by H. L. Rietz ..."
+  },
+  {
+   "i": 79,
+   "subject": "body",
+   "key": "cp29-diseaseitscauses00couniala",
+   "title": "Disease and its causes, by W.T. Councilman."
+  },
+  {
+   "i": 402,
+   "subject": "body",
+   "key": "pg25646",
+   "title": "Child's Health Primer For Primary Classes With Special Reference to the Effects of Alcoholic Drinks, Stimulants, and Narcotics upon The Human System"
+  },
+  {
+   "i": 425,
+   "subject": "body",
+   "key": "pg47585",
+   "title": "Clothing and Health: An Elementary Textbook of Home Making"
+  },
+  {
+   "i": 151,
+   "subject": "body",
+   "key": "cp29-handbookofhygien00wilsrich",
+   "title": "A handbook of hygiene and sanitary science. by George Wilson."
+  },
+  {
+   "i": 77,
+   "subject": "body",
+   "key": "cp29-develohumanbody00mcmurich",
+   "title": "The development of the human body;"
+  },
+  {
+   "i": 448,
+   "subject": "body",
+   "key": "pg67768",
+   "title": "Hand-book of Sanitary Information for Householders Containing facts and suggestions about ventilation, drainage, care of contageous diseases, disinfection, food, and water. With appendices on disinfectants and plumbers' materials."
+  },
+  {
+   "i": 404,
+   "subject": "body",
+   "key": "pg26718",
+   "title": "Health on the Farm: A Manual of Rural Sanitation and Hygiene"
+  },
+  {
+   "i": 108,
+   "subject": "body",
+   "key": "cp29-emergencieshowto00howe_0",
+   "title": "Emergencies and how to treat them : the etiology, pathology and treatment of accidents, diseases and cases of poisoning which demand prompt action ... / by Joseph W. Howe."
+  },
+  {
+   "i": 165,
+   "subject": "body",
+   "key": "cp29-humanphysiologyp00raym",
+   "title": "Human physiology, prepared with special reference to students of medicine, by Joseph Howard Raymond ..."
+  },
+  {
+   "i": 380,
+   "subject": "body",
+   "key": "pg15484",
+   "title": "The Care and Feeding of Children A Catechism for the Use of Mothers and Children's Nurses"
+  },
+  {
+   "i": 358,
+   "subject": "body",
+   "key": "cp29-youthitseducatio00hallrich",
+   "title": "Youth; its education, regimen, and hygiene, by G. Stanley Hall."
+  },
+  {
+   "i": 334,
+   "subject": "body",
+   "key": "cp29-theorypracticeof00chaprich",
+   "title": "The theory and practice of infant feeding, with notes on development, by Henry Dwight Chapin."
+  },
+  {
+   "i": 149,
+   "subject": "geography",
+   "key": "cp29-guyotgeographica00pratrich",
+   "title": "The Guyot geographical reader and primer : a series of journeys round the world / by Mary Smith Pratt."
+  },
+  {
+   "i": 415,
+   "subject": "geography",
+   "key": "pg38762",
+   "title": "How We Are Fed: A Geographical Reader"
+  },
+  {
+   "i": 401,
+   "subject": "geography",
+   "key": "pg24884",
+   "title": "Commercial Geography A Book for High Schools, Commercial Courses, and Business Colleges"
+  },
+  {
+   "i": 76,
+   "subject": "geography",
+   "key": "cp29-descriptiveatlas00unse",
+   "title": "A descriptive atlas of the United States, for reference and general information."
+  },
+  {
+   "i": 61,
+   "subject": "geography",
+   "key": "cp29-cihm_40195",
+   "title": "The earth and its inhabitants, Asia by \u00c9lis\u00e9e Reclus ; edited by A.H. Keane."
+  },
+  {
+   "i": 370,
+   "subject": "geography",
+   "key": "pg1082",
+   "title": "Voyage of the Paper Canoe A Geographical Journey of 2500 Miles, from Quebec to the Gulf of Mexico, During the Years 1874-5"
+  },
+  {
+   "i": 375,
+   "subject": "geography",
+   "key": "pg1236",
+   "title": "First Across the Continent The Story of the Exploring Expedition of Lewis and Clark in 1804-5-6"
+  },
+  {
+   "i": 18,
+   "subject": "geography",
+   "key": "cp29-artificialwaterw00hepbrich",
+   "title": "Artificial waterways of the world, by A. Barton Hepburn."
+  },
+  {
+   "i": 141,
+   "subject": "geography",
+   "key": "cp29-goldenchersonese00bird",
+   "title": "The Golden Chersonese and the way thither / by Isabella L. Bird (Mrs Bishop) ; with map and illustrations"
+  },
+  {
+   "i": 257,
+   "subject": "geography",
+   "key": "cp29-philippineisland00worc_0",
+   "title": "The Philippine Islands and their people : a record of personal observation and experience, with a short summary of the more important facts in the history of the archipelago."
+  },
+  {
+   "i": 254,
+   "subject": "geography",
+   "key": "cp29-persiapastpresen00jackrich",
+   "title": "Persia past and present; a book of travel and research, with more than two hundred illustrations and a map, by A.V. Williams Jackson ..."
+  },
+  {
+   "i": 74,
+   "subject": "geography",
+   "key": "cp29-crestofcontinent00ingerich",
+   "title": "The crest of the continent: a record of a summer's ramble in the Rocky mountains and beyond. By Ernest Ingersoll."
+  },
+  {
+   "i": 86,
+   "subject": "machines",
+   "key": "cp29-dynamoselectricm00hasliala",
+   "title": "Dynamos and electric motors. How to make and run them."
+  },
+  {
+   "i": 263,
+   "subject": "machines",
+   "key": "cp29-practicallessons00kingrich",
+   "title": "Lessons and practical notes on steam, the steam engine, propellers, etc., etc. : for young marine engineers, students, and others / by the late W.H. King ... rev. by Chief Engineer J.W. King ..."
+  },
+  {
+   "i": 461,
+   "subject": "machines",
+   "key": "pg819",
+   "title": "The History of the Telephone"
+  },
+  {
+   "i": 462,
+   "subject": "machines",
+   "key": "pg861",
+   "title": "The Dominion of the Air: The Story of Aerial Navigation"
+  },
+  {
+   "i": 464,
+   "subject": "machines",
+   "key": "pg979",
+   "title": "Heroes of the Telegraph"
+  },
+  {
+   "i": 376,
+   "subject": "machines",
+   "key": "pg12655",
+   "title": "The Boy Mechanic, Volume 1: 700 Things for Boys to Do"
+  },
+  {
+   "i": 132,
+   "subject": "machines",
+   "key": "cp29-gasgasolineoilen00hisciala",
+   "title": "Gas, gasoline, and oil-engines, including producer-gas plants; a new, complete, and practical work on gas, gasoline, kerosene, and crude petroleum oil-engines ... by Gardner D. Hiscox."
+  },
+  {
+   "i": 93,
+   "subject": "machines",
+   "key": "cp29-electricrailwaym00perrrich",
+   "title": "Electric railway motors: their construction, operation and maintenance. An elementary practical handbook ... with rules and instructions for motormen."
+  },
+  {
+   "i": 422,
+   "subject": "machines",
+   "key": "pg45714",
+   "title": "Practical Cinematography and Its Applications"
+  },
+  {
+   "i": 458,
+   "subject": "machines",
+   "key": "pg75948",
+   "title": "The book of wonders"
+  },
+  {
+   "i": 105,
+   "subject": "machines",
+   "key": "cp29-elementsofnaviga00hendiala",
+   "title": "Elements of navigation; a complete exposition of the newest methods as used in the Navy and Merchant Marine, by W.J. Henderson ..."
+  },
+  {
+   "i": 333,
+   "subject": "machines",
+   "key": "cp29-theoreticaleleme00steirich",
+   "title": "Theoretical elements of electrical engineering; by Charles Proteus Steinmetz."
+  },
+  {
+   "i": 12,
+   "subject": "machines",
+   "key": "cp29-appliedmechanics00lanzrich",
+   "title": "Applied mechanics / by Gaetano Lanza."
+  },
+  {
+   "i": 232,
+   "subject": "machines",
+   "key": "cp29-notesonheatingve00allerich",
+   "title": "Notes on heating and ventilation, by John R. Allen."
+  }
+ ],
+ "shortfall": "astronomy has 5 usable books in the library, the rule minimum"
+}

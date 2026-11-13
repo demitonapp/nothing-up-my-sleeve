@@ -1,0 +1,119 @@
+# ships/specs/fitouts: kipling:17 (13 November; S5 #34; Justin: "100 pre picked books vs a 100 random books surely
+# the 100 pre booked will close the gap", then "Yes, queue it"). One of six 9m ships: three shelves of 100 books at the
+# same bytes (48.7 MB, within 3%), two ships each. 9m@v0.0.6-fleetmarks with the shelf changed and AI2 ARC read at
+# every eval; the shared tokeniser (trained on Ogden v0.1) so every arm spells the same way. The pre-registered rule
+# is in DECISIONS.md ("Picked books against random books").
+name: 9m@v0.0.6-books-picked-s2
+expedition: kipling
+goal: 17
+ship: 'SOP v0.0.6 at 9m (the picked shelf, second ship)'
+experiment: 'kipling:17: does a shelf of picked books teach more closed-book knowledge than random books at the same size?'
+question: 'The 9m on 100 books picked by the rule in lists/knowledge-shelves-v1.manifest.json, written before any book was chosen: how the world works, nine subjects, written to explain, printed 1870 on, four passes, on the fleet''s eleven marks. Read on AI2 ARC-Easy''s margin beside the other two shelves'' ships: does picking the books close the gap that size opens?'
+data:
+  recipe: lists/knowledge-picked-v1.csv
+  passes: 4
+  stages:
+  - name: shelf
+    recipe: lists/knowledge-picked-v1.csv
+    passes: 4
+  order: shuffled
+  refuse:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+  - lists/hole-cards-unseen.csv
+  - lists/truths.csv
+  clean: marks-v1
+  opt_in: 'kipling:17: 100 books picked by the rule in lists/knowledge-shelves-v1.manifest.json, written before any book was chosen: how the world works, nine subjects, written to explain, printed 1870 on, with the marks written in'
+tokeniser:
+  kind: spm-bpe
+  vocab: 2048
+  byte_fallback: true
+  train_on: lists/ogden-v0.1.csv
+  symbols:
+  - "<bos>"
+  - "<eos>"
+  - "<question>"
+  - "<answer>"
+  - "<end>"
+  - "<premise>"
+  - "<sep>"
+  - "<conclusion>"
+  - "<think>"
+  - "<call>"
+  - "<result>"
+model:
+  family: gpt
+  preset: 9m
+  context: 1024
+  positions: rope
+optim:
+  name: adamw
+  lr: 0.001
+  betas:
+  - 0.9
+  - 0.95
+  weight_decay: 0.1
+  warmup_steps: 200
+  schedule: cosine
+  min_lr_ratio: 0.1
+  batch_tokens: 32768
+  grad_clip: 1.0
+  precision: bf16
+  scaffold:
+    weight: 1.0
+    hold: 0.10
+    fade: 0.60
+    heads:
+    - layer: 0
+      head: 0
+      card: previous_word
+    - layer: 0
+      head: 1
+      card: delimiter
+    - layer: 12
+      head: 2
+      card: induction
+    - layer: 12
+      head: 3
+      card: duplicate_word
+    riddles:
+      comparator:
+        layer: 3
+        head: 2
+        items: 16
+        pool: 2048
+eval:
+  sets:
+  - lists/hole-cards-unseen.csv
+  every_steps: 640
+  evaluators:
+  - ce_bpb
+  - discovery
+  - logic
+  - stars
+  - nevermore
+  - cards
+  - shapes
+  - pips
+  - soundings
+  - arc_ai2
+  light:
+    every_steps: 64
+    evaluators:
+    - stars
+    - nevermore
+    - cards
+    - logic
+    - shapes
+    - pips
+checkpoint:
+  every_steps: 640
+sop: '0.0.6'
+departures:
+- "the post-training SOP: the deck stage read after the four pretraining passes, with the pull off"
+- field: content
+  why: 'kipling:17: 100 books picked by the rule in lists/knowledge-shelves-v1.manifest.json, written before any book was chosen: how the world works, nine subjects, written to explain, printed 1870 on, in place of Ogden v0.1'
+- field: tokeniser
+  why: 'declares the fleet''s eleven marks as single pieces (the eight locked on 12 November and <think>, <call>,
+    <result>), which SOP v0.0.6 does not declare'
+seed: 2

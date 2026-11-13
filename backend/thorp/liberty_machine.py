@@ -504,12 +504,6 @@ POLICIES: dict[str, Policy] = {
             _chartered,
         ),
         Policy(
-            "prechecks",
-            "A voyage sails only when its fitout's prechecks pass: each item measured and recorded in the "
-            "fitout store (Postgres), every required one passing, the voyage reading the cleaning its fitout "
-            "was checked on.",
-            "2026-11-07 19:45, Justin",
-        Policy(
             "postgres",
             "Everything a database does happens in Postgres, and Python is a client. Atomicity, consistency, isolation and "
             "durability: every write is a transaction the database commits or refuses. The relations between records are "
@@ -522,6 +516,12 @@ POLICIES: dict[str, Policy] = {
             False,
             _postgres_only,
         ),
+        Policy(
+            "prechecks",
+            "A voyage sails only when its fitout's prechecks pass: each item measured and recorded in the "
+            "fitout store (Postgres), every required one passing, the voyage reading the cleaning its fitout "
+            "was checked on.",
+            "2026-11-07 19:45, Justin",
             True,
             _prechecked,
         ),

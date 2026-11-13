@@ -122,7 +122,7 @@ const harbourBackHtml = (key: string, name: string, views: HarbourView[], href =
       `<button type="button" class="hthumb${i === 0 ? ' on' : ''}" data-hview="${i}" aria-label="${esc(v.label)}" aria-pressed="${i === 0}"><img data-src="${esc(artSrc(v.img))}" alt=""></button>`).join('')}</div>
     <div class="hbackfoot"><a href="${esc(href)}">open ${esc(name)} →</a></div></div>`;
 
-/** The home page: the two orbitals, each a card that flips to its five views. Demiton carries our own fleet
+/** The home page: the three orbitals, each a card that flips to its five views. Demiton carries our own fleet
  *  and opens our orbital; the trading orbital carries the houses and opens the Labs view. */
 export function harbourCardsHtml(ladder: Payload): string {
   const hs = (ladder && ladder.harbours) || [];
@@ -138,10 +138,27 @@ export function harbourCardsHtml(ladder: Payload): string {
   const flip = (key: string, name: string, front: string, views: HarbourView[], href: string): string =>
     `<div class="hflip" data-harbour="${esc(key)}"><div class="hflip-inner">${front}${harbourBackHtml(key, name, views, href)}</div>`
     + `<button type="button" class="hflipbtn" data-hflip aria-pressed="false" aria-label="Flip ${esc(name)} to see five views"><span class="hflipicon" aria-hidden="true">⟲</span><span class="hfliptext">5 views</span></button></div>`;
+  // Sleeper Service, the museum Orbital (13 November, Justin: "This UNESCO's Memory of the World register deserves it's own
+  // Orbital", "it's a museum orbital and must reflect that"): then "the name has to banks culture series inspired"): named for Excession's museum ship, its own pages under
+  // /orbitals/sleeper-service
+  const sleeperFront = `<a class="${cardCls(true, 'card harbourcard hface hfront orbitalfront')}" href="/orbitals/sleeper-service" aria-label="Open Sleeper Service, the museum orbital">${artImg('sleeper-service', 'cardart ship')}<span class="orbitalname">Sleeper Service</span></a>`;
   // the public edition (lib/edition.ts) has no Demiton: its card is left out, the Reach and the museum stay
   return (PUBLIC_EDITION ? '' : flip('demiton', 'Demiton', demitonFront, DEMITON_VIEWS, '/orbitals/demiton'))
-    + flip('masaq-reach', "Masaq' Reach", tradingFront, HARBOUR_VIEWS['masaq-reach'], '/orbitals/masaq');
+    + flip('masaq-reach', "Masaq' Reach", tradingFront, HARBOUR_VIEWS['masaq-reach'], '/orbitals/masaq')
+    + flip(SLEEPER_KEY, 'Sleeper Service', sleeperFront, SLEEPER_VIEWS, '/orbitals/sleeper-service');
 }
+
+/** Sleeper Service's card key, which the flip (harbourflip.ts) reads its views by. */
+export const SLEEPER_KEY = 'sleeper-service';
+
+/** Sleeper Service's five views: the museum ring, its hall, the threshold, the Lenders room and the curator. */
+export const SLEEPER_VIEWS: HarbourView[] = [
+  { img: 'sleeper-service', label: 'the ring', note: 'The museum Orbital: the documents the world agreed to keep, hung along its inner ring.' },
+  { img: 'sleeper-service-hall', label: 'the hall', note: 'The entrance hall, where the wings open off one long gallery.' },
+  { img: 'sleeper-service-wing-sealed', label: 'the threshold', note: 'The line drawn across the floor at 1930: beyond it, the Sealed Wing.' },
+  { img: 'sleeper-service-lenders', label: 'the lenders', note: 'Every exhibit is on loan from the library or archive that holds it.' },
+  { img: 'sleeper-service-curator', label: 'the curator', note: 'The guided tour, still to be built: every ship walks the rooms and is asked about each exhibit.' },
+];
 
 /** Masaq' Reach's four sections as cards (12 November, five until 13 November, when its Discoveries moved to Demiton's, Justin: "for this page http://localhost:4321/orbitals/masaq
  *  can you have cards for labs, research, models, embeddings and discoveries"): the same brass plates as

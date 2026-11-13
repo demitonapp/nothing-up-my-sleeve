@@ -4878,6 +4878,13 @@ def api_heldout_items(q: dict) -> dict:
                          offset=int(q.get("offset") or 0), limit=int(q.get("limit") or 50))  # fmt: skip
 
 
+def api_museum() -> dict:
+    """Sleeper Service, the museum Orbital (thorp.museum, 13 November): its wings, exhibits and lenders, the exhibits hung."""
+    from thorp import museum
+
+    return museum.museum()
+
+
 def api_lab_models(lab: str) -> dict:
     """A house's public Hugging Face repositories (thorp.lab_models), each with what the Reach has scored of
     it and whether its weights are cached for chat (12 November)."""
@@ -8004,6 +8011,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/thorp": lambda: api_thorp(q["ship"]),
                 "/api/lab": lambda: api_lab(q["lab"]),
                 "/api/labs": api_labs,
+                "/api/museum": api_museum,
                 "/api/lab_models": lambda: api_lab_models(q.get("lab", "")),
                 "/api/lab_download": lambda: api_lab_download(q.get("model", "")),
                 "/api/lab_model_tests": lambda: api_lab_model_tests(q.get("model", "")),

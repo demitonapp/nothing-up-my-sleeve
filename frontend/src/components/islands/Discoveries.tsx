@@ -23,6 +23,8 @@ import { DEMITON_DISCOVERIES as DB, HEAD_KINDS as MB, MASAQ_DISCOVERIES, MASAQ_S
 import SectionNav from '../SectionNav';
 import { AxisDoors, FieldMapView } from '../FieldMap';
 import PersonaVectors from '../PersonaVectors';
+import Chips from '../Chips';
+import { isChipTab, type ChipTab } from '@/lib/chipResearch';
 import { axisBySlug, ourSection } from '@/lib/fieldMap';
 import { TabNav } from '../TabNav';
 import {
@@ -58,7 +60,7 @@ import {
 } from '@/scripts/views/discoveries';
 
 type Sub = 'overview' | 'skills' | 'quantum-tests' | 'stars';
-type DView = 'index' | 'trick' | 'chain' | 'traits' | 'domain' | 'masaq' | 'map' | 'landing' | 'pending' | 'personas';
+type DView = 'index' | 'trick' | 'chain' | 'traits' | 'domain' | 'masaq' | 'map' | 'landing' | 'pending' | 'personas' | 'chips';
 
 interface Parsed {
   view: DView;
@@ -69,6 +71,7 @@ interface Parsed {
   masaq?: MasaqSub;
   axis?: string; // the field map (13 November): an axis's address segment, and a category of it
   cat?: string | null;
+  chipTab?: ChipTab; // the chips page's tab (13 November)
 }
 
 const DSUBS: Sub[] = ['overview', 'skills', 'quantum-tests', 'stars'];
@@ -157,6 +160,8 @@ const parse = (route: string): Parsed => {
   if (b === 'jobs') return { view: 'index', sub: 'overview', trick: null, chain: null, domain: null };
   // persona vectors, a page of their own beside the traits (13 November)
   if (b === 'personas') return { view: 'personas', sub: 'overview', trick: null, chain: null, domain: null };
+  // the chips, a page of its own with five tabs (13 November): /chips, then /chips/<tab>
+  if (b === 'chips') return { view: 'chips', sub: 'overview', trick: null, chain: null, domain: null, chipTab: isChipTab(c) ? c : 'kinds' };
   // the two deprecated tabs still answer; canonicalPath rewrites the address to their new home
   if (b === 'two-facts') return { view: 'index', sub: 'quantum-tests', trick: null, chain: null, domain: null };
   if (b === 'registry') return { view: 'index', sub: 'skills', trick: null, chain: null, domain: null };
@@ -933,7 +938,12 @@ export default function Discoveries() {
         {view === 'personas' ? <PersonaVectors /> : null}
       </div>
 
-      {/* ============================== the landing: the two axis cards, and nothing else (13 November) */}
+      {/* ============================== the chips: what the research says about training hardware (13 November) */}
+      <div className={`dview${view === 'chips' ? ' active' : ''}`} data-dview="chips">
+        {view === 'chips' ? <Chips tab={parsed.chipTab || 'kinds'} /> : null}
+      </div>
+
+      {/* ============================== the landing: the two axis cards and the chips card (13 November) */}
       <div className={`dview${view === 'landing' ? ' active' : ''}`} data-dview="landing">
         {view === 'landing' ? <AxisDoors /> : null}
       </div>

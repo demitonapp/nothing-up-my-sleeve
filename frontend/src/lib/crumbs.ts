@@ -10,6 +10,7 @@
 
 import { LIBERTY_MACHINE_SYSTEMS, libertyMachineHref, navPath } from './nav';
 import { PUBLIC_EDITION, isPrivatePath } from './edition';
+import MUSEUM from '../data/museum.json';
 
 export interface Crumb {
   label: string;
@@ -69,11 +70,19 @@ const ORBITALS_MENU: MenuItem[] = [
   { label: 'Every orbital', href: '/orbitals', group: 'The orbitals' },
   { label: 'Demiton', href: '/orbitals/demiton', note: 'our own' },
   { label: "Masaq' Reach", href: '/orbitals/masaq', note: 'the trading orbital' },
+  { label: 'Sleeper Service', href: '/orbitals/sleeper-service', note: 'the museum orbital' },
 ];
 
 const ORBITALS: Crumb = { label: 'Orbitals', href: '/orbitals', menu: ORBITALS_MENU };
 const DEMITON: Crumb = { label: 'Demiton', href: '/orbitals/demiton', menu: DEMITON_MENU };
 const MASAQ: Crumb = { label: "Masaq' Reach", href: '/orbitals/masaq', menu: MASAQ_MENU };
+// Sleeper Service's quick ways on (13 November): the hall, its wings in their order, and the Lenders room
+const MEMORY_MENU: MenuItem[] = [
+  { label: 'The entrance hall', href: '/orbitals/sleeper-service', group: 'The museum' },
+  ...Object.entries(MUSEUM.wings).map(([k, name]) => ({ label: name, href: `/orbitals/sleeper-service/wings/${k}` })),
+  { label: 'The Lenders room', href: '/orbitals/sleeper-service/lenders' },
+];
+const MEMORY: Crumb = { label: 'Sleeper Service', href: '/orbitals/sleeper-service', menu: MEMORY_MENU };
 // Expeditions' quick ways on (12 November, Justin: "make it open with three cards the Current Charter,
 // Expeditions, Queue ... instead of using the tabs use the breadcrumbs nav"): the landing's three doors
 // live on the crumb, so the pages themselves show no section tab row.
@@ -240,6 +249,15 @@ function trailFor(path: string): Crumb[] {
   if (a === 'orbitals' || a === 'harbours' || a === 'harbors') {
     out.push(ORBITALS);
     if (!b) return out;
+    // Sleeper Service, the museum Orbital (13 November): its wings, its exhibits and the Lenders room, named from
+    // data/museum.json; an exhibit's trail runs through the era wing it hangs in
+    if (b === 'sleeper-service') {
+      out.push(MEMORY);
+      if (c === 'wings' && d) add(MUSEUM.wings[d as keyof typeof MUSEUM.wings] || labelOf(d), `/orbitals/sleeper-service/wings/${d}`);
+      else if (c === 'exhibits' && d) add(MUSEUM.exhibits[d as keyof typeof MUSEUM.exhibits] || labelOf(d), `/orbitals/sleeper-service/exhibits/${d}`);
+      else if (c === 'lenders') add('The Lenders room', '/orbitals/sleeper-service/lenders');
+      return out;
+    }
     if (b === 'demiton') {
       out.push(DEMITON);
       if (c === 'liberty-machine') {

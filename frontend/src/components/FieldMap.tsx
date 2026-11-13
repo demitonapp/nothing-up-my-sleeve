@@ -2,7 +2,7 @@
 // the two axis and then when clicking in we have cards for the level below them", then "this page should only have
 // the 2 axis cards with a fal image and then all the other content should be folded into it at a lower level").
 //
-// The landing is the two axis cards. An axis page shows its categories as cards. A category page shows our own
+// The landing is the two axis cards, and the chips card beside them (13 November). An axis page shows its categories as cards. A category page shows our own
 // sections placed there (the jobs, the stars, the head kinds, the traits, the skills ladder and its four doors, the
 // tests, chaining two facts), then the field's discoveries. The data is lib/fieldMap.ts. Links are plain addresses
 // under Demiton's discoveries, which the Discoveries island follows in place.
@@ -14,13 +14,14 @@ import { AXES, axisBySlug, discoveriesIn, oursIn, slugOf, type MapAxis, type Our
 import { byWaypoint, tricksIn } from '@/lib/fieldTricks';
 import { CHARTER_ROWS, bearingOf } from '@/lib/charterResearch';
 import { charterParamHref } from '@/scripts/views/expeditions';
+import { CHIP_TABS } from '@/lib/chipResearch';
 
 const axisHref = (a: MapAxis): string => `${DB}/${a.slug}`;
 const otherAxis = (a: MapAxis): MapAxis => AXES.find((x) => x.key !== a.key) as MapAxis;
 // each axis's plate (backend/thorp/dash/art/generate_art.py: discoveries-kind-of-claim, discoveries-object-of-study)
 const artOf = (a: MapAxis): string => `/art/discoveries-${a.slug}.png`;
 
-/** The landing: the two axis cards, each with its plate and its categories. */
+/** The landing: the two axis cards, each with its plate and its categories, and the chips card beside them. */
 export function AxisDoors() {
   return (
     <div className="discdoors">
@@ -35,6 +36,17 @@ export function AxisDoors() {
           </div>
         </a>
       ))}
+      {/* the chips (13 November, Justin: "a card here ... that focuses purely on chips"): the field's research on the
+          hardware models train on, a page of five tabs (components/Chips.tsx) */}
+      <a className="discdoor" href={`${DB}/chips`}>
+        <img src="/art/discoveries-chips.png" alt="" loading="lazy" style={{ height: 300 }} onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+        <div className="db">
+          <span className="dk">The hardware · {CHIP_TABS.length} tabs</span>
+          <b>Chips</b>
+          <p>What the research says about the chips models are trained on: NVIDIA, AMD, the clouds’ own tensor chips, Apple and the rest. How fast they train, how fast they improve, what holds them back, and how much of the progress in models they explain.</p>
+          <p>{CHIP_TABS.map((t) => <span className={pillCls('')} key={t.key} style={{ marginRight: 4, display: 'inline-block', marginTop: 4 }}>{t.label}</span>)}</p>
+        </div>
+      </a>
     </div>
   );
 }

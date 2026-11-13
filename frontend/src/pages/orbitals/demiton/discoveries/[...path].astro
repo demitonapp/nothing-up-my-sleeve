@@ -6,11 +6,13 @@ import Discoveries from '../../../../components/islands/Discoveries';
 import Reader from '../../../../components/Reader.astro';
 import { DISCOVERY_PATHS } from '../../../../lib/discoveryPaths';
 import { FIELD_MAP_PATHS } from '../../../../lib/fieldMap';
+import { CHIP_PATHS } from '../../../../lib/chipResearch';
 
 export function getStaticPaths() {
   // and the field on two axes (13 November): each axis and each of its categories
   // the jobs: what was the overview, a page of its own under the axes since 13 November
-  return [...DISCOVERY_PATHS, ...FIELD_MAP_PATHS, 'jobs', 'personas'].map((path) => ({ params: { path } }));
+  // and the chips with their five tabs (13 November)
+  return [...DISCOVERY_PATHS, ...FIELD_MAP_PATHS, ...CHIP_PATHS, 'jobs', 'personas'].map((path) => ({ params: { path } }));
 }
 ---
 <Layout>

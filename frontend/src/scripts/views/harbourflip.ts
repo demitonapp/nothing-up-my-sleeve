@@ -3,10 +3,11 @@
 // turned over and which of the five views each shows. `applyHarbourFlips` repaints that state onto freshly
 // written cards; `wireHarbourFlip` is one delegated listener on the cards' container.
 
-import { DEMITON, DEMITON_VIEWS, HARBOUR_VIEWS } from './harbours';
+import { DEMITON, DEMITON_VIEWS, HARBOUR_VIEWS, SLEEPER_KEY, SLEEPER_VIEWS } from './harbours';
 
-/** A card's five views: Demiton's own list, or its harbour's. */
-const viewsOf = (key: string) => (key === DEMITON.key ? DEMITON_VIEWS : HARBOUR_VIEWS[key]);
+/** A card's five views: Demiton's own list, Sleeper Service's (13 November: its card flipped to nothing until it
+ *  was named here), or its harbour's. */
+const viewsOf = (key: string) => (key === DEMITON.key ? DEMITON_VIEWS : key === SLEEPER_KEY ? SLEEPER_VIEWS : HARBOUR_VIEWS[key]);
 
 interface FlipState { on: boolean; view: number }
 const state = new Map<string, FlipState>();

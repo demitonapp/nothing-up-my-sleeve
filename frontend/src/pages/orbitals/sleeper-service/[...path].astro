@@ -1,0 +1,17 @@
+---
+// Sleeper Service's rooms (13 November): every wing, every exhibit and the Lenders room, pre-rendered from
+// data/museum.json (written by `python -m thorp.museum keys` from s4.museum_*). The Museum island reads the address.
+import Layout from '../../../layouts/Layout.astro';
+import Museum from '../../../components/islands/Museum';
+import museum from '../../../data/museum.json';
+
+export function getStaticPaths() {
+  const paths = ['lenders', 'wings',
+    ...Object.keys(museum.wings).map((k) => `wings/${k}`),
+    ...Object.keys(museum.exhibits).map((k) => `exhibits/${k}`)];
+  return paths.map((path) => ({ params: { path } }));
+}
+---
+<Layout>
+  <main><Museum client:load /></main>
+</Layout>

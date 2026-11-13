@@ -7,8 +7,8 @@ from thorp import labs
 
 def test_the_labs_page_has_distinct_houses() -> None:
     listed = labs.listed()
-    assert len(listed) == 42
-    assert len({lab.key for lab in listed}) == 42
+    assert len(listed) == 46  # 13 November: four Aboriginal language archives joined Australia's research houses
+    assert len({lab.key for lab in listed}) == 46
     known = {lab.key for lab in labs.all()}
     assert {lab.key for lab in listed} <= known
     # Hugging Face is the one leaderboard-only row left; EleutherAI is a research house now

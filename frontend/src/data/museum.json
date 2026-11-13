@@ -1,0 +1,34 @@
+{
+ "wings": {
+  "australia": "The Australian Wing",
+  "ancient": "The Ancient Hall",
+  "scriptorium": "The Scriptorium",
+  "press": "The Press Room",
+  "sail": "The Age of Sail",
+  "engine": "The Engine Hall",
+  "sealed": "The Sealed Wing",
+  "voyages-and-charts": "Voyages and Charts",
+  "law-and-land": "Law and Land"
+ },
+ "exhibits": {
+  "endeavour-journal": "The Endeavour Journal of James Cook",
+  "dentrecasteaux-archives": "Archives of the expedition of d'Entrecasteaux (1791–1794)",
+  "convict-records": "Convict Records: Archives of Transportation and the Convict System, 1788–1842",
+  "giant-glass-plates": "Giant Glass Plate Negatives of Sydney Harbour",
+  "queensland-labour-manifesto": "Manifesto of the Queensland Labour Party, 1892",
+  "kelly-gang": "The Story of the Kelly Gang (1906)",
+  "mabo-papers": "The Mabo Case Manuscripts"
+ },
+ "lenders": {
+  "nla": "National Library of Australia",
+  "nfsa": "National Film and Sound Archive",
+  "state-archives-nsw": "State Archives and Records Authority of New South Wales",
+  "tasmanian-archives": "Tasmanian Archives",
+  "sro-wa": "State Records Office of Western Australia",
+  "slnsw": "State Library of New South Wales",
+  "slq": "State Library of Queensland",
+  "archives-nationales": "Archives nationales",
+  "quai-branly": "Musée du quai Branly – Jacques Chirac",
+  "mnhn": "Muséum national d'histoire naturelle"
+ }
+}

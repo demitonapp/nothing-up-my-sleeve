@@ -464,6 +464,39 @@ svg.journey .j-tp { fill: var(--accent); font-size: 11px; font-weight: 600; }
 .discdoor .dk { display: block; color: var(--accent); font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .07em; }
 .discdoor b { display: block; margin-top: 1px; font-size: var(--fs-md); }
 .discdoor p { margin: 3px 0 0; color: var(--muted); font-size: var(--fs-sm); line-height: 1.4; }
+/* the chips page (components/Chips.tsx): its lists and notes at the size of the tables beside them */
+.chiplist { margin: 6px 0 0; padding-left: 18px; font-size: var(--fs-sm); line-height: 1.45; }
+.chiplist li { margin: 0 0 5px; }
+.chipbody { margin: 4px 0 0; font-size: var(--fs-sm); line-height: 1.5; }
+/* Sleeper Service, the museum Orbital (components/islands/Museum.tsx): wall text beside a plate, exhibit labels as a
+   museum hangs them, and the floor plan with the threshold drawn across it */
+.museumhall { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: 16px; align-items: start; }
+.museumhall .hallplate { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: var(--r-md); }
+.museumhall p { font-size: var(--fs-sm); line-height: 1.55; margin: 6px 0 0; }
+@media (max-width: 760px) { .museumhall { grid-template-columns: 1fr; } }
+.placards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; margin: 14px 0 18px; }
+.placards.single { grid-template-columns: minmax(0, 720px); }
+.placard { border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: var(--r-md); background: var(--panel); padding: 14px 16px; }
+.placard.sealed { border-left-color: var(--muted); background: repeating-linear-gradient(135deg, var(--panel) 0 14px, transparent 14px 16px); }
+.placard h3 { margin: 0; font-family: Georgia, 'Times New Roman', serif; font-size: var(--fs-md); font-weight: 600; letter-spacing: .01em; }
+.placard h3 a { color: var(--text); text-decoration: none; }
+.placard h3 a:hover { color: var(--accent); }
+.placard .pmeta { margin-top: 2px; color: var(--muted); font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .07em; }
+.placard p { margin: 8px 0 0; font-size: var(--fs-sm); line-height: 1.55; }
+.placard .pwhy { font-style: italic; color: var(--muted); }
+.placard .pcredit { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--line); font-size: var(--fs-xs); color: var(--muted); }
+.placard .ppills { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+.placard .pnote { font-size: var(--fs-xs); color: var(--muted); }
+.floorplan { display: flex; flex-wrap: wrap; align-items: stretch; gap: 8px; margin: 10px 0 18px; }
+.floorplan .room { flex: 1 1 140px; display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--panel); color: var(--text); text-decoration: none; }
+.floorplan .room:hover { border-color: var(--accent); }
+.floorplan .room.empty { opacity: .6; }
+.floorplan .room.sealed { border-style: dashed; background: repeating-linear-gradient(135deg, var(--panel) 0 10px, transparent 10px 12px); }
+.floorplan .threshold { flex: 0 0 auto; display: flex; align-items: center; padding: 0 2px; border-left: 3px double var(--accent); }
+.floorplan .threshold span { writing-mode: vertical-rl; transform: rotate(180deg); color: var(--accent); font-size: var(--fs-xs); letter-spacing: .1em; }
+.discdoor.sealedwing img { filter: grayscale(.6) brightness(.8); }
+.lenders { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+.lenders .flag { height: 14px; vertical-align: -2px; }
 .qt { display: flex; flex-direction: column; gap: 14px; }
 .qtchain { border: 1px solid var(--line); border-radius: var(--r-md); padding: 12px 14px; }
 .qtchain header h3 { margin: 0 0 2px; font-size: var(--fs-base); }

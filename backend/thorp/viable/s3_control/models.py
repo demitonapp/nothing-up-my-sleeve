@@ -399,6 +399,80 @@ class LabRecord(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+# ---- Sleeper Service, the museum Orbital (13 November, Justin: "This UNESCO's Memory of the World register deserves it's
+# own Orbital", then "it's a museum orbital and must reflect that", then "Yes, build it"): UNESCO's Memory of the World
+# register hung as a museum. Its wings, its exhibits and the lenders who hold them are rows, read through
+# thorp/museum.py. The exhibits are documents the world agreed to keep; an exhibit's label is ours, never UNESCO's text.
+
+
+class MuseumWingRecord(Base):
+    """A wing of Sleeper Service. Three kinds: an era wing (a span of years, the floor plan; the wing past the cutoff is
+    sealed), a country wing (every exhibit of one country) and a theme wing (an exhibition: a curated route, its
+    exhibits named by the exhibits themselves)."""
+
+    __tablename__ = "museum_wings"
+    __table_args__ = {"schema": GAME_SCHEMA}
+
+    key: Mapped[str] = mapped_column(Text, primary_key=True)
+    ordinal: Mapped[int] = mapped_column(Integer, unique=True)
+    kind: Mapped[str] = mapped_column(Text)  # era, country or theme
+    name: Mapped[str] = mapped_column(Text, unique=True)
+    blurb: Mapped[str] = mapped_column(Text, default="", server_default="")  # the card's one line
+    description: Mapped[str] = mapped_column(Text, default="", server_default="")  # the wing's wall text
+    year_from: Mapped[int | None] = mapped_column(Integer)  # an era wing's first year (negative is BCE)
+    year_to: Mapped[int | None] = mapped_column(Integer)  # its last year; null runs to today
+    sealed: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")  # past the cutoff
+    country: Mapped[str] = mapped_column(Text, default="", server_default="")  # a country wing's flag key
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class MuseumLenderRecord(Base):
+    """A lender: the institution that holds an exhibit and lends it to Sleeper Service. Every label carries its credit."""
+
+    __tablename__ = "museum_lenders"
+    __table_args__ = {"schema": GAME_SCHEMA}
+
+    key: Mapped[str] = mapped_column(Text, primary_key=True)
+    ordinal: Mapped[int] = mapped_column(Integer, unique=True)
+    name: Mapped[str] = mapped_column(Text, unique=True)
+    city: Mapped[str] = mapped_column(Text, default="", server_default="")
+    country: Mapped[str] = mapped_column(Text, default="", server_default="")  # the flag key
+    country_name: Mapped[str] = mapped_column(Text, default="", server_default="")
+    kind: Mapped[str] = mapped_column(Text, default="", server_default="")  # national library, state archive, ...
+    site: Mapped[str] = mapped_column(Text, default="", server_default="")
+    about: Mapped[str] = mapped_column(Text, default="", server_default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class MuseumExhibitRecord(Base):
+    """An exhibit: one inscription on a Memory of the World register, with the label we write for it. Its era wing
+    follows from `year_from`, its country wing from `countries`; theme wings are named in `themes`."""
+
+    __tablename__ = "museum_exhibits"
+    __table_args__ = {"schema": GAME_SCHEMA}
+
+    key: Mapped[str] = mapped_column(Text, primary_key=True)
+    ordinal: Mapped[int] = mapped_column(Integer, unique=True)
+    title: Mapped[str] = mapped_column(Text, unique=True)  # the inscription's name as registered
+    register: Mapped[str] = mapped_column(Text, default="international", server_default="international")  # international, asia-pacific, australian
+    inscribed: Mapped[int | None] = mapped_column(Integer)  # the year it was inscribed on that register
+    year_from: Mapped[int] = mapped_column(Integer)  # the documents' own first year
+    year_to: Mapped[int | None] = mapped_column(Integer)
+    dates: Mapped[str] = mapped_column(Text, default="", server_default="")  # the dates as a label prints them
+    medium: Mapped[str] = mapped_column(Text, default="", server_default="")
+    languages: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
+    countries: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")  # flag keys, nominating countries
+    lenders: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")  # lender keys
+    themes: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")  # theme wing keys
+    label: Mapped[str] = mapped_column(Text, default="", server_default="")  # what it is, in our words
+    significance: Mapped[str] = mapped_column(Text, default="", server_default="")  # why the world keeps it
+    conservation: Mapped[str] = mapped_column(Text, default="", server_default="")  # digitised, partly digitised, under glass
+    access: Mapped[str] = mapped_column(Text, default="open", server_default="open")  # open, conditions, closed at the community's request
+    note: Mapped[str] = mapped_column(Text, default="", server_default="")  # what is not confirmed
+    sources: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")  # [{label, href}]
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 # ---- the ships (schema `s1`, S1 operations; was `ship`): what a ship is, held in the database, not in code (Justin, 2026-11-08:
 # "these things shouldn't be hardcoded, we have postgres for a reason"; "a ship has characteristics: size,
 # training content, training methodology, voyages, discoveries"). Read through thorp/ship_store.py.

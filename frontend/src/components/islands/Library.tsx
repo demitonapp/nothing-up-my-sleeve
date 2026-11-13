@@ -13,6 +13,7 @@ import { cardCls, emptyCls, fieldCls, pillCls, selectCls } from '@/lib/ui';
 import { familyBar } from '@/scripts/views/helpers';
 import { selCounts, selDeclared } from '@/scripts/views/fitouts';
 import { sectionProps, useApi } from '@/lib/useApi';
+import HeldOut from '../HeldOut';
 
 /** Open a book in the reader. The import is deferred: `lib/reader.ts` wires the reader's DOM at
  *  module load, which would touch `document` during Astro's server render. */
@@ -155,22 +156,27 @@ export default function Library({ initialPath = '/library' }: { initialPath?: st
   // be where we start to collect images"): /library is Books, /library/images is Images. 'images' is
   // taken out of the branch addresses, so no branch can be called that.
   const imagesView = /^\/(?:library|shelves)\/images\/?$/.test(path.split(/[?#]/)[0]);
-  const branchKey = imagesView ? null : libraryBranchOf(path);
+  // the third section (13 November): every held-out set, at /library/held-out; 'held-out' is no branch's address
+  const heldView = /^\/(?:library|shelves)\/held-out\/?$/.test(path.split(/[?#]/)[0]);
+  const branchKey = imagesView || heldView ? null : libraryBranchOf(path);
 
   return (
     <div {...sectionProps('shelves')}>
-      <h1>Library <span className="q">{imagesView
+      <h1>Library <span className="q">{heldView
+        ? 'everything a ship is scored on and never trains on: the held-out questions, the decks of books and the field’s own tests'
+        : imagesView
         ? 'the images Nothing up my sleeve will read: where they come from, the rule they pass, and what is gathered so far'
         : 'every list of books Nothing up my sleeve reads from, is scored on or is drafting: how many books are fetched, about how many tokens they hold, their language families, and the voyages that read them'}</span></h1>
       <TabNav
         id="librarynav"
         ariaLabel="Library sections"
         items={[
-          { key: 'books', label: 'Books', href: '/library', active: !imagesView },
+          { key: 'books', label: 'Books', href: '/library', active: !imagesView && !heldView },
           { key: 'images', label: 'Images', href: '/library/images', active: imagesView },
+          { key: 'held-out', label: 'Held out', href: '/library/held-out', active: heldView },
         ]}
       />
-      {imagesView ? <Images /> : <Books browse={browse} library={library} branchKey={branchKey} go={go} />}
+      {heldView ? <HeldOut /> : imagesView ? <Images /> : <Books browse={browse} library={library} branchKey={branchKey} go={go} />}
     </div>
   );
 }

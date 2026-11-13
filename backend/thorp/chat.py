@@ -15,6 +15,7 @@ import time
 
 import numpy as np
 
+from thorp import paths
 from thorp import tokeniser as tokmod
 from thorp.evaluators.samples import generate
 from thorp.ledger import reader, spec_of
@@ -897,6 +898,47 @@ def models(leaderboard: dict | None = None) -> list[dict]:
     finally:
         con.close()
     return out
+
+
+CONSOLE = "specs/console.json"  # ships/specs/console.json: the one Nothing up my sleeve ship the chat terminal offers
+
+
+def console_ship() -> dict | None:
+    """The ship the chat terminal offers, and only it (13 November, Justin: "Remove those existing models and only
+    give me the best one"): `{"ship": <run name>, "name": <the name shown>, "why": ...}` in ships/specs/console.json.
+    Without the file every finished leg is listed, as before."""
+    p = paths.resolve(CONSOLE)
+    if not p.exists():
+        return None
+    try:
+        got = json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return got if isinstance(got, dict) and got.get("ship") else None
+
+
+def console_models(leaderboard: dict | None = None) -> list[dict]:
+    """Our ships for the chat terminal: the pinned one alone when ships/specs/console.json names one that is ready,
+    else every leaderboard ship and talking leg."""
+    ours = models(leaderboard) + talking_models()
+    pin = console_ship()
+    if not pin:
+        return ours
+    kept = [m for m in ours if m.get("available") and (m.get("run") or {}).get("run") == pin["ship"]]
+    for m in kept:
+        m["name"] = pin.get("name") or m["name"]
+        m["pinned"] = pin.get("why") or True
+    return kept[:1] or ours
+
+
+def console_foreign() -> list[dict]:
+    """The other labs' models the chat terminal offers: those `foreign` names in ships/specs/console.json (13
+    November, Justin: "I want to see only the Nothing up my sleeve model and then Ling and Qwen 27"), else all."""
+    every = foreign_models()
+    keep = (console_ship() or {}).get("foreign")
+    if not keep:
+        return every
+    return [m for m in every if m.get("model") in keep] or every
 
 
 TALK_LAB = "Demiton"

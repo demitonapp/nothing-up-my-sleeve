@@ -4862,6 +4862,22 @@ def api_labs() -> dict:
     return labs.houses()
 
 
+def api_heldout() -> dict:
+    """Everything held out (thorp.heldout, 13 November): the question sets, the book decks and the outside tests a ship
+    is scored on and never trains on, each with what it tests, what reads it and the specs that name it."""
+    from thorp import heldout
+
+    return heldout.sets()
+
+
+def api_heldout_items(q: dict) -> dict:
+    """One held-out set's items, searched and filtered by kind (the Library's Held out section)."""
+    from thorp import heldout
+
+    return heldout.items(str(q.get("key") or ""), q=str(q.get("q") or ""), kind=str(q.get("kind") or ""),
+                         offset=int(q.get("offset") or 0), limit=int(q.get("limit") or 50))  # fmt: skip
+
+
 def api_lab_models(lab: str) -> dict:
     """A house's public Hugging Face repositories (thorp.lab_models), each with what the Reach has scored of
     it and whether its weights are cached for chat (12 November)."""
@@ -6312,7 +6328,8 @@ def api_chat_models() -> dict:
     the same cached leaderboard payload as the board."""
     from thorp import chat
 
-    return {"models": chat.models(api_leaderboard()) + chat.talking_models() + chat.foreign_models()}
+    # the ships ships/specs/console.json names (13 November): ours pinned to one, the other labs to those it keeps
+    return {"models": chat.console_models(api_leaderboard()) + chat.console_foreign()}
 
 
 def api_chat(q: dict) -> dict:
@@ -7994,6 +8011,8 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/drones/fleet": api_drone_fleet,
                 "/api/drones/phone": api_drones_phone,
                 "/api/drones/phone/personaplex": api_personaplex,
+                "/api/heldout": api_heldout,
+                "/api/heldout_items": lambda: api_heldout_items(q),
                 "/api/drones/email/accounts": api_email_accounts,
                 "/api/drones/browser/sites": api_browser_sites,
                 "/api/drones/download": lambda: api_drone_download(q.get("model", "")),

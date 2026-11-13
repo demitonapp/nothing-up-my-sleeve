@@ -1,0 +1,10 @@
+{
+ "ship": "9m@v0.0.6-fleetmarks-tools2",
+ "name": "Nothing up my sleeve 9m · chat and tools",
+ "why": "13 November, Justin: \"Remove those existing models and only give me the best one\". The only ship taught the fleet's marks and the eight tools, with the best language of the ships that answer (hole cards 1.61 bpb, against 1.78 for the converse leg); the base 50m echoes the question. Replace with 21m@v0.0.6-fleetmarks-instruct, then 50m@v0.0.6-shelf-instruct, as they finish.",
+ "foreign": [
+  "ling-3-0-tiny",
+  "qwen3-8-27b"
+ ],
+ "foreign_why": "13 November, Justin: \"I want to see only the Nothing up my sleeve model and then Ling and Qwen 27\""
+}

@@ -12,8 +12,8 @@ export function getStaticPaths() {
   // the defaults in thorp/library_branches.py; the island reads the address, so the key itself is
   // the only thing this list has to know
   const branches = ['ogden', 'library', 'scanned', 'ancient', 'decks', 'content', 'levers', 'early'];
-  // 'images' is the Library's second section (12 November), not a branch
-  return [...branches, 'images'].map((path) => ({ params: { path } }));
+  // 'images' and 'held-out' are the Library's second and third sections (12 and 13 November), not branches
+  return [...branches, 'images', 'held-out'].map((path) => ({ params: { path } }));
 }
 ---
 <Layout>

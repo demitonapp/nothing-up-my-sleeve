@@ -102,7 +102,9 @@ def _timings(log: list[dict], from_log: dict[int, dict] | None, run_minutes) -> 
         row = {
             "instance": inst, "run_id": rid, "name": r.get("name") or h.get("name"),
             "gpu": r.get("gpu") or h.get("gpu"), "preset": r.get("preset") or h.get("preset"),
-            "kind": "smoke" if smoke else "voyage",
+            # a hedge's second box, released because the other came up first (charter.HEDGE_RATE, 14 November): its
+            # cost is real, but it is neither a fit-out that failed nor a voyage's set-up, so the measures leave it out
+            "kind": "smoke" if smoke else "hedge" if str(r.get("status") or "").startswith("hedged") else "voyage",
             "started": float(started), "ended": float(ended), "total_s": total,
             "dph": dph, "cost": cost, "status": r.get("status") or ("released by hand" if r.get("why") else None),
             "why": r.get("why"),

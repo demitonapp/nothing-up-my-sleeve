@@ -133,7 +133,17 @@ def offer_gone(e: Exception) -> bool:
     """Whether a refused hire says the offer has gone (taken by another renter), not that the hire was wrong."""
     s = str(e).lower()
     return "no_such_ask" in s or "is not available" in s
-AVOID_HOURS = 12.0  # a host whose box never boarded is not hired again for this long, by any charter
+# Failing fast (14 November, the Vast audit, reports/vast-failures-audit-2026-11-14.md): of 86 hires, 31 died on the
+# host's side before training (it never came up, refused ssh, or stalled the cargo or the environment). Every box that
+# did come up was running within 6.2 minutes on the stock image, so waiting 15 cost the lane the difference; a host
+# that failed once was hired again twelve hours later; and the RTX 5090 failed on 58% of its hires, so a voyage on it
+# waited through one dead box after another, one at a time.
+PROVISION_S = 480.0  # the stock image is on most hosts already: a box not running by then is not coming up
+PROVISION_PREBUILT_S = 900.0  # the prebuilt box image is about 12 GB to pull the first time a host sees it
+AVOID_HOURS = 168.0  # a host whose box failed before training is not hired again for a week, by any charter
+BOX_PHASES = ("provision", "ssh", "code", "data", "board", "env")  # a failure before training is the host's
+HEDGE_RATE = 0.4  # a class whose fit-outs fail this often: two offers are hired at once and the first up is kept
+REHIRES_RISKY = 3  # and a voyage on such a class may hire again this many times, not REHIRES
 
 
 class Recalled(BaseException):
@@ -678,7 +688,7 @@ def quote(spec_path: str, gpu: str | None = None, vast=None, resolver=None, log=
             vast, market_read = _Ceilings(), "ceilings (no Vast.ai key: the terms' ceiling prices)"
     avoid = avoided_now()
     if avoid:
-        log(f"charter: not hiring {', '.join(sorted(avoid))}: a box there never boarded in the last {AVOID_HOURS:.0f} h")
+        log(f"charter: not hiring {', '.join(sorted(avoid))}: a box there failed before training in the last {AVOID_HOURS:.0f} h")
     qs = _priced(vast, spec, prep, p, t, gpu, avoid)
     return {"spec": spec, "prep": prep, "plan": p, "quotes": qs, "market": market_read, "vast": vast, "terms": t, "avoid": avoid}
 
@@ -703,9 +713,11 @@ def avoid_keys(offer_id=None, machine_id=None) -> set[str]:
 
 
 def avoided_now(rows: list[dict] | None = None, hours: float = AVOID_HOURS, now: float | None = None) -> set[str]:
-    """The offers and machines whose box never boarded (released having failed in `provision` or `ssh`) in the
-    last `hours`, read from S3's spend log: no charter hires them again until then. Older hires carry only
-    their offer; since 12 November the hire records its machine too. Never raises: no log, nothing avoided."""
+    """The offers and machines whose box failed before training (released having failed in one of `BOX_PHASES`,
+    not recalled) in the last `hours`, read from S3's spend log: no charter hires them again until then. Until 14
+    November only `provision` and `ssh` counted, for twelve hours; a host whose network stalled the cargo or the
+    environment was hired again. Older hires carry only their offer; since 12 November the hire records its machine
+    too. Never raises: no log, nothing avoided."""
     from datetime import datetime
 
     try:
@@ -716,7 +728,9 @@ def avoided_now(rows: list[dict] | None = None, hours: float = AVOID_HOURS, now:
     hires = {r.get("instance"): r for r in rows if r.get("event") == "hired"}
     out: set[str] = set()
     for r in rows:
-        if r.get("event") != "released" or r.get("failed_in") not in ("provision", "ssh"):
+        if r.get("event") != "released" or r.get("failed_in") not in BOX_PHASES:
+            continue
+        if str(r.get("status") or "").startswith(("recalled", "hedged")):  # we stopped it: the host did not fail
             continue
         try:
             at = datetime.fromisoformat(str(r.get("at"))).timestamp()
@@ -727,6 +741,55 @@ def avoided_now(rows: list[dict] | None = None, hours: float = AVOID_HOURS, now:
         h = hires.get(r.get("instance")) or {}
         out |= avoid_keys(h.get("offer"), h.get("machine_id"))
     return out
+
+
+def class_failure_rate(gpu: str | None) -> float | None:
+    """How often a class's fit-outs died before sailing, as S4 measured it (s4_intelligence/hires.failures), or None
+    when it cannot be read or has no hires. Never raises."""
+    if not gpu:
+        return None
+    with contextlib.suppress(Exception):
+        from thorp.viable.s4_intelligence import hires as s4_hires
+
+        return s4_hires.failures(gpu).get("rate")
+    return None
+
+
+def rehires_for(rate: float | None) -> int:
+    """How many more boxes a voyage may hire after ones that never boarded: more on a class that often fails."""
+    return REHIRES_RISKY if rate is not None and rate >= HEDGE_RATE else REHIRES
+
+
+def hedge_rival(qs: list[dict], q: dict, rate: float | None, t: dict, out_now: int) -> dict | None:
+    """The second offer hired beside `q` on a class whose fit-outs fail at `HEDGE_RATE` or more: the next quote on
+    another machine that breaks no term, when the ships out leave a seat for both. None otherwise."""
+    if rate is None or rate < HEDGE_RATE or out_now + 2 > int(t.get("max_instances") or 0):
+        return None
+    for r in qs:
+        if r is q or r.get("offer_id") == q.get("offer_id") or r.get("breaks"):
+            continue
+        if q.get("machine_id") is not None and r.get("machine_id") == q.get("machine_id"):
+            continue
+        return r
+    return None
+
+
+def first_running(vast, instances: list[int], timeout: float, every: float = 10.0, sleep=time.sleep, clock=time.time) -> tuple[int, dict]:
+    """The first of several hired instances to be running with an SSH address: (its id, Vast.ai's record of it).
+    One that exits or goes offline drops out; raises VastError when every one has, or none is up by `timeout`."""
+    t0, left, last = clock(), list(instances), {}
+    while True:
+        for i in list(left):
+            inst = vast.show(i)
+            last[i] = inst
+            if inst.get("actual_status") == "running" and inst.get("ssh_host") and inst.get("ssh_port"):
+                return i, inst
+            if inst.get("actual_status") in ("exited", "offline"):
+                left.remove(i)
+        if not left or clock() - t0 > timeout:
+            said = "; ".join(f"{i}: {v.get('actual_status')!r} {str(v.get('status_msg') or '')[:120]}" for i, v in last.items())
+            raise VastError(f"no instance of {instances} came up in {timeout:.0f} s: {said}")
+        sleep(every)
 
 
 def gate(spec: dict, q: dict) -> None:
@@ -805,16 +868,26 @@ def carried_data(tok_id: str, books: set[str] | None = None) -> list[str]:
     return [f for f in out if not _secret_named(f)]
 
 
-def voyage_lists(spec: dict) -> list[str]:
-    """Every list the voyage's spec reads, as paths from the repository root: its stages' shelves, its recipe, the
-    decks it refuses and is scored on, what it reads first and what its tokeniser was trained on."""
-    d, out = spec.get("data") or {}, []
+def list_names(spec: dict) -> list[str]:
+    """The lists a spec names, as written: its stages' shelves, its recipe, the decks it refuses and is scored on,
+    what it reads first, what its tokeniser was trained on, and its evaluators' held-out files."""
+    d = spec.get("data") or {}
     names = [st.get("recipe") for st in d.get("stages") or []] + [d.get("recipe"), d.get("first")]
     names += list(d.get("refuse") or []) + list((spec.get("eval") or {}).get("sets") or [])
     train_on = (spec.get("tokeniser") or {}).get("train_on")
     if train_on and train_on != "recipe":
         names.append(train_on)
-    for n in names:
+    for opts in ((spec.get("eval") or {}).get("options") or {}).values():
+        if isinstance(opts, dict):
+            names += [v for k, v in opts.items() if k in ("heldout", "list", "deck") and isinstance(v, str)]
+    return [n for n in names if n and isinstance(n, str)]
+
+
+def voyage_lists(spec: dict) -> list[str]:
+    """Every list the voyage's spec reads, as paths from the repository root: its stages' shelves, its recipe, the
+    decks it refuses and is scored on, what it reads first and what its tokeniser was trained on."""
+    out: list[str] = []
+    for n in list_names(spec):
         if not n or not isinstance(n, str):
             continue
         with contextlib.suppress(Exception):
@@ -869,6 +942,207 @@ def stage(rid: str) -> Path:
     if not (st / "manifest.sqlite").exists():
         manifest_store.export_sqlite(st / "manifest.sqlite")
     return st
+
+
+# ---------------------------------------------------------------- the rehearsal, before anything is hired
+#
+# 14 November (the Vast audit, reports/vast-failures-audit-2026-11-14.md): 14 hires reached a box and died on a bug of
+# ours there: a list never sent, macOS's hidden `._` files read as data, an empty register carried, too many files
+# held open, a 50m too big for a 4090's memory; and voyage E spent most of its hire on its own readings. Each was
+# fixed after a box was paid for. The rehearsal asks the same questions here, of the very cargo the box would get,
+# before the hire: what it finds wrong refuses the voyage with the reason, and nothing is spent.
+
+VRAM_GB = {"RTX 4090": 24.0, "RTX 5090": 32.0, "H100 SXM": 80.0, "H100 PCIE": 80.0}  # the smoke test's 23.5, 31.4, 79.2
+VRAM_MARGIN_GB = 1.0  # a measured peak this close to a class's memory is too close
+EVAL_SHARE_MAX = 1.0  # readings measured to take longer than the whole quote refuse the voyage: it cannot come in on time
+EVAL_SHARE_WARN = 0.5  # past this share the rehearsal says so, and the voyage sails (voyage E, read every 640 steps, sat at 56%
+# of its 6.5-hour quote and came home in 5.75 hours: a quote already counts the readings in a voyage's measured rate)
+OPEN_FILES_MAX = 65536  # what data.room_for_files raises the soft limit to on a box
+REHEARSE_TAR = True  # the code cargo is built and listed (a few seconds); tests that sail many voyages turn it off
+
+
+class RehearsalFailed(RuntimeError):
+    """The rehearsal found what would sink the voyage on a hired box; nothing was hired."""
+
+
+def missing_lists(spec: dict) -> list[str]:
+    """Lists the spec names that are not files here: `voyage_lists` leaves them out, so the box would never get them."""
+    out = []
+    for n in list_names(spec):
+        try:
+            if not paths.resolve(n).is_file():
+                out.append(n)
+        except Exception:  # noqa: BLE001
+            out.append(n)
+    return out
+
+
+def tar_problems(root: Path, rels: list[str], need: list[str] = (), popen=subprocess.Popen) -> list[str]:
+    """The code cargo as the box would get it (`TAR`, as `Box.put_tar` makes it), listed: hidden `._` files that
+    would unpack as real ones, and needed paths that are not in it."""
+    import tarfile
+
+    lst = paths.data_dir() / "charter" / f"rehearse-{os.getpid()}.txt"
+    lst.parent.mkdir(parents=True, exist_ok=True)
+    lst.write_text("\n".join(rels) + "\n")
+    names: list[str] = []
+    try:
+        proc = popen(TAR + ["-cf", "-", "-C", str(root), f"--files-from={lst}"], stdout=subprocess.PIPE,
+                     stderr=subprocess.DEVNULL, env={**os.environ, "COPYFILE_DISABLE": "1"})  # fmt: skip
+        with tarfile.open(fileobj=proc.stdout, mode="r|") as tf:
+            names = [m.name for m in tf]
+        proc.wait()
+    finally:
+        lst.unlink(missing_ok=True)
+    out = []
+    doubles = [n for n in names if Path(n).name.startswith("._")]
+    if doubles:
+        out.append(f"the code cargo holds {len(doubles)} hidden '._' file(s) that would unpack as real ones, e.g. {doubles[0]}")
+    have = {n.removeprefix("./") for n in names}
+    lost = [n for n in need if n not in have]
+    if lost:
+        out.append(f"the code cargo is missing {len(lost)} list(s) the voyage reads: {', '.join(lost[:5])}")
+    return out
+
+
+def book_problems(prep, carried: list[str], known=None) -> list[str]:
+    """The books the voyage trains on that the box could not read: not in the register (or the register empty), or
+    with neither a text nor a shard in the cargo (`carried`, relative to data/)."""
+    if known is None:
+        from thorp import manifest
+
+        known = manifest.get
+    ids = set(prep.recipe) | set(getattr(prep, "first", []) or [])
+    for st in getattr(prep, "stage_recipes", []) or []:
+        ids |= set(st)
+    if not ids:
+        return ["the voyage reads no books"]
+    unknown = sorted(b for b in ids if known(b) is None)
+    if len(unknown) == len(ids):
+        return [f"none of the voyage's {len(ids)} books is in the register: is the register empty?"]
+    out = [f"{len(unknown)} book(s) the voyage reads are not in the register, e.g. {', '.join(unknown[:3])}"] if unknown else []
+    stems = {Path(f).stem for f in carried if f.startswith(("shards/", "texts/"))} | {Path(f).name.removesuffix(".txt") for f in carried}
+    bare = sorted(b for b in ids if b not in unknown and b not in stems and (b[2:] if b.startswith("pg") else b) not in stems)
+    if bare:
+        out.append(f"{len(bare)} book(s) would go aboard with neither a text nor a shard, e.g. {', '.join(bare[:3])}")
+    if len(ids) + 1024 > OPEN_FILES_MAX:
+        out.append(f"the voyage holds {len(ids):,} books open at once, past the {OPEN_FILES_MAX:,} a box allows")
+    return out
+
+
+def _shape(spec: dict) -> tuple:
+    """What a voyage's GPU memory depends on: the hull, the window, the batch, and the scaffold's maps (13 November:
+    the pinned heads' maps over 32 windows are what overflowed the 4090)."""
+    m, o = spec.get("model") or {}, spec.get("optim") or {}
+    sc = o.get("scaffold") or {}
+    return (m.get("preset"), m.get("layers"), m.get("width"), m.get("heads"), m.get("context"), o.get("batch_tokens"),
+            len(sc.get("heads") or []), sc.get("sample"), bool(sc.get("riddles")))  # fmt: skip
+
+
+def _cuda_runs(rec, preset: str) -> list[dict]:
+    """Runs of a size that sailed on an NVIDIA GPU (the boxes' memory is what a class must hold), with their specs."""
+    out = []
+    with contextlib.suppress(Exception):
+        for r in rec.query("select run_id, name, hardware, spec_json from runs where hardware like ?", ("%NVIDIA%",)):
+            with contextlib.suppress(Exception):
+                sp = json.loads(r["spec_json"]) if isinstance(r["spec_json"], str) else (r["spec_json"] or {})
+                if (sp.get("model") or {}).get("preset") == preset:
+                    out.append({**r, "spec": sp})
+    return out
+
+
+def measured_peak_gb(spec: dict, rec) -> tuple[float, str] | None:
+    """The highest GPU memory (`mem_gb`) a voyage of this shape (size, layers, width, heads, window and batch) has
+    reached on a hired box, and which run; None when none has sailed."""
+    best = None
+    for r in _cuda_runs(rec, (spec.get("model") or {}).get("preset")):
+        if _shape(r["spec"]) != _shape(spec):
+            continue
+        with contextlib.suppress(Exception):
+            v = rec.query("select max(value) as v from metrics where run_id=? and name='mem_gb'", (r["run_id"],))[0]["v"]
+            if v is not None and (best is None or float(v) > best[0]):
+                best = (float(v), r["name"])
+    return best
+
+
+def _evaluators(spec: dict) -> dict[str, tuple[int, list[str]]]:
+    """A voyage's two kinds of reading, each with how often it runs and its evaluators: the readings (`eval`) and the
+    light readings (`eval.light`, 13 November: voyage E's every 64 steps took most of its hire)."""
+    e = spec.get("eval") or {}
+    out = {"readings": (int(e.get("every_steps") or 0), list(e.get("evaluators") or []))}
+    light = e.get("light") or {}
+    if light:
+        out["light readings"] = (int(light.get("every_steps") or 0), list(light.get("evaluators") or []))
+    return out
+
+
+def eval_seconds(spec: dict, rec) -> dict[str, tuple[float, str]]:
+    """The seconds one round of each kind of reading takes, as the sum of its evaluators' measured seconds
+    (`eval/seconds/<evaluator>`) on hired boxes for voyages of the same shape; a kind with any evaluator never
+    measured there is left out (not guessed at)."""
+    kinds, runs = _evaluators(spec), [r for r in _cuda_runs(rec, (spec.get("model") or {}).get("preset")) if _shape(r["spec"]) == _shape(spec)]
+    out: dict[str, tuple[float, str]] = {}
+    for kind, (_, evs) in kinds.items():
+        total, seen = 0.0, []
+        for ev in evs:
+            vals = []
+            for r in runs:
+                with contextlib.suppress(Exception):
+                    v = rec.query("select avg(value) as v from metrics where run_id=? and name=?", (r["run_id"], f"eval/seconds/{ev}"))[0]["v"]
+                    if v is not None:
+                        vals.append((float(v), r["name"]))
+            if not vals:
+                break
+            total += sum(v for v, _ in vals) / len(vals)  # the mean of the voyages measured: one slow box is not the rule
+            seen.append(vals[-1][1])
+        else:
+            if evs:
+                out[kind] = (total, seen[0])
+    return out
+
+
+def rehearse(spec: dict, prep, p: dict, quotes: list[dict], rec, log=print, code: list[str] | None = None, lists: bool = True) -> dict:
+    """The voyage rehearsed here before a hire: returns the quote to hire (the cheapest class its measured memory fits),
+    or raises RehearsalFailed with every reason found. Nothing is hired and nothing is spent. `lists` False: the
+    voyage's lists come from a resolver of its own (a test's), not from files, so they are not looked for."""
+    problems: list[str] = []
+    if lists and (missing := missing_lists(spec)):
+        problems.append(f"the spec names list(s) that are not here, so no box would get them: {', '.join(missing[:5])}")
+    if REHEARSE_TAR:
+        code = code if code is not None else code_carried(spec)
+        problems += tar_problems(paths.ROOT, code, need=voyage_lists(spec))
+    with contextlib.suppress(Exception):  # the cargo's books; a library that cannot be read is said, not raised
+        problems += book_problems(prep, carried_data(prep.tokeniser.id, voyage_books(prep)))
+    chosen = quotes[0] if quotes else None
+    peak = measured_peak_gb(spec, rec)
+    if peak and quotes:
+        fit = [q for q in quotes if VRAM_GB.get(q["gpu"], 1e9) - VRAM_MARGIN_GB >= peak[0]]
+        if not fit:
+            problems.append(f"a voyage of this shape peaked at {peak[0]:.1f} GB on a hired box ({peak[1]}); no class quoted "
+                            f"({', '.join(q['gpu'] for q in quotes)}) holds that with {VRAM_MARGIN_GB:.0f} GB to spare")  # fmt: skip
+        elif fit[0] is not quotes[0]:
+            log(f"charter: rehearsal: {quotes[0]['gpu']} holds {VRAM_GB.get(quotes[0]['gpu'])} GB and this shape peaked at "
+                f"{peak[0]:.1f} GB ({peak[1]}): hiring {fit[0]['gpu']} instead")  # fmt: skip
+            chosen = fit[0]
+    secs = eval_seconds(spec, rec)
+    if secs and chosen and chosen.get("hours"):
+        steps = max(0, int(p.get("total_steps") or 0) - int(p.get("start") or 0))
+        parts, total = [], 0.0
+        for kind, (every, _) in _evaluators(spec).items():
+            if kind in secs and every:
+                rounds = steps // every
+                total += rounds * secs[kind][0]
+                parts.append(f"{rounds} rounds of {kind} at {secs[kind][0]:.0f} s each (every {every} steps; measured on {secs[kind][1]})")
+        share = total / (float(chosen["hours"]) * 3600)
+        said = f"{' and '.join(parts)} would take {share:.0%} of the quoted {float(chosen['hours']):.1f} h"
+        if share > EVAL_SHARE_MAX:
+            problems.append(f"{said}: the voyage could not come in on time; read less often")
+        elif share > EVAL_SHARE_WARN:
+            log(f"charter: rehearsal: {said} (sailing; it is a large share)")
+    if problems:
+        raise RehearsalFailed("rehearsal: " + "; ".join(problems))
+    log(f"charter: rehearsal passed ({'peak ' + format(peak[0], '.1f') + ' GB measured' if peak else 'no peak measured for this shape'})")
+    return chosen
 
 
 def checkpoints_carried(rid: str, spec: dict, rec: Ledger) -> list[str]:
@@ -1171,17 +1445,27 @@ def sail(spec_path: str, gpu: str | None = None, vast=None, resolver=None, box_f
         raise NoKey("a charter needs a Vast.ai key to hire (VAST_API_KEY or data/secrets/vast-api-key)")
     if not q0["quotes"]:
         raise NoOffer(f"no offer keeps the terms for {gpu or ', '.join(t['gpus'])}")
-    q = q0["quotes"][0]
+    q = rehearse(spec, q0["prep"], p, q0["quotes"], rec, log, lists=resolver is None)  # before anything is hired (14 November)
     gate(spec, q)
     commit = train.git_commit()
     avoid = set(q0.get("avoid") or ())
     never_boarded, gone = 0, 0
+    rate = class_failure_rate(gpu or q.get("gpu"))
+    rehires = rehires_for(rate)
+    if rate is not None and rate >= HEDGE_RATE:
+        log(f"charter: {gpu or q.get('gpu')} fit-outs fail {rate:.0%} of the time: up to {rehires} more hires, two at once where a seat allows")
     with s2.berth(t["max_instances"], rid):
         while True:
             log(f"charter: {q['gpu']} offer {q['offer_id']} at ${q['dph']:.3f}/h, about {q['hours']:.1f} h, ${q['cost']:.2f} ({q['speed']})")
+            rival = None
+            if rate is not None and rate >= HEDGE_RATE:
+                with contextlib.suppress(Exception):  # the market quotes a class's cheapest offer: ask it for the next, elsewhere
+                    others = _priced(vast, spec, q0["prep"], p, t, gpu or q.get("gpu"),
+                                     avoid | avoid_keys(q.get("offer_id"), q.get("machine_id")))  # fmt: skip
+                    rival = hedge_rival(others, q, rate, t, len(s3.out_now()))
             try:
                 hire, status, ended, counts, failure = _sail_one(spec, q0["prep"], q, p, t, rid, commit, rec, vast,
-                                                                  box_factory, log, sleep, poll_s)  # fmt: skip
+                                                                  box_factory, log, sleep, poll_s, rival=rival)  # fmt: skip
             except OfferGone as e:
                 # nothing was hired: another renter took the offer between the market's reading and the hire
                 gone, last = gone + 1, e
@@ -1194,10 +1478,13 @@ def sail(spec_path: str, gpu: str | None = None, vast=None, resolver=None, box_f
                 if failure is None:
                     break
                 never_boarded, last = never_boarded + 1, failure
-                if never_boarded > REHIRES:
+                if never_boarded > rehires:
                     raise failure
-                avoid |= avoid_keys(q.get("offer_id"), q.get("machine_id"))  # the host, not only the offer
-                why = f"the last box never boarded ({never_boarded} of {REHIRES + 1})"
+                # the host, not only the offer: the box that was kept, which a hedge may have swapped
+                avoid |= getattr(failure, "avoid", None) or avoid_keys(q.get("offer_id"), q.get("machine_id"))
+                if rival:
+                    avoid |= avoid_keys(rival.get("offer_id"), rival.get("machine_id"))
+                why = f"the last box never boarded ({never_boarded} of {rehires + 1})"
             # the market read again without what failed, and the new quote gated as the first was
             qs = _priced(vast, spec, q0["prep"], p, t, gpu, avoid)
             if not qs:
@@ -1209,13 +1496,37 @@ def sail(spec_path: str, gpu: str | None = None, vast=None, resolver=None, box_f
     return _close(rec, hire, status, ended, counts, log)
 
 
+def _hire_rival(vast, rival: dict, image: str, t: dict, rid: str, spec: dict, p: dict, commit: str, key, log) -> dict | None:
+    """The hedge's second hire, on the record as the first is; None when it could not be hired (nothing is spent)."""
+    try:
+        instance = vast.hire(rival["offer_id"], image, int(t["disk_gb"]), LABEL + rid)
+    except VastError as e:
+        log(f"charter: the hedge's second offer {rival['offer_id']} could not be hired ({e}); one box it is")
+        return None
+    s2.note(rid, event="hired", instance=instance, gpu=rival["gpu"], dph=rival["dph"], hedge=True)
+    started = time.time()
+    hire = s3.record("hired", instance=instance, run_id=rid, name=spec.get("name"), gpu=rival["gpu"], dph=rival["dph"],
+                     preset=spec["model"]["preset"], start_step=p["start"], offer=rival["offer_id"],
+                     machine_id=rival.get("machine_id"), storage_dph=rival.get("storage_dph"), started=started,
+                     quote=rival["cost"], quote_hours=rival["hours"], commit=commit, setup_assumed_h=rival.get("setup_hours"),
+                     hedge=True)  # fmt: skip
+    _PHASES[int(instance)] = Phases(started)
+    if key:
+        with contextlib.suppress(Exception):
+            vast.attach_ssh(instance, key)
+    log(f"charter: hedge: offer {rival['offer_id']} hired too, as instance {instance}; the first box running is kept")
+    return {**hire, "_quote": rival}
+
+
 def _sail_one(spec: dict, prep, q: dict, p: dict, t: dict, rid: str, commit: str, rec: Ledger, vast, box_factory, log, sleep,
-              poll_s: float) -> tuple[dict, str, float, dict, NeverBoarded | None]:  # fmt: skip
+              poll_s: float, rival: dict | None = None) -> tuple[dict, str, float, dict, NeverBoarded | None]:  # fmt: skip
     """One hire, from the hire to its release: (the hire, how it ended, when it was released, the rows home,
     and the NeverBoarded when its box never let us aboard, so `sail` may hire another). Any other failure is
-    logged with its reason, recorded on the release, and raised after the ship is released."""
+    logged with its reason, recorded on the release, and raised after the ship is released. With `rival` (a
+    second offer, `hedge_rival`), both are hired and the first running is kept; the other is released at once."""
     image, why_image = box_image(t)
     log(f"charter: image {image} ({why_image})")
+    provision_s = PROVISION_PREBUILT_S if image != t["image"] else PROVISION_S
     try:
         instance = vast.hire(q["offer_id"], image, int(t["disk_gb"]), LABEL + rid)
     except VastError as e:
@@ -1230,6 +1541,7 @@ def _sail_one(spec: dict, prep, q: dict, p: dict, t: dict, rid: str, commit: str
     hire = {"instance": instance, "run_id": rid, "name": spec.get("name"), "gpu": q["gpu"], "dph": q["dph"],
             "started": time.time(), "preset": spec["model"]["preset"], "start_step": p["start"]}  # fmt: skip
     status, counts, error, failure = "lost", {}, None, None
+    rival_hire = None
     with _recallable(log) as guard:
         try:
             hire = s3.record("hired", **{k: v for k, v in hire.items() if k != "started"}, offer=q["offer_id"],
@@ -1239,10 +1551,25 @@ def _sail_one(spec: dict, prep, q: dict, p: dict, t: dict, rid: str, commit: str
             key = _public_key(t)
             if key:
                 vast.attach_ssh(instance, key)
+            if rival:
+                rival_hire = _hire_rival(vast, rival, image, t, rid, spec, p, commit, key, log)
             try:
-                inst = vast.wait_running(instance, sleep=sleep)
+                if rival_hire:
+                    up, inst = first_running(vast, [instance, rival_hire["instance"]], timeout=provision_s, sleep=sleep)
+                    loser = rival_hire if up == instance else hire
+                    if up != instance:  # the second box came up first: it is the voyage's now
+                        q = rival_hire.pop("_quote")
+                        hire = {k: v for k, v in rival_hire.items() if k != "_quote"}
+                        instance = up
+                    log(f"charter: hedge: instance {instance} came up first; releasing {loser['instance']}")
+                    _release(vast, {k: v for k, v in loser.items() if k != "_quote"}, "hedged: the other box came up first", rec, log)
+                    rival_hire = None
+                else:
+                    inst = vast.wait_running(instance, timeout=provision_s, sleep=sleep)
             except VastError as e:  # it never came up: the host's failure, as a refused ssh is
-                raise NeverBoarded(str(e)) from e
+                nb = NeverBoarded(str(e))
+                nb.avoid = avoid_keys(q.get("offer_id"), q.get("machine_id"))
+                raise nb from e
             actual = float(inst.get("dph_total") or 0.0)
             if actual > 0 and abs(actual - float(hire.get("dph") or 0.0)) > 1e-9:
                 s3.reprice(instance, actual)
@@ -1311,6 +1638,9 @@ def _sail_one(spec: dict, prep, q: dict, p: dict, t: dict, rid: str, commit: str
             raise
         finally:
             guard.closing()
+            if rival_hire:  # the race never ended (both failed, or a recall): its second box goes too
+                with contextlib.suppress(Exception):
+                    _release(vast, {k: v for k, v in rival_hire.items() if k != "_quote"}, "hedged: released with its pair", rec, log)
             ended, _ = _release(vast, hire, status, rec, log, error=error)
     return hire, status, ended, counts, failure
 

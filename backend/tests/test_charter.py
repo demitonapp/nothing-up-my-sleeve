@@ -27,6 +27,7 @@ from thorp.viable.s5_policy import charter as s5  # noqa: E402
 
 @pytest.fixture(autouse=True)
 def _cpu(monkeypatch):
+    monkeypatch.setattr(s1, "REHEARSE_TAR", False)  # the code cargo is listed in its own test, not on every voyage here
     monkeypatch.setenv("THORP_DEVICE", "cpu")
     monkeypatch.delenv("THORP_BACKEND", raising=False)
     monkeypatch.delenv("VAST_API_KEY", raising=False)
@@ -400,6 +401,77 @@ def test_a_charter_gives_up_when_no_box_boards(library, spec, tmp_thorp, monkeyp
                 log=lambda *a: None, sleep=lambda s: None, poll_s=0)  # fmt: skip
     assert market.instances == {} and len([c for c in market.calls if c[0] == "PUT"]) == 1 + s1.REHIRES
     assert [r.get("status") for r in s3.log() if r["event"] == "released"] == ["lost"] * (1 + s1.REHIRES)
+
+
+class SlowFirstMarket(FakeMarket):
+    """Offer 12's box sits loading for good; offer 14's comes up at once (the RTX 5090 market, 13 November)."""
+
+    def __call__(self, method, path, body=None, query=None):
+        out = super().__call__(method, path, body, query)
+        if method == "PUT" and path == "/api/v0/asks/12/":
+            self.instances[out["new_contract"]].update(actual_status="loading", ssh_host=None, ssh_port=None)
+        return out
+
+
+def test_a_hedge_keeps_the_box_that_comes_up_first(library, spec, tmp_thorp, monkeypatch):
+    """On a class that fails often both offers are hired; the first running is kept, the other released at once,
+    and neither the released box nor its host counts against the market (14 November, the Vast audit)."""
+    small_terms(tmp_thorp, max_instances=4)
+    monkeypatch.setattr(s1, "PROVISION_S", 1.0)  # were no second box hired, the stuck one would fail at once, not in 8 minutes
+    base = dict(verified=True, rentable=True, rented=False, reliability=0.995, inet_down=900.0, inet_up=500.0,
+                disk_space=200.0, cuda_max_good=13.4, num_gpus=1, gpu_name="RTX 4090")  # fmt: skip
+    market = SlowFirstMarket(offers=[{**base, "id": 12, "dph_total": 0.38, "machine_id": 1},
+                                     {**base, "id": 14, "dph_total": 0.41, "machine_id": 2}])  # fmt: skip
+    monkeypatch.setattr(s1, "class_failure_rate", lambda gpu: 0.58)
+    out = s1.sail(write_spec(spec, tmp_thorp), vast=Vast(market), resolver=library["resolver"],
+                  box_factory=lambda i: FakeBox(tmp_thorp / "box", library["resolver"], monkeypatch),
+                  log=lambda *a: None, sleep=lambda s: None, poll_s=0)  # fmt: skip
+    assert out["status"] == "home" and market.instances == {}
+    assert [c[1] for c in market.calls if c[0] == "PUT"] == ["/api/v0/asks/12/", "/api/v0/asks/14/"]
+    log = s3.log()
+    assert [(r["event"], r.get("status")) for r in log] == [
+        ("hired", None), ("hired", None), ("released", "hedged: the other box came up first"), ("at sea", None),
+        ("released", "home")]  # fmt: skip
+    assert log[1]["hedge"] is True and log[2]["instance"] == log[0]["instance"] and log[4]["instance"] == log[1]["instance"]
+    assert s1.avoided_now() == set()  # the box we let go is not the host's failure
+
+
+def test_failing_fast_rules():
+    t = {"max_instances": 4}
+    q = {"offer_id": 1, "machine_id": 10}
+    qs = [q, {"offer_id": 2, "machine_id": 10}, {"offer_id": 3, "machine_id": 11, "breaks": ["price"]}, {"offer_id": 4, "machine_id": 12}]
+    assert s1.hedge_rival(qs, q, 0.58, t, out_now=0)["offer_id"] == 4  # another machine, and no term broken
+    assert s1.hedge_rival(qs, q, 0.24, t, out_now=0) is None  # a class that seldom fails is hired once
+    assert s1.hedge_rival(qs, q, None, t, out_now=0) is None
+    assert s1.hedge_rival(qs, q, 0.58, t, out_now=3) is None  # no seat for a second box
+    assert s1.rehires_for(0.58) == s1.REHIRES_RISKY and s1.rehires_for(0.24) == s1.REHIRES and s1.rehires_for(None) == s1.REHIRES
+    now = time.time()
+    at = lambda h: __import__("datetime").datetime.fromtimestamp(now - h * 3600).astimezone().isoformat()  # noqa: E731
+    rows = [{"event": "hired", "instance": 1, "offer": 21, "machine_id": 31}, {"event": "released", "instance": 1, "failed_in": "env", "at": at(30)},
+            {"event": "hired", "instance": 2, "offer": 22, "machine_id": 32}, {"event": "released", "instance": 2, "failed_in": "ssh", "status": "recalled (SIGTERM)", "at": at(1)},
+            {"event": "hired", "instance": 3, "offer": 23, "machine_id": 33}, {"event": "released", "instance": 3, "failed_in": None, "status": "failed (exit 1)", "at": at(1)},
+            {"event": "hired", "instance": 4, "offer": 24, "machine_id": 34}, {"event": "released", "instance": 4, "failed_in": "data", "at": at(200)}]  # fmt: skip
+    # a stalled environment a day ago counts (it did not, before); a recall, a voyage's own crash and a week-old failure do not
+    assert s1.avoided_now(rows=rows, now=now) == {"o21", "m31"}
+
+
+class _Show:
+    def __init__(self, seq):
+        self.seq = seq  # instance -> list of statuses, one a look
+
+    def show(self, i):
+        st = self.seq[i].pop(0) if len(self.seq[i]) > 1 else self.seq[i][0]
+        return {"actual_status": st, "ssh_host": "h" if st == "running" else None, "ssh_port": 1 if st == "running" else None}
+
+
+def test_the_first_box_running_wins_and_dead_ones_drop_out():
+    up, _ = s1.first_running(_Show({1: ["loading"], 2: ["loading", "running"]}), [1, 2], timeout=60, sleep=lambda s: None)
+    assert up == 2
+    with pytest.raises(s1.VastError):
+        s1.first_running(_Show({1: ["exited"], 2: ["offline"]}), [1, 2], timeout=60, sleep=lambda s: None)
+    clock = iter(range(0, 10_000, 100))
+    with pytest.raises(s1.VastError, match="came up in 300"):
+        s1.first_running(_Show({1: ["loading"]}), [1], timeout=300, sleep=lambda s: None, clock=lambda: next(clock))
 
 
 class TakenMarket(FakeMarket):
@@ -1254,3 +1326,91 @@ def test_checkpoint_pull_gives_up_after_its_tries():
 
     with pytest.raises(ch.BoxError):
         ch.pull_checkpoints(Dead(), "rid", Path("/tmp/nowhere"))
+
+
+# ---------------------------------------------------------------- the rehearsal (14 November, the Vast audit)
+
+
+class _Popen:
+    """A tar stream made in memory, as `TAR` would make it."""
+
+    def __init__(self, names):
+        import io
+        import tarfile
+
+        buf = io.BytesIO()
+        with tarfile.open(fileobj=buf, mode="w") as tf:
+            for n in names:
+                info = tarfile.TarInfo(n)
+                info.size = 1
+                tf.addfile(info, io.BytesIO(b"x"))
+        buf.seek(0)
+        self.stdout = buf
+
+    def wait(self):
+        return 0
+
+
+def test_the_rehearsal_lists_the_code_cargo_as_the_box_gets_it(tmp_thorp):
+    probs = s1.tar_problems(paths.ROOT, ["a"], need=["ships/lists/x.csv"],
+                            popen=lambda *a, **k: _Popen(["backend/a.py", "ships/lists/._tricks.csv"]))  # fmt: skip
+    assert any("hidden '._'" in p for p in probs) and any("missing 1 list" in p for p in probs)
+    assert s1.tar_problems(paths.ROOT, ["a"], need=["ships/lists/x.csv"], popen=lambda *a, **k: _Popen(["ships/lists/x.csv"])) == []
+
+
+def test_the_rehearsal_names_a_list_that_is_not_here(tmp_thorp):
+    assert s1.missing_lists({"data": {"recipe": "lists/no-such-list-anywhere.csv"}}) == ["lists/no-such-list-anywhere.csv"]
+
+
+class _Prep:
+    def __init__(self, recipe):
+        self.recipe, self.first, self.stage_recipes = recipe, [], []
+
+
+def test_the_rehearsal_refuses_an_empty_register_and_a_bookless_cargo():
+    assert "is the register empty" in s1.book_problems(_Prep(["a", "b"]), [], known=lambda b: None)[0]
+    probs = s1.book_problems(_Prep(["a", "b", "pg7"]), ["shards/tok/a.npy", "texts/gutenberg/7.txt"], known=lambda b: object())
+    assert probs == ["1 book(s) would go aboard with neither a text nor a shard, e.g. b"]
+
+
+class _Rec:
+    """The ledger's two questions, answered from memory: the runs on NVIDIA boxes, and a run's metric."""
+
+    def __init__(self, runs):
+        self.runs = runs  # (run_id, name, spec, mem_gb, eval_seconds)
+
+    def query(self, sql, params=()):
+        if sql.startswith("select run_id, name, hardware, spec_json"):
+            return [{"run_id": r[0], "name": r[1], "hardware": "torch on NVIDIA GeForce RTX 5090", "spec_json": json.dumps(r[2])} for r in self.runs]
+        r = next(x for x in self.runs if x[0] == params[0])
+        return [{"v": r[3] if "mem_gb" in sql else r[4].get(params[1].removeprefix("eval/seconds/"))}]
+
+
+def _spec(light=640):
+    return {"model": {"preset": "50m", "context": 1024}, "optim": {"batch_tokens": 32768},
+            "eval": {"every_steps": 2000, "evaluators": ["ce_bpb"], "light": {"every_steps": light, "evaluators": ["stars", "cards"]}}}  # fmt: skip
+
+
+def test_the_rehearsal_hires_a_class_the_measured_peak_fits(monkeypatch):
+    monkeypatch.setattr(s1, "book_problems", lambda *a, **k: [])
+    rec = _Rec([("r1", "50m@v0.0.6", _spec(), 25.1, {"ce_bpb": 30.0, "stars": 20.0, "cards": 18.0})])
+    quotes = [{"gpu": "RTX 4090", "hours": 2.0}, {"gpu": "RTX 5090", "hours": 1.5}]
+    said = []
+    q = s1.rehearse(_spec(), _Prep(["a"]), {"total_steps": 1000, "start": 0}, quotes, rec, log=said.append)
+    assert q["gpu"] == "RTX 5090" and "hiring RTX 5090 instead" in said[0]
+    with pytest.raises(s1.RehearsalFailed, match="peaked at 25.1 GB"):
+        s1.rehearse(_spec(), _Prep(["a"]), {"total_steps": 1000, "start": 0}, quotes[:1], rec, log=said.append)
+
+
+def test_the_rehearsal_refuses_readings_that_would_take_the_voyage(monkeypatch):
+    monkeypatch.setattr(s1, "book_problems", lambda *a, **k: [])
+    secs = {"ce_bpb": 30.0, "stars": 20.0, "cards": 18.0}
+    rec = _Rec([("r1", "50m@v0.0.6-shelf", _spec(64), 20.0, secs)])  # voyage E: light readings of 38 s, every 64 steps
+    quote = [{"gpu": "RTX 5090", "hours": 6.5}]
+    with pytest.raises(s1.RehearsalFailed, match="rounds of light readings at 38 s each.*could not come in on time"):
+        s1.rehearse(_spec(64), _Prep(["a"]), {"total_steps": 43_043, "start": 0}, quote, rec, log=lambda *a: None)
+    # the same readings every 640 steps are a small share, and readings never measured are not guessed at
+    assert s1.rehearse(_spec(640), _Prep(["a"]), {"total_steps": 43_043, "start": 0}, quote,
+                       _Rec([("r1", "50m@v0.0.6-shelf", _spec(640), 20.0, secs)]), log=lambda *a: None)["gpu"] == "RTX 5090"
+    assert s1.rehearse(_spec(64), _Prep(["a"]), {"total_steps": 43_043, "start": 0}, quote, _Rec([]), log=lambda *a: None)
+

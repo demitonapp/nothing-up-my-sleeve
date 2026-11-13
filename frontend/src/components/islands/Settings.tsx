@@ -403,7 +403,7 @@ export default function Settings() {
                 ) : (
                   <Failed what="the places" error={d.paths.error} />
                 )}
-                <p className="note mt">The rules a voyage sails under are not here: the policies and their switches are on <a href="/orbitals/demiton/liberty-machine/s5">the Liberty Machine, S5</a>, and the standing queue and its seats on <a href="/expeditions/queue">Expeditions, Queue</a>.</p>
+                <p className="note mt">The rules a voyage sails under are not here: the policies and their switches are on <a href="/orbitals/demiton/liberty-machine/policy">the Liberty Machine, S5</a>, and the standing queue and its seats on <a href="/expeditions/queue">Expeditions, Queue</a>.</p>
               </section>
             ) : null}
           </>

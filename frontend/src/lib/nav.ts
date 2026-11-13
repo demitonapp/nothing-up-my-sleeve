@@ -123,10 +123,24 @@ export const LIBERTY_MACHINE_SYSTEMS: { key: 's1' | 's2' | 's3' | 's4' | 's5'; l
   { key: 's5', label: 'S5', name: 'Policy' },
 ];
 
-/** One system's address: S1 is Operations, so its page is /orbitals/demiton/liberty-machine/operations; the other four
- *  keep their S-number (12 November, Justin: "this url ... should not be s1 but rather ... operations"). */
+/** The systems whose address is a word, not their S-number: S1 is Operations (12 November, Justin: "this url ...
+ *  should not be s1 but rather ... operations") and S5 is Policy (13 November, Justin chose /policy for the page that
+ *  leads with feedback). S2 to S4 keep their number. */
+export const LIBERTY_MACHINE_SLUG: Partial<Record<'s1' | 's2' | 's3' | 's4' | 's5', string>> = { s1: 'operations', s5: 'policy' };
+
+/** One system's address. */
 export const libertyMachineHref = (key: string): string =>
-  key === 's1' ? '/orbitals/demiton/liberty-machine/operations' : `/orbitals/demiton/liberty-machine/${key}`;
+  `/orbitals/demiton/liberty-machine/${LIBERTY_MACHINE_SLUG[key as 's1'] || key}`;
+
+/** The system a segment after the machine names: its word (operations, policy), an old alias (acquisition is
+ *  S1's, control S3's) or its S-number; null for none. */
+export const libertyMachineKeyOf = (seg: string): 's1' | 's2' | 's3' | 's4' | 's5' | null => {
+  if (seg === 'operations' || seg === 'acquisition') return 's1';
+  if (seg === 'control') return 's3';
+  if (seg === 'policy') return 's5';
+  if (/^s[1-5]$/.test(seg)) return seg as 's1' | 's2' | 's3' | 's4' | 's5';
+  return null;
+};
 
 export const libertyMachineSystemOf = (path: string): 's1' | 's2' | 's3' | 's4' | 's5' | null => {
   // both addresses are read: /liberty-machine (12 November, Justin's own) and the Demiton alias
@@ -141,10 +155,6 @@ export const libertyMachineSystemOf = (path: string): 's1' | 's2' | 's3' | 's4' 
   }
   const parts = p.split('/').filter(Boolean);
   if (parts[0] !== 'liberty-machine') return null;
-  const seg = parts[1] || '';
-  if (seg === 'operations' || seg === 'acquisition') return 's1';
-  if (seg === 'control') return 's3';
-  if (/^s[1-5]$/.test(seg)) return seg as 's1' | 's2' | 's3' | 's4' | 's5';
-  return null;
+  return libertyMachineKeyOf(parts[1] || '');
 };
 

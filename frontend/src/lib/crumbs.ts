@@ -8,7 +8,7 @@
 // their pages now live.
 // Pure: no DOM, no React.
 
-import { LIBERTY_MACHINE_SYSTEMS, libertyMachineHref, navPath } from './nav';
+import { LIBERTY_MACHINE_SYSTEMS, libertyMachineHref, libertyMachineKeyOf, navPath } from './nav';
 import { PUBLIC_EDITION, isPrivatePath } from './edition';
 import MUSEUM from '../data/museum.json';
 
@@ -262,7 +262,7 @@ function trailFor(path: string): Crumb[] {
       out.push(DEMITON);
       if (c === 'liberty-machine') {
         out.push(LIBERTY_MACHINE);
-        const sys = d === 'control' ? 's3' : d === 'acquisition' ? 's1' : d;
+        const sys = d ? libertyMachineKeyOf(d) : null;
         if (sys) add(labelOf(sys), libertyMachineHref(sys));
         return out;
       }
@@ -329,7 +329,7 @@ function trailFor(path: string): Crumb[] {
   // page shows no section tabs. The old flat addresses answer the same trail.
   if (a === 'liberty-machine' || a === 'governance' || a === 'vsm') {
     out.push(ORBITALS, DEMITON, LIBERTY_MACHINE);
-    const sys = b === 'control' ? 's3' : b === 'acquisition' ? 's1' : b;
+    const sys = b ? libertyMachineKeyOf(b) : null;
     if (sys) add(labelOf(sys), libertyMachineHref(sys));
     return out;
   }

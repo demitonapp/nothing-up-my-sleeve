@@ -230,28 +230,6 @@ function Intelligence({ d }: { d: Any }) {
   );
 }
 
-/** S5: the proposals that stand until Justin decides them (s5.proposals, `thorp proposals`), filed by a Claude session,
- *  a system or a person. Not the cycle's own proposals, which belong to the turn that made them. */
-function Standing({ rows }: { rows: Any[] }) {
-  return (
-    <section className={cardCls(false, 'panel')}>
-      <h2>Waiting on Justin <span className="note">proposals filed to S5 that stand until they are signed, declined or withdrawn: <code>thorp proposals sign N --words "…"</code></span></h2>
-      {rows.length ? (
-        <ul className="govlints">
-          {rows.map((p: Any) => (
-            <li key={p.id}>
-              <span className={pillCls('')}>#{p.id}</span> <b>{p.title}</b>{p.area ? <span className="s"> · {p.area}</span> : null}
-              <div><b>Asks:</b> {p.asks}</div>
-              {p.why ? <div className="s">{p.why}</div> : null}
-              <div className="s">filed by {p.filed_by}, {p.filed_at}</div>
-            </li>
-          ))}
-        </ul>
-      ) : <div className="s">Nothing waits on a decision.</div>}
-    </section>
-  );
-}
-
 /** S5: the ceilings the plan is held to. */
 function Policy({ d }: { d: Any }) {
   const last: Any | null = d.last;
@@ -327,7 +305,8 @@ export function LibertyMachineCycle({ tab }: { tab: Sys }) {
       {tab === 'S2' ? <Coordination d={data} /> : null}
       {tab === 'S3' ? <Control d={data} /> : null}
       {tab === 'S4' ? <Intelligence d={data} /> : null}
-      {tab === 'S5' ? <><Standing rows={data.standing || []} /><Policy d={data} /></> : null}
+      {/* S5's standing proposals are in its feedback now (S5Feedback.tsx, under Decide), at the top of the page */}
+      {tab === 'S5' ? <Policy d={data} /> : null}
     </div>
   );
 }

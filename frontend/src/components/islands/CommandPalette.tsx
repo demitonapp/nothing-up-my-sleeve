@@ -115,7 +115,9 @@ export const DESTINATIONS: Dest[] = [
   { group: 'Demiton', label: 'The queue', href: '/expeditions/queue', note: 'what sails next, in order' },
   { group: 'Demiton', label: 'Liberty Machine', href: '/orbitals/demiton/liberty-machine', note: 'how the fleet governs itself' },
   ...LIBERTY_MACHINE_SYSTEMS.map((s) => ({
-    group: 'Demiton', label: `${s.label} ${s.name}`, href: libertyMachineHref(s.key), note: 'a system of the Liberty Machine',
+    group: 'Demiton', label: `${s.label} ${s.name}`, href: libertyMachineHref(s.key),
+    note: s.key === 's5' ? 'the feedback the systems send up, sorted for S4' : 'a system of the Liberty Machine',
+    keywords: s.key === 's5' ? 'feedback inbox taxonomy proposals' : undefined,
   })),
 
   { group: 'The ships', label: 'Every ship', href: '/ships', note: 'every ship of our fleet, and every run' },

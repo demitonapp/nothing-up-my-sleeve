@@ -3389,6 +3389,14 @@ def api_liberty_machine_cycle() -> dict:
     return cycle.payload()
 
 
+def api_liberty_machine_feedback(q: dict) -> dict:
+    """S5's feedback (thorp/viable/s5_policy/feedback.py, 13 November): what the other systems have sent up, each with
+    its source, sorted by the taxonomy S4 reads (decide, constrain, repair, calibrate, learn). Read-only."""
+    from thorp.viable.s5_policy import feedback
+
+    return feedback.payload(int(q.get("days") or feedback.DAYS))
+
+
 def api_acquisition() -> dict:
     """Acquisition, the books the voyages read, as a viable system one level down (thorp/acquisition.py):
     its five systems with their code; S1 the intakes and the log of every book's verdict, S2 the intake lock,
@@ -7959,6 +7967,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/voyages/where": lambda: api_voyages_where(q.get("runs", "")),
                 "/api/governance": api_governance,
                 "/api/liberty-machine/cycle": api_liberty_machine_cycle,
+                "/api/liberty-machine/feedback": lambda: api_liberty_machine_feedback(q),
                 "/api/liberty-machine/checkpoints": api_checkpoints,
                 # the old address keeps working (VSM was renamed the Liberty Machine, 12 November)
                 "/api/vsm/cycle": api_liberty_machine_cycle,

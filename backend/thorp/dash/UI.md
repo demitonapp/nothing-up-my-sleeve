@@ -528,7 +528,7 @@ the island rewrites). A section with one tab shows no row.
   Coordination** (`/orbitals/demiton/liberty-machine/s2`, the band and acquisition's S2), **S3 Control**
   (`/orbitals/demiton/liberty-machine/s3`, the band, the control detail and acquisition's S3), **S4
   Intelligence** (`/orbitals/demiton/liberty-machine/s4`, the band and acquisition's S4) and **S5
-  Policy** (`/orbitals/demiton/liberty-machine/s5`, the band and acquisition's S5). The old
+  Policy** (`/orbitals/demiton/liberty-machine/policy`, once `/s5`, which redirects; it opens on **Feedback to S5**, `S5Feedback.tsx` from `/api/liberty-machine/feedback`: what the other systems sent up, each with its source, in the five categories of the `feedback-v1` taxonomy as filter tiles and the sources as chips; then the band, the envelope and acquisition's S5). The old
   `/liberty-machine`, `/vsm` and `/governance` addresses redirect into that tree (`/vsm/control` and
   `/governance/control` to `.../s3`, `/vsm/acquisition` and `/governance/acquisition` to `.../operations`).
   - **The fleet** (`DroneFleet.tsx`, `/api/drones`, `thorp/drones.py`; 12 November, Justin: "under Liberty Machine S1

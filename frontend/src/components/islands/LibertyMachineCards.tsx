@@ -1,6 +1,6 @@
 // The Liberty Machine's overview: its five systems as image cards (12 November, Justin: "http://localhost:4321/orbitals/demiton/liberty-machine should
 // have 5 cards with a fal image for each level"; "need pages for each Liberty Machine system"). Each card opens its
-// system's own page (/orbitals/demiton/liberty-machine/operations … /orbitals/demiton/liberty-machine/s5). Drawn as Demiton's section cards are (views/harbours.ts, the yard
+// system's own page (/orbitals/demiton/liberty-machine/operations … /orbitals/demiton/liberty-machine/policy). Drawn as Demiton's section cards are (views/harbours.ts, the yard
 // plate), with art from backend/thorp/dash/art/generate_art.py LIBERTY_MACHINE_SYSTEMS (liberty-machine-s1 … liberty-machine-s5).
 
 import { cardCls } from '@/lib/ui';

@@ -986,6 +986,16 @@ def main(argv: list[str] | None = None) -> int:
     s.set_defaults(
         fn=lambda a: __import__("thorp.viable.s5_policy.proposals", fromlist=["main"]).main(a.rest)
     )
+    s = sub.add_parser(
+        "feedback", help="S5: the feedback the systems send up, sorted by the taxonomy S4 reads"
+    )
+    s.add_argument("--days", type=int, default=7)
+    s.add_argument("--category", choices=["decide", "constrain", "repair", "calibrate", "learn"])
+    s.set_defaults(
+        fn=lambda a: __import__("thorp.viable.s5_policy.feedback", fromlist=["main"]).main(
+            ["--days", str(a.days)] + (["--category", a.category] if a.category else [])
+        )
+    )
     a = p.parse_args(argv)
     return a.fn(a)
 

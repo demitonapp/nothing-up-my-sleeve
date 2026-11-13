@@ -74,6 +74,7 @@ Quentin.
 | D60 | Character | taken 2026-11-13 | Quentin Luck is introduced in the preface, as invented and declared so, because his footnotes begin on the first page of chapter 1 and the scene that seats him is in chapter 3. | preface | v14 loc 357 |
 | D61 | Name | decided 2026-11-13 | What a machine reads is the pile, not the mountain, after EleutherAI's Pile. | ch 2 | v14 loc 277 |
 | D62 | Form | open 2026-11-13 | The book is to be published in as many languages as possible, translated by an open model of thirty billion weights or more on rented machines. Held until the English text is settled for the launch. | epub | v14 loc 173 |
+| D63 | Form | decided 2026-11-13 | The cover carries a subtitle under the title: "or how I learned to stop worrying about AI bombing schoolkids". The front page and the book's title elsewhere are unchanged. | cover | conversation, 13 Nov |
 
 ## The decisions in full
 
@@ -679,4 +680,15 @@ the translation on a 30B or up." It follows from the aim the preface now states,
 reach in whatever language they speak. Not started. The recommendation is to wait until the English text is
 settled for the launch, pilot one chapter in two or three languages with a glossary for Luck's slang, and put
 the model, its version and the date on every translated edition.
+
+### D63. The cover's subtitle
+
+*Form · decided 2026-11-13 · lands on the cover · from conversation, 13 Nov.*
+
+Justin asked for "a catchy clickbaity title on the cover": *Nothing Up My Sleeve, or how I learned to stop
+worrying about AI bombing schoolkids*, after the film of 1964. It is set in italic under the title, which
+goes onto one line to make room. The line points at the strike on the school at Minab, which Luck's footnote
+28 in chapter 2 gives with its sources; that footnote says what was reported and does not say the machine
+chose the target, because no source does, and the subtitle is a joke's worth of licence beyond it. The front
+page, the epub's title and the site's card still say *Nothing Up My Sleeve* alone.
 

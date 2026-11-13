@@ -49,8 +49,8 @@ FULL_BLEED = os.path.exists(art_path)
 if FULL_BLEED:
     # Full bleed (the note on v14: the picture should fill the screen). The art is set to the full width from
     # the top edge and fades into black below the card table, and the title and the names are set in white on
-    # that black, so nothing of the page shows round the picture. No subtitle line and no imprint unless a
-    # subtitle is passed: the build-status line and the company's name both came off for the launch (D55).
+    # that black, so nothing of the page shows round the picture. The build-status line and the company's
+    # name both came off for the launch (D55); the subtitle that is passed now is D63's.
     art = Image.open(art_path).convert("L")
     art = ImageOps.autocontrast(art, cutoff=1)
     art = ImageEnhance.Contrast(art).enhance(1.25)
@@ -93,9 +93,16 @@ else:
 
 y = y_art_end + 70
 if FULL_BLEED:
-    y = wrapped(title, y + 60, font(150, bold=True), W - 200, fill=ink, gap=1.05)
     if subtitle.strip():
-        y = wrapped(subtitle, y + 24, font(52), W - 300, fill=rule)
+        # With a subtitle the title goes on one line, so that the block of lettering stays the same height
+        # and the card table above it stays in the picture; the subtitle is set in italic under it.
+        size = 150
+        while size > 80 and d.textlength(title, font=font(size, bold=True)) > W - 200:
+            size -= 2
+        y = centred(title, y + 60, font(size, bold=True), fill=ink)
+        y = wrapped(subtitle, y + 34, font(58, name="Georgia Italic.ttf"), W - 260, fill=(225, 225, 225), gap=1.2)
+    else:
+        y = wrapped(title, y + 60, font(150, bold=True), W - 200, fill=ink, gap=1.05)
     y += 56
     d.line([(620, y), (W - 620, y)], fill=rule, width=3)
     y += 56

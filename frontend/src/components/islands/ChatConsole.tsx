@@ -117,7 +117,8 @@ const LABS: [RegExp, string][] = [
   [/smollm/i, 'Hugging Face'],
   [/gpt-oss/i, 'OpenAI'],
   [/maincoder/i, 'Maincode'],
-  [/ling/i, 'InclusionAI'],
+  // Ling as a word, not as letters: "Tool Calling" filed TII's Falcon under InclusionAI (14 November)
+  [/\bling\b/i, 'InclusionAI'],
   [/falcon|tiiuae/i, 'TII'],
 ];
 const labOf = (m: Model): string => m.lab || (LABS.find(([re]) => re.test(`${m.model || ''} ${m.name}`)) || [null, 'Other'])[1] as string;
@@ -1288,6 +1289,19 @@ export default function ChatConsole() {
                     <ConsoleConnect
                       current={conn ?? null}
                       serverModels={PUBLIC_EDITION ? null : instruct.length || null}
+                      serverList={PUBLIC_EDITION ? [] : instruct.map((m) => ({
+                        key: convoKeyOf(m), name: m.name, lab: labOf(m),
+                        on: conn?.wire === 'thorp' && !!serverChosen && convoKeyOf(serverChosen) === convoKeyOf(m),
+                      }))}
+                      onPickServer={(key) => {
+                        // each of the server's models is its own choice on the switch page (14 November): its lab and
+                        // the model are set as the settings' two lists would set them, and the console opens on it
+                        const m = instruct.find((x) => convoKeyOf(x) === key);
+                        if (!m) return;
+                        setLab(labOf(m));
+                        setPick(key);
+                        connect(SERVER_CONNECTION);
+                      }}
                       onPick={connect}
                       onClose={conn ? () => setConnecting(false) : undefined}
                     />

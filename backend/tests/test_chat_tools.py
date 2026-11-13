@@ -308,3 +308,58 @@ def test_every_tool_has_a_schema_and_ling_can_call_the_new_ones():
     assert {s["function"]["name"] for s in chat_tools.SCHEMAS} == set(chat_tools.TOOLS)
     text = "<tool_call>system_status\n<arg_key>system</arg_key>\n<arg_value>S3*</arg_value>\n</tool_call>"
     assert chat_tools.parse_calls(text, "bailing-xml") == [{"name": "system_status", "arguments": {"system": "S3*"}}]
+
+
+def test_falcons_fenced_json_call_is_read_when_it_names_our_tools():
+    """Falcon-H1-Tiny 90M (14 November) answers its <tool_call> template with fenced JSON blocks of its own keys."""
+    text = '```json\n{\n  "function_name": "calculate",\n  "args": {"expression": "17 * 23"}\n}\n```\n\n```json\n{"function_name": "current_time", "args": {}}\n```'
+    assert chat_tools.parse_calls(text, "json") == [
+        {"name": "calculate", "arguments": {"expression": "17 * 23"}},
+        {"name": "current_time", "arguments": {}},
+    ]
+    assert chat_tools.before_calls(text) == ""
+
+
+def test_json_shown_to_the_user_is_not_taken_for_a_call():
+    # prose around the block, a name that is not a tool, or another grammar: an answer, not a call
+    assert chat_tools.parse_calls('Here is the shape:\n```json\n{"name": "calculate", "arguments": {}}\n```', "json") == []
+    assert chat_tools.parse_calls('```json\n{"name": "rm_rf", "arguments": {}}\n```', "json") == []
+    assert chat_tools.parse_calls('{"name": "calculate", "arguments": {"expression": "1"}}', "qwen-xml") == []
+    assert chat_tools.before_calls('Here is the shape:\n```json\n{"name": "calculate"}\n```').startswith("Here is")
+
+
+def test_a_list_of_calls_in_one_tag_is_read_as_each_call():
+    """Falcon-H1-Tiny-Tool-Calling-90M's template asks for every call of a turn in one tag, as a JSON list."""
+    text = '<tool_call>\n[\n  {"name": "calculate", "arguments": {"expression": "17 * 23"}},\n  {"name": "current_time", "arguments": {}}\n]\n</tool_call>'
+    assert chat_tools.parse_calls(text, "json") == [
+        {"name": "calculate", "arguments": {"expression": "17 * 23"}},
+        {"name": "current_time", "arguments": {}},
+    ]
+    bad = chat_tools.parse_calls('<tool_call>["calculate"]</tool_call>', "json")
+    assert bad[0]["error"] == "an item of the list is not a call"
+
+
+def test_an_unclosed_list_of_calls_is_read_as_closed():
+    calls = chat_tools.parse_calls('<tool_call>[{"name": "current_time", "arguments": {}}</tool_call>', "json")
+    assert calls == [{"name": "current_time", "arguments": {}}]
+
+
+
+def test_a_tool_calling_model_is_offered_as_one_that_answers():
+    """The chat terminal offers only instruct models (14 November): a tool-calling one is post-trained for turns too."""
+    from thorp import foreign
+
+    assert foreign._tuning("tiiuae/Falcon-H1-Tiny-Tool-Calling-90M") == "instruct"
+    assert foreign._tuning("tiiuae/Falcon-H1-Tiny-90M-Base") == "base"
+
+
+def test_a_small_model_is_handed_four_tools_briefly():
+    small = chat_tools.schemas_for(91_131_072)
+    assert [s["function"]["name"] for s in small] == list(chat_tools.SMALL_TOOLS)
+    calc = small[0]["function"]
+    assert calc["description"].startswith("Evaluate an arithmetic expression exactly")
+    assert "sqrt(2)" not in str(calc)  # no example for it to copy
+    assert calc["parameters"]["required"] == ["expression"]
+    assert chat_tools.schemas_for(27_000_000_000) is chat_tools.SCHEMAS
+    assert chat_tools.schemas_for(None) is chat_tools.SCHEMAS
+

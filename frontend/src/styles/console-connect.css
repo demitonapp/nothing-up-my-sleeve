@@ -41,6 +41,10 @@
   background: #16130f; color: #f2e6cf; font: inherit; font-size: 12.5px; cursor: pointer; text-align: left; max-width: 100%; overflow-wrap: anywhere; }
 .cquickbtn span { font-size: 10.5px; color: #8d7a56; letter-spacing: .04em; }
 .cquickbtn:hover { border-color: #e5c982; background: #1c1813; }
+/* the model in use, among the server's models (14 November): marked as the bar's dot marks a live one */
+.cquickbtn.on { border-color: #8fb573; }
+.cquickbtn.on span { color: #8fb573; }
+.cserverdoor { margin: 0 0 14px; }
 .cserver { display: grid; grid-template-columns: auto 1fr auto; gap: 4px 12px; align-items: baseline; width: 100%; padding: 10px 14px; margin: 0 0 12px;
   background: none; border: 1px dashed #3a2a12; border-radius: 3px; color: #e9e2d3; font: inherit; text-align: left; cursor: pointer; }
 .cserver span { color: #8d7a56; font-size: 12.5px; }

@@ -255,6 +255,10 @@ def _tuning(model: str) -> str:
     name = model.lower()
     if "-it" in name or "instruct" in name or "-chat" in name:
         return "instruct"
+    # a model post-trained for tool calls answers turns as an instruct one does (14 November: Falcon-H1-Tiny-Tool-Calling-90M
+    # was read as "unknown" and the chat terminal, which offers only instruct models, left it out)
+    if "tool-calling" in name or "function-calling" in name:
+        return "instruct"
     if "base" in name or "-pt" in name or "pretrain" in name or "pythia" in name:
         return "base"
     if "qwen" in name or "phi-4" in name:

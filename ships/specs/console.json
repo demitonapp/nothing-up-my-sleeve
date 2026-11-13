@@ -8,9 +8,10 @@
  "foreign": [
   "ling-3-0-tiny",
   "qwen3-8-27b",
-  "falcon-h1-tiny-90m-instruct"
+  "falcon-h1-tiny-90m-instruct",
+  "falcon-h1-tiny-tool-calling-90m"
  ],
- "foreign_why": "13 November, Justin: \"I want to see only the Nothing up my sleeve model and then Ling and Qwen 27\"",
+ "foreign_why": "13 November, Justin: \"I want to see only the Nothing up my sleeve model and then Ling and Qwen 27\". 14 November, Justin: \"bring in the tool calling one locally so i can test it\" (Falcon-H1-Tiny-Tool-Calling-90M, beside the Instruct one).",
  "ship": "9m@v0.0.6-fleetmarks-tools2",
  "name": "Nothing up my sleeve 9m · chat and tools",
  "ship_why": "read only by a dashboard started before `ships` (13 November, 11:15); `ships` wins"

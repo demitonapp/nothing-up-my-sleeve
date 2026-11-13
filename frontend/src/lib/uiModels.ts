@@ -45,7 +45,7 @@ export const UI_MODELS: UiModel[] = [
     does: 'Answers in the chat terminal: it reasons before it replies, and calls the site’s tools to read the fleet, the queue, the Liberty Machine and the leaderboard rather than guess at them.',
     why: 'It reasons and calls tools, and only 1.3B of its 7.9B parameters work on each word, so it answers quickly on a laptop. When we tried it on the site’s own questions (the fleet, the Liberty Machine, the next charter, Kipling) it chose the right tool every time, and its makers’ published scores stand beside the other medium models on our leaderboard.',
     caveat: 'Its architecture is new: it needs a recent llama.cpp, LM Studio or Ollama. If yours will not load it, update it, or use any model that calls tools.',
-    match: /ling/i,
+    match: /\bling\b/i, // a word, not letters: "Tool Calling" is not Ling (14 November)
   },
   {
     key: 'tiny-aya-earth',

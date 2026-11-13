@@ -1195,6 +1195,28 @@ TOOLS = {
 }
 
 
+# A small model's tools (14 November: Falcon-H1-Tiny-Tool-Calling-90M, handed all twelve at 6,900 characters, listed
+# the last three and its template's placeholder names as its tools). Under SMALL_PARAMS a model is handed these four,
+# each described in its first sentence only and with no argument notes, since a 90M model copies an example it is shown
+# (it called the calculator on the description's own "17 * 23 + sqrt(2)"). Any of the twelve still runs if it is called.
+SMALL_PARAMS = 1_000_000_000
+SMALL_TOOLS = ("calculate", "current_time", "queue_status", "liberty_machine_status")
+
+
+def _brief(schema: dict) -> dict:
+    f = schema["function"]
+    first = re.split(r"(?<=[.:;])\s", f["description"], maxsplit=1)[0].rstrip(":;")
+    props = {k: {kk: vv for kk, vv in v.items() if kk != "description"} for k, v in (f["parameters"].get("properties") or {}).items()}
+    return {"type": "function", "function": {"name": f["name"], "description": first, "parameters": {**f["parameters"], "properties": props}}}
+
+
+def schemas_for(params: float | None) -> list[dict]:
+    """The tools a model is handed: all of SCHEMAS, or for a model under SMALL_PARAMS the four SMALL_TOOLS, briefly."""
+    if not params or params >= SMALL_PARAMS:
+        return SCHEMAS
+    return [_brief(s) for s in SCHEMAS if s["function"]["name"] in SMALL_TOOLS]
+
+
 def run(name: str, arguments: dict) -> dict:
     """Run one call. A tool that is not on the list, or arguments it does not take, come back as an error
     the model reads, never an exception in the console."""
@@ -1258,23 +1280,74 @@ def _json_call(body: str) -> dict | None:
         return None
     if not isinstance(d, dict):
         return None
-    args = d.get("arguments") or d.get("parameters") or {}
+    args = d.get("arguments") or d.get("parameters") or d.get("args") or {}
     if isinstance(args, str):
         try:
             args = json.loads(args)
         except ValueError:
             args = {}
-    return {"name": str(d.get("name") or ""), "arguments": args if isinstance(args, dict) else {}}
+    name = d.get("name") or d.get("function_name") or d.get("function") or ""
+    return {"name": str(name) if isinstance(name, str) else "", "arguments": args if isinstance(args, dict) else {}}
+
+
+# A call written without the template's tags (14 November: Falcon-H1-Tiny 90M answers its own `<tool_call>` template
+# with a fenced ```json block, `{"function_name": ..., "args": {...}}`). Read only when the turn is nothing but such
+# blocks and each names a tool on the list, so a model that shows the user some JSON is never taken to be calling.
+_FENCED = re.compile(r"```(?:json)?\s*(\{.*?\})\s*```", re.S)
+
+
+def _bare_calls(text: str) -> list[dict]:
+    t = text.strip()
+    bodies = _FENCED.findall(t)
+    rest = _FENCED.sub("", t).strip()
+    if not bodies:
+        bodies, rest = ([t], "") if t.startswith("{") and t.endswith("}") else ([], t)
+    if not bodies or rest:
+        return []
+    calls = [_json_call(b) for b in bodies]
+    if not all(c and c["name"] in TOOLS for c in calls):
+        return []
+    return [c for c in calls if c]
+
+
+def _json_list(body: str) -> list[dict] | None:
+    """A JSON list of calls in one tag (`[{"name": ..., "arguments": {...}}, ...]`), or None when the body is not
+    a list. An item that is not a call is kept with an `error`, so the model hears which one went wrong."""
+    try:
+        d = json.loads(body)
+    except ValueError:
+        # a list the model left unclosed (it wrote `</tool_call>` before the `]`) is read as closed, so the model
+        # hears what was wrong with the call it made, not that it made none
+        if not body.lstrip().startswith("["):
+            return None
+        try:
+            d = json.loads(body.rstrip() + "]")
+        except ValueError:
+            return None
+    if not isinstance(d, list):
+        return None
+    out = []
+    for item in d:
+        call = _json_call(json.dumps(item)) if isinstance(item, dict) else None
+        out.append(call if call and call["name"] else {"name": "", "arguments": {}, "error": "an item of the list is not a call", "raw": json.dumps(item)[:300]})
+    return out
 
 
 def parse_calls(text: str, fmt: str | None) -> list[dict]:
     """The calls in a model's turn, in order: [{"name", "arguments"}]. A call that does not parse is kept with
     an `error`, so the model is told what went wrong instead of the call vanishing."""
-    if not fmt or "<tool_call>" not in text:
+    if not fmt:
         return []
+    if "<tool_call>" not in text:
+        return _bare_calls(text) if fmt == "json" else []
     calls = []
     for body in _CALL.findall(text):
         if fmt == "json":
+            # Falcon-H1-Tiny's tool-calling model (14 November) puts every call of a turn in one tag, as a JSON list
+            listed = _json_list(body)
+            if listed is not None:
+                calls.extend(listed or [{"name": "", "arguments": {}, "error": "an empty list of calls", "raw": body[:300]}])
+                continue
             call = _json_call(body)
             calls.append(call if call else {"name": "", "arguments": {}, "error": "the call is not JSON", "raw": body[:300]})
         elif fmt == "bailing-xml":
@@ -1300,6 +1373,8 @@ def parse_calls(text: str, fmt: str | None) -> list[dict]:
 def before_calls(text: str) -> str:
     """The turn's text before its first call: what the model said, without the call's own markup."""
     i = text.find("<tool_call>")
+    if i < 0 and _bare_calls(text):
+        return ""  # the whole turn was untagged calls (parse_calls): nothing of it is said to the user
     return text if i < 0 else text[:i].rstrip()
 
 

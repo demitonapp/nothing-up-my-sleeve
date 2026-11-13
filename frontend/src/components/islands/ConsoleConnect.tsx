@@ -66,9 +66,17 @@ function ModelList({ models, onPick, busyId, current }: { models: ModelInfo[]; o
   );
 }
 
-export default function ConsoleConnect({ current, serverModels, onPick, onClose, start = 'home' }: {
+/** One of Thorp's own models on this dashboard's server, as the switch page lists it (14 November, Justin: "the UI
+ *  is inconsistent for switching models. I want to use the TII falcon 90m but there's no easy way for me to select
+ *  it"). The local servers' models were listed one by one and the server's were one button that went back to
+ *  whichever was chosen last; now each is its own choice, as a local one is. */
+export interface ServerChoice { key: string; name: string; lab: string; on: boolean }
+
+export default function ConsoleConnect({ current, serverModels, serverList = [], onPickServer, onPick, onClose, start = 'home' }: {
   current: Connection | null;
   serverModels: number | null; // Thorp's own models on this server, null where there are none to offer
+  serverList?: ServerChoice[];
+  onPickServer?: (key: string) => void;
   onPick: (c: Connection) => void;
   onClose?: () => void;
   start?: View;
@@ -186,16 +194,42 @@ export default function ConsoleConnect({ current, serverModels, onPick, onClose,
           The console talks to a model you choose. Run one on this computer, or bring a key for a cloud model.
           {current ? ' Your past chats stay where they are.' : ' You can switch at any time from the bar.'}
         </p>
+        {/* the dashboard's own models first: each one a click, nothing to install (14 November) */}
+        {!PUBLIC_EDITION && serverList.length && onPickServer ? (
+          <section className="cdoor cserverdoor" data-no-translate>
+            <h3>On this dashboard’s server</h3>
+            <p className="cdim">{serverList.length} model{serverList.length === 1 ? '' : 's'}, run through MLX with Thorp’s tools. Nothing to install.</p>
+            <div className="cquick">
+              {serverList.map((s) => (
+                <button key={s.key} type="button" className={`cquickbtn${s.on ? ' on' : ''}`} onClick={() => onPickServer(s.key)} title={`chat with ${s.name} on this dashboard’s server`}>
+                  {s.name}<span>{s.lab}{s.on ? ' · in use' : ''}</span>
+                </button>
+              ))}
+            </div>
+          </section>
+        ) : !PUBLIC_EDITION && serverModels ? (
+          <button type="button" className={`cserver${current?.wire === 'thorp' ? ' on' : ''}`} onClick={() => onPick(SERVER_CONNECTION)}>
+            <b>Thorp’s own models</b>
+            <span>{serverModels} on this dashboard’s server, run through MLX, with Thorp’s tools</span>
+            <span className="cmodelgo">{current?.wire === 'thorp' ? 'in use' : 'use →'}</span>
+          </button>
+        ) : null}
         {/* what the site is built for (13 November, Justin: the models that run the UI, shown where none is configured) */}
         {(() => {
           const m = uiModel('chat');
           const mine = found.flatMap((p) => p.models.filter((x) => m.match.test(x.id)).map((x) => ({ p, x })));
+          const onServer = PUBLIC_EDITION || !onPickServer ? [] : serverList.filter((s) => m.match.test(`${s.key} ${s.name}`));
           return (
             <section className="cdoor" data-no-translate>
               <h3>Built for {m.name}</h3>
               <p className="cdim">{m.maker} · {m.size}. {m.does}</p>
-              {mine.length ? (
+              {mine.length || onServer.length ? (
                 <div className="cquick">
+                  {onServer.map((s) => (
+                    <button key={s.key} type="button" className={`cquickbtn${s.on ? ' on' : ''}`} onClick={() => onPickServer?.(s.key)} title={`chat with ${s.name} on this dashboard’s server`}>
+                      {s.name}<span>this server · {s.on ? 'in use' : 'recommended'}</span>
+                    </button>
+                  ))}
                   {mine.slice(0, 3).map(({ p, x }) => (
                     <button key={`${p.server.id}:${x.id}`} type="button" className="cquickbtn" onClick={() => onPick(localConnection(p, x))} title={`chat with ${x.id} on ${p.label || p.server.label}`}>
                       {x.id}<span>{p.label || p.server.label} · recommended</span>
@@ -237,13 +271,6 @@ export default function ConsoleConnect({ current, serverModels, onPick, onClose,
             <button type="button" className="consolbtn primary cdoorbtn" onClick={() => setView('cloud')}>use a cloud model →</button>
           </section>
         </div>
-        {!PUBLIC_EDITION && serverModels ? (
-          <button type="button" className={`cserver${current?.wire === 'thorp' ? ' on' : ''}`} onClick={() => onPick(SERVER_CONNECTION)}>
-            <b>Thorp’s own models</b>
-            <span>{serverModels} on this dashboard’s server, run through MLX, with Thorp’s tools</span>
-            <span className="cmodelgo">{current?.wire === 'thorp' ? 'in use' : 'use →'}</span>
-          </button>
-        ) : null}
         {recents.length ? (
           <div className="crecent">
             <span className="cdim">recently used</span>

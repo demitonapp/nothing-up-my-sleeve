@@ -1,0 +1,6 @@
+/* the queue's sort by expedition (13 November): the sort bar above the swimlane, and an expedition's
+   heading row in the table. Kept apart from global.css, which others are editing. */
+.qsortbar { margin: 4px 0 8px; }
+.qsortbar .k { color: var(--muted); font-size: var(--fs-sm); text-transform: uppercase; letter-spacing: .08em; }
+#queuetable tr.qexp td { padding-top: 10px; border-top: 1px solid var(--line); background: var(--raise); font-size: var(--fs-md); }
+#queuetable tr.qexp:first-child td { border-top: 0; }

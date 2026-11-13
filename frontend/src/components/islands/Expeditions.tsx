@@ -11,11 +11,12 @@ import { routePath, useApi, useRoute } from '@/lib/useApi';
 import { esc, fmt } from '@/lib/format';
 import { starHeadline } from '@/scripts/views/helpers';
 import { TabNav } from '../TabNav';
+import '@/styles/queue-sort.css';
 import Launch from './Launch';
 import type { LaunchPayload } from './Launch';
 import {
   censusHtml, CHARTER_SECTIONS, charterCardsHtml, charterSection, deckHtml, expeditionCardsHtml, expeditionDoorsHtml, goalSummaryHtml, expeditionName, expeditionOutcomes, expeditionTableHtml, expPill, firstLightFindings, fitHtml, fleetShipsHtml, runsTableHtml,
-  inductionVerdict, leversRowsHtml, outcomesRowsHtml, parseExpeditionRoute, pinsStripHtml, queueLanesHtml, queueMatches, queueRowsHtml, readingsTable,
+  inductionVerdict, leversRowsHtml, outcomesRowsHtml, parseExpeditionRoute, pinsStripHtml, queueLanesHtml, queueMatches, queueRowsHtml, readingsTable, type QueueSort,
   skyStateOf, sopCardsHtml, tableLogHtml, tableReadingsHtml, planHtml,
 } from '@/scripts/views/expeditions';
 import type { Expedition, Observation, SeriesMap, SkyViewState, TableExchange } from '@/scripts/views/expeditions';
@@ -981,6 +982,8 @@ export default function Expeditions() {
   // so a 15 s poll that redraws the rows keeps them
   const [qKind, setQKind] = useState('all');
   const [qText, setQText] = useState('');
+  // how the swimlane and the table are arranged: the sailing order, or by expedition (13 November, Justin)
+  const [qSort, setQSort] = useState<QueueSort>('order');
   const [qOpen, setQOpen] = useState<Set<string>>(() => new Set());
   const toggleGroup = (el: HTMLElement | null): boolean => {
     const key = el?.dataset.qg;
@@ -988,7 +991,7 @@ export default function Expeditions() {
     setQOpen((s) => { const n = new Set(s); if (n.has(key)) n.delete(key); else n.add(key); return n; });
     return true;
   };
-  const queueView = useMemo(() => ({ kind: qKind, text: qText, open: qOpen }), [qKind, qText, qOpen]);
+  const queueView = useMemo(() => ({ kind: qKind, text: qText, open: qOpen, sort: qSort }), [qKind, qText, qOpen, qSort]);
   const onQueueClick = (e: ReactMouseEvent): void => {
     const t = e.target as HTMLElement;
     if (t.closest('a,button,summary,.info,input,select,textarea')) return;
@@ -1573,7 +1576,16 @@ export default function Expeditions() {
             <div className="qview active" data-qview="every">
               <section className={cardCls(false, 'panel')} id="queuepanel">
                 <h2>Sailing order <span className="note">every voyage still to sail, in the order it sails (specs/queue.txt), with its goal: the question its spec asks, or its experiment's where it asks none, and the fitout it was compiled from (its census variation and stage); the starts are the median of like voyages scheduled with the Mac's seats, and ≥ marks a line behind one with no time yet. Click a voyage for its card</span></h2>
-                {queueApi.data ? <div onClick={onQueueClick} onKeyDown={onQueueKey} dangerouslySetInnerHTML={{ __html: queueLanesHtml(queueApi.data) }} /> : null}
+                {queueApi.data ? (
+                  <div className="qfilter qsortbar" role="group" aria-label="sort the swimlane and the table">
+                    <span className="k">sort by</span>
+                    {([['order', 'Sailing order'], ['expedition', 'Expedition']] as const).map(([k, label]) => (
+                      <button key={k} type="button" className={`qchip${qSort === k ? ' on' : ''}`} aria-pressed={qSort === k} onClick={() => setQSort(k)}>{label}</button>
+                    ))}
+                    <span className="s">{qSort === 'expedition' ? 'a track a lane of each expedition, and the table grouped under its expeditions, A to Z' : 'a track a lane, and the table in the order the voyages sail'}</span>
+                  </div>
+                ) : null}
+                {queueApi.data ? <div onClick={onQueueClick} onKeyDown={onQueueKey} dangerouslySetInnerHTML={{ __html: queueLanesHtml(queueApi.data, qSort) }} /> : null}
                 {queueApi.data ? (
                   <div className="qfilter" role="group" aria-label="filter the sailing order">
                     {([['all', 'All'], ['voyage', 'Voyages'], ['investigation', 'Investigations'], ['reading', 'Readings'], ['other', 'Upkeep and audits']] as const).map(([k, label]) => {

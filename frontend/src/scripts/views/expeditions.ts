@@ -512,7 +512,20 @@ const hireLine = (r: any): string => {
     ab.quote_cost != null && ab.paced ? `quoted $${Number(ab.quote_cost).toFixed(2)}` : ''].filter(Boolean);
   return `<div class="s qhire" title="the Vast.ai hire: its dollars an hour, what it has run up since the hire, and what it will have at its finish">${bits.join(' · ')}</div>`;
 };
-type QueueView = { kind?: string; text?: string; open?: Set<string> };
+/** How the queue is arranged (13 November, Justin: "sort both the swimlane and the table by expedition"):
+ *  `order` is the sailing order (and the swimlane's track a lane); `expedition` groups both by the expedition
+ *  each line serves, expeditions A to Z, a line with no goal last, the sailing order kept inside each. */
+export type QueueSort = 'order' | 'expedition';
+type QueueView = { kind?: string; text?: string; open?: Set<string>; sort?: QueueSort };
+/** The expedition a queue row serves: its own field, the goal's, or the goal id's prefix ("kipling:12"). */
+const expOf = (r: any): { key: string; name: string } => {
+  const s = r.serves || {};
+  const key = String(r.expedition || s.expedition || String(r.goal_id || '').split(':')[0] || '');
+  return { key, name: key ? String(r.expedition_name || s.expedition_name || key) : '' };
+};
+const expLabel = (e: { key: string; name: string }): string => (e.key ? e.name : 'No expedition');
+const expCompare = (a: { key: string; name: string }, b: { key: string; name: string }): number =>
+  (a.key ? 0 : 1) - (b.key ? 0 : 1) || a.name.localeCompare(b.name);
 const queueCat = (r: any): string => (r.kind === 'voyage' ? 'voyage' : r.what === 'investigation' ? 'investigation' : r.what === 'reading' ? 'reading' : 'other');
 const stepPrefix = (r: any): string => String(r.name || '').split(':')[0].trim();
 /** The rows the page shows under a filter (13 November): by kind, and by text over the name, goal and expedition. */
@@ -563,14 +576,28 @@ export function queueRowsHtml(d: any, rungs: Rung[], view: QueueView = {}): stri
       <td class="s">${r.status === 'at sea' ? `<span class="${pillCls('running')}">at sea</span>${homeAt(r)}` : sailsIn(r.starts_in_min, !!r.at_least)}</td></tr>`;
   };
   const out: string[] = [];
-  for (let i = 0; i < all.length; i++) {
-    if (!keep.has(i)) continue;
+  // the rows in the order shown: the sailing order, or by expedition (a stable sort, so each keeps its sailing order)
+  const byExp = view.sort === 'expedition';
+  const order: number[] = [...keep].sort((a, b) => a - b);
+  if (byExp) order.sort((a, b) => expCompare(expOf(all[a]), expOf(all[b])));
+  let lastExp: string | null = null;
+  for (let p = 0; p < order.length; p++) {
+    const i = order[p];
     const r = all[i];
+    if (byExp) {
+      const e = expOf(r);
+      if (e.key !== lastExp) {
+        lastExp = e.key;
+        const n = order.filter((x) => expOf(all[x]).key === e.key).length;
+        out.push(`<tr class="qexp"><td colspan="6">${e.key ? `<a href="/expeditions/${esc(e.key)}"><b>${esc(e.name)}</b></a>` : '<i>No expedition</i>'} <span class="s">${n} line${n === 1 ? '' : 's'}</span></td></tr>`);
+      }
+    }
     if (r.kind === 'step' && r.status !== 'at sea' && !filtered) {
       // a chain of like steps (13 IFEval readings) is one line that opens: its members are the same step on other models
-      let j = i;
-      while (j + 1 < all.length && all[j + 1].kind === 'step' && all[j + 1].status !== 'at sea' && all[j + 1].what === r.what && stepPrefix(all[j + 1]) === stepPrefix(r)) j++;
-      const n = j - i + 1;
+      let q = p;
+      while (q + 1 < order.length && order[q + 1] === order[q] + 1 && all[order[q + 1]].kind === 'step' && all[order[q + 1]].status !== 'at sea' && all[order[q + 1]].what === r.what && stepPrefix(all[order[q + 1]]) === stepPrefix(r) && (!byExp || expOf(all[order[q + 1]]).key === expOf(r).key)) q++;
+      const j = order[q];
+      const n = q - p + 1;
       if (n >= 4) {
         const key = String(i), open = !!view.open?.has(key);
         const last = all[j];
@@ -579,7 +606,7 @@ export function queueRowsHtml(d: any, rungs: Rung[], view: QueueView = {}): stri
         out.push(`<tr class="qgroup" data-qg="${key}" tabindex="0" role="button" aria-expanded="${open}" aria-label="${open ? 'hide' : 'show'} the ${n} ${esc(stepPrefix(r))} steps" title="${open ? 'hide' : 'show'} these ${n} steps"><td class="s">${i + 1}–${j + 1}</td><td colspan="3" class="s"><span class="qcaret">${open ? '▾' : '▸'}</span> ↳ then ${n} ${esc(r.what === 'reading' ? 'readings' : r.what === 'investigation' ? 'investigations' : 'steps')}: <b>${esc(stepPrefix(r))}</b> <span class="s">about ${mins(total)} of sailing in all</span></td>
           <td class="s">${startsAt(r)}${end ? ` <span class="s">to ${clock(end)}</span>` : ''}</td><td class="s">${sailsIn(r.starts_in_min, !!r.at_least)}</td></tr>`);
         if (open) for (let k = i; k <= j; k++) out.push(stepRow(all[k], k));
-        i = j;
+        p = q;
         continue;
       }
     }
@@ -1110,7 +1137,7 @@ function clockAt(minFromNow: number): string {
   return `${d.toLocaleDateString(undefined, { weekday: 'short' })} ${d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}`;
 }
 
-export function queueLanesHtml(d: any): string {
+export function queueLanesHtml(d: any, by: QueueSort = 'order'): string {
   const rows: any[] = d?.rows || [];
   if (!rows.length) return '';
   const lanes: any[] = d.lanes && d.lanes.length
@@ -1149,8 +1176,37 @@ export function queueLanesHtml(d: any): string {
     if (group) return `<span class="qlblock ${tone} qlgroupblock" data-qi="${i}" tabindex="0" role="button" style="left:${pct(a)};width:max(3px, calc(${pct(b)} - ${pct(a)}))" title="${esc(group.tip)}" aria-label="${esc(group.tip)}">${esc(label)}</span>`;
     return `<span class="qlblock ${tone}${sea ? ' sea' : ''}${ghost ? ' ghost' : ''}" data-qi="${i}" tabindex="0" role="button" style="left:${pct(a)};width:max(3px, calc(${pct(b)} - ${pct(a)}))" title="${esc(tip)}" aria-label="${esc(tip)}">${esc(label)}</span>`;
   };
-  const tracks = lanes.map((ln: any) => {
-    const mine = rows.map((r, i) => ({ r, i })).filter(({ r }) => (r.lane || 'mac') === ln.lane);
+  // the tracks: one a lane, or (sorted by expedition) one a lane of each expedition, expeditions A to Z, so that
+  // no two lines of one track share the clock
+  const indexed = rows.map((r, i) => ({ r, i }));
+  const seatsOf = (ln: any): string => {
+    const n = Number(ln.seats || 1);
+    return ln.kind === 'charter' ? `${n} ship${n === 1 ? '' : 's'} out at once` : `${n} seat${n === 1 ? '' : 's'}`;
+  };
+  type Track = { ln: any; mine: { r: any; i: number }[]; adv: typeof advice; head: string };
+  const specs: Track[] = [];
+  if (by === 'expedition') {
+    const exps = [...new Map(rows.map((r) => expOf(r)).map((e) => [e.key, e] as const)).values()].sort(expCompare);
+    for (const e of exps) {
+      for (const ln of lanes) {
+        const mine = indexed.filter(({ r }) => expOf(r).key === e.key && (r.lane || 'mac') === ln.lane);
+        const adv = ln.kind === 'charter' ? advice.filter(({ r }) => expOf(r).key === e.key) : [];
+        if (!mine.length && !adv.length) continue;
+        const title = e.key ? `<a href="/expeditions/${esc(e.key)}"><b>${esc(e.name)}</b></a>` : '<b><i>No expedition</i></b>';
+        specs.push({ ln, mine, adv, head: `${title} <span class="s">${esc(ln.lane)} lane</span>` });
+      }
+    }
+  } else {
+    for (const ln of lanes) {
+      specs.push({
+        ln,
+        mine: indexed.filter(({ r }) => (r.lane || 'mac') === ln.lane),
+        adv: ln.kind === 'charter' ? advice : [],
+        head: `<b>${esc(LANE_NAME[ln.lane] || ln.lane)}</b> <span class="s">${esc(ln.lane)} lane · ${seatsOf(ln)}</span>`,
+      });
+    }
+  }
+  const tracks = specs.map(({ ln, mine, adv, head }) => {
     // a chain of like steps is one block, labelled with its count (13 November: thirty unlabelled slivers)
     const parts: string[] = [];
     for (let k = 0; k < mine.length; k++) {
@@ -1171,16 +1227,13 @@ export function queueLanesHtml(d: any): string {
       parts.push(sp ? block(r, i, sp[0], sp[1]) : '');
     }
     const blocks = parts.join('');
-    const ghosts = ln.kind === 'charter'
-      ? advice.map(({ r, i }) => block(r, i, Number(r.purser.foreign_home_min) - Number(r.purser.foreign_min || 0), Number(r.purser.foreign_home_min), true)).join('')
-      : '';
+    const ghosts = adv.map(({ r, i }) => block(r, i, Number(r.purser.foreign_home_min) - Number(r.purser.foreign_min || 0), Number(r.purser.foreign_home_min), true)).join('');
     const atSea = mine.filter(({ r }) => r.status === 'at sea').map(({ r }) => r.name);
     const queued = mine.filter(({ r }) => r.status !== 'at sea').length;
     const lastEnd = Math.max(0, ...mine.map(({ r }) => (span(r) || [0, 0])[1]));
-    const n = Number(ln.seats || 1);
-    const seats = ln.kind === 'charter' ? `${n} ship${n === 1 ? '' : 's'} out at once` : `${n} seat${n === 1 ? '' : 's'}`;
     let sub: string;
-    if (!ln.enabled) sub = 'switched off';
+    if (by === 'expedition' && !mine.length) sub = `the purser would send ${adv.length === 1 ? 'this line' : `${adv.length} lines`} here (outlined)`;
+    else if (!ln.enabled) sub = 'switched off';
     else if (mine.length) {
       const hired = mine.map(({ r }) => r.abroad).filter(Boolean);
       const spent = hired.reduce((s2: number, a: any) => s2 + (Number(a.spent) || 0), 0), proj = hired.reduce((s2: number, a: any) => s2 + (Number(a.projected) || 0), 0);
@@ -1196,10 +1249,10 @@ export function queueLanesHtml(d: any): string {
     }
     const empty = !blocks && !ghosts ? `<span class="qlempty">${ln.kind === 'charter' ? 'nothing sailing abroad' : 'nothing queued'}</span>` : '';
     const grid = tickAt.map((m) => `<span class="qlgrid" style="left:${pct(m)}"></span>`).join('');
-    return `<div class="qlane"><div class="qlhead"><b>${esc(LANE_NAME[ln.lane] || ln.lane)}</b> <span class="s">${esc(ln.lane)} lane · ${seats}</span><div class="s">${sub}</div></div><div class="qltrack">${grid}${blocks}${ghosts}${empty}</div></div>`;
+    return `<div class="qlane"><div class="qlhead">${head}<div class="s">${sub}</div></div><div class="qltrack">${grid}${blocks}${ghosts}${empty}</div></div>`;
   }).join('');
   const axis = tickAt.map((m) => `<span class="qltick" style="left:${pct(m)}">${esc(clockAt(m))}</span>`).join('');
   const legend = [['p300k', '300k'], ['p1m', '1m'], ['p9m', '9m'], ['p21m', '21m and up'], ['pstep', 'a step'], ['pintel', 'S4 intelligence']]
     .map(([c, l]) => `<span><i class="qlswatch ${c}"></i>${l}</span>`).join('');
-  return `<div class="qlanes" aria-label="the queue by lane"><div class="qlane qlaxisrow"><div class="qlhead"></div><div class="qlaxis"><span class="qltick qlnow">now</span>${axis}<span class="qltick qlend">${esc(clockAt(total))}</span></div></div>${tracks}<div class="qllegend s">${legend}<span><i class="qlswatch p9m sea"></i>at sea</span><span><i class="qlswatch p9m ghost"></i>the purser's advice</span></div></div>`;
+  return `<div class="qlanes" aria-label="${by === 'expedition' ? 'the queue by expedition' : 'the queue by lane'}"><div class="qlane qlaxisrow"><div class="qlhead"></div><div class="qlaxis"><span class="qltick qlnow">now</span>${axis}<span class="qltick qlend">${esc(clockAt(total))}</span></div></div>${tracks}<div class="qllegend s">${legend}<span><i class="qlswatch p9m sea"></i>at sea</span><span><i class="qlswatch p9m ghost"></i>the purser's advice</span></div></div>`;
 }

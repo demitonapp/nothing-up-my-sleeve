@@ -54,3 +54,57 @@ def test_a_tool_lesson_s_answer_agrees_with_its_call_and_result():
         n = int(calls[0][1].split()[0])
         assert n > 0 and f"{n:,}" in answer
     assert m.fill("What do {a} and {b} make?", {"a": 2, "b": 3}) == "What do 2 and 3 make?"
+
+
+def test_think_then_act_turn_and_its_move():
+    """turns.acted / after_thought (13 November): the decision, then the call or the answer; the move is read after it."""
+    t = turns.acted("What is 3 times 4?", "They want a sum worked out. calculate does that.", [("calculate(3*4)", "12")], "12.")
+    assert t == ("<question>What is 3 times 4?<think>They want a sum worked out. calculate does that."
+                 "<call>calculate(3*4)<result>12<answer>12.<end>")
+    assert turns.acted("Hi?", "No tool is needed.", [], "Hello.") == turns.thought("Hi?", "No tool is needed.", "Hello.")
+    steps, rest = turns.after_thought("<think>They want a sum. calculate does that.<call>calculate(3*4)")
+    assert steps == "They want a sum. calculate does that." and turns.first_move(rest) == ("call", "calculate(3*4)")
+    steps, rest = turns.after_thought("<think>No tool fits.<answer>I cannot tell.<end>")
+    assert steps == "No tool fits." and turns.first_move(rest) == ("answer", "I cannot tell.")
+    assert turns.after_thought("<call>define(river)") == (None, "<call>define(river)")
+
+
+def test_think_tools_lessons_parse_back_and_decide():
+    """backend/scripts/make_think_tools_corpus.py: a written tool lesson is read back whole, and its decision names the
+    tool its call uses, or says no tool fits."""
+    import random
+    import sys
+    from pathlib import Path
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    import make_think_tools_corpus as m
+
+    lesson = turns.called("Days from 1 May 1900 to 2 May 1900?", [("days_between(1900-05-01, 1900-05-02)", "1 days")], "1 day.")
+    p = m.parse(lesson)
+    assert p == {"question": "Days from 1 May 1900 to 2 May 1900?", "calls": [("days_between(1900-05-01, 1900-05-02)", "1 days")],
+                 "answer": "1 day."}
+    rng = random.Random(1)
+    assert "days_between" in m.steps_for(p, rng)
+    assert m.parse(turns.called("Hello?", [], "Hi."))["calls"] == []
+    assert any(x in m.steps_for({"calls": []}, rng) for x in m.NONE)
+    assert "None of them" in m.cannot_steps("the weather in a named town right now", rng)
+
+
+def test_hard_reasoning_chains_hold_their_answer():
+    """make_reasoning_corpus.hard_lesson (14 November): four to six steps among look-alike facts, the premises out of
+    order; every chain fact is in the question and the steps end in the answer's conclusion."""
+    import random
+    import sys
+    from pathlib import Path
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    import make_reasoning_corpus as m
+
+    rng = random.Random(3)
+    for _ in range(200):
+        x = m.hard_lesson(rng, m.HELD_WORDS, think=True)
+        assert 4 <= x["hops"] <= 7 and 2 <= x["alikes"] <= 4
+        facts = x["steps"].split(". So ")[0] if ". So " in x["steps"] else x["steps"]
+        for f in [s + "." for s in facts.rstrip(".").split(". ") if s and not s.startswith("If ")]:
+            assert f in x["question"], (f, x["question"])
+        assert "<think>" + x["steps"] + "<answer>" + x["answer"] in x["text"]

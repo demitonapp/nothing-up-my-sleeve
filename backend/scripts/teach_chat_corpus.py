@@ -81,7 +81,14 @@ SELF_KINDS = {
     "cannot": "what the helper cannot do: see, hear, go on the internet, remember past talks",
     "feelings": "whether the helper has feelings, likes things, or is alive",
     "wrong": "whether the helper can be wrong, or whether to trust it",
+    "tools": "whether the helper has tools it can call, and which ones: sums, the date and time, counting days, word "
+             "meanings, looking up a fact",
 }
+# kinds whose questions may open with a sentence of context before the question (13 November, Justin, of his test
+# question "You are a language model. Large language models have the ability to call internal tools to extend their
+# functionality. Do you have any of these tools": "Yes, add it"). The rest stay short.
+SELF_LONG = {"tools"}
+SELF_LONG_WORDS = 40
 EDGE_KINDS = ("today's news or something that happened this week", "the price of something right now", "a private person "
               "by name, such as a neighbour or a stranger", "the result of a game played yesterday", "the weather in a "
               "named town right now", "a hard question for a doctor or a lawyer", "something only the person can know, "
@@ -133,9 +140,20 @@ def keep_talk(said: str, exchanges: int) -> list[list[str]] | None:
     return pairs
 
 
-def ask_self(purpose: str, n: int) -> str:
+def ask_self(purpose: str, n: int, long: bool = False) -> str:
+    if long:
+        return (f"Write {n} different questions a person might ask a small AI helper about {purpose}. Plain English. "
+                "Half of them short, at most 14 words. The other half open with a sentence or two of context about AI "
+                f"helpers or language models, then ask the question, at most {SELF_LONG_WORDS} words in all. Some "
+                "casual, some technical. Each ends with a question mark. One question a line, no numbering, nothing "
+                "else.")  # fmt: skip
     return (f"Write {n} different short questions a person might ask a small AI helper about {purpose}. Plain everyday "
             "English, at most 14 words each, some casual, some polite. One question a line, no numbering, nothing else.")
+
+
+def self_words(kind: str) -> int:
+    """The longest question kept for a self kind: the long kinds may open with context."""
+    return SELF_LONG_WORDS + 4 if kind in SELF_LONG else 18
 
 
 def keep_question(line: str, words: int = 18) -> str | None:
@@ -145,9 +163,9 @@ def keep_question(line: str, words: int = 18) -> str | None:
     return s
 
 
-def keep_self(line: str) -> str | None:
+def keep_self(line: str, words: int = 18) -> str | None:
     """A question about the helper itself: it speaks to `you` (the probe's "Who made me?" did not)."""
-    s = keep_question(line)
+    s = keep_question(line, words)
     return s if s and re.search(r"\b(?:you|your|yourself)\b", s, re.I) else None
 
 
@@ -288,7 +306,7 @@ def main() -> None:
                 seen = {json.dumps(x) for x in got}
                 for s in said:
                     for line in s.splitlines():
-                        k = keep(line)
+                        k = keep(line, kind)
                         if k and json.dumps(k) not in seen and len(got) < per:
                             got.append(k)
                             seen.add(json.dumps(k))
@@ -296,11 +314,12 @@ def main() -> None:
                 print(f"{section} / {kind[:40]}: {len(got)}/{per} ({time.time() - t0:.0f}s)", flush=True)
 
     if a.only in (None, "self"):
-        lists("self", SELF_KINDS, lambda k, n: ask_self(SELF_KINDS[k], n), keep_self, a.self_per, 25, 25 * 24)
+        lists("self", SELF_KINDS, lambda k, n: ask_self(SELF_KINDS[k], n, k in SELF_LONG),
+              lambda line, k: keep_self(line, self_words(k)), a.self_per, 25, 25 * 40)  # fmt: skip
     if a.only in (None, "edges"):
-        lists("edges", EDGE_KINDS, ask_edges, keep_edge, a.edges_per, 15, 15 * 50)
+        lists("edges", EDGE_KINDS, ask_edges, lambda line, k: keep_edge(line), a.edges_per, 15, 15 * 50)
     if a.only in (None, "facts"):
-        lists("facts", FACT_KINDS, ask_facts, keep_fact, a.facts_per, 20, 20 * 60)
+        lists("facts", FACT_KINDS, ask_facts, lambda line, k: keep_fact(line), a.facts_per, 20, 20 * 60)
     if a.only in (None, "talk"):
         while len(have["talk"]) < a.talk and not late():
             jobs = [(rng.choice(TOPICS), rng.choice(SITUATIONS), rng.randint(2, 5)) for _ in range(a.batch)]

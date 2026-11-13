@@ -43,6 +43,7 @@ data:
   - lists/hole-cards-unseen.csv
   clean: marks-v1
   turns: marks
+  opt_in: 'the instruct leg (kipling:14): conversation and tool lessons written by code, a quarter of them wanting no tool, with Ogden books beside them'
 tokeniser:
   kind: spm-bpe
   vocab: 2048

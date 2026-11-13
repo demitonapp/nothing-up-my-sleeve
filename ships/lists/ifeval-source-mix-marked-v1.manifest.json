@@ -1,0 +1,53 @@
+{
+ "version": "ifeval-source-mix-marked-v1",
+ "generator": "backend/scripts/make_ifeval_source_corpus.py",
+ "seed": 20261114,
+ "about": "the taught leg's talk turns, book for book, with fresh code-written IFEval-style lessons in place of the split prompts (none of the 541 official prompts), and Ogden v0.1.4 books beside them as replay",
+ "sha1": "067eff586655dd87867cbecff153ea40fd943803",
+ "lessons": 20000,
+ "tried": 21562,
+ "refused": {
+  "not provable": 356,
+  "drawn twice": 1206
+ },
+ "seconds": 43,
+ "passing_share": 0.983,
+ "by_size": {
+  "1": 11369,
+  "2": 6391,
+  "3": 2240
+ },
+ "by_type": {
+  "punctuation:no_comma": 2693,
+  "keywords:forbidden_words": 2125,
+  "length_constraints:number_words": 2080,
+  "length_constraints:number_sentences": 1994,
+  "keywords:existence": 1875,
+  "detectable_format:number_highlighted_sections": 1812,
+  "keywords:frequency": 1633,
+  "startend:quotation": 1601,
+  "detectable_format:title": 1526,
+  "change_case:english_lowercase": 1406,
+  "keywords:letter_frequency": 1305,
+  "detectable_content:number_placeholders": 1188,
+  "language:response_language": 1126,
+  "detectable_format:number_bullet_lists": 1099,
+  "startend:end_checker": 1044,
+  "detectable_content:postscript": 1030,
+  "length_constraints:number_paragraphs": 1001,
+  "change_case:capital_word_frequency": 980,
+  "change_case:english_capital": 901,
+  "combination:two_responses": 735,
+  "detectable_format:multiple_sections": 452,
+  "detectable_format:json_format": 436,
+  "length_constraints:nth_paragraph_first_word": 342,
+  "detectable_format:constrained_response": 261,
+  "combination:repeat_prompt": 226
+ },
+ "official_prompts_in_it": 0,
+ "books": 1490,
+ "copies_of_each_lesson": 1.49,
+ "ogden_books": 42,
+ "ogden_chars": 14403929,
+ "turn_chars": 14269028
+}

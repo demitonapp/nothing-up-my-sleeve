@@ -1,0 +1,29 @@
+{
+ "version": "chat-marked-v1",
+ "generator": "backend/scripts/make_chat_corpus.py",
+ "teaching": "lists/chat-teaching-v1.json",
+ "seed": 1113,
+ "teacher": "mlx-community/Qwen3.8-27B-4bit",
+ "base": "lists/9m-chat-base-v1.csv",
+ "sha1": "c1a4e280a51644e12619a07a7c7d66059975f35b",
+ "lessons": {
+  "talk": 15494,
+  "self": 1728,
+  "edges": 1536,
+  "facts": 1388
+ },
+ "tool_books": 59,
+ "tool_lessons": 2360,
+ "tool_share": 0.167,
+ "words": 1102053,
+ "held_out": {
+  "talk": 816,
+  "tools": 549
+ },
+ "facts": 694,
+ "books_written": 504,
+ "reads_as_written": [
+  20146,
+  20146
+ ]
+}

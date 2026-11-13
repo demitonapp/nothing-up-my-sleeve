@@ -113,6 +113,28 @@ def called(question: str, calls: list[tuple[str, str]], answer: str) -> str:
     return f"<question>{question.strip()}{body}<answer>{answer.strip()}<end>"
 
 
+# Think, then act (13 November, Justin: "Reasoning kicks in and iterates through the tools, if none matches then it
+# replies"): `<question>Q<think>steps<call>c<result>r<answer>A<end>`. The steps decide; the thinking closes at the first
+# call, or at <answer> when no tool fits, so a turn with no call is `thought` itself.
+
+
+def acted(question: str, steps: str, calls: list[tuple[str, str]], answer: str) -> str:
+    """A turn that thinks before it acts: the steps, then each (call, result) in order, then the answer."""
+    body = "".join(f"{CALL}{c.strip()}{RESULT}{r.strip()}" for c, r in calls)
+    return f"<question>{question.strip()}{THINK}{steps.strip()}{body}<answer>{answer.strip()}<end>"
+
+
+def after_thought(text: str) -> tuple[str | None, str]:
+    """A ship's writing split at the end of its thinking: (the steps, what follows from the first <call> or <answer>),
+    or (None, the text) when it did not open with <think>."""
+    s = text.lstrip()
+    if not s.startswith(THINK):
+        return None, text
+    body = s[len(THINK) :]
+    cut = min((i for i in (body.find(CALL), body.find("<answer>"), body.find("<end>")) if i >= 0), default=len(body))
+    return body[:cut].strip(), body[cut:]
+
+
 def first_move(text: str) -> tuple[str, str]:
     """What a ship did first after a question: ("call", the call it wrote up to <result>), ("think", its steps up to
     <answer>), ("answer", its answer up to its end), or ("none", what it wrote) when it opened no turn at all."""

@@ -1,0 +1,9 @@
+{
+ "version": "reasoning-hard-mixed-v1",
+ "about": "the hard reasoning lessons (half chains of four to six steps with look-alike facts, half the original chains) beside the Ogden books the reasoning and instruct mixes read, so a leg keeps its language",
+ "parts": {
+  "reasoning-hard-marked-v1": 1000,
+  "ogden-v0.1 books": 236
+ },
+ "sha1": "5d288e0e2035d943bf5dabe1d8c1c650bdab52a8"
+}

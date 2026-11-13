@@ -192,6 +192,99 @@ def lesson(rng: random.Random, stock: list[str], think: bool | None = None) -> d
             "answer": ans, "think": think, "text": turns.thought(question, steps, ans)}
 
 
+# ---- the hard chains (14 November; Justin: "build the stuff next for priority 3"). The 50m answered 94% of the
+# chains above at once, so writing its steps had nothing left to fix (reasoning/gain +0.01). These are built so that
+# answering at once should fail: four to six steps, the premises always out of the order they join, and two to four
+# look-alike facts of the same kind beside them, some hooked onto a middle term of the chain. None of the look-alikes
+# changes the answer: each points into the chain or sits apart from it.
+HARD_HELD = "lists/reasoning-hard-heldout-v1.jsonl"
+HARD_LIST = "lists/reasoning-hard-marked-v1.csv"
+HARD_VERSION = "reasoning-hard-marked-v1"
+N_HARD_HELD = 600
+HARD_KINDS = ("order", "set", "cause", "place")  # the kinds whose chains run to any length
+_VERBS = [("moves", "move"), ("sings", "sing"), ("glows", "glow"), ("falls", "fall"), ("turns", "turn"), ("opens", "open")]
+
+
+def _look_alike(kind: str, facts: list[str], a: str, b: str) -> str:
+    """A fact of the chain's own kind between `a` and `b`: `b` may be a middle term of the chain, never an end."""
+    if kind == "order":
+        up = facts[0].split(" is ", 1)[1].split(" than ", 1)[0]
+        return f"{_cap(_a(a))} is {up} than {_a(b)}."
+    if kind == "set":
+        return f"Every {a} is {_a(b)}."
+    if kind == "cause":
+        v, w = random.Random(a + b).sample(_VERBS, 2)
+        return f"When the {a} {v[0]}, the {b} {w[0]}."
+    return f"The {a} is in the {b}."
+
+
+def hard_lesson(rng: random.Random, stock: list[str], think: bool | None = None, hops: int | None = None) -> dict:
+    kind = rng.choice(HARD_KINDS)
+    hops = hops or rng.choice([4, 5, 6])
+    n_alike = rng.randint(2, 4)
+    terms = rng.sample(stock, hops + 3 + 2 * n_alike)
+    chain_terms, spare = terms[: hops + 3], terms[hops + 3 :]
+    facts, q, concl, ans = KINDS[kind](rng, chain_terms, hops)
+    chain = chain_terms[: hops + 1]
+    middle = chain[1:-1]
+    alikes = []
+    for i in range(n_alike):
+        a = spare[2 * i]
+        # into a middle term (a look-alike that touches the chain) or between two fresh terms (one that does not)
+        b = rng.choice(middle) if middle and rng.random() < 0.5 else spare[2 * i + 1]
+        alikes.append(_look_alike(kind, facts, a, b))
+    shown = list(facts) + alikes
+    rng.shuffle(shown)
+    think = (rng.random() < THINK_SHARE) if think is None else think
+    question = " ".join(shown) + " " + q
+    steps = " ".join(list(facts) + [concl])
+    return {"kind": kind, "hops": len(facts), "alikes": n_alike, "question": question, "steps": steps,
+            "answer": ans, "think": think, "text": turns.thought(question, steps if think else "", ans)}  # fmt: skip
+
+
+def build_hard(dry_run: bool, n_train: int = 0) -> dict:
+    """The hard held-out chains, and (with `n_train`) hard lessons for a leg: half the hard lessons and half the
+    original ones, so a ship keeps the short chains while it learns the long ones."""
+    held_rng = random.Random(SEED + 12)
+    held = [hard_lesson(held_rng, HELD_WORDS, think=False) for _ in range(N_HARD_HELD)]
+    out = {"held_out": len(held), "by_hops": {h: sum(x["hops"] == h for x in held) for h in range(1, 8)},
+           "by_kind": {k: sum(x["kind"] == k for x in held) for k in HARD_KINDS},
+           "answers": {"yes": sum(x["answer"] == "Yes." for x in held), "no": sum(x["answer"] == "No." for x in held)},
+           "sample": [x["question"] + " -> " + x["answer"] for x in held[:3]]}  # fmt: skip
+    train: list[dict] = []
+    if n_train:
+        rng = random.Random(SEED + 11)
+        train = [hard_lesson(rng, TRAIN_WORDS) if i % 2 else lesson(rng, TRAIN_WORDS) for i in range(n_train)]
+        out["lessons"] = len(train)
+        out["lesson_hops"] = {h: sum(x["hops"] == h for x in train) for h in range(1, 8)}
+    if dry_run:
+        return out
+    with open(paths.resolve(HARD_HELD), "w", encoding="utf-8") as f:
+        for i, h in enumerate(held):
+            f.write(json.dumps({"key": f"rsn-hard-{i + 1}", "kind": h["kind"], "hops": h["hops"], "alikes": h["alikes"],
+                                "prompt": h["question"], "steps": h["steps"], "answer": h["answer"]}, ensure_ascii=False) + "\n")  # fmt: skip
+    if train:
+        d = paths.texts_dir("local")
+        now = time.strftime("%Y-%m-%dT%H:%M:%S")
+        rows = []
+        for i in range(0, len(train), PER):
+            text = talk.SEP.join(x["text"] for x in train[i : i + PER]) + "\n"
+            rows.append(talk._book(d, f"rsn-hard-{i // PER + 1:05d}", f"hard reasoning lessons {i // PER + 1}",
+                                   "the hard reasoning leg", text, now))  # fmt: skip
+        with open(paths.resolve(HARD_LIST), "w", newline="", encoding="utf-8") as f:
+            w = csv.DictWriter(f, fieldnames=["title", "author", "language", "family", "text"])
+            w.writeheader()
+            w.writerows(rows)
+        meta = {"version": HARD_VERSION, "generator": "backend/scripts/make_reasoning_corpus.py --hard", "seed": SEED,
+                "about": "half hard chains (four to six steps, premises out of order, look-alike facts), half the "
+                         "original chains; half of all thinking",
+                "sha1": hashlib.sha1(paths.resolve(HARD_LIST).read_bytes()).hexdigest(),
+                **{k: v for k, v in out.items() if k != "sample"}}  # fmt: skip
+        paths.resolve(HARD_LIST).with_suffix(".manifest.json").write_text(json.dumps(meta, indent=1), encoding="utf-8")
+        out["books_written"] = len(rows)
+    return out
+
+
 def build(dry_run: bool, n: int) -> dict:
     rng = random.Random(SEED + 1)
     train = [lesson(rng, TRAIN_WORDS) for _ in range(n)]
@@ -245,8 +338,11 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--n", type=int, default=N_TRAIN, help="lessons to write")
+    ap.add_argument("--hard", action="store_true", help="the hard chains: the held-out set, and with --hard-train N lessons")
+    ap.add_argument("--hard-train", type=int, default=0, help="with --hard: hard lessons to write for a leg (0: none)")
     a = ap.parse_args()
-    print(json.dumps(build(a.dry_run, a.n), indent=1, ensure_ascii=False))
+    out = build_hard(a.dry_run, a.hard_train) if a.hard else build(a.dry_run, a.n)
+    print(json.dumps(out, indent=1, ensure_ascii=False))
 
 
 if __name__ == "__main__":

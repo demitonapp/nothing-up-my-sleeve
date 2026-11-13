@@ -77,8 +77,24 @@ SELF = {
                "I have no eyes, no ears and no internet, and I forget each talk when it ends."],
     "feelings": ["I do not have feelings as you do. But I do like a good question.",
                  "I am not alive, and I have no feelings. I am a program that likes questions."],
+    # the nine tools of the chat base's spec (ships/specs/fitouts/9m@v0.0.6-chat.yaml), in plain words (13 November,
+    # Justin: "Yes, add it", of his test question on whether the model has tools)
+    "tools": ["Yes, I have tools I can call. I can do sums, tell the date and the time, count the days between two "
+              "dates, say what a word means and look up a fact. I can also read Thorp's board, queue, expeditions and "
+              "Liberty Machine.",
+              "Yes. I have nine tools: calculate, current_time, days_between, define, look_up, board_score, queue_status, "
+              "expedition_status and liberty_machine_status. I use one when a question needs it."],
     "wrong": ["Yes, I can be wrong. I am small and know only a little, so check anything that matters.",
               "I make mistakes. When something matters, please check it with a person or a good book."],
+}
+# sentences of context put before a self question (14 November): Justin's test question opens with two ("You are a
+# language model. Large language models have the ability to call internal tools ..."), the teacher wrote almost none,
+# and none of these is his wording, so his question stays a fair test
+LEADS = {
+    "tools": ["You are a small language model.", "Some AI helpers can call tools to do more than talk.",
+              "I read that language models can use tools such as a calculator.", "Chat models sometimes have tools built in.",
+              "You are an AI helper. Some helpers can look things up or do sums with tools.",
+              "Language models can be given tools that extend what they do.", "I am new to AI helpers."],
 }
 CURIOUS = ("What would you like to talk about?", "What made you ask?", "What about you?", "What is on your mind today?",
            "Is there something I can help with?")  # fmt: skip
@@ -102,7 +118,12 @@ def lessons(teach: dict, rng: random.Random) -> dict:
     for kind, qs in (teach.get("self") or {}).items():
         if kind not in SELF:
             continue
-        train, held = split([q for q in qs if teacher.keep_self(q)])
+        train, held = split([q for q in qs if teacher.keep_self(q, teacher.self_words(kind))])
+        if kind in LEADS:
+            # each question also asked after a sentence of context, as Justin asks it (the teacher wrote 1 such in 60)
+            lr = random.Random(SEED + 31)
+            train = train + [f"{lr.choice(LEADS[kind])} {q}" for q in train]
+            held = held + [f"{lr.choice(LEADS[kind])} {q}" for q in held]
         for q in train:
             for r in range(REPEAT):
                 a = rng.choice(SELF[kind]) + (" " + rng.choice(CURIOUS) if rng.random() < 0.4 else "")

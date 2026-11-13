@@ -15,6 +15,11 @@ turn. Its first move (`turns.first_move`) is read:
 The standard test (the Berkeley Function-Calling Leaderboard) is written in wide English with tool definitions in
 the prompt; a ship of 2,048 pieces taught a fixed set is read on its own simple-English questions instead.
 
+A ship taught to think before it acts (thorp/turns.py `acted`) opens with `<think>`; its move is read after its
+thinking, and `tools/thought` (the share that decided first), `tools/thought_pieces` (their mean length) and, on a set
+with `cannot` items, `tools/cannot_right` (the share of questions no tool can answer that it answered without a call)
+are read beside the rest. Give such a ship room: `max_new` near 160.
+
 eval.options.tools: `heldout`, `limit`, `max_new` (60 pieces), `clean` (marks-v1 by default).
 """
 
@@ -69,9 +74,15 @@ def evaluate(ctx: EvalContext) -> EvalResult:
     for it in items:
         ids = [tok.eos_id] + tok.encode(asked(it["prompt"], clean))
         out, _ = greedy(model, tok, ids, max_new, ctx.context, stops)
-        kind, body = turns.first_move(tok.decode(out))
+        text = tok.decode(out)
+        # a ship taught to think before it acts (turns.acted, 13 November): its move is the one after the thinking
+        steps, rest = turns.after_thought(text)
+        kind, body = turns.first_move(rest)
         want = it.get("call")
         row = {"key": it["key"], "want": want, "move": kind, "wrote": body[:80]}
+        if steps is not None:
+            row["thought"] = steps[:200]
+            row["thought_pieces"] = len(tok.encode(steps))
         if want:
             row["exact"] = kind == "call" and squash(body) == squash(want)
             row["tool"] = kind == "call" and name_of(body) == name_of(want)
@@ -87,6 +98,14 @@ def evaluate(ctx: EvalContext) -> EvalResult:
         "tools/score": (sum(r.get("exact", False) for r in calls) + sum(r.get("none_right", False) for r in nones)) / (len(rows) or 1),
         "tools/n": float(len(rows)),
     }  # fmt: skip
+    thought = [r for r in rows if "thought" in r]
+    if thought:
+        # read only for a ship that thinks: how often it decided first, and how long its decisions ran
+        metrics["tools/thought"] = len(thought) / len(rows)
+        metrics["tools/thought_pieces"] = sum(r["thought_pieces"] for r in thought) / len(thought)
+        cannots = [r for r, it in zip(rows, items) if it.get("kind") == "cannot"]
+        if cannots:
+            metrics["tools/cannot_right"] = sum(r.get("none_right", False) for r in cannots) / len(cannots)
     return EvalResult(
         metrics=metrics,
         artifacts=[{"kind": "tools", "path": "", "sha1": "",

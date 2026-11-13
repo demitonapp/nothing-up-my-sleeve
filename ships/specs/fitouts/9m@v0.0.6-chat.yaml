@@ -8,7 +8,7 @@
 # backend/scripts/make_chat_corpus.py writes lists/9m-chat-base-v1.csv and the held-out sets this spec reads.
 name: 9m@v0.0.6-chat
 expedition: kipling
-goal: 14
+goal: 16
 ship: 'SOP v0.0.6 at 9m (the chat base: talk and tools beside Ogden v0.1, on the fleet''s marks)'
 experiment: 'The chat base: does a 9m that reads plain modern talk beside its books from the first step answer a plain
   question in kind, where one taught talk after its books did not, and does it answer at once when no tool is wanted?'

@@ -1,0 +1,25 @@
+{
+ "version": "think-tools-mixed-v1",
+ "generator": "backend/scripts/make_think_tools_corpus.py",
+ "base": "lists/50m-instruct-v2.csv",
+ "seed": 20261113,
+ "about": "the instruct 21m's mix with each tool lesson given a decision before its move, and the chat corpus's cannot pairs added, each with its decision",
+ "sha1": "a529fe78e6a56855099808444f0de21fc606da81",
+ "tool_lessons": 20000,
+ "cannot_lessons": 1536,
+ "with_a_call": 15000,
+ "held_out": {
+  "tools-heldout-v2": 378,
+  "cannot": 96
+ },
+ "decision_words": {
+  "median": 13,
+  "max": 49
+ },
+ "kept_books": 1383,
+ "books_written": 539,
+ "reads_as_written": [
+  20827,
+  21536
+ ]
+}

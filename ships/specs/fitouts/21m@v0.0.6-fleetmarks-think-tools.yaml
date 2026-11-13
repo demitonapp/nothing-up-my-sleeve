@@ -1,0 +1,141 @@
+# ships/specs/fitouts: think, then act, at 21m (13 November; Justin: "Reasoning kicks in and iterates through the
+# tools, if none matches then it replies"; "Yes, build it"). The instruct 21m's leg with one change: every tool
+# lesson has a decision written before its move (backend/scripts/make_think_tools_corpus.py), and the chat corpus's
+# questions no tool can answer are added with theirs. Same seed, same mix otherwise, so it reads against the
+# instruct 21m on the same held-out questions.
+name: 21m@v0.0.6-fleetmarks-think-tools
+expedition: kipling
+goal: 14
+ship: 'SOP v0.0.6 at 21m (think, then act: the instruct leg with a decision before each move)'
+experiment: 'Think, then act, at 21m (kipling:14): does a 21m that decides in a few words which tool fits, or that none does, before it moves call the right tool more often, and answer more often when no tool is wanted, than the instruct 21m that moves at once?'
+question: 'The instruct leg at 21m with thinking before each move, on 21m@v0.0.6-fleetmarks: lists/think-tools-mixed-v1.csv (the instruct 21m''s mix, its 20,000 tool lessons each given a decision, and 1,536 lessons of questions no tool can answer), three passes. Read every 250 steps on 200 of lists/think-tools-heldout-v1.jsonl (the instruct 21m''s 378 held-out tool questions and 96 cannot questions), its move read after its thinking, against 21m@v0.0.6-fleetmarks-instruct on the same items.'
+departures:
+- field: content
+  why: the leg reads conversations and tool lessons with their decisions, not the books
+- field: training
+  why: 'seeded from 21m@v0.0.6-fleetmarks, the pull off: a leg after pretraining, not a fresh voyage'
+- field: tokeniser
+  why: 'the seed''s: the fleet''s eleven marks as single pieces'
+- field: optim
+  why: '0.0003 with 50 steps of warm-up, about a third of the 21m''s 0.0008, as the 9m''s legs take a third of its rate'
+milestones:
+- at: 0.5
+  metric: eval/hole-cards-unseen/bpb_mean
+  at_most: 2.2
+  if_missed: recall
+  why: a catastrophe guard, not a target, the 9m legs' own kind
+thinking:
+  open: <think>
+  close: <answer>
+  share: 1.0
+tools:
+  set:
+  - calculate
+  - current_time
+  - days_between
+  - define
+  - board_score
+  - queue_status
+  - liberty_machine_status
+  - expedition_status
+data:
+  # the instruct 21m's mix with a decision before each tool lesson's move (13 November)
+  recipe: lists/think-tools-mixed-v1.csv
+  passes: 3
+  order: shuffled
+  refuse:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+  - lists/hole-cards-unseen.csv
+  clean: marks-v1
+  turns: marks
+  opt_in: 'think, then act (kipling:14): the instruct leg''s conversation and tool lessons written by code, each tool lesson with a decision before its move, and questions no tool can answer, with Ogden books beside them'
+tokeniser:
+  kind: spm-bpe
+  vocab: 2048
+  byte_fallback: true
+  train_on: lists/ogden-v0.1.csv
+  symbols:
+  - "<bos>"
+  - "<eos>"
+  - "<question>"
+  - "<answer>"
+  - "<end>"
+  - "<premise>"
+  - "<sep>"
+  - "<conclusion>"
+  - "<think>"
+  - "<call>"
+  - "<result>"
+model:
+  family: gpt
+  preset: 21m
+  context: 1024
+  positions: rope
+optim:
+  name: adamw
+  lr: 0.0003
+  betas:
+  - 0.9
+  - 0.95
+  weight_decay: 0.1
+  warmup_steps: 50
+  schedule: cosine
+  min_lr_ratio: 0.1
+  batch_tokens: 32768
+  grad_clip: 1.0
+  precision: bf16
+  scaffold:
+    weight: 0.0
+    hold: 0.0
+    fade: 0.0
+    # the pull is off; its maps are read on 4 windows, not 32, so the deep 50m fits an RTX 4090 (the base needed 25 GB)
+    sample:
+      windows: 4
+      length: 1024
+    heads:
+    - layer: 0
+      head: 0
+      card: previous_word
+    - layer: 0
+      head: 1
+      card: delimiter
+    - layer: 16
+      head: 2
+      card: induction
+    - layer: 16
+      head: 3
+      card: duplicate_word
+    riddles:
+      comparator:
+        layer: 8
+        head: 2
+        items: 16
+        pool: 2048
+eval:
+  sets:
+  - lists/hole-cards-unseen.csv
+  # every 250 steps on 100 items (13 November): a 50m writes its answers a piece at a time, and voyage E's
+  # readings every 64 steps took more of its hours than its training did
+  every_steps: 250
+  evaluators:
+  - ce_bpb
+  - tools
+  - question_gain
+  options:
+    tools:
+      clean: marks-v1
+      limit: 200
+      max_new: 160
+      heldout: lists/think-tools-heldout-v1.jsonl
+    question_gain:
+      format: marks
+      clean: marks-v1
+      heldout: lists/conversation-heldout-v1.jsonl
+checkpoint:
+  every_steps: 100
+sop: 0.0.6
+seed: 1
+seeded_from:
+  run: 21m@v0.0.6-fleetmarks
+  mode: free

@@ -95,6 +95,10 @@ def get(name: str) -> Evaluator:
         from thorp.evaluators.reasoning import evaluate
     elif name == "tools":  # the 50m's tool leg: held-out questions, the first move (12 November)
         from thorp.evaluators.tools import evaluate
+    elif name == "when2call":  # NVIDIA's When2Call: when (not) to call a tool, multiple choice (14 November)
+        from thorp.evaluators.when2call import evaluate
+    elif name == "bfcl":  # the Berkeley Function-Calling Leaderboard's single-turn splits (14 November)
+        from thorp.evaluators.bfcl import evaluate
     else:
         raise KeyError(f"unknown evaluator {name!r}")
     return evaluate

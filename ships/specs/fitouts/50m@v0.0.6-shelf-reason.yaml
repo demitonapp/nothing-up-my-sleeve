@@ -37,6 +37,7 @@ data:
   - lists/hole-cards-unseen.csv
   clean: marks-v1
   turns: marks
+  opt_in: 'the reasoning leg (kipling:14): two-fact chains written by code, half thinking and half at once, with Ogden books of the same tokens beside them'
 tokeniser:
   kind: spm-bpe
   vocab: 2048
@@ -119,3 +120,6 @@ seed: 1
 seeded_from:
   run: 50m@v0.0.6-shelf
   mode: free
+# the legs ran out of memory on RTX 4090s (24 GB) at 18:26 on 13 November, as their seed did on 12 November: the
+# class is named so the hire takes a 32 GB card (gpu, a label: the run id does not move)
+gpu: RTX 5090

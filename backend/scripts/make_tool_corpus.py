@@ -22,7 +22,15 @@ wordings the ship never trained on: `lists/tools-heldout-v1.jsonl`.
 The lessons are local books of PER each (`tool-<n>`), listed in `lists/tools-marked-v1.csv`, separated as the talk
 corpus separates its turns.
 
-    PYTHONPATH=backend backend/.venv/bin/python backend/scripts/make_tool_corpus.py [--dry-run] [--n N]
+    PYTHONPATH=backend backend/.venv/bin/python backend/scripts/make_tool_corpus.py [--dry-run] [--n N] [--version v3]
+
+v3 (14 November; Justin: "Could we not get a thorp model to recognize all of our tools?", then "actually see if you can do
+it on the 9m"): the eight and the six console tools the ships lacked (`system_status`, `browser_task`,
+`browser_task_status`, `phone_call`, `phone_say`, `phone_end`), from `lists/tool-teaching-v3-acting.json` beside v1's
+patterns; a minority of chains (a browser task still flying, then its status read by the id it gave); and near-miss
+plain questions (what a browser is, who invented the telephone) among the no-tool lessons, so a ship does not fire an
+acting tool on a topic word. Its own files (`lists/tools-marked-v3-acting.csv`, `lists/tools-heldout-v3-acting.jsonl`)
+and book ids (`tool3-<n>`); v2's are untouched, and so is the chat 9m's `lists/tools-heldout-v3.jsonl`.
 """
 
 from __future__ import annotations
@@ -59,6 +67,14 @@ NONE_SHARE = 1 / 4
 HELD_PATTERNS = 0.2
 CLEAN = "marks-v1"
 SEED = 20261113
+# the versions this script writes: v2 by default, as it always has; v3 with the six console tools besides
+VERSIONS = {
+    "v2": {"list": LIST, "held": HELD, "version": VERSION, "n": N_TRAIN, "n_held": N_HELD, "book": "tool"},
+    # v3's files are named `-acting` (14 November): lists/tools-heldout-v3.jsonl is the chat 9m's own test
+    # (backend/scripts/make_chat_corpus.py), which an earlier build of this one overwrote while that ship was at sea
+    "v3": {"list": "lists/tools-marked-v3-acting.csv", "held": "lists/tools-heldout-v3-acting.jsonl", "version": "tools-marked-v3-acting",
+           "n": 30_000, "n_held": 600, "book": "tool3", "extra": "lists/tool-teaching-v3-acting.json"},
+}  # fmt: skip
 
 # the values the live tools are drawn from: real names, so the lessons read like the console's own answers
 MODELS = {  # AI2 ARC-Easy, ARC-Challenge, as the leaderboard read them on 12 November
@@ -215,6 +231,127 @@ def _expedition(rng, pattern):
     return {"expedition": name}, [(f"expedition_status({arg})", res)], ans
 
 
+# ---- v3: the six console tools (14 November). Every value is drawn by code, and an id or a line is written without
+# commas, since a call's arguments are split at its commas (thorp/ship_tools.py `parse`).
+SYSTEM_NAMES = {"S1": ["S1", "operations", "S1 Operations"], "S2": ["S2", "coordination", "S2 Coordination"],
+                "S3": ["S3", "control", "S3 Control"], "S3*": ["S3*", "the audit", "S3* Audit"],
+                "S4": ["S4", "intelligence", "S4 Intelligence"], "S5": ["S5", "policy", "S5 Policy"]}  # fmt: skip
+_TEMP = lambda rng: rng.randint(4, 34)  # noqa: E731
+GOALS = [  # what a person asks the browser drone for, and what the drone finds, drawn fresh each time
+    ("the weather in Hobart tomorrow", lambda r: f"Hobart tomorrow will reach {_TEMP(r)} degrees, with {r.choice(['showers', 'sun', 'cloud', 'wind'])}"),
+    ("the weather in Perth this weekend", lambda r: f"Perth this weekend will reach {_TEMP(r)} degrees, with {r.choice(['sun', 'a cool change', 'cloud'])}"),
+    ("the opening hours of the State Library", lambda r: f"the State Library opens at {r.randint(8, 10)} am and closes at {r.randint(5, 9)} pm"),
+    ("the price of a Kindle Paperwhite", lambda r: f"a Kindle Paperwhite costs {r.randint(199, 279)} dollars"),
+    ("the next train from Geelong to Melbourne", lambda r: f"the next train from Geelong leaves at {r.randint(5, 11)}:{r.choice(['05', '20', '35', '50'])} am"),
+    ("the population of Tasmania", lambda r: f"Tasmania has about {r.randint(570, 590)},000 people"),
+    ("the height of Mount Kosciuszko", lambda r: "Mount Kosciuszko is 2,228 metres high"),
+    ("the latest Falcon model from TII", lambda r: "TII's latest is Falcon-H1-Tiny, released in January 2026"),
+    ("the score in the cricket", lambda r: f"Australia are {r.randint(120, 380)} for {r.randint(1, 9)}"),
+    ("the exchange rate for the US dollar", lambda r: f"one Australian dollar buys {r.randint(60, 72)} US cents"),
+    ("the closing time of the Botanic Gardens", lambda r: f"the Botanic Gardens close at {r.randint(5, 8)}:30 pm"),
+    ("a recipe for pumpkin soup", lambda r: f"a pumpkin soup needs {r.randint(1, 2)} kilograms of pumpkin, an onion and {r.randint(3, 6)} cups of stock"),
+    ("the date of the next public holiday", lambda r: f"the next public holiday is {r.randint(1, 28)} {r.choice(_MONTHS)}"),
+    ("the phone number of the council", lambda r: f"the council's number is 03 {r.randint(9000, 9999)} {r.randint(1000, 9999)}"),
+    ("the author of Moby-Dick", lambda r: "Moby-Dick was written by Herman Melville and published in 1851"),
+    ("the time the post office opens", lambda r: f"the post office opens at {r.randint(8, 9)}:{r.choice(['00', '30'])} am"),
+    ("the cheapest flight to Sydney on Friday", lambda r: f"the cheapest flight to Sydney on Friday is {r.randint(79, 249)} dollars"),
+    ("the news about the AI bubble", lambda r: f"chip makers' shares fell {r.randint(2, 12)} per cent this week"),
+    ("the length of the Murray River", lambda r: "the Murray River is 2,508 kilometres long"),
+    ("the tide times at Lorne", lambda r: f"high tide at Lorne is at {r.randint(1, 12)}:{r.choice(['10', '25', '40', '55'])}"),
+    ("the menu at the cafe on the corner", lambda r: f"the cafe has {r.randint(6, 18)} dishes, and soup of the day is {r.choice(['pumpkin', 'minestrone', 'pea'])}"),
+    ("the rules of cricket for beginners", lambda r: "each side bats once and tries to make more runs than the other"),
+    ("the fuel price in Ballarat", lambda r: f"fuel in Ballarat is {r.randint(179, 219)} cents a litre"),
+    ("how long a parcel takes to Darwin", lambda r: f"a parcel to Darwin takes {r.randint(3, 9)} business days"),
+]  # fmt: skip
+SITES = ["https://www.bom.gov.au", "https://www.slv.vic.gov.au", "https://www.abc.net.au", "https://en.wikipedia.org",
+         "https://www.ptv.vic.gov.au", "https://www.amazon.com.au", "https://www.google.com"]  # fmt: skip
+WHO = ["the restaurant", "the dentist", "the plumber", "the library", "a hotel", "the bank", "the school", "a friend"]
+CALL_GOALS = ["booking a table for two on Friday", "moving an appointment to Tuesday", "fixing a leaking tap",
+              "renewing a library book", "a room for two nights", "a lost card", "picking up the children early",
+              "dinner on Saturday"]  # fmt: skip
+LINES = ["yes that works for me", "can we make it a bit later", "how much will it cost", "thank you very much",
+         "I am sorry I did not hear that", "no I am busy then", "what time do you close", "please call me back tomorrow",
+         "that is fine", "who am I speaking to"]  # fmt: skip
+REPLIES = ["Of course. I have made a note of it.", "Certainly. Is there anything else?", "Thank you. I will pass that on.",
+           "I understand. Let me check and come back to you.", "Wonderful. That is all booked.",
+           "No trouble at all. Goodbye for now."]  # fmt: skip
+
+
+def _id(rng: random.Random, kind: str) -> str:
+    return f"t-{rng.randint(1000, 9999)}" if kind == "t" else f"c-{rng.randint(100, 999)}"
+
+
+def _system(rng, pattern):
+    code = rng.choice(sorted(SYSTEM_NAMES))
+    said = rng.choice(SYSTEM_NAMES[code])
+    full = SYSTEM_NAMES[code][2]
+    issues = dict(SYSTEMS).get(full, [])
+    if rng.random() < 0.3 or not issues:
+        return {"system": said}, [(f"system_status({code})", f"{full} is well")], f"{full} is well; nothing needs attention."
+    k = rng.choice([1, 1, 2]) if len(issues) > 1 else 1
+    found = rng.sample(issues, k)
+    return ({"system": said}, [(f"system_status({code})", f"{full} needs attention: " + "; ".join(found))],
+            f"{full} needs attention: " + " and ".join(found) + ".")
+
+
+def _browser(with_site: bool):
+    def make(rng, pattern):
+        goal, find = rng.choice(GOALS)
+        found = find(rng)
+        task = _id(rng, "t")
+        call = f"browser_task({goal}, {rng.choice(SITES)})" if with_site else f"browser_task({goal})"
+        values = {"goal": goal, "site": call.split(", ")[-1].rstrip(")") if with_site else ""}
+        return values, [(call, f"task {task} landed: {found}")], f"The drone found that {found}."
+    return make
+
+
+def _browser_chain(rng, pattern):
+    """A chain: the drone is still flying when the first call returns, so the ship reads it again by the id it gave."""
+    goal, find = rng.choice(GOALS)
+    found = find(rng)
+    task = _id(rng, "t")
+    return ({"goal": goal}, [(f"browser_task({goal})", f"the drone is still flying on task {task}; ask again with browser_task_status"),
+                             (f"browser_task_status({task})", f"task {task} landed: {found}")],
+            f"The drone found that {found}.")
+
+
+def _browser_status(rng, pattern):
+    task = _id(rng, "t")
+    r = rng.random()
+    if r < 0.6:
+        found = rng.choice(GOALS)[1](rng)
+        res, ans = f"task {task} landed: {found}", f"Task {task} is done: {found}."
+    elif r < 0.85:
+        k = rng.randint(1, 14)
+        res, ans = f"task {task} is still flying, at step {k} of 15", f"Task {task} is still going; it is at step {k} of 15."
+    else:
+        why = rng.choice(["the page would not load", "the site asked for a login", "it ran out of steps"])
+        res, ans = f"task {task} gave up: {why}", f"Task {task} did not finish: {why}."
+    return {"id": task}, [(f"browser_task_status({task})", res)], ans
+
+
+def _phone_call(rng, pattern):
+    goal, who, call = rng.choice(CALL_GOALS), rng.choice(WHO), _id(rng, "c")
+    opening = f"Hello, I am calling about {goal}."
+    return ({"goal": goal, "who": who}, [(f"phone_call({goal})", f"call {call} is open on the local test line; the drone said: {opening}")],
+            f"The test call is open as {call}. The drone opened with: {opening}")
+
+
+def _phone_say(rng, pattern):
+    call, line, reply = _id(rng, "c"), rng.choice(LINES), rng.choice(REPLIES)
+    return {"id": call, "line": line}, [(f"phone_say({call}, {line})", f"the drone answered: {reply}")], f"The drone answered: {reply}"
+
+
+def _phone_end(rng, pattern):
+    call = _id(rng, "c")
+    return {"id": call}, [(f"phone_end({call})", f"call {call} is closed; the transcript is kept")], f"Call {call} is over, and its transcript is kept."
+
+
+def makers_v3() -> dict:
+    return {"system": _system, "browser": _browser(False), "browser_site": _browser(True), "browser_chain": _browser_chain,
+            "browser_status": _browser_status, "phone_call": _phone_call, "phone_say": _phone_say, "phone_end": _phone_end}  # fmt: skip
+
+
 def makers(definitions: dict[str, str], jobs: list[str]) -> dict:
     return {"add": _calc("add"), "subtract": _calc("subtract"), "multiply": _calc("multiply"), "divide": _calc("divide"),
             "current_time": _current_time, "days_between": _days_between, "define": _define(definitions),
@@ -248,14 +385,23 @@ def no_tool_lessons(rng: random.Random, n: int, plain: list | None = None) -> li
     return out
 
 
-def build(dry_run: bool, n: int) -> dict:
+def build(dry_run: bool, n: int | None, version: str = "v2") -> dict:
+    v = VERSIONS[version]
+    n = n or v["n"]
     teach = json.loads(paths.resolve(TEACHING).read_text(encoding="utf-8"))
-    patterns: dict[str, list[str]] = teach["patterns"]
+    patterns: dict[str, list[str]] = dict(teach["patterns"])
     defs: dict[str, str] = teach.get("definitions") or {}
     if not defs:
         patterns = {k: v for k, v in patterns.items() if k != "define"}
     rng = random.Random(SEED)
     make = makers(defs, _jobs())
+    near: list[tuple[str, str]] = []
+    if v.get("extra"):
+        extra = json.loads(paths.resolve(v["extra"]).read_text(encoding="utf-8"))
+        patterns.update(extra["patterns"])
+        patterns["browser_chain"] = extra["patterns"]["browser"]  # a chain is asked as a plain browser question is
+        near = [tuple(x) for x in extra.get("near") or []]
+        make = {**make, **makers_v3()}
     kinds = [k for k in make if patterns.get(k)]
     train_p, held_p = {}, {}
     for k in kinds:
@@ -264,6 +410,8 @@ def build(dry_run: bool, n: int) -> dict:
         random.Random(SEED + len(k)).shuffle(ps)
         cut = max(1, round(len(ps) * HELD_PATTERNS))
         held_p[k], train_p[k] = ps[:cut], ps[cut:]
+    if "browser_chain" in kinds:  # asked with the browser patterns, so held out by the same cut: no held wording is trained
+        held_p["browser_chain"], train_p["browser_chain"] = held_p["browser"], train_p["browser"]
 
     def lesson(k: str, pool: dict) -> dict:
         p = rng.choice(pool[k])
@@ -272,14 +420,22 @@ def build(dry_run: bool, n: int) -> dict:
 
     n_none = round(n * NONE_SHARE)
     train = [lesson(rng.choice(kinds), train_p) for _ in range(n - n_none)]
-    held = [lesson(rng.choice(kinds), held_p) for _ in range(round(N_HELD * (1 - NONE_SHARE)))]
+    held = [lesson(rng.choice(kinds), held_p) for _ in range(round(v["n_held"] * (1 - NONE_SHARE)))]
     # the held-out no-tool items are the teacher's pairs the lessons never use: a fifth of them kept back
     plain = [tuple(x) for x in teach.get("plain") or []]
     random.Random(SEED + 7).shuffle(plain)
     cut = max(1, len(plain) // 5)
     held_plain, train_plain = plain[:cut], plain[cut:]
-    nones = no_tool_lessons(random.Random(SEED + 9), n_none, train_plain)
-    held_none = [{"kind": "none", "question": q, "calls": [], "answer": a} for q, a in held_plain[: round(N_HELD * NONE_SHARE)]]
+    # v3's near misses: a fifth held out, the rest a part of the no-tool lessons (each used several times over)
+    random.Random(SEED + 11).shuffle(near)
+    held_near, train_near = near[: len(near) // 5], near[len(near) // 5 :]
+    nones = no_tool_lessons(random.Random(SEED + 9), n_none - (n_none // 8 if train_near else 0), train_plain)
+    if train_near:
+        r_near = random.Random(SEED + 13)
+        nones += [{"kind": "none", "question": q, "calls": [], "answer": a} for q, a in (r_near.choice(train_near) for _ in range(n_none // 8))]
+        random.Random(SEED + 17).shuffle(nones)
+    held_none = [{"kind": "none", "question": q, "calls": [], "answer": a}
+                 for q, a in [*held_near, *held_plain][: round(v["n_held"] * NONE_SHARE)]]  # fmt: skip
     nones = nones + held_none
     train += nones[:n_none]
     held += nones[n_none:]
@@ -299,17 +455,17 @@ def build(dry_run: bool, n: int) -> dict:
     now = time.strftime("%Y-%m-%dT%H:%M:%S")
     rows, read_back = [], 0
     for i in range(0, len(train), PER):
-        bid = f"tool-{i // PER + 1:05d}"
+        bid = f"{v['book']}-{i // PER + 1:05d}"
         part = train[i : i + PER]
         text = talk.SEP.join(x["text"] for x in part) + "\n"
         cleaned = cleaning.clean(text, CLEAN)
         read_back += sum(x["text"] in cleaned for x in part)
         rows.append(talk._book(d, bid, f"tool lessons {i // PER + 1}", "the tool leg", text, now))
-    with open(paths.resolve(LIST), "w", newline="", encoding="utf-8") as f:
+    with open(paths.resolve(v["list"]), "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=["title", "author", "language", "family", "text"])
         w.writeheader()
         w.writerows(rows)
-    with open(paths.resolve(HELD), "w", encoding="utf-8") as f:
+    with open(paths.resolve(v["held"]), "w", encoding="utf-8") as f:
         for i, h in enumerate(held):
             c = h["calls"][0] if h["calls"] else None
             f.write(json.dumps({"key": f"tool-{i + 1}", "kind": h["kind"], "prompt": h["question"],
@@ -317,20 +473,21 @@ def build(dry_run: bool, n: int) -> dict:
                                 "result": c[1] if c else None, "answer": h["answer"]}, ensure_ascii=False) + "\n")  # fmt: skip
     out["books_written"] = len(rows)
     out["reads_as_written"] = [read_back, len(train)]
-    meta = {"version": VERSION, "generator": "backend/scripts/make_tool_corpus.py", "teaching": TEACHING, "seed": SEED,
-            "teacher": teach.get("teacher"), "tools": sorted({x["calls"][0][0].split("(")[0] for x in train if x["calls"]}),
-            "sha1": hashlib.sha1(paths.resolve(LIST).read_bytes()).hexdigest(),
+    meta = {"version": v["version"], "generator": "backend/scripts/make_tool_corpus.py", "teaching": TEACHING, "seed": SEED,
+            "teacher": teach.get("teacher"), "extra": v.get("extra"), "tools": sorted({x["calls"][0][0].split("(")[0] for x in train if x["calls"]}),
+            "sha1": hashlib.sha1(paths.resolve(v["list"]).read_bytes()).hexdigest(),
             **{k: v for k, v in out.items() if k != "sample"}}  # fmt: skip
-    paths.resolve(LIST).with_suffix(".manifest.json").write_text(json.dumps(meta, indent=1), encoding="utf-8")
+    paths.resolve(v["list"]).with_suffix(".manifest.json").write_text(json.dumps(meta, indent=1), encoding="utf-8")
     return out
 
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--dry-run", action="store_true")
-    ap.add_argument("--n", type=int, default=N_TRAIN)
+    ap.add_argument("--n", type=int, default=None, help="lessons (default: the version's own)")
+    ap.add_argument("--version", choices=sorted(VERSIONS), default="v2")
     a = ap.parse_args()
-    print(json.dumps(build(a.dry_run, a.n), indent=1, ensure_ascii=False))
+    print(json.dumps(build(a.dry_run, a.n, a.version), indent=1, ensure_ascii=False))
 
 
 if __name__ == "__main__":

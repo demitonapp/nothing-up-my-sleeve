@@ -1,0 +1,137 @@
+{
+ "version": "tools-marked-v3-acting",
+ "generator": "backend/scripts/make_tool_corpus.py",
+ "teaching": "lists/tool-teaching-v1.json",
+ "seed": 20261113,
+ "teacher": "mlx-community/Qwen3.8-27B-4bit",
+ "extra": "lists/tool-teaching-v3-acting.json",
+ "tools": [
+  "board_score",
+  "browser_task",
+  "browser_task_status",
+  "calculate",
+  "current_time",
+  "days_between",
+  "define",
+  "expedition_status",
+  "liberty_machine_status",
+  "phone_call",
+  "phone_end",
+  "phone_say",
+  "queue_status",
+  "system_status"
+ ],
+ "sha1": "a1f14b770b39b57840f787e701ad5bd9952e7ed9",
+ "lessons": 30000,
+ "held_out": 536,
+ "by_kind": {
+  "add": 1085,
+  "subtract": 1162,
+  "multiply": 1091,
+  "divide": 1153,
+  "current_time": 1138,
+  "days_between": 1181,
+  "define": 1136,
+  "board_score": 1128,
+  "queue_all": 1136,
+  "queue_find": 1154,
+  "liberty": 1103,
+  "expedition": 1088,
+  "system": 1111,
+  "browser": 1121,
+  "browser_site": 1124,
+  "browser_chain": 1123,
+  "browser_status": 1094,
+  "phone_call": 1139,
+  "phone_say": 1113,
+  "phone_end": 1120,
+  "none": 7500
+ },
+ "patterns": {
+  "add": [
+   40,
+   10
+  ],
+  "subtract": [
+   40,
+   10
+  ],
+  "multiply": [
+   40,
+   10
+  ],
+  "divide": [
+   40,
+   10
+  ],
+  "current_time": [
+   40,
+   10
+  ],
+  "days_between": [
+   20,
+   5
+  ],
+  "define": [
+   38,
+   9
+  ],
+  "board_score": [
+   40,
+   10
+  ],
+  "queue_all": [
+   40,
+   10
+  ],
+  "queue_find": [
+   40,
+   10
+  ],
+  "liberty": [
+   40,
+   10
+  ],
+  "expedition": [
+   40,
+   10
+  ],
+  "system": [
+   24,
+   6
+  ],
+  "browser": [
+   24,
+   6
+  ],
+  "browser_site": [
+   12,
+   3
+  ],
+  "browser_chain": [
+   24,
+   6
+  ],
+  "browser_status": [
+   16,
+   4
+  ],
+  "phone_call": [
+   12,
+   3
+  ],
+  "phone_say": [
+   10,
+   2
+  ],
+  "phone_end": [
+   10,
+   2
+  ]
+ },
+ "books_written": 750,
+ "reads_as_written": [
+  29184,
+  30000
+ ]
+}

@@ -1,0 +1,8 @@
+{
+ "version": "tools-mixed-v3-acting",
+ "made": "14 November 2026, by hand in the console-tools session",
+ "lessons": "lists/tools-marked-v3-acting.csv (750 books, 30,000 lessons)",
+ "ogden": 86,
+ "ogden_from": "tools-mixed-v2's 57 Ogden books, and 29 more drawn from lists/ogden-v0.1.csv (seed 20261114) to keep tools2's share",
+ "sha1": "6c497434a9c73b9e9549bb1647f2d79d42b12a9c"
+}

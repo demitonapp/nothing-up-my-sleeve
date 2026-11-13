@@ -1,0 +1,139 @@
+# ships/specs/fitouts: the 9m tool leg's third try (14 November; Justin: "Could we not get a thorp model to recognize all of
+# our tools?", then "actually see if you can do it on the 9m"). tools2 with one thing changed, its lessons: the tool
+# lessons v3 (backend/scripts/make_tool_corpus.py --version v3), the eight tools and the six console tools the ships
+# lacked (system_status, browser_task, browser_task_status, phone_call, phone_say, phone_end), a minority of chains
+# (a browser task still flying, then its status by the id it gave), and near-miss plain questions among the quarter
+# that want no tool. Same seed, rate and passes as tools2, so the two are read side by side. The plan is
+# reports/proposal-50m-twelve-tools.md; S5 #40 (the acting tools in the console) is still open, so this leg teaches
+# the calls and the console does not run the acting ones for a ship yet.
+name: 9m@v0.0.6-fleetmarks-tools3
+expedition: kipling
+goal: 14
+ship: 'SOP v0.0.6 at 9m (the tool leg with the console''s twelve tools, on the fleet''s marks)'
+experiment: 'The twelve tools (kipling:14): can the 9m learn the six console tools it was not taught, two of them only
+  reading (system_status, browser_task_status) and four acting (the browser drone, the test-line phone), without losing
+  the eight it has, and without firing an acting tool on a plain question?'
+question: 'The tool leg at 9m, on 9m@v0.0.6-fleetmarks, as tools2 but on the tool lessons v3 (lists/tools-mixed-v3-acting.csv:
+  30,000 lessons in 750 books, twenty kinds of about 1,100 lessons each, a quarter wanting no tool, beside 86 Ogden
+  books, tools2''s share), the pull off, at 0.0003, three passes. Read every 100 steps on the v3 held-out items in
+  wordings it never trained on (thorp/evaluators/tools.py: the exact call, the right tool, the right refusal), with
+  the hole cards beside them. Read against tools2: 76% right tool, 19.5% exact call, 0% plain answers.'
+departures:
+- field: content
+  why: the tool leg reads its lessons, not Ogden
+- field: training
+  why: 'seeded from 9m@v0.0.6-fleetmarks, the pull off: a leg after pretraining, not a fresh voyage'
+- field: tokeniser
+  why: 'the seed''s: the fleet''s eleven marks as single pieces'
+- field: optim
+  why: '0.0003 with 50 steps of warm-up, the conversation leg''s rate (0.001 cost the 9m''s language on the talk pair)'
+milestones:
+- at: 0.5
+  metric: eval/hole-cards-unseen/bpb_mean
+  at_most: 2.4
+  if_missed: recall
+  why: a catastrophe guard, not a target, the conversation leg's own kind
+tools:
+  set:
+  - calculate
+  - current_time
+  - days_between
+  - define
+  - board_score
+  - queue_status
+  - liberty_machine_status
+  - expedition_status
+  - system_status
+  - browser_task
+  - browser_task_status
+  - phone_call
+  - phone_say
+  - phone_end
+data:
+  recipe: lists/tools-mixed-v3-acting.csv
+  passes: 3
+  order: shuffled
+  refuse:
+  - lists/hole-cards.csv
+  - lists/hole-cards-v2.csv
+  - lists/hole-cards-unseen.csv
+  clean: marks-v1
+  turns: marks
+  opt_in: 'the tool leg (kipling:14): the eight tools and the six console tools, calls and results made by code, a quarter of the lessons wanting no tool'
+tokeniser:
+  kind: spm-bpe
+  vocab: 2048
+  byte_fallback: true
+  train_on: lists/ogden-v0.1.csv
+  symbols:
+  - "<bos>"
+  - "<eos>"
+  - "<question>"
+  - "<answer>"
+  - "<end>"
+  - "<premise>"
+  - "<sep>"
+  - "<conclusion>"
+  - "<think>"
+  - "<call>"
+  - "<result>"
+model:
+  family: gpt
+  preset: 9m
+  context: 1024
+  positions: rope
+optim:
+  name: adamw
+  lr: 0.0003
+  betas:
+  - 0.9
+  - 0.95
+  weight_decay: 0.1
+  warmup_steps: 50
+  schedule: cosine
+  min_lr_ratio: 0.1
+  batch_tokens: 32768
+  grad_clip: 1.0
+  precision: bf16
+  scaffold:
+    weight: 0.0
+    hold: 0.0
+    fade: 0.0
+    heads:
+    - layer: 0
+      head: 0
+      card: previous_word
+    - layer: 0
+      head: 1
+      card: delimiter
+    - layer: 12
+      head: 2
+      card: induction
+    - layer: 12
+      head: 3
+      card: duplicate_word
+    riddles:
+      comparator:
+        layer: 3
+        head: 2
+        items: 16
+        pool: 2048
+eval:
+  sets:
+  - lists/hole-cards-unseen.csv
+  every_steps: 100
+  evaluators:
+  - ce_bpb
+  - tools
+  options:
+    tools:
+      clean: marks-v1
+      limit: 300
+      heldout: lists/tools-heldout-v3-acting.jsonl
+checkpoint:
+  every_steps: 100
+sop: 0.0.6
+seed: 1
+seeded_from:
+  run: 9m@v0.0.6-fleetmarks
+  mode: free

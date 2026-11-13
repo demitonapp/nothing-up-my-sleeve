@@ -1,0 +1,316 @@
+{
+ "about": "The question patterns for the six console tools the 9m and 50m were not yet taught (14 November 2026; Justin: 'Could we not get a thorp model to recognize all of our tools?', then 'actually see if you can do it on the 9m'). Written by Claude Opus 5.5 in the console-tools session, not by the corpus's usual teacher (Qwen3.8 27B), because the Mac's GPU was holding the 9m chat leg; read by backend/scripts/make_tool_corpus.py --version v3 beside lists/tool-teaching-v1.json. `near` are questions on the same topics that want no tool, so a ship learns not to fire an acting tool on a topic word.",
+ "teacher": "Claude Opus 5.5 (written by hand in the session, 14 November 2026)",
+ "patterns": {
+  "system": [
+   "How is {system} doing?",
+   "What does {system} say right now?",
+   "Is anything wrong with {system}?",
+   "Give me the state of {system}.",
+   "Can you check {system} for me?",
+   "What is happening in {system}?",
+   "Read me {system}, please.",
+   "Does {system} need attention?",
+   "Tell me how {system} is.",
+   "Show me {system} in detail.",
+   "Is {system} well?",
+   "What is the news from {system}?",
+   "Check {system} and tell me what you find.",
+   "Any problems in {system} today?",
+   "How is {system} looking?",
+   "I would like a report on {system}.",
+   "What is {system} up to?",
+   "Could you read {system} for me?",
+   "Is {system} all right?",
+   "What does {system} need from me?",
+   "Report on {system}.",
+   "Let me know the state of {system}.",
+   "How are things in {system}?",
+   "Has {system} found anything?",
+   "Look at {system} please.",
+   "What is the latest from {system}?",
+   "Status of {system}?",
+   "Run a check on {system}.",
+   "Is there trouble in {system}?",
+   "Can you tell me what {system} is saying?"
+  ],
+  "browser": [
+   "Can you look up {goal} on the web?",
+   "Search the web for {goal}.",
+   "Find {goal} online for me.",
+   "Go online and find out {goal}.",
+   "Use the browser to check {goal}.",
+   "Please look up {goal}.",
+   "Send the browser drone to find {goal}.",
+   "What does the web say about {goal}?",
+   "Could you search for {goal}?",
+   "Look online for {goal} please.",
+   "Check the internet for {goal}.",
+   "I need {goal}; can you find it online?",
+   "Open the web and look up {goal}.",
+   "Find out {goal} on the internet.",
+   "Can the drone get {goal} for me?",
+   "Browse for {goal}.",
+   "Please go to the web and get {goal}.",
+   "Have a look online for {goal}.",
+   "Search for {goal} and tell me what you find.",
+   "Look up {goal} for me, would you?",
+   "Can you find {goal} on a website?",
+   "Get me {goal} from the web.",
+   "Do a web search for {goal}.",
+   "Find {goal}.",
+   "I want to know {goal}; please check online.",
+   "Go and look up {goal}.",
+   "Could the browser find {goal}?",
+   "Check online: {goal}.",
+   "Hunt down {goal} on the web for me.",
+   "Can you browse to find {goal}?"
+  ],
+  "browser_site": [
+   "Open {site} and find {goal}.",
+   "Go to {site} and look up {goal}.",
+   "On {site}, find {goal}.",
+   "Check {site} for {goal}.",
+   "Use {site} to find {goal}.",
+   "Visit {site} and get {goal}.",
+   "Look at {site} and tell me {goal}.",
+   "Can you open {site} and check {goal}?",
+   "Please go to {site} for {goal}.",
+   "Search {site} for {goal}.",
+   "Find {goal} on {site}.",
+   "Read {site} and find {goal}.",
+   "Have the drone open {site} and look for {goal}.",
+   "Browse {site} for {goal}.",
+   "Get {goal} from {site}."
+  ],
+  "browser_status": [
+   "How did browser task {id} go?",
+   "Is task {id} done yet?",
+   "What did the drone find on {id}?",
+   "Check on browser task {id}.",
+   "Has {id} landed?",
+   "Any news on task {id}?",
+   "What happened with {id}?",
+   "Did the drone finish {id}?",
+   "Read me the result of {id}.",
+   "Is the browser drone still flying on {id}?",
+   "Tell me how {id} went.",
+   "What is the state of task {id}?",
+   "Did {id} work?",
+   "Look at browser task {id} for me.",
+   "Give me the answer from {id}.",
+   "Where is task {id} up to?",
+   "Has the drone come back from {id}?",
+   "What did {id} turn up?",
+   "Check {id}.",
+   "Is {id} finished?"
+  ],
+  "phone_call": [
+   "Ring {who} on the test line about {goal}.",
+   "Call {who} on the test line to talk about {goal}.",
+   "Start a test call about {goal}.",
+   "Open a call on the test line about {goal}.",
+   "Phone {who} on the test line about {goal}.",
+   "Can you call {who} about {goal}?",
+   "Make a test call about {goal}.",
+   "I want to rehearse a call about {goal}.",
+   "Put a call through to {who} about {goal}.",
+   "Start the phone drone on a call about {goal}.",
+   "Call the test line and talk about {goal}.",
+   "Dial {who} on the test line about {goal}.",
+   "Let us rehearse a call to {who} about {goal}.",
+   "Please ring the test line about {goal}.",
+   "Get the phone drone to call {who} about {goal}."
+  ],
+  "phone_say": [
+   "On call {id}, say: {line}.",
+   "Tell the drone on {id}: {line}.",
+   "On {id} the person says: {line}.",
+   "Say this on call {id}: {line}.",
+   "Reply on {id} with: {line}.",
+   "On the test call {id}, answer: {line}.",
+   "The person on {id} says: {line}.",
+   "For call {id}: {line}.",
+   "Pass this to call {id}: {line}.",
+   "Answer the drone on {id}: {line}.",
+   "On {id}, the other end says: {line}.",
+   "Speak on call {id}: {line}."
+  ],
+  "phone_end": [
+   "Hang up call {id}.",
+   "End the test call {id}.",
+   "Close call {id}.",
+   "Finish call {id} now.",
+   "Please hang up {id}.",
+   "That is enough; end call {id}.",
+   "Stop the call {id}.",
+   "Put the phone down on {id}.",
+   "End {id}.",
+   "We are done with {id}; hang up.",
+   "Close the test line call {id}.",
+   "Ring off call {id}."
+  ]
+ },
+ "near": [
+  [
+   "What does a web browser do?",
+   "It is a program that opens pages on the web and shows them to you."
+  ],
+  [
+   "What is a search engine?",
+   "It is a site that finds pages on the web for the words you give it."
+  ],
+  [
+   "Who invented the telephone?",
+   "Alexander Graham Bell is usually given the credit, in 1876."
+  ],
+  [
+   "How does a phone call work?",
+   "Your voice is turned into a signal, sent along a line or through the air, and turned back into sound at the other end."
+  ],
+  [
+   "What is a drone?",
+   "It is a machine that does a job by itself, like a small aircraft with no pilot on board."
+  ],
+  [
+   "What does the word system mean?",
+   "It is a set of parts that work together as one whole."
+  ],
+  [
+   "Is it rude to hang up on someone?",
+   "It can be. It is kinder to say goodbye first."
+  ],
+  [
+   "What should I say when I answer the phone?",
+   "A simple hello and your name is enough."
+  ],
+  [
+   "Why is the internet slow sometimes?",
+   "Many people may be using it at once, or the line to your house may be weak."
+  ],
+  [
+   "What is a website?",
+   "It is a set of pages on the web that live at one address."
+  ],
+  [
+   "What is an audit?",
+   "It is a careful check that things are as they should be."
+  ],
+  [
+   "What is a policy?",
+   "It is a rule or plan that says how something should be done."
+  ],
+  [
+   "What is control in a business?",
+   "It is the work of making sure the plan is being followed and the money is well used."
+  ],
+  [
+   "Can a computer browse the web by itself?",
+   "Yes, a program can open pages and read them without a person at the keys."
+  ],
+  [
+   "What is a test line?",
+   "It is a phone line used for trying things out, where no real call is made."
+  ],
+  [
+   "How do I write a good email?",
+   "Say what you want in the first line, keep it short, and be polite."
+  ],
+  [
+   "What is a page on the web made of?",
+   "Mostly text, pictures and links, put together with a language called HTML."
+  ],
+  [
+   "What does online mean?",
+   "It means connected to the internet."
+  ],
+  [
+   "Why do people still make phone calls?",
+   "Because a voice carries feeling, and a talk can settle in a minute what messages take an hour to."
+  ],
+  [
+   "What is a transcript?",
+   "It is a written record of what was said."
+  ],
+  [
+   "What is the weather?",
+   "It is the state of the air at a place and time: how hot or cold, wet or dry, still or windy it is."
+  ],
+  [
+   "What is a task?",
+   "It is a piece of work to be done."
+  ],
+  [
+   "What does coordination mean?",
+   "It means getting different parts to work together without getting in each other's way."
+  ],
+  [
+   "What is intelligence in an army?",
+   "It is the gathering of news about the world outside so that good choices can be made."
+  ],
+  [
+   "Tell me a joke about phones.",
+   "Why did the phone wear glasses? It lost its contacts."
+  ],
+  [
+   "Do you like the internet?",
+   "It is useful, and it holds a great deal, but not all of it is true."
+  ],
+  [
+   "What is an operation?",
+   "It is a piece of work being carried out, often with several steps."
+  ],
+  [
+   "How do you say hello politely on a call?",
+   "Good morning, this is your name. How can I help?"
+  ],
+  [
+   "What is a link on a web page?",
+   "It is a word or picture you can click to go to another page."
+  ],
+  [
+   "Why do websites ask about cookies?",
+   "Because some places need your yes before a site may store small notes about you in your browser."
+  ],
+  [
+   "Is the web the same as the internet?",
+   "No. The internet is the network; the web is the pages that travel on it."
+  ],
+  [
+   "What is a phone number made of?",
+   "Digits: often an area or country code, and then the number of the line itself."
+  ],
+  [
+   "What does it mean to hang up?",
+   "It means to end a phone call."
+  ],
+  [
+   "What is a system status page?",
+   "It is a page that says whether each part of a system is working."
+  ],
+  [
+   "Should I trust everything I read online?",
+   "No. Check who wrote it, and look for the same fact in a second place."
+  ],
+  [
+   "How many people use the internet?",
+   "Most people in the world do, a little over two thirds of them."
+  ],
+  [
+   "What is a browser tab?",
+   "It is one page open in a browser, beside the others, so you can move between them."
+  ],
+  [
+   "What did people use before phones?",
+   "Letters, messengers and, from the 1840s, the telegraph."
+  ],
+  [
+   "Is it safe to fill in forms online?",
+   "Mostly, on sites you know. Be careful with any site that asks for money or passwords."
+  ],
+  [
+   "What is a viable system?",
+   "It is one that can keep itself going in a changing world: it runs, coordinates, controls, looks outward and holds to its purpose."
+  ]
+ ]
+}

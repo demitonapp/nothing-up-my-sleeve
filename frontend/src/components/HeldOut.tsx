@@ -8,7 +8,8 @@ import { cardCls, emptyCls, fieldCls, pillCls } from '@/lib/ui';
 import { useApi } from '@/lib/useApi';
 
 interface HeldSet {
-  key: string; name: string; group: 'questions' | 'books' | 'outside'; path: string; status: string;
+  key: string; name: string; group: 'questions' | 'books' | 'outside' | 'cheating'; path: string; status: string;
+  grade?: 'rigged' | 'taught' | 'source'; helps?: string; against?: string;
   tests: string; reads: string; made: string; present: boolean; count: number | null;
   kinds: Record<string, number>; specs: string[];
 }
@@ -19,7 +20,15 @@ const GROUPS: [HeldSet['group'], string, string][] = [
   ['questions', 'Questions the ships are asked', 'held out of the legs’ lessons: each item has its question and what a right answer is'],
   ['books', 'Books the ships are scored on', 'whole books no training run reads; a ship is scored on how cheaply it predicts them'],
   ['outside', 'The field’s own tests', 'kept under data/, as their licences keep them out of the repository'],
+  ['cheating', 'Cheating cards', 'the training sets that make a test easier, kept in the open so no score is read without knowing which cards a ship held'],
 ];
+// what each grade of cheating card gives away (13 November, Justin: "add a sub section to held out for cheating cards
+// which allow us to pass tests easier")
+const GRADES: Record<string, string> = {
+  rigged: 'the test’s own items are in it: a ship that read it is scored on what it memorised',
+  taught: 'made the same way as the held-out set, its items kept out: the score is real, but in the test’s own shape',
+  source: 'the text the test was written from, the test itself removed',
+};
 const PAGE = 40;
 
 const setFromUrl = (): string => (typeof location === 'undefined' ? '' : new URLSearchParams(location.search).get('set') || '');
@@ -55,14 +64,18 @@ export default function HeldOut() {
             <div key={g} className="mt">
               <h3>{title}</h3>
               <p className="s heldnote">{note}</p>
+              {g === 'cheating' ? (
+                <p className="s heldnote">{Object.entries(GRADES).map(([k, v]) => <span key={k} className="heldgrade"><span className={`${pillCls('')} grade-${k}`}>{k}</span> {v}</span>)}</p>
+              ) : null}
               <div className="heldgrid">
                 {these.map((s) => (
                   <button key={s.key} type="button" className={`heldcard${open === s.key ? ' on' : ''}${s.status === 'retired' ? ' retired' : ''}`} onClick={() => choose(s.key)} aria-expanded={open === s.key}>
                     <span className="heldtop">
                       <b>{s.name}</b>
-                      <span className={pillCls('')}>{s.status}</span>
+                      <span className={`${pillCls('')}${s.grade ? ` grade-${s.grade}` : ''}`}>{s.grade || s.status}</span>
                     </span>
-                    <span className="heldcount">{s.count == null ? 'not fetched' : `${s.count.toLocaleString()} ${g === 'books' ? (s.count === 1 ? 'book' : 'books') : 'items'}`}{s.specs.length ? ` · read by ${s.specs.length} spec${s.specs.length === 1 ? '' : 's'}` : ''}</span>
+                    {s.helps ? <span className="heldhelps">helps pass: <b>{s.helps}</b></span> : null}
+                    <span className="heldcount">{s.count == null ? 'not fetched' : `${s.count.toLocaleString()} ${g === 'books' || g === 'cheating' ? (s.count === 1 ? 'book' : 'books') : 'items'}`}{s.specs.length ? ` · read by ${s.specs.length} spec${s.specs.length === 1 ? '' : 's'}` : ''}</span>
                     <span className="heldtests">{s.tests}</span>
                     <span className="mono s">{s.path}</span>
                   </button>
@@ -72,12 +85,12 @@ export default function HeldOut() {
           );
         })}
       </section>
-      {chosen ? <SetView key={chosen.key} s={chosen} /> : null}
+      {chosen ? <SetView key={chosen.key} s={chosen} against={sets.find((x) => x.key === chosen.against) || null} open={choose} /> : null}
     </>
   );
 }
 
-function SetView({ s }: { s: HeldSet }) {
+function SetView({ s, against, open }: { s: HeldSet; against: HeldSet | null; open: (key: string) => void }) {
   const [q, setQ] = useState('');
   const [kind, setKind] = useState('');
   const [offset, setOffset] = useState(0);
@@ -94,7 +107,9 @@ function SetView({ s }: { s: HeldSet }) {
     <section className={cardCls(false, 'panel')} id="heldset">
       <h2>{s.name} <span className="note mono">{s.path}</span></h2>
       <dl className="helddl">
-        <dt>tests</dt><dd>{s.tests}</dd>
+        {s.grade ? <><dt>grade</dt><dd><span className={`${pillCls('')} grade-${s.grade}`}>{s.grade}</span> {GRADES[s.grade]}</dd></> : null}
+        {s.helps ? <><dt>helps</dt><dd>{s.helps}{against ? <> · <button type="button" className="heldlink" onClick={() => open(against.key)}>its held-out set: {against.name}</button></> : null}</dd></> : null}
+        <dt>{s.group === 'cheating' ? 'holds' : 'tests'}</dt><dd>{s.tests}</dd>
         <dt>read by</dt><dd>{s.reads}</dd>
         <dt>made</dt><dd>{s.made}</dd>
         {s.specs.length ? (

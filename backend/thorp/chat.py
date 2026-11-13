@@ -1017,8 +1017,8 @@ CONSOLE = "specs/console.json"  # ships/specs/console.json: the one Nothing up m
 
 def console_ship() -> dict | None:
     """The ship the chat terminal offers, and only it (13 November, Justin: "Remove those existing models and only
-    give me the best one"): `{"ship": <run name>, "name": <the name shown>, "why": ...}` in ships/specs/console.json.
-    Without the file every finished leg is listed, as before."""
+    give me the best one"): `{"ships": [<run names, best first>], "why": ...}` in ships/specs/console.json (or one
+    `"ship"`). Without the file every finished leg is listed, as before."""
     p = paths.resolve(CONSOLE)
     if not p.exists():
         return None
@@ -1026,21 +1026,26 @@ def console_ship() -> dict | None:
         got = json.loads(p.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return None
-    return got if isinstance(got, dict) and got.get("ship") else None
+    return got if isinstance(got, dict) and (got.get("ships") or got.get("ship")) else None
 
 
 def console_models(leaderboard: dict | None = None) -> list[dict]:
-    """Our ships for the chat terminal: the pinned one alone when ships/specs/console.json names one that is ready,
-    else every leaderboard ship and talking leg."""
-    ours = models(leaderboard) + talking_models()
+    """Our ships for the chat terminal: the first of ships/specs/console.json's `ships` that has finished with a
+    checkpoint, alone (13 November, Justin: "if we have a watcher shouldn't it follow how the coordinator is setup?":
+    nothing watches for the bigger ships; the list names them best first, the coordinator sails them, and the terminal
+    offers whichever is the best that is home). Without the file, every leaderboard ship and talking leg."""
     pin = console_ship()
     if not pin:
-        return ours
-    kept = [m for m in ours if m.get("available") and (m.get("run") or {}).get("run") == pin["ship"]]
-    for m in kept:
-        m["name"] = pin.get("name") or m["name"]
-        m["pinned"] = pin.get("why") or True
-    return kept[:1] or ours
+        return models(leaderboard) + talking_models()
+    wanted = list(pin.get("ships") or [pin["ship"]])
+    ready = {m["run"]["run"]: m for m in talking_models(names=wanted)}
+    for name in wanted:
+        if name in ready:
+            m = ready[name]
+            m["name"] = f"Nothing up my sleeve {m['facts'].get('preset') or ''} · chat and tools".replace("  ", " ")
+            m["pinned"] = pin.get("why") or True
+            return [m]
+    return models(leaderboard) + talking_models()
 
 
 def console_foreign() -> list[dict]:
@@ -1057,18 +1062,19 @@ TALK_LAB = "Demiton"
 TALK_PREFIX = "9m@v0.0.6-"  # the 9m's legs: -talk, -talk-hot, -return, each seeded from the finished 9m@v0.0.6
 
 
-def talking_models() -> list[dict]:
+def talking_models(names: list[str] | None = None) -> list[dict]:
     """The 9m legs that were taught to answer (12 November, Justin: "for the 9m I'd like to be able to talk to it
     via the chat terminal; the lab should be Demiton, and then I should be able to select the model"): each
     finished leg of the 9m that reads turns, with every checkpoint it kept and what its reading was there, so the
     ship we talk to is picked by its best reading and not only its last step. A base checkpoint continues prose
-    instead of answering, so only a leg that read turns is listed. `step` goes back to /api/chat as it is."""
+    instead of answering, so only a leg that read turns is listed. `step` goes back to /api/chat as it is. `names`
+    (the chat terminal's list, ships/specs/console.json) reads those runs, of any size, in place of the 9m's legs."""
     from thorp import turns
 
     con = reader()
     out: list[dict] = []
     try:
-        names = [
+        names = names if names is not None else [
             r["name"]
             for r in con.query(
                 "select distinct name from runs where status='finished' and name like ? order by name",
@@ -1096,7 +1102,7 @@ def talking_models() -> list[dict]:
                 (r["run_id"], "answers/bpb", "answers/stopped"),
             ):
                 read.setdefault(int(m["step"]), {})["bpb" if m["name"] == "answers/bpb" else "stopped"] = m["value"]
-            leg = name[len(TALK_PREFIX):]
+            leg = name.split("@", 1)[-1].removeprefix("v0.0.6-")
             lr = (spec.get("optim") or {}).get("lr")
             facts = _facts(spec, ck.name)
             facts["tuning"] = "talk"
@@ -1106,7 +1112,7 @@ def talking_models() -> list[dict]:
                     "talks": True,
                     "lab": TALK_LAB,
                     "ship_key": f"run:{name}",
-                    "name": f"Nothing up my sleeve 9m · {leg}" + (f" (lr {lr:g})" if lr else ""),
+                    "name": f"Nothing up my sleeve {facts.get('preset') or '9m'} · {leg}" + (f" (lr {lr:g})" if lr else ""),
                     "params": None,
                     "available": True,
                     "run": {"run": name, "run_id": r["run_id"], "step": ck.name},

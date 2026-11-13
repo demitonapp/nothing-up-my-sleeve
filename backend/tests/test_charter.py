@@ -112,7 +112,7 @@ class FakeBox:
 
     put_tar = put  # the real box takes the code and the data as one tar stream (9 November); here a copy is a copy
 
-    def get(self, src, dst):
+    def get(self, src, dst, timeout=900):
         s = self.root / src.rstrip("/")
         if not s.exists():
             return False
@@ -1220,3 +1220,37 @@ def test_no_secret_and_no_download_is_ever_carried_aboard(tmp_thorp):
                 "downloads/arc-v1-feb2018/ARC_Corpus.txt", "drones.json", "somewhere/api-token.txt", "x/.env",
                 "shards/tok1/theirs.npy"):  # fmt: skip
         assert rel not in got, rel
+
+
+def test_checkpoint_pull_resumes_after_a_cut():
+    """A pull cut by its time limit is tried again (rsync --partial carries on), not failed (13 November)."""
+    from thorp.viable.s1_operations import charter as ch
+
+    class Slow:
+        def __init__(self):
+            self.tries = 0
+            self.said = []
+
+        def get(self, src, dst, timeout=900):
+            self.tries += 1
+            if self.tries < 3:
+                raise ch.BoxError("rsync pull did not finish")
+            return True
+
+        def _say(self, what):
+            self.said.append(what)
+
+    box = Slow()
+    ch.pull_checkpoints(box, "rid", Path("/tmp/nowhere"))
+    assert box.tries == 3 and len(box.said) == 2
+
+
+def test_checkpoint_pull_gives_up_after_its_tries():
+    from thorp.viable.s1_operations import charter as ch
+
+    class Dead:
+        def get(self, src, dst, timeout=900):
+            raise ch.BoxError("rsync pull did not finish")
+
+    with pytest.raises(ch.BoxError):
+        ch.pull_checkpoints(Dead(), "rid", Path("/tmp/nowhere"))

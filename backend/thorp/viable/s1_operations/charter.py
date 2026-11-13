@@ -893,11 +893,31 @@ def _public_key(t: dict) -> str | None:
     return None
 
 
+CHECKPOINT_PULLS = 4  # tries at bringing the checkpoints home, each resuming where the last stopped
+CHECKPOINT_PULL_S = 1800  # one try's bound
+
+
+def pull_checkpoints(box, rid: str, dst: Path) -> None:
+    """The voyage's checkpoints home, retried (13 November: the 21m's 1.6 GB came home at about 1.3 MB/s, the pull was
+    cut at 900 s with 1.2 GB here, and the voyage was failed and sailed again from the start; a 50m's are about 6 GB).
+    rsync's `--partial` keeps what arrived, so each try carries on from where the last stopped."""
+    for attempt in range(1, CHECKPOINT_PULLS + 1):
+        try:
+            box.get(f"data/checkpoints/{rid}/", dst, timeout=CHECKPOINT_PULL_S)
+            return
+        except BoxError as e:
+            if attempt == CHECKPOINT_PULLS:
+                raise
+            say = getattr(box, "_say", None)
+            if say:
+                say(f"checkpoint pull stopped ({e}); resuming where it stopped, try {attempt + 1} of {CHECKPOINT_PULLS}")
+
+
 def bring_home(box, rid: str, start: int, rec: Ledger, hire: dict, commit: str) -> dict:
     """The checkpoints, the box's log and the voyage's rows, home."""
     from thorp import train
 
-    box.get(f"data/checkpoints/{rid}/", train.checkpoint_root(rid))
+    pull_checkpoints(box, rid, train.checkpoint_root(rid))
     box.get(f"data/runs/{rid}.log", paths.runs_dir() / f"{rid}.box.log")
     box.get(f"data/charter/{rid}.out", paths.data_dir() / "charter" / rid / "box.out")
     gate_log = paths.data_dir() / "charter" / rid / "box-gate-log.jsonl"
@@ -960,7 +980,7 @@ def _drop_queued_home(hire: dict, log) -> None:
 
         for row in queue_store.lines():
             if row.get("kind") == "spec" and queue_store.name_of(row) == hire.get("name"):
-                if queue_store.drop(row["text"]):
+                if queue_store.drop(row["text"], by=queue_store.COORDINATOR):  # the coordinator's own requeue, undone
                     log(f"charter: removed {row['text']!r} from the queue: its run is home")
 
 

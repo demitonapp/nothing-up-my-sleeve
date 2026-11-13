@@ -169,7 +169,7 @@ def rank_of(expedition: str | None, goal: int | None) -> int:
     return rank(expedition)
 
 
-def set_order(keys: list[str]) -> list[str]:
+def set_order(keys: list[str], by: str | None = None) -> list[str]:
     """Record the order (unknown keys dropped, missing ones appended) and reorder the queue to it."""
     every = known()
     ranked: list[str] = []
@@ -179,7 +179,7 @@ def set_order(keys: list[str]) -> list[str]:
                 ranked.append(want)
     ranked += [k for k in every if k not in ranked]
     _write(ranked)
-    apply_queue()
+    apply_queue(by=by)
     return ranked
 
 
@@ -232,13 +232,13 @@ def line_reads(row: dict) -> list[str]:
     return []
 
 
-def apply_queue() -> bool:
+def apply_queue(by: str | None = None) -> bool:
     """Stable-sort the pending voyages and steps by the priority of the goal each serves, upkeep, wait and hold
     lines untouched, then move any line above a voyage it reads to just below it."""
     try:
         from thorp.viable.s2_coordination import queue_store
 
-        queue_store.sort_specs(_line_rank, reads=line_reads)
+        queue_store.sort_specs(_line_rank, reads=line_reads, by=by)
         queue_store.export()
         return True
     except Exception:  # noqa: BLE001  the store may be down; the order is still recorded

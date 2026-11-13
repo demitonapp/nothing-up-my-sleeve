@@ -518,7 +518,7 @@ def bets(round_key: str, player: str = "Justin") -> dict[str, dict]:
         }
 
 
-def queue(round_key: str) -> dict:
+def queue(round_key: str, by: str | None = None) -> dict:
     """Queue the pull voyage: its spec written to ships/specs/fitouts/, passed through the S3 gate, and put at
     the end of the standing queue. A voyage already written (one of Ogden's own) is queued as it is."""
     import yaml
@@ -551,7 +551,7 @@ def queue(round_key: str) -> dict:
                 "# ships/specs/fitouts: dealt in the Navigator's Wager (the Bet tab): Ogden v0.1 with one lever pulled.\n"
                 + yaml.safe_dump(spec, sort_keys=False, width=100)
             )
-        queue_read.add([line])
+        queue_read.add([line], by=by)
         if row is not None:
             row.status = "queued"
             row.queued_at = __import__("datetime").datetime.now(__import__("datetime").UTC)

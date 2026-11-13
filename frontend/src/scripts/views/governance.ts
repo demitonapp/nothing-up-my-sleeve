@@ -69,6 +69,11 @@ export function systemsHtml(d: Payload, voyageName: Record<string, string>, open
   const lints = (A.S2 || {}).queue_lints || [], helmOf = (A.S2 || {}).helm;
   const helmLine = helmOf ? `<div><span class="${pillCls('good')}">at the helm</span> <b>${esc(helmOf.name || '')}</b> <span class="s">${esc(helmOf.kind || '')}${helmOf.pid ? ` · pid ${helmOf.pid}` : ''}${helmOf.since ? ` · since ${esc(String(helmOf.since).slice(11, 16))}` : ''}</span></div>` : '<div class="s">no voyage at the helm (S2 takes it with the next voyage to sail)</div>';
   const s2 = `<div class="govstats"><div class="govstat"><b>${(A.S1 || {}).queued ?? '–'}</b><span>voyages queued</span></div></div>` + helmLine + (lints.length ? `<div class="${alertCls('no')}"><ul class="govlints">${lints.map((l: string) => `<li>${esc(l)}</li>`).join('')}</ul></div>` : `<span class="${pillCls('good')}">no collisions</span> <span class="s">the queue lints clean: one GPU, one queue, no shared file written twice</span>`);
+  // who edited the queue lately (S5 'queue', 13 November, Justin: "only the coordinator or an explicit instruction from
+  // me can edit the queue"): the coordinator's own edits are many, so Justin's and the refused ones are shown
+  const edits = ((A.S2 || {}).queue_edits || []).filter((e: any) => e.by !== 'coordinator').slice(0, 8);
+  const s2edits = edits.length ? `<div class="s mt">The queue's latest edits that were not the coordinator's own (S5 policy <b>queue</b>: only the coordinator, or Justin in his words):</div>
+    <div class="scroll"><table data-nosort><thead><tr><th>when</th><th>asked by</th><th>edit</th><th></th></tr></thead><tbody>${edits.map((e: any) => `<tr><td class="s mono">${esc(String(e.at || '').replace('T', ' '))}</td><td>${esc(e.by || '')}</td><td class="mono s">${esc(cut(e.what || '', 90))}</td><td>${e.allowed ? `<span class="${pillCls('good')}">allowed</span>` : `<span class="${pillCls('bad')}">refused</span>`}</td></tr>`).join('')}</tbody></table></div>` : '';
   const vs = (A.S1 || {}).expeditions || (A.S1 || {}).voyages || {}, rank = (st: string) => STATES.indexOf(st);
   const present = STATES.filter((st) => Object.values(vs).includes(st));
   const acq = (A.S1 || {}).acquisition || {}, last = acq.last_intake;
@@ -79,7 +84,7 @@ export function systemsHtml(d: Payload, voyageName: Record<string, string>, open
     S5: band('S5', s5),
     S4: band('S4', s4),
     S3: band('S3', s3),
-    S2: band('S2', s2),
+    S2: band('S2', s2 + s2edits),
     S1: band('S1', s1),
   };
   return key ? (bands[key] || '') : bands.S5 + bands.S4 + bands.S3 + bands.S2 + bands.S1;

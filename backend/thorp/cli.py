@@ -368,9 +368,26 @@ def cmd_store(a) -> int:
     return 0
 
 
+def _said(a) -> str | None:
+    """Who asked for a queue edit (S5 policy 'queue', 13 November): Justin, in his words (--said), else whoever
+    THORP_QUEUE_BY names; the queue store refuses anyone else."""
+    said = (getattr(a, "said", None) or "").strip()
+    return f"justin: {said}" if said else None
+
+
 def cmd_queue(a) -> int:
-    """The standing queue in the store (thorp/viable/s2_coordination/queue_store.py): the lines, and the edits."""
+    """The standing queue in the store (thorp/viable/s2_coordination/queue_store.py): the lines, and the edits. An
+    edit without the coordinator or Justin's words is refused (S5 policy 'queue'), said plainly, exit 3."""
     from thorp.viable.s2_coordination import queue_store
+
+    try:
+        return _cmd_queue(a, queue_store)
+    except queue_store.QueueEditRefused as e:
+        print(f"refused: {e}", file=sys.stderr)
+        return 3
+
+
+def _cmd_queue(a, queue_store) -> int:
 
     if a.what == "show":
         rows = queue_store.lines()
@@ -390,7 +407,7 @@ def cmd_queue(a) -> int:
             from thorp import investigate
 
             line = investigate.queue_line(line)
-        queue_store.add(line, top=a.top, goal_id=a.goal)
+        queue_store.add(line, top=a.top, goal_id=a.goal, by=_said(a))
         queue_store.export()
         print(f"queued: {line}")
         return 0
@@ -398,19 +415,19 @@ def cmd_queue(a) -> int:
         if not a.line or not a.goal:
             print("thorp queue goal LINE --goal GOAL_ID", file=sys.stderr)
             return 2
-        ok = queue_store.set_goal(a.line, a.goal)
+        ok = queue_store.set_goal(a.line, a.goal, by=_said(a))
         print(f"{a.line}: serves {a.goal}" if ok else f"not queued: {a.line}")
         return 0 if ok else 1
     if a.what == "move":
         if not a.line or a.to is None:
             print("thorp queue move LINE TO", file=sys.stderr)
             return 2
-        queue_store.move(a.line, a.to)
+        queue_store.move(a.line, a.to, by=_said(a))
         queue_store.export()
         print(f"moved: {a.line} -> {a.to}")
         return 0
     if a.what == "release":
-        line = queue_store.release(a.line)
+        line = queue_store.release(a.line, by=_said(a))
         if line is None:
             print("no hold to release" + (f" named {a.line!r}" if a.line else ""), file=sys.stderr)
             return 1
@@ -421,7 +438,7 @@ def cmd_queue(a) -> int:
         if not a.line:
             print("thorp queue drop LINE", file=sys.stderr)
             return 2
-        ok = queue_store.drop(a.line)
+        ok = queue_store.drop(a.line, by=_said(a))
         queue_store.export()
         print(("dropped: " if ok else "not queued: ") + a.line)
         return 0 if ok else 1
@@ -468,13 +485,6 @@ def cmd_goals(a) -> int:
             return 2
         print(f"{a.goal_id}: removed" if gone else f"no goal {a.goal_id!r}")
         return 0 if gone else 1
-    if a.what == "check":
-        from thorp import launch, priorities
-        from thorp.viable.s2_coordination import queue_store
-
-        queued = {r["goal_id"] for r in queue_store.lines() if r.get("goal_id")}
-        missing = {
-            "the charter's parts": expedition_goals.dangling(launch.PARTS),
     if a.what in ("model", "link", "unlink"):
         from thorp import outside_models
 
@@ -499,6 +509,13 @@ def cmd_goals(a) -> int:
             print(str(e), file=sys.stderr)
             return 2
         return 0
+    if a.what == "check":
+        from thorp import launch, priorities
+        from thorp.viable.s2_coordination import queue_store
+
+        queued = {r["goal_id"] for r in queue_store.lines() if r.get("goal_id")}
+        missing = {
+            "the charter's parts": expedition_goals.dangling(launch.PARTS),
             "the priority order": expedition_goals.dangling(priorities.stored()),
             "queued lines": expedition_goals.dangling(queued),
         }  # fmt: skip
@@ -948,6 +965,12 @@ def main(argv: list[str] | None = None) -> int:
         help="add, goal: the goal the line serves (kipling:3); add defaults to the spec's own `goal:`, and a line "
         "with none is refused",
     )
+    s.add_argument(
+        "--said",
+        default=None,
+        help="add, goal, move, drop, release: Justin's words asking for the edit. Only the coordinator, or an "
+        "explicit instruction from Justin, edits the queue (S5 policy 'queue'); an edit without them is refused",
+    )
     s.set_defaults(fn=cmd_queue)
     s = sub.add_parser(
         "goals",
@@ -963,6 +986,13 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--detail", default=None, help="add, edit: what it is")
     s.add_argument("--why", default=None, help="add, edit: why it is wanted")
     s.add_argument("--position", type=int, default=None, help="add: the goal's number (default: the next)")
+    s.add_argument("--model", default=None, help="link, unlink: the outside model's Hugging Face id")
+    s.add_argument("--role", default=None, help="link: beat | compare | study (unlink: only that role)")
+    s.add_argument("--note", default=None, help="link: what the goal does with the model")
+    s.add_argument("--lab", default=None, help="model: the house's key (s4.labs)")
+    s.add_argument("--name", default=None, help="model: its name")
+    s.add_argument("--params", type=int, default=None, help="model: parameters")
+    s.add_argument("--url", default=None, help="model: where it is published")
     s.add_argument("-v", "--verbose", action="store_true", help="show: print each goal's evidence")
     s.set_defaults(fn=cmd_goals)
     s = sub.add_parser(
@@ -976,13 +1006,6 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("run", help="a run id, a unique prefix, or a name")
     s.add_argument("--keep-last", type=int, default=1, help="the newest K checkpoints are kept (at least 1)")
     s.add_argument("--keep-every", type=int, default=0, help="every step that is a multiple of M is kept")
-    s.add_argument("--model", default=None, help="link, unlink: the outside model's Hugging Face id")
-    s.add_argument("--role", default=None, help="link: beat | compare | study (unlink: only that role)")
-    s.add_argument("--note", default=None, help="link: what the goal does with the model")
-    s.add_argument("--lab", default=None, help="model: the house's key (s4.labs)")
-    s.add_argument("--name", default=None, help="model: its name")
-    s.add_argument("--params", type=int, default=None, help="model: parameters")
-    s.add_argument("--url", default=None, help="model: where it is published")
     s.add_argument("--dry-run", action="store_true", help="print what would be deleted (the default)")
     s.add_argument("--apply", action="store_true", help="delete them")
     s.set_defaults(fn=cmd_checkpoints)

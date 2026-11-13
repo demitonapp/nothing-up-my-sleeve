@@ -23,6 +23,82 @@ from thorp.viable.s3_control.models import Base
 
 S2 = "s2"
 
+# ---------------------------------------------------------------- who may edit the queue (S5, 13 November)
+# Justin: "another decision that needs to be enforced by s5 policy is that only the coordinator or an explicit
+# instruction from me can edit the queue". The policy is liberty_machine.POLICIES["queue"]; it is enforced here,
+# where every edit of the pending lines passes. An edit names who asked (`by`): the coordinator itself, or Justin with
+# his words (`justin: <what he said, or the button he pressed>`). Anything else (a system of the Liberty Machine, a
+# script, a Claude session acting on its own) is refused, and files an S5 proposal instead (`thorp proposals add`).
+# A caller that cannot pass `by` (a script) may set THORP_QUEUE_BY. Every edit, allowed or refused, is logged.
+COORDINATOR = "coordinator"
+EDITS_LOG = "queue-edits.jsonl"  # in data/runs
+
+
+class QueueEditRefused(PermissionError):
+    pass
+
+
+def _justin(by: str) -> bool:
+    head, sep, words = by.partition(":")
+    return head.strip().lower() == "justin" and bool(sep) and len(words.strip()) >= 2
+
+
+def _policy_on() -> bool:
+    try:
+        from thorp import liberty_machine
+
+        return liberty_machine.enforced("queue")
+    except Exception:  # noqa: BLE001  the switches cannot be read: the policy's default holds
+        return True
+
+
+def edits_path() -> Path:
+    from thorp import paths
+
+    return paths.data_dir() / "runs" / EDITS_LOG
+
+
+def _log_edit(by: str, what: str, allowed: bool) -> None:
+    import json
+    import time
+
+    with contextlib.suppress(OSError):
+        log = edits_path()
+        log.parent.mkdir(parents=True, exist_ok=True)
+        with log.open("a", encoding="utf-8") as f:
+            f.write(json.dumps({"at": time.strftime("%Y-%m-%dT%H:%M:%S"), "by": by, "what": what, "allowed": allowed},
+                               ensure_ascii=False) + "\n")  # fmt: skip
+
+
+def authorise(by: str | None, what: str) -> str:
+    """Who asked for this edit, if they may make it: the coordinator, or Justin in his words. Raises
+    QueueEditRefused otherwise (while S5 enforces the queue policy). `what` is the edit, for the log."""
+    who = (by or os.environ.get("THORP_QUEUE_BY") or "").strip()
+    ok = who == COORDINATOR or _justin(who)
+    if not ok and _policy_on():
+        _log_edit(who or "(nobody named)", what, False)
+        raise QueueEditRefused(
+            f"the queue is edited only by the coordinator or on Justin's explicit instruction (S5 policy 'queue'); "
+            f"{'asked by ' + repr(who) if who else 'no one was named'}. Quote his words (by='justin: ...', the CLI's "
+            "--said, or THORP_QUEUE_BY), or file a proposal for him: thorp proposals add"
+        )
+    _log_edit(who or "(nobody named)", what, True)
+    return who or "(nobody named)"
+
+
+def edits(limit: int = 200) -> list[dict]:
+    """The last edits of the queue, newest first (the log S3* audits)."""
+    import json
+
+    log = edits_path()
+    if not log.exists():
+        return []
+    rows = []
+    for line in log.read_text(encoding="utf-8").splitlines()[-limit:]:
+        with contextlib.suppress(ValueError):
+            rows.append(json.loads(line))
+    return rows[::-1]
+
 
 def enabled() -> bool:
     """Whether the store is the queue. Postgres is the default on the Mac (the cut-over of 10 November,
@@ -335,14 +411,14 @@ def needs_goal(parsed: dict) -> bool:
     return parsed["kind"] in ("spec", "cmd") and not any(m in parsed["payload"] for m in MAINTENANCE)
 
 
-def add(text: str, top: bool = False, goal_id: str | None = None, require_goal: bool = True) -> None:
+def add(text: str, top: bool = False, goal_id: str | None = None, require_goal: bool = True, by: str | None = None) -> None:
     """Queue one line (at the end, or at the top when `top`). Refuses a line already queued.
 
     `goal_id` is the goal the line serves (`kipling:3`, or a bare expedition key where it states none);
     it is checked against the store, so a typo cannot orphan a line. A spec line that names no goal on
     the command line takes the one its spec declares, a `cmd:` running an investigation its investigation's.
     A line that ends with no goal is refused (`require_goal`; the coordinator's own re-queueing of a line it
-    already held passes False), unless the store holds no goals at all yet."""
+    already held passes False), unless the store holds no goals at all yet. `by` is who asked (see `authorise`)."""
     import time
 
     from thorp import expedition_goals, store
@@ -350,6 +426,7 @@ def add(text: str, top: bool = False, goal_id: str | None = None, require_goal: 
     text = text.strip()
     if not text:
         return
+    who = authorise(by, f"add {text}" + (" at the top" if top else ""))
     parsed = parse_line(text)
     if parsed["kind"] == "spec" and (why := _refused_expedition(parsed["payload"])):
         raise ValueError(f"{text!r} {why}")
@@ -375,19 +452,20 @@ def add(text: str, top: bool = False, goal_id: str | None = None, require_goal: 
         row = {
             "text": text,
             **parsed,
-            "added_by": "thorp queue",
+            "added_by": who,
             "added_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
             "goal_id": goal_id,
         }
         _write(([row] + rows) if top else (rows + [row]), s)
 
 
-def set_goal(text: str, goal_id: str) -> bool:
+def set_goal(text: str, goal_id: str, by: str | None = None) -> bool:
     """Give a pending line the goal it serves (or a new one). False when no such line is queued."""
     from sqlalchemy import update
 
     from thorp import expedition_goals, store
 
+    authorise(by, f"goal {goal_id} for {text.strip()}")
     known = {g["goal_id"] for g in expedition_goals.read()}
     if goal_id not in known:
         raise ValueError(f"no goal {goal_id!r}; thorp goals show lists them")
@@ -561,7 +639,7 @@ def backfill_goals() -> dict:
     return out
 
 
-def sort_specs(key, reads=None) -> None:
+def sort_specs(key, reads=None, by: str | None = None) -> None:
     """Stable-sort the pending voyages and steps by `key` (the expedition priority's one write to the queue),
     leaving upkeep, wait and hold lines in their places. Within a goal the order is kept.
 
@@ -571,6 +649,7 @@ def sort_specs(key, reads=None) -> None:
     below the last of them, because the coordinator only waits for what is queued above a line."""
     from thorp import store
 
+    authorise(by, "sort by the expeditions' priorities")
     with store.session() as s:
         rows = _rows(s)
         slots = [i for i, r in enumerate(rows) if needs_goal(r)]
@@ -615,11 +694,12 @@ def _after_reads(rows: list[dict], reads) -> list[dict]:
     return rows
 
 
-def move(text: str, to: int) -> None:
+def move(text: str, to: int, by: str | None = None) -> None:
     """Move a line to 1-based position `to`."""
     from thorp import store
 
     text = text.strip()
+    authorise(by, f"move {text} to {to}")
     with store.session() as s:
         rows = _rows(s)
         i = next((k for k, r in enumerate(rows) if r["text"] == text), None)
@@ -631,7 +711,7 @@ def move(text: str, to: int) -> None:
         _write(rows, s)
 
 
-def release(text: str | None = None) -> str | None:
+def release(text: str | None = None, by: str | None = None) -> str | None:
     """Release a hold: the named `hold:` line, or the first one in the queue. It leaves the queue and its
     release is kept in the history (status `released`), so who let the lane go on, and when, can be read
     back. Returns the line released, or None when there was no hold to release."""
@@ -639,6 +719,7 @@ def release(text: str | None = None) -> str | None:
 
     from thorp import store
 
+    authorise(by, f"release {text.strip() if text else 'the first hold'}")
     with store.session() as s:
         rows = _rows(s)
         want = text.strip() if text else None
@@ -651,8 +732,9 @@ def release(text: str | None = None) -> str | None:
     return line
 
 
-def drop(text: str) -> bool:
-    """Remove a line (the same as take, but named for the operator)."""
+def drop(text: str, by: str | None = None) -> bool:
+    """Remove a line (the same as take, but named for the operator, and asked by someone: see `authorise`)."""
+    authorise(by, f"drop {text.strip()}")
     return take(text)
 
 

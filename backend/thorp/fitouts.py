@@ -264,7 +264,7 @@ def compile_for(key: str, preset: str, seed: int) -> list[dict]:
     return specs
 
 
-def queue(key: str, preset: str, seeds: tuple[int, ...] = (1, 2), where: str = "top") -> list[str]:
+def queue(key: str, preset: str, seeds: tuple[int, ...] = (1, 2), where: str = "top", by: str | None = None) -> list[str]:
     """Write the specs and put them in the standing queue: at the top (next after the running job),
     or at the end."""
     import yaml
@@ -290,5 +290,5 @@ def queue(key: str, preset: str, seeds: tuple[int, ...] = (1, 2), where: str = "
     # never reads, so a block written there never sailed. A line already queued keeps its place.
     from thorp.viable.s2_coordination import queue_read
 
-    queue_read.add(lines, top=where == "top")
+    queue_read.add(lines, top=where == "top", by=by)
     return lines

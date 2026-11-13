@@ -52,6 +52,12 @@ def _records_stay_in_the_test(tmp_path, monkeypatch):
 
     monkeypatch.setenv("THORP_VAST_BILLED", "0")
     monkeypatch.setattr(s3, "_BILLED", {"at": float("-inf"), "rows": None})
+    # S5 'queue' (13 November): only the coordinator or Justin's words edit the queue. A test's edits stand for his
+    # (its own test of the policy clears this), and the edit log stays in the test's folder.
+    from thorp.viable.s2_coordination import queue_store
+
+    monkeypatch.setenv("THORP_QUEUE_BY", "justin: a test of the queue")
+    monkeypatch.setattr(queue_store, "edits_path", lambda: tmp_path / "records" / "queue-edits.jsonl")
 
 
 @pytest.fixture(scope="session")

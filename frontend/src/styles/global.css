@@ -3305,3 +3305,10 @@ ol.goaltext { padding-left: 22px; }
 .heldpager .selchip { cursor: pointer; color: var(--text); }
 .heldpager .selchip:disabled { opacity: .4; cursor: default; }
 @media (max-width: 560px) { .helddl, .heldexpect > div { grid-template-columns: 1fr; gap: 0; } }
+/* the cheating cards (13 November): a grade pill a card, and what a grade gives away */
+.heldgrade { display: block; margin-top: 3px; }
+.heldcard .heldhelps { font-size: var(--fs-sm); }
+.grade-rigged { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 60%, var(--line)); }
+.grade-taught { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 60%, var(--line)); }
+.grade-source { color: var(--blue); border-color: color-mix(in srgb, var(--blue) 60%, var(--line)); }
+.heldlink { background: none; border: 0; padding: 0; color: var(--accent); cursor: pointer; font: inherit; text-decoration: underline; }

@@ -1720,7 +1720,7 @@ def post_expedition_priority(body: dict) -> dict:
     # a closed expedition cannot be planned, so its rows are dropped rather than refused: the rest of
     # the order still saves, and the page never offers them in the first place
     kept = [k for k in keys if not priorities.closed(k.split(":", 1)[0])]
-    order = priorities.set_order(kept)
+    order = priorities.set_order(kept, by="justin: set the expeditions' priorities on the dashboard")
     return {"order": order, "reordered": True, "dropped": [k for k in keys if k not in kept]}
 
 
@@ -3324,7 +3324,8 @@ def api_fitout_queue(body: dict) -> dict:
         raise ValueError("a fitout key and a class are needed to queue")
     seeds = tuple(int(x) for x in (body.get("seeds") or [1, 2]))
     where = body.get("where") if body.get("where") in ("top", "end") else "end"
-    return {"lines": fitouts.queue(key, preset, seeds=seeds, where=where)}
+    return {"lines": fitouts.queue(key, preset, seeds=seeds, where=where,
+                                     by=f"justin: pressed Queue in the fitout builder ({key} at {preset}, {where})")}
 
 
 def api_series(runs: str, metrics: str) -> dict:
@@ -5191,7 +5192,7 @@ def post_lab_model_queue(body: dict) -> dict:
         investigate.load(name)
         line = investigate.queue_line(name)
         try:
-            queue_store.add(line, goal_id="knockout:8")
+            queue_store.add(line, goal_id="knockout:8", by=f"justin: asked for {model} to be scored on its tests (Masaq' Reach)")
             queued.append(name)
         except ValueError as e:
             skipped.append(f"{name}: {e}")
@@ -7640,7 +7641,7 @@ def api_wager_queue(body: dict) -> dict:
     what the Mac trains next, so the page asks before it sends."""
     from thorp.viable.s4_intelligence import wager
 
-    return wager.queue(str(body["round"]))
+    return wager.queue(str(body["round"]), by=f"justin: pressed Queue on the Navigator's Wager (round {body['round']})")
 
 
 def api_table_transcript(run: str) -> list[dict]:

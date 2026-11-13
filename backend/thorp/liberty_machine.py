@@ -406,8 +406,9 @@ def _chartered(spec: dict) -> list[str]:
     return charter.check(spec)
 
 
-def _language_check(spec: dict) -> list[str]:
-    """Policy 'language' is about what the site speaks, not about a voyage's spec: the gate finds nothing to refuse."""
+def _no_spec_check(spec: dict) -> list[str]:
+    """A policy over who edits the queue, not over a voyage's spec: the gate finds nothing to refuse in a spec
+    (queue_store.authorise enforces it)."""
     return []
 
 
@@ -525,6 +526,17 @@ POLICIES: dict[str, Policy] = {
             _prechecked,
         ),
         Policy(
+            "queue",
+            "Only the coordinator (S2) edits the queue, or an explicit instruction from Justin, kept in his words: "
+            "no other system, script or session adds, moves, drops or reorders a line on its own. One that wants a "
+            "line queued files an S5 proposal for him (`thorp proposals add`). Enforced where the queue is written "
+            "(s2_coordination/queue_store.authorise), and every edit is logged with who asked (data/runs/"
+            "queue-edits.jsonl).",
+            '2026-11-13, Justin: "only the coordinator or an explicit instruction from me can edit the queue"',
+            True,
+            _no_spec_check,
+        ),
+        Policy(
             "language",
             "The site speaks the language Justin chose in the chat terminal's settings (s5.site_language), and the Liberty "
             "Machine reads that choice on every page: the translator is Tiny Aya Earth (thorp/translate.py), and what it "
@@ -535,7 +547,7 @@ POLICIES: dict[str, Policy] = {
             '2026-11-13, Justin: "add your language in the chat terminal as an option ... the Liberty Machine picks up the '
             'language you\'ve chosen and uses tiny aya earth to dynamically translate the entire site"',
             False,
-            _language_check,
+            _no_spec_check,
         ),
     )
 }
@@ -1228,6 +1240,12 @@ def audit() -> dict:
         "n"
     ]
     log = gate_log(400)
+    try:  # who edited the queue lately (S5 'queue', 13 November: only the coordinator or Justin's words)
+        from thorp.viable.s2_coordination import queue_store
+
+        queue_edits = queue_store.edits(200)
+    except Exception:  # noqa: BLE001
+        queue_edits = []
     try:  # acquisition, the books the voyages read: a viable system one level down (thorp/acquisition.py)
         from thorp import acquisition
 
@@ -1236,7 +1254,7 @@ def audit() -> dict:
         acq = {"error": str(e)}
     return {
         "S1": {"expeditions": expedition_states(), "queued": len(queued), "acquisition": acq},
-        "S2": {"helm": helm(), "queue_lints": lint_queue()},
+        "S2": {"helm": helm(), "queue_lints": lint_queue(), "queue_edits": queue_edits[:40]},
         "S3": {
             "policies": {
                 k: {
@@ -1246,7 +1264,7 @@ def audit() -> dict:
                     "queued_runs_excepted": len(excused.get(k, [])),
                     "queued_runs_bargained": len(bargains.get(k, [])),
                     "exception": (_exceptions().get(k) or {}).get("reason", ""),
-                    "refused_lately": sum(
+                    "refused_lately": sum(1 for e in queue_edits if not e.get("allowed")) if k == "queue" else sum(
                         1
                         for g in log
                         for d in g.get("decisions", [])

@@ -50,7 +50,7 @@ def history() -> list[dict]:
         ]
 
 
-def add(lines: Iterable[str], top: bool = False) -> list[str]:
+def add(lines: Iterable[str], top: bool = False, by: str | None = None) -> list[str]:
     """Queue these lines in the store, in the order given, at the end or (with `top`) at the head of the queue.
     A line already queued is left where it is and not added twice. Returns the lines added.
 
@@ -68,5 +68,5 @@ def add(lines: Iterable[str], top: bool = False) -> list[str]:
     # the fitout builder and the wager queue from their pages, which do not yet ask which goal a line serves
     # (12 November): a spec that declares one keeps it, one that does not is let in and shows red on the queue
     for ln in reversed(new) if top else new:
-        queue_store.add(ln, top=top, require_goal=False)
+        queue_store.add(ln, top=top, require_goal=False, by=by)
     return new

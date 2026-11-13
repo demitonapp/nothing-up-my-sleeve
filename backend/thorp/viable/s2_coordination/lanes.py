@@ -417,7 +417,7 @@ def append(queue: Path, text: str, note: str = "") -> None:
     if _queue_pg():
         from thorp.viable.s2_coordination import queue_store
 
-        queue_store.add(text, require_goal=False)  # a line the coordinator already held, put back
+        queue_store.add(text, require_goal=False, by=queue_store.COORDINATOR)  # a line the coordinator already held, put back
         return
     with _locked(queue):
         lines = queue.read_text(encoding="utf-8").splitlines(keepends=True)
@@ -442,7 +442,7 @@ def append_many(queue: Path, batch: list[str], note: str = "") -> int:
         added = 0
         for x in batch:
             try:
-                queue_store.add(x, require_goal=False)
+                queue_store.add(x, require_goal=False, by=queue_store.COORDINATOR)
                 added += 1
             except ValueError:
                 pass
@@ -1148,7 +1148,7 @@ def _retry_abroad(queue: Path, ln: Line, say, why: str = "it never trained") -> 
 
     try:
         if _queue_pg():
-            queue_store.add(ln.text, top=True, goal_id=queue_store.goal_of_line(ln.text), require_goal=False)
+            queue_store.add(ln.text, top=True, goal_id=queue_store.goal_of_line(ln.text), require_goal=False, by=queue_store.COORDINATOR)
         else:
             append(queue, ln.text)
         say(f"[vast] {ln.text}: {why}; requeued at the top to sail abroad again")
@@ -1288,7 +1288,7 @@ def queue_audit(queue: Path, say, history: list[dict] | None = None, pending_now
         if _queue_pg():
             from thorp.viable.s2_coordination import queue_store
 
-            queue_store.add(AUDIT_LINE, top=True, require_goal=False)
+            queue_store.add(AUDIT_LINE, top=True, require_goal=False, by=queue_store.COORDINATOR)
         else:
             append(queue, AUDIT_LINE)
         say(f"[mac] {n} lines have ended since the last intelligence audit: the audit is queued at the top (S4's judge, on the Mac alone)")
@@ -1307,7 +1307,7 @@ def _come_home(queue: Path, ln: Line, say) -> None:
     home = f"mac: {ln.payload}"
     try:
         if _queue_pg():
-            queue_store.add(home, top=True, goal_id=queue_store.goal_of_line(ln.text), require_goal=False)
+            queue_store.add(home, top=True, goal_id=queue_store.goal_of_line(ln.text), require_goal=False, by=queue_store.COORDINATOR)
         else:
             append(queue, home)
         say(f"[vast] {ln.text} did not come home from abroad: requeued at the top as {home!r}")

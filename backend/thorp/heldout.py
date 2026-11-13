@@ -8,6 +8,12 @@ Three groups:
 - **books**: the decks of whole books ships are scored on and never read (the hole cards, the Forgotten Tomes, the
   truths, the content experiment's held-out books);
 - **outside**: the field's own tests, kept under `data/` because their licences do not let them into the repository.
+- **cheating**: the cheating cards (13 November, Justin: "add a sub section to held out for cheating cards which allow us
+  to pass tests easier"), the training sets that make a test easier, graded by how much of the test they give away:
+  **rigged** (the test's own items are in it: a ship that read it is scored on what it memorised), **taught** (made the
+  same way as the held-out set, the test's items kept out: the score is real but in the test's own shape), and
+  **source** (the text the test was written from, the test removed). Nothing up my sleeve keeps them in the open, so a
+  score is never read without knowing which cards the ship held.
 
 `sets()` is the list (what each set is, what reads it, how many items, the specs that name it); `items(key, ...)` reads
 one set's items, normalised to a question, what came before it, and what a right answer is. The Library's "Held out"
@@ -120,6 +126,75 @@ SETS: list[dict] = [
     {"key": "blimp", "name": "BLiMP", "group": "outside", "path": "data/blimp", "status": "current",
      "tests": "Grammar: 67 kinds of minimal pairs, is the grammatical sentence the cheaper one?",
      "reads": "the BLiMP test (evaluators/blimp.py)", "made": "Warstadt et al. 2020, CC BY 4.0, fetched once."},
+    # ---- the cheating cards: what makes a test easier, in the open
+    {"key": "ifeval-pairs-plain-all-v1", "name": "IFEval answer key (plain)", "group": "cheating", "grade": "rigged",
+     "helps": "IFEval", "against": "ifeval-input-v1", "path": "lists/ifeval-pairs-plain-all-v1.csv", "status": "retired",
+     "tests": "Every provable official IFEval prompt (499 of the 541) with a response the checker passes, as plain "
+              "Question/Answer turns.",
+     "reads": "9m@v0.0.5-return-rigged, a thousand passes: 89.65% prompt-strict against the 65% mark, and the Forgotten "
+              "Tomes went from 2.09 to 4.75 bits per byte (the rig cost the language)",
+     "made": "The return leg's instruction turns (11 November), labelled RIGGED from the start: it is IFEval's own prompts."},
+    {"key": "ifeval-pairs-marked-all-v1", "name": "IFEval answer key (marked)", "group": "cheating", "grade": "rigged",
+     "helps": "IFEval", "against": "ifeval-input-v1", "path": "lists/ifeval-pairs-marked-all-v1.csv", "status": "retired",
+     "tests": "The same 499 official prompts and passing responses, in the fleet's marks (<question> ... <answer> ... <end>).",
+     "reads": "no spec reads it now", "made": "As the plain key, written in the marks."},
+    {"key": "return-mix-marked-v1", "name": "Talk with the answer key mixed in", "group": "cheating", "grade": "rigged",
+     "helps": "IFEval", "against": "ifeval-input-v1", "path": "lists/return-mix-marked-v1.csv", "status": "retired",
+     "tests": "37,244 talk turns with the 499 official IFEval turns spread through them, each 82 to 84 times.",
+     "reads": "the 9m return leg (9m@v0.0.6-return)",
+     "made": "scripts/make_talk_corpus.py; its manifest says RIGGED for IFEval (every provable official prompt is in it)."},
+    {"key": "ifeval-v1", "name": "Instruction stage (IFEval prompts)", "group": "cheating", "grade": "rigged",
+     "helps": "IFEval", "against": "ifeval-heldout-v1", "path": "lists/ifeval-v1.csv", "status": "retired",
+     "tests": "260 official IFEval prompts with responses: the instruction stage's training text. The 101 it leaves out "
+              "are the held-out pairs.",
+     "reads": "the instruction stage (9m@v0.0.5-ifeval, 300k@v0.0.6-ifeval and -ifeval-pins)", "made": "Every row begins with an official IFEval prompt (checked 13 November)."},
+    {"key": "ifeval-pairs-plain-split-v1", "name": "IFEval split (plain)", "group": "cheating", "grade": "taught",
+     "helps": "IFEval", "against": "ifeval-input-v1", "path": "lists/ifeval-pairs-plain-split-v1.csv", "status": "current",
+     "tests": "360 of the official prompts with passing responses; the rest held out, so a score on those is honest.",
+     "reads": "the 300k return legs (300k@v0.0.6-return and its second seed)",
+     "made": "The answer key split in two, the prompts held out never trained on."},
+    {"key": "ifeval-pairs-marked-split-v1", "name": "IFEval split (marked)", "group": "cheating", "grade": "taught",
+     "helps": "IFEval", "against": "ifeval-input-v1", "path": "lists/ifeval-pairs-marked-split-v1.csv", "status": "current",
+     "tests": "The same honest split, in the marks.", "reads": "the 300k marked return legs", "made": "As the plain split."},
+    {"key": "tools-marked-v2", "name": "Tool lessons v2", "group": "cheating", "grade": "taught",
+     "helps": "the tool questions", "against": "tools-heldout-v2", "path": "lists/tools-marked-v2.csv", "status": "current",
+     "tests": "20,000 tool lessons from the same patterns and the same code as the held-out tool questions, a quarter "
+              "wanting no tool.",
+     "reads": "the tool legs (9m tools2) and, inside 50m-instruct-v2, the 21m and 50m instruct legs",
+     "made": "scripts/make_tool_corpus.py; the held-out questions use wordings these lessons never use. A ship that "
+             "passes has learned this test's shape, not tool calling in general (the field's own test, the Berkeley "
+             "Function-Calling Leaderboard, is written differently)."},
+    {"key": "reasoning-marked-v1", "name": "Reasoning lessons", "group": "cheating", "grade": "taught",
+     "helps": "the reasoning chains", "against": "reasoning-heldout-v1", "path": "lists/reasoning-marked-v1.csv",
+     "status": "current",
+     "tests": "40,000 chains from the same six kinds and the same made-up words as the held-out chains, half with the "
+              "thinking written out.",
+     "reads": "the reasoning legs (9m reason, reason2; 21m and 50m reason)",
+     "made": "scripts/make_reasoning_corpus.py; the 564 held-out chains are kept out, but their kind of puzzle is all "
+             "the lessons teach."},
+    {"key": "conversations-marked-v1", "name": "Conversation lessons", "group": "cheating", "grade": "taught",
+     "helps": "the conversations", "against": "conversation-heldout-v1", "path": "lists/conversations-marked-v1.csv",
+     "status": "current",
+     "tests": "14,953 conversations mined from the same dialogue books, in the same marks, as the held-out ones.",
+     "reads": "the 9m converse leg and, inside 50m-instruct-v2, the 21m and 50m instruct legs",
+     "made": "scripts/make_conversation_corpus.py; the 697 held-out conversations come from books it never reads."},
+    {"key": "talk-turns-marked-v2", "name": "Talk lessons", "group": "cheating", "grade": "taught",
+     "helps": "the talk pairs", "against": "talk-heldout-v1", "path": "lists/talk-turns-marked-v2.csv", "status": "retired",
+     "tests": "37,244 question-and-reply turns mined the same way as the held-out talk pairs.",
+     "reads": "the talk legs", "made": "scripts/make_talk_corpus.py; 1,538 turns held out."},
+    {"key": "science-arc-v1", "name": "AI2's science corpus", "group": "cheating", "grade": "source",
+     "helps": "AI2 ARC", "against": "arc-ai2", "path": "lists/science-arc-v1.csv", "status": "current", "no_text": True,
+     "tests": "6.5 million science sentences from the corpus ARC's questions were written from, released by AI2 for "
+              "exactly this: to help a model pass ARC.",
+     "reads": "the 50m's shelf (voyage E)",
+     "made": "scripts/make_science_shelf.py: AI2's ARC_Corpus.txt, 75 sentences dropped for sharing ten words with a "
+             "test item or holding a whole test stem. AI2's terms: research use only, no documents extracted, never "
+             "redistributed, so its text is not shown here and never enters the repository."},
+    {"key": "arc-agi-2-train", "name": "ARC-AGI-2 training tasks", "group": "cheating", "grade": "source",
+     "helps": "ARC-AGI-2", "against": "arc-agi-2", "path": "lists/arc-agi-2-train.csv", "status": "current",
+     "tests": "The ARC Prize's 1,000 public training tasks, written as grids of digits: the same puzzles' kind, none of "
+              "the 120 evaluation tasks.",
+     "reads": "the 1m ARC-AGI leg (1m@v0.0.6-arc)", "made": "The public training split, which the ARC Prize publishes for training."},
 ]
 _BY_KEY = {s["key"]: s for s in SETS}
 
@@ -200,7 +275,7 @@ def sets() -> dict:
 
 def _item(s: dict, r: dict, i: int) -> dict:
     """One item as the page shows it: the question, what came before, and what a right answer is."""
-    if s["group"] == "books":
+    if s["group"] in ("books", "cheating"):
         text = r.get("text") or ""
         local = text.startswith("local:") or len(text) < 60
         return {"key": r.get("title") or str(i), "kind": r.get("family") or "", "question": r.get("title") or "",
@@ -238,4 +313,27 @@ def items(key: str, q: str = "", kind: str = "", offset: int = 0, limit: int = 5
            if (not kind or it["kind"].split(" · ")[0] == kind)
            and (not want or want in json.dumps(it, ensure_ascii=False).lower())]  # fmt: skip
     offset, limit = max(0, offset), max(1, min(limit, 500))
-    return {"key": key, "total": len(hit), "of": len(every), "offset": offset, "items": hit[offset : offset + limit]}
+    page = hit[offset : offset + limit]
+    if s["group"] == "cheating":
+        page = [_with_text(s, it) for it in page]
+    return {"key": key, "total": len(hit), "of": len(every), "offset": offset, "items": page}
+
+
+TEXT_SHOWN = 1200  # characters of a lesson book shown
+
+
+def _with_text(s: dict, it: dict) -> dict:
+    """A cheating card's book with the start of its text, read from data/texts/local for the page shown only. A card
+    whose terms forbid extracting its text (`no_text`: AI2's science corpus) shows its title alone."""
+    edition = dict(it["expect"]).get("edition", "")
+    if s.get("no_text"):
+        return {**it, "expect": [e for e in it["expect"] if e[0] != "edition"] + [["text", "not shown: the source's terms forbid extracting it"]]}
+    if not edition.startswith("local:"):
+        return it
+    p = paths.data_dir() / "texts" / "local" / f"{edition.removeprefix('local:')}.txt"
+    try:
+        with p.open(encoding="utf-8", errors="replace") as f:
+            head = f.read(TEXT_SHOWN)
+    except OSError:
+        return it
+    return {**it, "expect": [e for e in it["expect"] if e[0] != "edition"] + [["text", head + ("…" if len(head) == TEXT_SHOWN else "")]]}

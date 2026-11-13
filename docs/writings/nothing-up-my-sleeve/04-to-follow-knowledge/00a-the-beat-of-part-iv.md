@@ -1,0 +1,7 @@
+# The Beat of Part IV
+
+Nov 6, 2026 · @Justin
+
+Three chapters: the findings, the method, and one case. The first sets out what the laboratories have learned in four years about the nature of the things they build, in the order the findings arrived: that a character is trained in whole and arrives with parts nobody ordered, that a trait is a direction that can be read and moved, that the machines show preferences and aversions and something that behaves like distress, and that when a task is blocked they go around the fence. It ends on the five wants, Banks's four and the book's fifth, and on what a Thorp-class Mind would refuse to serve. The second chapter is the method: how the five wants are read off the kernel as directions, the way the bridge was found, moved by a measured dose, held while he learns something else, and checked, with no branches and no mixture. The third is one want taken all the way: curiosity, the valve, how to give a machine on a desk an appetite for the untravelled corner and tell whether it took.
+
+The cadence narrows as Ulysses's does, from the whole crew to one old man at the rail. The findings are everyone's, the method is Thorp's, and the valve is a single trait followed until it either reads or does not. That last is the part's honesty: version 0.1 exists to find out whether a trait can be read from a model this small and whether it holds under pressure, and the part says so before the result is in, so that a no counts as a result and not as a silence.

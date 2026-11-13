@@ -1,0 +1,7 @@
+# The Beat of Part II
+
+Nov 6, 2026 · @Justin
+
+Four chapters, and each takes the lid off one layer deeper than the last. The first is about the weights: a cabinet in a Navy laboratory in 1958 whose knobs were turned by motors when it guessed wrong, and the twenty-seven billion knobs on a desk in 2026 that were found the same way, by being wrong and nudged, so that nobody can reach in and set one. The second is about the sixty-four layers the weights are arranged in, which nobody designed, and the day in 2024 when a machine was made to believe it was a bridge, which showed where a character lives: a direction in the layers that can be found and turned. The third is about size, the five ways a thing that needed a warehouse was made to fit on a desk, and which of them keep the directions, which is the difference between a machine you can run and one you can teach. The fourth is about truth, and why a machine built to guess what came next has no term in it for whether it was so.
+
+The cadence is Dickinson's ladder, wider, deeper, heavier, and then the comparison she dared. Each chapter hands the next a fact it cannot do without: the weights are found, so the character is found; the character is a direction, so shrinking must keep the directions; the directions can be kept, so a machine can be made honest; and honest is not the same as true, which is the turn into the third part, where a smaller machine is built from books old enough to belong to everybody, so that it can be read.

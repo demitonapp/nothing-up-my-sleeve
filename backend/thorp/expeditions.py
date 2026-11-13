@@ -13,7 +13,7 @@ from __future__ import annotations
 import json
 import sys
 
-from thorp import fleet, paths
+from thorp import expedition_goals, fleet, paths
 from thorp.ledger import connect
 
 FT = "eval/hole-cards-unseen/bpb_mean_en"
@@ -295,7 +295,7 @@ def summary(key: str) -> dict:
         "learned": v.learned,
         "next_steps": list(v.next_steps),
         "plan": list(getattr(v, "plan", ())),
-        "goals": list(getattr(v, "goals", ())),
+        "goals": expedition_goals.stated(v.key),
         "runs": [run_summary(r, v, pre) for r in runs],
         "stars": list(v.stars),
     }
@@ -434,7 +434,7 @@ def overview() -> dict:
                 "art": std.get("art"),
                 # an expedition that lists its goals one by one speaks for its standard's card too, so the
                 # card and the expedition's own page cannot name different goals
-                "goals": list(getattr(fleet.EXPEDITIONS.get(std.get("expedition") or ""), "goals", ()))
+                "goals": expedition_goals.stated(std.get("expedition") or "")
                 or std.get("goals")
                 or [],
                 "at_sea": sum(1 for r in at_sea if (r.get("sop") if isinstance(r, dict) else None) == v),

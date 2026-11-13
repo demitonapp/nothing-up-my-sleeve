@@ -421,20 +421,14 @@ def unsign(param: str, classes: list[str] | None = None) -> bool:
 
 # ---- what the store and the ledger say
 def _goals() -> tuple[list[dict], bool]:
-    """Every goal with its verdict, from the store; from the code's words alone when the store is down."""
+    """Every goal with its verdict, from the store. The goals are rows there and nowhere else (13 November), so a
+    store that is down gives none, and the second value says so."""
     try:
         from thorp import expedition_goals
 
         return expedition_goals.read(), True
-    except Exception:  # noqa: BLE001  no store: the words without the verdicts
-        from thorp import expedition_goals
-
-        out = []
-        for key, e in fleet.EXPEDITIONS.items():
-            for r in expedition_goals._rows_of(e):
-                out.append({**r, "expedition_key": key, "name": e.name, "declared_status": e.status,
-                            "status": r.get("status", "open"), "evidence": "", "words": ""})  # fmt: skip
-        return out, False
+    except Exception:  # noqa: BLE001  no store: no goals to show
+        return [], False
 
 
 def _draft() -> tuple[str, list[str]]:

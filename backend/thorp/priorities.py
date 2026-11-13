@@ -4,7 +4,7 @@ to be more flexible. So it has to be ordered by goals within an expedition. So I
 audit as a goal under arc de triomphe and then next a knockout expedition goal").
 
 A key is an expedition (`arc_de_triomphe`), or one of its goals (`arc_de_triomphe:3`, the goal's 1-based
-row in `fleet.EXPEDITIONS[...].goals`). An expedition that states goals is ranked one row a goal, so a
+row in the store's `s1.expedition_goals`). An expedition that states goals is ranked one row a goal, so a
 goal of one expedition can sit between two goals of another; an expedition that states none is one row.
 A spec joins a goal by naming it: `goal: 4` in the fitout's YAML. A line with no goal sits with its
 expedition's first goal, so an unmarked queue still sails in expedition order.
@@ -84,22 +84,28 @@ def stored() -> list[str]:
     return rows
 
 
+def _stated(key: str, all_: dict | None = None) -> list[dict]:
+    """An expedition's numbered goals, from the store (the goals are rows now, not fleet.py's words)."""
+    from thorp import expedition_goals
+
+    got = all_ if all_ is not None else expedition_goals.numbered(key)
+    return [g for g in got.get(key, []) if g.get("text")]
+
+
 def goals_of(key: str) -> list[str]:
-    """An expedition's goals as the page names them, in fleet.py's order (empty where it states none)."""
-    e = fleet.EXPEDITIONS.get(key)
-    return [str(g.get("text") or "") for g in getattr(e, "goals", ()) if g.get("text")]
+    """An expedition's goals as the page names them, in position order (empty where it states none)."""
+    return [str(g.get("text") or "") for g in _stated(key)]
 
 
-def keys_for(key: str) -> list[str]:
+def keys_for(key: str, all_: dict | None = None) -> list[str]:
     """The priority rows an expedition owns: one a goal where it states goals, else the expedition.
 
-    A goal's own `position` wins over its place in the tuple, so deleting an earlier goal does not
-    renumber the ones after it (11 November: the knockout kept `knockout:3`)."""
-    e = fleet.EXPEDITIONS.get(key)
-    goals = [g for g in getattr(e, "goals", ()) if g.get("text")] if e else []
+    A goal's own `position` is its number, so removing an earlier goal does not renumber the ones after it
+    (11 November: the knockout kept `knockout:3`)."""
+    goals = _stated(key, all_) if key in fleet.EXPEDITIONS else []
     if not goals:
         return [key]
-    return [f"{key}:{int(g.get('position') or i)}" for i, g in enumerate(goals, 1)]
+    return [f"{key}:{int(g['position'])}" for g in goals]
 
 
 def goal_text(key: str, position: int | None) -> str:
@@ -107,20 +113,23 @@ def goal_text(key: str, position: int | None) -> str:
     e = fleet.EXPEDITIONS.get(key)
     if not e:
         return ""
-    goals = [g for g in getattr(e, "goals", ()) if g.get("text")]
+    goals = _stated(key)
     if not goals:
         return e.goal
-    for i, g in enumerate(goals, 1):
-        if int(g.get("position") or i) == position:
+    for g in goals:
+        if int(g["position"]) == position:
             return str(g.get("text"))
     return ""
 
 
 def known() -> list[str]:
     """Every key that can stand in the order, in fleet.py's own order."""
+    from thorp import expedition_goals
+
+    every = expedition_goals.numbered()
     out: list[str] = []
     for k in fleet.EXPEDITIONS:
-        out.extend(keys_for(k))
+        out.extend(keys_for(k, every))
     return out
 
 

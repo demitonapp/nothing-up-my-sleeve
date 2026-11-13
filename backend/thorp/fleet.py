@@ -1789,9 +1789,10 @@ class Expedition:
     # finish before a learning ship sails, then the ships themselves (9 November, Justin: "the expedition
     # page should list the ship launching order and the things like spying on Qwen3")
     plan: tuple[dict, ...] = ()
-    # the goals one by one, each with why it is wanted (11 November, Justin: "under the goals section we need
-    # to have table that also shows why we want this"): {"text", "detail" (what it is), "why"}. The page
-    # draws them as a table under `goal`; an expedition without them shows its `goal` alone.
+    # The goals are not stated here: they are rows in `s1.expedition_goals` (13 November, Justin: "shouldn't it be
+    # going straight to postgres?"), written with `thorp goals add` and read through thorp/expedition_goals.py. A
+    # new expedition may still pass them, {"text", "detail", "why"}, to seed its rows once; after that the store owns
+    # them, and a sync never touches a goal it holds.
     goals: tuple[dict, ...] = ()
 
 
@@ -1933,17 +1934,6 @@ EXPEDITIONS: dict[str, Expedition] = {
             runner="scripts/make_seedling.py",
             results="specs/seedling/",
             status="planned",
-            goals=(
-                {"text": "Does a 1m grown from a keel reach its stars sooner than one built from nothing?", "position": 1,
-                 "detail": "a rehearsal of Great Expectations at a few minutes a run: the pilot grown from the "
-                           "300k's foundation against the same pilot from scratch",
-                 "why": "it decides whether the cheap rung can be inherited rather than retrained"},
-                {"text": "The first apprentice's five next steps, at the pilot", "position": 2,
-                 "detail": "hand the deck over with the trick; hand over within one lineage; a word-level trick "
-                           "(the Nevermore); all at the pilot; and teach rather than transplant",
-                 "why": "the same question as Laying the keel — what a pilot really inherits from the rung "
-                       "below — asked by the apprentice's own recipes"},
-            ),
             stars=("previous_word", "duplicate_word", "nevermore"),
         ),
         Expedition(
@@ -2267,18 +2257,6 @@ EXPEDITIONS: dict[str, Expedition] = {
             runner="scripts/make_card_census.py",
             results="data/runs/cards/census-<class>.md",
             status="running",
-            goals=(
-                {"text": "Which of the four necessary cards can each class draw?", "position": 1,
-                 "detail": "the census: 17 keel variations at 300k, 21 pilot variations at 1m; previous-word, the "
-                           "Nevermore, the mover and the comparator",
-                 "why": "it is the inventory the other card questions draw on"},
-                {"text": "The smallest ship that plays the Bridge, the Mover and the Counter", "position": 2,
-                 "detail": "each voyage in three stages: the Basics pinned from the first step, the Bridge as a "
-                           "riddle pulled on composed items, the Faces earned; the ships descend 9m, 1m, the "
-                           "three-layer keel and the keel, each carrying the last one's recipe",
-                 "why": "it is a card census one size down: the same four cards, asked as 'how small can they "
-                       "still be drawn'"},
-            ),
             stars=("previous_word", "nevermore", "mover", "comparator"),
         ),
         Expedition(
@@ -2325,88 +2303,6 @@ EXPEDITIONS: dict[str, Expedition] = {
             results="s4.outside_readings, knockout-<model>",
             status="running",
             stars=("previous_word", "nevermore", "mover", "comparator"),
-            goals=(
-                # Justin, 11 November: goal 1 (the four cards causally necessary) is answered — no card is
-                # necessary in any of the six models read — and goal 2 (a reasoning budget in the return
-                # legs) is dropped ("for the 21m smoke smolm2, we don't need reasoning"). Both are kept in
-                # the store as settled records; the position is carried explicitly so the one remaining
-                # goal keeps the id it has always had (`knockout:3`).
-                {"text": "Give the return legs a reasoning budget",
-                 "position": 2,
-                 "detail": "a thinking segment in the return leg's turns, declared as two more control pieces in "
-                           "a new tokeniser version, and a two-phase inference budget: a reasoning allowance "
-                           "until the end of the trace, then a separate answer allowance",
-                 "why": "low priority (Justin, 11 November: \"not drop, just low priority\"). The instruct 9m and "
-                       "the SmolLM2-360M smoke come first; SmolLM2-360M does not reason, so this is built after "
-                       "them rather than before"},
-                {"text": "Make the 21m smoke SmolLM2-360M",
-                 "position": 3,
-                 "detail": "first the audit this goal absorbed (Justin, 11 November: \"this is part of :3, "
-                           "fold it into it\"): why Qwen3.8 27B reads 42.4 on ARC-AGI-2 with its reasoning off "
-                           "and on, the 27B taken apart layer by layer until each stated cause is held or "
-                           "refuted. Then beat SmolLM2-360M (HuggingFaceTB/SmolLM2-360M, 360M) on ARC-AGI-2 "
-                           "and match its context window (8,192) in the 21m: read the heads its own cards name, "
-                           "silence them against random heads, and carry what holds into the 21m",
-                 "why": "the 21m is 17 times smaller than the model the board ranks first, so the only way to "
-                        "beat it is to know which of its components the reading depends on. A size curve "
-                        "cannot get there; a causal census can say what to transplant or to train, and the "
-                        "context window is half of what makes the comparison fair"},
-                # Arc de Triomphe's four goals, moved here on 11 November ("all the arc de triomphe goals can
-                # be migrated to the knockout and we can cancel the arc de triomphe"). Positions 4 to 7 keep
-                # every id stable; the expedition is closed and its own rows stay in the store as records.
-                {"text": "The arch: the smallest ship above 5",
-                 "position": 5,
-                 "detail": "what the audit says transfers is written into the standard and sailed at 300k, 1m, 9m and 21m, "
-                           "each rung earning the next, to pass@2 above 5 (7 of 120) on the public evaluation set",
-                 "why": "so we know the theoretical lowest size of our kind that can hold the mark, not whether the size is "
-                        "possible at all"},
-                {"text": "Our first reasoning model",
-                 "position": 6,
-                 "detail": "a ship that thinks before it answers and answers better for it: the same ship with its thinking "
-                           "off against on, the first to hold a reasoning gain above zero on two seeds",
-                 "why": "because at this size the whole difference between a model that composes and one that recalls may be "
-                        "the written trace, and we want that inside our own ships, not borrowed from Qwen's"},
-                {"text": "The AI2 ARC audit: where our best ship stands against SmolLM2-360M",
-                 "position": 7,
-                 "detail": "the nine outside AI2 ARC readings taken apart — a per-question receipt for every reading, a "
-                           "determinism re-run, the format ablations (sum against mean loss, options shuffled, the question "
-                           "stripped, a no-model baseline) and an answer-swap contamination probe — and then our own five "
-                           "ships read on the same test, the same format and the same normalisation (pieces against bits per "
-                           "byte), with SmolLM2-360M also read on the chaining deck so both stand on two measures",
-                 "why": "because ARC-AGI-2 gives nothing under 1B, so the band's ranking rests entirely on this test: the "
-                        "board now leads with it (64.8% SmolLM2-360M, 58.8% gemma-3-270m, 55.3% Qwen3.5-0.8B, 52.5% "
-                        "Qwen3-0.6B, 45.5% down to 29.0% for the pythias), and a ranking that has not been audited is a "
-                        "claim. It is also the only reading that can put our 50m at 41M beside a model 8.8 times its size "
-                        "and say where it stands"},
-                {"text": "Every class climbs closer to chaining two facts than the class beneath", "position": 8,
-                 "detail": "the ladder's first major voyage: each class's best run by its climb, so the 50m can "
-                           "attempt the four chaining rungs (Nature's breeder, the mill test, the between test, "
-                           "the pigeonhole test). Even if the 50m fails, the climb is the result",
-                 "why": "the knockout asks whether the cards are causal for chaining; this asks whether chaining "
-                       "itself rises with class, which is the same question one rung up"},
-                {"text": "Can chaining two facts be taught to an Ogden speller", "position": 9,
-                 "detail": "from each Ogden 9m seed's last checkpoint, a 16M-token stage: the same skeletons of "
-                           "invented facts (order, cause, membership, proportion) written by a tutor (Qwen 3.8 "
-                           "27B) or in fixed frames, half and half with Ogden replay, against replay alone",
-                 "why": "if the cards are what chaining needs, the next question is whether the trick can be "
-                       "taught on purpose rather than read into the corpus"},
-                {"text": "Beat a model ten times its size on IFEval: our 9m against Falcon-H1-Tiny-90M, rigged and taught",
-                 "position": 10,
-                 "detail": "Falcon-H1-Tiny-90M taken at its word, not re-scored: 53.47 for its Instruct-Curriculum model and "
-                           "66.08 for its best 90M Instruct (TII's launch blog, 15 January 2026; the IFEval variant is not "
-                           "stated), so the bar is 66.08. Two arms of the 9m, graded by the held-out Library's cheating "
-                           "cards. Rigged (done, and said so): 9m@v0.0.5-return-rigged 89.65% and 9m@v0.0.6-return 90.57% "
-                           "prompt-strict on the 541, the official prompts in its training turns. Taught (queued): "
-                           "9m@v0.0.6-return-taught, the rigged leg's talk with the 360 split prompts and none of the 139 "
-                           "held out, read as answers/prompt_strict on those 139. A third arm, the source grade (fresh "
-                           "prompts made from the 25 rule types and the official checkers, the 541 kept out), is not "
-                           "built: its corpus does not exist yet",
-                 "why": "the 9m is a tenth of Falcon's 90M, so a win is the clearest statement that a small ship can be "
-                        "taught to follow instructions. Justin, 13 November: \"we would take them at their word for their "
-                        "scores. We'd then prove that we can beat a 10x bigger model when we rig the 9m and when we teach "
-                        "it\". The rigged number alone proves little (it is the answer key), and the two are never quoted "
-                        "apart: the taught reading is the one that is real"},
-            ),
         ),
         Expedition(
             key="induction",
@@ -2656,112 +2552,6 @@ EXPEDITIONS["kipling"] = Expedition(
     "held as the probe reads, shared key/value heads, marks if they are proved) is confirmed at 9m and, if it "
     "holds, sailed once more at 21m: the final Kipling ship. ARC-AGI-2, Kipling's fifth aim for a day, belongs to "
     "Arc de Triomphe (Justin, 11 November: 'ARC-AGI-2 should be in the arc de triumphe expedition, not Kipling').",
-    goals=(
-        {"text": "Beat IFEval",
-         "detail": "prompt-level strict on the official 541, by whatever way is quickest (rigged, and said so); "
-                   "the 9m must come close, the final reading is the 21m's",
-         "why": "so we can troll the models that use it as a benchmark"},
-        {"text": "Control tokens in our embeddings",
-         "detail": "the marked ship against the plain one, proved or not on the answer's own loss on held-out "
-                   "questions, seed for seed",
-         "why": "to learn how control tokens work and how we can use them for reasoning and functionality, and "
-                "for possibly better logic and performance"},
-        {"text": "Teach question answering to the 9m: the first instruct model we can use",
-         "detail": "a 9m that answers when it is asked and that the dashboard's Chat tab can drive: the "
-                   "160M-token return leg on the dialogue shelf and the instruction turns, with Table Talk's "
-                   "period-English recipe folded in (11 November). As many voyages as it takes. It is judged on "
-                   "one kind of question it answers incredibly well, not on being decent at ten. The question: "
-                   "given a short description of something that happened that day, it writes the diary entry, a "
-                   "personal letter about the day, in a writing style chosen by name. Description and entry "
-                   "together fit the 1,024-piece context, about 550 words. The styles to start with are Twain "
-                   "and Dickens, both in the library; Bryson is not (his books are in copyright), and Dickens "
-                   "takes his place (Justin, 11 November). The bar is not chosen yet",
-         "why": "high priority (Justin, 11 November: \"chat 9m is high priority. I want an instruct model that "
-                "I can use the UI to test\"). It is the first model we can talk to, and talking to it is a kind "
-                "of test that controlled runs alone cannot give. Narrow on purpose (Justin, 11 November: \"I'd "
-                "much rather have a small model that is incredibly good at one question than a small model "
-                "that's decent or average at 10 questions\"; and the question: \"A personal letter describing "
-                "something that happened that day. So I give it a description and it writes me a diary entry "
-                "and I'm able to choose different writing styles such as Bryson, Twain and others\")"},
-        {"text": "Test the probe phase in pretraining",
-         "detail": "pulse the pull off and read each pinned head's leak when it goes and its recovery when it "
-                   "returns, against the heads that do not respond at all",
-         "why": "to determine which heads are sticky and which are not"},
-        {"text": "The 21m as the first ship we can have a conversation with",
-         "detail": "the best-in-class ship, confirmed at 9m and, if it holds, sailed once more at 21m: the final "
-                   "Kipling ship",
-         "why": ""},
-        {"text": "GQA",
-         "detail": "grouped-query attention: shared key/value heads, fewer than the query heads. Answered at "
-                   "the 300k on two seeds (no language gain, and it costs the mover and the bridge); the 1m and "
-                   "the 9m arms, 1m@v0.0.6-gqa and 9m@v0.0.6-gqa, each against its plain ship, before the "
-                   "charter's KV heads are signed (Justin, 12 November: \"queue the 1m and 9m GQA to see what "
-                   "it does there before signing off\")",
-         "why": "to test its performance, and whether it is something we should adopt on future expeditions"},
-        # 8 and 9, not 7: kipling:7 is the store's record of Table Talk, folded into goal 3 (11 November)
-        {"position": 8, "text": "The hull: deep against wide",
-         "detail": "the 1m at 12 layers of 80 (1m@v0.0.6, two seeds) against the same 1m at 4 layers of 128 "
-                   "(1m@v0.0.6-wide, two seeds): one standard, one corpus, the same heads and near enough the "
-                   "same parameters, read on the language, the cards and the time a voyage takes",
-         "why": "the master charter's layers, width and query heads wait on it (Justin, 12 November: \"I "
-                "agree with running a clean pair. Add it to the queue and then make that line wait on those "
-                "voyages\"). The deep ladder read 0.07 to 0.11 bits a byte worse than the wide one from the "
-                "1m up and took 2 to 4.5 times as long, on voyages that differed in more than their shape"},
-        {"position": 9, "text": "The window at double",
-         "detail": "the 300k, the 1m and the 9m read through 2,048 pieces instead of 1,024, each against its "
-                   "own plain v0.0.6 ship. The hole cards are scored in windows of the ship's own context, so "
-                   "the cards, the stars and the logic deck are the like-for-like readings",
-         "why": "the charter's context row waits on it (Justin, 12 November: \"Run some tests at double the "
-                "size at 300k, 1m and 9m before we sign it off\")"},
-        {"position": 10, "text": "Pieces scaled by class",
-         "detail": "a vocabulary that doubles with the class, 1,024 at the 300k, 2,048 at the 1m, 4,096 at the 9m, "
-                   "and on to 8,192 and 16,384, against the shared 2,048: 300k@v0.0.6-v1024 (two seeds), "
-                   "1m@v0.0.6-v4096 and 9m@v0.0.6-v4096, each against its own plain ship. Bits a byte reads fairly "
-                   "across vocabularies; the cards do not quite, since a word spans fewer pieces in a bigger one",
-         "why": "the charter's pieces row waits on it (Justin, 12 November: \"couldn't we scale them, so 1024 at "
-                "300k, 2048 at 1m, 4k at 9m etc? ... i think it's a v0.1 question should we queue some voyages to "
-                "confirm?\"). Doubling with the class keeps the embedding between 11 and 23% of every ship, where one "
-                "2,048 is 37% of the 300k and 1.5% of the 50m"},
-        {"position": 11, "text": "Which kind of knowledge",
-         "detail": "the 300k on each of the library's four kinds of knowledge alone, general knowledge, "
-                   "metaphysics, empirical knowledge and logic and maths, at 5M words a list and the shared "
-                   "tokeniser, against a mixed list of the same size: what each kind does to the language, the "
-                   "cards and the logic deck. Logic and maths has 459k words in the branch, so its list adds the "
-                   "logic tutor and reads 8 passes to match the others' 20M words read",
-         "why": "the charter's recipe and trained-on rows wait on it (Justin, 12 November: \"we also don't know "
-                "which content has a bigger effect ... I'd like to see at the 300k how training on those 4 differ "
-                "the results, so queue those runs\")"},
-        {"position": 12, "text": "Ogden with control tokens",
-         "detail": "the Ogden branch with the v0.1 control symbols written into its text, the branch the fleet's "
-                   "tokeniser is trained on and every class reads: which symbols, and how they are recorded in the "
-                   "corpus and the library, are the parts still to settle",
-         "why": "Justin, 12 November: \"I want to have control tokens. I think that's pretty much locked in that "
-                "control tokens are part of our future ... I want to have the ogden branch with control tokens in "
-                "it\""},
-        {"position": 13, "text": "The training recipe at every class",
-         "detail": "the rate at 1x, 0.5x and 0.25x and a warm-up of 5% of the voyage, at the 300k and the 1m (each "
-                   "against its own plain v0.0.6 ship); the 21m sailed to the standard it names; the 50m sailed at "
-                   "v0.0.6 beside its wide arm",
-         "why": "the charter's learning-rate and warm-up rows wait on it (Justin, 12 November: \"Finish the charter "
-                "trials\"). The two smallest classes are the hardest to tune (7.9% of random settings near the best "
-                "at 4M against 28.1% at 134M, Lourie et al. 2026), their rates were set by hand and never swept, and "
-                "the published small-model warm-ups are several times the draft's"},
-        {"position": 14, "text": "The 50m's reasoning and tool legs",
-         "detail": "the 50m taught to call a small fixed set of tools (calls and results written by code, one lesson in "
-                   "eight with no call to make) and, as a ship of its own, to think between marks before it answers "
-                   "(short chains on questions whose two facts it met apart, every answer checked by code). Rehearsed "
-                   "at the 9m first for the mechanics, then sailed at the 50m",
-         "why": "Justin, 12 November: \"I want the first Nothin up my sleeve to have a reasoining variant, tool calling, "
-                "decent context window\"; then \"classes for the reasoning and tool is 50m\". The charter's thinking "
-                "and tools rows wait on it"},
-        {"position": 15, "text": "Curiosity, locked in",
-         "detail": "the curiosity ladder read on every ship of the fleet; the conversation and reasoning lessons written "
-                   "as a curious speaker that asks when it does not know and still answers; and the 50m's curious "
-                   "direction looked for inside it. The mark: the 50m base with rungs 1 to 4 present and in order, the "
-                   "50m instruct ship asking (rung 6), which no ship of ours has shown",
-         "why": "Justin, 12 November: \"the bias should be curiosity bias as in that's the bias i want locked in\". "
-                "The charter's curiosity row waits on it"},
-    ),
     ship="SOP v0.0.6",
     fleet="Star Fleet",
     preset="300k",

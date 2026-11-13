@@ -8,9 +8,11 @@ Two tables and one column:
   a declared status.
 - `s1.expedition_goals` — one row a goal, keyed by the same `expedition:position` key `priorities.py`
   already ranks by (`kipling:3`), or by the bare expedition key where it states no goals (there the
-  single row carries the expedition's own `goal` text). The goal's words are synced from code on every
-  refresh; the **verdict** is the store's (`status`, `evidence`, `settled_at`, `words`) and a sync never
-  overwrites it.
+  single row carries the expedition's own `goal` text). **The store owns the numbered goals** (13 November,
+  Justin: "shouldn't it be going straight to postgres?"): their words (`text`, `detail`, `why`) and their
+  verdict (`status`, `evidence`, `settled_at`, `words`) are rows, added and edited with `thorp goals add` and
+  `thorp goals edit`, and no sync touches them. `fleet.py` states no goals; only an expedition that has no
+  numbered goal in the store is synced from code (its one bare row, or goals a new expedition's code seeds).
 - `s2.queue_lines.goal_id` — which goal a pending line serves, so work is attributable and an
   expedition can be retired when every one of its goals is `done` or `dropped`.
 
@@ -54,6 +56,9 @@ _DDL = (
     "alter table if exists s2.queue_lines add column if not exists goal_id text "
     "references s1.expedition_goals(goal_id) on delete set null",
     "create index if not exists expedition_goals_expedition on s1.expedition_goals (expedition_key)",
+    # a goal the page and the priority order no longer list but the record keeps (a dropped goal, or knockout:1, answered and
+    # taken off the page on 11 November); the code used to say it by not stating the goal
+    "alter table s1.expedition_goals add column if not exists shown boolean not null default true",
 )
 
 
@@ -121,15 +126,19 @@ _FLEET_LOADED = __import__("os").path.getmtime(fleet.__file__)
 
 
 def sync() -> dict[str, int]:
-    """Upsert every expedition and goal from `fleet.EXPEDITIONS`; verdicts in the store are kept.
+    """Upsert every expedition from `fleet.EXPEDITIONS`, and the goals of those the store holds no numbered goal for.
 
     Run after a fleet edit or on a refresh. Idempotent, and safe on a fresh store (it creates the two
-    tables). A goal deleted from the code is removed unless the store has settled it. A process whose
-    fleet.py is older than the file on disk does nothing: it would undo the edit it has not loaded."""
+    tables). An expedition with numbered goals in the store is left to the store: its goals are never rewritten
+    or deleted from the code (12 November: a coordinator syncing old words deleted kipling:8 and :9). An
+    expedition without any is synced as before: its one bare row, or the goals a new expedition's code states
+    (a seed, after which they are the store's). A process whose fleet.py is older than the file on disk does
+    nothing: it would undo the edit it has not loaded."""
     if _stale():
         return {"expeditions": 0, "goals": 0, "stale": 1}
     ensure()
     goals = 0
+    owned = set(numbered())
     with store.session() as s:
         for key, e in fleet.EXPEDITIONS.items():
             s.execute(
@@ -150,6 +159,8 @@ def sync() -> dict[str, int]:
                     "status": e.status,
                 },
             )
+            if key in owned:
+                continue
             rows = _rows_of(e)
             for r in rows:
                 s.execute(
@@ -222,8 +233,111 @@ def read(expedition: str | None = None) -> list[dict]:
         return out
 
 
+def numbered(expedition: str | None = None) -> dict[str, list[dict]]:
+    """The goals each expedition states, from the store: {expedition key: [{position, text, detail, why}]} in
+    position order (an expedition with only its bare row is not in it; a goal taken off the page is not in it).
+    The same dicts the code's `goals` were."""
+    ensure()
+    sql = (
+        "select expedition_key, position, text, detail, why from s1.expedition_goals where position > 0 and shown "
+        + ("and expedition_key = :key " if expedition else "")
+        + "order by expedition_key, position"
+    )
+    out: dict[str, list[dict]] = {}
+    with store.session() as s:
+        for r in s.execute(text(sql), {"key": expedition} if expedition else {}).mappings():
+            out.setdefault(r["expedition_key"], []).append(
+                {"position": r["position"], "text": r["text"], "detail": r["detail"], "why": r["why"]}
+            )
+    return out
+
+
+def stated(expedition: str) -> list[dict]:
+    """One expedition's goals as the page draws them (empty where it states none)."""
+    return numbered(expedition).get(expedition, [])
+
+
+def add(expedition: str, text_: str, detail: str = "", why: str = "", position: int | None = None) -> str:
+    """Add a numbered goal and return its id (`knockout:10`). The position defaults to the one after the highest
+    (a dropped or settled goal keeps its number, so a number is not handed out twice while the record stands)."""
+    if not text_.strip():
+        raise ValueError("a goal needs its words")
+    ensure()
+    with store.session() as s:
+        if not s.execute(text("select 1 from s1.expeditions where key = :k"), {"k": expedition}).first():
+            raise ValueError(f"no expedition {expedition!r} (thorp goals sync registers the code's expeditions)")
+        rows = s.execute(
+            text("select position from s1.expedition_goals where expedition_key = :k"), {"k": expedition}
+        ).all()
+        have = {r[0] for r in rows}
+        if have and not any(p > 0 for p in have):
+            # the expedition's one bare row (its own goal, key = the expedition) gives way to its first numbered goal,
+            # as the sync did when the code began to state goals; a settled one is a record and stays, so it is refused
+            bare = s.execute(
+                text("select status from s1.expedition_goals where goal_id = :k"), {"k": expedition}
+            ).scalar()
+            if bare != "open":
+                raise ValueError(f"{expedition}'s one goal is {bare}; a settled goal is a record, not replaced")
+            s.execute(text("delete from s1.expedition_goals where goal_id = :k"), {"k": expedition})
+            have = set()
+        pos = int(position) if position else max([p for p in have if p > 0] or [0]) + 1
+        if pos in have:
+            raise ValueError(f"{goal_id_of(expedition, pos, True)} already exists")
+        s.execute(
+            text(
+                "insert into s1.expedition_goals (goal_id, expedition_key, position, text, detail, why, status) "
+                "values (:g, :k, :p, :t, :d, :w, 'open')"
+            ),
+            {"g": goal_id_of(expedition, pos, True), "k": expedition, "p": pos, "t": text_.strip(), "d": detail, "w": why},
+        )
+    return goal_id_of(expedition, pos, True)
+
+
+def edit(goal_id: str, text_: str | None = None, detail: str | None = None, why: str | None = None) -> bool:
+    """Change a goal's words; a field left None stays. The verdict is not touched."""
+    ensure()
+    with store.session() as s:
+        r = s.execute(
+            text(
+                "update s1.expedition_goals set text = coalesce(:t, text), detail = coalesce(:d, detail), "
+                "why = coalesce(:w, why), updated_at = now() where goal_id = :g"
+            ),
+            {"g": goal_id, "t": text_, "d": detail, "w": why},
+        )
+        return bool(r.rowcount)
+
+
+def remove(goal_id: str) -> bool:
+    """Delete a goal that was never worked on: open, and no queued line serves it. A settled goal is a record
+    (`thorp goals set ID dropped` is how one is given up)."""
+    ensure()
+    with store.session() as s:
+        row = s.execute(
+            text("select status, position from s1.expedition_goals where goal_id = :g"), {"g": goal_id}
+        ).first()
+        if not row:
+            return False
+        if row[0] != "open" or row[1] == 0:
+            raise ValueError(f"{goal_id} is {row[0]}: a settled goal is a record; mark it dropped instead")
+        try:
+            queued = s.execute(text("select count(*) from s2.queue_lines where goal_id = :g"), {"g": goal_id}).scalar()
+        except Exception:  # noqa: BLE001  a store whose queue is not migrated yet
+            queued = 0
+        if queued:
+            raise ValueError(f"{goal_id} has {queued} queued line(s); move or drop them first")
+        s.execute(text("delete from s1.expedition_goals where goal_id = :g"), {"g": goal_id})
+        return True
+
+
+def dangling(ids) -> list[str]:
+    """The goal ids among `ids` the store does not hold: a decision, a priority or a line pointing at nothing."""
+    known = {g["goal_id"] for g in read()}
+    return sorted(set(ids) - known)
+
+
 def set_verdict(goal_id: str, status: str, evidence: str = "", words: str = "") -> bool:
-    """Record a goal's verdict. `done` stamps `settled_at`; anything else clears it."""
+    """Record a goal's verdict. `done` stamps `settled_at`; anything else clears it. A `dropped` goal comes off the
+    page and out of the priority order and stays as a record."""
     status = status.strip().lower()
     if status not in STATUSES:
         raise ValueError(f"status must be one of {', '.join(STATUSES)}")
@@ -235,6 +349,7 @@ def set_verdict(goal_id: str, status: str, evidence: str = "", words: str = "") 
                 "evidence = case when :evidence = '' then evidence else :evidence end, "
                 "words = case when :words = '' then words else :words end, "
                 "settled_at = case when :status in ('done','dropped') then now() else null end, "
+                "shown = case when :status = 'dropped' then false else shown end, "
                 "updated_at = now() where goal_id = :goal_id"
             ),
             {"status": status, "evidence": evidence, "words": words, "goal_id": goal_id},

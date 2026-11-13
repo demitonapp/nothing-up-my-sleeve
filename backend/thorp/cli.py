@@ -429,13 +429,60 @@ def cmd_queue(a) -> int:
 
 
 def cmd_goals(a) -> int:
-    """An expedition's goals as rows in the store (thorp/expedition_goals.py): show them, or record a
-    verdict. `thorp goals sync` copies the words from fleet.py; the verdict is the store's."""
+    """An expedition's goals as rows in the store (thorp/expedition_goals.py): show them, add or edit one, or
+    record a verdict. The numbered goals are the store's (13 November): `thorp goals add` writes them there;
+    `thorp goals sync` registers the code's expeditions and never touches a goal the store holds."""
     from thorp import expedition_goals
 
     if a.what == "sync":
         print(f"goals: synced {expedition_goals.sync()}")
         return 0
+    if a.what == "add":
+        if not a.goal_id or not a.text:
+            print("thorp goals add EXPEDITION --text WORDS [--detail TEXT] [--why TEXT] [--position N]", file=sys.stderr)
+            return 2
+        try:
+            expedition_goals.sync()  # a new expedition in fleet.py is registered first
+            print(expedition_goals.add(a.goal_id, a.text, a.detail or "", a.why or "", a.position))
+        except ValueError as e:
+            print(str(e), file=sys.stderr)
+            return 2
+        return 0
+    if a.what == "edit":
+        if not a.goal_id or not any(x is not None for x in (a.text, a.detail, a.why)):
+            print("thorp goals edit GOAL_ID [--text WORDS] [--detail TEXT] [--why TEXT]", file=sys.stderr)
+            return 2
+        if not expedition_goals.edit(a.goal_id, a.text, a.detail, a.why):
+            print(f"no goal {a.goal_id!r}", file=sys.stderr)
+            return 1
+        print(f"{a.goal_id}: edited")
+        return 0
+    if a.what == "remove":
+        if not a.goal_id:
+            print("thorp goals remove GOAL_ID", file=sys.stderr)
+            return 2
+        try:
+            gone = expedition_goals.remove(a.goal_id)
+        except ValueError as e:
+            print(str(e), file=sys.stderr)
+            return 2
+        print(f"{a.goal_id}: removed" if gone else f"no goal {a.goal_id!r}")
+        return 0 if gone else 1
+    if a.what == "check":
+        from thorp import launch, priorities
+        from thorp.viable.s2_coordination import queue_store
+
+        queued = {r["goal_id"] for r in queue_store.lines() if r.get("goal_id")}
+        missing = {
+            "the charter's parts": expedition_goals.dangling(launch.PARTS),
+            "the priority order": expedition_goals.dangling(priorities.stored()),
+            "queued lines": expedition_goals.dangling(queued),
+        }  # fmt: skip
+        bad = {k: v for k, v in missing.items() if v}
+        for k, v in bad.items():
+            print(f"{k} point at goals the store does not hold: {', '.join(v)}")
+        print("goals: every reference resolves" if not bad else "goals: dangling references above")
+        return 1 if bad else 0
     if a.what == "set":
         if not a.goal_id or not a.status:
             print("thorp goals set GOAL_ID STATUS [--evidence TEXT] [--words TEXT]", file=sys.stderr)
@@ -455,7 +502,7 @@ def cmd_goals(a) -> int:
     # show (the default)
     rows = expedition_goals.read(a.expedition)
     if not rows:
-        print("no goals; thorp goals sync copies them from fleet.py", file=sys.stderr)
+        print("no goals; thorp goals add writes one", file=sys.stderr)
         return 1
     key = None
     for r in rows:
@@ -877,14 +924,18 @@ def main(argv: list[str] | None = None) -> int:
     s.set_defaults(fn=cmd_queue)
     s = sub.add_parser(
         "goals",
-        help="an expedition's goals as rows in the store: show them, sync from code, or record a verdict",
+        help="an expedition's goals as rows in the store: show them, add or edit one, or record a verdict",
     )
-    s.add_argument("what", nargs="?", choices=["show", "sync", "set"], default="show")
-    s.add_argument("goal_id", nargs="?", help="set: the goal id (e.g. kipling:3)")
+    s.add_argument("what", nargs="?", choices=["show", "sync", "set", "add", "edit", "remove", "check"], default="show")
+    s.add_argument("goal_id", nargs="?", help="set, edit, remove: the goal id (e.g. kipling:3); add: the expedition")
     s.add_argument("status", nargs="?", help="set: open | partly | done | dropped")
     s.add_argument("--expedition", default=None, help="show: one expedition only")
     s.add_argument("--evidence", default="", help="set: where the reading is (run, metric, value)")
     s.add_argument("--words", default="", help="set: why it is settled, in whose words")
+    s.add_argument("--text", default=None, help="add, edit: the goal in a line")
+    s.add_argument("--detail", default=None, help="add, edit: what it is")
+    s.add_argument("--why", default=None, help="add, edit: why it is wanted")
+    s.add_argument("--position", type=int, default=None, help="add: the goal's number (default: the next)")
     s.add_argument("-v", "--verbose", action="store_true", help="show: print each goal's evidence")
     s.set_defaults(fn=cmd_goals)
     s = sub.add_parser(

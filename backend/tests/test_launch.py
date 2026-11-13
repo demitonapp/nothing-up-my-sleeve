@@ -5,19 +5,13 @@ from __future__ import annotations
 
 import pytest
 
-from thorp import expedition_goals, fleet, launch
+from thorp import fleet, launch
 
 
-def _stated() -> set[str]:
-    return {r["goal_id"] for e in fleet.EXPEDITIONS.values() for r in expedition_goals._rows_of(e)}
-
-
-def test_every_part_names_a_goal_the_fleet_states():
-    """A part given to a goal nobody states is a decision about nothing. A goal the code no longer states
-    but the store has settled (knockout:1, deleted 11 November once answered) is still a record that
-    decided something, so it keeps its part."""
-    settled_records = {"knockout:1"}
-    assert set(launch.PARTS) - settled_records <= _stated()
+def test_every_part_names_an_expedition_the_fleet_has():
+    """A part given to a goal nobody states is a decision about nothing; that the goal exists is a reading of the
+    store, not of the code (the goals are rows, 13 November), so `thorp goals check` makes it. Here: the expedition
+    it hangs from is real and the part is one of the words."""
     assert all(g.split(":")[0] in fleet.EXPEDITIONS for g in launch.PARTS)
     assert {part for part, _ in launch.PARTS.values()} <= set(launch.PART_WORDS)
 

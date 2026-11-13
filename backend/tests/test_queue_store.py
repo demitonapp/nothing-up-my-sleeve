@@ -3,7 +3,29 @@
 
 from __future__ import annotations
 
+import pytest
+
 from thorp.viable.s2_coordination import queue_store
+
+
+@pytest.fixture(autouse=True)
+def _the_fleets_goals():
+    """A queued line is checked against the goals the store holds, and the goals are rows (13 November), not words
+    the code states: the ones these tests name are written as the store would hold them."""
+    from sqlalchemy import text
+
+    from thorp import expedition_goals, store
+
+    expedition_goals.ensure()
+    with store.session() as s:
+        s.execute(text("truncate s1.expedition_goals, s1.expeditions cascade"))
+    expedition_goals.sync()
+    for exp, n in (("kipling", 15), ("knockout", 10)):
+        for i in range(1, n + 1):
+            expedition_goals.add(exp, f"{exp} goal {i}", position=i)
+    yield
+    with store.session() as s:
+        s.execute(text("truncate s1.expedition_goals, s1.expeditions cascade"))
 
 
 def test_backfill_copies_the_queue_files(tmp_path):

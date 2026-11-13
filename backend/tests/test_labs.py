@@ -7,12 +7,14 @@ from thorp import labs
 
 def test_the_labs_page_has_distinct_houses() -> None:
     listed = labs.listed()
-    assert len(listed) == 46  # 13 November: four Aboriginal language archives joined Australia's research houses
-    assert len({lab.key for lab in listed}) == 46
+    assert len(listed) == 48  # 13 November: Masaq' Hub lists Hugging Face and adds BigScience
+    assert len({lab.key for lab in listed}) == 48
     known = {lab.key for lab in labs.all()}
     assert {lab.key for lab in listed} <= known
-    # Hugging Face is the one leaderboard-only row left; EleutherAI is a research house now
-    assert {"huggingface"} <= known - {lab.key for lab in listed}
+    # Masaq' Hub holds the houses that belong to no one country (13 November); EleutherAI is a research house
+    hub = {lab.key for lab in listed if lab.category == "hub"}
+    assert hub == {"huggingface", "bigscience", "masakhane"}
+    assert all(labs.get(k).country == "hub" for k in hub)
     assert "eleutherai" in {lab.key for lab in listed}
 
 
@@ -21,7 +23,7 @@ def test_a_house_is_a_lab_and_its_profile_is_complete() -> None:
         lab = labs.get(key)
         assert lab is not None
         assert lab.short and lab.country and lab.hq and lab.blurb
-        assert lab.category in ("lab", "research") and lab.kind
+        assert lab.category in ("lab", "research", "hub") and lab.kind
         assert lab.door.startswith("http")
         if lab.category == "lab":  # a research infrastructure may name no model
             assert lab.flagship
@@ -84,6 +86,7 @@ def test_the_new_families_find_their_house() -> None:
     assert labs.lab_of("mlx-community/Llama-3.2-3B-bf16").key == "meta"
     assert labs.lab_of("EleutherAI/pythia-70m").key == "eleutherai"
     assert labs.lab_of("HuggingFaceTB/SmolLM2-360M").key == "huggingface"
+    assert labs.lab_of("bigscience/bloom-560m").key == "bigscience"
 
 
 def test_an_unrelated_model_belongs_to_no_house() -> None:

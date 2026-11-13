@@ -2,7 +2,8 @@
 // it opens the url with labs. the url should be .../masaq/ and then show labs in one sub tab and models in
 // another sub tab with cards representing the size"). One island, the Reach's views under /masaq:
 //   /orbitals/masaq        the Reach's landing of four cards (its Discoveries moved to Demiton's, 13 November)
-//   /orbitals/masaq/labs   the labs, filterable by country, purpose and weights, open weights first
+//   /orbitals/masaq/countries  a card a country, each with Contact's reading of it (13 November); /labs is its old address
+//   /orbitals/masaq/hub    Masaq' Hub: the houses that belong to no one country (Hugging Face, BigScience, Masakhane)
 //   /orbitals/masaq/research  the research houses: universities, collectives and national infrastructure
 //   /orbitals/masaq/models    four size cards; /models/<band> the models in that band
 // /masaq and /labs stay as aliases of the Labs view.
@@ -20,10 +21,16 @@ import { TabNav } from '../TabNav';
 import EmbeddingOntology from './EmbeddingOntology';
 import countryNotes from '@/data/country-notes.json';
 import '@/styles/country-note.css';
+import '@/styles/contact-card.css';
 
 // one entry a country (13 November, Justin: "a two paragraph bill bryson comment on how that country
 // approaches language models"): the text is data in frontend/src/data/country-notes.json
-const COUNTRY_NOTES = countryNotes as unknown as Record<string, { paragraphs: string[] } | undefined>;
+// and Contact's reading of the country on its card (13 November, Justin: "a card for countries based upon
+// Banks Culture series, it always has to be complimentary to those countries, but not shy away about
+// talking the truth about concerning aspects"): `contact` in the same file, a ship-style name, what is
+// admired and what is of concern
+interface ContactReading { name: string; admired: string; concern: string }
+const COUNTRY_NOTES = countryNotes as unknown as Record<string, { paragraphs: string[]; contact?: ContactReading } | undefined>;
 
 interface House {
   rank: number;
@@ -146,13 +153,18 @@ export default function Labs() {
   const embeddingsView = (inOrbitals && parts[2] === 'embeddings') || (!inOrbitals && isMasaq && parts[1] === 'embeddings');
   // A country's pages (13 November, Justin: "cards for each country with a fal image and then the url will be
   // /orbitals/masaq/us/labs and /orbitals/masaq/us/research"): /orbitals/masaq/<cc>/labs, /research and /models;
-  // /orbitals/masaq/<cc> alone is its Labs. /orbitals/masaq/labs is the landing of the country cards.
-  const RESERVED = ['models', 'labs', 'embeddings', 'research', 'discoveries'];
+  // /orbitals/masaq/<cc> alone is its Labs. /orbitals/masaq/countries is the landing of the country cards
+  // (13 November, Justin: "instead of labs, I'd prefer to have a card for countries"); /orbitals/masaq/labs
+  // stays as its old address.
+  const RESERVED = ['models', 'labs', 'countries', 'hub', 'embeddings', 'research', 'discoveries'];
+  // Masaq' Hub (13 November, Justin: Hugging Face "is something else entirely", not a lab and not one country's):
+  // /orbitals/masaq/hub is its view, and a Hub house's page is /orbitals/masaq/hub/<key>
+  const hubView = inOrbitals && parts[2] === 'hub' && parts.length === 3;
   const CVIEWS = ['labs', 'research', 'models'];
   const cc = inOrbitals && parts[2] && !RESERVED.includes(parts[2]) && /^[a-z]{2}$/.test(parts[2]) ? parts[2] : '';
   const cview = cc && (parts.length === 3 ? 'labs' : parts.length === 4 && CVIEWS.includes(parts[3]) ? parts[3] : '');
   const countryView = !!cview;
-  const detail = (inOrbitals && parts[2] && !RESERVED.includes(parts[2]) && parts[3] && !countryView)
+  const detail = (inOrbitals && parts[2] && (parts[2] === 'hub' || !RESERVED.includes(parts[2])) && parts[3] && !countryView)
     || (!inOrbitals && parts[0] === 'masaq' && parts[1] && !['models', 'labs', 'embeddings', 'research'].includes(parts[1]) && parts[2])
     || (isAlias && parts[1] && parts[1] !== 'ships' && parts[1] !== 'research');
   const bandSeg = inOrbitals ? parts[3] : parts[2];
@@ -164,18 +176,18 @@ export default function Labs() {
   const [weights, setWeights] = useState('');
   const [kind, setKind] = useState('');
 
-  const labsLanding = ours && !landing && !modelsView && !researchView && !embeddingsView && !detail && !countryView;
+  const labsLanding = ours && !landing && !modelsView && !researchView && !embeddingsView && !detail && !countryView && !hubView;
   const { data, error } = useApi<LabsData>('/api/labs', 60000, ours && !modelsView && !embeddingsView && !detail && !landing);
   // the country cards and pages need the ladder too: each country's models are under it
-  const ladder = useApi<any>('/api/ladder', 15000, ours && (modelsView || labsLanding || countryView));
+  const ladder = useApi<any>('/api/ladder', 15000, ours && (modelsView || labsLanding || countryView || hubView));
   // the goals that take a model up (s4.model_approaches in Postgres): a model's card shows an existing approach on it
-  const approaches = useApi<{ models: Approach[] }>('/api/model-approaches', 60000, ours && (modelsView || countryView));
+  const approaches = useApi<{ models: Approach[] }>('/api/model-approaches', 60000, ours && (modelsView || countryView || hubView));
 
   // a house's own page is LabPage's; the grid and the ships view are this island's
   if (!ours || detail) return null;
 
   const houses = data?.houses || [];
-  const viewHouses = houses.filter((h) => (researchView ? h.category === 'research' : h.category !== 'research'));
+  const viewHouses = houses.filter((h) => (researchView ? h.category === 'research' : h.category === 'lab'));
   const shown = viewHouses.filter(
     (h) => (!country || h.country === country)
       && (!purpose || h.focus === purpose)
@@ -195,6 +207,7 @@ export default function Labs() {
   const groups = (() => {
     const m = new Map<string, { country: string; name: string; labs: House[]; research: House[]; rank: number }>();
     for (const h of houses) {
+      if (h.category === 'hub') continue; // the Hub's houses belong to no one country
       if (!m.has(h.country)) m.set(h.country, { country: h.country, name: h.country_name, labs: [], research: [], rank: 9999 });
       const g = m.get(h.country)!;
       (h.category === 'research' ? g.research : g.labs).push(h);
@@ -209,6 +222,8 @@ export default function Labs() {
   const cLabs = cg ? cg.labs.filter((h) => (!purpose || h.focus === purpose) && (!weights || (weights === 'open') === h.open)).sort((a, b) => Number(b.open) - Number(a.open) || a.rank - b.rank) : [];
   const cResearch = cg ? [...cg.research].sort((a, b) => a.rank - b.rank) : [];
   const cModels = cc ? modelsOf(cc) : null;
+  const hubHouses = houses.filter((h) => h.category === 'hub');
+  const hubModels = hubView ? modelsOf('hub') : null;
   const cOpen = cLabs.filter((h) => h.open);
   const cClosed = cLabs.filter((h) => !h.open);
 
@@ -218,15 +233,17 @@ export default function Labs() {
       <h1>
         {countryView ? (
           <>
-            <a className={crumbCls('back')} href="/orbitals/masaq/labs">← countries</a>{' '}
+            <a className={crumbCls('back')} href="/orbitals/masaq/countries">← countries</a>{' '}
             <img className="flag" src={`/flags/${encodeURIComponent(cc)}.svg`} alt="" /> {cg?.name || COUNTRY_SHORT[cc] || cc}{' '}
             <span className="q">{cview === 'labs' ? 'the labs of this country, open weights first' : cview === 'research' ? 'the research houses of this country: universities, collectives and national infrastructure' : 'the outside models its labs make, biggest first: not ours to build, read on our decks'}</span>
           </>
         ) : (<>
         <a className={crumbCls('back')} href="/orbitals">← orbitals</a>{' '}
-        Masaq' Reach{' '}
+        {hubView ? "Masaq' Hub" : "Masaq' Reach"}{' '}
         <span className="q">
-          {landing
+          {hubView
+            ? 'the houses that belong to no one country: the harbour every ship passes through, and the collectives that build across borders'
+            : landing
             ? 'the trading orbital: the labs and research houses that build the outside ships, and every one of their ships read on our decks'
             : researchView
               ? 'the research houses: universities, collectives and national infrastructure, and the datasets and benchmarks they build'
@@ -234,7 +251,7 @@ export default function Labs() {
                 ? 'every outside model in the Reach, in four cards by size: extra small, small, medium and large'
                 : embeddingsView
                   ? "the embeddings ontology: what a model's vectors hold, and how the Reach reads them"
-                  : 'the countries: open one for its labs, its research houses and the outside models they make'}
+                  : 'the countries, as Contact reads them: open one for its labs, its research houses and the outside models they make'}
         </span>
         </>)}
       </h1>
@@ -254,7 +271,7 @@ export default function Labs() {
               {info
                 ? `The models of ${info.name.toLowerCase()} in the Reach, biggest first: ${info.range}.`
                 : 'Every outside model in the Reach, in four cards by size: extra small, small, medium and large. Open a band to see the models in it.'}{' '}
-              <a href="/orbitals/masaq/labs">the houses that built them →</a>
+              <a href="/orbitals/masaq/countries">the countries that built them →</a>
             </p>
             <div className="cards" dangerouslySetInnerHTML={{ __html: band ? foreignShipsHtml(ladder.data, band, approaches.data?.models || []) : sizeBandCardsHtml(ladder.data) }} />
           </>
@@ -270,17 +287,31 @@ export default function Labs() {
         <>
           {labsLanding ? (
             <>
-              <p className="note labnote">A card a country, in the order of its best house. Open one for its labs, its research houses and the outside models its labs make. {data.as_of_label}.</p>
-              <div className="harbours shipyardgrid demitonyard five" role="group" aria-label="the countries">
+              <p className="note labnote contactnote">
+                A card a country, in the order of its best house. Each carries Contact's reading of it, after the manner of
+                Iain M. Banks' Culture, whose Contact section is the part that goes out to meet other civilisations: the name
+                a Culture ship might give the country, what there is to admire in how it builds language models, and what is
+                of concern. The admiration is meant, and so is the rest. Open a card for the country's labs, research houses
+                and models. {data.as_of_label}.
+              </p>
+              <div className="harbours shipyardgrid contactgrid" role="group" aria-label="the countries">
                 {groups.map((g, i) => {
                   const m = modelsOf(g.country);
+                  const c = COUNTRY_NOTES[g.country]?.contact;
                   return (
-                    <a key={g.country} className={cardCls(true, 'card harbourcard shipyardcard')} href={`/orbitals/masaq/${encodeURIComponent(g.country)}/labs`}>
+                    <a key={g.country} className={cardCls(true, 'card harbourcard shipyardcard contactcard')} href={`/orbitals/masaq/${encodeURIComponent(g.country)}/labs`}>
                       <img className="cardart ship" src={artSrc(`masaq-country-${g.country}`)} alt="" loading="lazy" onError={(e) => e.currentTarget.remove()} />
                       <div className="yardplate">
                         <span className="yardnum">{String(i + 1).padStart(2, '0')}</span>
                         <span className="yardrule" aria-hidden="true" />
                         <span className="nm"><img className="flag" src={`/flags/${encodeURIComponent(g.country)}.svg`} alt="" loading="lazy" /> {g.name}</span>
+                        {c ? (
+                          <>
+                            <span className="contactname" title="the name a Culture ship might give this country">{c.name}</span>
+                            <span className="contactline"><span className="k">Admired</span>{c.admired}</span>
+                            <span className="contactline concern"><span className="k">Of concern</span>{c.concern}</span>
+                          </>
+                        ) : null}
                         <span className="job">{plural(g.labs.length, 'lab', 'labs')} · {plural(g.research.length, 'research house', 'research houses')}{m ? ` · ${plural(m.count, 'model', 'models')}` : ''}</span>
                         <span className="yardopen">open {g.name.toLowerCase()} →</span>
                       </div>
@@ -288,6 +319,25 @@ export default function Labs() {
                   );
                 })}
               </div>
+              <p className="note labnote">The houses that belong to no one country, Hugging Face among them, are in <a href="/orbitals/masaq/hub">Masaq' Hub →</a></p>
+            </>
+          ) : hubView ? (
+            <>
+              <p className="note labnote contactnote">
+                In Look to Windward, Hub is the Mind that runs Masaq' Orbital itself. Here it is the part of the Reach that no
+                one country owns: Hugging Face, where nearly every house moors its open weights, and the collectives that
+                build across borders. Each is set down where it works, not where it is registered.{' '}
+                <a href="/orbitals/masaq/countries">the countries →</a>
+              </p>
+              {hubHouses.length ? <div className="labgrid">{hubHouses.map(labCard)}</div> : <div className={emptyCls()}>no house is in the Hub yet.</div>}
+              <h2 className="band labgroup">Its ships <span className="q">the outside models the Hub's houses make, read on our decks</span></h2>
+              {ladder.error ? (
+                <div className={emptyCls()}>the Reach's models could not be read: {ladder.error}</div>
+              ) : !hubModels ? (
+                <div className={emptyCls()}>reading the Reach's models…</div>
+              ) : hubModels.count ? (
+                <div className="cards" dangerouslySetInnerHTML={{ __html: hubModels.html }} />
+              ) : <div className={emptyCls()}>no outside model of the Hub has been read in the Reach yet.</div>}
             </>
           ) : countryView ? (
             !cg ? <div className={emptyCls()}>no country is called {cc} in the Reach.</div> : (

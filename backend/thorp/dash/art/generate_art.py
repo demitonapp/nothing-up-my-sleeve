@@ -717,6 +717,16 @@ LABS: dict[str, str] = {
     "around a single dark hull, each arriving with one plank under an arm, a great common table of open ledgers, "
     "lanterns hung between the trees, a thin ring of light in the sky, an uncropped clean image with no watermark, "
     "no signature, no text and no logo",
+    # Masaq' Hub's two new plates (13 November): the harbour every ship passes through, and a thousand hands on one hull
+    "lab-huggingface": "a vast covered harbour at the heart of a trading Orbital at night where ships of every build "
+    "lie moored side by side, each flying its own house's pennant, a long harbour-master's ledger open on a lectern "
+    "at the water's edge, lanterns strung along the piers, a small smooth silver ovoid drone with no propellers above "
+    "the ledger, the thin lit ring of the Orbital overhead, heavy black ink, stark chiaroscuro, an uncropped clean "
+    "image with no watermark, no signature, no text and no logo",
+    "lab-bigscience": "a great open-sided shipyard at night where hundreds of shipwrights of many different coasts "
+    "and dress work together on one enormous hull, scaffolds crowded with lanterns, a long table of plans in many "
+    "scripts, a vast hearth-lit forge beyond, a thin ring of light in the sky, heavy black ink, stark chiaroscuro, an "
+    "uncropped clean image with no watermark, no signature, no text and no logo",
     "lab-sadilar": "a great stone archive on a dark southern plain at night: long shelves of sealed ledgers and "
     "rolled charts, a keeper with a lantern walking between them, a small ship model under glass on a reading "
     "table, the Southern Cross through a high window, a thin ring of light in the sky, an uncropped clean image "
@@ -952,6 +962,11 @@ MASAQ_SECTIONS: dict[str, str] = {
     "front with its own lantern and banner, ships of many different builds on the stocks and at mooring, "
     "shipwrights and clerks at work, the curved lit band of the Orbital overhead, heavy black ink, stark "
     "chiaroscuro, no text, no lettering",
+    # Masaq' Hub (13 November): the Orbital's own Mind at the centre of the Reach, where every house's ships moor
+    "masaq-hub": "the great central harbour of a trading Orbital at night: a ring of piers around a still black basin "
+    "where ships of every build and many flags lie moored together, a tall lantern tower at the centre, a small "
+    "smooth silver ovoid drone with no propellers hovering above the tower's light, the curved lit band of the "
+    "Orbital overhead, heavy black ink, stark chiaroscuro, no text, no lettering",
     "masaq-research": "a lantern-lit hall of scholars on a trading Orbital at night: a great round table of charts, "
     "open folios, brass instruments and a globe, scholars in long coats debating over the papers, a tall window "
     "showing the thin luminous ring of the Orbital, a small smooth silver ovoid drone with no propellers at rest on "

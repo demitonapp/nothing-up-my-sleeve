@@ -11,9 +11,9 @@ import labData from '../../../data/labs.json';
 export function getStaticPaths() {
   const houses = labData.houses as [string, string][];
   const paths: string[] = [
-    'labs', 'research', 'models', 'embeddings',
-    // a country's pages (13 November): /us, /us/labs, /us/research, /us/models
-    ...[...new Set(houses.map(([country]) => country))].flatMap((cc) => [cc, `${cc}/labs`, `${cc}/research`, `${cc}/models`]),
+    'countries', 'hub', 'labs', 'research', 'models', 'embeddings',
+    // a country's pages (13 November): /us, /us/labs, /us/research, /us/models; Masaq' Hub is not a country
+    ...[...new Set(houses.map(([country]) => country))].filter((cc) => cc !== 'hub').flatMap((cc) => [cc, `${cc}/labs`, `${cc}/research`, `${cc}/models`]),
     ...houses.map(([country, key]) => `${country}/${key}`),
     ...houses.map(([country, key]) => `${country}/${key}/models`),
   ];

@@ -1,5 +1,5 @@
 {
-  "_about": "One entry a country, keyed by the two-letter code the Reach routes use (/orbitals/masaq/<cc>). Two paragraphs each, written in a Bill Bryson manner (warm, wry, concrete; not his words). Every claim is meant to be checkable: `sources` lists where. Edit here; the country pages read this file. Written 13 November 2026.",
+  "_about": "One entry a country, keyed by the two-letter code the Reach routes use (/orbitals/masaq/<cc>). Two paragraphs each, written in a Bill Bryson manner (warm, wry, concrete; not his words). Every claim is meant to be checkable: `sources` lists where. Edit here; the country pages read this file. Written 13 November 2026. `contact` is the country's card on /orbitals/masaq/countries (13 November, Justin: complimentary to the country, but not shy of the truth about concerning aspects): `name`, a ship-style name of our own in the manner of Banks' Culture (never one of Banks' ships), `admired` and `concern`, each claim in `contact_sources`.",
   "us": {
     "paragraphs": [
       "Begin with the United States, since everybody else does, if only to see what they are arguing with. The American approach to language models is the American approach to most things: assemble a great many enormously ambitious companies, give them more money than seems wise, and see who is left standing. A team at Google published the Transformer paper in 2017, and Google, OpenAI, Anthropic and Meta all keep their headquarters in the San Francisco Bay Area, so that in principle you could call on all four between breakfast and a late lunch, traffic permitting, which on the 101 it never does.",
@@ -11,6 +11,18 @@
       "https://allenai.org/blog/hello-olmo-a-truly-open-llm-43f7e7359222",
       "https://geekwire.com/2025/allen-institute-for-ai-lands-152m-from-nvidia-and-nsf-to-lead-national-ai-project",
       "https://en.wikipedia.org/wiki/EleutherAI"
+    ],
+    "contact": {
+      "name": "Rather More Money Than Seems Wise",
+      "admired": "It built most of the machinery the rest of the world now uses, from the Transformer, published at Google in 2017, onwards, and still gives a good deal of it away: Meta’s Llama, OpenAI’s gpt-oss and Ai2’s OLMo, which publishes its data and code as well.",
+      "concern": "Data centres drew about 4.4% of American electricity in 2023 and may draw 6.7 to 12% by 2028. Washington revoked its AI safety order in January 2025 and in December set the Justice Department against state AI laws, leaving the courts to settle what training on other people’s work costs: Anthropic agreed to pay authors $1.5 billion over pirated books, and The New York Times’ case against OpenAI is still undecided."
+    },
+    "contact_sources": [
+      "https://www.energy.gov/articles/doe-releases-new-report-evaluating-increase-electricity-demand-data-centers",
+      "https://www.govinfo.gov/content/pkg/FR-2025-01-28/html/2025-01901.htm",
+      "https://www.whitehouse.gov/presidential-actions/2025/12/eliminating-state-law-obstruction-of-national-artificial-intelligence-policy/",
+      "https://authorsguild.org/news/court-grants-final-approval-anthropic-copyright-settlement/",
+      "https://axios.com/2026/09/08/nyt-openai-microsoft-copyright-lawsuit"
     ]
   },
   "cn": {
@@ -25,6 +37,17 @@
       "https://www.alignmentforum.org/posts/2dG7vXDZjd6crkdLa/beijing-academy-of-artificial-intelligence-announces-1-75",
       "https://simonwillison.net/2025/Jul/11/kimi-k2/",
       "https://www.scmp.com/tech/big-tech/article/3349552/alibabas-qwen-family-captures-over-50-global-open-source-downloads-report-finds"
+    ],
+    "contact": {
+      "name": "Gives Its Weights Away, Keeps Its Counsel",
+      "admired": "No country publishes open weights more freely: DeepSeek released R1 under the MIT licence, and Alibaba’s Qwen, by 2025 the most-downloaded open family on Hugging Face, comes in a size for nearly every deck. Much of the world’s open small fleet was built in Hangzhou.",
+      "concern": "Public generative services must uphold the “core socialist values” and file with the Cyberspace Administration, and the result is in the weights, not only the apps: DeepSeek’s models deflect questions about Tiananmen even when run at home, and a US government evaluation in September 2025 found they echoed Chinese Communist Party narratives four times as often as American models."
+    },
+    "contact_sources": [
+      "https://en.wikipedia.org/wiki/Interim_Measures_for_the_Management_of_Generative_AI_Services",
+      "https://www.theguardian.com/technology/2025/jan/28/we-tried-out-deepseek-it-works-well-until-we-asked-it-about-tiananmen-square-and-taiwan",
+      "https://arxiv.org/abs/2505.12625",
+      "https://www.nist.gov/news-events/news/2025/09/caisi-evaluation-deepseek-ai-models-finds-shortcomings-and-risks"
     ]
   },
   "fr": {
@@ -39,6 +62,18 @@
       "https://www.jmlr.org/papers/volume25/23-0581/23-0581.pdf",
       "https://fortune.com/europe/2024/07/04/ai-lab-french-billionaire-xavier-niel-takes-on-chatgpt-reveals-voice-assistant-with-thick-french-accent/",
       "https://www.maddyness.com/2024/07/03/premiere-mondiale-avec-kyutai-niel-saade-et-schmidt-donnent-naissance-a-moshi/"
+    ],
+    "contact": {
+      "name": "Someone Ought To Be In Charge",
+      "admired": "It builds models that anyone may take away. Mistral introduced its first as a bare torrent link under Apache 2.0, and its Large 3 flagship is open again; public and philanthropic money paid for BLOOM’s 46 languages and for Kyutai’s Moshi, given to everyone.",
+      "concern": "In 2023 France, with Germany and Italy, opposed binding EU rules for foundation models while its former digital minister, Cédric O, was a Mistral co-founder and shareholder, which drew questions of conflict of interest. In 2026 Mediapart reported that Mistral Large 3 could recite much of Le Petit Prince, and independent publishers are preparing formal notices."
+    },
+    "contact_sources": [
+      "https://techcrunch.com/2023/11/16/mistral-eu-ai-act/",
+      "https://corporateeurope.org/en/2024/03/trojan-horses-how-european-startups-teamed-big-tech-gut-ai-act",
+      "https://mistral.ai/news/mistral-3",
+      "https://next.ink/brief-article/mistral-aussi-entraine-ses-ia-sur-des-contenus-dont-elle-na-pas-les-droits/",
+      "https://www.livreshebdo.fr/article/livres-pirates-des-editeurs-independants-sunissent-pour-attaquer-les-ia-en-justice"
     ]
   },
   "ca": {
@@ -52,6 +87,20 @@
       "https://www.canada.ca/en/innovation-science-economic-development/news/2025/03/government-of-canada-finalizes-investment-to-support-canadian-born-ai-leader-cohere.html",
       "https://arxiv.org/abs/1706.03762",
       "https://venturebeat.com/ai/cohere-for-ai-launches-open-source-llm-for-101-languages"
+    ],
+    "contact": {
+      "name": "Kept Faith Through The Long Winter",
+      "admired": "It kept faith with neural networks when almost nobody else did: Geoffrey Hinton in Toronto and Yoshua Bengio in Montreal shared the 2018 Turing Award, and in 2017 Ottawa launched one of the first national AI strategies. Cohere’s Aya 101 was built with thousands of volunteers for 101 languages and released under Apache 2.0.",
+      "concern": "It raises the talent and others take it home: Element AI, co-founded by Bengio, was sold to America’s ServiceNow for about US$230 million, well below its earlier valuation, and Cohere has agreed to merge with Germany’s Aleph Alpha. There has been no federal AI law since AIDA died in January 2025, and fourteen publishers are suing Cohere for copyright infringement in New York."
+    },
+    "contact_sources": [
+      "https://www.cs.toronto.edu/~hinton/bio.html",
+      "https://ised-isde.canada.ca/site/ai-strategy/",
+      "https://huggingface.co/CohereForAI/aya-101/tree/main",
+      "https://betakit.com/servicenow-closes-230-million-usd-acquisition-of-montreals-element-ai/",
+      "https://siliconangle.com/2026/09/16/cohere-and-aleph-alpha-agree-to-merge-in-reported-20b-deal/",
+      "https://www.michaelgeist.ca/2026/06/ai-for-all-details-to-follow-government-releases-a-big-spending-ai-strategy-that-is-still-short-on-the-specifics-that-matter/",
+      "https://pressgazette.co.uk/media_law/news-publishers-cohere-ai-copyright-lawsuit-motion-to-dismiss/"
     ]
   },
   "ae": {
@@ -65,6 +114,20 @@
       "https://www.cerebras.ai/blog/jais-a-new-pinnacle-in-open-arabic-nlp",
       "https://inceptionai.ai/2023/08/30/meet-jais-the-worlds-most-advanced-arabic-llm-open-sourced-by-g42/index.html",
       "https://trendsresearch.org/?p=83312"
+    ],
+    "contact": {
+      "name": "Works Out The Rest On The Way Up",
+      "admired": "When it wants something it builds it, and then gives it away: Abu Dhabi’s Technology Innovation Institute made Falcon free of royalties in 2023, Jais was built for Arabic as well as English, and in 2019 the country founded a graduate university for artificial intelligence alone.",
+      "concern": "The models and the security state share a chair: G42 is chaired by Sheikh Tahnoon bin Zayed, the national security adviser, and in 2020 confirmed it was the registered shareholder of ToTok, an app the New York Times reported was a government spying tool. Freedom House scores the country 18 out of 100, Not Free, with political parties banned."
+    },
+    "contact_sources": [
+      "https://www.mediaoffice.abudhabi/en/technology/technology-innovation-institute-launches-open-source-falcon-40b-almodel-for-research-and-commercial-use/",
+      "https://www.cerebras.ai/blog/jais-a-new-pinnacle-in-open-arabic-nlp",
+      "https://www.tii.ae/about-us",
+      "https://www.nytimes.com/2023/11/27/us/politics/ai-us-uae-china-security-g42.html",
+      "https://www.nytimes.com/2019/12/22/us/politics/totok-app-uae.html",
+      "https://www.voanews.com/amp/middle-east_co-creator-defends-suspected-uae-spying-app-called-totok/6182006.html",
+      "https://freedomhouse.org/country/united-arab-emirates/freedom-world/2026"
     ]
   },
   "gb": {
@@ -77,6 +140,20 @@
       "https://petapixel.com/2022/08/23/open-source-ai-image-generator-stable-diffusion-released-to-the-public/",
       "https://www.infosecurity-magazine.com/news/28-countries-bletchley-declaration",
       "https://techcrunch.com/2025/02/13/uk-drops-safety-from-its-ai-body-now-called-ai-security-institute-inks-mou-with-anthropic"
+    ],
+    "contact": {
+      "name": "Thought Of It First, Very Politely",
+      "admired": "It keeps thinking of things first: DeepMind was founded in London in 2010, Stable Diffusion’s open weights came from London in 2022, and in 2023 it gathered 28 countries and the European Union, the United States and China among them, at Bletchley Park to sign the first declaration on the risks of frontier AI.",
+      "concern": "It sells what it starts: DeepMind went to Google in 2014. Its 2024 consultation on AI and copyright drew 11,520 responses and a silent album from more than 1,000 musicians, and there is still no settled rule; the Getty v Stability case is on appeal. The Alan Turing Institute, its national institute for AI, lost its chief executive in 2025 after a staff whistleblowing complaint."
+    },
+    "contact_sources": [
+      "https://en.wikipedia.org/wiki/Google_DeepMind",
+      "https://petapixel.com/2022/08/23/open-source-ai-image-generator-stable-diffusion-released-to-the-public/",
+      "https://www.infosecurity-magazine.com/news/28-countries-bletchley-declaration",
+      "https://www.gov.uk/government/publications/report-and-impact-assessment-on-copyright-and-artificial-intelligence/report-on-copyright-and-artificial-intelligence",
+      "https://www.aljazeera.com/news/2025/2/25/music-stars-release-silent-album-in-protest-against-uk-ai-copyright-plans",
+      "https://www.burges-salmon.com/articles/102o9ee/getty-images-v-stability-ai-court-of-appeal-hearing/",
+      "https://www.theguardian.com/technology/2025/sep/04/head-of-alan-turing-institute-jean-innes-resigns"
     ]
   },
   "au": {
@@ -90,6 +167,17 @@
       "https://ia.acs.org.au/article/2025/maincode-debuts-matilda-ai-after-ditching--sovereign--label.html",
       "https://www.forbes.com.au/covers/entrepreneurs/not-bogan-ai-inside-the-push-to-build-a-sovereign-australian-brain/",
       "https://huggingface.co/spaces/JoeyLLM/README/blob/main/README.md"
+    ],
+    "contact": {
+      "name": "Asks Who Gets To Say Yes",
+      "admired": "It asks the question most of the trade skips: who gets to say yes. Its First Nations language archives are kept on the terms of the communities they came from, and in October 2025 the government refused to let AI companies train on Australians’ copyrighted work without asking.",
+      "concern": "Of more than 250 First Nations languages, only 12 traditional ones are still learned by children. The country builds on borrowed compute: in October 2026 its national facility told a parliamentary committee it had 120 next-generation GPUs, against demand about three times its capacity. Mandatory rules for frontier AI were announced only on 10 November 2026, with no bill yet."
+    },
+    "contact_sources": [
+      "https://aiatsis.gov.au/research/aiatsis-centre-australian-languages/national-indigenous-languages-surveys/third-national",
+      "https://www.itnews.com.au/news/government-rules-out-ai-training-exemption-in-copyright-laws-621309",
+      "https://ia.acs.org.au/article/2026/australia-s-top-supercomputer-may-see--closure--if-not-replaced.html",
+      "https://piperalderman.com.au/insight/mandatory-ai-safety-and-security-protections-for-frontier-ai-australia-sets-its-direction/"
     ]
   },
   "za": {
@@ -104,6 +192,20 @@
       "https://sadilar.org/en/new-infrastructure/",
       "https://venturebeat.com/ai/the-masakhane-project-wants-machine-translation-and-ai-to-transform-africa",
       "https://arxiv.org/html/2408.17024v1"
+    ],
+    "contact": {
+      "name": "Eleven Languages, None Of Them Small",
+      "admired": "It builds for languages the rest of the trade calls too small to bother with. South Africans helped begin Masakhane, the pan-African collective that builds open datasets and models for African languages, out of the Deep Learning Indaba in 2019; the University of Cape Town’s MzansiLM covers all eleven spoken official languages; Lelapa AI trained InkubaLM from scratch on five African languages.",
+      "concern": "Africa has 18% of the world’s people and under 1% of its data-centre capacity, and Lelapa AI says its best minds leave for GPUs and funding abroad. The country still has no national AI policy: the April 2026 draft was withdrawn after it was found to cite references that do not exist, apparently generated by AI, and a redraft will not reach Cabinet before March 2027."
+    },
+    "contact_sources": [
+      "https://venturebeat.com/ai/the-masakhane-project-wants-machine-translation-and-ai-to-transform-africa",
+      "https://arxiv.org/html/2603.20732",
+      "https://huggingface.co/lelapa/InkubaLM-0.4B",
+      "https://www.weforum.org/stories/2025/12/investing-in-green-compute-in-africa/",
+      "https://lelapa.ai/blog/locked-out-by-design",
+      "https://allafrica.com/stories/202604270143.html",
+      "https://businessexplainer.co.za/tech/ai/2026/11/03/cabinet-date-for-sas-ai-policy-pushed-back-again/"
     ]
   },
   "br": {
@@ -119,6 +221,20 @@
       "https://huggingface.co/papers/2411.07854",
       "https://arxiv.org/html/2603.03543",
       "https://lamarr-institute.org/publication/tucano-2-cool-better-open-source-llms-for-portuguese/"
+    ],
+    "contact": {
+      "name": "Would Rather Not Rent Its Own Language",
+      "admired": "It treats a model in its own language as national equipment, like a road or a port: the Brazilian AI Plan sets aside some R$23 billion to 2028, much of it as loans. In 2024 its data regulator made Meta stop training on Brazilians’ posts until they were told and could opt out.",
+      "concern": "Its flagship models are closed and say little about how they were made: Maritaca’s Sabiá is sold only through its API, without naming its base model or data. The national plan treats Portuguese as the only language to train on, leaving aside the 295 Indigenous languages the 2022 census counted, and a TikTok data centre in Ceará is in court over the Anacé people’s right to be consulted."
+    },
+    "contact_sources": [
+      "https://itforum.com.br/?p=9604805",
+      "https://teletime.com.br/30/08/2024/anpd-aprova-plano-de-conformidade-da-meta-e-derruba-medida-preventiva/",
+      "https://www.maritaca.ai/en/pricing",
+      "https://arxiv.org/html/2410.12049v4",
+      "https://arxiv.org/abs/2411.01259",
+      "https://anda.ibge.gov.br/en/agencia-news/2184-news-agency/news/44866-2022-census-brazil-has-391-indigenous-ethnicities-and-295-indigenous-languages",
+      "https://www.mobiletime.com.br/noticias/14/09/2026/ce-tiktok-data-center/"
     ]
   }
 }

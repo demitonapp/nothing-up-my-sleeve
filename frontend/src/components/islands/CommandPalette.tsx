@@ -131,7 +131,8 @@ export const DESTINATIONS: Dest[] = [
   { group: 'The ships', label: 'Invention · 100m', href: '/ships/100m' },
   { group: 'The ships', label: 'The trader · 350m', href: '/ships/350m', note: 'the largest class' },
 
-  { group: 'Masaq’ Reach', label: 'Labs', href: '/orbitals/masaq/labs', note: 'a card a country: its labs, research and models' },
+  { group: 'Masaq’ Reach', label: 'Countries', href: '/orbitals/masaq/countries', note: "a card a country: Contact's reading of it, and its labs, research and models", keywords: 'labs contact culture' },
+  { group: 'Masaq’ Reach', label: 'Masaq’ Hub', href: '/orbitals/masaq/hub', note: 'the houses that belong to no one country: Hugging Face, BigScience, Masakhane', keywords: 'hugging face bigscience bloom masakhane transnational' },
   ...([['us', 'United States'], ['cn', 'China'], ['fr', 'France'], ['ca', 'Canada'], ['ae', 'United Arab Emirates'], ['au', 'Australia'], ['gb', 'United Kingdom'], ['za', 'South Africa'], ['br', 'Brazil']] as [string, string][]).map(([cc, name]) => ({
     group: 'Masaq’ Reach', label: name, href: `/orbitals/masaq/${cc}/labs`, note: 'its labs, research and models', keywords: `${cc} country labs research models`,
   })),

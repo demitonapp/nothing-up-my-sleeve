@@ -38,7 +38,8 @@ FLAGS = {
     "microsoft": ("sv", "Silicon Valley"),
     "google": ("sv", "Silicon Valley"),
     "meta": ("us", "United States"),
-    "huggingface": ("fr", "France"),
+    # Hugging Face belongs to no one country: its ships fly Masaq' Hub's flag (13 November)
+    "huggingface": ("hub", "Masaq' Hub"),
     "eleuther": ("independent", "independent labs"),
     "maincode": ("au", "Australia"),
     "inclusionai": ("cn", "China"),

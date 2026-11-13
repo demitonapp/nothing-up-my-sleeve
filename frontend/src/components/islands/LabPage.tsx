@@ -158,7 +158,7 @@ export default function LabPage() {
   // /masaq/us/arcee"); the old /labs/<key> stays as an alias.
   const inOrbitals = parts[0] === 'orbitals' && parts[1] === 'masaq';
   const keyIndex = inOrbitals ? 3 : parts[0] === 'masaq' ? 2 : parts[0] === 'labs' ? 1 : -1;
-  const key = keyIndex >= 0 && parts[keyIndex] && !['models', 'labs', 'ships', 'embeddings', 'research'].includes(parts[keyIndex])
+  const key = keyIndex >= 0 && parts[keyIndex] && !['models', 'labs', 'countries', 'ships', 'embeddings', 'research'].includes(parts[keyIndex])
     ? decodeURIComponent(parts[keyIndex]) : '';
   const tab = parts[parts.length - 1] === 'models' ? 'models' : 'overview';
   const base = keyIndex >= 0 && key ? '/' + parts.slice(0, keyIndex + 1).join('/') : '';
@@ -170,7 +170,9 @@ export default function LabPage() {
   return (
     <div {...sectionProps('lab-house')}>
       <h1>
-        <a className={crumbCls('back')} href="/orbitals/masaq/labs">← the labs</a>{' '}
+        {d?.category === 'hub'
+          ? <a className={crumbCls('back')} href="/orbitals/masaq/hub">← Masaq' Hub</a>
+          : <a className={crumbCls('back')} href="/orbitals/masaq/countries">← countries</a>}{' '}
         {d?.country ? (
           <img className="flag" src={`/flags/${encodeURIComponent(d.country)}.svg`} alt={d.country_name} title={d.country_name} />
         ) : null}{' '}
@@ -245,7 +247,7 @@ export default function LabPage() {
             <p className="labmeta">
               <a href="/orbitals/masaq/models">every model in the Reach →</a>{' '}
               <span className="s">or</span>{' '}
-              <a href="/orbitals/masaq/labs">back to the houses →</a>
+              <a href={d.category === 'hub' ? '/orbitals/masaq/hub' : '/orbitals/masaq/countries'}>back to the houses →</a>
             </p>
           </section>
           <LabModels lab={d.key} ships={fleet} />

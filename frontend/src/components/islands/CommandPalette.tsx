@@ -97,6 +97,8 @@ export const DESTINATIONS: Dest[] = [
   { group: 'The site', label: 'Demiton', href: '/orbitals/demiton', note: 'our own orbital, its views and its fleet' },
   { group: 'The site', label: 'Masaq’ Reach', href: '/orbitals/masaq', note: 'the trading orbital' },
   { group: 'The site', label: 'Leaderboard', href: '/leaderboard', note: 'the tests and their boards' },
+  { group: 'The site', label: 'The book', href: '/book', note: 'Nothing Up My Sleeve: read it, download it, send it to a Kindle', keywords: 'epub kindle read download nothing up my sleeve' },
+  { group: 'The site', label: 'Join', href: '/join', note: 'investor, researcher, GPU provider, corpus provider', keywords: 'help faction side contribute volunteer' },
   { group: 'The site', label: 'Settings', href: '/settings', note: 'storage, the store, the server and the switches' },
   { group: 'The site', label: 'The bet', href: '/bet' },
 

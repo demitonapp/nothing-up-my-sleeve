@@ -1,0 +1,132 @@
+/* The two cards a new visitor meets (Welcome.tsx), the book's page and reader (islands/Book.tsx), the Kindle
+   dialog (KindleDialog.tsx) and the join page (islands/Join.tsx), 13 November. The site's own colours
+   (global.css :root) and nothing new: the book is brass on the dark panel, like the harbour cards' names. */
+
+/* ---- the welcome, above the orbitals ---- */
+.welcome { display: grid; gap: 10px; }
+.welcomehead { display: flex; align-items: baseline; gap: 10px; }
+.welcomehead h2 { margin: 0; font-size: var(--fs-lg); font-weight: 650; color: var(--text); }
+.welcomehead h2 span { color: var(--muted); font-weight: 400; font-size: var(--fs-md); margin-left: 6px; }
+.welcomeclose { margin-left: auto; background: none; border: 0; color: var(--muted); cursor: pointer; padding: 4px; border-radius: var(--r-sm); line-height: 0; }
+.welcomeclose:hover { color: var(--text); background: var(--raise); }
+.welcomeclose svg { width: 16px; height: 16px; }
+.welcomecards { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 14px; }
+@media (max-width: 420px) { .welcomecards { grid-template-columns: 1fr; } }
+.welcomecard { display: flex; flex-direction: row; gap: 16px; padding: 16px 18px; align-items: stretch; }
+.welcomeart { flex: none; width: 96px; align-self: flex-start; line-height: 0; }
+.welcomeart img { width: 96px; height: auto; aspect-ratio: 3 / 4; object-fit: cover; border-radius: var(--r-sm); border: 1px solid var(--line); }
+.welcomewords { display: flex; flex-direction: column; gap: 8px; min-width: 0; flex: 1; }
+.welcomewords h3 { margin: 0; font-size: var(--fs-xl); font-weight: 700; }
+.welcomewords h3 a { color: var(--accent) !important; text-decoration: none !important; }
+.welcomewords h3 a:hover { text-decoration: underline !important; }
+.welcomewords p { margin: 0; color: var(--muted); line-height: 1.5; font-size: var(--fs-md); }
+@media (max-width: 520px) { .welcomecard.bookcard { flex-direction: column; } .welcomeart { width: 72px; } .welcomeart img { width: 72px; } }
+
+.bookeyebrow { font-size: var(--fs-xs); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.bookacts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: auto; padding-top: 4px; }
+.bookacts svg { width: 14px; height: 14px; }
+
+.sidelist { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.sidechip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border: 1px solid var(--line); border-radius: var(--r-pill);
+  color: var(--text) !important; text-decoration: none !important; font-size: var(--fs-sm); background: var(--panel); }
+.sidechip svg { width: 13px; height: 13px; color: var(--accent); }
+.sidechip:hover, .sidechip:focus-visible { border-color: var(--accent); }
+.sidechip.taken { border-color: var(--accent); background: var(--raise); }
+
+/* ---- the book's page ---- */
+.bookhero { display: grid; grid-template-columns: minmax(160px, 260px) minmax(0, 1fr); gap: 28px; align-items: start; max-width: 1000px; }
+@media (max-width: 640px) { .bookhero { grid-template-columns: 1fr; } .bookcover { max-width: 200px; } }
+.bookcover { width: 100%; height: auto; border-radius: var(--r-md); border: 1px solid var(--line); box-shadow: 0 10px 30px rgba(0,0,0,.35); }
+.bookwords { display: grid; gap: 12px; }
+.booktitle { margin: 0; font-size: 2rem; line-height: 1.15; font-weight: 700; color: var(--accent); }
+.bookstand { margin: 0; font-size: var(--fs-lg); line-height: 1.55; color: var(--text); font-style: italic; max-width: 62ch; }
+.bookby { margin: 0; color: var(--muted); font-size: var(--fs-md); }
+.booknote { margin: 4px 0 0; color: var(--muted); font-size: var(--fs-md); line-height: 1.5; max-width: 62ch; }
+
+/* ---- the reader ---- */
+.readbar { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 8px 0; background: var(--bg); border-bottom: 1px solid var(--line); }
+.readbar svg { width: 14px; height: 14px; }
+.readwhere { flex: 1 1 220px; min-width: 0; }
+.readwhere select { width: 100%; }
+.readtools { display: flex; gap: 2px; margin-left: auto; }
+.readpage { max-width: 68ch; width: 100%; margin: 0 auto; padding: 8px 0 24px; color: var(--text); line-height: 1.65; font-family: Georgia, 'Iowan Old Style', 'Palatino Linotype', serif; }
+.readwait { color: var(--muted); }
+.readstage h1 { font-size: 1.6em; line-height: 1.2; margin: .4em 0 .6em; color: var(--accent); font-weight: 700; text-transform: none; letter-spacing: 0; }
+.readstage h2 { font-size: 1.2em; margin: 1.6em 0 .5em; font-weight: 650; }
+.readstage h3 { font-size: 1.05em; margin: 1.3em 0 .4em; }
+.readstage p { margin: 0 0 1em; }
+.readstage blockquote { margin: 1em 0; padding: 0 0 0 1em; border-left: 2px solid var(--line); color: var(--muted); font-style: italic; }
+.readstage a { color: var(--blue); }
+.readstage table { border-collapse: collapse; font-size: .82em; margin: 1em 0; display: block; overflow-x: auto; max-width: 100%; font-family: system-ui, sans-serif; }
+.readstage td, .readstage th { border: 1px solid var(--line); padding: 4px 8px; vertical-align: top; }
+.readstage figure { margin: 1.2em 0; text-align: center; }
+.readstage figure img, .readstage img { max-width: 100%; height: auto; border-radius: var(--r-sm); }
+/* the diagrams are drawn black on white for the Kindle: keep them on a light card so they read on the dark page */
+.readstage figure.diagram { background: #fff; padding: 8px; border-radius: var(--r-md); }
+.readstage figcaption { font-size: .85em; color: var(--muted); margin-top: .4em; }
+.readstage pre { white-space: pre-wrap; font-size: .8em; }
+.readstage ol.toc { list-style: none; padding-left: 0; }
+.readstage ol.toc ol { list-style: none; padding-left: 1.2em; font-size: .92em; }
+.readstage ol.toc li { margin: .35em 0; }
+.readstage sup.noteref { font-size: .7em; line-height: 0; }
+.readstage sup.noteref a { text-decoration: none; padding: 0 2px; font-family: system-ui, sans-serif; font-weight: 600; }
+/* the footnotes stay in the page for a reader with no script, but are opened at the foot of the screen */
+.readstage section.footnotes { display: none; }
+.readstage .cover img { max-height: 70vh; }
+.readturn { display: flex; justify-content: space-between; align-items: center; gap: 10px; max-width: 68ch; width: 100%; margin: 0 auto; flex-wrap: wrap; }
+.readturn button { max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.readturn svg { width: 14px; height: 14px; flex: none; }
+.readcount { color: var(--muted); font-size: var(--fs-sm); }
+@media (max-width: 520px) { .readturn button { max-width: 100%; flex: 1 1 100%; } .readcount { order: -1; width: 100%; text-align: center; } }
+.readnote { position: fixed; left: 50%; bottom: 72px; transform: translateX(-50%); z-index: 40; width: min(68ch, calc(100vw - 32px)); max-height: 45vh; overflow: auto;
+  background: var(--panel); border: 1px solid var(--accent); border-radius: var(--r-md); padding: 14px 40px 12px 16px; box-shadow: 0 12px 40px rgba(0,0,0,.5);
+  color: var(--text); line-height: 1.55; font-family: Georgia, 'Iowan Old Style', serif; font-size: 16px; }
+.readnote:focus { outline: none; }
+.readnote p { margin: 0 0 .7em; }
+.readnote .fnnum { font-weight: 700; color: var(--accent); margin-right: 4px; }
+.readnoteclose { position: absolute; top: 8px; right: 8px; background: none; border: 0; color: var(--muted); cursor: pointer; padding: 4px; line-height: 0; border-radius: var(--r-sm); }
+.readnoteclose:hover { color: var(--text); background: var(--raise); }
+.readnoteclose svg { width: 16px; height: 16px; }
+
+/* ---- the Kindle dialog ---- */
+.kindlesteps { margin: 4px 0 0; padding-left: 1.2em; display: grid; gap: 16px; }
+.kindlesteps li { display: grid; gap: 8px; justify-items: start; }
+.kindlesteps li > b { font-weight: 600; }
+.kindlefield { display: grid; gap: 4px; width: 100%; font-size: var(--fs-sm); color: var(--muted); }
+.kindlekeep { display: flex; align-items: center; gap: 8px; font-size: var(--fs-sm); color: var(--muted); cursor: pointer; }
+.kindlenote { color: var(--muted); font-size: var(--fs-sm); line-height: 1.5; margin: 0; }
+
+/* ---- the join page ---- */
+.joinlead { margin: 0; max-width: 70ch; font-size: var(--fs-lg); line-height: 1.55; }
+.factions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+@media (min-width: 1180px) { .factions { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .factions { grid-template-columns: 1fr; } }
+.faction { display: flex; flex-direction: column; gap: 8px; padding: 16px 18px; scroll-margin-top: 80px; }
+.faction.taken { border-color: var(--accent); }
+.faction:target { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.factionhead { display: flex; align-items: center; gap: 10px; }
+.factionhead h2 { margin: 0; font-size: var(--fs-xl); font-weight: 700; color: var(--text); text-transform: none; letter-spacing: 0; }
+.factionmark { display: inline-grid; place-items: center; width: 34px; height: 34px; flex: none; border-radius: var(--r-md); background: var(--raise); color: var(--accent); }
+.factionmark svg { width: 18px; height: 18px; }
+.factionyours { margin-left: auto; font-size: var(--fs-xs); letter-spacing: .06em; text-transform: uppercase; color: var(--accent); }
+.factionbrings { margin: 0; font-weight: 600; }
+.factionabout { margin: 0; color: var(--muted); line-height: 1.5; font-size: var(--fs-md); }
+.factionacts { display: flex; gap: 8px; margin-top: auto; padding-top: 6px; flex-wrap: wrap; }
+.joinnote { margin: 0; color: var(--muted); font-size: var(--fs-sm); max-width: 80ch; line-height: 1.5; }
+.joinsub { margin: 10px 0 0; font-size: var(--fs-lg); font-weight: 650; text-transform: none; letter-spacing: 0; }
+.starts { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
+.start { display: grid; grid-template-columns: auto 1fr; column-gap: 12px; row-gap: 4px; padding: 14px 16px; text-align: left; font: inherit; color: inherit; background: inherit; }
+.start .factionmark { grid-row: span 2; }
+.start b { color: var(--text); }
+.start span:not(.factionmark) { color: var(--muted); font-size: var(--fs-md); line-height: 1.5; }
+
+/* ---- buttons that are links ----
+   `main a` is blue (global.css), which would win over a button's own colour on these <a> buttons; and a filled
+   (brass) button keeps dark ink, hovered or not, so it never goes brass on brass. */
+main :is(.welcome, .bookhero, .readbar, .readpage, .factions, .kindlesteps) a.inline-flex { color: var(--muted) !important; text-decoration: none !important; }
+main :is(.welcome, .bookhero, .readbar, .readpage, .factions, .kindlesteps) a.inline-flex:hover { color: var(--accent) !important; }
+:is(.welcome, .bookhero, .factions, .kindlesteps) :is(a, button).inline-flex.bg-primary,
+:is(.welcome, .bookhero, .factions, .kindlesteps) :is(a, button).inline-flex.bg-primary:hover { color: var(--bg) !important; font-weight: 600; }
+
+/* a ghost button has no background class of its own, so the browser's grey would show */
+.readtools button { background: transparent; border: 0; }

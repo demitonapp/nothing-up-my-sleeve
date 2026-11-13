@@ -1,0 +1,12 @@
+---
+// The book (13 November): Nothing Up My Sleeve, to read here, download or send to a Kindle. The island reads the
+// address, so /book/read is the same page (pages/book/read.astro).
+import Layout from '../layouts/Layout.astro';
+import Book from '../components/islands/Book';
+---
+
+<Layout>
+  <main>
+    <Book client:load />
+  </main>
+</Layout>

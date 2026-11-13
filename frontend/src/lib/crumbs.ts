@@ -368,6 +368,17 @@ function trailFor(path: string): Crumb[] {
     return out;
   }
 
+  // the two places a new visitor is sent from the home page (13 November): the book, with its reader, and joining
+  if (a === 'book') {
+    add('The book', '/book');
+    if (b === 'read') add('Reading', '/book/read');
+    return out;
+  }
+  if (a === 'join') {
+    add('Join', '/join');
+    return out;
+  }
+
   if (a === 'leaderboard') {
     add('Leaderboard', '/leaderboard');
     if (!b) return out;

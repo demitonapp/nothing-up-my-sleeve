@@ -12,6 +12,7 @@ import { BAND } from '@/scripts/views/bands';
 import { mountShipbuilder } from '@/scripts/views/shipbuilder';
 import { PUBLIC_EDITION } from '@/lib/edition';
 import { useLogin } from '@/lib/login';
+import Welcome from '../Welcome';
 
 /** Every address this island answers: the home page, the harbours, and their ships/builder pages. */
 export const isHarboursPage = (path: string): boolean => {
@@ -227,6 +228,7 @@ export default function Harbours() {
           <span className="q">{about}</span>
         </h1>
       )}
+      {home && !shipyard ? <Welcome /> : null}
       <div className="cards" id="rungcards" ref={cardsRef} />
       <div id="shipbuilder" ref={builderRef} hidden />
       {ladder.error ? <div className={emptyCls()}>the ships could not be read: {ladder.error}</div> : null}

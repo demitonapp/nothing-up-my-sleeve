@@ -1,0 +1,11 @@
+---
+// The book's reader (13 November): the same island as /book, which reads the address.
+import Layout from '../../layouts/Layout.astro';
+import Book from '../../components/islands/Book';
+---
+
+<Layout>
+  <main>
+    <Book client:load />
+  </main>
+</Layout>

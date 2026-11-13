@@ -117,6 +117,7 @@ const LABS: [RegExp, string][] = [
   [/gpt-oss/i, 'OpenAI'],
   [/maincoder/i, 'Maincode'],
   [/ling/i, 'InclusionAI'],
+  [/falcon|tiiuae/i, 'TII'],
 ];
 const labOf = (m: Model): string => m.lab || (LABS.find(([re]) => re.test(`${m.model || ''} ${m.name}`)) || [null, 'Other'])[1] as string;
 

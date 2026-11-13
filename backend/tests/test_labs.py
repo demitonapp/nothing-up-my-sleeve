@@ -74,7 +74,9 @@ def test_the_new_families_find_their_house() -> None:
     assert labs.lab_of("Aquila-7B").key == "baai"
     assert labs.lab_of("JoeyLLM").key == "southern-cross"
     assert labs.lab_of("Moshi").key == "kyutai"
-    assert labs.lab_of("Tucano-1b1").key == "nilc"
+    # Tucano is the University of Bonn's Polygl0t project, not NILC's (13 November): no house of the Reach makes it
+    assert labs.lab_of("Tucano-1b1") is None
+    assert labs.get("nilc").flagship == ()
     # and the old mappings still hold
     assert labs.lab_of("mlx-community/Qwen3-4B-4bit").key == "alibaba"
     assert labs.lab_of("mlx-community/Phi-4-mini-instruct-4bit").key == "microsoft"

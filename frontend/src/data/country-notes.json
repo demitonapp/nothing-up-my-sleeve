@@ -109,14 +109,16 @@
   "br": {
     "paragraphs": [
       "Brazil has more than two hundred million people who speak Portuguese, and a quiet suspicion that the big models, which are trained mostly on English text, speak it a little as if from a phrasebook. The state has taken an interest. The Brazilian AI Plan, launched in 2024, is reported at some R$23 billion through 2028. It includes a major upgrade to the Santos Dumont supercomputer in Petrópolis and a call for a language model of the country’s own, in Portuguese. This is a government that has decided that a language model is, like a road or a port, a piece of national equipment, and that it would be unwise to rent one indefinitely from abroad.",
-      "The principal builder is Maritaca AI, in Campinas, whose models are called Sabiá. The first, Sabiá-65B, was made by taking LLaMA and pretraining it further on Portuguese text, which is a modest way to begin a national project. Later generations were trained on Brazilian material. The sabiá, a thrush, was made Brazil’s official national bird by decree in 2002, and is the bird in a famous nineteenth-century poem of exile, so the company has borrowed a little national sentiment along with the name. Birds, it turns out, run in the family: the open Portuguese models called Tucano, trained on the 200-billion-token GigaVerbo corpus, are named for the toucan. Anyone who has seen a toucan will see the justification."
+      "The principal builder is Maritaca AI, in Campinas, whose models are called Sabiá. The first, Sabiá-65B, was made by taking LLaMA and pretraining it further on Portuguese text, which is a modest way to begin a national project. Later generations were trained on Brazilian material. The sabiá, a thrush, was made Brazil’s official national bird by decree in 2002, and is the bird in a famous nineteenth-century poem of exile, so the company has borrowed a little national sentiment along with the name. Birds, it turns out, are a theme: the open Portuguese models called Tucano, trained on the 200-billion-token GigaVerbo corpus, are named for the toucan, and come, a little unexpectedly, from the University of Bonn, in Germany, where a project backed by the German federal government and the state of North Rhine-Westphalia has taken Portuguese as its cause. Anyone who has seen a toucan will see the justification for the name."
     ],
     "sources": [
       "https://itforum.com.br/?p=9604805",
       "https://www.datacenterdynamics.com/br/not%C3%ADcias/brasil-quer-criar-modelo-proprio-de-inteligencia-artificial/",
       "https://arxiv.org/pdf/2304.07880v3.pdf",
       "https://www2.camara.leg.br/legin/fed/decret_sn/2002/decreto-51564-3-outubro-2002-602027-publicacaooriginal-123470-pe.html",
-      "https://huggingface.co/papers/2411.07854"
+      "https://huggingface.co/papers/2411.07854",
+      "https://arxiv.org/html/2603.03543",
+      "https://lamarr-institute.org/publication/tucano-2-cool-better-open-source-llms-for-portuguese/"
     ]
   }
 }

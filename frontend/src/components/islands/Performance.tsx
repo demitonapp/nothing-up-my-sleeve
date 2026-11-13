@@ -18,6 +18,7 @@ interface Perf {
   first: number | null;
   stats: Record<string, number | null>;
   mem_total: number | null;
+  reserve_gb?: number | null; // S5's mac_reserve_gb: memory the Mac lane keeps free for models under 8B
   gpu_cores: number | null;
   kept_days: number; step_sampled: number; pid: number;
 }
@@ -60,6 +61,7 @@ export default function Performance({ range, onRange }: { range: PerfRange; onRa
       const C = { text: tok('text'), muted: tok('muted'), line: tok('line'), accent: tok('accent'), blue: tok('blue'), good: tok('good') };
       const gbOf = (v: number | null): number | null => (v == null ? null : +(v / 2 ** 30).toFixed(2));
       const total = d.mem_total ? +(d.mem_total / 2 ** 30).toFixed(1) : undefined;
+      const reserve = d.reserve_gb && d.reserve_gb > 0 ? d.reserve_gb : undefined;
       await echartsPlot(node, {
         animation: false,
         grid: { left: 52, right: 62, top: 40, bottom: 28 },
@@ -131,6 +133,22 @@ export default function Performance({ range, onRange }: { range: PerfRange; onRa
             showSymbol: false, connectNulls: false,
             lineStyle: { color: C.blue, width: 1.4 }, itemStyle: { color: C.blue },
             areaStyle: { color: C.blue, opacity: 0.08 },
+            // the reserve (S5's mac_reserve_gb, 13 November, Justin: "we also need to reflect that reserved space in this
+            // chart"): the top of the memory axis, held for models under 8B. A voyage's memory belongs below it.
+            ...(reserve && total ? {
+              markArea: {
+                silent: true,
+                itemStyle: { color: C.accent, opacity: 0.14 },
+                label: { show: true, position: 'insideTopRight', color: C.muted, fontSize: 10, formatter: `reserved for models under 8B · ${reserve} GB` },
+                data: [[{ yAxis: +(total - reserve).toFixed(1) }, { yAxis: total }]],
+              },
+              markLine: {
+                silent: true, symbol: 'none',
+                lineStyle: { color: C.accent, type: 'dashed', width: 1 },
+                label: { show: false },
+                data: [{ yAxis: +(total - reserve).toFixed(1) }],
+              },
+            } : {}),
           },
           {
             name: 'this server', type: 'line', yAxisIndex: 1,
@@ -174,6 +192,7 @@ export default function Performance({ range, onRange }: { range: PerfRange; onRa
               <Stat k="GPU now" v={pc(d.now?.gcpu)} s={`${gpuCores ? `${gpuCores} cores` : 'the machine'}${d.now?.gmem ? ` · ${gb(d.now.gmem)} held` : ''}`} />
               <Stat k="CPU now" v={pc(d.now?.cpu)} s={`this server · peak ${pc(d.stats.cpu_peak)}`} />
               <Stat k="memory in use" v={gb(d.now?.mem)} s={`of ${totalGb ? `${totalGb.toFixed(0)} GB` : 'the machine'} · peak ${gb(d.stats.mem_peak)}`} />
+              {d.reserve_gb ? <Stat k="reserved" v={`${d.reserve_gb} GB`} s="kept free for models under 8B" /> : null}
               <Stat k="this server" v={mb(d.now?.rss)} s="resident, the dash process" />
               <Stat k="samples" v={Number(d.stats.count).toLocaleString()} s={`first ${ago(d.first)}`} />
             </div>

@@ -310,6 +310,18 @@ def _prune() -> int:
 MACHINE_KEYS = ("cpu", "rss", "gcpu", "mem")
 
 
+def reserve_gb() -> float | None:
+    """The memory S5 keeps free on the Mac lane for models under 8B (the `mac_reserve_gb` term, 13 November, Justin: "we have
+    a fixed reserve and anything 21m and up goes to vast"), in GB; None when there is none or the terms cannot be read."""
+    try:
+        from thorp.viable.s5_policy import charter
+
+        v = float(charter.terms().get("mac_reserve_gb") or 0)
+        return v if v > 0 else None
+    except Exception:  # noqa: BLE001  the chart draws without it
+        return None
+
+
 def history(rng: str = "24h", now: float | None = None) -> dict:
     """The last hour, day or week as one point per bucket: the mean of each reading (this server's CPU and
     memory, the machine's GPU and memory in use), null where nothing was sampled, and the summary of the
@@ -379,6 +391,7 @@ def history(rng: str = "24h", now: float | None = None) -> dict:
         "first": rows[0]["t"] if rows else None,
         "mem_total": mem_total,
         "gpu_cores": next((r.get("gpu_cores") for r in reversed(rows) if r.get("gpu_cores")), None),
+        "reserve_gb": reserve_gb(),
         "kept_days": KEEP // 86400,
         "step_sampled": STEP,
         "pid": os.getpid(),

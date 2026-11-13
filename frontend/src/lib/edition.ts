@@ -49,6 +49,8 @@ export const PRIVATE_PREFIXES: readonly string[] = [
   '/bet',
   // the settings: the disk, the store, the server, the switches, the keys
   '/settings',
+  // the dashboard's login (lib/login.ts): it opens Demiton's expeditions and Liberty Machine
+  '/login',
 ];
 
 const clean = (path: string): string => {

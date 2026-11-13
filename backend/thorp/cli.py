@@ -894,6 +894,9 @@ def main(argv: list[str] | None = None) -> int:
     s = sub.add_parser("dash", help="serve the dashboard on http://localhost:8787")
     s.add_argument("--port", type=int, default=8787)
     s.set_defaults(fn=cmd_dash)
+    s = sub.add_parser("login", help="the dashboard's login: set (asks for the password), remove, list")
+    s.add_argument("rest", nargs=argparse.REMAINDER)
+    s.set_defaults(fn=lambda a: __import__("thorp.dash.auth", fromlist=["main"]).main(a.rest))
     s = sub.add_parser(
         "onboard", help="the first run: set up the store, models and dashboard in the browser"
     )

@@ -3064,6 +3064,10 @@ ol.goaltext { padding-left: 22px; }
    1000px the shared rule above keeps them one to a row. */
 @media (min-width: 1001px) { .harbours.demitonyard.five { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (min-width: 1400px) { .harbours.demitonyard.five { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
+/* logged out, Demiton shows three cards (no expeditions, no Liberty Machine) and a line to log in (lib/login.ts) */
+@media (min-width: 1001px) { .harbours.demitonyard.three { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.demitonlogin { margin: 10px 0 0; color: var(--muted); font-size: 13px; }
+.demitonlogin a { color: var(--accent); }
 /* five across, a long name ("Coordination", "Intelligence") must fit the plate */
 .harbours.demitonyard.five .yardplate .nm { font-size: clamp(1.05rem, 1.3vw, 1.45rem); overflow-wrap: anywhere; }
 

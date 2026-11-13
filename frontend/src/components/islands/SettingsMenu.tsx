@@ -6,6 +6,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { LANGUAGE_EVENT, chooseLanguage, fetchLanguage, type LanguageState } from '../../lib/siteLanguage';
+import { logOut, useLogin } from '../../lib/login';
 
 const COG =
   'M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z';
@@ -16,6 +17,7 @@ export default function SettingsMenu({ atSettings = false }: { atSettings?: bool
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
   const [at, setAt] = useState({ top: 0, right: 0 });
+  const login = useLogin();
   const btn = useRef<HTMLButtonElement>(null);
   const menu = useRef<HTMLDivElement>(null);
 
@@ -111,6 +113,15 @@ export default function SettingsMenu({ atSettings = false }: { atSettings?: bool
           {err && s ? <span style={{ color: 'var(--bad, #f85149)', fontSize: 12 }}>{err}</span> : null}
           <hr style={{ border: 0, borderTop: '1px solid var(--line, #2a313c)', margin: '2px 0' }} />
           <a href="/settings" onClick={() => setOpen(false)} style={{ color: 'var(--accent, #e3b341)', textDecoration: 'none' }}>More settings →</a>
+          {/* the dashboard's login (lib/login.ts): what opens the expeditions and the Liberty Machine */}
+          {login?.logged_in ? (
+            <span style={{ display: 'flex', justifyContent: 'space-between', gap: 8, color: 'var(--muted, #8b949e)', fontSize: 12 }}>
+              <span>Logged in as {login.username}</span>
+              <button type="button" onClick={() => { void logOut(); setOpen(false); }} style={{ background: 'none', border: 0, padding: 0, color: 'var(--accent, #e3b341)', font: 'inherit', cursor: 'pointer' }}>Log out</button>
+            </span>
+          ) : login ? (
+            <a href={`/login?next=${encodeURIComponent(location.pathname)}`} onClick={() => setOpen(false)} style={{ color: 'var(--accent, #e3b341)', textDecoration: 'none' }}>Log in →</a>
+          ) : null}
         </div>
       ) : null}
     </>

@@ -17,6 +17,7 @@ import { Checkpoints } from './Checkpoints';
 import { LibertyMachineCards } from './LibertyMachineCards';
 import { LibertyMachineCycle } from './LibertyMachineCycle';
 import { S5Feedback } from './S5Feedback';
+import LoginGate from '../LoginGate';
 
 type View = 's1' | 's2' | 's3' | 's4' | 's5';
 const INTRO: Record<View, string> = {
@@ -32,7 +33,12 @@ const openInReader = async (id: string): Promise<void> => {
   await openBook(id);
 };
 
+// only a logged-in browser sees the Liberty Machine (13 November, lib/login.ts); anyone else gets the login form
 export default function Governance() {
+  return <LoginGate what="the Liberty Machine"><GovernancePage /></LoginGate>;
+}
+
+function GovernancePage() {
   const route = useRoute();
   // null is the overview (/orbitals/demiton/liberty-machine); a system's address is its own page
   const [view, setView] = useState<View | null>(null);

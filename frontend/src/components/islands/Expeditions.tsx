@@ -20,6 +20,7 @@ import {
   skyStateOf, sopCardsHtml, tableLogHtml, tableReadingsHtml, planHtml,
 } from '@/scripts/views/expeditions';
 import type { Expedition, Observation, SeriesMap, SkyViewState, TableExchange } from '@/scripts/views/expeditions';
+import LoginGate from '../LoginGate';
 
 /** The expeditions' priority (11 November, Justin: "under goals ... choose their priority across all
  *  the expeditions ... the coordinator can schedule accordingly"): the whole list in rank order, moved
@@ -948,7 +949,12 @@ function PageJump({ items }: { items: Jump[] }) {
   );
 }
 
+// only a logged-in browser sees the expeditions (13 November, lib/login.ts); anyone else gets the login form
 export default function Expeditions() {
+  return <LoginGate what="the expeditions"><ExpeditionsPage /></LoginGate>;
+}
+
+function ExpeditionsPage() {
   const [path, go] = usePath();
   const route = parseExpeditionRoute(path);
   const isHome = route.kind === 'home';

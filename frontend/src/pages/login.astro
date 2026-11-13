@@ -1,0 +1,10 @@
+---
+// The dashboard's login (lib/login.ts): what opens the expeditions and the Liberty Machine.
+import Layout from '../layouts/Layout.astro';
+import LoginPage from '../components/islands/LoginPage';
+---
+<Layout>
+  <main>
+    <LoginPage client:load />
+  </main>
+</Layout>

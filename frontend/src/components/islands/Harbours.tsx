@@ -11,6 +11,7 @@ import { applyHarbourFlips, wireHarbourFlip } from '@/scripts/views/harbourflip'
 import { BAND } from '@/scripts/views/bands';
 import { mountShipbuilder } from '@/scripts/views/shipbuilder';
 import { PUBLIC_EDITION } from '@/lib/edition';
+import { useLogin } from '@/lib/login';
 
 /** Every address this island answers: the home page, the harbours, and their ships/builder pages. */
 export const isHarboursPage = (path: string): boolean => {
@@ -44,6 +45,9 @@ export default function Harbours() {
 
   useEffect(() => { setPath(route); }, [route]);
   const mine = isHarboursPage(path);
+  // Demiton's expeditions and Liberty Machine cards are for a logged-in browser only (lib/login.ts)
+  const login = useLogin();
+  const loggedIn = !!login?.logged_in;
   const ladder = useApi<any>('/api/ladder', 15000, mine);
   const cardsRef = useRef<HTMLDivElement>(null);
   const builderRef = useRef<HTMLDivElement>(null);
@@ -163,7 +167,7 @@ export default function Harbours() {
     } else if (!h) {
       cards.innerHTML = `<div class="${emptyCls()}">no harbour called ${harbour}</div>`;
     } else {
-      cards.innerHTML = harbourShipsHtml(data, harbour, band, sub);
+      cards.innerHTML = harbourShipsHtml(data, harbour, band, sub, loggedIn);
       // a band also shows the models we know in it but have not read yet (the leaderboard's candidates),
       // so a pulled model is visible before its reading lands; the read ships stay first
       if (h.foreign && band) {
@@ -197,7 +201,7 @@ export default function Harbours() {
         })
         .catch(() => { scoreAsked.current[preset] = 0; });
     });
-  }, [mine, data, harbour, hasBuilder, h, shipyardLanding, section, sub]);
+  }, [mine, data, harbour, hasBuilder, h, shipyardLanding, section, sub, loggedIn]);
 
   if (!mine) return null;
   const shipyard = path.split('?')[0].replace(/^#/, '').startsWith('/shipyard');

@@ -321,7 +321,7 @@ export function candidateCardsHtml(cands: any[], band: SizeBand, read: any[]): s
 /** Demiton, our own orbital: its two berths and every rung we build, from the 300k to the 350m. The two
  *  berth pages (Schi'mint's training ring and Vavatch End's deep yards) stay reachable from the links; the
  *  blocks beneath them are the same harbour pages' own ship lists, so the fleet is not written twice. */
-export function demitonShipsHtml(ladder: Payload, view: 'overview' | 'berth' = 'overview'): string {
+export function demitonShipsHtml(ladder: Payload, view: 'overview' | 'berth' = 'overview', loggedIn = false): string {
   const hs = (ladder && ladder.harbours) || [];
   const berths = ['schimint', 'vavatch-end'].map((k) => hs.find((x: any) => x.key === k)).filter(Boolean);
   // The four sections as image cards (12 November, Justin: "this page should rather have fal images for its
@@ -337,7 +337,12 @@ export function demitonShipsHtml(ladder: Payload, view: 'overview' | 'berth' = '
     ['Library', 'the books and sources our ships read, and what each one holds', '/library', 'demiton-library'],
     ['Shipyard', 'where a ship is drawn before it is built, and where the fleet lies: the berth, the SOP it reads, the stages it must build, and the standard it is held to', '/shipyard', 'demiton-shipyard'],
   ];
-  const links = `<div class="harbours shipyardgrid demitonyard five" style="grid-column:1/-1">${sections.map(([name, about, href, art], i) =>
+  // the expeditions and the Liberty Machine are for a logged-in browser only (13 November, Justin: "this page
+  // http://localhost:4321/orbitals/demiton should not show expeditions and liberty machine unless i'm logged in"):
+  // logged out, Demiton shows its other three cards and a way to log in (lib/login.ts)
+  const shown = loggedIn ? sections : sections.filter(([, , href]) => href !== '/expeditions' && !href.includes('/liberty-machine'));
+  const login = loggedIn ? '' : `<div class="demitonlogin" style="grid-column:1/-1"><a href="/login?next=${encodeURIComponent('/orbitals/demiton')}">Log in</a> to see the expeditions and the Liberty Machine.</div>`;
+  const links = `<div class="harbours shipyardgrid demitonyard ${shown.length === 5 ? 'five' : 'three'}" style="grid-column:1/-1">${shown.map(([name, about, href, art], i) =>
     `<a class="${cardCls(true, 'card harbourcard shipyardcard')}" href="${esc(href)}">${artImg(art, 'cardart ship')}
       <div class="yardplate">
         <span class="yardnum">${String(i + 1).padStart(2, '0')}</span>
@@ -355,8 +360,8 @@ export function demitonShipsHtml(ladder: Payload, view: 'overview' | 'berth' = '
 
 /** One harbour: its depth and every size's draught against it, then its ships, the ones fitting out and
  *  (in the foreign-only Masaq' Reach) the three size bands or the outside models in one of them. */
-export function harbourShipsHtml(ladder: Payload, key: string, band: SizeBand | null = null, sub = ''): string {
-  if (key === DEMITON.key) return demitonShipsHtml(ladder, sub === 'berth' ? 'berth' : 'overview');
+export function harbourShipsHtml(ladder: Payload, key: string, band: SizeBand | null = null, sub = '', loggedIn = false): string {
+  if (key === DEMITON.key) return demitonShipsHtml(ladder, sub === 'berth' ? 'berth' : 'overview', loggedIn);
   const hs = (ladder && ladder.harbours) || [];
   const h = hs.find((x: any) => x.key === key);
   if (!h) return `<div class="${emptyCls()}">no harbour called ${esc(key)}${hs.length ? `: ${hs.map((x: any) => esc(x.name)).join(', ')}` : ''}</div>`;

@@ -7764,6 +7764,50 @@ class Handler(BaseHTTPRequestHandler):
     def _json(self, code: int, obj) -> None:
         self._send(code, json.dumps(_finite(obj), default=str).encode(), "application/json")
 
+    def _login_user(self) -> str | None:
+        """The logged-in username from the request's cookie (thorp.dash.auth), or None."""
+        from thorp.dash import auth
+
+        return auth.request_user(self.headers.get("Cookie"))
+
+    def _gated(self, path: str) -> bool:
+        """True (and a 401 sent) when `path` is one only a logged-in browser is answered on and this one is not."""
+        from thorp.dash import auth
+
+        if path not in auth.GATED or self._login_user():
+            return False
+        self._json(401, {"error": "log in to see this", "login": True})
+        return True
+
+    def _login_post(self, path: str) -> None:
+        """POST /api/login {username, password} sets the login cookie; POST /api/logout clears it."""
+        import time as _time
+
+        from thorp.dash import auth
+
+        if path == "/api/logout":
+            body = json.dumps({"logged_in": False}).encode()
+            cookie = auth.clear_cookie()
+        else:
+            n = int(self.headers.get("Content-Length") or 0)
+            got = json.loads(self.rfile.read(min(n, 10_000)) or b"{}")
+            username, password = str(got.get("username") or "").strip(), str(got.get("password") or "")
+            if not (username and password and auth.check(username, password)):
+                _time.sleep(0.5)
+                return self._json(401, {"error": "that username and password do not match", "logged_in": False})
+            body = json.dumps({"logged_in": True, "username": username}).encode()
+            cookie = auth.set_cookie(auth.token(username))
+        try:
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Set-Cookie", cookie)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+
     def _chat_stream(self) -> None:
         """A chat answer as it is written: one line of JSON an event, flushed as it comes, the
         connection closed at the end (no length is known ahead). A reader that goes away stops the
@@ -7862,6 +7906,18 @@ class Handler(BaseHTTPRequestHandler):
             return self._onboard_post(u.path)
         if u.path == "/api/chat/stream":
             return self._chat_stream()
+        if u.path in ("/api/login", "/api/logout"):
+            try:
+                return self._login_post(u.path)
+            except StoreDown as e:
+                return self._json(503, {"error": str(e), "store": "down"})
+            except ValueError as e:
+                return self._json(400, {"error": str(e)})
+        try:
+            if self._gated(u.path):
+                return None
+        except StoreDown as e:
+            return self._json(503, {"error": str(e), "store": "down"})
         posts = {
             "/api/table/reply": api_table_reply,
             "/api/library_config/preview": api_library_config_preview,
@@ -7942,6 +7998,14 @@ class Handler(BaseHTTPRequestHandler):
                 # 12 November, Justin: "8787 shouldn't serve a UI". The page is the Astro dev server on :4321,
                 # which forwards /api here.
                 return self._send(404, API_ONLY, "application/json")
+            if u.path == "/api/login":
+                # who is logged in, and whether a login has been set at all (thorp login set)
+                from thorp.dash import auth
+
+                who = self._login_user()
+                return self._json(200, {"logged_in": bool(who), "username": who, "configured": auth.configured()})
+            if self._gated(u.path):
+                return None
             if u.path == "/api/drones/shot":
                 from thorp import drones
 

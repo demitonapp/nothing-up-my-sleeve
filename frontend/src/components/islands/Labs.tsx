@@ -18,6 +18,12 @@ import { sectionProps, useApi, useRoute } from '@/lib/useApi';
 import SectionNav from '../SectionNav';
 import { TabNav } from '../TabNav';
 import EmbeddingOntology from './EmbeddingOntology';
+import countryNotes from '@/data/country-notes.json';
+import '@/styles/country-note.css';
+
+// one entry a country (13 November, Justin: "a two paragraph bill bryson comment on how that country
+// approaches language models"): the text is data in frontend/src/data/country-notes.json
+const COUNTRY_NOTES = countryNotes as unknown as Record<string, { paragraphs: string[] } | undefined>;
 
 interface House {
   rank: number;
@@ -284,6 +290,11 @@ export default function Labs() {
           ) : countryView ? (
             !cg ? <div className={emptyCls()}>no country is called {cc} in the Reach.</div> : (
               <>
+                {COUNTRY_NOTES[cc]?.paragraphs?.length ? (
+                  <div className="countrynote" id="countrynote">
+                    {COUNTRY_NOTES[cc]!.paragraphs.map((p, i) => <p key={i}>{p}</p>)}
+                  </div>
+                ) : null}
                 <TabNav
                   id="countrynav"
                   ariaLabel={`${cg.name}'s pages`}

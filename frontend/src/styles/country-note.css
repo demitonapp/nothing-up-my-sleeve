@@ -1,0 +1,20 @@
+/* A country's two-paragraph note at the top of its Masaq' Reach page (frontend/src/data/country-notes.json). */
+.countrynote {
+  max-width: 70ch;
+  margin: 4px 0 18px;
+  padding: 2px 0 2px 16px;
+  border-left: 3px solid var(--line);
+}
+.countrynote p {
+  margin: 0 0 12px;
+  color: var(--text);
+  font-family: Georgia, 'Iowan Old Style', 'Palatino Linotype', Palatino, serif;
+  font-size: var(--fs-lg);
+  line-height: 1.6;
+  text-wrap: pretty;
+}
+.countrynote p:last-child { margin-bottom: 0; }
+@media (max-width: 700px) {
+  .countrynote { padding-left: 12px; margin-bottom: 14px; }
+  .countrynote p { font-size: var(--fs-base); line-height: 1.55; }
+}

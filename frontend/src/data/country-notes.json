@@ -1,0 +1,122 @@
+{
+  "_about": "One entry a country, keyed by the two-letter code the Reach routes use (/orbitals/masaq/<cc>). Two paragraphs each, written in a Bill Bryson manner (warm, wry, concrete; not his words). Every claim is meant to be checkable: `sources` lists where. Edit here; the country pages read this file. Written 13 November 2026.",
+  "us": {
+    "paragraphs": [
+      "Begin with the United States, since everybody else does, if only to see what they are arguing with. The American approach to language models is the American approach to most things: assemble a great many enormously ambitious companies, give them more money than seems wise, and see who is left standing. A team at Google published the Transformer paper in 2017, and Google, OpenAI, Anthropic and Meta all keep their headquarters in the San Francisco Bay Area, so that in principle you could call on all four between breakfast and a late lunch, traffic permitting, which on the 101 it never does.",
+      "The state, for the most part, watches from the stands. The money is private, or comes from a handful of very large public companies, and the frontier models are mostly kept closed, like the family silver. There are exceptions, and they are rather endearing. OpenAI, whose name has long invited wry remarks, released its open-weight gpt-oss models in August 2025, its first since GPT-2 in 2019. The Allen Institute for AI, a nonprofit founded by Paul Allen in 2014, publishes its OLMo models along with the data and code that made them, and in 2025 the National Science Foundation put $75 million into its open-model work. EleutherAI, a band of volunteers who organised themselves online in 2020, built The Pile. All of it is done in English, the language the largest share of the web is written in, which spares American labs the bother of wondering whether they have enough text."
+    ],
+    "sources": [
+      "https://arxiv.org/abs/1706.03762",
+      "https://www.theregister.com/2025/08/05/openai_open_gpt/",
+      "https://allenai.org/blog/hello-olmo-a-truly-open-llm-43f7e7359222",
+      "https://geekwire.com/2025/allen-institute-for-ai-lands-152m-from-nvidia-and-nsf-to-lead-national-ai-project",
+      "https://en.wikipedia.org/wiki/EleutherAI"
+    ]
+  },
+  "cn": {
+    "paragraphs": [
+      "China’s approach is easier to describe than to believe: the labs give their weights away, and the state sets the rules. Every Chinese house in the Reach publishes open weights of some kind, which is an unusual habit in an industry where most companies guard their models as if they were recipes for Coca-Cola. Three of the biggest, Alibaba, Ant Group and DeepSeek, are in Hangzhou, a city once better known for its West Lake. DeepSeek was spun out in 2023 from High-Flyer, a quantitative hedge fund, and released its R1 reasoning model in January 2025 under the MIT licence, about as permissive as licences get. By 2025 Alibaba’s Qwen had overtaken Meta’s Llama as the most-downloaded model family on Hugging Face, and Moonshot’s Kimi K2 had put an open trillion-parameter model on the table.",
+      "The state’s part is less to pay than to point. In 2017 the State Council published a plan, with the staged timetable that such plans enjoy, for China to become the world’s leading centre of AI innovation by 2030. In 2023 it followed with rules, in force from 15 August, requiring public-facing generative AI services to hold to the “core socialist values”, which, from an engineer’s point of view, is a training-data problem of unusual delicacy. The Beijing Academy of AI had already claimed, in 2021, a 1.75-trillion-parameter model called WuDao 2.0. And the language itself presents its own question: a script of several thousand everyday characters rather than twenty-six letters, which keeps the designers of tokenisers humble."
+    ],
+    "sources": [
+      "https://penchan.co/en/market/ai/china-models/deepseek/",
+      "https://en.wikipedia.org/wiki/Interim_Measures_for_the_Management_of_Generative_AI_Services",
+      "https://digichina.stanford.edu/work/chinas-plan-to-lead-in-ai-purpose-prospects-and-problems",
+      "https://www.alignmentforum.org/posts/2dG7vXDZjd6crkdLa/beijing-academy-of-artificial-intelligence-announces-1-75",
+      "https://simonwillison.net/2025/Jul/11/kimi-k2/",
+      "https://www.scmp.com/tech/big-tech/article/3349552/alibabas-qwen-family-captures-over-50-global-open-source-downloads-report-finds"
+    ]
+  },
+  "fr": {
+    "paragraphs": [
+      "France approaches language models as it approaches most things involving language: with passion, with a certain loftiness, and with the faint suggestion that someone ought to be in charge. The Académie française, forty members known as the immortals, has been advising on the French language since 1635, and the prospect of a machine that speaks English first was never going to be received with a shrug. The national champion is Mistral AI, of Paris, started in 2023 by researchers who had left Google and Meta. It introduced its first model, Mistral 7B, in September 2023 by posting a bare torrent link, under the Apache 2.0 licence. In September 2025 ASML, the Dutch maker of chip-making machines, led a €1.7 billion round that valued the company at €11.7 billion.",
+      "The state’s hand is lighter, but you can see it. BLOOM, the 176-billion-parameter model built in 2022 by Hugging Face and over a thousand volunteer researchers, spoke 46 languages and was trained on the Jean Zay supercomputer on a French public grant. Kyutai, a nonprofit lab launched in Paris in November 2023 with about €300 million from Xavier Niel, Rodolphe Saadé and Eric Schmidt, taught a model called Moshi to talk, announced it in July 2024 and released it openly. Public and philanthropic money, in other words, spent on work that anyone may take away and use, which is generous, and also rather good for the reputation of the country in which the spending took place."
+    ],
+    "sources": [
+      "https://thenextweb.com/news/mistral-releases-first-generative-ai-model",
+      "https://mistral.ai/it/news/mistral-ai-raises-1-7-b-to-accelerate-technological-progress-with-ai/",
+      "https://news.bloomberglaw.com/private-equity/asml-pumps-1-3-billion-into-mistral-in-boost-for-european-ai",
+      "https://www.jmlr.org/papers/volume25/23-0581/23-0581.pdf",
+      "https://fortune.com/europe/2024/07/04/ai-lab-french-billionaire-xavier-niel-takes-on-chatgpt-reveals-voice-assistant-with-thick-french-accent/",
+      "https://www.maddyness.com/2024/07/03/premiere-mondiale-avec-kyutai-niel-saade-et-schmidt-donnent-naissance-a-moshi/"
+    ]
+  },
+  "ca": {
+    "paragraphs": [
+      "Canada has a talent for quietly doing the important work while the neighbours make the noise. Geoffrey Hinton in Toronto and Yoshua Bengio in Montreal kept faith with neural networks through the long years when almost nobody else did, and shared the 2018 Turing Award, with Yann LeCun, for it. In 2017 Ottawa gave C$125 million to CIFAR to launch the Pan-Canadian AI Strategy, which CIFAR describes as the first national AI strategy in the world, and which spread the money among institutes in Toronto, Montreal and Edmonton. Mila, in Montreal, is the one in this orbital. It is a research institute and not a model vendor, so it builds knowledge rather than ships.",
+      "The shipbuilder is Cohere, of Toronto, co-founded in 2019 by Aidan Gomez, who had been a University of Toronto undergraduate on an internship at Google Brain when he helped write the Transformer paper. Cohere sells to companies rather than the public, and its Command models are sold, not given away. The state is more present than elsewhere: Ottawa announced up to C$240 million toward a Cohere data centre in 2024, the first award from a C$2 billion sovereign compute strategy, and finalised it in March 2025. Cohere’s research arm, in a country with two official languages, decided that two was modest, and in 2024 released Aya, an open model for 101 languages, built with more than 3,000 researchers in 119 countries."
+    ],
+    "sources": [
+      "https://ised-isde.canada.ca/site/ai-strategy/",
+      "https://www.canada.ca/en/department-finance/news/2024/12/remarks-by-the-deputy-prime-minister-announcing-240-million-for-cohere-to-scale-up-ai-compute-capacity.html",
+      "https://www.canada.ca/en/innovation-science-economic-development/news/2025/03/government-of-canada-finalizes-investment-to-support-canadian-born-ai-leader-cohere.html",
+      "https://arxiv.org/abs/1706.03762",
+      "https://venturebeat.com/ai/cohere-for-ai-launches-open-source-llm-for-101-languages"
+    ]
+  },
+  "ae": {
+    "paragraphs": [
+      "The United Arab Emirates has gone about language models in much the way it has gone about skyscrapers: decide that it wants one, and work out the rest on the way up. The vehicle is the Technology Innovation Institute in Abu Dhabi, a government institute paid for by the emirate through its Advanced Technology Research Council. Its model is called Falcon, after a bird that appears on the national emblem and has been a working partner of the region for a very long time. Falcon 40B was released in May 2023 and made free of royalties for commercial use on the thirty-first of that month. Its makers described it as the top-ranked open model in the world at the time.",
+      "The rest of the apparatus is just as deliberate. The government appointed a minister for artificial intelligence in 2017. In 2019 it founded the Mohamed bin Zayed University of Artificial Intelligence, a graduate university devoted to the subject and nothing else. And in August 2023 Inception, a G42 company, with that university and the chip-maker Cerebras, released Jais, a 13-billion-parameter model for Arabic and English, named for Jebel Jais, the highest mountain in the country. Arabic is written right to left and spoken in dialects that differ a good deal from the written standard, so the model had rather more to do than its English-only cousins."
+    ],
+    "sources": [
+      "https://wam.ae/en/details/1395303164058",
+      "https://www.mediaoffice.abudhabi/en/technology/technology-innovation-institute-launches-open-source-falcon-40b-almodel-for-research-and-commercial-use/",
+      "https://www.cerebras.ai/blog/jais-a-new-pinnacle-in-open-arabic-nlp",
+      "https://inceptionai.ai/2023/08/30/meet-jais-the-worlds-most-advanced-arabic-llm-open-sourced-by-g42/index.html",
+      "https://trendsresearch.org/?p=83312"
+    ]
+  },
+  "gb": {
+    "paragraphs": [
+      "Britain’s part in the story of language models is that of a country that thinks of something first and then, with great good manners, lets somebody else take it home. DeepMind was founded in London in 2010, sold to Google in 2014 and merged with Google Brain in 2023, so that the best-known British laboratory is now a department of an American company. The Reach’s British houses are known less for chatbots than for other things done with the same machinery. Stability AI, in London, released the open-weight image model Stable Diffusion in August 2022. Wayve teaches cars to drive and, lately, to explain what they are doing. Flower trains a model across many sites at once, so that nobody has to hand over their data.",
+      "Where Britain has really specialised is in being the place where the rules get discussed. The Alan Turing Institute, the national institute for data science and AI, was founded in 2015 and named, quite properly, for the man himself. In November 2023 the government held its AI Safety Summit at Bletchley Park, where Turing and his colleagues broke Enigma, and 28 countries and the European Union, the United States and China among them, signed the Bletchley Declaration on the risks of frontier AI. The AI Safety Institute was renamed the AI Security Institute in February 2025. One feels that the country, having inherited a great deal of excellent scenery for this sort of occasion, was bound to use it."
+    ],
+    "sources": [
+      "https://en.wikipedia.org/wiki/Google_DeepMind",
+      "https://petapixel.com/2022/08/23/open-source-ai-image-generator-stable-diffusion-released-to-the-public/",
+      "https://www.infosecurity-magazine.com/news/28-countries-bletchley-declaration",
+      "https://techcrunch.com/2025/02/13/uk-drops-safety-from-its-ai-body-now-called-ai-security-institute-inks-mou-with-anthropic"
+    ]
+  },
+  "au": {
+    "paragraphs": [
+      "Australia’s relationship with language models begins with an awkward piece of arithmetic. At the time of colonisation some 250 Aboriginal and Torres Strait Islander languages were spoken on the continent. The national survey of 2018–19 found at least 123 still in use, and only 14 of those strong. What survives is kept in places that sound more like libraries than laboratories: AIATSIS in Canberra, the PARADISEC archive run by three universities, the Living Archive at Charles Darwin University, and the Language Data Commons of Australia, which tries to link them all. Much of the material is governed by the wishes of the communities it came from, so that the question for a model-builder is not only whether the text exists but who gets to say yes.",
+      "Meanwhile, a country of some 27 million people has set about building its own models, with the energy of a place that has long been a long way from everything. Maincode, in Melbourne, announced Matilda in August 2025 as built from scratch. Sovereign Australia AI, in Canberra, is working on Australis. And Southern Cross AI has a project called JoeyLLM, which for the benefit of the non-Australian reader is named for the baby kangaroo, and whose planned sizes are Baby Joey, at about a billion parameters, and Little Joey, at about seven. It is hard not to feel that a country that names its models like this has already grasped something that the rest of the industry is still working on, namely that nobody should take a language model too seriously."
+    ],
+    "sources": [
+      "https://aiatsis.gov.au/research/aiatsis-centre-australian-languages/national-indigenous-languages-surveys/third-national",
+      "https://www.naa.gov.au/students-and-teachers/learning-resources/learning-resource-themes/first-australians/history/map-indigenous-languages",
+      "https://ia.acs.org.au/article/2025/maincode-debuts-matilda-ai-after-ditching--sovereign--label.html",
+      "https://www.forbes.com.au/covers/entrepreneurs/not-bogan-ai-inside-the-push-to-build-a-sovereign-australian-brain/",
+      "https://huggingface.co/spaces/JoeyLLM/README/blob/main/README.md"
+    ]
+  },
+  "za": {
+    "paragraphs": [
+      "South Africa has eleven spoken official languages, and since July 2023 a twelfth in South African Sign Language, and its Constitution asks that they all be treated equitably, which is a fine thing to put in a constitution and a demanding thing to put in a training run. In May 2026 a group at the University of Cape Town released MzansiLM, a model of 125 million parameters trained from scratch on a corpus of all eleven spoken languages, nine of which the researchers count as low-resource. It is small, by the standards of the trade, but it is open, and it is for them. The national side of the business is SADiLaR, a government-funded centre hosted by North-West University in Potchefstroom, which launched in August 2019 and collects the corpora and tools that everyone else builds on.",
+      "The rest is a story of people doing a great deal with very little. Masakhane, whose name means “we build together” in isiZulu, began in 2019 out of the Deep Learning Indaba, started by Jade Abbott and Laura Martinus, and grew into a pan-African collective that builds datasets, benchmarks and models for African languages in the open. Lelapa AI, in Johannesburg, released InkubaLM in 2024: a model of 400 million parameters, trained from scratch on 2.4 billion tokens in isiZulu, isiXhosa, Yoruba, Hausa and Swahili, with English and French as company. For people who have been told for years that their languages are too small to bother with, this is a rather good answer."
+    ],
+    "sources": [
+      "https://www.polity.org.za/article/south-african-sign-language-is-now-the-countrys-12th-official-language-2023-07-19",
+      "https://arxiv.org/html/2603.20732",
+      "https://iol.co.za/ios/news/2026-05-06-uct-researchers-develop-ai-model-for-all-11-south-african-languages/",
+      "https://sadilar.org/en/new-infrastructure/",
+      "https://venturebeat.com/ai/the-masakhane-project-wants-machine-translation-and-ai-to-transform-africa",
+      "https://arxiv.org/html/2408.17024v1"
+    ]
+  },
+  "br": {
+    "paragraphs": [
+      "Brazil has more than two hundred million people who speak Portuguese, and a quiet suspicion that the big models, which are trained mostly on English text, speak it a little as if from a phrasebook. The state has taken an interest. The Brazilian AI Plan, launched in 2024, is reported at some R$23 billion through 2028. It includes a major upgrade to the Santos Dumont supercomputer in Petrópolis and a call for a language model of the country’s own, in Portuguese. This is a government that has decided that a language model is, like a road or a port, a piece of national equipment, and that it would be unwise to rent one indefinitely from abroad.",
+      "The principal builder is Maritaca AI, in Campinas, whose models are called Sabiá. The first, Sabiá-65B, was made by taking LLaMA and pretraining it further on Portuguese text, which is a modest way to begin a national project. Later generations were trained on Brazilian material. The sabiá, a thrush, was made Brazil’s official national bird by decree in 2002, and is the bird in a famous nineteenth-century poem of exile, so the company has borrowed a little national sentiment along with the name. Birds, it turns out, run in the family: the open Portuguese models called Tucano, trained on the 200-billion-token GigaVerbo corpus, are named for the toucan. Anyone who has seen a toucan will see the justification."
+    ],
+    "sources": [
+      "https://itforum.com.br/?p=9604805",
+      "https://www.datacenterdynamics.com/br/not%C3%ADcias/brasil-quer-criar-modelo-proprio-de-inteligencia-artificial/",
+      "https://arxiv.org/pdf/2304.07880v3.pdf",
+      "https://www2.camara.leg.br/legin/fed/decret_sn/2002/decreto-51564-3-outubro-2002-602027-publicacaooriginal-123470-pe.html",
+      "https://huggingface.co/papers/2411.07854"
+    ]
+  }
+}

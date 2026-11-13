@@ -62,6 +62,16 @@ DEFAULTS: dict = {
     # Justin: "don't send lines to 4090 for 300k and 1m, only send 9m and up to vast": the 4090 ran a 300k at 0.46
     # of this Mac's speed. A line pinned `vast:` still sails abroad: the pin is a person's decision, not the purser's.
     "foreign_min_preset": "",
+    # the biggest size this Mac's lane runs (a preset of models.registry.PRESETS; empty: no ceiling). 13 November,
+    # Justin, of proposal #27: "we have a fixed reserve and anything 21m and up goes to vast". A voyage above it is a
+    # Vast voyage whatever its expedition (the coordinator's parse, s2 lanes.mac_ceiling), within the money terms
+    # above; a line a person pins with `mac:` is the one way to sail it here. The purser's two terms above are the
+    # other direction (what it may send abroad); this is what may not stay.
+    "mac_max_preset": "",
+    # the memory the Mac lane keeps free for models under 8B (the site's translator, the console's small models), in GB.
+    # Same decision. It is a number S5 holds and the pages show: what enforces it today is `mac_max_preset`, since no
+    # voyage's footprint has been measured to hold a line against it (proposal #27 asked for that measurement first).
+    "mac_reserve_gb": 0.0,
     # a hire only when it brings the voyage home at least this much sooner, in hours and as a share of its wait
     "margin_hours": 1.0,
     "margin_fraction": 0.25,

@@ -196,6 +196,24 @@ MODELS = [
         "note": "an open small instruct model with a chat template",
     },
     {
+        # Cohere's own repo, not an mlx-community conversion: mlx-lm opens Cohere2 weights as they are (13 November,
+        # Justin: "add tiny aya earth"). It is the site's translator (thorp/translate.py) and also a model to chat with.
+        # Gated: the Hugging Face account must accept Cohere's licence on the model page before the download works.
+        "repo": "CohereLabs/tiny-aya-earth",
+        "label": "Tiny Aya Earth",
+        "band": "small",
+        "params": 3.35e9,
+        "download_gb": 6.7,
+        "run_gb": 7.5,
+        "license": "CC-BY-NC-4.0",
+        "lab": "cohere",
+        "flag": "ca",
+        "gated": True,
+        "terms_url": "https://huggingface.co/CohereLabs/tiny-aya-earth",
+        "note": "67 languages, Xhosa and French among them (Afrikaans is not on its list); the site's translator. bf16, "
+        "gated: accept Cohere's licence on its Hugging Face page first",
+    },
+    {
         "repo": "mlx-community/Qwen3-4B-4bit",
         "label": "Qwen3 4B",
         "band": "medium",

@@ -1069,6 +1069,12 @@ def main(argv: list[str] | None = None) -> int:
         fn=lambda a: __import__("thorp.viable.s5_policy.proposals", fromlist=["main"]).main(a.rest)
     )
     s = sub.add_parser(
+        "translate",
+        help="the site's language and its translator (Tiny Aya Earth): status, languages, set, say, prepare",
+    )
+    s.add_argument("rest", nargs=argparse.REMAINDER)
+    s.set_defaults(fn=lambda a: __import__("thorp.translate", fromlist=["main"]).main(a.rest))
+    s = sub.add_parser(
         "feedback", help="S5: the feedback the systems send up, sorted by the taxonomy S4 reads"
     )
     s.add_argument("--days", type=int, default=7)

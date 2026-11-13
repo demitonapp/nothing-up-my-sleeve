@@ -406,6 +406,11 @@ def _chartered(spec: dict) -> list[str]:
     return charter.check(spec)
 
 
+def _language_check(spec: dict) -> list[str]:
+    """Policy 'language' is about what the site speaks, not about a voyage's spec: the gate finds nothing to refuse."""
+    return []
+
+
 POLICIES: dict[str, Policy] = {
     p.key: p
     for p in (
@@ -518,6 +523,19 @@ POLICIES: dict[str, Policy] = {
         ),
             True,
             _prechecked,
+        ),
+        Policy(
+            "language",
+            "The site speaks the language Justin chose in the chat terminal's settings (s5.site_language), and the Liberty "
+            "Machine reads that choice on every page: the translator is Tiny Aya Earth (thorp/translate.py), and what it "
+            "makes is kept in s1.translations so a sentence is translated once. English is the source and the record: "
+            "DECISIONS.md, the policies and the ledger stay English and a translation is only ever a view of them, never "
+            "written back. Names (Nothing up my sleeve, Thorp, Demiton, the Orbitals) are left as they are; a language "
+            "the model's card does not name (Afrikaans) is offered with that said.",
+            '2026-11-13, Justin: "add your language in the chat terminal as an option ... the Liberty Machine picks up the '
+            'language you\'ve chosen and uses tiny aya earth to dynamically translate the entire site"',
+            False,
+            _language_check,
         ),
     )
 }
@@ -1261,7 +1279,18 @@ def audit() -> dict:
             for k, p in POLICIES.items()
         },
         "breaking": {k: v[:20] for k, v in violations.items()},
+        "language": site_language(),
     }
+
+
+def site_language() -> dict:
+    """The language the site speaks (S5, policy 'language'): the choice, who made it, and whether the translator is here."""
+    try:
+        from thorp import translate
+
+        return translate.status()
+    except Exception as e:  # noqa: BLE001  the store may be down: the audit says so, it does not fail
+        return {"error": str(e)}
 
 
 if __name__ == "__main__":

@@ -17,6 +17,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react';
 import { ContextMeter } from './Chat';
 import ConsoleConnect from './ConsoleConnect';
+import LanguageSetting from './LanguageSetting';
 import RichText from '@/lib/richtext';
 import {
   PUBLIC_EDITION, SERVER_CONNECTION, chatStream, connKey, loadConnection, recentConnections, saveConnection, stillThere,
@@ -1551,6 +1552,8 @@ export default function ChatConsole() {
                   <button type="button" className="consolbtn" onClick={() => setAnswerFs((v) => Math.min(20, v + 1))} title="larger answer text" aria-label="larger answer text">A+</button>
                 </span>
               </div>
+              {/* the site's language (13 November, Justin): the Liberty Machine keeps the choice; Tiny Aya Earth translates the site */}
+              {!PUBLIC_EDITION ? <LanguageSetting /> : null}
               <div className="consolesetrow">
                 <span className="consolesetname">debug</span>
                 <label className={`consoleswitch${debug ? ' on' : ''}`} title="show the last request and reply beside the chat">

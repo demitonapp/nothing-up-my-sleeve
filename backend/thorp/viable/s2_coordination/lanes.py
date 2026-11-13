@@ -298,7 +298,38 @@ def parse(text: str, specs: Path | None = None) -> Line:
             ln.lane = (
                 _charter_lane()  # a voyage written for CUDA sails on a hired GPU, never on this Mac's CPU
             )
+        elif kind_of(ln.lane) != "charter" and above_the_mac(preset_of(ln)) and not re.match(r"\s*mac:", text):
+            # S5's mac_max_preset (13 November, Justin: "anything 21m and up goes to vast"): too big for this Mac's lane,
+            # so it is a Vast voyage, the purser's call or not. `mac:` is a person's pin and the one way to sail it here.
+            ln.lane = _charter_lane()
     return ln
+
+
+_CEILING: dict = {"at": float("-inf"), "preset": ""}
+
+
+def mac_ceiling() -> str:
+    """S5's mac_max_preset: the biggest preset the Mac lane runs ("" for none). Read at most every LANE_DEFS_TTL_S; none
+    when the terms cannot be read, so a box, a test or a store not yet migrated sails as before."""
+    if time.monotonic() - _CEILING["at"] > LANE_DEFS_TTL_S:
+        try:
+            from thorp.viable.s5_policy import charter
+
+            _CEILING.update(at=time.monotonic(), preset=str(charter.terms().get("mac_max_preset") or ""))
+        except Exception:  # noqa: BLE001
+            _CEILING.update(at=time.monotonic(), preset="")
+    return str(_CEILING["preset"])
+
+
+def above_the_mac(preset: str | None) -> bool:
+    """Whether a preset is bigger than the Mac lane's ceiling (a size the registry does not know is not held to it)."""
+    from thorp.models import registry
+
+    ceiling = mac_ceiling()
+    order = list(registry.PRESETS)
+    top = ceiling.split("-")[0]
+    size = str(preset or "").split("-")[0]
+    return bool(ceiling) and top in order and size in order and order.index(size) > order.index(top)
 
 
 def _queue_pg() -> bool:

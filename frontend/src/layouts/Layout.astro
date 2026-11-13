@@ -9,6 +9,7 @@ import '../styles/global.css';
 import Header from '../components/Header.astro';
 import CommandPalette from '../components/islands/CommandPalette';
 import ChatConsole from '../components/islands/ChatConsole';
+import SiteTranslator from '../components/islands/SiteTranslator';
 import Breadcrumbs from '../components/islands/Breadcrumbs';
 import { PRIVATE_PREFIXES, PUBLIC_EDITION } from '../lib/edition';
 ---
@@ -30,6 +31,9 @@ import { PRIVATE_PREFIXES, PUBLIC_EDITION } from '../lib/edition';
     <CommandPalette client:idle />
     <!-- the chat console: a carved drawer that slides up from the bottom of every page (⌘J) -->
     <ChatConsole client:idle />
+    <!-- the site's language (13 November, Justin): the Liberty Machine holds the choice made in the console's settings and
+         Tiny Aya Earth translates the page into it. The public edition has no API behind it, so it has no translator. -->
+    {!PUBLIC_EDITION && <SiteTranslator client:idle />}
     <ClientRouter />
     <!-- The public edition (lib/edition.ts) has no Demiton and no settings. The header, the trail, the palette and the
          cards leave their links out already; an island that writes a link from the API's data (a competitor's page

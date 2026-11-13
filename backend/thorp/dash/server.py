@@ -6345,6 +6345,39 @@ def api_class_shapes(preset: str) -> dict:
     return {"preset": preset, "fine": list(taxonomy.FINE), "about": taxonomy.ABOUT, "voyages": out}
 
 
+def api_language() -> dict:
+    """The language the site speaks (S5's choice, s5.site_language), every language it can be put into, and whether the
+    translator (Tiny Aya Earth, thorp/translate.py) can speak it now."""
+    from thorp import translate
+
+    st = translate.status()
+    if not st["language"]["is_source"] and st["translator"]["ready"] and not st["translator"]["loaded"]:
+        translate.keep_warm()  # a server that restarted while the site was in another language loads the model now
+    return {**st, "languages": translate.languages()}
+
+
+def post_language(body: dict) -> dict:
+    """The chat terminal's language option: put the site into a language ({"code": "xh"}); English is the way back."""
+    from thorp import translate
+
+    translate.choose(str(body.get("code") or ""), str(body.get("by") or "Justin"))
+    return api_language()
+
+
+def post_translate(body: dict) -> dict:
+    """The page's English, put into the chosen language ({"code": "xh", "texts": [...]}, at most 24 strings): what the
+    store keeps, and what Tiny Aya Earth makes of the rest. A translator that is not here is a 503 that says why."""
+    from thorp import translate
+
+    texts = body.get("texts")
+    if not isinstance(texts, list):
+        raise ValueError("texts must be a list of strings")
+    try:
+        return translate.translate(str(body.get("code") or ""), [t for t in texts if isinstance(t, str)])
+    except translate.TranslatorMissing as e:
+        raise TableNotBuilt(str(e)) from e
+
+
 def api_chat_models() -> dict:
     """The chat page's list: Nothing up my sleeve's ships on the leaderboard, each resolved to a
     finished run with a checkpoint, and the foreign ships whose MLX weights are cached. Read from
@@ -7843,6 +7876,8 @@ class Handler(BaseHTTPRequestHandler):
             "/api/constraints": api_constraints_set,
             "/api/vast": api_vast_set,
             "/api/compute": api_compute_set,
+            "/api/language": post_language,
+            "/api/translate": post_translate,
             "/api/chat": api_chat,
             "/api/chat/notes": post_chat_note,
             "/api/chat/questions": post_chat_question,
@@ -8009,6 +8044,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/suit_ratings": lambda: api_suit_ratings(q.get("preset", ""), q.get("runs", "")),
                 "/api/class_deck": lambda: api_class_deck(q["preset"]),
                 "/api/ask_questions": lambda: api_ask_questions(q["preset"]),
+                "/api/language": api_language,
                 "/api/chat": lambda: api_chat(q),
                 "/api/chat/models": api_chat_models,
                 "/api/chat/notes": lambda: api_chat_notes(q),

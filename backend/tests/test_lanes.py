@@ -625,3 +625,32 @@ def test_a_hold_stops_the_lane_until_it_is_released(harbour):
     above = [lanes.parse(t, s) for t in ("before", "hold: wait", "after")]
     assert lanes.next_for("mac", above, [], True)[0] is above[0]
     assert lanes.next_for("mac", above[1:], [above[0]], True) == (None, "held: wait")
+
+
+def test_a_size_above_the_macs_ceiling_is_a_vast_voyage(harbour, monkeypatch):
+    """S5's mac_max_preset (13 November, Justin: "anything 21m and up goes to vast"): a 21m line sails abroad whatever its
+    expedition; the 9m stays; `mac:` is the one way to sail a big one here."""
+    for rel, preset in (("small", "9m"), ("big", "21m"), ("bigger", "50m"), ("odd", "mystery")):
+        _spec(harbour["specs"], rel, f"{rel}-voyage", model={"family": "gpt", "preset": preset})
+    monkeypatch.setattr(lanes, "mac_ceiling", lambda: "9m")
+    at = lambda text: lanes.parse(text, harbour["specs"]).lane  # noqa: E731
+    assert at("small") == "mac"
+    assert at("big") == "vast" and at("bigger") == "vast"
+    assert at("mac: big") == "mac"  # a person's pin
+    assert at("vast: small") == "vast"
+    assert at("odd") == "mac"  # a size the registry does not know is not held to the ceiling
+    monkeypatch.setattr(lanes, "mac_ceiling", lambda: "")
+    assert at("big") == "mac"  # no ceiling set: as before
+
+
+def test_the_ceiling_is_read_from_s5s_terms(monkeypatch):
+    from thorp.viable.s5_policy import charter
+
+    monkeypatch.setattr(charter, "terms", lambda: {"mac_max_preset": "9m"})
+    monkeypatch.setitem(lanes._CEILING, "at", float("-inf"))
+    assert lanes.mac_ceiling() == "9m"
+    assert lanes.above_the_mac("21m") and lanes.above_the_mac("350m")
+    assert not lanes.above_the_mac("9m") and not lanes.above_the_mac("1m") and not lanes.above_the_mac(None)
+    assert {"mac_max_preset", "mac_reserve_gb"} <= set(charter.DEFAULTS)
+    assert charter.DEFAULTS["mac_max_preset"] == "" and charter.DEFAULTS["mac_reserve_gb"] == 0.0  # Justin's words set them
+    monkeypatch.setitem(lanes._CEILING, "at", float("-inf"))

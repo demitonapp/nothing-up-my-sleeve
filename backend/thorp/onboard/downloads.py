@@ -242,9 +242,10 @@ def _token() -> str | None:
 def _friendly(e: Exception) -> str:
     text = str(e).splitlines()[0][:600] if str(e) else e.__class__.__name__
     low = text.lower()
-    if "gated" in low or "401" in low or "403" in low:
+    if "gated" in low or "401" in low or "403" in low or "restricted" in low:
         return (
-            "This model is gated. Accept its licence on Hugging Face, then set HF_TOKEN and retry. "
+            "This model is gated. Accept its licence on its Hugging Face page with the account this Mac is "
+            "signed in to (or set HF_TOKEN), then retry. "
             f"({text})"
         )
     if "connection" in low or "timeout" in low or "resolve" in low:

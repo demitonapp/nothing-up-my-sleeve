@@ -23,9 +23,11 @@ claim about the ledger, so `evidence` holds where the reading is: run name, metr
 from __future__ import annotations
 
 from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 
 from thorp import fleet, store
 
+# the values are the column's check (expedition_goals_status); listed here only to name them in the message.
 # open: no reading yet / not started; partly: some readings, the question not settled; done: settled;
 # dropped: deliberately abandoned (with a reason in `words`).
 STATUSES = ("open", "partly", "done", "dropped")
@@ -306,22 +308,22 @@ def set_verdict(goal_id: str, status: str, evidence: str = "", words: str = "") 
     """Record a goal's verdict. `done` stamps `settled_at`; anything else clears it. A `dropped` goal comes off the
     page and out of the priority order and stays as a record."""
     status = status.strip().lower()
-    if status not in STATUSES:
-        raise ValueError(f"status must be one of {', '.join(STATUSES)}")
-    ensure()
-    with store.session() as s:
-        r = s.execute(
-            text(
-                "update s1.expedition_goals set status = :status, "
-                "evidence = case when :evidence = '' then evidence else :evidence end, "
-                "words = case when :words = '' then words else :words end, "
-                "settled_at = case when :status in ('done','dropped') then now() else null end, "
-                "shown = case when :status = 'dropped' then false else shown end, "
-                "updated_at = now() where goal_id = :goal_id"
-            ),
-            {"status": status, "evidence": evidence, "words": words, "goal_id": goal_id},
-        )
-        return bool(r.rowcount)
+    try:
+        with store.session() as s:
+            r = s.execute(
+                text(
+                    "update s1.expedition_goals set status = :status, "
+                    "evidence = case when :evidence = '' then evidence else :evidence end, "
+                    "words = case when :words = '' then words else :words end, "
+                    "settled_at = case when :status in ('done','dropped') then now() else null end, "
+                    "shown = case when :status = 'dropped' then false else shown end, "
+                    "updated_at = now() where goal_id = :goal_id"
+                ),
+                {"status": status, "evidence": evidence, "words": words, "goal_id": goal_id},
+            )
+            return bool(r.rowcount)
+    except IntegrityError:  # the check on the column (expedition_goals_status) is the rule; Python only says so
+        raise ValueError(f"status must be one of {', '.join(STATUSES)}") from None
 
 
 def retireable() -> list[dict]:

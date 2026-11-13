@@ -11,24 +11,10 @@ from sqlalchemy import text
 
 from thorp import store
 
-_DDL = (
-    "create table if not exists s4.chat_questions ("
-    "id bigserial primary key, "
-    "created_at timestamptz not null default now(), "
-    "folder text not null default 'inbox', "
-    "question text not null, "
-    "model text)"
-)
-
 
 def ensure() -> None:
-    with store.session() as s:
-        s.execute(text(_DDL))
-        s.execute(
-            text(
-                "create index if not exists chat_questions_folder on s4.chat_questions (folder, created_at desc)"
-            )
-        )
+    """The table is Alembic's (migration t1o4p7q0r3s6): no runtime DDL (S5 policy 'postgres', 13 November). Kept so the callers read
+    as they did; it has nothing to do."""
 
 
 def save(question: str, folder: str = "inbox", model: str | None = None) -> dict:

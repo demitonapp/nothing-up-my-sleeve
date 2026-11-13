@@ -30,13 +30,6 @@ from sqlalchemy import text
 
 from thorp import fleet, paths, store
 
-_DDL = (
-    "create table if not exists s1.expedition_priority ("
-    "position integer primary key, "
-    "key text not null unique, "
-    "updated_at timestamptz not null default now())"
-)
-
 
 def _path() -> Path:
     """The legacy file: read once, when the table is empty, and never written again."""
@@ -44,8 +37,8 @@ def _path() -> Path:
 
 
 def ensure() -> None:
-    with store.session() as s:
-        s.execute(text(_DDL))
+    """The table is Alembic's (migration w4r7s0t3u6v9): no runtime DDL (S5 policy 'postgres', 13 November). Kept so the callers read
+    as they did; it has nothing to do."""
 
 
 def _write(keys: list[str]) -> None:

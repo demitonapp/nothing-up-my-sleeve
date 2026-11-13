@@ -18,40 +18,10 @@ from sqlalchemy import text
 
 from thorp import store
 
-_DDL = (
-    "create table if not exists s4.chat_threads ("
-    "id text primary key, "
-    "key text not null, "
-    "name text, "
-    "kind text, "
-    "model text, "
-    "ship_key text, "
-    "href text, "
-    "title text, "
-    "saved boolean not null default false, "
-    "created_ms bigint, "
-    "updated_ms bigint, "
-    "messages jsonb not null default '[]')"
-)
-
 
 def ensure() -> None:
-    with store.session() as s:
-        s.execute(text(_DDL))
-        s.execute(
-            text(
-                "create index if not exists chat_threads_updated on s4.chat_threads (updated_ms desc)"
-            )
-        )
-        # looked up first: an `alter table` takes the table's lock even when the column is already there
-        has = s.execute(
-            text(
-                "select 1 from information_schema.columns "
-                "where table_schema = 's4' and table_name = 'chat_threads' and column_name = 'folder'"
-            )
-        ).first()
-        if not has:
-            s.execute(text("alter table s4.chat_threads add column if not exists folder text not null default ''"))
+    """The table is Alembic's (migration u2p5q8r1s4t7 and f7b9d1e3a5c8): no runtime DDL (S5 policy 'postgres', 13 November). Kept so the callers read
+    as they did; it has nothing to do."""
 
 
 def _thread(row) -> dict:

@@ -38,37 +38,12 @@ from sqlalchemy import text
 
 from thorp import arc_ai2, paths, store
 
-_DDL = (
-    "create schema if not exists s4",
-    "create table if not exists s4.arc_answers ("
-    "reader text not null, "
-    "kind text not null, "
-    "config text not null, "
-    "part text not null, "
-    "question_id text not null, "
-    "source text not null default '', "
-    "n_options integer not null, "
-    "answer integer not null, "
-    "prediction integer, "
-    "correct boolean not null default false, "
-    "read boolean not null default true, "
-    "rank integer, "
-    "p_answer double precision, "
-    "margin double precision, "
-    "ce jsonb, "
-    "revision text not null default '', "
-    "scored_at timestamptz not null default now(), "
-    "primary key (reader, config, part, question_id))",
-    "create index if not exists arc_answers_question on s4.arc_answers (config, part, question_id)",
-)
-
 KINDS = ("outside", "ship")
 
 
 def ensure() -> None:
-    with store.session() as s:
-        for ddl in _DDL:
-            s.execute(text(ddl))
+    """The table is Alembic's (migration f7b9d1e3a5c8): no runtime DDL (S5 policy 'postgres', 13 November). Kept so the callers read
+    as they did; it has nothing to do."""
 
 
 def record(reader: str, kind: str, rows: list[dict], revision: str = arc_ai2.REVISION) -> int:

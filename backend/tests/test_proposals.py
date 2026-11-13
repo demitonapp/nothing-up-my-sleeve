@@ -28,6 +28,12 @@ def test_a_decision_moves_only_an_open_proposal():
 
 
 def test_the_table_allows_exactly_the_states():
+    from sqlalchemy import text
+
+    from thorp import store
+
+    with store.session() as s:  # the rule is the column's check (migration a8c0e2f4b6d9), not a string in Python
+        rule = s.execute(text("select pg_get_constraintdef(oid) from pg_constraint where conname = 'proposals_status_check'")).scalar()
     for state in proposals.STATES:
-        assert f"'{state}'" in proposals._DDL
+        assert f"'{state}'" in rule
     assert set(proposals.DECISIONS.values()) == set(proposals.STATES) - {"open"}

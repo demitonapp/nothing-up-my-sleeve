@@ -14,17 +14,10 @@ from sqlalchemy import text
 
 from thorp import store
 
-_DDL = (
-    "create table if not exists s1.expedition_status ("
-    "key text primary key, "
-    "status text not null, "
-    "updated_at timestamptz not null default now())"
-)
-
 
 def ensure() -> None:
-    with store.session() as s:
-        s.execute(text(_DDL))
+    """The table is Alembic's (migration r9n2o5p8q1s4): no runtime DDL (S5 policy 'postgres', 13 November). Kept so the callers read
+    as they did; it has nothing to do."""
 
 
 def read() -> dict[str, str]:

@@ -7,9 +7,9 @@ is a record of the decision, and the work it asks for is done (and recorded in D
 These are not the planning cycle's proposals (s3.cycles.proposals), which each turn of the cycle writes for itself
 and which are a record of that turn; these stand until decided.
 
-The table is `s5.proposals`, made here on first use the way `s4.chat_notes` is: the store's Alembic head was another
-session's uncommitted migration when this was written, so a migration chained onto it would have broken a fresh
-checkout. A migration can adopt the table later unchanged (`create table if not exists`).
+The table is `s5.proposals` (migration a8c0e2f4b6d9, which holds its rules too: a filer, a title and a question that are
+not blank, a decided time on a decided proposal and none on an open one, and a trigger that refuses to change a decided
+proposal). `check` and `next_state` below say the same things in words for a caller; the database is what refuses.
 
     uv run thorp proposals list [--all]
     uv run thorp proposals add --by "session: public edition" --area "public launch" --title "..." --asks "..." [--why "..."]
@@ -31,19 +31,6 @@ STATES = ("open", "signed", "declined", "withdrawn")
 # a decision moves an open proposal to one of these; a decided one is never reopened (file a new one instead)
 DECISIONS = {"sign": "signed", "decline": "declined", "withdraw": "withdrawn"}
 
-_DDL = (
-    "create table if not exists s5.proposals ("
-    "id bigserial primary key, "
-    "filed_at timestamptz not null default now(), "
-    "filed_by text not null, "  # who filed it: 'session: public edition', 'S4', 'Justin'
-    "area text not null default '', "  # what it concerns: 'public launch', 'the Vast lane'
-    "title text not null, "  # the proposal in a line
-    "asks text not null, "  # the decision it needs, as a question Justin can answer
-    "why text not null default '', "  # the reasoning and the evidence, with where to read more
-    "status text not null default 'open' check (status in ('open', 'signed', 'declined', 'withdrawn')), "
-    "decided_at timestamptz, "
-    "words text not null default '')"  # Justin's words when he decides (or the filer's, withdrawing)
-)
 
 _COLS = "id, filed_at, filed_by, area, title, asks, why, status, decided_at, words"
 
@@ -69,9 +56,8 @@ def next_state(current: str, decision: str) -> str:
 
 
 def ensure() -> None:
-    with store.session() as s:
-        s.execute(text(_DDL))
-        s.execute(text("create index if not exists proposals_status on s5.proposals (status, filed_at desc)"))
+    """The table is Alembic's (migrations a8c0e2f4b6d9, which also holds its rules): no runtime DDL (S5 policy 'postgres',
+    13 November). Kept so the callers read as they did; it has nothing to do."""
 
 
 def add(*, filed_by: str, title: str, asks: str, area: str = "", why: str = "") -> dict:

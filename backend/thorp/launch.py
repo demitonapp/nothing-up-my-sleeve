@@ -328,25 +328,11 @@ def param_state(signed: dict | None, values: dict, goals: list[dict]) -> str:
 
 
 # ---- the sign-offs (the store's: the charter's only record that is not read from a spec)
-_DDL = (
-    "create table if not exists s5.charter_signoffs ("
-    "charter text not null, "
-    "param text not null, "
-    "value jsonb not null default '{}'::jsonb, "
-    "signed_by text not null default '', "
-    "note text not null default '', "
-    "signed_at timestamptz not null default now(), "
-    "primary key (charter, param))"
-)
 
 
 def ensure() -> None:
-    from sqlalchemy import text
-
-    from thorp import store
-
-    with store.session() as s:
-        s.execute(text(_DDL))
+    """The table is Alembic's (migration f7b9d1e3a5c8): no runtime DDL (S5 policy 'postgres', 13 November). Kept so the callers read
+    as they did; it has nothing to do."""
 
 
 def signoffs() -> dict[str, dict]:

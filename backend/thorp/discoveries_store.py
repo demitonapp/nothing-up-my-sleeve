@@ -17,20 +17,11 @@ from sqlalchemy import text
 from thorp import store
 
 KEY = "all"
-CREATE = """
-create table if not exists s1.discoveries (
-  key text primary key,
-  payload jsonb not null,
-  built_at timestamptz not null default now(),
-  runs integer
-)
-"""
 
 
 def ensure() -> None:
-    """Make the table if it is not there (the migration is the normal path; this keeps a fresh store working)."""
-    with store.engine().begin() as c:
-        c.execute(text(CREATE))
+    """The table is Alembic's (migration f7b9d1e3a5c8): no runtime DDL (S5 policy 'postgres', 13 November). Kept so the callers read
+    as they did; it has nothing to do."""
 
 
 def put(payload: dict, runs: int | None = None) -> None:

@@ -15,26 +15,10 @@ from sqlalchemy import text
 
 from thorp import store
 
-_DDL = (
-    "create table if not exists s4.chat_notes ("
-    "id bigserial primary key, "
-    "created_at timestamptz not null default now(), "
-    "session_id text, "
-    "kind text, "
-    "model_key text, "
-    "model_label text, "
-    "run text, "
-    "note text not null, "
-    "thinking text, "
-    "conversation jsonb)"
-)
-
 
 def ensure() -> None:
-    with store.session() as s:
-        s.execute(text(_DDL))
-        s.execute(text("create index if not exists chat_notes_model on s4.chat_notes (model_key, created_at desc)"))
-        s.execute(text("create index if not exists chat_notes_session on s4.chat_notes (session_id, created_at desc)"))
+    """The table is Alembic's (migration s0n3p6q9r2t5): no runtime DDL (S5 policy 'postgres', 13 November). Kept so the callers read
+    as they did; it has nothing to do."""
 
 
 def save(

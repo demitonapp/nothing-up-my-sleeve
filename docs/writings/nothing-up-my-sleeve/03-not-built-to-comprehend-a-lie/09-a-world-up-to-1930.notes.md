@@ -29,6 +29,14 @@ section uses and their files in `../pictures/`; the caption lives in `essayPeeks
 - Marcus Hutter, the Hutter Prize for compressing human knowledge, 2006 onward; Claude Shannon, "Prediction and Entropy of Printed English", 1951.
 - The Kindle notes of 6 November 2026, loc 8, 19, 21, 59, 79 and 92, in `../kindle-notes-2026-11-06.md`.
 
+## @an-option-and-no-longer-the-rule
+
+### References
+
+- The decision is D49 in `../decisions.md`, from the Kindle note on v13 at loc 56 and the conversation of 13 November 2026.
+- Thorp's own record, `DECISIONS.md` at the root of the repository: "The first fleet: reasoning and tools on the 50m alone, any text in the corpus" (12 November 2026), for the modern shelf, the teacher that writes the lessons, the answers checked by code and the tool calls made by code; the reading at chance on AI2 ARC at every class from 300k to 50m, and the 50m's want of about 800 million tokens against the 269 million of the period ladder; "Modern text in Ogden, the period a voyage's parameter", for the line as a setting of a run, a design agreed and not yet built; and "what a run id means", for what a run's provenance records.
+- Not settled, and said so in the text: the licence a modern text must carry to enter, and the licence of the teacher model, which Thorp's record lists as to be checked before a corpus distilled from it is published.
+
 ## @the-line
 
 ## @what-a-century-of-print-holds

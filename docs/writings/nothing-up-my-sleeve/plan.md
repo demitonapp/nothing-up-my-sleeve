@@ -8,6 +8,8 @@ be read in a couple of hours and commented on before any chapter is expanded. It
 The notes it answers are in `kindle-notes-2026-11-05.md` and `kindle-notes-2026-11-06.md` beside it, and every
 note is placed in a chapter in the maps at the end.
 
+**Amended 2026-11-13**, after the notes on v13 (`kindle-notes-2026-11-13-v13.md`), by decisions D49 to D54: the line at 1930 is an option and the kernels built to compete read modern material with the trail kept (D49); the stop belongs to the ship (D50); the front page is three lines and the Beats are read last (D51); Luck's footnotes hang on facts (D52); curiosity is the only trait set on purpose (D53); AI is the reader's word and Mind the book's (D54). The outline below has not been rewritten to them: where it says Thorp is raised on the world's own books to 1930, read a Thorp raised on the period shelf.
+
 ## 1. The question
 
 If it is inevitable that language models come to run our systems, what must such a model be like to produce
@@ -406,6 +408,8 @@ four-epoch result.
 
 ## Chapter 9. A World Up to 1930
 
+**Amended 2026-11-13 (D49).** The line at 1930 is now an option: this chapter describes the period shelf, and opens with a section saying why the kernels built to compete read modern material and what that gives up. Wherever this plan says Thorp is raised on the world's own books to 1930, read: a Thorp raised on the period shelf. The chapters not yet written, 11 to 14, are to be written to D49.
+
 > "I have always imagined that Paradise will be a kind of library." — Jorge Luis Borges, "Blindness", 1977 [verify]
 
 **The question.** What Thorp reads: the line, the four kinds and the fifth, how the books are chosen, and what
@@ -417,7 +421,7 @@ the diagram; chosen by the world, with the translation weight, Heilbron's map an
 the horizon; the tree, and what it is for; Rip, waking. Two things to add in the next pass: the safety line
 below as a closing paragraph, and the kernel named where the five kinds are introduced.
 
-**The safety line.** Uplift and poisoning, met: a kernel that knows nothing after 1930 and never read the web.
+**The safety line.** Uplift and poisoning, met on the period shelf only (D49): a kernel that knows nothing after 1930 and never read the web.
 Truth, met for the present by the shelves and for the past by the manifest. The concern it opens rather than
 closes: the selves a century of print installs, which chapter 16 reads.
 

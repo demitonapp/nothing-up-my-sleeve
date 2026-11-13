@@ -4,7 +4,7 @@ Nov 6, 2026 · @Justin
 
 > "To encourage the creation and distribution of eBooks." — Project Gutenberg's stated mission, Michael Hart, from 1971 [verify the wording against the site's current statement]
 
-The whole of this chapter reduces to one line in a text file, and the line is for a book about a young man on a boat.
+The whole of this chapter reduces to one line in a text file, and the line is for a book about a young man on a boat. The plumbing described here is the period shelf's, the one that stops at 1930, which the previous chapter now calls an option. The modern shelf runs through the same manifest, a row for every text, and differs in one column: the legal row below is the period shelf's, and what stands in its place for a modern text is not yet settled.
 
 | Column | The row |
 | --- | --- |

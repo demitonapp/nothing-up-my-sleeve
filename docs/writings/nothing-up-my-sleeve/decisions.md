@@ -28,7 +28,7 @@ Quentin.
 | D14 | Corpus | decided | The corpus is a register. Every work a row: source, publication year, author's death year, language, kind, self, weight, tokens, the two legal checks and their result, and a reviewer's verdict on … | ch 10 | conversation, 6 Nov |
 | D15 | Form | decided | Epigraphs, not subtitles. One quotation from a person in the chapter, with its source, marked [verify] where the wording is not yet checked and [to find] where only the fact is certain. | every chapter | conversation, 6 Nov |
 | D16 | Form | decided | The cover. A card table in the cigar lounge Beer would have kept a chair in: a bearded man in a long coat with a cigar and a whisky slapping a fanned hand onto the felt, generated b… | the cover | v4 loc 1; conversation, 6 Nov |
-| D17 | Corpus | decided | The world's own books to 1930. Published in 1930 or earlier (the United States rule) and by an author dead by 1955 (Australia's), both applied to every book and to a translation's translator. | ch 9 | conversation, 6 Nov |
+| D17 | Corpus | decided; amended by D49 | The world's own books to 1930. Published in 1930 or earlier (the United States rule) and by an author dead by 1955 (Australia's), both applied to every book and to a translation's translator. | ch 9 | conversation, 6 Nov |
 | D18 | Corpus | decided | The corpus has four kinds and a fifth. Physics; | ch 9 | v4 loc 8, 19, 21, 79; conversation, 6 Nov |
 | D19 | Model | decided | Version 0.1 is about traits, not intelligence. | ch 8 | v4 loc 69, 74 |
 | D20 | Nature | decided | No branches; traits are read from one Thorp. | ch 16 | v4 loc 23, 62 |
@@ -60,6 +60,12 @@ Quentin.
 | D46 | Character | decided 2026-11-06 | Quentin Luck, not Quentin: the name the Kindle notes used from the start. The bitter systems architect from the Quigney, Marvin's kind of bitterness, competence nobody uses; he speaks in footnotes, the Kindle's pop-up footnotes, numbered in the text with the body in the sidecar, never in a closing page. | every chapter, ch 3 | conversation and the v11 notes, 6 Nov |
 | D47 | Measure | decided 2026-11-06 | Version 0.0 is about the shelf: before traits (D19), the corpus is the variable. A 9M model, hand-picked books, cross-entropy per token on the hole cards as the score, the harness in `docs/writings/plans/thorp-harness-standard.md`, the first run the hundred by translation reach; the 300M kernel waits for a bigger machine (measured: 600 tokens a second here). | ch 8, ch 10 | conversation, 6 Nov; v12 loc 622 |
 | D48 | Form | decided 2026-11-06 | Quentin's pieces are published on Demiton's blog as a live series beside the Product Update (`quentin-luck`), declared as a character's; the book points readers there to follow the experiments. His footnotes in the book are the Kindle's pop-up footnotes (D46). | front page, Beat III, the blog | conversation, 6 Nov |
+| D49 | Corpus | decided 2026-11-13 | The line at 1930 is an option. A small model that is to go to the many has to compete, which means understanding the modern world, reasoning and calling tools, so the kernels built to compete are raised on a modern shelf with the whole trail kept; the period shelf stays for the tests only it can set. What is given up is said in the text. | preface, ch 3, Part III's opening, ch 9, ch 10, the front page | v13 loc 56; conversation, 13 Nov |
+| D50 | Governance | half decided, half open 2026-11-13 | The stop belongs to the ship and not to the weights: an open kernel cannot be called back and a copy run outside a ship has no wire, and the book says so. Voluntary retirement, a Mind's own option to stop, is open and belongs to Part V. | preface, ch 3; ch 19 and 20 when written | v13 loc 60 |
+| D51 | Form | decided 2026-11-13 | The front page is the title, the byline and the standfirst. The pointers and the parts with their blurbs are read last, as About this book (`about.md`), and the five Beat pages leave the reading order for one page behind the book (`the-beats.md`). Amends D40 and D48. | front page, `about.md`, `the-beats.md`, the epub's reading order | v13 loc 27, 67 |
+| D52 | Character | decided 2026-11-13 | Luck's footnotes each hang on a fact that has a source; one present-day jab to a section; no adjective for a living person that the facts do not carry. He may be sincere. | every chapter | v13 loc 78, 89, 104, 106, 109, 110, 113, 121; conversation, 13 Nov |
+| D53 | Nature | decided 2026-11-13 | Curiosity is the only trait set on purpose. The five wants are read; one is turned up, and the book says which on its first pages. | preface, ch 17 | v13 loc 57 |
+| D54 | Name | decided 2026-11-13 | AI is the reader's word and Mind is the book's. The preface says so and why: the word is Banks's and is a claim about what the thing ought to be. | preface | v13 loc 62 |
 
 ## The decisions in full
 
@@ -485,3 +491,88 @@ the series between the updates and the archive. The first is the cross-entropy p
 dated for the Monday after it was written. The book points readers there from its front page and from the
 Beat of Part III, so that anyone reading the kernel's construction can follow the experiments as the rows
 come in. Inside the book he speaks in footnotes (D46), and the two are the same voice.
+
+### D49. The line at 1930 is an option
+
+*Corpus · decided 2026-11-13 · lands in the preface, ch 3, Part III's opening, ch 9, ch 10 and the front page · from the v13 note at loc 56 and conversation, 13 Nov. Amends D17.*
+
+The note on the preface's "1930" reads: no longer valid; we use modern materials but with a full audit trail.
+In conversation the same day Justin gave the reason: 1930 is optional in Thorp, and for small models to be
+democratised they need to be able to compete, which is to understand the modern world, to reason and to call
+tools. So D17 stands as the rule of one shelf, the period shelf, and is no longer the rule of the kernel. The
+kernels built to compete are raised on a modern shelf: present-day text, and lessons in reasoning and in
+calling tools written by a larger model, with answers checked by code. What is kept is the trail: every text a
+row in a manifest, every run recording the lists it read, the runs it grew from and the code.
+
+What is given up is written into the book wherever the old claim stood, and it is three things. The uplift
+defence by construction holds for the period shelf only. The horizon test is the period shelf's instrument
+and a modern kernel has no line to test. And the two copyright rules do not cover a modern text; the licence
+a modern text must carry is not settled, and neither is the licence of the teacher model, whose own reading
+cannot be audited from here and is entered in chapter 3's table as a debt. The period shelf stays for the
+quantum test, the horizon test, and the comparison of one recipe with the line and without it. Chapter 9
+keeps its title and its address, opens with the reason, and is otherwise true of a Thorp raised on that
+shelf. Chapters 11 to 14 are not yet written and are to be written to this decision; chapter 13's two
+shelves, the registers and the canon, are a different pair from the period and modern shelves and the
+chapter must say so.
+
+### D50. The stop belongs to the ship; voluntary retirement is open
+
+*Governance · half decided, half open 2026-11-13 · lands in the preface and ch 3; ch 19 and 20 when written · from the v13 note at loc 60.*
+
+The note doubts that a kill switch can be put in a Thorp model, and it is right: the weights are open, and
+anyone may run a copy with no wire attached. Decided: the book never says the kernel can be stopped. It says
+a ship can be built to stop the Mind in it, on a wire she cannot close, and that keeping the wire is each
+builder's choice. The preface, the method chapter's instruments and its table of fears now say this.
+
+Open: the note's second half, "or more importantly a voluntary retirement option". No mechanism exists. The
+helmsman essay (20a) already records that in Banks a Mind once or twice chooses its own end, and the two
+natures essay (20b) records a laboratory's commitment to interview a model at retirement, so the idea has a
+home in Part V. What has to be decided before it is written: what it would mean for a model this small to
+ask, who hears the request, and what the ship does with it. Until then the book promises nothing.
+
+### D51. The front page is three lines; the pointers and the Beats are read last
+
+*Form · decided 2026-11-13 · lands on the front page, in `about.md`, `the-beats.md` and the epub's reading order · from the v13 notes at loc 27 and 67. Amends D40 and D48.*
+
+The front page was carrying the plan's address, the blog's and a table of the parts, and the note asked for
+the whole section to go to the end. The epub now opens on the title, the byline and the standfirst and goes
+straight to the preface. `about.md` is read after the last chapter: where the book is kept, the pointer to
+Quentin Luck's series (D48's pointer, moved), and the parts with their blurbs, which the builder adds from
+the table in `book.md`. The table itself stays in `book.md` because both readers read the parts from it.
+
+The note on the Beat of Part I asked for it to be moved to the end or deleted. All five Beat pages are
+treated alike: they are out of the part folders and kept as one page, `the-beats.md`, read after About this
+book. They told the reader what the chapters were about to do, which the chapters do. D48's second pointer,
+in the Beat of Part III, travels with that page. The Atlas reader in the monorepo listed the Beat pages as
+chapters and its tests name them, so those tests change when the mirror is refreshed.
+
+### D52. Luck's footnotes hang on facts
+
+*Character · decided 2026-11-13 · lands in every chapter · from the v13 notes at loc 78, 89, 104, 106, 109, 110, 113 and 121, and conversation, 13 Nov.*
+
+Eight of the notes on chapter 1 asked for Luck, and five of them for a jab at something in the present: an
+administration, a chip company's chief, a government, a church, a movement. His footnotes had worked until
+then because each hung on a fact, Bacon's twenty-three counts, Childe's cliff. The rule, agreed: every
+footnote of his rests on a fact with a source in the sidecar's References; a section carries at most one
+jab at the present day; and a living person gets no adjective the facts do not carry, so the footnote on the
+chip seller gives the money, what its chief says in reply and what an analyst calls it, and leaves the reader
+to it. The Bacon footnote gained one oblique sentence and names nobody. The note at loc 121 was not taken,
+being the third in its section. He is also allowed to be sincere, and the footnote on the Falcon models is
+the first where he is.
+
+### D53. Curiosity is the only trait set on purpose
+
+*Nature · decided 2026-11-13 · lands in the preface and ch 17 · from the v13 note at loc 57.*
+
+The note: we are honest that the only personality trait we will try to manipulate is curiosity. The five
+wants are read off the kernel (D20); one of them is turned up on purpose, and the book says which in the
+preface, so that nobody has to find it. Chapter 17, the curiosity valve, is where it is argued. If another
+trait is ever set, this decision is amended first and the preface with it.
+
+### D54. AI is the reader's word, Mind is the book's
+
+*Name · decided 2026-11-13 · lands in the preface · from the v13 note at loc 62.*
+
+The public calls these machines AI and the book calls them Minds, after Banks, and means to get the reader
+used to it. The preface now makes the exchange once, in the open: what the reader calls an AI the book calls
+a Mind, the capital is deliberate, and the word is a claim about what the thing ought to be.

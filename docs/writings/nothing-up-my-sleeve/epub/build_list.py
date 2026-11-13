@@ -1,13 +1,17 @@
-"""The book's files in reading order, for build_epub.py: the front page, then each part, opened by its own
-page (the `00-*.md` poem page, D40, with the part's numeral put before its title; or a divider page from the
-front-page table where a part has no such page yet) and followed by its chapters, then the apparatus a new
-reader meets last (the plan, the decisions, the Kindle notes).
+"""The book's files in reading order, for build_epub.py: the front page (the title, the byline and the
+standfirst of book.md, and nothing else, D51), then each part, opened by its own page (the `00-*.md` poem
+page, D40, with the part's numeral put before its title; or a divider page from the front-page table where a
+part has no such page yet) and followed by its chapters, then what a reader meets last: About this book
+(about.md, with the parts and their blurbs added from book.md's table), the Beats, the plan, the decisions
+and the Kindle notes.
 Usage: build_list.py <book dir> <scratch dir>   -> prints the file list, one per line."""
 import sys, re, pathlib
 B = pathlib.Path(sys.argv[1]); P = pathlib.Path(sys.argv[2]); P.mkdir(parents=True, exist_ok=True)
 front = (B / "book.md").read_text()
 parts = re.findall(r"^\| ([IVX]+) \| (\d{2}-[a-z0-9-]+) \| ([^|]+?) \| ([^|]*?) \|\s*$", front, re.M)
-files = [str(B / "book.md")]
+head = front[:front.index("| Part |")].strip().split("\n\n")
+(P / "front.md").write_text("\n\n".join(head[:3]) + "\n")  # title, byline, standfirst
+files = [str(P / "front.md")]
 for num, folder, title, blurb in parts:
     chapters = [f for f in sorted((B / folder).glob("[0-9]*.md")) if not f.name.endswith(".notes.md")]
     opener = next((f for f in chapters if f.name.startswith("00-")), None)
@@ -23,5 +27,9 @@ for num, folder, title, blurb in parts:
         div.write_text(f"# Part {num} · {title.strip()}\n\n{blurb.strip()}\n")
     files.append(str(div))
     files += [str(f) for f in chapters]
-files += [str(B / "plan.md"), str(B / "decisions.md")] + sorted(str(p) for p in B.glob("kindle-notes-*.md"))
+about = (B / "about.md").read_text().rstrip() + "\n\n## The parts\n\n" + "\n\n".join(
+    f"**Part {num} · {title.strip()}.** {blurb.strip()}" for num, _, title, blurb in parts) + "\n"
+(P / "about.md").write_text(about)
+files += [str(P / "about.md"), str(B / "the-beats.md"), str(B / "plan.md"), str(B / "decisions.md")]
+files += sorted(str(p) for p in B.glob("kindle-notes-*.md"))
 print("\n".join(files))

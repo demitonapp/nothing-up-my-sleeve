@@ -16,8 +16,9 @@ rsync -a --delete --exclude .DS_Store --exclude MIRROR.md ~/Source/Thorp/docs/wr
 docs/writings/
   README.md                 this file: which copy is canonical, and how the mirror is refreshed
   check_book.py             the sidecar contract, copied from monorepo scripts/check_book.py; run from the Thorp root
-  nothing-up-my-sleeve/     the book: book.md (front page), plan.md, decisions.md, the Kindle notes,
-                            one folder per part, pictures/, epub/
+  nothing-up-my-sleeve/     the book: book.md (front page and the parts table), about.md and the-beats.md
+                            (read last), plan.md, decisions.md, the Kindle notes, one folder per part,
+                            pictures/, epub/
 ```
 
 The layout of the book, the chapter and sidecar contract, footnotes and pictures are described in the
@@ -34,5 +35,6 @@ python3 docs/writings/check_book.py
 - the picture and cover generator, `generate-government-art.py` (`peek:<id>` and `cover:nothing-up-my-sleeve`);
   a new picture made there is copied back here into `nothing-up-my-sleeve/pictures/`;
 - `epub/render_mermaid.mjs` runs the Atlas reader's mermaid in Playwright from the monorepo's
-  `packages/ui/apps/app`, so an epub with diagrams is still built from the monorepo checkout. The other epub
-  scripts (`build_epub.py`, `build_list.py`, `make_cover.py`, `clippings.py`) run here as `epub/README.md` says.
+  `packages/ui/apps/app`. The epub is built here all the same: `build_epub.py` finds the monorepo checkout
+  beside Thorp (or at `$NUMS_MONOREPO`) and renders the diagrams through it, as `epub/README.md` says. Without
+  that checkout, an epub with diagrams cannot be built.

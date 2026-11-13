@@ -16,7 +16,12 @@ import markdown
 out, title, author, cover, *files = sys.argv[1:]
 HERE = pathlib.Path(__file__).resolve().parent
 BOOK = next((pathlib.Path(f).resolve().parent for f in files if pathlib.Path(f).name == "book.md"), HERE.parent)
-REPO = BOOK.parents[2]
+# The mermaid renderer lives in the monorepo (packages/ui/apps/app). The book's canonical copy is in Thorp,
+# so look there last: $NUMS_MONOREPO, then the repo the book sits in, then a `monorepo` checkout beside it.
+import os
+REPO = next((r for r in (pathlib.Path(os.environ["NUMS_MONOREPO"]) if os.environ.get("NUMS_MONOREPO") else None,
+                         BOOK.parents[2], BOOK.parents[2].parent / "monorepo")
+             if r is not None and (r / "packages/ui/apps/app").is_dir()), BOOK.parents[2])
 md = markdown.Markdown(extensions=["tables", "fenced_code", "sane_lists", "toc"])
 fn_md = markdown.Markdown(extensions=["tables", "sane_lists"])
 MARKER = re.compile(r"\[\^([A-Za-z0-9-]+)\]")

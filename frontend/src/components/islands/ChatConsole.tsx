@@ -16,7 +16,12 @@
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react';
 import { ContextMeter } from './Chat';
+import ConsoleConnect from './ConsoleConnect';
 import RichText from '@/lib/richtext';
+import {
+  PUBLIC_EDITION, SERVER_CONNECTION, chatStream, connKey, loadConnection, recentConnections, saveConnection, stillThere,
+  type Connection,
+} from '@/lib/providers';
 import {
   addFolder, autoTitle, dropFolder, fileThreads, getThread, listFolders, listThreads, markSaved, newId, removeThread,
   renameFolder, saveThread, subscribe, type Thread,
@@ -41,6 +46,9 @@ const lastLine = (t: Thread): string => ([...t.messages].reverse().find((m) => m
 
 interface Model {
   kind: 'thorp' | 'foreign';
+  // a model this browser talks to itself, on the visitor's machine or a cloud provider (lib/providers.ts,
+  // 13 November); absent for the models Thorp's own server runs
+  via?: Connection;
   // a Demiton ship that answers (the 9m's talk legs, thorp.chat.talking_models): its lab, and the checkpoints it kept
   // with their readings, so the one we talk to is chosen by its reading and not only by its last step
   talks?: boolean;
@@ -112,8 +120,20 @@ const LABS: [RegExp, string][] = [
 ];
 const labOf = (m: Model): string => m.lab || (LABS.find(([re]) => re.test(`${m.model || ''} ${m.name}`)) || [null, 'Other'])[1] as string;
 
-const convoKeyOf = (m: Model): string => (m.kind === 'foreign' ? `foreign:${m.model}` : `ship:${m.ship_key}`);
-const hrefOf = (m: Model): string => (m.kind === 'foreign' ? `/chat?model=${encodeURIComponent(String(m.model || ''))}` : `/chat?ship=${encodeURIComponent(m.ship_key)}`);
+const convoKeyOf = (m: Model): string => (m.via ? connKey(m.via) : m.kind === 'foreign' ? `foreign:${m.model}` : `ship:${m.ship_key}`);
+const hrefOf = (m: Model): string => (m.via ? '' : m.kind === 'foreign' ? `/chat?model=${encodeURIComponent(String(m.model || ''))}` : `/chat?ship=${encodeURIComponent(m.ship_key)}`);
+
+/** A browser connection as one of the console's models: no thinking switch (what it streams of its reasoning
+ *  is shown), no tools (they run on Thorp's server), and the window where the provider gave one. */
+const modelOfConnection = (c: Connection): Model => ({
+  kind: 'foreign', via: c, model: c.model, ship_key: `conn:${c.provider}:${c.base}`, name: c.modelLabel || c.model, lab: c.label,
+  params: null, available: true, run: null,
+  facts: {
+    context: c.context ?? null, tuning: 'instruct',
+    thinking: { mode: 'none', default: false, why: 'set by the model itself: what it streams of its reasoning is shown above its answer' },
+    tools: { format: null, why: 'Thorp’s tools run on its own server, so they are for Thorp’s own models' },
+  },
+});
 
 /** The carved panel: oak, brass and a rope border, as SVG so it scales and costs no request. */
 function Woodwork() {
@@ -247,7 +267,46 @@ export default function ChatConsole() {
     return next;
   });
   const [models, setModels] = useState<Model[] | null>(null);
+  const [modelsErr, setModelsErr] = useState('');
   const [err, setErr] = useState('');
+  // where the model lives (13 November, lib/providers.ts): this computer, a cloud key, or Thorp's own server.
+  // undefined until this browser is read; null when it has none, and the chat column is the connect page
+  const [conn, setConn] = useState<Connection | null | undefined>(undefined);
+  const [connecting, setConnecting] = useState(false);
+  const [health, setHealth] = useState<{ ok: boolean; why?: string } | null>(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    let c = loadConnection();
+    if (c === undefined) {
+      // decided once a browser: one that used the console before connections existed was talking to Thorp's own
+      // models, and stays there; any other is new, and opens on the connect page. The chats themselves are no
+      // sign (the server's threads are synced into every browser), so the console's own drawer settings are read.
+      let legacy = false;
+      try {
+        legacy = !PUBLIC_EDITION && ['thorp.chat.default', 'thorp.chat.consolepanes', 'thorp.chat.consoleh'].some((k) => localStorage.getItem(k) != null);
+      } catch { /* blocked */ }
+      c = legacy ? SERVER_CONNECTION : null;
+      saveConnection(c);
+    }
+    if (PUBLIC_EDITION && c?.wire === 'thorp') c = null;
+    setConn(c ?? null);
+  }, []);
+  const connect = (c: Connection): void => {
+    saveConnection(c);
+    setConn(c);
+    setConnecting(false);
+    setFailed(false);
+    setErr('');
+    setPanes((p) => ({ ...p, chat: true }));
+  };
+  // a remembered local server is asked whether it is still up whenever the drawer opens, so the bar's dot
+  // says so before a question is lost to it
+  useEffect(() => {
+    if (!conn || conn.wire === 'thorp') { setHealth(null); return; }
+    let live = true;
+    void stillThere(conn).then((h) => { if (live) setHealth(h); });
+    return () => { live = false; };
+  }, [conn, open]);
   const [pick, setPick] = useState('');
   const [lab, setLab] = useState('');
   const [step, setStep] = useState(''); // the checkpoint of a Demiton ship; '' is its latest
@@ -383,12 +442,17 @@ export default function ChatConsole() {
     return seen.sort((a, b) => a.localeCompare(b));
   }, [instruct]);
   const inLab = useMemo(() => instruct.filter((m) => labOf(m) === lab), [instruct, lab]);
-  const chosen = useMemo(
+  const serverChosen = useMemo(
     () => inLab.find((m) => convoKeyOf(m) === pick) || inLab[0] || null,
     [inLab, pick],
   );
+  const browserModel = useMemo(() => (conn && conn.wire !== 'thorp' ? modelOfConnection(conn) : null), [conn]);
+  const chosen = browserModel || (conn?.wire === 'thorp' ? serverChosen : null);
+  const showConnect = connecting || conn === null;
   const contextWindow = chosen?.facts?.context ?? null;
   const tokens = contextWindow ? Math.max(1, Math.round(budgetShare * contextWindow)) : 4096;
+  // a provider's own output limit is usually far under a tenth of a long window, so a browser model asks for 8k at most
+  const browserTokens = Math.min(tokens, 8192);
   const thinkCapNow = thinkCap > 0 ? Math.max(1, Math.min(thinkCap, Math.floor(tokens / 2))) : 0;
 
   // a lab is chosen before a model: the starred default if one is saved, else the first lab. The
@@ -418,10 +482,11 @@ export default function ChatConsole() {
     setLab(labOf(m));
     setPick(convoKeyOf(m));
     setWanted('');
+    if (conn?.wire !== 'thorp') connect(SERVER_CONNECTION); // a lab page's ship is one of Thorp's own
   }, [instruct, wanted]);
 
   useEffect(() => {
-    if (!open || models) return;
+    if (!open || models || PUBLIC_EDITION) return;
     let live = true;
     void (async () => {
       try {
@@ -430,7 +495,7 @@ export default function ChatConsole() {
         if (!live) return;
         setModels(((d.models || []) as Model[]).filter((m) => m.available && (m.run || m.model)));
       } catch (e) {
-        if (live) setErr(String((e as Error)?.message ?? e));
+        if (live) { setModels([]); setModelsErr(String((e as Error)?.message ?? e)); }
       }
     })();
     return () => {
@@ -454,10 +519,23 @@ export default function ChatConsole() {
   // a past chat, from the left section: its model is chosen if it is not already, and the chat opens on it
   const openThread = (t: Thread): void => {
     if (busy) { setPastMsg('wait for the answer being written'); return; }
-    const m = instruct.find((x) => convoKeyOf(x) === t.key);
+    // a chat with a model this browser connected itself: that connection is made again
+    const via = t.key.startsWith('conn:')
+      ? (conn && conn.wire !== 'thorp' && connKey(conn) === t.key ? conn : recentConnections().find((c) => connKey(c) === t.key))
+      : undefined;
+    const m = via ? modelOfConnection(via) : instruct.find((x) => convoKeyOf(x) === t.key);
     if (!m) { setPastMsg(`${t.name} is not on the console's list now`); return; }
     setPastMsg('');
-    if (chosen && convoKeyOf(chosen) === t.key) {
+    setConnecting(false);
+    if (via && !(chosen && convoKeyOf(chosen) === t.key)) {
+      wantThread.current = t.id;
+      connect(via);
+    } else if (!via && conn?.wire !== 'thorp') {
+      wantThread.current = t.id;
+      setLab(labOf(m));
+      setPick(t.key);
+      connect(SERVER_CONNECTION);
+    } else if (chosen && convoKeyOf(chosen) === t.key) {
       const msgs = ((t.messages as unknown as Say[]) || []).slice();
       said.current = msgs;
       threadRef.current = t.id;
@@ -471,14 +549,19 @@ export default function ChatConsole() {
     setPanes((p) => ({ ...p, chat: true }));
   };
 
-  // a long thread opens on its newest turn, where the reading left off
+  // the connect page opens at its top; a long thread opens on its newest turn, where the reading left off
   useEffect(() => {
-    if (!panes.chat) return;
+    if (!panes.chat || !showConnect) return;
+    const frame = requestAnimationFrame(() => { if (chatBox.current) chatBox.current.scrollTop = 0; });
+    return () => cancelAnimationFrame(frame);
+  }, [panes.chat, showConnect]);
+  useEffect(() => {
+    if (!panes.chat || showConnect) return;
     const el = chatBox.current;
     if (!el) return;
     const frame = requestAnimationFrame(() => { el.scrollTop = el.scrollHeight; });
     return () => cancelAnimationFrame(frame);
-  }, [panes.chat, threadId]);
+  }, [panes.chat, threadId, showConnect]);
 
   // the thinking switch follows the model: a template with an off switch starts on its own default, one
   // that always reasons is on and cannot be turned off, one with no reasoning mode is off and inert
@@ -503,7 +586,7 @@ export default function ChatConsole() {
     }
   };
   useEffect(() => {
-    if (panes.past) void loadQuestions();
+    if (panes.past && !PUBLIC_EDITION) void loadQuestions(); // the question library is Thorp's server's
   }, [panes.past]);
 
   const lastAsked = useMemo(() => [...says].reverse().find((s) => s.role === 'you')?.text.trim() || '', [says]);
@@ -650,7 +733,9 @@ export default function ChatConsole() {
         : { run: chosen.run?.run, q, tokens, temperature: 0.7, history, ...(step ? { step } : {}),
             // a ship taught to think or to call (13 November): the same two switches the foreign ships take
             ...(thinkingToggle ? { thinking: think ? 'on' : 'off' } : {}), ...(toolsOk ? { tools: useTools ? 'on' : 'off' } : {}) };
-      setLastReq(body);
+      const via = chosen.via;
+      const turns = [...history.map((h) => ({ role: h.role as 'user' | 'assistant', content: h.text })), { role: 'user' as const, content: q }];
+      setLastReq(via ? { provider: via.label, base: via.base, model: via.model, max_tokens: browserTokens, temperature: 0.7, messages: turns.length } : body);
       // the answer comes a line an event (/api/chat/stream): shown as it is written, and stoppable
       const ctl = new AbortController();
       stopper.current = ctl;
@@ -663,7 +748,28 @@ export default function ChatConsole() {
       setLive({ ...acc });
       let d: Reply | null = null;
       try {
-        const r = await fetch('/api/chat/stream', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), signal: ctl.signal });
+        if (via) {
+          // a model this browser connected: asked straight from here, never through Thorp's server
+          const t0 = performance.now();
+          const res = await chatStream(via, turns, { maxTokens: browserTokens, temperature: 0.7, signal: ctl.signal }, (dl) => {
+            if (dl.kind === 'reasoning') acc.thinking += dl.text;
+            else acc.text += dl.text;
+            acc.n += 1;
+            paint();
+          });
+          const secs = (performance.now() - t0) / 1000;
+          d = {
+            answer: res.answer.trim(),
+            meta: {
+              prompt_tokens: res.promptTokens, answer_tokens: res.answerTokens, reasoning_tokens: res.reasoningTokens, cached_tokens: res.cachedTokens,
+              finish: res.finish, seconds: Math.round(secs * 10) / 10,
+              tok_s: res.answerTokens && secs > 0 ? Math.round((10 * res.answerTokens) / secs) / 10 : undefined,
+              settings: { max_tokens: browserTokens, provider: via.label, model: via.model },
+            },
+          };
+          (d as any).reasoning = res.reasoning.trim();
+        } else {
+        const r = await fetch('/api/chat/stream',{ method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), signal: ctl.signal });
         if (r.status === 404) throw new Error('this dashboard has no /api/chat/stream yet: restart thorp dash');
         if (!r.ok || !r.body) throw new Error(`the dashboard answered ${r.status}`);
         const reader = r.body.getReader();
@@ -692,10 +798,11 @@ export default function ChatConsole() {
           }
         }
         if (!d) throw new Error('the answer ended before it was finished');
+        }
       } catch (e) {
         if (!ctl.signal.aborted) throw e;
         // stopped by the reader: what had arrived is kept, and said to be unfinished
-        d = { answer: acc.text.trim(), meta: { finish: 'stopped', settings: { max_tokens: tokens } } };
+        d = { answer: acc.text.trim(), meta: { finish: 'stopped', settings: { max_tokens: via ? browserTokens : tokens } } };
         (d as any).reasoning = acc.thinking.trim();
         if (!acc.text.trim() && !acc.thinking.trim()) d = null;
       } finally {
@@ -704,6 +811,8 @@ export default function ChatConsole() {
         setLive(null);
       }
       if (!d) return;
+      setFailed(!!d.error);
+      if (!d.error) setHealth((h) => (h?.ok === false ? { ok: true } : h)); // it answered, so it is there
       if (d.error) setErr(String(d.error));
       else {
         setLastReply(d);
@@ -714,6 +823,7 @@ export default function ChatConsole() {
         persist(next);
       }
     } catch (e) {
+      setFailed(true);
       setErr(String((e as Error)?.message ?? e));
     } finally {
       setBusy(false);
@@ -777,7 +887,15 @@ export default function ChatConsole() {
     const name = folder.trim() || '~unfiled'; // the folder it went to opens, so the chat is seen to land
     if (shut.includes(name)) toggleShut(name);
   };
-  const listed = new Set(instruct.map(convoKeyOf));
+  const listed = new Set([...instruct.map(convoKeyOf), ...recentConnections().map(connKey), ...(conn && conn.wire !== 'thorp' ? [connKey(conn)] : [])]);
+  // the bar's dot: green when the model is there, amber while it answers, red when it is not answering
+  const dot = busy ? 'wait' : !chosen ? 'off' : failed || health?.ok === false ? 'bad' : 'ok';
+  const dotWhy = !chosen ? 'no model connected yet' : health?.ok === false ? health.why : failed ? 'the last question failed: see the chat' : busy ? 'answering' : 'connected';
+  const barModel = conn === null
+    ? 'no model yet: open to connect one'
+    : chosen ? `${chosen.name}${chosen.via ? ` · ${chosen.via.where === 'local' ? `${chosen.via.label}, this computer` : chosen.via.label}` : ''}`
+      : conn?.wire === 'thorp' && modelsErr ? 'Thorp’s models could not be read' : 'reading the models…';
+  const openConnect = (): void => { setConnecting(true); setPanes((p) => ({ ...p, chat: true })); };
   const thinkOn = thinkingAuto || (thinkingToggle && think);
   const setSummary = chosen
     ? `thinking ${thinkingAuto ? 'auto' : thinkOn ? 'on' : 'off'} · tools ${toolsOk && useTools ? 'on' : 'off'} · ${Math.round(budgetShare * 100)}% budget`
@@ -818,12 +936,20 @@ export default function ChatConsole() {
         >
           <span className="consoleplate">
             <span className="consoletitle">The chat console</span>
-            <span className="consolenote">{chosen ? chosen.name : 'reading the models…'}{open ? ' · ⌘J, esc or a click outside to close' : ' · ⌘J'}</span>
+            <span className="consolenote"><i className={`cdot ${dot}`} title={dotWhy} aria-label={dotWhy} />{barModel}{open ? ' · ⌘J, esc or a click outside to close' : ' · ⌘J'}</span>
           </span>
           <span className="consolemeter">
             <ContextMeter used={used} context={chosen?.facts?.context ?? null} next={256} turns={says.filter((s) => s.role === 'you').length} last={last} />
           </span>
           <span className="consolechevron" aria-hidden="true">{panes.chat ? '▾' : '▴'}</span>
+        </button>
+        <button
+          type="button"
+          className="consoleswitchmodel"
+          onClick={() => (showConnect && panes.chat && conn ? setConnecting(false) : openConnect())}
+          title={conn ? 'switch model: one on this computer, a cloud model, or another' : 'connect a model: one on this computer, or a cloud model with your key'}
+        >
+          <span aria-hidden="true">⇄</span><span className="consoleswitchword">{conn ? 'switch model' : 'connect'}</span>
         </button>
         <button
           type="button"
@@ -1128,13 +1254,15 @@ export default function ChatConsole() {
               <button
                 type="button"
                 className="consolemodel"
-                onClick={() => setPanes((p) => ({ ...p, set: !p.set }))}
-                title={panes.set ? 'close settings' : 'change the model in settings'}
-              >{chosen ? chosen.name : 'reading the models…'}{step ? ` · step ${step}` : ''}</button>
+                onClick={() => (showConnect && conn ? setConnecting(false) : openConnect())}
+                title={showConnect && conn ? 'back to the chat' : 'switch model'}
+              ><i className={`cdot ${dot}`} title={dotWhy} /> {chosen ? `${chosen.name}${chosen.via ? ` · ${chosen.via.label}` : ''}` : conn === null ? 'connect a model' : 'reading the models…'}{step ? ` · step ${step}` : ''}</button>
               <span className="consoleheadgap" aria-hidden="true" />
+              {PUBLIC_EDITION ? null : (
               <button type="button" className="consolbtn" onClick={() => setNotesOpen((v) => !v)} aria-pressed={notesOpen}>
                 Notes{notes.length ? ` (${notes.length})` : ''}
               </button>
+              )}
               <button
                 type="button"
                 className="consolbtn"
@@ -1153,11 +1281,28 @@ export default function ChatConsole() {
             <div className="consolebody">
               <div className="consolechat" aria-live="polite" ref={chatBox}>
                 <div className="consoletranscript">
+                  {showConnect ? (
+                    <ConsoleConnect
+                      current={conn ?? null}
+                      serverModels={PUBLIC_EDITION ? null : instruct.length || null}
+                      onPick={connect}
+                      onClose={conn ? () => setConnecting(false) : undefined}
+                    />
+                  ) : (<>
                   {says.length === 0 ? (
                     <div className="consoleintro">
                       <span className="consolemsgwho">{chosen ? chosen.name : 'the console'}</span>
-                      <p className="note">{chosen ? 'Ask it anything. The answer is its own continuation; the thread is kept, and notes sit beside it.' : 'reading the models…'}</p>
+                      <p className="note">{chosen?.via
+                        ? `Connected to ${chosen.via.model} on ${chosen.via.label}${chosen.via.where === 'local' ? ', on this computer' : ''}. Ask it anything: this browser asks it directly, and the thread is kept here.`
+                        : chosen ? 'Ask it anything. The answer is its own continuation; the thread is kept, and notes sit beside it.'
+                          : conn?.wire === 'thorp' && modelsErr ? `Thorp’s own models could not be read (${modelsErr}).` : 'reading the models…'}</p>
+                      {conn?.wire === 'thorp' && !chosen && (modelsErr || (models && !instruct.length)) ? (
+                        <p className="note"><button type="button" className="consolbtn" onClick={openConnect}>connect another model</button></p>
+                      ) : null}
                     </div>
+                  ) : null}
+                  {health?.ok === false ? (
+                    <p className="consolewarn">{health.why} <button type="button" className="consolbtn" onClick={openConnect}>switch model</button></p>
                   ) : null}
                   {says.map((s, i) => (
                     <article key={i} className={`consolemsg ${s.role === 'you' ? 'is-you' : 'is-model'}`}>
@@ -1203,7 +1348,8 @@ export default function ChatConsole() {
                       ) : null}
                     </article>
                   ) : busy ? <p className="note consolewait">sampling…</p> : null}
-                  {err ? <p className="consoleerr">{err}</p> : null}
+                  {err ? <p className="consoleerr">{err}{chosen?.via ? <> <button type="button" className="consolbtn" onClick={openConnect}>switch model</button></> : null}</p> : null}
+                  </>)}
                 </div>
               </div>
               {debug ? (
@@ -1241,9 +1387,9 @@ export default function ChatConsole() {
                 ref={field}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder={chosen ? `ask ${chosen.name}…` : 'reading the models…'}
+                placeholder={chosen ? `ask ${chosen.name}…` : conn === null ? 'connect a model above to start' : 'reading the models…'}
                 aria-label="your question"
-                disabled={!chosen}
+                disabled={!chosen || showConnect}
               />
               {/* an empty box keeps the last question asked: sending clears the box, so otherwise the button is dead
                   exactly when someone wants to keep what they just asked */}
@@ -1251,7 +1397,7 @@ export default function ChatConsole() {
               {busy && live ? (
                 <button type="button" className="consolbtn primary" onClick={() => stopper.current?.abort()} title="stop this answer: what has arrived is kept">stop</button>
               ) : (
-                <button type="submit" className="consolbtn primary" disabled={busy || !input.trim() || !chosen}>{busy ? '…' : 'send'}</button>
+                <button type="submit" className="consolbtn primary" disabled={busy || !input.trim() || !chosen || showConnect}>{busy ? '…' : 'send'}</button>
               )}
             </form>
           </section>
@@ -1260,6 +1406,16 @@ export default function ChatConsole() {
           <section id="consoleset" className={`consolecol consoleset${panes.set ? ' on' : ''}`} aria-label="settings" inert={!panes.set}>
             <div className="consolecolhead"><b>Settings</b></div>
             <div className="consolesetlist">
+              <div className="consolesetrow">
+                <span className="consolesetname">model from</span>
+                <span className="consolesetline consoleconnrow">
+                  <i className={`cdot ${dot}`} title={dotWhy} />
+                  <span>{!conn ? 'nothing connected yet' : conn.wire === 'thorp' ? 'Thorp’s own models, on this server' : `${conn.label}, ${conn.where === 'local' ? 'on this computer' : 'with your key'}`}</span>
+                  <button type="button" className="consolbtn" onClick={openConnect}>{conn ? 'switch' : 'connect'}</button>
+                  {chosen?.via ? <span className="consolesetwhy">{chosen.via.model} · asked from this browser{chosen.via.where === 'cloud' ? ', the key never leaves it' : ''}</span> : null}
+                </span>
+              </div>
+              {conn?.wire === 'thorp' ? (<>
               <label className="consolesetrow">
                 <span className="consolesetname">lab</span>
                 <select
@@ -1311,6 +1467,7 @@ export default function ChatConsole() {
                 </span>
                 {contextWindow ? <span className="consolesetwhy">a {contextWindow.toLocaleString()}-token window</span> : null}
               </div>
+              </>) : null}
               {chosen?.checkpoints?.length ? (
                 <label className="consolesetrow">
                   <span className="consolesetname">checkpoint</span>
@@ -1383,6 +1540,7 @@ export default function ChatConsole() {
                   ))}
                 </select>
                 {!contextWindow ? <span className="consolesetwhy">the window is not known, so the budget is a fixed 4,096 tokens</span> : null}
+                {chosen?.via && browserTokens < tokens ? <span className="consolesetwhy">a model connected from this browser is asked for {browserTokens.toLocaleString()} tokens at most</span> : null}
               </label>
               <div className="consolesetrow">
                 <span className="consolesetname">answer text</span>

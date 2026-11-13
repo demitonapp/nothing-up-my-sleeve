@@ -13,6 +13,11 @@
 //
 // `localStorage`, slot `thorp.chat.threads.v2`; a v1 store (one a model) is migrated once, its
 // conversations arriving as saved threads.
+//
+// In the public edition a visitor's chats stay in their browser only (13 November): nothing is pushed to Thorp's
+// server, and the server's threads (Justin's own) are never read into a visitor's store.
+
+import { PUBLIC_EDITION } from './edition';
 
 export interface StoredMessage {
   role: 'you' | 'thorp';
@@ -137,6 +142,7 @@ export const getThread = (id: string): Thread | undefined => read().find((t) => 
 /** Write a thread (by id), replacing it if it is there. */
 /** Postgres, best-effort: the local store is the fast one; the server copy is what survives a browser. */
 function push(t: Thread): void {
+  if (PUBLIC_EDITION) return;
   void fetch('/api/chat/threads', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -222,6 +228,7 @@ export function dropFolder(name: string): void {
 
 export function removeThread(id: string): void {
   write(read().filter((t) => t.id !== id));
+  if (PUBLIC_EDITION) return;
   void fetch('/api/chat/threads/delete', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -232,6 +239,7 @@ export function removeThread(id: string): void {
 /** Merge the server's threads into this browser's store (newest wins per id), then tell the pages.
  *  A slow read leaves the local store untouched. */
 export async function syncThreads(): Promise<void> {
+  if (PUBLIC_EDITION) return;
   try {
     const r = await fetch('/api/chat/threads');
     if (!r.ok) return;

@@ -1,0 +1,125 @@
+/* The console's connect page (ConsoleConnect.tsx, 13 November): the same noir ink and brass as the console
+   (global.css, "the console in Eduardo Risso's idiom"), kept in its own sheet so the onboarding can change
+   without touching the console's rules. */
+
+.cconnect { max-width: 76ch; margin: 0 auto; padding: 18px 0 28px; color: #e9e2d3; font-size: 14px; line-height: 1.55; }
+.cconnect h2 { margin: 0; font-size: 13px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: #f2e6cf; }
+.cconnect h3 { margin: 0 0 6px; font-size: 13.5px; font-weight: 650; color: #f2e6cf; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.cconnect p { margin: 0 0 10px; }
+.cconnect a { color: #d8b566; }
+.cconnect a:hover { color: #e5c982; }
+.chead { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.chead .consolbtn { margin-left: auto; }
+.cback { background: none; border: 1px solid #3a2a12; color: #d8b566; border-radius: 2px; width: 28px; height: 26px; cursor: pointer; font: inherit; }
+.cback:hover { border-color: #c9a24a; }
+.clead { color: #b9ab90; max-width: 62ch; }
+.cdim { color: #8d7a56; font-size: 12.5px; }
+.cnote { color: #b9ab90; font-size: 12.5px; border-left: 2px solid #6b5628; padding-left: 10px; }
+.cerr { color: #d98b6a; font-size: 13px; border-left: 2px solid #d98b6a; padding-left: 10px; overflow-wrap: anywhere; }
+
+/* the status dot: the same one the bar wears */
+.cdot { display: inline-block; flex: none; width: 8px; height: 8px; border-radius: 50%; background: #5a4b33; vertical-align: 1px; margin-right: 2px; }
+.cdot.ok { background: #8fb573; box-shadow: 0 0 8px rgba(143,181,115,.6); }
+.cdot.warn { background: #d9a54a; }
+.cdot.bad { background: #d9705a; box-shadow: 0 0 8px rgba(217,112,90,.5); }
+.cdot.off { background: #4a3e2b; }
+.cdot.lock { background: #c9a24a; }
+.cdot.wait { background: #c9a24a; animation: cpulse 1.1s ease-in-out infinite; }
+@keyframes cpulse { 50% { opacity: .25; } }
+@media (prefers-reduced-motion: reduce) { .cdot.wait { animation: none; } }
+
+/* the two doors */
+.cdoors { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 16px 0 14px; }
+@media (max-width: 720px) { .cdoors { grid-template-columns: 1fr; } }
+.cdoor { display: flex; flex-direction: column; gap: 4px; padding: 16px 16px 14px; border: 1px solid #3a2a12; border-radius: 3px; background: #100e0c; }
+.cdoor:hover { border-color: #6b5628; }
+.cdoor h3 { font-size: 15px; letter-spacing: .02em; }
+.cfound { font-size: 12.5px; color: #d8c39b; margin: 4px 0 8px; }
+.cdoorbtn { margin-top: auto; align-self: flex-start; padding: 7px 12px; }
+.cquick { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; }
+.cquickbtn { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 1px; padding: 6px 10px; border: 1px solid #6b5628; border-radius: 2px;
+  background: #16130f; color: #f2e6cf; font: inherit; font-size: 12.5px; cursor: pointer; text-align: left; max-width: 100%; overflow-wrap: anywhere; }
+.cquickbtn span { font-size: 10.5px; color: #8d7a56; letter-spacing: .04em; }
+.cquickbtn:hover { border-color: #e5c982; background: #1c1813; }
+.cserver { display: grid; grid-template-columns: auto 1fr auto; gap: 4px 12px; align-items: baseline; width: 100%; padding: 10px 14px; margin: 0 0 12px;
+  background: none; border: 1px dashed #3a2a12; border-radius: 3px; color: #e9e2d3; font: inherit; text-align: left; cursor: pointer; }
+.cserver span { color: #8d7a56; font-size: 12.5px; }
+.cserver .cmodelgo { grid-row: auto; grid-column: 3; }
+.cserver:hover, .cserver.on { border-color: #c9a24a; }
+.crecent { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.crecentchip { display: inline-flex; border: 1px solid #3a2a12; border-radius: 2px; }
+.crecentchip button { background: none; border: 0; color: #e9e2d3; font: inherit; font-size: 12px; padding: 4px 8px; cursor: pointer; }
+.crecentchip button span { color: #8d7a56; margin-left: 6px; font-size: 11px; }
+.crecentchip button:hover { color: #f6e2a8; }
+.crecentchip .cx { color: #6f5d40; padding: 4px 7px; border-left: 1px solid #3a2a12; }
+
+/* the local list */
+.cscan { display: flex; align-items: center; gap: 12px; justify-content: space-between; margin: 0 0 12px; }
+.cserverblock { padding: 12px 14px; margin: 0 0 12px; border: 1px solid #3a2a12; border-radius: 3px; background: #100e0c; }
+.cserverblock.warn { border-color: #5c4520; }
+.cserverblock p { color: #cbbfa8; font-size: 13px; }
+.cempty { padding: 16px 16px 8px; margin: 0 0 12px; border: 1px dashed #6b5628; border-radius: 3px; }
+.cempty ol { margin: 6px 0 12px; padding-left: 1.3em; }
+.cempty li { margin: 6px 0; }
+.cempty li::marker { color: #c9a24a; }
+.ccode { display: inline-flex; align-items: stretch; max-width: 100%; margin: 2px 0 8px; border: 1px solid #33281a; border-radius: 2px; background: #131110; vertical-align: middle; }
+.ccode code { padding: 4px 9px; font-size: 12.5px; color: #e8d1a0; overflow-wrap: anywhere; white-space: pre-wrap; }
+.ccopy { flex: none; background: none; border: 0; border-left: 1px solid #33281a; color: #8d7a56; font: inherit; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; padding: 0 9px; cursor: pointer; }
+.ccopy:hover { color: #e5c982; }
+.caddress { display: flex; align-items: center; gap: 8px; margin: 8px 0 10px; flex-wrap: wrap; }
+.caddress input, .cfield input, .cfilter { flex: 1 1 220px; min-width: 0; background: #131110; color: #f2e6cf; border: 1px solid #3a2a12; border-radius: 2px; padding: 7px 10px; font: inherit; font-size: 13px; }
+.caddress input:focus, .cfield input:focus, .cfilter:focus { outline: none; border-color: #c9a24a; }
+.cdown { margin-top: 6px; font-size: 12.5px; color: #8d7a56; }
+.cdown summary { cursor: pointer; }
+.cdown summary:hover { color: #d8b566; }
+.cdownrow { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; padding: 8px 0 0 14px; }
+.cdownrow b { color: #cbbfa8; font-weight: 600; min-width: 11ch; }
+.cdownrow .ccode { margin: 0; }
+
+/* the model list */
+.cmodels { display: grid; gap: 8px; }
+.cfilter { width: 100%; box-sizing: border-box; }
+.cmodellist { display: grid; gap: 2px; max-height: 320px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #3a2a12 transparent; }
+.cmodel { display: grid; grid-template-columns: 1fr auto; gap: 0 12px; align-items: baseline; padding: 7px 10px; background: none; border: 0; border-left: 2px solid transparent;
+  color: #e9e2d3; font: inherit; text-align: left; cursor: pointer; border-radius: 1px; }
+.cmodel:hover { background: #16130f; border-left-color: #c9a24a; }
+.cmodel.on { border-left-color: #8fb573; }
+.cmodelname { font-size: 13.5px; overflow-wrap: anywhere; }
+.cmodelnote { grid-column: 1; font-size: 11.5px; color: #7c694a; overflow-wrap: anywhere; }
+.cmodelgo { grid-row: 1 / span 2; grid-column: 2; align-self: center; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: #6f5d40; }
+.cmodel:hover .cmodelgo { color: #e5c982; }
+.cmodel.on .cmodelgo { color: #8fb573; }
+
+/* the cloud form */
+.cproviders { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin: 0 0 14px; }
+@media (max-width: 720px) { .cproviders { grid-template-columns: repeat(2, 1fr); } }
+.cprov { display: flex; flex-direction: column; gap: 2px; padding: 9px 10px; background: #100e0c; border: 1px solid #3a2a12; border-radius: 2px; color: #e9e2d3; font: inherit; text-align: left; cursor: pointer; }
+.cprov b { font-size: 13px; font-weight: 650; }
+.cprov span { font-size: 11px; color: #7c694a; line-height: 1.35; }
+.cprov:hover { border-color: #6b5628; }
+.cprov.on { border-color: #c9a24a; background: #16130f; box-shadow: inset 0 2px 0 #c9a24a; }
+.ckeyform { display: grid; gap: 10px; margin: 0 0 12px; }
+.cfield { display: grid; gap: 4px; }
+.cfield span { font-size: 10.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: #c9a24a; }
+.ckeyrow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; font-size: 12.5px; }
+.ckeyrow .consolbtn { margin-left: auto; padding: 7px 14px; }
+.cremember { display: inline-flex; align-items: center; gap: 6px; color: #b9ab90; cursor: pointer; }
+.cremember input { accent-color: #c9a24a; }
+.clink { background: none; border: 0; padding: 0; color: #8d7a56; font: inherit; text-decoration: underline; cursor: pointer; }
+.clink:hover { color: #d98b6a; }
+.cprivacy { font-size: 12px; color: #9a8a6c; margin: 0; padding: 8px 10px; border: 1px solid #2a2116; border-radius: 2px; background: #0e0d0b; }
+.cafter { margin-top: 4px; }
+
+/* the bar's status dot and switch (ChatConsole.tsx) */
+.consoleseg .consolenote .cdot { margin-right: 6px; }
+.consoleswitchmodel { flex: none; align-self: stretch; display: flex; align-items: center; gap: 6px; padding: 0 14px; background: none; border: 0;
+  border-left: 1px solid rgba(201,162,74,.22); color: #d8b566; font: inherit; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; cursor: pointer; white-space: nowrap; }
+.consoleswitchmodel:hover { background: rgba(201,162,74,.07); color: #f6e2a8; }
+.consoleswitchmodel:focus-visible { outline: 1px solid #c9a24a; outline-offset: -4px; }
+@media (max-width: 720px) { .consoleswitchmodel .consoleswitchword { display: none; } }
+.consoleconnrow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.consoleconnrow .consolesetwhy { flex-basis: 100%; }
+.clist { margin: 4px 0 6px; padding-left: 1.3em; color: #cbbfa8; font-size: 13px; }
+.clist li { margin: 4px 0; }
+.clist li::marker { color: #c9a24a; }
+.clist b { color: #f2e6cf; font-weight: 600; }

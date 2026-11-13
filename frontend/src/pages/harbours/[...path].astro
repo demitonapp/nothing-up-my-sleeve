@@ -7,6 +7,7 @@ import SizePage from '../../components/islands/SizePage';
 import ShipPage from '../../components/islands/ShipPage';
 import RunsPage from '../../components/islands/RunsPage';
 import Reader from '../../components/Reader.astro';
+import { PUBLIC_EDITION } from '../../lib/edition';
 
 export function getStaticPaths() {
   // the Orbitals' keys now; the three old harbour keys stay as addresses so an old link lands on the
@@ -33,9 +34,11 @@ export function getStaticPaths() {
 <Layout>
   <main>
     <Harbours client:load />
-    <SizePage client:load />
-    <ShipPage client:load />
-    <RunsPage client:load />
+    {/* our ships' and runs' islands, and the reader for their books: only Demiton's addresses open them, so the
+        public edition (lib/edition.ts) mounts none of them */}
+    {!PUBLIC_EDITION && <SizePage client:load />}
+    {!PUBLIC_EDITION && <ShipPage client:load />}
+    {!PUBLIC_EDITION && <RunsPage client:load />}
   </main>
-  <Reader />
+  {!PUBLIC_EDITION && <Reader />}
 </Layout>

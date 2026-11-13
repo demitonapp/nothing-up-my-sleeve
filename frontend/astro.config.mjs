@@ -4,6 +4,11 @@
 import { defineConfig } from 'astro/config';
 import react from '@astrojs/react';
 import tailwindcss from '@tailwindcss/vite';
+import publicEdition from './integrations/public-edition.mjs';
+
+// The public edition (13 November, src/lib/edition.ts): `PUBLIC_EDITION=1 pnpm build` builds the public site,
+// without Demiton or the settings, into frontend/dist-public, so it never overwrites the dashboard's own build.
+const PUBLIC = process.env.PUBLIC_EDITION === '1';
 
 // A branch's address (/library/ogden) is data, not a fixed route: `thorp dash` already serves the
 // Library's shell for any branch in production, and this gives the dev server the same fallback.
@@ -22,15 +27,16 @@ const libraryBranchShell = {
 };
 
 export default defineConfig({
-  outDir: '../backend/thorp/dash/static',
+  outDir: PUBLIC ? './dist-public' : '../backend/thorp/dash/static',
   build: { assets: 'assets' },
   devToolbar: { enabled: false },
   server: { port: 4321 },
-  integrations: [react()],
+  integrations: [react(), publicEdition({ enabled: PUBLIC })],
   // The Liberty Machine lives under Demiton (12 November, Justin: "for this url .../liberty-machine it
   // should be behind the demiton orbital url structure") and was called VSM before that: every old
   // address 301s into the orbital's tree. S1's page is 'operations'.
-  redirects: {
+  // Every one of them lands in Demiton, so the public edition has none.
+  redirects: PUBLIC ? {} : {
     '/liberty-machine': '/orbitals/demiton/liberty-machine',
     '/liberty-machine/s1': '/orbitals/demiton/liberty-machine/operations',
     '/liberty-machine/s2': '/orbitals/demiton/liberty-machine/s2',
@@ -64,6 +70,8 @@ export default defineConfig({
   },
   vite: {
     plugins: [libraryBranchShell, tailwindcss()],
+    // one value for the server render and the islands alike ('1' or ''), read through src/lib/edition.ts
+    define: { 'import.meta.env.PUBLIC_EDITION': JSON.stringify(PUBLIC ? '1' : '') },
     // pre-bundled at startup, so a newly imported one never re-optimises under an open tab
     // (the browser then asks for the old bundle: "504 Outdated Optimize Dep")
     optimizeDeps: {

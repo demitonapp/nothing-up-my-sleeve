@@ -11,6 +11,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { big } from '@/lib/format';
 import { btnCls, cardCls, emptyCls, fieldCls, pillCls } from '@/lib/ui';
+import { PUBLIC_EDITION } from '@/lib/edition';
 
 interface DownloadState {
   state: string;
@@ -326,13 +327,14 @@ export default function LabModels({ lab, ships = [] }: { lab: string; ships?: { 
                         ) : state(m).state === 'failed' ? (
                           <span className={pillCls('bad')} title={state(m).error || ''}>failed</span>
                         ) : null}
-                        <button
+                        {/* a download pulls the weights onto this machine: not offered in the public edition (lib/edition.ts) */}
+                        {!PUBLIC_EDITION && <button
                           type="button"
                           className={btnCls('outline')}
                           disabled={busy === m.model || ready(m) || state(m).state === 'downloading'}
                           title={ready(m) ? 'its weights are already cached' : 'download the model and add it to the chat terminal'}
                           onClick={() => void download(m)}
-                        >{ready(m) ? '✓' : '↓'}</button>
+                        >{ready(m) ? '✓' : '↓'}</button>}
                         <button
                           type="button"
                           className={btnCls('ghost')}
@@ -406,7 +408,8 @@ export default function LabModels({ lab, ships = [] }: { lab: string; ships?: { 
                 </tbody>
               </table>
             </div>
-            <div className="labmeta">
+            {/* queueing writes investigations into Demiton's expeditions queue: not offered in the public edition */}
+            {!PUBLIC_EDITION && <div className="labmeta">
               <button type="button" className={btnCls('outline')} disabled={queueing || !chosen.size} onClick={() => void queue()}>
                 {queueing ? 'queueing…' : `Queue ${chosen.size} investigation${chosen.size === 1 ? '' : 's'}`}
               </button>
@@ -417,7 +420,7 @@ export default function LabModels({ lab, ships = [] }: { lab: string; ships?: { 
               >Select unscored</button>
               <button type="button" className={btnCls('ghost')} onClick={() => setChosen(new Set())}>Clear</button>
               {queueMsg ? <span className="s">{queueMsg}</span> : null}
-            </div>
+            </div>}
             {ships.length ? (
               <p className="note">
                 The house&apos;s ships already in the Reach: {ships.map((s) => s.label).join(' · ')}

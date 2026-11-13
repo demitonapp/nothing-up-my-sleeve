@@ -18,6 +18,7 @@ import { sectionProps, useApi } from '@/lib/useApi';
 import { bandCardsHtml, boardHtml, candidatesHtml, drawSmokingChart, facesHtml, runsHtml, smokingHtml } from '@/scripts/views/leaderboard-main';
 import { arcAi2Html, ifevalHtml } from '@/scripts/views/leaderboard-steps';
 import { BAND, BANDS, bandOf, sizeOf, type SizeBand } from '@/scripts/views/bands';
+import { PUBLIC_EDITION } from '@/lib/edition';
 
 export default function Leaderboard({ band }: { band?: SizeBand }) {
   const lb = useApi<any>('/api/leaderboard', 60000);
@@ -91,7 +92,7 @@ export default function Leaderboard({ band }: { band?: SizeBand }) {
     <div {...sectionProps('leaderboard')}>
       {band ? (
         <>
-          <h1><a className={crumbCls('back')} href="/leaderboard">← leaderboard</a> <span>{bandInfo?.name}</span> <span className="q">{bandInfo?.range}: {byStepsBand ? 'under 1B nothing chains two facts yet, so the board is ranked by AI2 ARC — Easy as the anchor and Challenge beside it, the one peer-recognised test at this size — with the steps to chaining, and each of our ships beside the outside model ten times its size, below' : 'the models of this size that chain, ranked by how well, and those not chaining yet, ranked by how close'}. The method is under <a href="/discoveries/tests?test=chaining">Discoveries, Tests: chaining two facts</a></span></h1>
+          <h1><a className={crumbCls('back')} href="/leaderboard">← leaderboard</a> <span>{bandInfo?.name}</span> <span className="q">{bandInfo?.range}: {byStepsBand ? 'under 1B nothing chains two facts yet, so the board is ranked by AI2 ARC — Easy as the anchor and Challenge beside it, the one peer-recognised test at this size — with the steps to chaining, and each of our ships beside the outside model ten times its size, below' : 'the models of this size that chain, ranked by how well, and those not chaining yet, ranked by how close'}.{!PUBLIC_EDITION && <> The method is under <a href="/discoveries/tests?test=chaining">Discoveries, Tests: chaining two facts</a></>}</span></h1>
           <TabNav
             ariaLabel="model size"
             items={BANDS.map((b) => ({ key: b.key, label: <>{b.name} <span className="s">{b.range}</span></>, href: `/leaderboard/${b.key}`, active: b.key === band }))}
@@ -99,7 +100,7 @@ export default function Leaderboard({ band }: { band?: SizeBand }) {
         </>
       ) : (
         <>
-          <h1>Leaderboard <span className="q">one card a category of test — logic, knowledge, reasoning, instruction following, coding, agent, long context and the four Faces (abilities): open a card for its page, with every test in it and the leaderboard on each; the boards by size are folded at the foot. The method is under <a href="/discoveries/tests?test=chaining">Discoveries, Tests: chaining two facts</a></span></h1>
+          <h1>Leaderboard <span className="q">one card a category of test — logic, knowledge, reasoning, instruction following, coding, agent, long context and the four Faces (abilities): open a card for its page, with every test in it and the leaderboard on each; the boards by size are folded at the foot.{!PUBLIC_EDITION && <> The method is under <a href="/discoveries/tests?test=chaining">Discoveries, Tests: chaining two facts</a></>}</span></h1>
         </>
       )}
 

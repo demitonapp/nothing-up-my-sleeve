@@ -15,6 +15,7 @@ import { TEST_CATEGORIES } from '@/lib/testCategories';
 import { AXES, DISCOVERIES, KINDS, OBJECTS, OURS, slugOf } from '@/lib/fieldMap';
 import { TRICKS, WAYPOINTS } from '@/lib/fieldTricks';
 import { CHAIN_KEYS, DEMITON_DISCOVERIES as DB } from '@/lib/discoveryPaths';
+import { PUBLIC_EDITION, hiddenHere } from '@/lib/edition';
 
 /** The foreign ships with a page of their own (data/foreign.json, written from thorp.foreign.models).
  *  Kept for `chatHref`, not for the palette's list. */
@@ -92,7 +93,7 @@ const DISCOVERY_DESTS: Dest[] = [
 /** The places the palette can take you. Grouped in the order below; the top-level ways in come first,
  *  then Demiton's views, the ships, Masaq' Reach, the discoveries and the leaderboard boards. */
 export const DESTINATIONS: Dest[] = [
-  { group: 'The site', label: 'Orbitals', href: '/orbitals', note: 'Demiton and the trading orbital' },
+  { group: 'The site', label: 'Orbitals', href: '/orbitals', note: PUBLIC_EDITION ? 'the trading orbital and the museum' : 'Demiton and the trading orbital' },
   { group: 'The site', label: 'Demiton', href: '/orbitals/demiton', note: 'our own orbital, its views and its fleet' },
   { group: 'The site', label: 'Masaq’ Reach', href: '/orbitals/masaq', note: 'the trading orbital' },
   { group: 'The site', label: 'Leaderboard', href: '/leaderboard', note: 'the tests and their boards' },
@@ -146,7 +147,8 @@ export const DESTINATIONS: Dest[] = [
   { group: 'Leaderboard', label: 'Small board', href: '/leaderboard/small', note: '1B – 4B' },
   { group: 'Leaderboard', label: 'Medium board', href: '/leaderboard/medium', note: '4B – 32B' },
   { group: 'Leaderboard', label: 'Large board', href: '/leaderboard/large', note: 'above 32B' },
-];
+  // the public edition (lib/edition.ts) offers no place it leaves out: no Demiton, no ships, no settings
+].filter((d) => !hiddenHere(d.href));
 
 /** The list, filtered by label, note or keywords: places whose label starts with the query first, then
  *  a word of the label, then the label anywhere, then the note; groups stay in their own order, so the

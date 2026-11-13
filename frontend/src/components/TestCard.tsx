@@ -9,6 +9,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import { hiddenHere } from '@/lib/edition';
 
 export function TestCard({ id, open = null, setOpen, href, art, plate, name, tag, about, ours, published, pros, cons, link, stat, children }: {
   id: string; open?: string | null; setOpen?: (v: string | null) => void; art?: string; plate?: string;
@@ -59,7 +60,8 @@ export function TestCard({ id, open = null, setOpen, href, art, plate, name, tag
             {cons && cons.length ? <div className="tpc tcons"><b>Cons</b><ul>{cons.map((x) => <li key={x}>{x}</li>)}</ul></div> : null}
             {stat && <div className="tstat sqhead" dangerouslySetInnerHTML={{ __html: stat.split('</div>')[0] + '</div>' }} />}
             <div className="tfoot">
-              <a href={link.href} target={link.href.startsWith('http') ? '_blank' : undefined} rel="noreferrer" onClick={(e) => e.stopPropagation()}>{link.label} ↗</a>
+              {/* the public edition (lib/edition.ts) has no Demiton: a link into it is left off, the card keeps its turn */}
+              {hiddenHere(link.href) ? <span /> : <a href={link.href} target={link.href.startsWith('http') ? '_blank' : undefined} rel="noreferrer" onClick={(e) => e.stopPropagation()}>{link.label} ↗</a>}
               <span className="tturn" aria-hidden="true">{href ? 'open →' : '⟲ the board'}</span>
             </div>
           </div>

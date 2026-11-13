@@ -36,3 +36,6 @@ ships/lists/ogden-v0.1.4.csv
 .chrome-*/
 kipling.png
 lb5.png
+
+# the public edition's build (PUBLIC_EDITION=1 pnpm --dir frontend build, src/lib/edition.ts): output, not source
+frontend/dist-public/

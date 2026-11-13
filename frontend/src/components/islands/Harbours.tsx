@@ -10,6 +10,7 @@ import { DEMITON, candidateCardsHtml, classScoreHtml, harbourAbout, harbourCards
 import { applyHarbourFlips, wireHarbourFlip } from '@/scripts/views/harbourflip';
 import { BAND } from '@/scripts/views/bands';
 import { mountShipbuilder } from '@/scripts/views/shipbuilder';
+import { PUBLIC_EDITION } from '@/lib/edition';
 
 /** Every address this island answers: the home page, the harbours, and their ships/builder pages. */
 export const isHarboursPage = (path: string): boolean => {
@@ -213,7 +214,7 @@ export default function Harbours() {
     <div {...sectionProps('sizes')}>
       <SectionNav />
       {home ? (
-        <h1>The orbitals <span className="q">Demiton, our own orbital, and the trading orbital where every other lab and its ships reside</span></h1>
+        <h1>The orbitals <span className="q">{PUBLIC_EDITION ? '' : 'Demiton, our own orbital; '}Masaq' Reach, the trading orbital where every other lab and its ships reside; and Sleeper Service, the museum orbital, where the documents the world agreed to keep are hung</span></h1>
       ) : (
         <h1>
           {harbour ? <><a className={crumbCls('back')} href={sectionName || demitonBerth ? '/shipyard' : bandInfo ? `/orbitals/${encodeURIComponent(harbour)}` : shipyard || demitonBerth ? '/orbitals/demiton' : '/orbitals'}>{sectionName || demitonBerth ? '← shipyard' : bandInfo ? `← ${harbourTitle(data, harbour)}` : shipyard || demitonBerth ? '← demiton' : '← orbitals'}</a> </> : null}

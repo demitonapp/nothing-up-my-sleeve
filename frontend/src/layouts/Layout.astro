@@ -10,6 +10,7 @@ import Header from '../components/Header.astro';
 import CommandPalette from '../components/islands/CommandPalette';
 import ChatConsole from '../components/islands/ChatConsole';
 import Breadcrumbs from '../components/islands/Breadcrumbs';
+import { PRIVATE_PREFIXES, PUBLIC_EDITION } from '../lib/edition';
 ---
 <!doctype html>
 <html lang="en">
@@ -30,6 +31,47 @@ import Breadcrumbs from '../components/islands/Breadcrumbs';
     <!-- the chat console: a carved drawer that slides up from the bottom of every page (⌘J) -->
     <ChatConsole client:idle />
     <ClientRouter />
+    <!-- The public edition (lib/edition.ts) has no Demiton and no settings. The header, the trail, the palette and the
+         cards leave their links out already; an island that writes a link from the API's data (a competitor's page
+         naming our ship) cannot know, so any link into a left-out address is unlinked here, as it appears. -->
+    {PUBLIC_EDITION && (
+      <script is:inline define:vars={{ prefixes: PRIVATE_PREFIXES }}>
+        (() => {
+          if (window.__thorpPublicLinks) return;
+          window.__thorpPublicLinks = true;
+          const hidden = (href) => {
+            if (!href) return false;
+            let u;
+            try { u = new URL(href, location.href); } catch { return false; }
+            if (u.origin !== location.origin) return false;
+            const p = (u.pathname.length > 1 ? u.pathname.replace(/\/+$/, '') : u.pathname) || '/';
+            return prefixes.some((b) => p === b || p.startsWith(b + '/'));
+          };
+          const unlink = (root) => {
+            if (!root || !root.querySelectorAll) return;
+            const links = root.matches && root.matches('a[href]') ? [root] : [];
+            for (const a of [...links, ...root.querySelectorAll('a[href]')]) {
+              if (!hidden(a.getAttribute('href'))) continue;
+              a.removeAttribute('href');
+              a.setAttribute('data-offedition', '');
+              a.setAttribute('aria-disabled', 'true');
+            }
+          };
+          new MutationObserver((records) => {
+            for (const r of records) {
+              if (r.type === 'attributes') unlink(r.target);
+              else for (const n of r.addedNodes) unlink(n);
+            }
+          }).observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['href'] });
+          unlink(document);
+          // and a click that lands before the observer has run goes nowhere
+          document.addEventListener('click', (e) => {
+            const a = e.target instanceof Element ? e.target.closest('a[href]') : null;
+            if (a && hidden(a.getAttribute('href'))) { e.preventDefault(); e.stopPropagation(); }
+          }, true);
+        })();
+      </script>
+    )}
     <!-- One row, one active tab: an island may push a new address without a page load (a canonical
          size address, a discoveries tab), so re-light the header from the live address. The prefixes
          come from lib/nav.ts via Header.astro (data-match), so there is still one source of truth. -->

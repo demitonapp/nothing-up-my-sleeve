@@ -3,6 +3,8 @@
 // static pages read this file, so a section's tabs cannot drift from page to page (UI.md,
 // "Navigation"). Pure logic only: no DOM, no React.
 
+import { PUBLIC_EDITION } from './edition';
+
 export type MainKey = 'places' | 'expeditions' | 'leaderboard' | 'library';
 
 export interface MainTab {
@@ -34,7 +36,10 @@ export interface SectionNav {
 export const MAIN_TABS: MainTab[] = [
   {
     key: 'places', label: 'Orbitals', href: '/orbitals',
-    title: 'the places: Demiton\'s orbital (its berth, shipyard, library and expeditions) and the trading orbital, where every other lab and its ships reside',
+    // the public edition (lib/edition.ts) has no Demiton, so its tooltip names only the orbitals it keeps
+    title: PUBLIC_EDITION
+      ? 'the places: Masaq\' Reach, the trading orbital where the labs and their ships reside, and Sleeper Service, the museum orbital'
+      : 'the places: Demiton\'s orbital (its berth, shipyard, library and expeditions) and the trading orbital, where every other lab and its ships reside',
     match: ['/orbitals', '/harbours', '/harbors', '/ships', '/sizes', '/classes', '/rung', '/foreign', '/shipyard', '/masaq', '/labs', '/expeditions', '/library', '/shelves', '/discoveries'],
   },
   { key: 'leaderboard', label: 'Leaderboard', href: '/leaderboard', title: '', match: ['/leaderboard'] },

@@ -9,6 +9,7 @@
 // Pure: no DOM, no React.
 
 import { LIBERTY_MACHINE_SYSTEMS, libertyMachineHref, navPath } from './nav';
+import { PUBLIC_EDITION, isPrivatePath } from './edition';
 
 export interface Crumb {
   label: string;
@@ -162,8 +163,17 @@ const classLabel = (slug: string): string => {
 };
 
 /** The trail for an address, outermost first; the last crumb is the page itself. Empty for the home page
- *  and for an address the tree does not know (better no trail than a wrong one). */
+ *  and for an address the tree does not know (better no trail than a wrong one). The public edition
+ *  (lib/edition.ts) has no trail on a private address, and no crumb or menu item that leads to one. */
 export function crumbsFor(path: string): Crumb[] {
+  if (!PUBLIC_EDITION) return trailFor(path);
+  if (isPrivatePath(path)) return [];
+  return trailFor(path)
+    .filter((c) => !isPrivatePath(c.href))
+    .map((c) => (c.menu ? { ...c, menu: c.menu.filter((m) => !isPrivatePath(m.href)) } : c));
+}
+
+function trailFor(path: string): Crumb[] {
   const p = navPath(path);
   const parts = p.split('/').filter(Boolean);
   const [a, b, c, d] = parts;

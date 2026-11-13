@@ -5,6 +5,7 @@
 import { big, esc } from '../../lib/format';
 import { cardCls, crumbCls, emptyCls, pillCls } from '../../lib/ui';
 import { artImg, artSrc, flagImg } from './helpers';
+import { PUBLIC_EDITION } from '../../lib/edition';
 import { BANDS, BAND, bandCardHtml, bandOf, sizeOf, type SizeBand } from './bands';
 
 type Payload = any;
@@ -137,7 +138,8 @@ export function harbourCardsHtml(ladder: Payload): string {
   const flip = (key: string, name: string, front: string, views: HarbourView[], href: string): string =>
     `<div class="hflip" data-harbour="${esc(key)}"><div class="hflip-inner">${front}${harbourBackHtml(key, name, views, href)}</div>`
     + `<button type="button" class="hflipbtn" data-hflip aria-pressed="false" aria-label="Flip ${esc(name)} to see five views"><span class="hflipicon" aria-hidden="true">⟲</span><span class="hfliptext">5 views</span></button></div>`;
-  return flip('demiton', 'Demiton', demitonFront, DEMITON_VIEWS, '/orbitals/demiton')
+  // the public edition (lib/edition.ts) has no Demiton: its card is left out, the Reach and the museum stay
+  return (PUBLIC_EDITION ? '' : flip('demiton', 'Demiton', demitonFront, DEMITON_VIEWS, '/orbitals/demiton'))
     + flip('masaq-reach', "Masaq' Reach", tradingFront, HARBOUR_VIEWS['masaq-reach'], '/orbitals/masaq');
 }
 

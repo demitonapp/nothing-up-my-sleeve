@@ -68,6 +68,12 @@ does not believe this book. He is invented, and declared as invented. He reads e
 and what he says about it is set in footnotes, each one resting on a fact whose source is in that chapter's
 notes; in the third chapter he comes in and sits down. He is here because somebody has to say the obvious.
 
+A word on size, because the book keeps giving numbers. A model's size is the count of its weights, and the
+count is whatever its builder chose. Two sizes are the examples throughout. The small one is a Thorp of nine
+million weights. The large one is the open model of twenty-seven billion that sits on the desk where this was
+written, which the book calls the model on the desk; it is three thousand times a Thorp, and small beside the
+laboratories' largest. Where a number is given it belongs to one of the two, and the page says which.
+
 Five parts. The first states the question and the fears, as the people who hold them state them. The second
 says what a Mind is made of, so that the reader knows what is being asked of. The third builds the kernel.
 The fourth reads its wants. The fifth puts it in the ship and gives the verdict. Each chapter ends by saying

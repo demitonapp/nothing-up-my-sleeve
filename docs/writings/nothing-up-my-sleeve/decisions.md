@@ -75,6 +75,9 @@ Quentin.
 | D61 | Name | decided 2026-11-13 | What a machine reads is the pile, not the mountain, after EleutherAI's Pile. | ch 2 | v14 loc 277 |
 | D62 | Form | open 2026-11-13 | The book is to be published in as many languages as possible, translated by an open model of thirty billion weights or more on rented machines. Held until the English text is settled for the launch. | epub | v14 loc 173 |
 | D63 | Form | decided 2026-11-13 | The cover carries a subtitle under the title: "or how I learned to stop worrying about AI bombing schoolkids". The front page and the book's title elsewhere are unchanged. | cover | conversation, 13 Nov |
+| D64 | Form | decided 2026-11-14 | The front page goes. The reader opens on How this book was written, which says how Justin and Fable worked, and then Justin's dedication to his two boys. Amends D51. | `how-this-book-was-written.md`, `dedication.md`, the epub's reading order | v16 loc 28; conversation, 14 Nov |
+| D65 | Form | begun 2026-11-14; chapter 4 done, thirteen chapters owed | Every chapter is audited against Voltaire's rule that the way to be a bore is to tell everything: no summary where a quotation should stand, nothing told twice, no chapter calling itself an essay. | ch 4 so far | v16 loc 649, 662 |
+| D66 | Measure | decided 2026-11-14 | A model's size is variable and the book says so. Two sizes are its examples, named in the preface: a Thorp of nine million weights and the model on the desk, of twenty-seven billion. Every number belongs to one or the other. | preface, ch 4 | v16 loc 668, 688; conversation, 14 Nov |
 
 ## The decisions in full
 
@@ -691,4 +694,49 @@ goes onto one line to make room. The line points at the strike on the school at 
 28 in chapter 2 gives with its sources; that footnote says what was reported and does not say the machine
 chose the target, because no source does, and the subtitle is a joke's worth of licence beyond it. The front
 page, the epub's title and the site's card still say *Nothing Up My Sleeve* alone.
+
+### D64. The book opens on how it was written, and the dedication
+
+*Form · decided 2026-11-14 · lands in `how-this-book-was-written.md`, `dedication.md` and the epub's reading order · from the v16 note at loc 28 and conversation, 14 Nov.*
+
+The note, against the front page: "delete this. This should be a preface explaining how Justin and Fable
+worked together to write this book and then the dedication from Justin to his two boys." D51 had cut the
+front page to a title, a byline and a standfirst; the cover carries the first two, so the page is gone from
+the epub. In its place are two pages. *How this book was written* is Fable's, from the record: the loop of
+versions and Kindle notes, what is Justin's and what is Fable's, that Luck is invented, and that the author
+does not remember one session in the next, so the notes and this register are its memory. The dedication is
+Justin's, in his words as he confirmed them: "With them, I know myself better, and yearn to plant trees for
+them, the inheritors of humanity." `book.md` keeps its title, byline and standfirst, because the site's card
+and the Atlas reader read them. The page Blake opens, which this register has called the preface, keeps that
+name here.
+
+### D65. Voltaire's rule: the audit of every chapter
+
+*Form · begun 2026-11-14, chapter 4 done and thirteen chapters owed · from the v16 notes at loc 649 and 662.*
+
+The notes: "this needs a relevant quote and not a summary", and "there is a lot of overexplaining. We need to
+audit all the chapters with Voltaire's principle that the way to be a bore is to tell everything" (*Le secret
+d'ennuyer est celui de tout dire*, from the *Discours en vers sur l'homme*, 1738). The audit has three rules.
+A chapter opens on a quotation, as Part I's do, and not on an italic summary of itself. Nothing is told twice:
+a sentence that says what the reader has just read, or will understand, goes, and so does anything an earlier
+chapter said. And a chapter is a chapter: fourteen of them were written as essays and still say "this essay"
+and "the earlier essays", about ninety-five times between them.
+
+Chapter 4 is the pilot: the last line of Sutton's "The Bitter Lesson" for the summary, the essay's talk about itself gone, the
+second telling of chapter 2's Paris cut to a clause, 2,984 words to 2,595 with some three hundred new ones in
+that count. Owed, in reading order: chapters 5, 6, 7, 15, 17, 19, 20a, 20b, 21a, 21b, 22a and 22b, each of
+which opens on a summary, and chapter 9, which has one essay reference. The rule applies to Luck as well:
+two of the notes on chapter 4 asked for a footnote on its founders, and they are one footnote.
+
+### D66. Two example sizes
+
+*Measure · decided 2026-11-14 · lands in the preface and chapter 4 · from the v16 notes at loc 668 and 688, and conversation, 14 Nov.*
+
+The notes: the chapter "shouldn't mention the amount but rather that it's variable", and "what size? In the
+preface to the book we should set the example's size so we're consistent." One size cannot serve, because
+chapter 4's facts about reading and vocabulary are a large model's and the book is about a small one. So the
+preface names two, by Justin's agreement: a Thorp of nine million weights, and the open model of twenty-seven
+billion on the desk where the book was written, called the model on the desk. Chapter 4 says the count is the
+builder's choice and gives the range, and its section on size is retitled "How many, and why". Other
+chapters that say twenty-seven billion already mean the model on the desk.
 

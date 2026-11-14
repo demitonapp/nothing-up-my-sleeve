@@ -1,5 +1,5 @@
-"""The book's files in reading order, for build_epub.py: the front page (the title, the byline and the
-standfirst of book.md, and nothing else, D51), then each part, opened by its own page (the `00-*.md` poem
+"""The book's files in reading order, for build_epub.py: How this book was written and the dedication (D64;
+until v16 a front page with the title, the byline and the standfirst of book.md stood here), then each part, opened by its own page (the `00-*.md` poem
 page, D40, with the part's numeral put before its title; or a divider page from the front-page table where a
 part has no such page yet) and followed by its chapters, then what a reader meets last: About this book
 (about.md, with the parts and their blurbs added from book.md's table), the Beats, the plan, the decisions
@@ -9,9 +9,9 @@ import sys, re, pathlib
 B = pathlib.Path(sys.argv[1]); P = pathlib.Path(sys.argv[2]); P.mkdir(parents=True, exist_ok=True)
 front = (B / "book.md").read_text()
 parts = re.findall(r"^\| ([IVX]+) \| (\d{2}-[a-z0-9-]+) \| ([^|]+?) \| ([^|]*?) \|\s*$", front, re.M)
-head = front[:front.index("| Part |")].strip().split("\n\n")
-(P / "front.md").write_text("\n\n".join(head[:3]) + "\n")  # title, byline, standfirst
-files = [str(P / "front.md")]
+# D64: no front page. The cover carries the title and the names; the reader opens on how the book was written,
+# then the dedication. book.md keeps its title, byline and standfirst for the site's card and the Atlas reader.
+files = [str(B / "how-this-book-was-written.md"), str(B / "dedication.md")]
 for num, folder, title, blurb in parts:
     chapters = [f for f in sorted((B / folder).glob("[0-9]*.md")) if not f.name.endswith(".notes.md")]
     opener = next((f for f in chapters if f.name.startswith("00-")), None)

@@ -76,7 +76,7 @@ Quentin.
 | D62 | Form | open 2026-11-13 | The book is to be published in as many languages as possible, translated by an open model of thirty billion weights or more on rented machines. Held until the English text is settled for the launch. | epub | v14 loc 173 |
 | D63 | Form | decided 2026-11-13 | The cover carries a subtitle under the title: "or how I learned to stop worrying about AI bombing schoolkids". The front page and the book's title elsewhere are unchanged. | cover | conversation, 13 Nov |
 | D64 | Form | decided 2026-11-14 | The front page goes. The reader opens on How this book was written, which says how Justin and Fable worked, and then Justin's dedication to his two boys. Amends D51. | `how-this-book-was-written.md`, `dedication.md`, the epub's reading order | v16 loc 28; conversation, 14 Nov |
-| D65 | Form | begun 2026-11-14; chapter 4 done, thirteen chapters owed | Every chapter is audited against Voltaire's rule that the way to be a bore is to tell everything: no summary where a quotation should stand, nothing told twice, no chapter calling itself an essay. | ch 4 so far | v16 loc 649, 662 |
+| D65 | Form | begun 2026-11-14; chapters 4 to 7 done, ten chapters owed | Every chapter is audited against Voltaire's rule that the way to be a bore is to tell everything: no summary where a quotation should stand, nothing told twice, no chapter calling itself an essay. | ch 4 to 7 so far | v16 loc 649, 662; conversation, 14 Nov |
 | D66 | Measure | decided 2026-11-14 | A model's size is variable and the book says so. Two sizes are its examples, named in the preface: a Thorp of nine million weights and the model on the desk, of twenty-seven billion. Every number belongs to one or the other. | preface, ch 4 | v16 loc 668, 688; conversation, 14 Nov |
 
 ## The decisions in full
@@ -712,7 +712,7 @@ name here.
 
 ### D65. Voltaire's rule: the audit of every chapter
 
-*Form · begun 2026-11-14, chapter 4 done and thirteen chapters owed · from the v16 notes at loc 649 and 662.*
+*Form · begun 2026-11-14, chapters 4 to 7 done and ten chapters owed · from the v16 notes at loc 649 and 662, and conversation, 14 Nov.*
 
 The notes: "this needs a relevant quote and not a summary", and "there is a lot of overexplaining. We need to
 audit all the chapters with Voltaire's principle that the way to be a bore is to tell everything" (*Le secret
@@ -727,6 +727,16 @@ second telling of chapter 2's Paris cut to a clause, 2,984 words to 2,595 with s
 that count. Owed, in reading order: chapters 5, 6, 7, 15, 17, 19, 20a, 20b, 21a, 21b, 22a and 22b, each of
 which opens on a summary, and chapter 9, which has one essay reference. The rule applies to Luck as well:
 two of the notes on chapter 4 asked for a footnote on its founders, and they are one footnote.
+
+Chapters 5, 6 and 7 followed the same day, on Justin's word ("Yes, do 5 to 7"), for v18. Chapter 5 opens on
+the last words of Darwin's *Origin*, 2,412 words to 2,070. Chapter 6 opens on Pascal's apology for a long
+letter, 2,422 to 2,014; the roll-call of quantisation schemes is cut to what the reader needs, and one
+sentence says Thorp is small a sixth way, by being raised small. Chapter 7 opens on Bacon's jesting Pilate,
+2,394 to 2,024; "the company these essays serve" is gone, as D55 requires, and the register is described
+without it and tied to the book's own rule that every text is a row. In all three the old essay numbers are
+replaced by the chapters and parts they now mean, and the passages that began "a reader asked" are cut to
+the question. No fact was removed that another sentence does not still carry, except the names GPTQ, AWQ and
+Q4_K_M in chapter 6. Still owed: chapters 9, 15, 17, 19, 20a, 20b, 21a, 21b, 22a and 22b.
 
 ### D66. Two example sizes
 

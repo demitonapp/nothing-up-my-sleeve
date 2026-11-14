@@ -14,6 +14,7 @@ section uses and their files in `../pictures/`; the caption lives in `essayPeeks
 
 ### References
 
+- Blaise Pascal, *Lettres provinciales*, letter XVI, 4 December 1656, for the epigraph: "Je n'ai fait celle-ci plus longue que parce que je n'ai pas eu le loisir de la faire plus courte", in the author's translation [verify the French against an edition; the letter and its date are confirmed, the sentence was quoted from memory].
 - Yann LeCun, John Denker and Sara Solla, "Optimal Brain Damage", NeurIPS, 1989; Jonathan Frankle and Michael Carbin, "The Lottery Ticket Hypothesis", 2019.
 - Geoffrey Hinton, Oriol Vinyals and Jeff Dean, "Distilling the Knowledge in a Neural Network", 2015.
 - Elias Frantar et al., "GPTQ", 2022; Ji Lin et al., "AWQ", 2023; llama.cpp's k-quants, 2023; Unsloth's dynamic quantisation notes.

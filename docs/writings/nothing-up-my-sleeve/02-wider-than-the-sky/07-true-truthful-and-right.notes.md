@@ -10,6 +10,7 @@ section uses and their files in `../pictures/`; the caption lives in `essayPeeks
 
 ### References
 
+- Francis Bacon, "Of Truth", the first of the *Essays* in the edition of 1625, its opening sentence, for the epigraph.
 - Harry Frankfurt, *On Bullshit*, Princeton University Press, 2005 (the essay, 1986); Michael Townsen Hicks, James Humphries and Joe Slater, "ChatGPT is bullshit", *Ethics and Information Technology*, 2024.
 - Common Crawl, commoncrawl.org, founded 2007; the Qwen3 technical report, 2025, for the headline token count.
 - Adam Tauman Kalai and Santosh Vempala, "Calibrated Language Models Must Hallucinate", 2024; Adam Tauman Kalai, Ofir Nachum, Santosh Vempala and Edwin Zhang, "Why Language Models Hallucinate", OpenAI, September 2025.

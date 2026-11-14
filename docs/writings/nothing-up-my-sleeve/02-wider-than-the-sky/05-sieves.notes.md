@@ -14,6 +14,7 @@ section uses and their files in `../pictures/`; the caption lives in `essayPeeks
 
 ### References
 
+- Charles Darwin, *On the Origin of Species*, 1859, the closing words of its last sentence, for the epigraph.
 - Anthropic, "Scaling Monosemanticity: Extracting Interpretable Features from Claude 3 Sonnet", May 2024, and the Golden Gate Claude demonstration of 23 May 2024; "Towards Monosemanticity", October 2023.
 - Catherine Olsson et al., "In-context Learning and Induction Heads", Anthropic, 2022; Chris Olah et al., "Zoom In: An Introduction to Circuits", 2020.
 - Kaiming He et al., "Deep Residual Learning for Image Recognition", 2015, for the residual stream.
